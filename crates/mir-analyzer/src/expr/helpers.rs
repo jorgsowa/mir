@@ -231,6 +231,17 @@ pub fn infer_int_range_arithmetic(left: &Type, right: &Type, op: BinaryOp) -> Op
         BinaryOp::Mul if lmin.is_some_and(|m| m >= 0) && rmin.is_some_and(|m| m >= 0) => {
             (mul_opt(lmin, rmin), mul_opt(lmax, rmax))
         }
+        // Modulo: result range depends only on the divisor.
+        // For a known positive divisor K: result ∈ [0, K-1] when dividend ≥ 0,
+        // or [-(K-1), K-1] when dividend may be negative (PHP truncates toward zero).
+        BinaryOp::Mod if rmin == rmax && rmin.is_some_and(|r| r > 0) => {
+            let divisor = rmin.unwrap();
+            if lmin.is_some_and(|m| m >= 0) {
+                (Some(0), Some(divisor - 1))
+            } else {
+                (Some(-(divisor - 1)), Some(divisor - 1))
+            }
+        }
         _ => return None,
     };
     Some(Type::single(Atomic::TIntRange { min, max }))
@@ -591,6 +602,23 @@ mod range_arithmetic_tests {
         // mixed-sign operand: defer to infer_arithmetic
         assert!(
             infer_int_range_arithmetic(&range(None, Some(-1)), &lit(2), BinaryOp::Mul).is_none()
+        );
+    }
+
+    #[test]
+    fn mod_non_negative_ranges() {
+        // non-negative-int % 5 → int<0, 4>
+        let r = infer_int_range_arithmetic(&range(Some(0), None), &lit(5), BinaryOp::Mod).unwrap();
+        assert_eq!(r, range(Some(0), Some(4)));
+
+        // int<0, 100> % 10 → int<0, 9>
+        let r = infer_int_range_arithmetic(&range(Some(0), Some(100)), &lit(10), BinaryOp::Mod)
+            .unwrap();
+        assert_eq!(r, range(Some(0), Some(9)));
+
+        // negative divisor: no range inference
+        assert!(
+            infer_int_range_arithmetic(&range(Some(0), None), &lit(-5), BinaryOp::Mod).is_none()
         );
     }
 }
