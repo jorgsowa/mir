@@ -50,8 +50,13 @@ pub(crate) fn named_object_return_compatible(
                     .iter()
                     .any(|d| matches!(d, Atomic::TClassString(_) | Atomic::TString));
             }
-            // Non-object types: not handled here (fall through to simple subtype check)
-            _ => return false,
+            // Non-object atom (scalar, array, closure, …): this function only
+            // resolves the object-inheritance dimension, so check this atom
+            // structurally against the declared union. Splitting the check
+            // per-atom lets unions that mix objects and scalars (e.g.
+            // `string|MyClass`) validate correctly — object atoms take the
+            // inheritance path below, scalar atoms are decided here. (G5)
+            other => return Type::single(other.clone()).is_subtype_structural(declared),
         };
 
         declared.types.iter().any(|declared_atom| {
