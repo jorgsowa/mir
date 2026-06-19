@@ -1308,7 +1308,10 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
                 fqcn: sup_fqcn,
                 type_params: sup_params,
             },
-        ) => sub_fqcn == sup_fqcn && (sup_params.is_empty() || sub_params == sup_params),
+        ) => {
+            sub_fqcn == sup_fqcn
+                && (sup_params.is_empty() || type_params_compatible(sub_params, sup_params))
+        }
 
         // Literal int widens to float in PHP
         (Atomic::TLiteralInt(_), Atomic::TFloat) => true,
@@ -1489,6 +1492,34 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
 
         _ => false,
     }
+}
+
+/// Whether each generic type-argument in `sub` is compatible with the
+/// corresponding argument in `sup`. Arguments are invariant (require structural
+/// equality) with one exception: an empty array literal (`array{}`) is accepted
+/// against any array/list argument, so `new Box([])` — inferred as
+/// `Box<array{}>` — satisfies a declared `Box<list<T>>` for any `T`.
+fn type_params_compatible(sub: &[Type], sup: &[Type]) -> bool {
+    if sub.len() != sup.len() {
+        return false;
+    }
+    sub.iter()
+        .zip(sup.iter())
+        .all(|(a, b)| a == b || (is_empty_array_literal(a) && is_array_like(b)))
+}
+
+/// True for a non-empty union whose atoms are all empty keyed arrays (`array{}`),
+/// i.e. the type of an empty array literal `[]`.
+fn is_empty_array_literal(t: &Type) -> bool {
+    !t.types.is_empty()
+        && t.types.iter().all(
+            |atom| matches!(atom, Atomic::TKeyedArray { properties, .. } if properties.is_empty()),
+        )
+}
+
+/// True for a non-empty union whose atoms are all array/list types.
+fn is_array_like(t: &Type) -> bool {
+    !t.types.is_empty() && t.types.iter().all(|atom| atom.is_array())
 }
 
 // ---------------------------------------------------------------------------

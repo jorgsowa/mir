@@ -1,10 +1,9 @@
 ===description===
-FALSE POSITIVE reproducer. Valid PHP: `new Wrap([])` should infer the declared `Wrap<list<AssetId>>`; the type argument is dropped to `array{}`.
-mir 0.42.0 currently emits (the bug): InvalidReturnType@14:24-14:44: actual Demo\Wrap<array{}>
-Expected: no issue. Remove ===ignore=== to activate once fixed.
-===ignore===
+`new Wrap([])` infers `Wrap<array{}>`; an empty array literal is a valid empty
+list, so it must satisfy a declared `Wrap<list<AssetId>>` return type.
 ===config===
 php_version=8.4
+suppress=UnusedParam
 ===file===
 <?php
 namespace Demo;
