@@ -238,27 +238,7 @@ impl CallAnalyzer {
 
         // Pre-mark by-reference parameter variables as defined BEFORE evaluating args
         if let Some(ref resolved) = resolved {
-            for (i, param) in resolved.params.iter().enumerate() {
-                if param.is_byref {
-                    if param.is_variadic {
-                        for arg in call.args.iter().skip(i) {
-                            if let ExprKind::Variable(name) = &arg.value.kind {
-                                let var_name = name.as_ref().trim_start_matches('$');
-                                if !ctx.var_is_defined(var_name) {
-                                    ctx.set_var(var_name, Type::mixed());
-                                }
-                            }
-                        }
-                    } else if let Some(arg) = call.args.get(i) {
-                        if let ExprKind::Variable(name) = &arg.value.kind {
-                            let var_name = name.as_ref().trim_start_matches('$');
-                            if !ctx.var_is_defined(var_name) {
-                                ctx.set_var(var_name, Type::mixed());
-                            }
-                        }
-                    }
-                }
-            }
+            super::premark_byref_arg_vars(&resolved.params, &call.args, ctx);
         }
 
         let mut arg_types = super::ARG_TYPES_BUF

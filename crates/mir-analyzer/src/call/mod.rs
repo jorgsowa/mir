@@ -25,6 +25,46 @@ pub(crate) fn consume_arg_assignment(
     }
 }
 
+/// Pre-mark variables passed to by-reference parameters as defined.
+///
+/// Passing an as-yet-undefined variable to an out-parameter (e.g. `&$matches`
+/// in `preg_match`, or a user method's `&$out`) defines it, so it must not be
+/// reported as `UndefinedVariable`. Variadic by-ref params (`&...$rest`) cover
+/// every argument from their position onward. Must run before the arguments are
+/// analyzed so the read side never sees the variable as undefined.
+pub(crate) fn premark_byref_arg_vars(
+    params: &[mir_codebase::storage::FnParam],
+    args: &[php_ast::owned::Arg],
+    ctx: &mut crate::flow_state::FlowState,
+) {
+    use php_ast::owned::ExprKind;
+    for (i, param) in params.iter().enumerate() {
+        if !param.is_byref {
+            continue;
+        }
+        let targets: &[php_ast::owned::Arg] = if param.is_variadic {
+            args.get(i..).unwrap_or(&[])
+        } else {
+            args.get(i..=i).unwrap_or(&[])
+        };
+        for arg in targets {
+            if let ExprKind::Variable(name) = &arg.value.kind {
+                let var_name = name.trim_start_matches('$');
+                if !ctx.var_is_defined(var_name) {
+                    // The out-parameter writes its declared type back through the
+                    // reference; fall back to `mixed` when the param is untyped.
+                    let ty = param
+                        .ty
+                        .as_ref()
+                        .map(|t| (**t).clone())
+                        .unwrap_or_else(mir_types::Type::mixed);
+                    ctx.set_var(var_name, ty);
+                }
+            }
+        }
+    }
+}
+
 // Reusable per-thread buffer for arg_types collection. The Option lets
 // reentrant calls (foo(bar(baz()))) detect they can't borrow the same buffer
 // and fall back to a fresh allocation.

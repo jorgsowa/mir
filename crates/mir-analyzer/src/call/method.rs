@@ -134,6 +134,25 @@ impl CallAnalyzer {
             }
         }
 
+        // Pre-mark by-reference parameter variables as defined before evaluating
+        // the arguments, so passing an undefined variable to an out-parameter
+        // (e.g. `$this->fill($out, …)` where the method declares `&$out`) does not
+        // produce a false UndefinedVariable. Mirrors the free-function path.
+        if let Some(fqcn) = obj_ty
+            .remove_null()
+            .types
+            .iter()
+            .find_map(|a| a.named_object_fqcn())
+        {
+            let fqcn_resolved = crate::db::resolve_name(ea.db, &ea.file, fqcn);
+            let fqcn_arc: Arc<str> = Arc::from(fqcn_resolved.as_str());
+            if let Some(resolved) =
+                resolve_method_from_db(ea, &fqcn_arc, &method_name.to_lowercase())
+            {
+                super::premark_byref_arg_vars(&resolved.params, &call.args, ctx);
+            }
+        }
+
         // Always analyze arguments — even when the receiver is null/mixed and we
         // return early — so that variable reads inside args are tracked and side
         // effects (taint, etc.) are recorded.
