@@ -112,6 +112,13 @@ pub struct FlowState {
     /// considered definitely assigned after the try/catch.
     pub diverges: bool,
 
+    /// Set once a variable-variable assignment (`${$name} = …`) whose target
+    /// name cannot be resolved statically is seen on this path. Such an
+    /// assignment may define arbitrarily-named variables, so subsequent reads of
+    /// otherwise-unknown variables must not be reported as `UndefinedVariable`
+    /// (matching Psalm). Monotonic: once set it propagates through clones/merges.
+    pub has_dynamic_var_def: bool,
+
     /// Pre-converted (line, col_start, line_end, col_end) of the first assignment
     /// to each variable. Used to emit accurate locations for UnusedVariable / UnusedParam.
     pub var_locations: FxHashMap<Name, (u32, u16, u32, u16)>,
@@ -239,6 +246,7 @@ impl FlowState {
             fn_return_type: None,
             fn_declared_throws: Arc::from([]),
             inside_loop: false,
+            has_dynamic_var_def: false,
             inside_finally: false,
             is_generator: false,
             inside_constructor: false,
@@ -627,6 +635,12 @@ impl FlowState {
     ) -> FlowState {
         let else_ctx = else_ctx.unwrap_or_else(|| pre.clone());
 
+        // A dynamic variable definition seen on any incoming path is sticky: it
+        // must survive every merge so later undefined-variable checks stay
+        // suppressed (see `FlowState::has_dynamic_var_def`).
+        let dynamic_var_def =
+            pre.has_dynamic_var_def || if_ctx.has_dynamic_var_def || else_ctx.has_dynamic_var_def;
+
         // If the then-branch always diverges, the code after the if runs only
         // in the else-branch — use that as the result directly.
         if if_ctx.diverges && !else_ctx.diverges {
@@ -661,6 +675,7 @@ impl FlowState {
             for name in if_ctx.catch_var_names.iter() {
                 result.catch_var_names.insert(*name);
             }
+            result.has_dynamic_var_def = dynamic_var_def;
             return result;
         }
         // If the else-branch always diverges, code after the if runs only
@@ -693,6 +708,7 @@ impl FlowState {
             for name in else_ctx.catch_var_names.iter() {
                 result.catch_var_names.insert(*name);
             }
+            result.has_dynamic_var_def = dynamic_var_def;
             return result;
         }
         // If both diverge, the code after the if is unreachable.
@@ -735,6 +751,7 @@ impl FlowState {
             {
                 result.catch_var_names.insert(*name);
             }
+            result.has_dynamic_var_def = dynamic_var_def;
             return result;
         }
 
@@ -893,6 +910,8 @@ impl FlowState {
         for name in if_ctx.read_vars.iter().chain(else_ctx.read_vars.iter()) {
             result.read_vars.insert(*name);
         }
+
+        result.has_dynamic_var_def = dynamic_var_def;
 
         // Foreach value var names: union — if either branch marks a var as a foreach value, keep it
         for name in if_ctx

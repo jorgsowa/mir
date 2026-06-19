@@ -640,6 +640,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
             }
             ExprKind::VariableVariable(inner) => {
+                // A variable-variable assignment may define arbitrarily-named
+                // variables (e.g. `${$key} = …` or `${"$key"} = …`). Once seen,
+                // later reads of otherwise-unknown variables must not be reported
+                // as undefined — we cannot prove they were not defined here.
+                ctx.has_dynamic_var_def = true;
                 if let Some(var_name) = extract_simple_var(inner) {
                     ctx.read_vars
                         .insert(mir_types::Name::from(var_name.as_str()));

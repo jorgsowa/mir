@@ -1,8 +1,6 @@
 ===description===
-FALSE POSITIVE reproducer. Valid PHP: `${"$key"} = ...` defines `$a`/`$b` via variable-variables.
-mir 0.42.0 currently emits (the bug): UndefinedVariable@7:9-7:11: $a
-Expected: no issue. Remove ===ignore=== to activate once fixed.
-===ignore===
+A variable-variable assignment (`${"$key"} = ...`) defines variables whose names
+are not statically known, so later reads must not be reported as UndefinedVariable.
 ===config===
 php_version=8.4
 ===file===

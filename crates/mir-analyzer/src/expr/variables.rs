@@ -20,7 +20,11 @@ impl<'a> ExpressionAnalyzer<'a> {
         // variables injected from the calling scope, so undefined-variable diagnostics
         // are false positives there.
         let is_view_template = crate::diagnostics::is_view_template_path(&self.file);
-        if !ctx.var_is_defined(name_str) && !self.in_existence_check && !is_view_template {
+        if !ctx.var_is_defined(name_str)
+            && !self.in_existence_check
+            && !is_view_template
+            && !ctx.has_dynamic_var_def
+        {
             if ctx.var_possibly_defined(name_str) {
                 self.emit(
                     IssueKind::PossiblyUndefinedVariable {
