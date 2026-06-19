@@ -229,6 +229,76 @@ pub(super) fn declared_return_has_template(declared: &Type, db: &dyn MirDatabase
     })
 }
 
+/// Erase template parameters to their declared bounds (`@template T of Foo` → `Foo`,
+/// unbounded `T` → `mixed`), recursing into generic type arguments and array/list
+/// element types.
+///
+/// This is the substitution step that makes a template-bearing return type checkable
+/// at a `return` site: a declared `@return T` (stored as `TTemplateParam { as_type }`)
+/// becomes its bound, and the body-erased actual type (parameters typed `T` are already
+/// resolved to their bound during analysis) can be compared against it. Returning a
+/// value that is not even a subtype of the bound is a genuine error; returning a
+/// subtype-of-bound stays compatible (we cannot prove it is the *specific* `T`, so we
+/// stay lenient and never emit a false positive). (G1)
+pub(super) fn erase_templates_to_bounds(ty: &Type) -> Type {
+    let mut out = Type::empty();
+    out.possibly_undefined = ty.possibly_undefined;
+    out.from_docblock = ty.from_docblock;
+    for atomic in &ty.types {
+        match atomic {
+            Atomic::TTemplateParam { as_type, .. } => {
+                for b in erase_templates_to_bounds(as_type).types {
+                    out.add_type(b);
+                }
+            }
+            Atomic::TNamedObject { fqcn, type_params } => {
+                let new_params: Vec<Type> =
+                    type_params.iter().map(erase_templates_to_bounds).collect();
+                out.add_type(Atomic::TNamedObject {
+                    fqcn: *fqcn,
+                    type_params: mir_types::union::vec_to_type_params(new_params),
+                });
+            }
+            Atomic::TArray { key, value } => out.add_type(Atomic::TArray {
+                key: Box::new(erase_templates_to_bounds(key)),
+                value: Box::new(erase_templates_to_bounds(value)),
+            }),
+            Atomic::TNonEmptyArray { key, value } => out.add_type(Atomic::TNonEmptyArray {
+                key: Box::new(erase_templates_to_bounds(key)),
+                value: Box::new(erase_templates_to_bounds(value)),
+            }),
+            Atomic::TList { value } => out.add_type(Atomic::TList {
+                value: Box::new(erase_templates_to_bounds(value)),
+            }),
+            Atomic::TNonEmptyList { value } => out.add_type(Atomic::TNonEmptyList {
+                value: Box::new(erase_templates_to_bounds(value)),
+            }),
+            other => out.add_type(other.clone()),
+        }
+    }
+    out
+}
+
+/// Returns true when every atom is a plain, non-parameterized object or scalar —
+/// no arrays, lists, keyed arrays, or generic (`Foo<…>`) instantiations.
+///
+/// Gates the G1 strict recheck (see `return_type_is_invalid`): template erasure on
+/// generic/collection returns loses the element-inference and empty-array special
+/// cases handled elsewhere, so the strict comparison is only trusted for plain types
+/// like a bare `@return T of Animal` (erased to `Animal`).
+pub(super) fn is_plain_checkable(ty: &Type) -> bool {
+    ty.types.iter().all(|a| match a {
+        Atomic::TNamedObject { type_params, .. } => type_params.is_empty(),
+        Atomic::TArray { .. }
+        | Atomic::TNonEmptyArray { .. }
+        | Atomic::TList { .. }
+        | Atomic::TNonEmptyList { .. }
+        | Atomic::TKeyedArray { .. }
+        | Atomic::TTemplateParam { .. } => false,
+        _ => true,
+    })
+}
+
 /// Resolve all TNamedObject FQCNs in a Type using the codebase's file-level imports/namespace.
 /// Used to fix up `@var` annotation types that were parsed without namespace context.
 pub(super) fn resolve_union_for_file(union: Type, db: &dyn MirDatabase, file: &str) -> Type {

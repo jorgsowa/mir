@@ -36,6 +36,32 @@ fn return_type_is_invalid(
         return false;
     }
     if declared_return_has_template(declared, db) || declared_return_has_template(actual, db) {
+        // (G1) Template inference at the return site: erase template params to
+        // their declared bounds, then re-check. If erasure yields fully-resolvable
+        // types (no bare templates, interfaces, or unknown classes remain), trust
+        // the comparison and recurse; a value that is not even a subtype of the
+        // bound is a real `InvalidReturnType`. Otherwise (an interface or unknown
+        // class survives erasure — implementations may satisfy it in ways we don't
+        // track) keep the conservative suppression.
+        let erased_declared = super::return_type::erase_templates_to_bounds(declared);
+        let erased_actual = super::return_type::erase_templates_to_bounds(actual);
+        // Only trust the strict comparison for plain object/scalar types. Generic
+        // and collection returns (`Result<list<L>>`, `non-empty-list<T>`) erase to
+        // forms whose element-inference / empty-array special cases live outside
+        // this check, so they keep the conservative suppression.
+        if super::return_type::is_plain_checkable(&erased_declared)
+            && super::return_type::is_plain_checkable(&erased_actual)
+            && !declared_return_has_template(&erased_declared, db)
+            && !declared_return_has_template(&erased_actual, db)
+        {
+            return return_type_is_invalid(
+                &erased_actual,
+                &erased_declared,
+                strict_types,
+                db,
+                file,
+            );
+        }
         return false;
     }
     if return_arrays_compatible(actual, declared, db, file) {
