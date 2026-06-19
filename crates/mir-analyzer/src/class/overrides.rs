@@ -340,8 +340,7 @@ impl<'a> ClassAnalyzer<'a> {
             // Skip when:
             //   - Either side has no type hint
             //   - Either type is mixed
-            //   - Either type contains a named object (needs codebase for inheritance check)
-            //   - Either type contains TSelf/TStaticObject
+            //   - Either type contains TSelf/TStaticObject (late-static semantics)
             //   - Either type contains a template param
             let shared_len = parent_params.len().min(own_params.len());
             for i in 0..shared_len {
@@ -355,8 +354,6 @@ impl<'a> ClassAnalyzer<'a> {
 
                 if parent_ty.is_mixed()
                     || child_ty.is_mixed()
-                    || Self::type_has_named_objects(parent_ty)
-                    || Self::type_has_named_objects(child_ty)
                     || self.type_has_self_or_static(parent_ty)
                     || self.type_has_self_or_static(child_ty)
                     || self.return_type_has_template(parent_ty)
@@ -365,7 +362,34 @@ impl<'a> ClassAnalyzer<'a> {
                     continue;
                 }
 
-                if Self::scalar_param_type_narrowed(parent_ty, child_ty) {
+                // Object (or mixed object+scalar) params resolve narrowing through
+                // the codebase inheritance graph: a contravariance violation is when
+                // the parent type is NOT a subtype of the child type (the child
+                // accepts strictly fewer values than the parent contract). We only
+                // decide this when every named class involved is known to the
+                // codebase — an unknown class would make `is_subtype` falsely report
+                // narrowing. Pure-scalar params keep the structural check. (G4)
+                let involves_objects = Self::type_has_named_objects(parent_ty)
+                    || Self::type_has_named_objects(child_ty);
+                let narrowed = if involves_objects {
+                    // Parameter contravariance is a native-signature concept: PHP only
+                    // enforces it on declared type hints. A docblock `@param` that
+                    // narrows to subclasses (native hint unchanged) is an intentional
+                    // refinement, not an LSP violation — so only compare native hints.
+                    if !parent_ty.from_docblock
+                        && !child_ty.from_docblock
+                        && self.all_object_classes_known(parent_ty)
+                        && self.all_object_classes_known(child_ty)
+                    {
+                        !crate::subtype::is_subtype(self.db, parent_ty, child_ty)
+                    } else {
+                        false
+                    }
+                } else {
+                    Self::scalar_param_type_narrowed(parent_ty, child_ty)
+                };
+
+                if narrowed {
                     issues.push(
                         Issue::new(
                             IssueKind::MethodSignatureMismatch {
@@ -470,6 +494,28 @@ impl<'a> ClassAnalyzer<'a> {
                 Self::type_has_named_objects(value)
             }
             _ => false,
+        })
+    }
+
+    /// Returns true if every named-object class referenced anywhere in `ty`
+    /// (including inside generic type arguments and array key/value types) is known
+    /// to the codebase. Used to gate object-aware param contravariance (G4): when an
+    /// involved class is unknown, `is_subtype` cannot resolve its hierarchy and would
+    /// falsely report narrowing, so the check is skipped instead.
+    fn all_object_classes_known(&self, ty: &mir_types::Type) -> bool {
+        use mir_types::Atomic;
+        ty.types.iter().all(|a| match a {
+            Atomic::TNamedObject { fqcn, type_params } => {
+                crate::db::class_exists(self.db, fqcn.as_ref())
+                    && type_params.iter().all(|p| self.all_object_classes_known(p))
+            }
+            Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value } => {
+                self.all_object_classes_known(key) && self.all_object_classes_known(value)
+            }
+            Atomic::TList { value } | Atomic::TNonEmptyList { value } => {
+                self.all_object_classes_known(value)
+            }
+            _ => true,
         })
     }
 

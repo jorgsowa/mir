@@ -1191,6 +1191,11 @@ impl<'a> DefinitionCollector<'a> {
                         {
                             return native_ty.clone().unwrap();
                         }
+                        // Mark the type as docblock-sourced so signature checks (e.g.
+                        // param contravariance) can tell a `@param` refinement apart
+                        // from a native type hint.
+                        let mut doc_ty = doc_ty;
+                        doc_ty.from_docblock = true;
                         doc_ty
                     })
                 })
