@@ -460,3 +460,130 @@ fn validate_variable_in_template_bound() {
     assert_eq!(parsed.invalid_annotations.len(), 1);
     assert!(parsed.invalid_annotations[0].contains("$invalid"));
 }
+
+// ---------------------------------------------------------------------------
+// Float-literal types
+// ---------------------------------------------------------------------------
+
+#[test]
+fn parse_float_literal_positive() {
+    let u = parse_type_string("3.14");
+    assert_eq!(u.types.len(), 1);
+    assert!(matches!(u.types[0], Atomic::TLiteralFloat(..)));
+    assert_eq!(format!("{u}"), "3.14");
+}
+
+#[test]
+fn parse_float_literal_negative() {
+    let u = parse_type_string("-0.5");
+    assert!(matches!(u.types[0], Atomic::TLiteralFloat(..)));
+    assert_eq!(format!("{u}"), "-0.5");
+}
+
+#[test]
+fn plain_integer_is_not_float_literal() {
+    let u = parse_type_string("42");
+    assert!(matches!(u.types[0], Atomic::TLiteralInt(42)));
+}
+
+#[test]
+fn dotted_non_number_is_not_float_literal() {
+    // A malformed token with a dot must not be mistaken for a float.
+    let u = parse_type_string("1.2.3");
+    assert!(!matches!(u.types[0], Atomic::TLiteralFloat(..)));
+}
+
+// ---------------------------------------------------------------------------
+// Psalm string refinements / int-mask
+// ---------------------------------------------------------------------------
+
+#[test]
+fn parse_truthy_and_non_falsy_string() {
+    assert!(matches!(
+        parse_type_string("truthy-string").types[0],
+        Atomic::TNonEmptyString
+    ));
+    assert!(matches!(
+        parse_type_string("non-falsy-string").types[0],
+        Atomic::TNonEmptyString
+    ));
+}
+
+#[test]
+fn parse_case_constrained_string() {
+    assert!(matches!(
+        parse_type_string("lowercase-string").types[0],
+        Atomic::TString
+    ));
+    assert!(matches!(
+        parse_type_string("uppercase-string").types[0],
+        Atomic::TString
+    ));
+}
+
+#[test]
+fn parse_int_mask() {
+    assert!(matches!(
+        parse_type_string("int-mask<1, 2, 4>").types[0],
+        Atomic::TInt
+    ));
+    assert!(matches!(
+        parse_type_string("int-mask-of<Foo::*>").types[0],
+        Atomic::TInt
+    ));
+}
+
+// ---------------------------------------------------------------------------
+// key-of / value-of evaluation
+// ---------------------------------------------------------------------------
+
+#[test]
+fn key_of_array_is_key_type() {
+    let u = parse_type_string("key-of<array<int, string>>");
+    assert_eq!(u.types.len(), 1);
+    assert!(matches!(u.types[0], Atomic::TInt));
+}
+
+#[test]
+fn key_of_list_is_int() {
+    let u = parse_type_string("key-of<list<string>>");
+    assert!(matches!(u.types[0], Atomic::TInt));
+}
+
+#[test]
+fn key_of_keyed_array_is_literal_keys() {
+    let u = parse_type_string("key-of<array{a: int, b: int}>");
+    assert!(u.contains(|t| matches!(t, Atomic::TLiteralString(s) if s.as_ref() == "a")));
+    assert!(u.contains(|t| matches!(t, Atomic::TLiteralString(s) if s.as_ref() == "b")));
+}
+
+#[test]
+fn value_of_array_is_value_type() {
+    let u = parse_type_string("value-of<array<int, string>>");
+    assert!(matches!(u.types[0], Atomic::TString));
+}
+
+#[test]
+fn value_of_keyed_array_is_value_union() {
+    let u = parse_type_string("value-of<array{a: \"foo\", b: \"bar\"}>");
+    assert!(u.contains(|t| matches!(t, Atomic::TLiteralString(s) if s.as_ref() == "foo")));
+    assert!(u.contains(|t| matches!(t, Atomic::TLiteralString(s) if s.as_ref() == "bar")));
+}
+
+#[test]
+fn value_of_union_of_lists_and_shapes() {
+    let u = parse_type_string("value-of<list<0|1|2>|array{0: 3, 1: 4}>");
+    for n in [0, 1, 2, 3, 4] {
+        assert!(
+            u.contains(|t| matches!(t, Atomic::TLiteralInt(m) if *m == n)),
+            "missing literal {n} in {u}"
+        );
+    }
+}
+
+#[test]
+fn key_of_unresolvable_falls_back_to_mixed() {
+    // key-of over a named class / template cannot be resolved statically.
+    let u = parse_type_string("key-of<\\SplStack>");
+    assert!(u.is_mixed());
+}

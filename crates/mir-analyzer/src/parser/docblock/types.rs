@@ -86,11 +86,32 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         }
     }
 
+    // Float literal: `3.14`, `-0.5`. Must run before the keyword/named-class
+    // arms (which only parse integer literals) so `@return 3.14` is not misread
+    // as a class named "3.14". Requires a decimal point so plain ints and class
+    // names (which never contain `.`) are left untouched.
+    if let Some(f) = parse_float_literal(s) {
+        let bits = f.to_bits();
+        return Type::single(Atomic::TLiteralFloat(
+            (bits >> 32) as i64,
+            (bits & 0xFFFF_FFFF) as i64,
+        ));
+    }
+
     // Keywords
     match s.to_lowercase().as_str() {
         "string" => Type::single(Atomic::TString),
         "non-empty-string" => Type::single(Atomic::TNonEmptyString),
         "numeric-string" => Type::single(Atomic::TNumericString),
+        // Psalm string refinements. mir does not model case/falsiness of strings
+        // precisely; approximate with the closest representable atom (same
+        // approach Psalm documents for back-compat). `truthy-string` /
+        // `non-falsy-string` ≈ non-empty-string; case-constrained strings ≈ string.
+        "truthy-string" | "non-falsy-string" => Type::single(Atomic::TNonEmptyString),
+        "lowercase-string"
+        | "uppercase-string"
+        | "non-empty-lowercase-string"
+        | "non-empty-uppercase-string" => Type::single(Atomic::TString),
         "class-string" => Type::single(Atomic::TClassString(None)),
         "int" | "integer" => Type::single(Atomic::TInt),
         "positive-int" => Type::single(Atomic::TPositiveInt),
@@ -282,6 +303,19 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
             };
             Type::single(Atomic::TIntRange { min, max })
         }
+        // `key-of<T>` — the union of array/shape key types of `T`.
+        "key-of" => {
+            let inner_ty = parse_type_string(inner.trim());
+            eval_key_of(&inner_ty).unwrap_or_else(Type::mixed)
+        }
+        // `value-of<T>` — the union of array/shape value types of `T`.
+        "value-of" => {
+            let inner_ty = parse_type_string(inner.trim());
+            eval_value_of(&inner_ty).unwrap_or_else(Type::mixed)
+        }
+        // `int-mask<...>` / `int-mask-of<T>` — a bitmask of int flags. mir does
+        // not track the exact set of representable values; approximate as `int`.
+        "int-mask" | "int-mask-of" => Type::single(Atomic::TInt),
         // Named class with type params
         _ => {
             let params: Vec<Type> = split_generics(inner)
@@ -294,6 +328,87 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
             })
         }
     }
+}
+
+/// Parse a floating-point literal type such as `3.14` or `-0.5`.
+///
+/// Returns `None` for anything that is not unambiguously a float: the string
+/// must contain a decimal point and parse as `f64`. Plain integers (`42`) and
+/// class names are rejected so they fall through to their normal handling.
+pub(super) fn parse_float_literal(s: &str) -> Option<f64> {
+    if !s.contains('.') {
+        return None;
+    }
+    // Reject anything with stray characters (e.g. `1.2.3`, `Foo.Bar`).
+    let body = s.strip_prefix('-').unwrap_or(s);
+    if !body
+        .chars()
+        .all(|c| c.is_ascii_digit() || c == '.' || c == 'e' || c == 'E' || c == '+' || c == '-')
+    {
+        return None;
+    }
+    s.parse::<f64>().ok()
+}
+
+/// Evaluate `key-of<T>`: collect the key types of every array/shape atom in `T`.
+///
+/// Returns `None` if any atom's keys cannot be determined statically (e.g. a
+/// template parameter or a named class), so the caller can fall back to `mixed`.
+pub(super) fn eval_key_of(t: &Type) -> Option<Type> {
+    let mut result = Type::empty();
+    for atomic in &t.types {
+        match atomic {
+            Atomic::TArray { key, .. } | Atomic::TNonEmptyArray { key, .. } => {
+                for k in &key.types {
+                    result.add_type(k.clone());
+                }
+            }
+            Atomic::TList { .. } | Atomic::TNonEmptyList { .. } => {
+                result.add_type(Atomic::TInt);
+            }
+            Atomic::TKeyedArray { properties, .. } => {
+                for key in properties.keys() {
+                    match key {
+                        mir_types::atomic::ArrayKey::Int(n) => {
+                            result.add_type(Atomic::TLiteralInt(*n));
+                        }
+                        mir_types::atomic::ArrayKey::String(s) => {
+                            result.add_type(Atomic::TLiteralString(s.clone()));
+                        }
+                    }
+                }
+            }
+            _ => return None,
+        }
+    }
+    (!result.types.is_empty()).then_some(result)
+}
+
+/// Evaluate `value-of<T>`: collect the value types of every array/shape atom in
+/// `T`. Returns `None` if any atom's values cannot be determined statically.
+pub(super) fn eval_value_of(t: &Type) -> Option<Type> {
+    let mut result = Type::empty();
+    for atomic in &t.types {
+        match atomic {
+            Atomic::TArray { value, .. }
+            | Atomic::TNonEmptyArray { value, .. }
+            | Atomic::TList { value }
+            | Atomic::TNonEmptyList { value } => {
+                for v in &value.types {
+                    result.add_type(v.clone());
+                }
+            }
+            Atomic::TKeyedArray { properties, .. } => {
+                for prop in properties.values() {
+                    for v in &prop.ty.types {
+                        result.add_type(v.clone());
+                    }
+                }
+            }
+            _ => return None,
+        }
+    }
+    (!result.types.is_empty()).then_some(result)
 }
 
 pub(super) fn strip_quotes(s: &str) -> &str {

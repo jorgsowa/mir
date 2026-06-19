@@ -10,4 +10,4 @@ namespace Ns;
 function foo($s) : void {}
 foo(7.8);
 ===expect===
-InvalidArgument@6:4-6:7: Argument $s of foo() expects 'Ns\1.2|Ns\3.4|Ns\5.6', got '7.8'
+InvalidArgument@6:4-6:7: Argument $s of foo() expects '1.2|3.4|5.6', got '7.8'

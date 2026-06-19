@@ -13,4 +13,4 @@ function getKey(bool $asInt) {
 }
 
 ===expect===
-UndefinedDocblockClass@5:9-5:15: Docblock type 'key-of' does not exist
+InvalidReturnType@9:4-9:16: Return type '"42"' is not compatible with declared 'int|"42.0"'

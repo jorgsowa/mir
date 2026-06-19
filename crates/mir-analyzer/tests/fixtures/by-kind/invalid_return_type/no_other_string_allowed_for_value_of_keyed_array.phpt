@@ -10,4 +10,4 @@ function getValue() {
 }
 
 ===expect===
-UndefinedDocblockClass@5:9-5:17: Docblock type 'value-of' does not exist
+InvalidReturnType@6:4-6:19: Return type '"adams"' is not compatible with declared '"foo"|"bar"'

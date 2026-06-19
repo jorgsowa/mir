@@ -12,3 +12,4 @@ class A {
 }
 
 ===expect===
+InvalidReturnType@7:8-7:18: Return type '42' is not compatible with declared 'string'
