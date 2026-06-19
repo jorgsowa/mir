@@ -316,6 +316,14 @@ impl CallAnalyzer {
             }
         }
 
+        // extract() defines variables whose names are only known at runtime (the
+        // keys of the passed array). After such a call, reads of otherwise-unknown
+        // variables must not be reported as undefined — the same handling as
+        // variable-variables.
+        if fn_name.eq_ignore_ascii_case("extract") {
+            ctx.has_dynamic_var_def = true;
+        }
+
         if let Some(resolved) = resolved {
             ea.record_ref(resolved.fqn.clone(), call.name.span);
             let deprecated = resolved.deprecated;
