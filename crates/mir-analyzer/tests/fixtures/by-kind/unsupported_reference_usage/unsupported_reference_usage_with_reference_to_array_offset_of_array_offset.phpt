@@ -1,5 +1,5 @@
 ===description===
-Unsupported reference usage with reference to array offset of array offset
+Reference to array offset of array offset does not fire UnsupportedReferenceUsage.
 ===config===
 suppress=UnusedVariable
 ===file===
@@ -13,4 +13,3 @@ $foo = ["foo"];
 $bar = &$arr[$foo[0]];
 
 ===expect===
-UnsupportedReferenceUsage@8:0-8:21: Reference assignment is not supported

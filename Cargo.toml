@@ -68,3 +68,8 @@ salsa = "0.27.0"
 [profile.release]
 lto           = "thin"
 codegen-units = 1
+
+# Optimize third-party deps (PHP parser, salsa, serde) in dev/test builds too:
+# compiled once then cached, so tests run faster with no ongoing compile cost.
+[profile.dev.package."*"]
+opt-level = 3

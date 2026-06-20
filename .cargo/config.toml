@@ -1,3 +1,8 @@
 [build]
 # Use all 12 cores for compilation
 jobs = 12
+
+[alias]
+# Fast feedback lane: the no-config fixtures, run stub-free in one process
+# (~0.6s vs minutes under nextest's per-test processes). See tests/fast_lane.rs.
+fast-test = ["test", "-p", "mir-analyzer", "--test", "fast_lane"]

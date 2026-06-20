@@ -2,8 +2,13 @@
 [profile.default]
 test-threads = 4
 slow-timeout = { period = "30s", terminate-after = 2 }
+# Exclude the standalone fast_lane binary from default runs so the no-config
+# fixtures don't execute twice. Run it via `cargo fast-test`.
+default-filter = 'not binary(fast_lane)'
 
 [profile.ci]
 test-threads = 4
 slow-timeout = { period = "60s", terminate-after = 2 }
 fail-fast = false
+# CI runs the full suite (with stubs); don't double-run the fast lane here.
+default-filter = 'not binary(fast_lane)'

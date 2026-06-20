@@ -68,6 +68,10 @@ pub struct BatchOptions {
     /// unaffected. Diagnostics-only consumers (the CLI) opt out: a
     /// Laravel-scale batch retains ~600k symbols nothing reads.
     pub skip_symbols: bool,
+    /// Skip ingesting the embedded PHP stdlib stubs. Defaults to `false`
+    /// (stubs loaded). Set `true` to drop the dominant per-analysis cost when
+    /// the input references no built-in symbols.
+    pub skip_builtin_stubs: bool,
 }
 
 impl BatchOptions {
@@ -285,7 +289,7 @@ impl AnalysisSession {
     /// Load the configured PHP version + built-in stubs + user stubs into
     /// the shared db. Called by [`Self::analyze_paths`] and
     /// [`Self::collect_definitions`].
-    fn load_batch_stubs(&self, php_version: PhpVersion) {
+    fn load_batch_stubs(&self, php_version: PhpVersion, load_builtin: bool) {
         // Wire the PHP version into the db before any SourceFile inputs are
         // registered — collect_file_definitions reads it for @since/@removed filtering.
         {
@@ -294,8 +298,11 @@ impl AnalysisSession {
         }
 
         // Built-in stubs for the configured PHP version.
-        let paths: Vec<&'static str> = crate::stubs::stub_files().iter().map(|&(p, _)| p).collect();
-        self.db.ingest_stub_paths(&paths, php_version);
+        if load_builtin {
+            let paths: Vec<&'static str> =
+                crate::stubs::stub_files().iter().map(|&(p, _)| p).collect();
+            self.db.ingest_stub_paths(&paths, php_version);
+        }
 
         // User-configured stubs.
         self.db

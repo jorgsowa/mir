@@ -19,4 +19,3 @@ for ($i = 0; $i < count($arr); ++$i) {
 $var = "foo";
 
 ===expect===
-UnsupportedReferenceUsage@8:12-8:33: Reference assignment is not supported

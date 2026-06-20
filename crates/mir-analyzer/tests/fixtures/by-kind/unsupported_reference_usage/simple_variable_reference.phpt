@@ -1,5 +1,5 @@
 ===description===
-UnsupportedReferenceUsage fires for a simple reference assignment ($b = &$a).
+Simple reference assignment ($b = &$a) does not fire UnsupportedReferenceUsage.
 ===config===
 suppress=UnusedVariable
 ===file===
@@ -8,4 +8,3 @@ $a = "hello";
 $b = &$a;
 
 ===expect===
-UnsupportedReferenceUsage@3:0-3:8: Reference assignment is not supported

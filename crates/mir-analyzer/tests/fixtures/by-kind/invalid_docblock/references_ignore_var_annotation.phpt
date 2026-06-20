@@ -9,4 +9,3 @@ $a = 1;
 $b = &$a;
 
 ===expect===
-UnsupportedReferenceUsage@4:0-4:8: Reference assignment is not supported

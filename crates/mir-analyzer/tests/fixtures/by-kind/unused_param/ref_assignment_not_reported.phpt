@@ -10,4 +10,3 @@ final class MyClass {
     }
 }
 ===expect===
-UnsupportedReferenceUsage@6:8-6:32: Reference assignment is not supported

@@ -1,5 +1,5 @@
 ===description===
-UnsupportedReferenceUsage fires when taking a reference to an object property.
+Reference to an object property does not fire UnsupportedReferenceUsage.
 ===config===
 suppress=UnusedVariable
 ===file===
@@ -12,4 +12,3 @@ $obj = new Foo();
 $ref = &$obj->bar;
 
 ===expect===
-UnsupportedReferenceUsage@7:0-7:17: Reference assignment is not supported

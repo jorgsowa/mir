@@ -45,13 +45,6 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
         match a.op {
             AssignOp::Assign => {
-                if a.by_ref {
-                    self.emit(
-                        IssueKind::UnsupportedReferenceUsage,
-                        Severity::Warning,
-                        expr_span,
-                    );
-                }
                 self.assign_to_target(&a.target, rhs_ty.clone(), ctx, expr_span);
                 // If the target variable was consumed during RHS analysis (e.g. `$x = f($x)`),
                 // re-arm the new write location so it is treated as a fresh pending write.

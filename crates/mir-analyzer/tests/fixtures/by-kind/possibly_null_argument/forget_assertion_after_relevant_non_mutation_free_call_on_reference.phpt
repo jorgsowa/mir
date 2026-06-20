@@ -33,5 +33,4 @@ if (assertBarNotNull($foo)) {
 function requiresString(string $_str): void {}
 
 ===expect===
-UnsupportedReferenceUsage@21:0-21:15: Reference assignment is not supported
 PossiblyNullArgument@25:19-25:28: Argument $_str of requiresString() might be null

@@ -32,5 +32,3 @@ if (rand(0, 1)) {
 
 $v = 8;
 ===expect===
-UnsupportedReferenceUsage@7:8-7:26: Reference assignment is not supported
-UnsupportedReferenceUsage@16:8-16:26: Reference assignment is not supported

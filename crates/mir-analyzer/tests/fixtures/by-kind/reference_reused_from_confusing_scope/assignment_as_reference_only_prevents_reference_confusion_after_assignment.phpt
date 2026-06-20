@@ -16,5 +16,4 @@ for ($i = 0; $i < 10; ++$i) {
 $i = &$foo;
 
 ===expect===
-UnsupportedReferenceUsage@11:0-11:10: Reference assignment is not supported
 UndefinedVariable@11:6-11:10: Variable $foo is not defined

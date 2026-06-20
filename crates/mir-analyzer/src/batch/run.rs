@@ -8,7 +8,7 @@ impl AnalysisSession {
         let _t0 = std::time::Instant::now();
 
         // ---- Load PHP built-in stubs (before definition collection so user code can override)
-        self.load_batch_stubs(php_version);
+        self.load_batch_stubs(php_version, !opts.skip_builtin_stubs);
         // Index vendor autoload.files (global function/constant helpers such as
         // Laravel's `confirm()`, `select()`, etc.) before body analysis so
         // calls to these functions resolve rather than emitting UndefinedFunction.
