@@ -574,24 +574,6 @@ fn count_occurrences(haystack: &str, needle: &str) -> usize {
 // Fixture runner
 // ---------------------------------------------------------------------------
 
-thread_local! {
-    /// Armed by [`run_fixture_no_stubs`] so [`run_analyzer`] skips the stdlib
-    /// stubs without a process-wide env var (racy under libtest's threads).
-    static FORCE_NO_BUILTIN_STUBS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
-}
-
-/// Run a fixture with the stdlib stubs disabled — entrypoint for the generated
-/// `fast_lane` binary. Clears the flag even on panic so the thread isn't left
-/// armed for the next fixture.
-pub fn run_fixture_no_stubs(path: &str) {
-    FORCE_NO_BUILTIN_STUBS.with(|f| f.set(true));
-    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run_fixture(path)));
-    FORCE_NO_BUILTIN_STUBS.with(|f| f.set(false));
-    if let Err(payload) = outcome {
-        std::panic::resume_unwind(payload);
-    }
-}
-
 /// Run a `.phpt` fixture file and assert issues match the `===expect===` section.
 ///
 /// Set `UPDATE_FIXTURES=1` to rewrite the expect section with actual output.
@@ -690,16 +672,6 @@ fn run_analyzer(files: &[(&str, &str)], config: &FixtureConfig) -> Vec<Issue> {
     let mut opts = BatchOptions::new();
     if let Some(explicit) = &config.suppressed_issue_kinds {
         opts.suppressed_issue_kinds = explicit.clone();
-    }
-
-    // Skip the stdlib stubs when MIR_NO_BUILTIN_STUBS is set (whole-suite runs)
-    // or the thread-local is armed (the fast_lane binary). Symbols aren't read
-    // by fixture assertions, so drop them too.
-    let no_builtin = std::env::var_os("MIR_NO_BUILTIN_STUBS").is_some()
-        || FORCE_NO_BUILTIN_STUBS.with(|f| f.get());
-    if no_builtin {
-        opts.skip_builtin_stubs = true;
-        opts.skip_symbols = true;
     }
 
     // Construct session at the requested PHP version (defaulting to LATEST).
