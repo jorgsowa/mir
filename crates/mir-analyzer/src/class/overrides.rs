@@ -200,19 +200,23 @@ impl<'a> ClassAnalyzer<'a> {
                     {
                         continue;
                     }
-                    let involves_named_objects = Self::type_has_named_objects(child_ret)
-                        || Self::type_has_named_objects(parent_ret);
-                    let involves_self_static = self.type_has_self_or_static(child_ret)
+                    let child_has_object = Self::type_has_named_objects(child_ret)
+                        || self.type_has_self_or_static(child_ret);
+                    let parent_has_object = Self::type_has_named_objects(parent_ret)
                         || self.type_has_self_or_static(parent_ret);
-                    let compatible = if (involves_named_objects || involves_self_static)
-                        && self.type_has_only_object_atoms(child_ret)
-                        && self.type_has_only_object_atoms(parent_ret)
-                    {
+                    let compatible = if child_has_object && parent_has_object {
+                        // Both sides involve objects: named_object_return_compatible now
+                        // splits mixed object+scalar unions per atom (G5), so it covers
+                        // `string|Cat` vs `string|Animal` directly — not just purely-object
+                        // unions as before.
                         crate::stmt::named_object_return_compatible(
                             child_ret, parent_ret, self.db, child_file,
                         )
-                    } else if involves_named_objects || involves_self_static {
-                        true // mixed scalar+object union — skip (G5 gap)
+                    } else if child_has_object || parent_has_object {
+                        // Object vs. disjoint scalar (e.g. stdClass vs int): handled by the
+                        // ImplementedReturnTypeMismatch check, so skip here to avoid a
+                        // duplicate diagnostic.
+                        true
                     } else {
                         Self::scalar_return_types_compatible(child_ret, parent_ret)
                     };
@@ -526,27 +530,6 @@ impl<'a> ClassAnalyzer<'a> {
         ty.types
             .iter()
             .any(|a| matches!(a, Atomic::TSelf { .. } | Atomic::TStaticObject { .. }))
-    }
-
-    /// Returns true if every atom in the union is handled by `named_object_return_compatible`:
-    /// object types (named/self/static/parent), null, void, never, and class-string variants.
-    /// Unions that also contain scalar atoms (int, string, …) are not fully handled there
-    /// and must fall back to the skip path (G5 gap).
-    fn type_has_only_object_atoms(&self, ty: &mir_types::Type) -> bool {
-        use mir_types::Atomic;
-        ty.types.iter().all(|a| {
-            matches!(
-                a,
-                Atomic::TNamedObject { .. }
-                    | Atomic::TSelf { .. }
-                    | Atomic::TStaticObject { .. }
-                    | Atomic::TParent { .. }
-                    | Atomic::TNull
-                    | Atomic::TVoid
-                    | Atomic::TNever
-                    | Atomic::TClassString(_)
-            )
-        })
     }
 
     // -----------------------------------------------------------------------
