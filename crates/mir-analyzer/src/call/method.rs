@@ -30,6 +30,15 @@ fn extract_namespace(fqcn: &str) -> Option<&str> {
     }
 }
 
+/// First namespace segment ("root namespace"), or `None` for the global namespace.
+/// `@internal` (no argument) scopes a symbol to its root namespace, so any
+/// sub-namespace under the same root may use it (Psalm semantics).
+fn namespace_root(ns: Option<&str>) -> Option<&str> {
+    ns.map(|n| n.trim_start_matches('\\'))
+        .and_then(|n| n.split('\\').next())
+        .filter(|seg| !seg.is_empty())
+}
+
 pub(super) struct ResolvedMethod {
     pub(super) owner_fqcn: Arc<str>,
     pub(super) name: Arc<str>,
@@ -525,8 +534,9 @@ fn resolve_method_return<'a>(
             );
         }
         if resolved.is_internal {
-            let calling_namespace = ea.db.file_namespace(&ea.file).map(|ns| ns.to_string());
-            let method_namespace = extract_namespace(&resolved.owner_fqcn).map(|s| s.to_string());
+            let calling_ns = ea.db.file_namespace(&ea.file);
+            let calling_root = namespace_root(calling_ns.as_deref());
+            let owner_root = namespace_root(extract_namespace(&resolved.owner_fqcn));
             // Calling an @internal method on $this (self-call or inherited) is allowed —
             // trait methods become part of the using class, and child classes may call
             // parent/trait @internal methods that are part of their own API.
@@ -535,7 +545,7 @@ fn resolve_method_return<'a>(
                 .as_deref()
                 .map(|s| s.eq_ignore_ascii_case(fqcn.as_ref()))
                 .unwrap_or(false);
-            if calling_namespace != method_namespace && !is_self_call {
+            if calling_root != owner_root && !is_self_call {
                 ea.emit(
                     IssueKind::InternalMethod {
                         class: fqcn.to_string(),

@@ -26,6 +26,15 @@ fn extract_namespace(fqcn: &str) -> Option<&str> {
     }
 }
 
+/// First namespace segment ("root namespace"), or `None` for the global namespace.
+/// `@internal` (no argument) scopes a symbol to its root namespace, so any
+/// sub-namespace under the same root may use it (Psalm semantics).
+fn namespace_root(ns: Option<&str>) -> Option<&str> {
+    ns.map(|n| n.trim_start_matches('\\'))
+        .and_then(|n| n.split('\\').next())
+        .filter(|seg| !seg.is_empty())
+}
+
 fn is_valid_class_name_type(ty: &Type) -> bool {
     // Class names must be strings or class-string types.
     // Mixed is allowed since it's already imprecise. Template params are
@@ -337,9 +346,9 @@ impl CallAnalyzer {
                 );
             }
             if resolved.is_internal {
-                let calling_namespace = ea.db.file_namespace(&ea.file).map(|ns| ns.to_string());
-                let method_namespace =
-                    extract_namespace(&resolved.owner_fqcn).map(|s| s.to_string());
+                let calling_ns = ea.db.file_namespace(&ea.file);
+                let calling_root = namespace_root(calling_ns.as_deref());
+                let owner_root = namespace_root(extract_namespace(&resolved.owner_fqcn));
                 // self::/static::/parent:: calls are self-calls; also allow when calling
                 // on a class that is the current self (trait @internal methods included).
                 let is_self_call = is_self_parent_call
@@ -348,7 +357,7 @@ impl CallAnalyzer {
                         .as_deref()
                         .map(|s| s.eq_ignore_ascii_case(fqcn.as_str()))
                         .unwrap_or(false);
-                if calling_namespace != method_namespace && !is_self_call {
+                if calling_root != owner_root && !is_self_call {
                     ea.emit(
                         IssueKind::InternalMethod {
                             class: fqcn.clone(),
