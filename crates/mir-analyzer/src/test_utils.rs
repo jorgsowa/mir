@@ -123,6 +123,7 @@ use std::sync::Arc;
 
 use crate::{batch::BatchOptions, session::AnalysisSession, PhpVersion};
 use mir_issues::{Issue, IssueKind};
+use parking_lot::Mutex;
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -644,6 +645,34 @@ fn fixture_stub_cache_dir() -> std::path::PathBuf {
     std::env::temp_dir().join("mir-fixture-stub-cache")
 }
 
+/// Pool of pre-warmed base sessions reused across "plain" fixtures (no user
+/// stubs, no PSR-4/composer). A checked-out session has the stdlib stub index
+/// already materialized — the dominant per-fixture cost. The caller analyzes
+/// its fixture files, then invalidates them to restore the stubs-only state
+/// before returning the session, so each reuse is independent. Keyed by PHP
+/// version; entries with different versions never mix. Opt out with
+/// `MIR_TEST_NO_SESSION_POOL=1` (the fresh-session path then runs per fixture).
+static SESSION_POOL: Mutex<Vec<(PhpVersion, AnalysisSession)>> = Mutex::new(Vec::new());
+
+fn session_pool_enabled() -> bool {
+    std::env::var_os("MIR_TEST_NO_SESSION_POOL").is_none()
+        && std::env::var_os("MIR_TEST_NO_STUB_CACHE").is_none()
+}
+
+fn checkout_base_session(version: PhpVersion) -> AnalysisSession {
+    {
+        let mut pool = SESSION_POOL.lock();
+        if let Some(pos) = pool.iter().position(|(v, _)| *v == version) {
+            return pool.swap_remove(pos).1;
+        }
+    }
+    AnalysisSession::new(version).with_cache_dir(&fixture_stub_cache_dir())
+}
+
+fn return_base_session(version: PhpVersion, session: AnalysisSession) {
+    SESSION_POOL.lock().push((version, session));
+}
+
 fn run_analyzer(files: &[(&str, &str)], config: &FixtureConfig) -> Vec<Issue> {
     // The pid disambiguates concurrent nextest processes: COUNTER is
     // process-local and resets to 0 in each, so without it they'd all share
@@ -674,43 +703,33 @@ fn run_analyzer(files: &[(&str, &str)], config: &FixtureConfig) -> Vec<Issue> {
         opts.suppressed_issue_kinds = explicit.clone();
     }
 
-    // Construct session at the requested PHP version (defaulting to LATEST).
+    // Resolve the requested PHP version (defaulting to LATEST), user stubs, and
+    // PSR-4/composer mapping, plus the set of files to analyze. Session
+    // construction is deferred until after we know whether this fixture can
+    // reuse a pooled base session.
     let version = config.php_version.unwrap_or(PhpVersion::LATEST);
-    let mut session = AnalysisSession::new(version);
 
-    // Enable the persistent stub-slice cache: parsing the stdlib stubs is the
-    // dominant per-fixture cost, and each fixture runs in a fresh session.
-    // Fixture/user-stub files use unique temp paths, so they never share a key.
-    // Opt out with MIR_TEST_NO_STUB_CACHE=1.
-    if std::env::var_os("MIR_TEST_NO_STUB_CACHE").is_none() {
-        session = session.with_cache_dir(&fixture_stub_cache_dir());
-    }
-
-    // Register user stub files and directories from the fixture config.
     let stub_files: Vec<PathBuf> = config.stub_files.iter().map(|f| tmp_dir.join(f)).collect();
     let stub_dirs: Vec<PathBuf> = config.stub_dirs.iter().map(|d| tmp_dir.join(d)).collect();
-    if !stub_files.is_empty() || !stub_dirs.is_empty() {
-        session = session.with_user_stubs(stub_files.clone(), stub_dirs.clone());
-    }
-
     let stub_file_set: HashSet<PathBuf> = stub_files.iter().cloned().collect();
     let is_stub = |p: &PathBuf| -> bool {
         stub_file_set.contains(p) || stub_dirs.iter().any(|d| p.starts_with(d))
     };
 
     let has_composer = files.iter().any(|(name, _)| *name == "composer.json");
+    let mut psr4: Option<Arc<crate::composer::Psr4Map>> = None;
     let explicit_paths: Vec<PathBuf> = if has_composer {
         match crate::composer::Psr4Map::from_composer(&tmp_dir) {
-            Ok(psr4) => {
-                let psr4 = Arc::new(psr4);
-                let psr4_files: HashSet<PathBuf> = psr4.project_files().into_iter().collect();
+            Ok(map) => {
+                let map = Arc::new(map);
+                let psr4_files: HashSet<PathBuf> = map.project_files().into_iter().collect();
                 let explicit: Vec<PathBuf> = paths
                     .iter()
                     .filter(|p| p.extension().map(|e| e == "php").unwrap_or(false))
                     .filter(|p| !psr4_files.contains(*p) && !is_stub(p))
                     .cloned()
                     .collect();
-                session = session.with_psr4(psr4);
+                psr4 = Some(map);
                 explicit
             }
             Err(_) => php_files_only(&paths)
@@ -729,7 +748,36 @@ fn run_analyzer(files: &[(&str, &str)], config: &FixtureConfig) -> Vec<Issue> {
         .iter()
         .any(|k| !opts.suppressed_issue_kinds.contains(*k));
 
-    let result = session.analyze_paths(&explicit_paths, &opts);
+    // The ~96% of fixtures with no user stubs and no PSR-4/composer need nothing
+    // in their session beyond the stdlib stubs, which are identical across all
+    // such fixtures. Reuse a pooled base session (stub index already
+    // materialized) and reset it afterwards by invalidating the fixture's files,
+    // amortizing the one-time stub-index build. Fixtures with custom stubs or a
+    // composer map get a fresh, isolated session as before.
+    let reusable =
+        stub_files.is_empty() && stub_dirs.is_empty() && !has_composer && session_pool_enabled();
+
+    let result = if reusable {
+        let session = checkout_base_session(version);
+        let result = session.analyze_paths(&explicit_paths, &opts);
+        for p in &explicit_paths {
+            session.invalidate_file(&p.to_string_lossy());
+        }
+        return_base_session(version, session);
+        result
+    } else {
+        let mut session = AnalysisSession::new(version);
+        if std::env::var_os("MIR_TEST_NO_STUB_CACHE").is_none() {
+            session = session.with_cache_dir(&fixture_stub_cache_dir());
+        }
+        if !stub_files.is_empty() || !stub_dirs.is_empty() {
+            session = session.with_user_stubs(stub_files.clone(), stub_dirs.clone());
+        }
+        if let Some(map) = psr4 {
+            session = session.with_psr4(map);
+        }
+        session.analyze_paths(&explicit_paths, &opts)
+    };
     std::fs::remove_dir_all(&tmp_dir).ok();
 
     result
