@@ -278,10 +278,9 @@ fn file_outgoing_dependencies(db: &dyn MirDatabase, file: &str) -> HashSet<Strin
 fn collect_class_refs_from_ast(program: &php_ast::owned::Program) -> Vec<String> {
     use php_ast::ast::BinaryOp;
     use php_ast::owned::visitor::{
-        walk_owned_catch_clause, walk_owned_class_member, walk_owned_expr, walk_owned_program,
-        walk_owned_stmt, walk_owned_type_hint, OwnedVisitor,
+        walk_owned_class_member, walk_owned_expr, walk_owned_program, walk_owned_stmt, OwnedVisitor,
     };
-    use php_ast::owned::{ClassMemberKind, ExprKind, TypeHintKind};
+    use php_ast::owned::{ClassMemberKind, ExprKind};
     use std::ops::ControlFlow;
 
     fn owned_name_str(name: &php_ast::owned::Name) -> String {
@@ -392,21 +391,13 @@ fn collect_class_refs_from_ast(program: &php_ast::owned::Program) -> Vec<String>
             walk_owned_expr(self, expr)
         }
 
-        fn visit_type_hint(&mut self, hint: &php_ast::owned::TypeHint) -> ControlFlow<()> {
-            if let TypeHintKind::Named(name) = &hint.kind {
-                let s = owned_name_str(name);
-                if !s.is_empty() {
-                    self.names.insert(s);
-                }
+        // Walker routes every class/type-position Name here: type hints, catch types, extends/implements, trait use, attributes.
+        fn visit_name(&mut self, name: &php_ast::owned::Name) -> ControlFlow<()> {
+            let s = owned_name_str(name);
+            if !s.is_empty() {
+                self.names.insert(s);
             }
-            walk_owned_type_hint(self, hint)
-        }
-
-        fn visit_catch_clause(&mut self, catch: &php_ast::owned::CatchClause) -> ControlFlow<()> {
-            for ty in catch.types.iter() {
-                self.names.insert(owned_name_str(ty));
-            }
-            walk_owned_catch_clause(self, catch)
+            ControlFlow::Continue(())
         }
     }
     let mut v = V {

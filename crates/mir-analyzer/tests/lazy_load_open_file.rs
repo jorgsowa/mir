@@ -88,6 +88,103 @@ fn undefined_method_count(analysis: &mir_analyzer::FileAnalysis) -> usize {
         .count()
 }
 
+/// Set up a PSR-4 project whose `lib_files` are written to disk (resolvable via
+/// the ClassResolver) but deliberately NOT eagerly indexed. The only way the
+/// open file's references reach those classes is `priority_index_for_ast`'s
+/// pre-load pass — the warm-up window these tests exercise. `lib_files` names
+/// may include subdirectories (e.g. `Contract/Runnable.php`).
+fn analyze_open_file_unindexed(
+    lib_files: &[(&str, &str)],
+    open_name: &str,
+    open_src: &str,
+) -> mir_analyzer::FileAnalysis {
+    let root = common::create_temp_dir("priority_index_unindexed");
+    for (name, src) in lib_files {
+        let p = root.path().join("src").join(name);
+        fs::create_dir_all(p.parent().unwrap()).unwrap();
+        fs::write(p, src).unwrap();
+    }
+    fs::write(
+        root.path().join("composer.json"),
+        r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+    )
+    .unwrap();
+
+    let psr4 = mir_analyzer::composer::Psr4Map::from_composer(root.path()).expect("psr4 map");
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
+
+    let open_path: Arc<str> = Arc::from(
+        root.path()
+            .join("src")
+            .join(open_name)
+            .to_string_lossy()
+            .as_ref(),
+    );
+    session.ingest_file(open_path.clone(), Arc::from(open_src));
+
+    let parsed = php_parse(open_src);
+    assert!(
+        parsed.errors.is_empty(),
+        "parse errors: {:?}",
+        parsed.errors
+    );
+    FileAnalyzer::new(&session).analyze(open_path, open_src, &parsed.program, &parsed.source_map)
+}
+
+/// `extends` with a bare, same-namespace name (no `use`): `Child extends Base`
+/// resolves to `App\Base` purely through the namespace. The parent is reachable
+/// only via the resolver, so `priority_index_for_ast` must collect the `extends`
+/// name and pre-load it; otherwise Child's ancestor chain stays incomplete and
+/// the genuinely-undefined `$c->nope()` is suppressed.
+#[test]
+fn priority_index_pre_loads_same_namespace_extends() {
+    let analysis = analyze_open_file_unindexed(
+        &[(
+            "Base.php",
+            "<?php\nnamespace App;\nclass Base {\n    public function fromBase(): void {}\n}\n",
+        )],
+        "Child.php",
+        "<?php\nnamespace App;\nclass Child extends Base {}\n$c = new Child();\n$c->nope();\n",
+    );
+
+    assert_eq!(
+        undefined_method_count(&analysis),
+        1,
+        "Child extends the bare same-namespace name `Base` (App\\Base), loadable only via the \
+         resolver. Once `extends` is collected and Base pre-loaded, the ancestor chain is \
+         complete and $c->nope() surfaces. A count of 0 means `extends` was never collected. \
+         Got issues: {:?}",
+        analysis.issues
+    );
+}
+
+/// `implements` with a `use`-imported alias: `Worker implements Runnable` where
+/// `use App\Contract\Runnable` aliases the interface. Until the alias is
+/// collected and the interface pre-loaded, Worker has an unknown ancestor and
+/// member checks against it are suppressed; once loaded, the hierarchy is
+/// complete and the genuinely-undefined `$w->nope()` surfaces.
+#[test]
+fn priority_index_pre_loads_use_imported_implements() {
+    let analysis = analyze_open_file_unindexed(
+        &[(
+            "Contract/Runnable.php",
+            "<?php\nnamespace App\\Contract;\ninterface Runnable {\n    public function run(): void;\n}\n",
+        )],
+        "Worker.php",
+        "<?php\nnamespace App;\nuse App\\Contract\\Runnable;\nclass Worker implements Runnable {}\n$w = new Worker();\n$w->nope();\n",
+    );
+
+    assert_eq!(
+        undefined_method_count(&analysis),
+        1,
+        "Worker implements the use-imported `Runnable` (App\\Contract\\Runnable). Until the \
+         alias is collected and the interface pre-loaded, Worker has an unknown ancestor and \
+         $w->nope() is suppressed. Once loaded, the hierarchy is complete and nope() surfaces. \
+         A count of 0 means `implements` was never collected. Got issues: {:?}",
+        analysis.issues
+    );
+}
+
 /// The open file calls a method that only exists on the *return type* of a
 /// lazily-loaded class. `App\Widget` is never named directly in the open file —
 /// it is reachable only through `App\Service::make()`'s declared return type.
