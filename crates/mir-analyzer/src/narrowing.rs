@@ -111,6 +111,17 @@ pub fn narrow_from_condition(
                     narrow_var_bool(ctx, &name, false, effective_true);
                 }
             }
+            // `true === $x` / `false === $x` — symmetric; extract_var_name looks through
+            // assignment exprs, so this also handles `false === ($x = expr)`.
+            else if matches!(b.left.kind, ExprKind::Bool(true)) {
+                if let Some(name) = extract_var_name(&b.right) {
+                    narrow_var_bool(ctx, &name, true, effective_true);
+                }
+            } else if matches!(b.left.kind, ExprKind::Bool(false)) {
+                if let Some(name) = extract_var_name(&b.right) {
+                    narrow_var_bool(ctx, &name, false, effective_true);
+                }
+            }
             // `get_class($x) === 'ClassName'` — check before literal strings so it takes precedence
             else if let ExprKind::String(class_name_str) = &b.right.kind {
                 if let Some(obj_var_name) = extract_get_class_arg(&b.left) {
