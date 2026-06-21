@@ -236,12 +236,12 @@ pub(super) fn parse_method_line(s: &str) -> Option<DocMethod> {
     if rest.is_empty() {
         return None;
     }
-    let is_static = rest
+    let starts_with_static = rest
         .split_whitespace()
         .next()
         .map(|w| w.eq_ignore_ascii_case("static"))
         .unwrap_or(false);
-    if is_static {
+    if starts_with_static {
         rest = rest["static".len()..].trim_start();
     }
 
@@ -252,7 +252,13 @@ pub(super) fn parse_method_line(s: &str) -> Option<DocMethod> {
     if name.is_empty() {
         return None;
     }
-    let return_type = parts.join(" ");
+    // `@method static name()` with no separate return type: `static` is the PHP
+    // return type for fluent APIs, not the static modifier.
+    let (is_static, return_type) = if starts_with_static && parts.is_empty() {
+        (false, "static".to_string())
+    } else {
+        (starts_with_static, parts.join(" "))
+    };
     Some(DocMethod {
         return_type,
         name,
