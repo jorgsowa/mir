@@ -1,5 +1,6 @@
 use super::helpers::{
-    as_concat_str, infer_arithmetic, infer_int_range_arithmetic, is_non_empty_when_concat,
+    as_concat_str, infer_arithmetic, infer_div, infer_int_range_arithmetic,
+    is_non_empty_when_concat,
 };
 use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
@@ -179,8 +180,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                         );
                     }
                 }
-                infer_int_range_arithmetic(&left_ty, &right_ty, b.op)
-                    .unwrap_or_else(|| infer_arithmetic(&left_ty, &right_ty))
+                infer_int_range_arithmetic(&left_ty, &right_ty, b.op).unwrap_or_else(|| {
+                    if b.op == BinaryOp::Div {
+                        infer_div(&left_ty, &right_ty)
+                    } else {
+                        infer_arithmetic(&left_ty, &right_ty)
+                    }
+                })
             }
 
             BinaryOp::Concat => {

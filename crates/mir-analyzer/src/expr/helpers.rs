@@ -199,6 +199,10 @@ pub fn infer_int_range_arithmetic(left: &Type, right: &Type, op: BinaryOp) -> Op
         if let Some(n) = result {
             return Some(Type::single(Atomic::TLiteralInt(n)));
         }
+        // Non-exact literal integer division (e.g. 5 / 2 = 2.5) → float.
+        if op == BinaryOp::Div && r != 0 {
+            return Some(Type::single(Atomic::TFloat));
+        }
     }
 
     // Only engage when a genuine range is in play; plain int/literal operands
@@ -310,6 +314,24 @@ pub fn infer_arithmetic(left: &Type, right: &Type) -> Type {
         u.add_type(Atomic::TFloat);
         u
     }
+}
+
+/// Type of the `/` operator. Unlike `+`/`-`/`*`, `int / int` yields `int|float` in PHP
+/// because division may produce a fractional result (e.g. `5 / 2 = 2.5`).
+pub fn infer_div(left: &Type, right: &Type) -> Type {
+    if left.is_mixed() || right.is_mixed() {
+        return Type::mixed();
+    }
+    let left_is_float = left.contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..)));
+    let right_is_float =
+        right.contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..)));
+    if left_is_float || right_is_float {
+        return Type::single(Atomic::TFloat);
+    }
+    let mut u = Type::empty();
+    u.add_type(Atomic::TInt);
+    u.add_type(Atomic::TFloat);
+    u
 }
 
 /// Returns true when all atoms of `ty` produce a non-empty string in PHP's string cast.

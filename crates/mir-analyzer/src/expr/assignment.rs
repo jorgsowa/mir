@@ -1,5 +1,5 @@
 use super::helpers::{
-    as_concat_str, extract_simple_var, extract_string_from_expr, infer_arithmetic,
+    as_concat_str, extract_simple_var, extract_string_from_expr, infer_arithmetic, infer_div,
     infer_int_range_arithmetic, is_non_empty_when_concat, is_property_type_coercion,
     property_assign_compatible, type_refs_any_template, widen_array_as_list,
     widen_array_with_value_and_key,
@@ -121,11 +121,18 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let range_op = match a.op {
                     AssignOp::Plus => Some(BinaryOp::Add),
                     AssignOp::Minus => Some(BinaryOp::Sub),
+                    AssignOp::Div => Some(BinaryOp::Div),
                     _ => None,
                 };
-                let result_ty = range_op
-                    .and_then(|op| infer_int_range_arithmetic(&lhs_ty, &rhs_ty, op))
-                    .unwrap_or_else(|| infer_arithmetic(&lhs_ty, &rhs_ty));
+                let range_result =
+                    range_op.and_then(|op| infer_int_range_arithmetic(&lhs_ty, &rhs_ty, op));
+                let result_ty = range_result.unwrap_or_else(|| {
+                    if a.op == AssignOp::Div {
+                        infer_div(&lhs_ty, &rhs_ty)
+                    } else {
+                        infer_arithmetic(&lhs_ty, &rhs_ty)
+                    }
+                });
                 self.assign_to_target(&a.target, result_ty.clone(), ctx, expr_span);
                 if let (Some(name), Some(pre_count)) = (&target_var_name, pre_lhs_consumed_count) {
                     let sym = mir_types::Name::from(name.as_str());
