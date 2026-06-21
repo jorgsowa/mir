@@ -294,7 +294,7 @@ function preg_match_all(string $pattern, string $subject, &$matches = null, int 
  * If specified, this variable will be filled with the number of
  * replacements done.
  * </p>
- * @return ($subject is array ? array<int, string>|null : string|null) <b>preg_replace</b> returns an array if the
+ * @return ($subject is array ? array<int, string> : string) <b>preg_replace</b> returns an array if the
  * <i>subject</i> parameter is an array, or a string
  * otherwise.
  * </p>
