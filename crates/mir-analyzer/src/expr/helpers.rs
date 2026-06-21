@@ -247,6 +247,17 @@ pub fn infer_int_range_arithmetic(left: &Type, right: &Type, op: BinaryOp) -> Op
     Some(Type::single(Atomic::TIntRange { min, max }))
 }
 
+/// Bool and null coerce to int (0/1 and 0 respectively) in PHP arithmetic;
+/// they never produce float. This predicate is used in `infer_arithmetic` to
+/// extend the "returns int" condition beyond pure-int operands.
+fn coerces_to_int_in_arithmetic(t: &Atomic) -> bool {
+    t.is_int()
+        || matches!(
+            t,
+            Atomic::TBool | Atomic::TTrue | Atomic::TFalse | Atomic::TNull
+        )
+}
+
 pub fn infer_arithmetic(left: &Type, right: &Type) -> Type {
     if left.is_mixed() || right.is_mixed() {
         return Type::mixed();
@@ -289,7 +300,9 @@ pub fn infer_arithmetic(left: &Type, right: &Type) -> Type {
         right.contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..)));
     if left_is_float || right_is_float {
         Type::single(Atomic::TFloat)
-    } else if left.contains(|t| t.is_int()) && right.contains(|t| t.is_int()) {
+    } else if left.contains(coerces_to_int_in_arithmetic)
+        && right.contains(coerces_to_int_in_arithmetic)
+    {
         Type::single(Atomic::TInt)
     } else {
         let mut u = Type::empty();
