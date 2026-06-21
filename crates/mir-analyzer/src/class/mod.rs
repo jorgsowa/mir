@@ -310,6 +310,25 @@ impl<'a> ClassAnalyzer<'a> {
                         }
                         issues.push(issue);
                     }
+                    if let Some(msg) = canonical.deprecated() {
+                        let loc = issue_location(
+                            location.as_ref(),
+                            location
+                                .as_ref()
+                                .and_then(|l| self.sources.get(&l.file).copied()),
+                        );
+                        let mut issue = Issue::new(
+                            IssueKind::DeprecatedInterface {
+                                name: parent_iface_fqcn.to_string(),
+                                message: Some(msg.clone()).filter(|m| !m.is_empty()),
+                            },
+                            loc,
+                        );
+                        if let Some(snippet) = extract_snippet(location.as_ref(), &self.sources) {
+                            issue = issue.with_snippet(snippet);
+                        }
+                        issues.push(issue);
+                    }
                 }
             }
             self.check_magic_method_casing(&iface_fqcn, &mut issues);
@@ -334,6 +353,25 @@ impl<'a> ClassAnalyzer<'a> {
                             IssueKind::WrongCaseClass {
                                 used,
                                 canonical: canonical_str,
+                            },
+                            loc,
+                        );
+                        if let Some(snippet) = extract_snippet(location.as_ref(), &self.sources) {
+                            issue = issue.with_snippet(snippet);
+                        }
+                        issues.push(issue);
+                    }
+                    if let Some(msg) = canonical.deprecated() {
+                        let loc = issue_location(
+                            location.as_ref(),
+                            location
+                                .as_ref()
+                                .and_then(|l| self.sources.get(&l.file).copied()),
+                        );
+                        let mut issue = Issue::new(
+                            IssueKind::DeprecatedInterface {
+                                name: iface_fqcn.to_string(),
+                                message: Some(msg.clone()).filter(|m| !m.is_empty()),
                             },
                             loc,
                         );

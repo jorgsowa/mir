@@ -61,7 +61,7 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/call/static_call.rs`.
     /// Fixtures: `tests/fixtures/by-kind/undefined_method/`.
     UndefinedMethod { class: String, method: String },
-    /// Emitted by `mir-analyzer/src/batch.rs`.
+    /// Emitted by `mir-analyzer/src/batch/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/undefined_class/`.
     UndefinedClass { name: String },
     /// Emitted by `mir-analyzer/src/expr/objects.rs`.
@@ -76,7 +76,7 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/expr/variables.rs`.
     /// Fixtures: `tests/fixtures/by-kind/possibly_undefined_variable/`.
     PossiblyUndefinedVariable { name: String },
-    /// Emitted by `mir-analyzer/src/body_analysis.rs`.
+    /// Emitted by `mir-analyzer/src/body_analysis/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/undefined_trait/`.
     UndefinedTrait { name: String },
     /// Emitted when `parent::` is used in a class that has no parent.
@@ -207,10 +207,10 @@ pub enum IssueKind {
     /// Emitted when `yield from` might be used with a non-iterable object.
     /// Fixtures: `tests/fixtures/by-kind/invalid_operand/`.
     PossiblyRawObjectIteration { ty: String },
-    /// Emitted by `mir-analyzer/src/body_analysis.rs`.
+    /// Emitted by `mir-analyzer/src/body_analysis/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/mismatching_docblock_return_type/`.
     MismatchingDocblockReturnType { declared: String, inferred: String },
-    /// Emitted by `mir-analyzer/src/body_analysis.rs`.
+    /// Emitted by `mir-analyzer/src/body_analysis/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/mismatching_docblock_param_type/`.
     MismatchingDocblockParamType {
         param: String,
@@ -298,7 +298,7 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/dead_code.rs`.
     /// Fixtures: `tests/fixtures/by-kind/unused_class/`.
     UnusedClass { class: String },
-    /// Emitted by `mir-analyzer/src/batch.rs` when a `@psalm-suppress` /
+    /// Emitted by `mir-analyzer/src/batch/mod.rs` when a `@psalm-suppress` /
     /// `@mir-suppress` / `@suppress` annotation does not match any actual issue.
     /// Fixtures: `tests/fixtures/by-kind/unused_suppress/`.
     UnusedSuppress { kind: String },
@@ -340,36 +340,36 @@ pub enum IssueKind {
     ReadonlyPropertyAssignment { class: String, property: String },
 
     // --- Inheritance --------------------------------------------------------
-    /// Emitted by `mir-analyzer/src/class.rs`.
+    /// Emitted by `mir-analyzer/src/class/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/unimplemented_abstract_method/`.
     UnimplementedAbstractMethod { class: String, method: String },
-    /// Emitted by `mir-analyzer/src/class.rs`.
+    /// Emitted by `mir-analyzer/src/class/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/unimplemented_interface_method/`.
     UnimplementedInterfaceMethod {
         class: String,
         interface: String,
         method: String,
     },
-    /// Emitted by `mir-analyzer/src/class.rs`.
+    /// Emitted by `mir-analyzer/src/class/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/method_signature_mismatch/`.
     MethodSignatureMismatch {
         class: String,
         method: String,
         detail: String,
     },
-    /// Emitted by `mir-analyzer/src/class.rs`.
+    /// Emitted by `mir-analyzer/src/class/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/overridden_method_access/`.
     OverriddenMethodAccess { class: String, method: String },
-    /// Emitted by `mir-analyzer/src/class.rs`.
+    /// Emitted by `mir-analyzer/src/class/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/overridden_property_access/`.
     OverriddenPropertyAccess { class: String, property: String },
     /// Emitted by `mir-analyzer/src/call/method.rs`.
     /// Fixtures: `tests/fixtures/by-kind/undefined_method/direct_constructor_call*.phpt`.
     DirectConstructorCall { class: String },
-    /// Emitted by `mir-analyzer/src/class.rs`.
+    /// Emitted by `mir-analyzer/src/class/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_extend_class/`.
     InvalidExtendClass { parent: String, child: String },
-    /// Emitted by `mir-analyzer/src/class.rs`.
+    /// Emitted by `mir-analyzer/src/class/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/final_method_overridden/`.
     FinalMethodOverridden {
         class: String,
@@ -385,7 +385,7 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/expr/objects.rs`.
     /// Fixtures: `tests/fixtures/by-kind/abstract_instantiation/interface_instantiation.phpt`.
     InterfaceInstantiation { class: String },
-    /// Emitted by `mir-analyzer/src/class.rs` when `#[Override]` is declared
+    /// Emitted by `mir-analyzer/src/class/mod.rs` when `#[Override]` is declared
     /// but no overridable parent method exists.
     /// Fixtures: `tests/fixtures/by-kind/method_signature_mismatch/`.
     InvalidOverride {
@@ -455,13 +455,13 @@ pub enum IssueKind {
         constant: String,
         message: Option<Arc<str>>,
     },
-    /// Emitted by `mir-analyzer/src/class.rs`.
-    /// Fixtures: `tests/fixtures/by-kind/deprecated_class/deprecated_interface*.phpt`.
+    /// Emitted by `mir-analyzer/src/class/mod.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/deprecated_interface/`.
     DeprecatedInterface {
         name: String,
         message: Option<Arc<str>>,
     },
-    /// Emitted by `mir-analyzer/src/class.rs`.
+    /// Emitted by `mir-analyzer/src/class/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/deprecated_trait/`.
     DeprecatedTrait {
         name: String,
@@ -481,7 +481,7 @@ pub enum IssueKind {
         method: String,
         message: Option<Arc<str>>,
     },
-    /// Emitted by `mir-analyzer/src/class.rs`.
+    /// Emitted by `mir-analyzer/src/class/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/deprecated_class/`.
     DeprecatedClass {
         name: String,
@@ -490,16 +490,16 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/call/method.rs`.
     /// Fixtures: `tests/fixtures/by-kind/internal_method/`.
     InternalMethod { class: String, method: String },
-    /// Emitted by `mir-analyzer/src/body_analysis.rs`.
+    /// Emitted by `mir-analyzer/src/body_analysis/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/missing_return_type/`.
     MissingReturnType { fn_name: String },
     /// Emitted by `mir-analyzer/src/expr/closures.rs`.
     /// Fixtures: `tests/fixtures/by-kind/missing_closure_return_type/`.
     MissingClosureReturnType,
-    /// Emitted by `mir-analyzer/src/body_analysis.rs`.
+    /// Emitted by `mir-analyzer/src/body_analysis/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/missing_param_type/`.
     MissingParamType { fn_name: String, param: String },
-    /// Emitted by `mir-analyzer/src/body_analysis.rs`.
+    /// Emitted by `mir-analyzer/src/body_analysis/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/missing_param_type/` (property variants).
     MissingPropertyType { class: String, property: String },
     /// Emitted by `mir-analyzer/src/stmt/flow.rs`.
@@ -576,15 +576,15 @@ pub enum IssueKind {
     /// Fixtures: `tests/fixtures/by-kind/mixed_clone/`.
     PossiblyInvalidClone { ty: String },
     /// A `__toString` method that does not return a `string`.
-    /// Emitted by `mir-analyzer/src/body_analysis.rs`.
+    /// Emitted by `mir-analyzer/src/body_analysis/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/implicit_to_string_cast/`.
     InvalidToString { class: String },
-    /// Emitted by `mir-analyzer/src/class.rs`.
+    /// Emitted by `mir-analyzer/src/class/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/circular_inheritance/`.
     CircularInheritance { class: String },
 
     // --- Trait constraints --------------------------------------------------
-    /// Emitted by `mir-analyzer/src/body_analysis.rs`.
+    /// Emitted by `mir-analyzer/src/body_analysis/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_trait_use/`.
     InvalidTraitUse { trait_name: String, reason: String },
     /// Emitted by `mir-analyzer/src/expr/mod.rs` and `mir-analyzer/src/call/function.rs`.
@@ -613,19 +613,19 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/expr/objects.rs` and `src/call/static_call.rs`.
     /// Fixtures: `tests/fixtures/by-kind/wrong_case_class/`.
     WrongCaseClass { used: String, canonical: String },
-    /// Emitted by `mir-analyzer/src/body_analysis.rs`.
+    /// Emitted by `mir-analyzer/src/body_analysis/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_argument/class_redefinition*.phpt`.
     DuplicateClass { name: String },
-    /// Emitted by `mir-analyzer/src/body_analysis.rs`.
+    /// Emitted by `mir-analyzer/src/body_analysis/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_argument/interface_redefinition*.phpt`.
     DuplicateInterface { name: String },
-    /// Emitted by `mir-analyzer/src/body_analysis.rs`.
+    /// Emitted by `mir-analyzer/src/body_analysis/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_argument/trait_redefinition*.phpt`.
     DuplicateTrait { name: String },
-    /// Emitted by `mir-analyzer/src/body_analysis.rs`.
+    /// Emitted by `mir-analyzer/src/body_analysis/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_argument/enum_redefinition*.phpt`.
     DuplicateEnum { name: String },
-    /// Emitted by `mir-analyzer/src/body_analysis.rs`.
+    /// Emitted by `mir-analyzer/src/body_analysis/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_argument/function_redefinition*.phpt`.
     DuplicateFunction { name: String },
 }
