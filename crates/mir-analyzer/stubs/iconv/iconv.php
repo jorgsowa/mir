@@ -25,10 +25,11 @@ use JetBrains\PhpStorm\ArrayShape;
  * @param string $string <p>
  * The string to be converted.
  * </p>
- * @return string|false the converted string or <b>FALSE</b> on failure.
+ * @return string the converted string. false on failure is treated as a programming
+ *   error and omitted to avoid FPs on normal usage.
  * @pure
  */
-function iconv(string $from_encoding, string $to_encoding, string $string): string|false {}
+function iconv(string $from_encoding, string $to_encoding, string $string): string {}
 
 /**
  * Convert character encoding as output buffer handler

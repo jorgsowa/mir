@@ -579,7 +579,7 @@ function mb_strimwidth(string $string, int $start, int $width, string $trim_mark
  * "auto" may be used, which expands to
  * "ASCII,JIS,UTF-8,EUC-JP,SJIS".
  * </p>
- * @return array|string|false The encoded string.
+ * @return ($string is array ? array : string)
  * @pure
  */
 function mb_convert_encoding(array|string $string, string $to_encoding, array|string|null $from_encoding = null): array|string|false {}

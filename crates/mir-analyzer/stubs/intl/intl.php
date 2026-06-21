@@ -5134,10 +5134,11 @@ function datefmt_get_error_message(IntlDateFormatter $formatter): string {}
  * @param string $string <p>
  * The string being measured for length. It must be a valid UTF-8 string.
  * </p>
- * @return int|false|null The length of the string on success, and 0 if the string is empty.
+ * @return int The length of the string on success. false/null only on invalid UTF-8;
+ *   omitted to avoid FPs on normal usage.
  * @pure
  */
-function grapheme_strlen(string $string): int|false|null {}
+function grapheme_strlen(string $string): int {}
 
 /**
  * (PHP 5 &gt;= 5.3.0, PECL intl &gt;= 1.0.0)<br/>
