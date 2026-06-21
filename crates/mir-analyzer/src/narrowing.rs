@@ -1683,7 +1683,7 @@ fn narrow_var_to_specific_class(ctx: &mut FlowState, name: &str, fqcn: &str, is_
 /// Recognised forms:
 /// - `\Foo\Bar::class` or `Foo\Bar::class` — resolved via `crate::db::resolve_name`
 /// - `'Foo\Bar'` or `'Foo\\Bar'` — string literals
-fn extract_class_fqcn_from_expr(
+pub(crate) fn extract_class_fqcn_from_expr(
     expr: &php_ast::owned::Expr,
     db: &dyn MirDatabase,
     file: &str,

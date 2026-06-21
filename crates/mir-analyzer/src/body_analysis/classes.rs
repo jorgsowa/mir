@@ -201,6 +201,7 @@ impl<'a> BodyAnalyzer<'a> {
         self.record_method_inference(fqcn, method_name, &inferred);
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn analyze_class_decl(
         &self,
         decl: &php_ast::owned::ClassDecl,
@@ -209,6 +210,7 @@ impl<'a> BodyAnalyzer<'a> {
         source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<Issue>,
         all_symbols: &mut Vec<ResolvedSymbol>,
+        guards: &rustc_hash::FxHashSet<std::sync::Arc<str>>,
     ) {
         crate::attributes::check_class_attributes(
             decl, self.db, file, source, source_map, all_issues,
@@ -237,26 +239,34 @@ impl<'a> BodyAnalyzer<'a> {
         );
 
         if let Some(parent) = &decl.extends {
-            crate::diagnostics::check_name_class_for_extends(
-                parent,
-                self.db,
-                file,
-                source,
-                source_map,
-                all_issues,
-                self.php_version,
-            );
+            let parent_str = crate::parser::name_to_string_owned(parent);
+            let parent_resolved = resolve_name(self.db, file.as_ref(), &parent_str);
+            if !guards.contains(parent_resolved.as_str()) {
+                crate::diagnostics::check_name_class_for_extends(
+                    parent,
+                    self.db,
+                    file,
+                    source,
+                    source_map,
+                    all_issues,
+                    self.php_version,
+                );
+            }
         }
         for iface in decl.implements.iter() {
-            check_name_class(
-                iface,
-                self.db,
-                file,
-                source,
-                source_map,
-                all_issues,
-                self.php_version,
-            );
+            let iface_str = crate::parser::name_to_string_owned(iface);
+            let iface_resolved = resolve_name(self.db, file.as_ref(), &iface_str);
+            if !guards.contains(iface_resolved.as_str()) {
+                check_name_class(
+                    iface,
+                    self.db,
+                    file,
+                    source,
+                    source_map,
+                    all_issues,
+                    self.php_version,
+                );
+            }
         }
 
         let scope_cx = MethodScopeCx {
@@ -309,6 +319,7 @@ impl<'a> BodyAnalyzer<'a> {
         all_issues: &mut Vec<Issue>,
         type_envs: &mut FxHashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
         all_symbols: &mut Vec<ResolvedSymbol>,
+        guards: &rustc_hash::FxHashSet<std::sync::Arc<str>>,
     ) {
         let class_name_owned = decl
             .name
@@ -324,26 +335,34 @@ impl<'a> BodyAnalyzer<'a> {
             crate::db::find_class_like(self.db, here).and_then(|c| c.parent().cloned());
 
         if let Some(parent) = &decl.extends {
-            crate::diagnostics::check_name_class_for_extends(
-                parent,
-                self.db,
-                file,
-                source,
-                source_map,
-                all_issues,
-                self.php_version,
-            );
+            let parent_str = crate::parser::name_to_string_owned(parent);
+            let parent_resolved = resolve_name(self.db, file.as_ref(), &parent_str);
+            if !guards.contains(parent_resolved.as_str()) {
+                crate::diagnostics::check_name_class_for_extends(
+                    parent,
+                    self.db,
+                    file,
+                    source,
+                    source_map,
+                    all_issues,
+                    self.php_version,
+                );
+            }
         }
         for iface in decl.implements.iter() {
-            check_name_class(
-                iface,
-                self.db,
-                file,
-                source,
-                source_map,
-                all_issues,
-                self.php_version,
-            );
+            let iface_str = crate::parser::name_to_string_owned(iface);
+            let iface_resolved = resolve_name(self.db, file.as_ref(), &iface_str);
+            if !guards.contains(iface_resolved.as_str()) {
+                check_name_class(
+                    iface,
+                    self.db,
+                    file,
+                    source,
+                    source_map,
+                    all_issues,
+                    self.php_version,
+                );
+            }
         }
 
         let scope_cx = MethodScopeCx {

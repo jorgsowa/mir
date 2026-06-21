@@ -172,6 +172,8 @@ impl<'a> BodyAnalyzer<'a> {
         all_symbols: &mut Vec<ResolvedSymbol>,
     ) {
         use php_ast::owned::StmtKind;
+        let mut guards: rustc_hash::FxHashSet<std::sync::Arc<str>> =
+            rustc_hash::FxHashSet::default();
         for stmt in stmts.iter() {
             match &stmt.kind {
                 StmtKind::Function(decl) => {
@@ -185,6 +187,7 @@ impl<'a> BodyAnalyzer<'a> {
                         source_map,
                         all_issues,
                         all_symbols,
+                        &guards,
                     );
                 }
                 StmtKind::Enum(decl) => {
@@ -220,6 +223,7 @@ impl<'a> BodyAnalyzer<'a> {
                 }
                 _ => {}
             }
+            accumulate_class_exists_guard(stmt, self.db, file.as_ref(), &mut guards);
         }
     }
 
@@ -235,6 +239,8 @@ impl<'a> BodyAnalyzer<'a> {
         all_symbols: &mut Vec<ResolvedSymbol>,
     ) {
         use php_ast::owned::StmtKind;
+        let mut guards: rustc_hash::FxHashSet<std::sync::Arc<str>> =
+            rustc_hash::FxHashSet::default();
         for stmt in stmts.iter() {
             match &stmt.kind {
                 StmtKind::Function(decl) => {
@@ -257,6 +263,7 @@ impl<'a> BodyAnalyzer<'a> {
                         all_issues,
                         type_envs,
                         all_symbols,
+                        &guards,
                     );
                 }
                 StmtKind::Enum(decl) => {
@@ -302,6 +309,70 @@ impl<'a> BodyAnalyzer<'a> {
                 }
                 _ => {}
             }
+            accumulate_class_exists_guard(stmt, self.db, file.as_ref(), &mut guards);
         }
+    }
+}
+
+/// If `stmt` is an `if (!class_exists('X')) { throw/return; }` guard, insert
+/// the proven-to-exist FQCN into `guards` so the immediately following class
+/// declaration can skip the UndefinedClass check for that name.
+fn accumulate_class_exists_guard(
+    stmt: &php_ast::owned::Stmt,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+    guards: &mut rustc_hash::FxHashSet<std::sync::Arc<str>>,
+) {
+    use php_ast::ast::UnaryPrefixOp;
+    use php_ast::owned::{ExprKind, StmtKind};
+
+    let StmtKind::If(if_stmt) = &stmt.kind else {
+        return;
+    };
+    // No else/elseif — we only handle the simple guard pattern.
+    if !if_stmt.elseif_branches.is_empty() || if_stmt.else_branch.is_some() {
+        return;
+    }
+    // Condition: `!class_exists(...)` / `!interface_exists(...)` / `!trait_exists(...)`
+    let ExprKind::UnaryPrefix(u) = &if_stmt.condition.kind else {
+        return;
+    };
+    if u.op != UnaryPrefixOp::BooleanNot {
+        return;
+    }
+    let ExprKind::FunctionCall(call) = &u.operand.kind else {
+        return;
+    };
+    let fn_name = match &call.name.kind {
+        ExprKind::Identifier(name) => name.as_ref(),
+        _ => return,
+    };
+    if !matches!(
+        fn_name.trim_start_matches('\\'),
+        "class_exists" | "interface_exists" | "trait_exists"
+    ) {
+        return;
+    }
+    // Then-body must diverge (throw or return).
+    if !then_branch_diverges(&if_stmt.then_branch) {
+        return;
+    }
+    if let Some(arg) = call.args.first() {
+        if let Some(fqcn) = crate::narrowing::extract_class_fqcn_from_expr(&arg.value, db, file) {
+            guards.insert(fqcn);
+        }
+    }
+}
+
+fn then_branch_diverges(stmt: &php_ast::owned::Stmt) -> bool {
+    use php_ast::owned::StmtKind;
+    match &stmt.kind {
+        StmtKind::Throw(_) => true,
+        StmtKind::Return(_) => true,
+        StmtKind::Block(block) => block
+            .stmts
+            .iter()
+            .any(|s| matches!(s.kind, StmtKind::Throw(_) | StmtKind::Return(_))),
+        _ => false,
     }
 }

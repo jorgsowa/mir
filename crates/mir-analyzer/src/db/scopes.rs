@@ -251,6 +251,7 @@ pub fn infer_scope(
                         &parsed.source_map,
                         &mut issues,
                         &mut symbols,
+                        &Default::default(),
                     ),
                     StmtKind::Enum(decl) => driver.analyze_enum_decl(
                         decl,
