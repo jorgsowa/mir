@@ -15,7 +15,9 @@ pub(super) fn operand_is_non_bitwise(ty: &Type) -> bool {
         return false;
     }
     ty.types.iter().all(|a| match a {
-        Atomic::TLiteralString(s) => !is_numeric_string(s),
+        // PHP coerces bool→int and allows string bitwise ops ("a"&"b"), so these
+        // are valid bitwise operands even though they aren't integers.
+        Atomic::TBool | Atomic::TTrue | Atomic::TFalse | Atomic::TLiteralString(_) => false,
         Atomic::TArray { .. }
         | Atomic::TList { .. }
         | Atomic::TNonEmptyArray { .. }
@@ -28,10 +30,7 @@ pub(super) fn operand_is_non_bitwise(ty: &Type) -> bool {
         | Atomic::TParent { .. }
         | Atomic::TIntersection { .. }
         | Atomic::TClosure { .. }
-        | Atomic::TLiteralEnumCase { .. }
-        | Atomic::TBool
-        | Atomic::TTrue
-        | Atomic::TFalse => true,
+        | Atomic::TLiteralEnumCase { .. } => true,
         _ => false,
     })
 }

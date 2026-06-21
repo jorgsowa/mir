@@ -111,6 +111,8 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
                     },
                     Atomic::TList { value: lv },
                 ) => *is_list && properties.values().all(|p| is_subtype(db, &p.ty, lv)),
+                // PHP implicitly coerces int to float in all numeric contexts.
+                (Atomic::TInt | Atomic::TLiteralInt(_), Atomic::TFloat) => true,
                 _ => false,
             }
         })
