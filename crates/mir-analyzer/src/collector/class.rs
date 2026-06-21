@@ -391,7 +391,10 @@ impl<'a> DefinitionCollector<'a> {
             extends_type_args,
             implements_type_args,
             is_abstract: decl.modifiers.is_abstract,
-            is_final: decl.modifiers.is_final || class_doc.is_final,
+            // @final is a soft convention — only the PHP `final` keyword enforces
+            // non-extensibility. Docblock-only @final is ignored to avoid FPs when
+            // tests or framework code legitimately extends @final-annotated classes.
+            is_final: decl.modifiers.is_final,
             is_readonly: decl.modifiers.is_readonly,
             deprecated: class_doc.deprecated.as_deref().map(Arc::from).or_else(|| {
                 // Also detect #[Deprecated] / #[\Deprecated] PHP attribute

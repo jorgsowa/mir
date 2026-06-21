@@ -1,5 +1,6 @@
 ===description===
-Invalid extends annotated final class
+@final is a soft docblock convention — the PHP `final` keyword enforces non-extensibility,
+but @final alone must not emit InvalidExtendClass (it is an IDE hint, not a PHP rule).
 ===file===
 <?php
 
@@ -11,4 +12,3 @@ class DoctrineA {}
 class DoctrineB extends DoctrineA {}
 
 ===expect===
-InvalidExtendClass@8:0-8:36: Class DoctrineB cannot extend final class DoctrineA
