@@ -1,6 +1,6 @@
 use super::DefinitionCollector;
 use crate::parser::{name_to_string_owned, type_from_hint_owned};
-use mir_codebase::storage::{ConstantDef, PropertyDef, TemplateParam};
+use mir_codebase::storage::{ConstantDef, FnParam, MethodDef, PropertyDef, TemplateParam};
 use mir_codebase::ClassDef;
 use mir_types::Atomic;
 use php_ast::owned::{ClassDecl, ClassMemberKind};
@@ -167,10 +167,12 @@ impl<'a> DefinitionCollector<'a> {
                         Some(&type_aliases),
                         &class_template_params,
                     ) {
-                        own_methods.insert(
-                            Arc::from(method.name.to_lowercase().as_str()),
-                            Arc::new(method),
-                        );
+                        let key = Arc::from(method.name.to_lowercase().as_str());
+                        if let Some(existing) = own_methods.get(&key) {
+                            own_methods.insert(key, merge_method_overloads(existing, &method));
+                        } else {
+                            own_methods.insert(key, Arc::new(method));
+                        }
                     }
                 }
                 ClassMemberKind::Property(p) => {
@@ -509,4 +511,48 @@ fn resolve_attribute_constant(name: &str) -> Option<i64> {
         "TARGET_ALL" => Some(ATTR_TARGET_ALL),
         _ => None,
     }
+}
+
+/// Merge two overloaded method definitions into one permissive signature.
+///
+/// PHP stubs represent constructor/method overloads as repeated declarations.
+/// We keep the longest param list and mark any param at index ≥ min_required
+/// (the minimum required count across both overloads) as optional.
+fn merge_method_overloads(existing: &Arc<MethodDef>, new_def: &MethodDef) -> Arc<MethodDef> {
+    let count_required = |params: &[FnParam]| {
+        params
+            .iter()
+            .take_while(|p| !p.is_optional && !p.has_default && !p.is_variadic)
+            .count()
+    };
+    let min_required = count_required(&existing.params).min(count_required(&new_def.params));
+
+    let longer = if new_def.params.len() >= existing.params.len() {
+        new_def
+    } else {
+        existing.as_ref()
+    };
+
+    let merged_params: Arc<[FnParam]> = longer
+        .params
+        .iter()
+        .enumerate()
+        .map(|(i, p)| {
+            if i >= min_required {
+                FnParam {
+                    has_default: true,
+                    is_optional: true,
+                    ..p.clone()
+                }
+            } else {
+                p.clone()
+            }
+        })
+        .collect::<Vec<_>>()
+        .into();
+
+    Arc::new(MethodDef {
+        params: merged_params,
+        ..longer.clone()
+    })
 }
