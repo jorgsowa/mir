@@ -25,14 +25,16 @@ jobs:
           notes=$(awk "/^## \[${version}\]/{found=1; next} found && /^## \[/{exit} found{print}" CHANGELOG.md)
           printf 'notes<<EOF\n%s\nEOF\n' "$notes" >> "$GITHUB_OUTPUT"
 
-      - name: Create release
+      - name: Create draft release
         run: |
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \
             --notes "$NOTES" \
+            --draft \
           || gh release edit "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \
-            --notes "$NOTES"
+            --notes "$NOTES" \
+            --draft
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NOTES: ${{ steps.changelog.outputs.notes }}
@@ -82,9 +84,20 @@ jobs:
           checksum: sha256
           token: ${{ secrets.GITHUB_TOKEN }}
 
+  publish-release:
+    name: Publish GitHub Release
+    needs: upload-assets
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Publish release
+        run: gh release edit "$GITHUB_REF_NAME" --draft=false
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   publish-crates:
     name: Publish to crates.io
-    needs: upload-assets
+    needs: publish-release
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -121,7 +134,7 @@ jobs:
 
   publish-composer:
     name: Publish to Packagist
-    needs: upload-assets
+    needs: publish-release
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -133,7 +146,7 @@ jobs:
 
   deploy-docs:
     name: Deploy docs
-    needs: upload-assets
+    needs: publish-release
     uses: ./.github/workflows/docs.yml
     permissions:
       contents: read
