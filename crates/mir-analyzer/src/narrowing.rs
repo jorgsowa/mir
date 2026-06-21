@@ -1944,6 +1944,13 @@ fn promote_assignment_effects(
         ExprKind::Parenthesized(inner) => {
             promote_assignment_effects(inner, ctx, db, file);
         }
+        // Array access: both base and index are evaluated; assignments inside either matter.
+        ExprKind::ArrayAccess(aa) => {
+            promote_assignment_effects(&aa.array, ctx, db, file);
+            if let Some(idx) = &aa.index {
+                promote_assignment_effects(idx, ctx, db, file);
+            }
+        }
         _ => {}
     }
 }

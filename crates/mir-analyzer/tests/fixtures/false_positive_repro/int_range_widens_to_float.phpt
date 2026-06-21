@@ -4,8 +4,7 @@ a `float` parameter, just as plain `int` does. Regression: `strlen()` returns
 `int<0, max>`, and passing it to `log()` (which takes `float`) was emitting
 `InvalidArgument`.
 ===config===
-[analysis]
-php_version = "8.1"
+php_version=8.1
 ===file===
 <?php
 declare(strict_types=1);
@@ -24,4 +23,3 @@ function range_log(string $s): float {
     return log($len + 1); // int<0, max> + 1 -> float param
 }
 ===expect===
-No errors
