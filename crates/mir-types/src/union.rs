@@ -1319,6 +1319,7 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         (Atomic::TNegativeInt, Atomic::TFloat) => true,
         (Atomic::TNonNegativeInt, Atomic::TFloat) => true,
         (Atomic::TInt, Atomic::TFloat) => true,
+        (Atomic::TIntRange { .. }, Atomic::TFloat) => true,
 
         // Literal int satisfies an int range only when the value is within bounds
         (Atomic::TLiteralInt(n), Atomic::TIntRange { min, max }) => {
