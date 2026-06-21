@@ -504,16 +504,6 @@ impl FlowState {
         Arc::make_mut(&mut self.prop_refined).insert(key, mir_codebase::storage::wrap_var_type(ty));
     }
 
-    /// Remove a refined type entry (e.g. after a write that invalidates it).
-    #[allow(dead_code)]
-    pub fn clear_prop_refined(&mut self, obj_var: &str, prop: &str) {
-        let key = (
-            Name::from(obj_var.trim_start_matches('$')),
-            Name::from(prop),
-        );
-        Arc::make_mut(&mut self.prop_refined).remove(&key);
-    }
-
     /// Mark a variable as carrying tainted (user-controlled) data.
     pub fn taint_var(&mut self, name: &str) {
         let name = Name::from(name.trim_start_matches('$'));

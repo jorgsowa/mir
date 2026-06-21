@@ -1,5 +1,5 @@
 ===description===
-Unsupported reference usage continues analysis
+Reference assignment to array offset: no issue, type is traceable
 ===config===
 suppress=Trace,UnusedVariable
 ===file===
@@ -10,7 +10,6 @@ $arr = [];
 /** @var non-empty-list<string> */
 $foo = ["foo"];
 
-/** @suppress UnsupportedReferenceUsage */
 $bar = &$arr[$foo[0]];
 
 /** @trace $bar */;
