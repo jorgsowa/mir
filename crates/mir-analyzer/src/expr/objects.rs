@@ -903,6 +903,27 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
                 Atomic::TNamedObject { fqcn, .. }
                     if crate::db::class_kind(self.db, fqcn.as_ref())
+                        .is_some_and(|k| k.is_trait) =>
+                {
+                    // Inside a trait body $this is typed as the trait itself.
+                    // Properties can be declared on the trait or inherited from
+                    // trait ancestors. If not found, return mixed silently —
+                    // the using class might supply the property.
+                    let prop_result = crate::db::find_property_in_chain(
+                        self.db,
+                        crate::db::Fqcn::new(self.db, *fqcn),
+                        prop_name,
+                    );
+                    if let Some((owner, p)) = prop_result {
+                        let ty = p.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
+                        self.record_ref(Arc::from(format!("{}::{}", owner, prop_name)), span);
+                        *declaring_class = Some(owner);
+                        return ty;
+                    }
+                    return Type::mixed();
+                }
+                Atomic::TNamedObject { fqcn, .. }
+                    if crate::db::class_kind(self.db, fqcn.as_ref())
                         .is_some_and(|k| k.is_interface) =>
                 {
                     if let Some(crate::db::ClassLike::Interface(iface)) = crate::db::find_class_like(
