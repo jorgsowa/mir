@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.46.0] - 2026-06-21
+
+### Added
+
+- `DeprecatedTrait` is now reported when a trait `use`s another deprecated trait.
+- `DeprecatedInterface` is now reported when an interface extends a deprecated interface, or an enum implements one.
+- `key-of<T>` and `value-of<T>` now resolve to the real key and value types in return-type checks; valid returns are accepted without false `InvalidReturnType`. Float-literal docblock types (e.g. `@return 3.14`) now parse and accept a matching float return. Psalm pseudo-types (`truthy-string`, `int-mask<…>`, `non-falsy-string`) in `@return` no longer emit `UndefinedClass`.
+
+### Fixed
+
+- **Method overrides (G4/G5):** Return-covariance violations in mixed `object|scalar` unions are now caught (e.g. widening `string|Cat` to `string|Animal` is flagged). Covariance-legal narrowing (e.g. `string|Animal` to `string|Cat`) and parameter widening are still accepted. Template `@return T of Bound` methods no longer emit false `InvalidReturnType` when the returned value satisfies the bound.
+- **FP-H (`@method static` return type):** `@method static name()` is now correctly parsed as a non-static method returning `static`, not a static modifier. Carbon-style fluent docblocks no longer cause `MethodSignatureMismatch` on concrete overrides in subclasses.
+- **FP-J (`@final` docblock):** Classes annotated with `@final` via docblock (not the PHP `final` keyword) no longer emit `InvalidExtendClass` when extended. The `@final` convention is an IDE hint only.
+- **FP-E (trait `$this` access):** `$this->prop` declared in the same trait now resolves to the declared type inside trait methods, eliminating false `UndefinedProperty` and `mixed` inference on self-contained trait properties.
+- **FP-K (`DatePeriod` overloads):** `new DatePeriod('R5/…')` (ISO 8601 one-argument form) no longer emits `TooFewArguments`. The arity minimum is computed across all declared constructor overloads.
+- **FP-B (property refinement):** Assigning a `mixed` or incompatible type to a property now clears any prior refinement, preventing stale narrowed types from producing `NullableReturnStatement` false positives downstream.
+- **FP-M (`int`/`bool` coercion):** Passing `int` to a `float` parameter no longer emits `InvalidArgument` — PHP implicitly coerces. Bitwise operators on `bool` operands no longer emit `InvalidOperand` — PHP coerces `bool` to `int`.
+- **FP-O/N (negative type guards and nullable property throws):** `if (!is_string($x)) { throw …; }` and `if (!is_int($n)) { return; }` now narrow `$x`/`$n` in the fallthrough branch. Nullable properties guarded by `!== null` before a `throw` (`if ($this->ex !== null) { throw $this->ex; }`) are also narrowed correctly, eliminating `InvalidThrow` false positives.
+- **FP-I (`use … as` alias and `#[\Override]`):** `use Foo as Bar` import aliases are now resolved before override checks. Classes that extend an aliased parent no longer emit `InvalidOverride` for methods that exist on the aliased class.
+- **FP-L (reference assignment):** `$b = &$a`, `$ref = &$arr[0]`, and `$ref = &$obj->prop` no longer emit `UnsupportedReferenceUsage`. By-reference method out-parameters also define the argument variable, suppressing `UndefinedVariable`.
+- **FP-C (`preg_replace` stub):** `preg_replace()` return type corrected — `|null` removed from the string-subject overload. Returning `preg_replace()` directly from a `string`-returning function no longer emits `NullableReturnStatement`.
+- **`@internal` scoping:** `@internal` is now scoped to the root namespace of the declaring package. Callers in sub-namespaces of the declaring package (e.g. `Symfony\Component\Console\Helper` calling `Symfony\Component\Console\Output::doWrite()`) are no longer flagged.
+- **Open-file session:** The open-file pre-loader now collects `extends`/`implements` references, ensuring parent classes and implemented interfaces are loaded before analysis of the opened file.
+- **`extract()` and variable-variable assignments:** `extract($arr)` no longer emits `UndefinedVariable` for variables populated at runtime. Variable-variable assignments (`$$key = …`) likewise suppress `UndefinedVariable` for later reads.
+- **Empty array + generic types:** An empty array literal (`[]`) now satisfies a `list<T>`, `array<K,V>`, or any other generic collection type argument, including in generic wrapper classes (`new Wrap([])`).
+
+### Changed
+
+- Updated php-rs-parser, php-ast, php-lexer, and phpdoc-parser from 0.18.0 to 0.18.1.
+
 ## [0.45.0] - 2026-06-18
 
 ### Added
