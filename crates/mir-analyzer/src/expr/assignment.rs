@@ -438,6 +438,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 .unwrap_or(true);
                         if should_refine {
                             ctx.set_prop_refined(obj_var.as_ref(), &prop_name, ty.clone());
+                        } else {
+                            // Assignment with incompatible or unknown (mixed) type: discard
+                            // any stale guard-based narrowing so reads fall back to declared.
+                            ctx.clear_prop_refined(obj_var.as_ref(), &prop_name);
                         }
                     }
                 }
