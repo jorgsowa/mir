@@ -488,6 +488,30 @@ pub fn analyzed_enum_defs(
     out
 }
 
+pub fn analyzed_trait_defs(
+    db: &dyn MirDatabase,
+    analyzed_files: &rustc_hash::FxHashSet<Arc<str>>,
+) -> Vec<(Arc<str>, Arc<mir_codebase::storage::TraitDef>)> {
+    let mut files: Vec<SourceFile> = if analyzed_files.is_empty() {
+        db.all_source_files()
+    } else {
+        analyzed_files
+            .iter()
+            .filter_map(|p| db.lookup_source_file(p))
+            .collect()
+    };
+    files.sort_by_key(|a| a.path(db));
+    let mut out = Vec::new();
+    for sf in files {
+        let defs = collect_file_definitions(db, sf);
+        for t in defs.slice.traits.iter() {
+            out.push((t.fqcn.clone(), t.clone()));
+        }
+    }
+    out.sort_by(|a, b| a.0.cmp(&b.0));
+    out
+}
+
 #[salsa::tracked]
 pub fn interface_def_at(
     db: &dyn MirDatabase,

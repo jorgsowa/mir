@@ -73,3 +73,7 @@ codegen-units = 1
 # compiled once then cached, so tests run faster with no ongoing compile cost.
 [profile.dev.package."*"]
 opt-level = 3
+
+# EXPERIMENT: cut test-profile debuginfo to speed test compiles.
+[profile.test]
+debug = 0

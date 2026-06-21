@@ -385,6 +385,38 @@ impl<'a> ClassAnalyzer<'a> {
             self.check_magic_method_casing(&enum_fqcn, &mut issues);
         }
 
+        // ---- 5c. DeprecatedTrait: trait uses a deprecated trait ---------------
+        for (trait_fqcn, trait_def) in crate::db::analyzed_trait_defs(self.db, &self.analyzed_files)
+        {
+            let _ = &trait_fqcn;
+            let location = trait_def.location.clone();
+            for used_trait_fqcn in trait_def.traits.iter() {
+                let fqcn_key = crate::db::Fqcn::from_str(self.db, used_trait_fqcn.as_ref());
+                let Some(canonical) = crate::db::find_class_like(self.db, fqcn_key) else {
+                    continue;
+                };
+                if let Some(msg) = canonical.deprecated() {
+                    let loc = issue_location(
+                        location.as_ref(),
+                        location
+                            .as_ref()
+                            .and_then(|l| self.sources.get(&l.file).copied()),
+                    );
+                    let mut issue = Issue::new(
+                        IssueKind::DeprecatedTrait {
+                            name: used_trait_fqcn.to_string(),
+                            message: Some(msg.clone()).filter(|m| !m.is_empty()),
+                        },
+                        loc,
+                    );
+                    if let Some(snippet) = extract_snippet(location.as_ref(), &self.sources) {
+                        issue = issue.with_snippet(snippet);
+                    }
+                    issues.push(issue);
+                }
+            }
+        }
+
         // ---- 6. Circular inheritance detection --------------------------------
         self.check_circular_class_inheritance(&mut issues);
         self.check_circular_interface_inheritance(&mut issues);
