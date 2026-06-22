@@ -10,6 +10,8 @@ class Animal {}
 class Dog extends Animal {}
 class Cat extends Animal {}
 
+function needs_int(int $i): void {}
+
 /** @param Animal|Dog|null $obj */
 function test_true_branch_keeps_subclass(mixed $obj): void {
     if (is_subclass_of($obj, 'Animal')) {
@@ -20,13 +22,14 @@ function test_true_branch_keeps_subclass(mixed $obj): void {
 }
 
 /** @param Animal $obj */
-function test_false_branch_keeps_exact_class(Animal $obj): void {
-    // Animal is NOT a subclass of itself, so is_subclass_of may return false
-    // even when $obj is typed as Animal. The false branch must keep Animal —
-    // removing it would diverge and suppress later diagnostics.
+function test_false_branch_stays_alive(Animal $obj): void {
+    // Animal is NOT a strict subclass of itself, so is_subclass_of($obj, 'Animal')
+    // can return false even when $obj is Animal. The false branch must NOT diverge —
+    // before the fix, filter_out_instanceof_match removed Animal from Animal (empty),
+    // then mark_diverges=true caused ctx.diverges, suppressing needs_int below.
+    // After the fix: false branch does no narrowing → branch alive → InvalidArgument fires.
     if (!is_subclass_of($obj, 'Animal')) {
-        /** @mir-check $obj is Animal */
-        $_ = $obj;
+        needs_int($obj);
     }
 }
 
@@ -43,3 +46,4 @@ function test_true_branch_drops_exact_and_non_object(mixed $obj): void {
     }
 }
 ===expect===
+InvalidArgument@25:18-25:22: Argument $i of needs_int() expects 'int', got 'Animal'
