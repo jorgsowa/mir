@@ -42,9 +42,8 @@ pub(super) fn validate_type_str(s: &str, tag: &str) -> Option<String> {
 
 /// Validates semantic constraints on generic type expressions like `int<min, max>` and `array<key, value>`.
 pub(super) fn validate_generic_semantics(s: &str, tag: &str) -> Option<String> {
-    let lower = s.to_lowercase();
     let (name, inner) = extract_generic_content(s)?;
-    match lower[..name.len()].as_ref() {
+    match name.to_lowercase().as_str() {
         "int" => validate_int_range_inner(inner, tag),
         "array" | "non-empty-array" => validate_array_key_inner(inner, tag),
         _ => None,

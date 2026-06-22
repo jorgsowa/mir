@@ -171,7 +171,16 @@ impl AnalyzerDb {
         }
         let path_sources: Vec<(PathBuf, String)> = all_paths
             .into_iter()
-            .filter_map(|p| std::fs::read_to_string(&p).ok().map(|s| (p, s)))
+            .filter_map(|p| match std::fs::read_to_string(&p) {
+                Ok(s) => Some((p, s)),
+                Err(e) => {
+                    eprintln!(
+                        "mir: warning: failed to read user stub {}: {e}",
+                        p.display()
+                    );
+                    None
+                }
+            })
             .collect();
 
         let mut guard = self.salsa.write();

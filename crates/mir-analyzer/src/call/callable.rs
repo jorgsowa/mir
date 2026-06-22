@@ -456,6 +456,20 @@ pub(crate) fn string_preserve_non_empty(arg_types: &[Type]) -> Option<Type> {
     }
 }
 
+/// Return `TString` (or `TNonEmptyString`) when the argument at `idx` is a string
+/// type — strips false/null/array from the stub return for functions that are
+/// effectively total when called with a string argument.
+pub(crate) fn string_if_string_arg(arg_types: &[Type], idx: usize) -> Option<Type> {
+    let arg = arg_types.get(idx)?;
+    if is_non_empty_string(arg) {
+        Some(Type::single(Atomic::TNonEmptyString))
+    } else if !arg.types.is_empty() && arg.types.iter().all(|a| a.is_string()) {
+        Some(Type::single(Atomic::TString))
+    } else {
+        None
+    }
+}
+
 /// Infer the return type of `number_format()`.
 ///
 /// `number_format()` always returns a non-empty string — even `number_format(0)`
@@ -1495,11 +1509,11 @@ pub(crate) fn preg_split_return_type(arg_types: &[Type]) -> Option<Type> {
     if !flags_zero {
         return None;
     }
-    // No PREG_SPLIT_NO_EMPTY → always at least one part.
-    let mut result = Type::single(Atomic::TNonEmptyList {
+    // No PREG_SPLIT_NO_EMPTY → always at least one part. The false case only
+    // fires on an invalid regex, which PHP code never handles in practice.
+    let result = Type::single(Atomic::TNonEmptyList {
         value: Box::new(Type::single(Atomic::TString)),
     });
-    result.add_type(Atomic::TFalse);
     Some(result)
 }
 

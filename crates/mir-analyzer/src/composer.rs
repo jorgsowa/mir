@@ -231,7 +231,13 @@ fn parse_vendor(root: &Path, entries: &mut Vec<(String, PathBuf)>, extras: &mut 
     };
     let value: serde_json::Value = match serde_json::from_str(&content) {
         Ok(v) => v,
-        Err(_) => return,
+        Err(e) => {
+            eprintln!(
+                "mir: warning: failed to parse {}: {e} (vendor PSR-4 map will be empty)",
+                installed_path.display()
+            );
+            return;
+        }
     };
 
     let packages = if let Some(arr) = value.get("packages").and_then(|v| v.as_array()) {
@@ -293,7 +299,13 @@ fn read_files_autoload(vendor_dir: &Path, base_dir: &Path) -> Vec<PathBuf> {
     };
     let value: serde_json::Value = match serde_json::from_str(&content) {
         Ok(v) => v,
-        Err(_) => return Vec::new(),
+        Err(e) => {
+            eprintln!(
+                "mir: warning: failed to parse {}: {e} (autoload.files from vendor will be empty)",
+                installed_path.display()
+            );
+            return Vec::new();
+        }
     };
     let packages = if let Some(arr) = value.get("packages").and_then(|v| v.as_array()) {
         arr.clone()
