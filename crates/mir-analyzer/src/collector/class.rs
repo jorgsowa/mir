@@ -250,9 +250,28 @@ impl<'a> DefinitionCollector<'a> {
                         continue;
                     }
                     let const_name = c.name.as_deref().unwrap_or_default();
+                    // PHP 8.3: typed class constants (`const int FOO = 1`).
+                    // Prefer @var docblock, then the native type hint, then mixed.
+                    let hint_ty = self.resolve_union_opt(
+                        c.type_hint
+                            .as_ref()
+                            .map(|h| type_from_hint_owned(h, Some(&fqcn))),
+                    );
+                    let const_ty = const_doc
+                        .var_type
+                        .map(|t| {
+                            self.resolve_union_doc_with_templates(
+                                t,
+                                &class_template_names,
+                                &fqcn,
+                                &class_template_params,
+                            )
+                        })
+                        .or(hint_ty)
+                        .unwrap_or_else(mir_types::Type::mixed);
                     let constant = ConstantDef {
                         name: Arc::from(const_name),
-                        ty: mir_types::Type::mixed(),
+                        ty: const_ty,
                         visibility: c.visibility.map(|v| Self::convert_visibility(Some(v))),
                         is_final: c.is_final,
                         location: Some(self.location(member.span.start, member.span.end)),
