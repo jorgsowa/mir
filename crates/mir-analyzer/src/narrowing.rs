@@ -491,11 +491,93 @@ pub fn narrow_from_condition(
                             }
                         }
                     }
-                } else if bare.eq_ignore_ascii_case("is_a")
-                    || bare.eq_ignore_ascii_case("is_subclass_of")
-                {
-                    // is_a($obj, 'ClassName') / is_subclass_of($obj, 'ClassName') →
-                    // narrow $obj to ClassName in the true branch.
+                } else if bare.eq_ignore_ascii_case("is_a") {
+                    // is_a($obj, 'ClassName') → instanceof semantics (includes exact class).
+                    // When $allow_string (3rd arg) is truthy, the first arg may be a class-string
+                    // — preserve string/class-string atoms so the true branch stays reachable
+                    // and no false diverge is set in the false branch.
+                    if let (Some(obj_arg), Some(class_arg)) = (call.args.first(), call.args.get(1))
+                    {
+                        if let Some(var_name) = extract_var_name(&obj_arg.value) {
+                            if let Some(class_name) =
+                                extract_class_fqcn_from_expr(&class_arg.value, db, file)
+                            {
+                                let allow_string = call
+                                    .args
+                                    .get(2)
+                                    .map(|a| is_truthy_bool_literal(&a.value))
+                                    .unwrap_or(false);
+                                let current = ctx.get_var(&var_name);
+                                if allow_string {
+                                    // When allow_string is true, string/class-string atoms are
+                                    // valid is_a() true-branch values — preserve them so the
+                                    // true branch stays reachable and type is not wrongly erased.
+                                    let narrowed = if is_true {
+                                        // Partition into string-like (kept as-is) and object-like
+                                        // (narrowed via instanceof) so `narrow_instanceof_preserving_subtypes`
+                                        // fallback doesn't inject a spurious named-object atom when
+                                        // the current type is purely string/class-string.
+                                        let mut result = Type::empty();
+                                        result.possibly_undefined = current.possibly_undefined;
+                                        result.from_docblock = current.from_docblock;
+                                        let mut obj_part = Type::empty();
+                                        for atom in &current.types {
+                                            if atom.is_string()
+                                                || matches!(atom, Atomic::TClassString(_))
+                                            {
+                                                result.add_type(atom.clone());
+                                            } else {
+                                                obj_part.add_type(atom.clone());
+                                            }
+                                        }
+                                        if !obj_part.is_empty() || current.is_mixed() {
+                                            let obj_src = if obj_part.is_empty() {
+                                                &current
+                                            } else {
+                                                &obj_part
+                                            };
+                                            let obj_narrowed =
+                                                narrow_instanceof_preserving_subtypes(
+                                                    obj_src,
+                                                    &class_name,
+                                                    db,
+                                                    &ctx.template_param_names,
+                                                );
+                                            for atom in obj_narrowed.types.iter() {
+                                                result.add_type(atom.clone());
+                                            }
+                                        }
+                                        result
+                                    } else {
+                                        filter_out_instanceof_match(&current, &class_name, db)
+                                    };
+                                    // Don't mark diverges when allow_string is set: a
+                                    // class-string variable may still be a valid non-object
+                                    // value that passes the test.
+                                    set_narrowed(ctx, &var_name, &current, narrowed, false);
+                                } else {
+                                    let narrowed = if is_true {
+                                        narrow_instanceof_preserving_subtypes(
+                                            &current,
+                                            &class_name,
+                                            db,
+                                            &ctx.template_param_names,
+                                        )
+                                    } else {
+                                        filter_out_instanceof_match(&current, &class_name, db)
+                                    };
+                                    set_narrowed(ctx, &var_name, &current, narrowed, true);
+                                }
+                            }
+                        }
+                    }
+                } else if bare.eq_ignore_ascii_case("is_subclass_of") {
+                    // is_subclass_of($obj, 'ClassName') → strict-subclass check: the exact
+                    // class itself is NOT a subclass of itself.
+                    // True branch: keep only atoms that are known strict subclasses.
+                    // False branch: no narrowing — is_subclass_of being false doesn't tell us
+                    // the variable isn't Foo; Foo is not a subclass of itself, so Foo atoms
+                    // must be kept (removing them would make a later `Foo` use diverge).
                     if let (Some(obj_arg), Some(class_arg)) = (call.args.first(), call.args.get(1))
                     {
                         if let Some(var_name) = extract_var_name(&obj_arg.value) {
@@ -503,17 +585,18 @@ pub fn narrow_from_condition(
                                 extract_class_fqcn_from_expr(&class_arg.value, db, file)
                             {
                                 let current = ctx.get_var(&var_name);
-                                let narrowed = if is_true {
-                                    narrow_instanceof_preserving_subtypes(
+                                if is_true {
+                                    let narrowed = narrow_strict_subclass_of(
                                         &current,
                                         &class_name,
                                         db,
                                         &ctx.template_param_names,
-                                    )
-                                } else {
-                                    filter_out_instanceof_match(&current, &class_name, db)
-                                };
-                                set_narrowed(ctx, &var_name, &current, narrowed, true);
+                                    );
+                                    // mark_diverges=false: the exact class being absent from
+                                    // strict-subclass narrowing doesn't make the branch dead.
+                                    set_narrowed(ctx, &var_name, &current, narrowed, false);
+                                }
+                                // False branch: leave current type unchanged.
                             }
                         }
                     }
@@ -898,6 +981,72 @@ fn filter_out_instanceof_match(current: &Type, class_name: &str, db: &dyn MirDat
 
 fn named_object_matches_instanceof(fqcn: &str, class_name: &str, db: &dyn MirDatabase) -> bool {
     fqcn == class_name || crate::db::extends_or_implements(db, fqcn, class_name)
+}
+
+/// Narrow `current` for the true branch of `is_subclass_of($obj, 'ClassName')`.
+///
+/// Unlike `instanceof` / `is_a`, `is_subclass_of` requires a *strict* subclass:
+/// the exact class itself is excluded. Atoms that are only the named class (not a
+/// descendant) are dropped. Mixed/TObject are narrowed to the named class as the
+/// best approximation (a value satisfying `is_subclass_of` must be some subclass,
+/// and the named class is the tightest bound we can express).
+fn narrow_strict_subclass_of(
+    current: &Type,
+    class_name: &str,
+    db: &dyn MirDatabase,
+    template_param_names: &rustc_hash::FxHashSet<mir_types::Name>,
+) -> Type {
+    let narrowed_ty = Atomic::TNamedObject {
+        fqcn: class_name.into(),
+        type_params: mir_types::union::empty_type_params(),
+    };
+
+    if current.is_empty() || current.is_mixed() {
+        return Type::single(narrowed_ty);
+    }
+
+    let mut result = Type::empty();
+    result.possibly_undefined = current.possibly_undefined;
+    result.from_docblock = current.from_docblock;
+
+    for atomic in &current.types {
+        match atomic {
+            // Strict subclass: keep only atoms that extend/implement without being the class itself.
+            Atomic::TNamedObject { fqcn, .. }
+            | Atomic::TSelf { fqcn }
+            | Atomic::TStaticObject { fqcn }
+            | Atomic::TParent { fqcn }
+                if crate::db::extends_or_implements(db, fqcn.as_ref(), class_name)
+                    && fqcn.as_ref() != class_name =>
+            {
+                result.add_type(atomic.clone());
+            }
+            // Template parameter — narrow to the named class as the bound.
+            Atomic::TNamedObject { fqcn, type_params }
+                if type_params.is_empty()
+                    && !fqcn.contains('\\')
+                    && template_param_names.contains(fqcn) =>
+            {
+                result.add_type(narrowed_ty.clone());
+            }
+            Atomic::TTemplateParam { .. } => {
+                result.add_type(narrowed_ty.clone());
+            }
+            Atomic::TObject | Atomic::TMixed => result.add_type(narrowed_ty.clone()),
+            _ => {}
+        }
+    }
+
+    result
+    // Note: no fallback to Type::single(narrowed_ty) when result is empty — if the
+    // current type contains no known subclasses of the named class, the narrowing
+    // returns empty and the caller should NOT mark diverges (is_subclass_of may still
+    // be false at runtime for the exact class, which is valid).
+}
+
+/// Returns true if `expr` is the boolean literal `true`.
+fn is_truthy_bool_literal(expr: &php_ast::owned::Expr) -> bool {
+    matches!(expr.kind, php_ast::owned::ExprKind::Bool(true))
 }
 
 /// Apply a pre-computed narrowed type to a variable.

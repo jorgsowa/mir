@@ -620,8 +620,19 @@ impl Type {
     }
 
     /// Narrow as if `is_callable($x)` is true.
+    ///
+    /// PHP accepts closures, TCallable, strings (function names), arrays
+    /// (['Class', 'method'] or [$obj, 'method']), and objects with __invoke.
+    /// Keep all of these; only drop atoms that are definitely not callable
+    /// (scalars, null, bool, etc.).
     pub fn narrow_to_callable(&self) -> Type {
-        self.filter(|t| t.is_callable() || matches!(t, Atomic::TMixed))
+        self.filter(|t| {
+            t.is_callable()
+                || t.is_string()
+                || t.is_array()
+                || t.is_object()
+                || matches!(t, Atomic::TMixed)
+        })
     }
 
     /// Narrow as if `is_scalar($x)` is true (int | string | float | bool).
