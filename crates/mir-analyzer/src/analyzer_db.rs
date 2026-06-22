@@ -115,6 +115,34 @@ impl AnalyzerDb {
         (**guard).clone()
     }
 
+    /// Register or update a [`crate::db::SourceFile`] salsa input and return its
+    /// handle. The single write-path entry point for callers that drive the db
+    /// directly (e.g. an LSP server sharing this db) instead of via
+    /// `ingest_file`.
+    pub fn upsert_source_file(
+        &self,
+        path: Arc<str>,
+        text: Arc<str>,
+        durability: salsa::Durability,
+    ) -> crate::db::SourceFile {
+        self.salsa
+            .write()
+            .upsert_source_file_with_durability(path, text, durability)
+    }
+
+    /// Look up an existing [`crate::db::SourceFile`] handle by path. Reads the
+    /// off-salsa path→handle registry (a plain map read — safe under the read
+    /// lock, no `ZalsaLocal` access).
+    pub fn lookup_source_file(&self, path: &str) -> Option<crate::db::SourceFile> {
+        use crate::db::MirDatabase as _;
+        self.salsa.read().lookup_source_file(path)
+    }
+
+    /// Mark a [`crate::db::SourceFile`] as removed from the workspace.
+    pub fn remove_source_file(&self, path: &str) {
+        self.salsa.write().remove_source_file(path);
+    }
+
     /// Ingest multiple stub paths. Idempotent — already-loaded stubs are skipped.
     pub fn ingest_stub_paths(&self, paths: &[&'static str], _php_version: PhpVersion) {
         // Identify needed paths (filter to those not yet loaded).

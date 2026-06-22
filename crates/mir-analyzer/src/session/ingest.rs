@@ -13,6 +13,63 @@ impl AnalysisSession {
         self.db.snapshot_db()
     }
 
+    /// Register or update a [`crate::db::SourceFile`] salsa input and return its
+    /// handle, without running definition collection or reference recording.
+    ///
+    /// The write-path entry point for a host that drives this db's salsa inputs
+    /// directly (the LSP database-convergence path) and pulls definitions
+    /// lazily via tracked queries, rather than the eager [`Self::ingest_file`].
+    ///
+    /// **Internal API — exposes Salsa types.** Subject to change without notice.
+    #[doc(hidden)]
+    pub fn upsert_source_file(
+        &self,
+        path: Arc<str>,
+        text: Arc<str>,
+        durability: salsa::Durability,
+    ) -> crate::db::SourceFile {
+        self.db.upsert_source_file(path, text, durability)
+    }
+
+    /// Look up an existing [`crate::db::SourceFile`] handle by path.
+    ///
+    /// **Internal API — exposes Salsa types.** Subject to change without notice.
+    #[doc(hidden)]
+    pub fn lookup_source_file(&self, path: &str) -> Option<crate::db::SourceFile> {
+        self.db.lookup_source_file(path)
+    }
+
+    /// Mark a [`crate::db::SourceFile`] as removed from the workspace.
+    ///
+    /// **Internal API — exposes Salsa types.** Subject to change without notice.
+    #[doc(hidden)]
+    pub fn remove_source_file_input(&self, path: &str) {
+        self.db.remove_source_file(path);
+    }
+
+    /// Run `f` with exclusive `&mut` access to the shared salsa db, for a host
+    /// that owns additional salsa ingredients (inputs/tracked fns) on this db
+    /// and needs to create or mutate them. Held under the db write lock, so it
+    /// serialises with all other writers.
+    ///
+    /// **Internal API — exposes Salsa types.** Subject to change without notice.
+    #[doc(hidden)]
+    pub fn with_db_mut<R>(&self, f: impl FnOnce(&mut MirDbStorage) -> R) -> R {
+        let mut guard = self.db.salsa.write();
+        f(&mut guard)
+    }
+
+    /// Run `f` with shared access to the canonical (non-snapshot) salsa db,
+    /// under the read lock. For host-owned read-only queries that must observe
+    /// the live db rather than a clone.
+    ///
+    /// **Internal API — exposes Salsa types.** Subject to change without notice.
+    #[doc(hidden)]
+    pub fn with_db_ref<R>(&self, f: impl FnOnce(&MirDbStorage) -> R) -> R {
+        let guard = self.db.salsa.read();
+        f(&guard)
+    }
+
     /// Commit a batch of reference locations from a db snapshot into the
     /// session's shared maps.  Called by [`crate::FileAnalyzer`] and
     /// [`crate::BatchFileAnalyzer`] after parallel body analysis to flush the pending
@@ -48,11 +105,18 @@ impl AnalysisSession {
     pub fn ingest_file(&self, file: Arc<str>, source: Arc<str>) {
         self.ensure_all_stubs();
 
-        // Snapshot symbols defined before clearing — O(symbols_in_file) with forward index.
-        let old_symbols: HashSet<Arc<str>> = {
-            let guard = self.db.salsa.read();
-            guard.file_defined_symbols(file.as_ref())
-        };
+        // The symbols this file defined as of its last ingest. Read from the
+        // explicit `last_ingested_symbols` map rather than re-deriving via
+        // `file_defined_symbols` (a salsa query on the `SourceFile` input):
+        // when a host drives the db directly it may have already updated that
+        // input to the new text, which would make a re-derived "old" set equal
+        // the new set and silently drop deletions.
+        let old_symbols: HashSet<Arc<str>> = self
+            .last_ingested_symbols
+            .read()
+            .get(file.as_ref())
+            .cloned()
+            .unwrap_or_default();
 
         {
             let mut guard = self.db.salsa.write();
@@ -67,6 +131,9 @@ impl AnalysisSession {
             let guard = self.db.salsa.read();
             guard.file_defined_symbols(file.as_ref())
         };
+        self.last_ingested_symbols
+            .write()
+            .insert(file.as_ref().to_string(), new_symbols.clone());
 
         // Symbols removed from this file must be tracked so dependency_graph()
         // can still produce edges to files referencing the now-gone symbols.
@@ -388,6 +455,7 @@ impl AnalysisSession {
         // `dependency_graph()` stops iterating it.
         // Clear stale symbol tracking for this file — it's fully gone.
         self.stale_defined_symbols.write().remove(file);
+        self.last_ingested_symbols.write().remove(file);
         if let Some(cache) = &self.cache {
             cache.update_reverse_deps_for_file(file, &HashSet::default());
             cache.evict_with_dependents(&[file.to_string()]);

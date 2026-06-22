@@ -56,6 +56,13 @@ pub struct AnalysisSession {
     /// The set may contain symbols with no current referencers; those are
     /// harmless — the `symbol_referencers_of` lookup returns empty.
     stale_defined_symbols: Arc<RwLock<HashMap<String, HashSet<Arc<str>>>>>,
+    /// Symbols defined by each file as of its last `ingest_file`. The
+    /// authoritative "old" set for the rename/deletion diff, independent of
+    /// whether the salsa `SourceFile` input was already updated to the new text
+    /// by a host driving the db directly (the LSP convergence path). Without
+    /// this, re-deriving "old" symbols from the (possibly pre-updated) input
+    /// would miss deletions and break cross-file dependency invalidation.
+    last_ingested_symbols: Arc<RwLock<HashMap<String, HashSet<Arc<str>>>>>,
     /// Negative cache: FQCNs that `load_class` already failed on.
     /// The value is the resolver-mapped path (when known) so eviction on
     /// `set_file_text` / `ingest_file` is a path equality check rather than
@@ -105,6 +112,7 @@ impl AnalysisSession {
             user_stub_files: Vec::new(),
             user_stub_dirs: Vec::new(),
             stale_defined_symbols: Arc::new(RwLock::new(HashMap::default())),
+            last_ingested_symbols: Arc::new(RwLock::new(HashMap::default())),
             unresolvable_fqcns: Arc::new(RwLock::new(HashMap::default())),
             source_provider: Arc::new(crate::FsSourceProvider),
             pending_eager_function_files: Arc::new(parking_lot::Mutex::new(Some(Vec::new()))),
