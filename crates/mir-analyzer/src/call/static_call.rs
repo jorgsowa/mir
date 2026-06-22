@@ -298,13 +298,20 @@ impl CallAnalyzer {
                 );
             }
             // Detect call to an abstract method via an explicit class name.
-            // Skip self/static/parent callers: those resolve to a concrete subclass at runtime.
             let is_self_parent_call = if let ExprKind::Identifier(id) = &call.class.kind {
                 matches!(id.as_ref(), "self" | "static" | "parent")
             } else {
                 false
             };
-            if resolved.is_abstract && !is_self_parent_call {
+            // Only static:: uses LSB and resolves to the concrete subclass at runtime.
+            // self:: resolves to the declaring class (abstract → no body to call).
+            // parent:: resolves to the parent class (abstract → no body to call).
+            let is_static_keyword = if let ExprKind::Identifier(id) = &call.class.kind {
+                id.as_ref() == "static"
+            } else {
+                false
+            };
+            if resolved.is_abstract && !is_static_keyword {
                 ea.emit(
                     IssueKind::AbstractMethodCall {
                         class: fqcn.clone(),
