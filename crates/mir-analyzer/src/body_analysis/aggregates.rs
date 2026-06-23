@@ -227,12 +227,21 @@ impl<'a> BodyAnalyzer<'a> {
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<Issue>,
+        guards: &rustc_hash::FxHashSet<std::sync::Arc<str>>,
     ) {
         crate::attributes::check_interface_attributes(
             decl, self.db, file, source, source_map, all_issues,
         );
         use php_ast::owned::ClassMemberKind;
         for parent in decl.extends.iter() {
+            // Suppress UndefinedClass for a parent guarded by
+            // `class_exists`/`interface_exists`/`trait_exists`, mirroring
+            // `analyze_class_decl`'s extends/implements handling.
+            let parent_str = crate::parser::name_to_string_owned(parent);
+            let parent_resolved = resolve_name(self.db, file.as_ref(), &parent_str);
+            if guards.contains(parent_resolved.as_str()) {
+                continue;
+            }
             check_name_class(
                 parent,
                 self.db,

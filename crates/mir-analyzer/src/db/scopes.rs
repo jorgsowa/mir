@@ -267,6 +267,7 @@ pub fn infer_scope(
                         text.as_ref(),
                         &parsed.source_map,
                         &mut issues,
+                        &Default::default(),
                     ),
                     StmtKind::Trait(decl) => driver.analyze_trait_decl(
                         decl,

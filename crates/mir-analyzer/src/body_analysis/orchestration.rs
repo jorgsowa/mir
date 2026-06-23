@@ -194,7 +194,9 @@ impl<'a> BodyAnalyzer<'a> {
                     self.analyze_enum_decl(decl, file, source, source_map, all_issues, all_symbols);
                 }
                 StmtKind::Interface(decl) => {
-                    self.analyze_interface_decl(decl, file, source, source_map, all_issues);
+                    self.analyze_interface_decl(
+                        decl, file, source, source_map, all_issues, &guards,
+                    );
                 }
                 StmtKind::Trait(decl) => {
                     self.analyze_trait_decl(
@@ -278,7 +280,9 @@ impl<'a> BodyAnalyzer<'a> {
                     );
                 }
                 StmtKind::Interface(decl) => {
-                    self.analyze_interface_decl(decl, file, source, source_map, all_issues);
+                    self.analyze_interface_decl(
+                        decl, file, source, source_map, all_issues, &guards,
+                    );
                 }
                 StmtKind::Trait(decl) => {
                     self.analyze_trait_decl_typed(
