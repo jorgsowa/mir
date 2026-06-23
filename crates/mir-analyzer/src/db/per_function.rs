@@ -99,13 +99,9 @@ pub fn infer_function(
     file: SourceFile,
     fn_fqn: Arc<str>,
 ) -> Option<Arc<FunctionInferenceResult>> {
-    use std::str::FromStr as _;
-
     let path = file.path(db);
     let text = file.text(db);
-    let php_version_str = db.analyze_config().php_version(db);
-    let php_version = crate::php_version::PhpVersion::from_str(php_version_str.as_ref())
-        .unwrap_or(crate::php_version::PhpVersion::LATEST);
+    let php_version = crate::db::queries::db_php_version(db);
 
     let parsed_file = crate::db::parse_file(db, file);
     let parsed = &*parsed_file.0;

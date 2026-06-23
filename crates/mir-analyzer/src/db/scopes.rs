@@ -27,7 +27,6 @@ use std::sync::Arc;
 use mir_issues::Issue;
 
 use crate::body_analysis::BodyAnalyzer;
-use crate::PhpVersion;
 
 use super::*;
 
@@ -145,8 +144,6 @@ pub fn infer_scope(
     file: SourceFile,
     scope: ScopeKey,
 ) -> Arc<ScopeInferenceResult> {
-    use std::str::FromStr as _;
-
     let path = file.path(db);
     let text = file.text(db);
     let parsed_file = super::queries::parse_file(db, file);
@@ -163,8 +160,7 @@ pub fn infer_scope(
         return empty();
     }
 
-    let php_version_str = db.analyze_config().php_version(db);
-    let php_version = PhpVersion::from_str(php_version_str.as_ref()).unwrap_or(PhpVersion::LATEST);
+    let php_version = super::queries::db_php_version(db);
     let driver = BodyAnalyzer::new(db, php_version);
 
     let mut issues: Vec<Issue> = Vec::new();

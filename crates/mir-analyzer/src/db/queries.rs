@@ -319,9 +319,7 @@ pub fn collect_file_definitions_uncached(
     let path = file.path(db);
     let text = file.text(db);
 
-    use std::str::FromStr as _;
-    let php_version = crate::php_version::PhpVersion::from_str(db.php_version_str().as_ref())
-        .unwrap_or(crate::php_version::PhpVersion::LATEST);
+    let php_version = db_php_version(db);
 
     // Content hash needed for both in-process and disk cache lookups.
     let content_hash = crate::stub_cache::hash_source(&text);
