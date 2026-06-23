@@ -167,7 +167,8 @@ impl<'a> DefinitionCollector<'a> {
                         Some(&type_aliases),
                         &class_template_params,
                     ) {
-                        let key = Arc::from(method.name.to_lowercase().as_str());
+                        let key =
+                            Arc::from(crate::util::php_ident_lowercase(&method.name).as_str());
                         if let Some(existing) = own_methods.get(&key) {
                             own_methods.insert(key, merge_method_overloads(existing, &method));
                         } else {

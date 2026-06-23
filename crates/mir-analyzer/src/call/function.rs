@@ -779,13 +779,14 @@ pub(crate) fn extract_class_docblock<'a>(src: &'a str, class_name: &str) -> Opti
     let short_name = class_name.split('\\').next_back().unwrap_or(class_name);
 
     // Try case-insensitive matching for "class" declarations.
-    let class_pattern_lower = format!("class {}", short_name.to_lowercase());
+    let class_pattern_lower = format!("class {}", crate::util::php_ident_lowercase(short_name));
     if let Some(docblock) = extract_docblock_case_insensitive(src, &class_pattern_lower) {
         return Some(docblock);
     }
 
     // Try case-insensitive matching for "interface" declarations.
-    let interface_pattern_lower = format!("interface {}", short_name.to_lowercase());
+    let interface_pattern_lower =
+        format!("interface {}", crate::util::php_ident_lowercase(short_name));
     extract_docblock_case_insensitive(src, &interface_pattern_lower)
 }
 

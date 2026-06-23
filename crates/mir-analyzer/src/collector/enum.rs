@@ -75,7 +75,7 @@ impl DefinitionCollector<'_> {
                         self.build_method_storage(m, &fqcn, Some(&member.span), None, &[])
                     {
                         own_methods.insert(
-                            Arc::from(method.name.to_lowercase().as_str()),
+                            Arc::from(crate::util::php_ident_lowercase(&method.name).as_str()),
                             Arc::new(method),
                         );
                     }

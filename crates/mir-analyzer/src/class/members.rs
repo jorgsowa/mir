@@ -86,7 +86,7 @@ impl<'a> ClassAnalyzer<'a> {
                 // PHP method names are case-insensitive; normalize before lookup so that
                 // a hand-written stub key like "jsonSerialize" matches the collector's
                 // lowercased key "jsonserialize" stored in own_methods.
-                let method_name_lower = method_name.to_lowercase();
+                let method_name_lower = crate::util::php_ident_lowercase(&method_name);
                 // Check if the class provides a concrete implementation
                 let implemented = crate::db::is_method_concretely_implemented(
                     self.db,

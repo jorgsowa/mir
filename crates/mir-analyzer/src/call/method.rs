@@ -155,9 +155,11 @@ impl CallAnalyzer {
         {
             let fqcn_resolved = crate::db::resolve_name(ea.db, &ea.file, fqcn);
             let fqcn_arc: Arc<str> = Arc::from(fqcn_resolved.as_str());
-            if let Some(resolved) =
-                resolve_method_from_db(ea, &fqcn_arc, &method_name.to_lowercase())
-            {
+            if let Some(resolved) = resolve_method_from_db(
+                ea,
+                &fqcn_arc,
+                &crate::util::php_ident_lowercase(method_name),
+            ) {
                 super::premark_byref_arg_vars(&resolved.params, &call.args, ctx);
             }
         }
@@ -343,7 +345,7 @@ impl CallAnalyzer {
                     return_type,
                     ..
                 } => {
-                    let method_name_lower = method_name.to_lowercase();
+                    let method_name_lower = crate::util::php_ident_lowercase(method_name);
                     match method_name_lower.as_str() {
                         "bindto" => {
                             // bindTo($newThis, $newScope = 'static'): ?Closure
@@ -456,7 +458,7 @@ fn resolve_method_return<'a>(
     arg_spans: &[Span],
     declaring_class: &mut Option<Arc<str>>,
 ) -> Type {
-    let method_name_lower = method_name.to_lowercase();
+    let method_name_lower = crate::util::php_ident_lowercase(method_name);
     let resolved = resolve_method_from_db(ea, fqcn, &method_name_lower);
 
     if let Some(resolved) = resolved {
@@ -467,7 +469,7 @@ fn resolve_method_return<'a>(
             Arc::from(format!(
                 "{}::{}",
                 &resolved.owner_fqcn,
-                resolved.name.to_lowercase()
+                crate::util::php_ident_lowercase(&resolved.name)
             )),
             call.method.span,
         );
@@ -754,8 +756,10 @@ fn resolve_method_return<'a>(
         // Also suppress when caller guarded with `method_exists($obj, 'method')`.
         let guarded_by_method_exists = extract_expr_guard_key(&call.object)
             .map(|key| {
-                ctx.method_exists_guards
-                    .contains(&(key, Arc::from(method_name.to_lowercase().as_str())))
+                ctx.method_exists_guards.contains(&(
+                    key,
+                    Arc::from(crate::util::php_ident_lowercase(method_name).as_str()),
+                ))
             })
             .unwrap_or(false);
         if is_interface || is_abstract || is_trait || has_call_magic || guarded_by_method_exists {

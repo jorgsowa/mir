@@ -100,7 +100,7 @@ fn builtin_type_to_union(ty: BuiltinType, context_fqcn: Option<&str>) -> Type {
 }
 
 fn named_type_to_union(name: &str, context_fqcn: Option<&str>) -> Type {
-    match name.to_lowercase().as_str() {
+    match crate::util::php_ident_lowercase(name).as_str() {
         "self" => {
             if let Some(fqcn) = context_fqcn {
                 Type::single(Atomic::TSelf { fqcn: fqcn.into() })

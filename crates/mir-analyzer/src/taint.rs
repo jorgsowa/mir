@@ -56,7 +56,7 @@ impl SinkKind {
 
 /// Return the sink kind for a built-in function name, if it is a taint sink.
 pub fn classify_sink(fn_name: &str) -> Option<SinkKind> {
-    match fn_name.to_lowercase().as_str() {
+    match crate::util::php_ident_lowercase(fn_name).as_str() {
         // HTML output
         "echo" | "print" | "printf" | "vprintf" | "fprintf" | "header" | "setcookie" => {
             Some(SinkKind::Html)

@@ -458,7 +458,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             TypeHintKind::Named(name) => {
                 let name_str = crate::parser::name_to_string_owned(name);
                 if matches!(
-                    name_str.to_lowercase().as_str(),
+                    crate::util::php_ident_lowercase(&name_str).as_str(),
                     "self"
                         | "static"
                         | "parent"

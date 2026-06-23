@@ -139,7 +139,7 @@ impl CallAnalyzer {
         // Detect `parent::` used in a class that has no parent. Skip inside a
         // trait: `parent::` there resolves against the using class at runtime,
         // not the trait (which never has a parent).
-        if fqcn.to_lowercase() == "parent"
+        if fqcn.eq_ignore_ascii_case("parent")
             && ctx.parent_fqcn.is_none()
             && ctx.self_fqcn.is_some()
             && !self_is_trait(ea.db, ctx)
@@ -211,7 +211,7 @@ impl CallAnalyzer {
         let arg_spans: Vec<Span> = call.args.iter().map(|a| a.span).collect();
 
         let fqcn_arc: Arc<str> = Arc::from(fqcn.as_str());
-        let method_name_lower = method_name.to_lowercase();
+        let method_name_lower = crate::util::php_ident_lowercase(method_name);
 
         // Check if trying to call static method on an interface (not allowed)
         if crate::db::class_exists(ea.db, &fqcn) {
@@ -269,7 +269,7 @@ impl CallAnalyzer {
                 Arc::from(format!(
                     "{}::{}",
                     resolved.owner_fqcn,
-                    method_name.to_lowercase()
+                    crate::util::php_ident_lowercase(method_name)
                 )),
                 call.method.span,
             );
@@ -482,7 +482,7 @@ impl CallAnalyzer {
 }
 
 fn resolve_static_class(name: &str, ctx: &FlowState) -> String {
-    match name.to_lowercase().as_str() {
+    match crate::util::php_ident_lowercase(name).as_str() {
         "self" => ctx.self_fqcn.as_deref().unwrap_or("self").to_string(),
         "parent" => ctx.parent_fqcn.as_deref().unwrap_or("parent").to_string(),
         "static" => ctx

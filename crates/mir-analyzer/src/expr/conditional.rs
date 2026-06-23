@@ -321,7 +321,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     ExprKind::Identifier(s) | ExprKind::Variable(s) => s.as_ref(),
                                     _ => return None,
                                 };
-                                Some(member.to_lowercase())
+                                Some(crate::util::php_ident_lowercase(member))
                             } else {
                                 None
                             }
@@ -331,7 +331,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                     let mut uncovered: Vec<&str> = enum_def
                         .cases
                         .keys()
-                        .filter(|k| !covered.contains(&k.to_lowercase()))
+                        .filter(|k| {
+                            !covered.contains(&crate::util::php_ident_lowercase(k.as_ref()))
+                        })
                         .map(|k| k.as_ref())
                         .collect();
                     uncovered.sort();

@@ -348,7 +348,7 @@ fn check_name_class_with_context(
 
 fn is_pseudo_type(name: &str) -> bool {
     matches!(
-        name.to_lowercase().as_str(),
+        crate::util::php_ident_lowercase(name).as_str(),
         "self"
             | "static"
             | "parent"

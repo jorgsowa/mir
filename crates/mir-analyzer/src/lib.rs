@@ -39,6 +39,7 @@ pub(crate) mod subtype;
 pub mod suppression;
 pub(crate) mod taint;
 pub(crate) mod type_env;
+pub(crate) mod util;
 
 pub use batch::{
     analyze_source, dead_code_issue_kinds, discover_files, AnalysisResult, BatchOptions,

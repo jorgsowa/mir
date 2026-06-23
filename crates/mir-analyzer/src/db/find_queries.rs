@@ -1042,7 +1042,7 @@ pub fn is_method_concretely_implemented(
     fqcn: &str,
     method_name: &str,
 ) -> bool {
-    let lower = method_name.to_lowercase();
+    let lower = crate::util::php_ident_lowercase(method_name);
     let here = Fqcn::from_str(db, fqcn);
     let Some(self_class) = find_class_like(db, here) else {
         return false;

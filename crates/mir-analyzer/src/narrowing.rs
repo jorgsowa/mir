@@ -392,7 +392,7 @@ pub fn narrow_from_condition(
                                 if let Some(method_arg) = call.args.get(1) {
                                     if let ExprKind::String(method_name) = &method_arg.value.kind {
                                         let method_lc = std::sync::Arc::from(
-                                            method_name.to_lowercase().as_str(),
+                                            crate::util::php_ident_lowercase(method_name).as_str(),
                                         );
                                         ctx.method_exists_guards.insert((expr_key, method_lc));
                                     }
@@ -1465,7 +1465,7 @@ fn narrow_var_bool(ctx: &mut FlowState, name: &str, value: bool, is_value: bool)
 
 fn narrow_from_type_fn(ctx: &mut FlowState, fn_name: &str, var_name: &str, is_true: bool) {
     let current = ctx.get_var(var_name);
-    let narrowed = match fn_name.to_lowercase().as_str() {
+    let narrowed = match crate::util::php_ident_lowercase(fn_name).as_str() {
         "is_string" => {
             if is_true {
                 current.narrow_to_string()
