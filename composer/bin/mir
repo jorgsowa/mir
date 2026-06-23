@@ -11,9 +11,41 @@
 
 declare(strict_types=1);
 
+// Load the Composer autoloader so Installer and InstalledVersions are available.
+if (!class_exists(\Composer\InstalledVersions::class, false)) {
+    $loaded = false;
+    foreach ([
+        __DIR__ . '/../../../../autoload.php',
+        __DIR__ . '/../../vendor/autoload.php',
+    ] as $autoload) {
+        if (file_exists($autoload)) {
+            require $autoload;
+            $loaded = true;
+            break;
+        }
+    }
+    if (!$loaded) {
+        fwrite(STDERR, "mir: Composer autoloader not found. Run `composer install` first.\n");
+        exit(1);
+    }
+}
+
 $packageRoot = dirname(__DIR__, 2);
 $binaryName = PHP_OS_FAMILY === 'Windows' ? 'mir.exe' : 'mir';
 $binary = $packageRoot . DIRECTORY_SEPARATOR . 'bin' . DIRECTORY_SEPARATOR . $binaryName;
+
+// Ensure the binary for the current platform is present. If the stored binary
+// was built for a different platform (e.g. a macOS binary in an Alpine container)
+// Installer::run() detects the marker mismatch and re-downloads the correct one.
+try {
+    \Mir\Composer\Installer::run(
+        static fn(string $msg) => fwrite(STDERR, "mir: {$msg}\n"),
+        static fn(string $msg) => fwrite(STDERR, "mir: warning: {$msg}\n"),
+    );
+} catch (\RuntimeException $e) {
+    fwrite(STDERR, "mir: {$e->getMessage()}\n");
+    exit(1);
+}
 
 if (!is_file($binary)) {
     fwrite(

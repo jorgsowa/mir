@@ -28,7 +28,22 @@ final class Installer
     public static function install(Event $event): void
     {
         $io = $event->getIO();
+        self::run(
+            static fn(string $msg) => $io->write("<info>mir: {$msg}</info>"),
+            static fn(string $msg) => $io->writeError("<warning>mir: {$msg}</warning>"),
+        );
+    }
 
+    /**
+     * Ensure the correct prebuilt binary is present for the current platform.
+     * Called by the Composer plugin at install/update time and by the bin shim
+     * at runtime when the installed binary does not match the current platform.
+     *
+     * @param callable(string):void $out  Progress messages.
+     * @param callable(string):void $err  Warning messages.
+     */
+    public static function run(callable $out, callable $err): void
+    {
         $installPath = self::resolveInstallPath();
         if ($installPath === null) {
             // Running inside the source repo itself, or the package isn't
@@ -38,14 +53,14 @@ final class Installer
 
         $version = self::resolveVersion();
         if ($version === null) {
-            $io->writeError('<warning>mir: could not determine package version, skipping binary download.</warning>');
+            $err('could not determine package version, skipping binary download.');
             return;
         }
 
         try {
             [$os, $target] = self::detectPlatform();
         } catch (\RuntimeException $e) {
-            $io->writeError('<warning>mir: ' . $e->getMessage() . '. Build from source instead.</warning>');
+            $err($e->getMessage() . '. Build from source instead.');
             return;
         }
 
@@ -76,7 +91,7 @@ final class Installer
         $archiveUrl = "{$base}/{$archiveName}";
         $checksumUrl = "{$base}/mir-{$target}.sha256";
 
-        $io->write("<info>mir: downloading {$archiveName} for {$tag}...</info>");
+        $out("downloading {$archiveName} for {$tag}...");
 
         if (!is_dir($binDir) && !@mkdir($binDir, 0755, true) && !is_dir($binDir)) {
             throw new \RuntimeException("mir: failed to create {$binDir}");
@@ -119,14 +134,14 @@ final class Installer
             }
 
             if (@file_put_contents($markerPath, "{$version}\n{$target}\n") === false) {
-                $io->writeError('<warning>mir: failed to write version marker; binary will be re-downloaded next install.</warning>');
+                $err('failed to write version marker; binary will be re-downloaded next install.');
             }
         } finally {
             @unlink($tmpArchive);
             self::rmRecursive($tmpExtractDir);
         }
 
-        $io->write("<info>mir: installed {$tag} to {$binaryPath}</info>");
+        $out("installed {$tag} to {$binaryPath}");
     }
 
     private static function resolveInstallPath(): ?string
@@ -179,8 +194,10 @@ final class Installer
 
         $libc = 'gnu';
         if ($os === 'linux') {
-            $ldd = (string) @shell_exec('ldd --version 2>&1');
-            if (str_contains($ldd, 'musl')) {
+            // Redirect stderr so "ldd: not found" shell errors are suppressed; an absent ldd
+            // means no glibc dynamic linker and is treated as musl (minimal container default).
+            $ldd = trim((string) @shell_exec('ldd --version 2>/dev/null'));
+            if ($ldd === '' || str_contains($ldd, 'musl')) {
                 $libc = 'musl';
             }
         }
