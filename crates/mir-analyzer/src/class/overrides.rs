@@ -25,10 +25,11 @@ impl<'a> ClassAnalyzer<'a> {
             }
 
             // Find parent definition (if any) — search ancestor chain
-            let method_name_lower: Arc<str> = if method_name.chars().all(|c| !c.is_uppercase()) {
-                method_name.clone()
+            let method_name_lower: Arc<str> = if method_name.bytes().any(|b| b.is_ascii_uppercase())
+            {
+                Arc::from(crate::util::php_ident_lowercase(&method_name).as_str())
             } else {
-                Arc::from(method_name.to_lowercase().as_str())
+                method_name.clone()
             };
             // Collect ALL ancestors (skipping self) that define this method.
             // The first one is the "primary parent" for structural checks (final,

@@ -70,10 +70,10 @@ pub(super) fn resolve_method_from_db(
         method_name_lower,
     ) {
         let name = storage.name.clone();
-        let name_lower = if name.chars().all(|c| !c.is_uppercase()) {
-            name.clone()
+        let name_lower = if name.bytes().any(|b| b.is_ascii_uppercase()) {
+            Arc::<str>::from(crate::util::php_ident_lowercase(&name).as_str())
         } else {
-            Arc::<str>::from(name.to_ascii_lowercase().as_str())
+            name.clone()
         };
         let inferred = crate::db::inferred_method_return_type_demand(db, &owner_fqcn, &name_lower);
         let return_ty_raw = storage

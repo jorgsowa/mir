@@ -529,10 +529,10 @@ pub fn infer_file_return_types(db: &dyn MirDatabase, file: SourceFile) -> Inferr
     let mut methods: FxHashMap<(Arc<str>, Arc<str>), Arc<Type>> =
         FxHashMap::with_capacity_and_hasher(inferred.methods.len(), Default::default());
     for (fqcn, name, ty) in inferred.methods {
-        let name_lower: Arc<str> = if name.chars().all(|c| !c.is_uppercase()) {
-            name
+        let name_lower: Arc<str> = if name.bytes().any(|b| b.is_ascii_uppercase()) {
+            Arc::from(crate::util::php_ident_lowercase(&name).as_str())
         } else {
-            Arc::from(name.to_lowercase().as_str())
+            name
         };
         methods.insert((fqcn, name_lower), mir_codebase::storage::wrap_var_type(ty));
     }
