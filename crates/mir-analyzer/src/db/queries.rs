@@ -501,13 +501,23 @@ fn infer_file_return_types_cycle(
     InferredFileTypes::empty()
 }
 
+/// Memoized parse of the configured PHP version string.
+///
+/// Reads the `AnalyzeFileInput.php_version` salsa input so that salsa tracks
+/// the dependency correctly; `from_str` is called at most once per version
+/// change instead of once per file.
+#[salsa::tracked]
+pub fn db_php_version(db: &dyn MirDatabase) -> crate::php_version::PhpVersion {
+    use std::str::FromStr as _;
+    crate::php_version::PhpVersion::from_str(db.analyze_config().php_version(db).as_ref())
+        .unwrap_or(crate::php_version::PhpVersion::LATEST)
+}
+
 #[salsa::tracked(cycle_fn = infer_file_return_types_cycle, cycle_initial = infer_file_return_types_initial)]
 pub fn infer_file_return_types(db: &dyn MirDatabase, file: SourceFile) -> InferredFileTypes {
-    use std::str::FromStr as _;
     let path = file.path(db);
     let text = file.text(db);
-    let php_version = crate::php_version::PhpVersion::from_str(db.php_version_str().as_ref())
-        .unwrap_or(crate::php_version::PhpVersion::LATEST);
+    let php_version = db_php_version(db);
 
     let parsed_file = parse_file(db, file);
     let parsed = &*parsed_file.0;
