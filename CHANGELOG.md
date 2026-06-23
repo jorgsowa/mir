@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.48.0] - 2026-06-23
+
+### Added
+
+- `AnalysisSession::references_to_in_files(symbol, files)`: returns every recorded reference to `symbol` that originates in the given file set, computed directly from memoized `analyze_file` queries. Unlike `references_to`, this analyzes files on demand (no prior `ingest_file` required), never mutates the shared reverse index, and is safe under concurrent background indexing — a serial warm-up phase faults in class references, then a parallel read phase retries on `salsa::Cancelled`.
+
+### Changed
+
+- **~18% faster full analysis:** Three hot-path improvements land together — (1) `php_ident_lowercase` replaces Unicode-aware `to_lowercase()` with `to_ascii_lowercase()` at ~25 identifier call sites across collector, call, class, db, narrowing, and expr modules; (2) `bytes().any(is_ascii_uppercase)` replaces the inverted `chars().all(!uppercase)` guards, short-circuiting on the first uppercase byte; (3) `db_php_version` wraps `PhpVersion::from_str` in a `#[salsa::tracked]` query so the parse executes once per session rather than once per file. Measured on the Laravel benchmark at 1 thread: 6.76 s → 5.54 s (−18%, p < 0.05).
+
 ## [0.47.0] - 2026-06-23
 
 ### Added
