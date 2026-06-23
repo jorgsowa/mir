@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.47.0] - 2026-06-23
+
+### Added
+
+- `AnalysisSession` now exposes database accessors (`upsert_source_file`, `lookup_source_file`, `remove_source_file_input`, `with_db_mut`, `with_db_ref`) so a host can share `MirDbStorage` as a single Salsa database and drive its inputs directly. `last_ingested_symbols` is tracked per file so rename/deletion diffs work correctly when a host updates inputs eagerly before calling `ingest_file`.
+
+### Fixed
+
+- **`class_exists` guard on interface extends:** `interface Foo extends GuardedIface {}` after an `interface_exists(…)` throw-guard no longer emits `UndefinedClass`. Mirrors the fix already applied to class `extends`/`implements`.
+- **`is_callable()` narrowing (N5):** The true branch now preserves string and array atoms (PHP accepts function-name strings and `['Class', 'method']` arrays as valid callables) alongside `callable`/`Closure`.
+- **PHP 8.3 typed class constants (N3):** `const int FOO = 1` declarations are now resolved to their declared type instead of always returning `mixed`. Accessing typed constants now produces correct `InvalidArgument`/`ArgumentTypeCoercion` diagnostics at call sites.
+- **`is_a()` with `$allow_string=true` (N2):** `is_a($x, 'Foo', true)` true branch now keeps `string`/`class-string` atoms unchanged instead of replacing them with the named object type.
+- **`is_subclass_of()` strict semantics (N1):** True branch now excludes the exact class itself — `is_subclass_of($x, Foo::class)` no longer keeps `Foo` in the true-branch type. False branch applies no narrowing, since the exact class is a valid false-branch value.
+- **`int`-range → `float` coercion (N4):** `positive-int`, `negative-int`, `non-negative-int`, and `int<a,b>` are now accepted as `float` subtypes in the per-pair subtype check, matching the existing union-level coercion table.
+- **Abstract method calls via `self::`/`parent::`:** `self::method()` and `parent::method()` calls on abstract methods now emit `AbstractMethodCall`. Only `static::` is exempt (it uses LSB and resolves to the concrete subclass at runtime).
+- **Crash / silent failure fixes (A1/A2/A3):** Unicode type names in docblocks (e.g. `Ⱥrray<…>`) no longer panic on char-boundary slicing (A1). Bad `installed.json` or unreadable stub files now emit a `mir: warning:` instead of silently returning empty results (A2). `mb_convert_encoding`, `iconv`, `preg_replace`, `preg_replace_callback`, and `substr_replace` no longer include `|false`/`|null` in their return type when the subject argument is a string (A3).
+- **`int / int` yields `int|float`:** PHP's `/` operator returns `float` when the division is inexact. The previous fallback always returned `int`, causing false `RedundantCast` on `(int)($a / $b)`.
+- **`&&` condition assignments in array subscripts:** A variable assigned inside an array subscript (e.g. `$arr[$n = count($arr) - 1]`) is now promoted to definitely-assigned in the true branch of a `&&` condition.
+- **`int<a,b>` widens to `float`:** `TIntRange` is now in the float-widening list in `atomic_subtype`, fixing false `InvalidArgument` for expressions like `log(strlen($s))`.
+- **`false === $x` narrowing:** The symmetric `false === $x` and `false === ($x = expr)` forms now narrow the variable in the true branch, fixing `InvalidPropertyAssignment` FPs in `normalizer_normalize` / `iconv` guard idioms.
+- **`class_exists`-guarded `extends`/`implements`:** The optional-dependency pattern (a `class_exists(…)` throw-guard before a class declaration) no longer emits `UndefinedClass` for the guarded parent or interface name.
+- **Encoding builtin return types:** `mb_convert_encoding`, `iconv`, and `grapheme_strlen` stubs no longer include `|false`/`|null` in normal call paths, eliminating pervasive `InvalidPropertyAssignment` and `NullableReturnStatement` FPs.
+- **`int + bool/null` coercion:** `$count + true`, `$n + null`, and similar expressions now infer `int` instead of `int|float` — PHP coerces `bool`/`null` to `int` in arithmetic.
+
 ## [0.46.0] - 2026-06-21
 
 ### Added
