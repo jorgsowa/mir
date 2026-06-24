@@ -394,9 +394,11 @@ impl CallAnalyzer {
 
             for (i, param) in params.iter().enumerate() {
                 if param.is_byref {
+                    // Prefer @param-out type if declared; fall back to declared in-type.
                     let output_ty = param
-                        .ty
+                        .out_ty
                         .as_ref()
+                        .or(param.ty.as_ref())
                         .map(|t| (**t).clone())
                         .unwrap_or_else(Type::mixed);
                     if param.is_variadic {
@@ -815,6 +817,7 @@ fn type_param_to_storage_param(p: &TypeFnParam) -> FnParam {
     FnParam {
         name: p.name,
         ty: p.ty.as_ref().map(|t| Arc::new(t.to_union())),
+        out_ty: None,
         has_default: p.default.is_some(),
         is_variadic: p.is_variadic,
         is_byref: p.is_byref,

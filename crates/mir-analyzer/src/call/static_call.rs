@@ -195,6 +195,17 @@ impl CallAnalyzer {
             }
         }
 
+        let fqcn_arc: Arc<str> = Arc::from(fqcn.as_str());
+        let method_name_lower = crate::util::php_ident_lowercase(method_name);
+
+        // Pre-mark by-reference argument variables as defined before evaluating
+        // the arguments, so passing an undefined variable to an out-param (e.g.
+        // `Registry::build($items, $out)` where `$out` is `@param-out`) does
+        // not produce a false UndefinedVariable.
+        if let Some(pre_resolved) = resolve_method_from_db(ea, &fqcn_arc, &method_name_lower) {
+            super::premark_byref_arg_vars(&pre_resolved.params, &call.args, ctx);
+        }
+
         let arg_types: Vec<Type> = call
             .args
             .iter()
@@ -209,9 +220,6 @@ impl CallAnalyzer {
             })
             .collect();
         let arg_spans: Vec<Span> = call.args.iter().map(|a| a.span).collect();
-
-        let fqcn_arc: Arc<str> = Arc::from(fqcn.as_str());
-        let method_name_lower = crate::util::php_ident_lowercase(method_name);
 
         // Check if trying to call static method on an interface (not allowed)
         if crate::db::class_exists(ea.db, &fqcn) {
@@ -421,6 +429,24 @@ impl CallAnalyzer {
                     .and_then(|idx| arg_types.get(idx))
                     .cloned()
             });
+            // Write @param-out types back to caller variables for by-ref params.
+            for (i, param) in resolved.params.iter().enumerate() {
+                let Some(out_ty) = param.out_ty.as_ref() else {
+                    continue;
+                };
+                let out_ty = (**out_ty).clone();
+                if param.is_variadic {
+                    for arg in call.args.iter().skip(i) {
+                        if let ExprKind::Variable(name) = &arg.value.kind {
+                            ctx.set_var(name.as_ref().trim_start_matches('$'), out_ty.clone());
+                        }
+                    }
+                } else if let Some(arg) = call.args.get(i) {
+                    if let ExprKind::Variable(name) = &arg.value.kind {
+                        ctx.set_var(name.as_ref().trim_start_matches('$'), out_ty);
+                    }
+                }
+            }
             ea.record_symbol(
                 call.method.span,
                 ReferenceKind::StaticCall {

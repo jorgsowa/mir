@@ -425,6 +425,7 @@ pub(crate) fn ast_params_to_fn_params_resolved(
             mir_codebase::FnParam {
                 name: Name::new(name_str),
                 ty: mir_codebase::wrap_param_type(ty),
+                out_ty: None,
                 has_default: p.default.is_some(),
                 is_variadic: p.variadic,
                 is_byref: p.by_ref,

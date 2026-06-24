@@ -257,6 +257,7 @@ fn ast_derived_fn_params(params: &[php_ast::owned::Param]) -> Vec<mir_codebase::
         .map(|p| mir_codebase::FnParam {
             name: Name::new(p.name.as_deref().unwrap_or("")),
             ty: None,
+            out_ty: None,
             has_default: p.default.is_some(),
             is_variadic: p.variadic,
             is_byref: p.by_ref,

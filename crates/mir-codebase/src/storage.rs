@@ -206,6 +206,15 @@ pub struct FnParam {
         serialize_with = "serialize_param_type"
     )]
     pub ty: Option<Arc<Type>>,
+    /// Out-type declared via `@param-out` / `@psalm-param-out`. When set, this
+    /// type is written back to the caller's argument variable after the call
+    /// instead of (or in addition to) the declared in-type.
+    #[serde(
+        default,
+        deserialize_with = "deserialize_param_type",
+        serialize_with = "serialize_param_type"
+    )]
+    pub out_ty: Option<Arc<Type>>,
     /// Whether this parameter has a default value. During analysis, defaults are
     /// never used for their value — only for marking parameters as optional.
     pub has_default: bool,
@@ -225,6 +234,7 @@ impl std::hash::Hash for FnParam {
         // equal types (PartialEq) always produce the same hash, even when they
         // are backed by different Arc allocations.
         self.ty.as_deref().hash(state);
+        self.out_ty.as_deref().hash(state);
     }
 }
 

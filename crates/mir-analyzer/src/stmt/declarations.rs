@@ -60,6 +60,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     .map(|p| mir_codebase::FnParam {
                         name: Name::new(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
                         ty: None,
+                        out_ty: None,
                         has_default: p.default.is_some(),
                         is_variadic: p.variadic,
                         is_byref: p.by_ref,
@@ -78,6 +79,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     .map(|p| mir_codebase::FnParam {
                         name: Name::new(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
                         ty: None,
+                        out_ty: None,
                         has_default: p.default.is_some(),
                         is_variadic: p.variadic,
                         is_byref: p.by_ref,
@@ -164,6 +166,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     .map(|p| mir_codebase::FnParam {
                         name: Name::new(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
                         ty: None,
+                        out_ty: None,
                         has_default: p.default.is_some(),
                         is_variadic: p.variadic,
                         is_byref: p.by_ref,

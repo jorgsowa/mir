@@ -248,9 +248,21 @@ impl DefinitionCollector<'_> {
                 local_defaults += 1;
             }
 
+            let out_ty = doc.get_out_param_type(param_name).cloned().map(|u| {
+                let doc_ty = self.resolve_union_doc_with_templates(
+                    u,
+                    &template_names,
+                    &fqn,
+                    &template_params,
+                );
+                let mut doc_ty = doc_ty;
+                doc_ty.from_docblock = true;
+                doc_ty
+            });
             params.push(FnParam {
                 name: Name::new(param_name),
                 ty: mir_codebase::wrap_param_type(ty),
+                out_ty: mir_codebase::wrap_param_type(out_ty),
                 has_default,
                 is_variadic: p.variadic,
                 is_byref: p.by_ref,
@@ -278,6 +290,7 @@ impl DefinitionCollector<'_> {
             params.push(FnParam {
                 name: Name::new("..."),
                 ty: None,
+                out_ty: None,
                 has_default: false,
                 is_variadic: true,
                 is_byref: false,

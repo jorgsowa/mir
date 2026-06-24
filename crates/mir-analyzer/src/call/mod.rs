@@ -51,11 +51,12 @@ pub(crate) fn premark_byref_arg_vars(
             if let ExprKind::Variable(name) = &arg.value.kind {
                 let var_name = name.trim_start_matches('$');
                 if !ctx.var_is_defined(var_name) {
-                    // The out-parameter writes its declared type back through the
-                    // reference; fall back to `mixed` when the param is untyped.
+                    // Prefer @param-out type if declared; fall back to declared
+                    // in-type, then mixed.
                     let ty = param
-                        .ty
+                        .out_ty
                         .as_ref()
+                        .or(param.ty.as_ref())
                         .map(|t| (**t).clone())
                         .unwrap_or_else(mir_types::Type::mixed);
                     ctx.set_var(var_name, ty);

@@ -818,6 +818,7 @@ impl<'a> DefinitionCollector<'a> {
                     FnParam {
                         name: Name::new(p.name.as_str()),
                         ty: mir_codebase::wrap_param_type(ty),
+                        out_ty: None,
                         has_default: p.is_optional,
                         is_variadic: p.is_variadic,
                         is_byref: p.is_byref,
@@ -1213,9 +1214,23 @@ impl<'a> DefinitionCollector<'a> {
                 local_defaults += 1;
             }
 
+            let out_ty = doc.get_out_param_type(param_name).cloned().map(|u| {
+                let resolved = aliases
+                    .map(|a| self.resolve_union_doc_with_aliases(u.clone(), a))
+                    .unwrap_or_else(|| self.resolve_union_doc(u));
+                let mut resolved = self.substitute_template_params(
+                    resolved,
+                    &template_names,
+                    template_params_for_resolve,
+                    class_fqcn,
+                );
+                resolved.from_docblock = true;
+                resolved
+            });
             params.push(FnParam {
                 name: Name::new(param_name),
                 ty: mir_codebase::wrap_param_type(ty),
+                out_ty: mir_codebase::wrap_param_type(out_ty),
                 has_default,
                 is_variadic: p.variadic,
                 is_byref: p.by_ref,
@@ -1244,6 +1259,7 @@ impl<'a> DefinitionCollector<'a> {
                 params.push(FnParam {
                     name: mir_types::Name::new("..."),
                     ty: None,
+                    out_ty: None,
                     has_default: false,
                     is_variadic: true,
                     is_byref: false,

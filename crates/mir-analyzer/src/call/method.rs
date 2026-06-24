@@ -521,7 +521,7 @@ impl CallAnalyzer {
 #[allow(clippy::too_many_arguments)]
 fn resolve_method_return<'a>(
     ea: &mut ExpressionAnalyzer<'a>,
-    ctx: &FlowState,
+    ctx: &mut FlowState,
     call: &MethodCallExpr,
     span: Span,
     method_name: &str,
@@ -801,6 +801,25 @@ fn resolve_method_return<'a>(
                     Severity::Info,
                     span,
                 );
+            }
+        }
+
+        // Write @param-out types back to caller variables for by-ref params.
+        for (i, param) in resolved.params.iter().enumerate() {
+            let Some(out_ty) = param.out_ty.as_ref() else {
+                continue;
+            };
+            let out_ty = (**out_ty).clone();
+            if param.is_variadic {
+                for arg in call.args.iter().skip(i) {
+                    if let php_ast::owned::ExprKind::Variable(name) = &arg.value.kind {
+                        ctx.set_var(name.as_ref().trim_start_matches('$'), out_ty.clone());
+                    }
+                }
+            } else if let Some(arg) = call.args.get(i) {
+                if let php_ast::owned::ExprKind::Variable(name) = &arg.value.kind {
+                    ctx.set_var(name.as_ref().trim_start_matches('$'), out_ty);
+                }
             }
         }
 

@@ -22,6 +22,20 @@ impl DocblockParser {
 
         for tag in &doc.tags {
             match tag.name.as_str() {
+                "param-out" | "psalm-param-out" | "phpstan-param-out" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        if let Some((ty_s, name)) = parse_param_line(&body_str) {
+                            if let Some(msg) = validate_type_str(&ty_s, "param-out") {
+                                result.invalid_annotations.push(msg);
+                            } else {
+                                result.out_params.push((
+                                    name.trim_start_matches('$').to_string(),
+                                    parse_type_string(&ty_s),
+                                ));
+                            }
+                        }
+                    }
+                }
                 "param" | "psalm-param" | "phpstan-param" => {
                     if let Some(body_str) = body_text(&tag.body) {
                         if let Some((ty_s, name)) = parse_param_line(&body_str) {
@@ -455,6 +469,9 @@ pub struct DocImportType {
 pub struct ParsedDocblock {
     /// `@param Type $name`
     pub params: Vec<(String, Type)>,
+    /// `@param-out Type $name` / `@psalm-param-out Type $name` — the type written
+    /// back to the caller's by-ref argument after the call.
+    pub out_params: Vec<(String, Type)>,
     /// `@return Type`
     pub return_type: Option<Type>,
     /// `@var Type` or `@var Type $name` — type and optional variable name
@@ -538,6 +555,16 @@ impl ParsedDocblock {
     pub fn get_param_type(&self, name: &str) -> Option<&Type> {
         let name = name.trim_start_matches('$');
         self.params
+            .iter()
+            .rfind(|(n, _)| n.trim_start_matches('$') == name)
+            .map(|(_, ty)| ty)
+    }
+
+    /// Returns the `@param-out` / `@psalm-param-out` type for a given parameter
+    /// name, if declared. Uses the **last** match.
+    pub fn get_out_param_type(&self, name: &str) -> Option<&Type> {
+        let name = name.trim_start_matches('$');
+        self.out_params
             .iter()
             .rfind(|(n, _)| n.trim_start_matches('$') == name)
             .map(|(_, ty)| ty)
