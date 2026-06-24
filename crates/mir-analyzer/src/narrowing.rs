@@ -332,12 +332,18 @@ pub fn narrow_from_condition(
                     // `if (class_exists(\Foo\Bar::class)) { ... }` — record \Foo\Bar as
                     // proven-to-exist in the true branch so that UndefinedClass is
                     // suppressed for all usages within the guarded block.
+                    // Variable form: `if (class_exists($var)) { ... }` — narrow $var to
+                    // class-string so it satisfies class-string-typed parameters.
                     if is_true {
                         if let Some(arg_expr) = call.args.first() {
                             if let Some(fqcn) =
                                 extract_class_fqcn_from_expr(&arg_expr.value, db, file)
                             {
                                 ctx.class_exists_guards.insert(fqcn);
+                            } else if let Some(var_name) = extract_var_name(&arg_expr.value) {
+                                let current = ctx.get_var(&var_name);
+                                let narrowed = current.narrow_to_class_string();
+                                set_narrowed(ctx, &var_name, &current, narrowed, true);
                             }
                         }
                     }

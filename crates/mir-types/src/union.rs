@@ -675,6 +675,25 @@ impl Type {
         self.filter(|t| matches!(t, Atomic::TMixed))
     }
 
+    /// Narrow as if `class_exists($x)` returned true for a string variable.
+    /// String atoms become `class-string`; existing class-string atoms pass through;
+    /// mixed/scalar becomes `class-string`. Non-string atoms are dropped (returning
+    /// empty so the caller can mark the branch as diverging).
+    pub fn narrow_to_class_string(&self) -> Type {
+        let mut out = Type::empty();
+        out.from_docblock = self.from_docblock;
+        for t in &self.types {
+            match t {
+                Atomic::TClassString(_) => out.add_type(t.clone()),
+                _ if t.is_string() || matches!(t, Atomic::TMixed | Atomic::TScalar) => {
+                    out.add_type(Atomic::TClassString(None));
+                }
+                _ => {}
+            }
+        }
+        out
+    }
+
     // --- Merge (branch join) ------------------------------------------------
 
     /// Merge two unions at a branch join point (e.g. after if/else).
