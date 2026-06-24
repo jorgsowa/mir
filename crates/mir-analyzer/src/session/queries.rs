@@ -323,6 +323,20 @@ impl AnalysisSession {
         }
     }
 
+    /// Files declaring transitive subclasses of `class_fqn`, computed from the
+    /// resolved inheritance graph (see [`crate::db::class_subtype_files`]).
+    /// Excludes `class_fqn`'s own declaring file — the caller adds it.
+    ///
+    /// Lets a reference-search caller scope a `protected` member to its class
+    /// hierarchy without reconstructing that hierarchy from declaration text:
+    /// subclasses are matched by resolved FQCN, so `extends \Ns\Base` and
+    /// aliased `use` forms are all found. Read-only; no input mutation.
+    pub fn subtype_files(&self, class_fqn: &str) -> Vec<Arc<str>> {
+        let db = self.snapshot_db();
+        let here = crate::db::Fqcn::from_str(&db, class_fqn);
+        crate::db::class_subtype_files(&db, here).to_vec()
+    }
+
     /// Class-level issues (inheritance violations, abstract-method gaps, override
     /// incompatibilities) for the given set of files.
     ///

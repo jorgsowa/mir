@@ -381,3 +381,41 @@ fn ancestor_walk_handles_cycles() {
     assert!(names.contains(&"App\\A"));
     assert!(names.contains(&"App\\B"));
 }
+
+#[test]
+fn subtype_files_resolves_plain_fqn_and_aliased_extends() {
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.set_file_text(
+        Arc::from("/proj/Base.php"),
+        Arc::from("<?php\nnamespace App;\nclass Base { protected function boot() {} }\n"),
+    );
+    session.set_file_text(
+        Arc::from("/proj/Child.php"),
+        Arc::from("<?php\nnamespace App;\nclass Child extends Base {}\n"),
+    );
+    session.set_file_text(
+        Arc::from("/proj/Grand.php"),
+        Arc::from("<?php\nnamespace App;\nclass Grand extends \\App\\Base {}\n"),
+    );
+    session.set_file_text(
+        Arc::from("/proj/Aliased.php"),
+        Arc::from("<?php\nnamespace App\\Sub;\nuse App\\Base as TheBase;\nclass Aliased extends TheBase {}\n"),
+    );
+    session.set_file_text(
+        Arc::from("/proj/Stranger.php"),
+        Arc::from("<?php\nnamespace App;\nclass Stranger {}\n"),
+    );
+
+    let mut files = session.subtype_files("App\\Base");
+    files.sort();
+    assert_eq!(
+        files,
+        vec![
+            Arc::<str>::from("/proj/Aliased.php"),
+            Arc::<str>::from("/proj/Child.php"),
+            Arc::<str>::from("/proj/Grand.php"),
+        ],
+        "subtype_files must find subclasses regardless of plain/FQN/aliased extends, \
+         and exclude the base's own file and unrelated classes"
+    );
+}
