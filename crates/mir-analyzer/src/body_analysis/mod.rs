@@ -136,15 +136,86 @@ fn method_chain_signature(
     Vec<mir_codebase::storage::TemplateParam>,
     Arc<[Arc<str>]>,
 ) {
-    if let Some((_, storage)) =
-        crate::db::find_method_in_chain(db, crate::db::Fqcn::from_str(db, fqcn), method_name)
-    {
-        return (
-            Arc::clone(&storage.params),
-            storage.return_type.as_deref().cloned(),
-            storage.template_params.clone(),
-            Arc::from(storage.throws.as_slice()),
+    let method_name_lower = if method_name.bytes().any(|b| b.is_ascii_uppercase()) {
+        std::borrow::Cow::Owned(method_name.to_ascii_lowercase())
+    } else {
+        std::borrow::Cow::Borrowed(method_name)
+    };
+    if let Some((_, storage)) = crate::db::find_method_in_chain(
+        db,
+        crate::db::Fqcn::from_str(db, fqcn),
+        method_name_lower.as_ref(),
+    ) {
+        let fqcn_interned = crate::db::Fqcn::from_str(db, fqcn);
+        let parent = crate::db::find_inheritdoc_parent(
+            db,
+            fqcn_interned,
+            fqcn_interned,
+            method_name_lower.as_ref(),
+            &storage,
         );
+
+        let own_has_docblock_return = storage
+            .return_type
+            .as_deref()
+            .map(|t| t.from_docblock)
+            .unwrap_or(false);
+        let return_type = if own_has_docblock_return {
+            storage.return_type.as_deref().cloned()
+        } else {
+            parent
+                .as_ref()
+                .and_then(|p| p.return_type.as_deref().cloned())
+                .or_else(|| storage.return_type.as_deref().cloned())
+        };
+
+        let params: Arc<[mir_codebase::storage::FnParam]> = if let Some(ref p) = parent {
+            storage
+                .params
+                .iter()
+                .enumerate()
+                .map(|(i, own)| {
+                    let own_ty_is_docblock =
+                        own.ty.as_deref().map(|t| t.from_docblock).unwrap_or(false);
+                    let own_is_mixed_or_absent =
+                        own.ty.as_deref().map(|t| t.is_mixed()).unwrap_or(true);
+                    if !own_ty_is_docblock && own_is_mixed_or_absent {
+                        if let Some(parent_param) = p.params.get(i) {
+                            if parent_param.ty.is_some() {
+                                return mir_codebase::storage::FnParam {
+                                    ty: parent_param.ty.clone(),
+                                    ..own.clone()
+                                };
+                            }
+                        }
+                    }
+                    own.clone()
+                })
+                .collect::<Vec<_>>()
+                .into()
+        } else {
+            Arc::clone(&storage.params)
+        };
+
+        let template_params = if storage.template_params.is_empty() {
+            parent
+                .as_ref()
+                .map(|p| p.template_params.clone())
+                .unwrap_or_default()
+        } else {
+            storage.template_params.clone()
+        };
+
+        let throws: Arc<[Arc<str>]> = if storage.throws.is_empty() {
+            parent
+                .as_ref()
+                .map(|p| Arc::from(p.throws.as_slice()))
+                .unwrap_or_else(|| Arc::from([]))
+        } else {
+            Arc::from(storage.throws.as_slice())
+        };
+
+        return (params, return_type, template_params, throws);
     }
     (Arc::from([]), None, vec![], Arc::from([]))
 }

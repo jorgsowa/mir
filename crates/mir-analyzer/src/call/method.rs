@@ -76,12 +76,85 @@ pub(super) fn resolve_method_from_db(
             name.clone()
         };
         let inferred = crate::db::inferred_method_return_type_demand(db, &owner_fqcn, &name_lower);
-        let return_ty_raw = storage
+
+        // Resolve @inheritDoc: when the method has no docblock-annotated return type
+        // or unannotated params, inherit them from the nearest ancestor that has them.
+        // A native-hint `mixed` (from_docblock=false) counts as "no docblock type" so
+        // that `/** @inheritdoc */ public function f(): mixed {}` still inherits.
+        let parent = crate::db::find_inheritdoc_parent(
+            db,
+            crate::db::Fqcn::from_str(db, fqcn.as_ref()),
+            crate::db::Fqcn::from_str(db, owner_fqcn.as_ref()),
+            method_name_lower,
+            &storage,
+        );
+
+        let own_has_docblock_return = storage
             .return_type
-            .clone()
-            .or(inferred)
-            .map(|t| (*t).clone())
-            .unwrap_or_else(Type::mixed);
+            .as_deref()
+            .map(|t| t.from_docblock)
+            .unwrap_or(false);
+
+        let return_ty_raw = if own_has_docblock_return {
+            storage.return_type.clone()
+        } else {
+            parent
+                .as_ref()
+                .and_then(|p| p.return_type.clone())
+                .or_else(|| storage.return_type.clone())
+        }
+        .or(inferred)
+        .map(|t| (*t).clone())
+        .unwrap_or_else(Type::mixed);
+
+        let params: Vec<FnParam> = if let Some(ref p) = parent {
+            storage
+                .params
+                .iter()
+                .enumerate()
+                .map(|(i, own)| {
+                    // Inherit parent param type only when the own type is absent
+                    // or is a non-docblock `mixed` hint. A concrete native type
+                    // hint (e.g. `A $class`) overrides the parent's narrower
+                    // docblock refinement to avoid false positives.
+                    let own_ty_is_docblock =
+                        own.ty.as_deref().map(|t| t.from_docblock).unwrap_or(false);
+                    let own_is_mixed_or_absent =
+                        own.ty.as_deref().map(|t| t.is_mixed()).unwrap_or(true);
+                    if !own_ty_is_docblock && own_is_mixed_or_absent {
+                        if let Some(parent_param) = p.params.get(i) {
+                            if parent_param.ty.is_some() {
+                                return FnParam {
+                                    ty: parent_param.ty.clone(),
+                                    ..own.clone()
+                                };
+                            }
+                        }
+                    }
+                    own.clone()
+                })
+                .collect()
+        } else {
+            storage.params.to_vec()
+        };
+
+        let template_params = if storage.template_params.is_empty() {
+            parent
+                .as_ref()
+                .map(|p| p.template_params.clone())
+                .unwrap_or_default()
+        } else {
+            storage.template_params.clone()
+        };
+
+        let throws: Arc<[Arc<str>]> = if storage.throws.is_empty() {
+            parent
+                .as_ref()
+                .map(|p| Arc::from(p.throws.as_slice()))
+                .unwrap_or_else(|| Arc::from([]))
+        } else {
+            storage.throws.clone().into()
+        };
 
         return Some(ResolvedMethod {
             owner_fqcn,
@@ -91,10 +164,10 @@ pub(super) fn resolve_method_from_db(
             is_internal: storage.is_internal,
             is_static: storage.is_static,
             is_abstract: storage.is_abstract,
-            params: storage.params.to_vec(),
-            template_params: storage.template_params.clone(),
+            params,
+            template_params,
             return_ty_raw,
-            throws: storage.throws.clone().into(),
+            throws,
             no_named_arguments: storage.no_named_arguments,
             taint_sink_params: storage.taint_sink_params.clone(),
             if_this_is: storage.if_this_is.clone(),

@@ -851,6 +851,7 @@ impl<'a> DefinitionCollector<'a> {
                     is_virtual: true,
                     taint_sink_params: vec![],
                     if_this_is: None,
+                    is_inherit_doc: false,
                 }),
             );
         }
@@ -1364,6 +1365,7 @@ impl<'a> DefinitionCollector<'a> {
                 .map(|(param, kind)| (Arc::from(param.as_str()), Arc::from(kind.as_str())))
                 .collect(),
             if_this_is: if_this_is_resolved,
+            is_inherit_doc: doc.is_inherit_doc,
         })
     }
 }

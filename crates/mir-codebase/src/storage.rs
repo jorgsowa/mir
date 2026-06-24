@@ -424,6 +424,11 @@ pub struct MethodDef {
     /// satisfy for this method to be callable. `None` when absent.
     #[serde(default)]
     pub if_this_is: Option<Arc<Type>>,
+    /// True when the method has `@inheritDoc` / `{@inheritDoc}` in its docblock.
+    /// The analyzer inherits the parent's return type, param types, throws, and
+    /// template params when this method has none of its own.
+    #[serde(default)]
+    pub is_inherit_doc: bool,
 }
 
 impl MethodDef {

@@ -672,6 +672,7 @@ pub fn find_method_in_class<'db>(
                 docstring: None,
                 taint_sink_params: vec![],
                 if_this_is: None,
+                is_inherit_doc: false,
             })
         };
         if lower == "cases" {
@@ -706,6 +707,7 @@ pub fn find_method_in_class<'db>(
                 docstring: None,
                 taint_sink_params: vec![],
                 if_this_is: None,
+                is_inherit_doc: false,
             }));
         }
         if is_backed && (lower == "from" || lower == "tryfrom") {
@@ -840,6 +842,54 @@ pub fn find_method_in_chain<'db>(
     // Separate @mixin walk — cycle-safe, depth-first.
     let mut visited_mixins = std::collections::HashSet::<Arc<str>>::new();
     find_method_in_mixins(db, fqcn, name, &mut visited_mixins)
+}
+
+/// If `method` has `@inheritDoc`, walks the ancestor chain of `receiver_fqcn`
+/// (the class where analysis is happening, which may differ from `owner_fqcn`
+/// when the method is pulled in from a trait) to find the best docblock parent.
+///
+/// Resolution strategy:
+/// 1. Skip `receiver_fqcn` itself and the immediate `owner_fqcn` (the trait/class
+///    that declares the `@inheritdoc` method).
+/// 2. Prefer the **first** ancestor that has a `from_docblock` return type —
+///    this skips intermediate `@inheritdoc` hops in multi-level chains.
+/// 3. Fall back to the first ancestor that has any declared return type.
+pub fn find_inheritdoc_parent<'db>(
+    db: &'db dyn MirDatabase,
+    receiver_fqcn: Fqcn<'db>,
+    owner_fqcn: Fqcn<'db>,
+    method_name_lower: &str,
+    method: &MethodDef,
+) -> Option<Arc<MethodDef>> {
+    if !method.is_inherit_doc {
+        return None;
+    }
+    let receiver_name = receiver_fqcn.name(db);
+    let owner_name = owner_fqcn.name(db);
+    let ancestors = class_ancestors_by_fqcn(db, receiver_fqcn);
+
+    // First pass: find the nearest ancestor with a docblock @return.
+    let mut first_any: Option<Arc<MethodDef>> = None;
+    for ancestor in ancestors.iter() {
+        let anc = ancestor.as_ref();
+        if anc == receiver_name.as_str() || anc == owner_name.as_str() {
+            continue;
+        }
+        let anc_fqcn = Fqcn::new(db, Name::new(anc));
+        if let Some(m) = find_method_in_class(db, anc_fqcn, method_name_lower) {
+            if m.return_type
+                .as_deref()
+                .map(|t| t.from_docblock)
+                .unwrap_or(false)
+            {
+                return Some(m);
+            }
+            if first_any.is_none() {
+                first_any = Some(m);
+            }
+        }
+    }
+    first_any
 }
 
 /// Walk the inheritance chain of `fqcn` respecting `insteadof` trait precedence
