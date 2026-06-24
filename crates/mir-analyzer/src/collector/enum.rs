@@ -28,11 +28,26 @@ impl DefinitionCollector<'_> {
             .as_ref()
             .map(|n| crate::parser::docblock::parse_type_string(&name_to_string_owned(n)));
 
-        let interfaces: Vec<Arc<str>> = decl
+        let mut interfaces: Vec<Arc<str>> = decl
             .implements
             .iter()
             .map(|n| self.resolve_name(&name_to_string_owned(n)).into())
             .collect();
+
+        // PHP automatically makes every enum implement UnitEnum (and backed enums
+        // implement IntBackedEnum / StringBackedEnum, which extend BackedEnum → UnitEnum).
+        // Inject the appropriate interface so method resolution finds cases() / from() /
+        // tryFrom() in the stubs without the user having to write `implements BackedEnum`.
+        let implicit_iface: Arc<str> = match decl.scalar_type.as_ref() {
+            None => Arc::from("UnitEnum"),
+            Some(n) if name_to_string_owned(n).eq_ignore_ascii_case("string") => {
+                Arc::from("StringBackedEnum")
+            }
+            _ => Arc::from("IntBackedEnum"),
+        };
+        if !interfaces.contains(&implicit_iface) {
+            interfaces.push(implicit_iface);
+        }
 
         let mut cases = indexmap::IndexMap::new();
         let mut own_methods = indexmap::IndexMap::new();

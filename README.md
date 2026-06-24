@@ -70,29 +70,9 @@ See the [CLI reference](https://jorgsowa.github.io/mir/reference/cli/) for all f
 
 ### Suppressing issues inline
 
-Silence a single false positive directly in the source with a comment, without
-editing config or a baseline file:
-
-```php
-// @mir-ignore UndefinedClass
-new ThirdPartyClass();
-
-$obj->method();          // @mir-ignore NullMethodCall   (trailing: this line)
-
-// @mir-ignore-next-line PossiblyNullArgument
-doThing($maybeNull);
-```
-
-A bare comment above a statement annotates the statement that follows it; a
-trailing comment annotates its own line. List one or more `IssueKind` names (or
-codes such as `MIR1400`) after the directive, or omit them to suppress every
-issue on the target line. `@mir-ignore-file Kind …` suppresses a kind across the
-whole file. The `@psalm-suppress`, `@suppress`, `@phpstan-ignore-line` and
-`@phpstan-ignore-next-line` aliases are accepted for drop-in compatibility.
-
-Directives are matched per physical line, so a directive written inside a string
-literal or heredoc body is also honored — harmless in practice, since no
-diagnostic is normally reported on such a line.
+Use `@mir-ignore`, `@mir-ignore-next-line`, or `@mir-ignore-file` to suppress a
+false positive directly in source. `@psalm-suppress` and `@phpstan-ignore-*`
+aliases are accepted. See the [suppression reference](https://jorgsowa.github.io/mir/reference/suppressions/).
 
 ## Documentation
 

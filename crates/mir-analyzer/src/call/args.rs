@@ -106,23 +106,46 @@ pub fn spread_element_type(arr_ty: &Type) -> Type {
     }
 }
 
-/// Replace `TStaticObject` / `TSelf` in a method's return type with the actual receiver FQCN.
-pub(crate) fn substitute_static_in_return(ret: Type, receiver_fqcn: &Arc<str>) -> Type {
-    let from_docblock = ret.from_docblock;
-    let types: Vec<Atomic> = ret
+fn substitute_static_in_type(t: Type, receiver_fqcn: &Arc<str>) -> Type {
+    let from_docblock = t.from_docblock;
+    let types: Vec<Atomic> = t
         .types
         .into_iter()
-        .map(|a| match a {
-            Atomic::TStaticObject { .. } | Atomic::TSelf { .. } => Atomic::TNamedObject {
-                fqcn: Name::from(receiver_fqcn.as_ref()),
-                type_params: mir_types::union::empty_type_params(),
-            },
-            other => other,
-        })
+        .map(|a| substitute_static_atom(a, receiver_fqcn))
         .collect();
     let mut result = Type::from_vec(types);
     result.from_docblock = from_docblock;
     result
+}
+
+fn substitute_static_atom(a: Atomic, fqcn: &Arc<str>) -> Atomic {
+    match a {
+        Atomic::TStaticObject { .. } | Atomic::TSelf { .. } => Atomic::TNamedObject {
+            fqcn: Name::from(fqcn.as_ref()),
+            type_params: mir_types::union::empty_type_params(),
+        },
+        Atomic::TList { value } => Atomic::TList {
+            value: Box::new(substitute_static_in_type(*value, fqcn)),
+        },
+        Atomic::TNonEmptyList { value } => Atomic::TNonEmptyList {
+            value: Box::new(substitute_static_in_type(*value, fqcn)),
+        },
+        Atomic::TArray { key, value } => Atomic::TArray {
+            key: Box::new(substitute_static_in_type(*key, fqcn)),
+            value: Box::new(substitute_static_in_type(*value, fqcn)),
+        },
+        Atomic::TNonEmptyArray { key, value } => Atomic::TNonEmptyArray {
+            key: Box::new(substitute_static_in_type(*key, fqcn)),
+            value: Box::new(substitute_static_in_type(*value, fqcn)),
+        },
+        other => other,
+    }
+}
+
+/// Replace `TStaticObject` / `TSelf` in a method's return type with the actual receiver FQCN.
+/// Also recurses into array and list value types so `@return static[]` is correctly resolved.
+pub(crate) fn substitute_static_in_return(ret: Type, receiver_fqcn: &Arc<str>) -> Type {
+    substitute_static_in_type(ret, receiver_fqcn)
 }
 
 pub(crate) fn check_method_visibility(

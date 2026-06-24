@@ -647,34 +647,6 @@ pub fn find_method_in_class<'db>(
     if let ClassLike::Enum(e) = &class {
         let lower = name.to_ascii_lowercase();
         let is_backed = e.scalar_type.is_some();
-        let synth = |method_name: &str, params: Arc<[FnParam]>| {
-            Arc::new(mir_codebase::storage::MethodDef {
-                fqcn: e.fqcn.clone(),
-                name: Arc::from(method_name),
-                params,
-                return_type: Some(Arc::new(mir_types::Type::mixed())),
-                inferred_return_type: None,
-                visibility: mir_codebase::storage::Visibility::Public,
-                is_static: true,
-                is_abstract: false,
-                is_constructor: false,
-                template_params: vec![],
-                assertions: vec![],
-                throws: vec![],
-                is_final: false,
-                is_virtual: false,
-                is_internal: false,
-                is_pure: false,
-                no_named_arguments: false,
-                is_override: false,
-                deprecated: None,
-                location: None,
-                docstring: None,
-                taint_sink_params: vec![],
-                if_this_is: None,
-                is_inherit_doc: false,
-            })
-        };
         if lower == "cases" {
             let enum_ty = mir_types::Type::single(Atomic::TNamedObject {
                 fqcn: Name::new(e.fqcn.as_ref()),
@@ -726,7 +698,43 @@ pub fn find_method_in_class<'db>(
             } else {
                 "from"
             };
-            return Some(synth(canonical_name, Arc::from(vec![value_param])));
+            let enum_ty = mir_types::Type::single(Atomic::TNamedObject {
+                fqcn: Name::new(e.fqcn.as_ref()),
+                type_params: mir_types::union::empty_type_params(),
+            });
+            let return_ty = if lower == "tryfrom" {
+                let mut t = enum_ty;
+                t.add_type(Atomic::TNull);
+                t
+            } else {
+                enum_ty
+            };
+            return Some(Arc::new(mir_codebase::storage::MethodDef {
+                fqcn: e.fqcn.clone(),
+                name: Arc::from(canonical_name),
+                params: Arc::from(vec![value_param]),
+                return_type: Some(Arc::new(return_ty)),
+                inferred_return_type: None,
+                visibility: mir_codebase::storage::Visibility::Public,
+                is_static: true,
+                is_abstract: false,
+                is_constructor: false,
+                template_params: vec![],
+                assertions: vec![],
+                throws: vec![],
+                is_final: false,
+                is_virtual: false,
+                is_internal: false,
+                is_pure: false,
+                no_named_arguments: false,
+                is_override: false,
+                deprecated: None,
+                location: None,
+                docstring: None,
+                taint_sink_params: vec![],
+                if_this_is: None,
+                is_inherit_doc: false,
+            }));
         }
     }
     None
