@@ -505,12 +505,14 @@ pub(crate) fn check_to_string_return(
 
 /// True when a declared return type obliges every code path to `return` a
 /// value, so falling off the end of the body is an error. Conservative:
-/// `void`/`never`/`mixed`/nullable returns are exempt (falling off yields
-/// `null`, which those accept or which is moot), and iterable/generator-like
-/// returns are exempt because a generator body legitimately never returns.
+/// `void`/`mixed`/nullable returns are exempt (falling off yields `null`,
+/// which those accept or which is moot). `never` is NOT exempt: a `: never`
+/// body that falls off the end is a bug — it must always throw/exit/diverge.
+/// Iterable/generator-like returns are exempt because a generator body
+/// legitimately never returns.
 fn return_requires_value(t: &mir_types::Type) -> bool {
     use mir_types::Atomic;
-    if t.is_empty() || t.is_void() || t.is_never() || t.is_mixed() || t.is_nullable() {
+    if t.is_empty() || t.is_void() || t.is_mixed() || t.is_nullable() {
         return false;
     }
     // `static|void`, `T|void` — void in a union means implicit return is valid.
