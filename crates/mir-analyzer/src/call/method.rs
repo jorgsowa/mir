@@ -39,25 +39,25 @@ fn namespace_root(ns: Option<&str>) -> Option<&str> {
         .filter(|seg| !seg.is_empty())
 }
 
-pub(super) struct ResolvedMethod {
-    pub(super) owner_fqcn: Arc<str>,
-    pub(super) name: Arc<str>,
-    pub(super) visibility: Visibility,
-    pub(super) deprecated: Option<Arc<str>>,
-    pub(super) is_internal: bool,
-    pub(super) is_static: bool,
-    pub(super) is_abstract: bool,
-    pub(super) params: Vec<FnParam>,
-    pub(super) template_params: Vec<TemplateParam>,
-    pub(super) return_ty_raw: Type,
-    pub(super) throws: Arc<[Arc<str>]>,
-    pub(super) no_named_arguments: bool,
-    pub(super) taint_sink_params: Vec<(Arc<str>, Arc<str>)>,
-    pub(super) if_this_is: Option<Arc<Type>>,
+pub(crate) struct ResolvedMethod {
+    pub(crate) owner_fqcn: Arc<str>,
+    pub(crate) name: Arc<str>,
+    pub(crate) visibility: Visibility,
+    pub(crate) deprecated: Option<Arc<str>>,
+    pub(crate) is_internal: bool,
+    pub(crate) is_static: bool,
+    pub(crate) is_abstract: bool,
+    pub(crate) params: Vec<FnParam>,
+    pub(crate) template_params: Vec<TemplateParam>,
+    pub(crate) return_ty_raw: Type,
+    pub(crate) throws: Arc<[Arc<str>]>,
+    pub(crate) no_named_arguments: bool,
+    pub(crate) taint_sink_params: Vec<(Arc<str>, Arc<str>)>,
+    pub(crate) if_this_is: Option<Arc<Type>>,
 }
 
 /// Resolve a method via the Salsa db, walking the class ancestor chain.
-pub(super) fn resolve_method_from_db(
+pub(crate) fn resolve_method_from_db(
     ea: &ExpressionAnalyzer<'_>,
     fqcn: &Arc<str>,
     method_name_lower: &str,

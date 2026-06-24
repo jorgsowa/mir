@@ -301,7 +301,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             ExprKind::ArrowFunction(af) => self.analyze_arrow_function(af, ctx),
 
-            ExprKind::CallableCreate(cc) => self.callable_create_type(cc, expr.span),
+            ExprKind::CallableCreate(cc) => self.callable_create_type(cc, expr.span, ctx),
 
             // --- Match expression ------------------------------------------
             ExprKind::Match(m) => self.analyze_match(m, expr.span, ctx),
@@ -373,66 +373,202 @@ impl<'a> ExpressionAnalyzer<'a> {
         &mut self,
         cc: &php_ast::owned::CallableCreateExpr,
         outer_span: php_ast::Span,
+        ctx: &mut FlowState,
     ) -> Type {
         use php_ast::owned::CallableCreateKind;
-        if let CallableCreateKind::Function(name_expr) = &cc.kind {
-            if let ExprKind::Identifier(name) = &name_expr.kind {
-                let resolved_fqn =
-                    crate::db::resolve_name(self.db, self.file.as_ref(), name.as_ref());
-                let db = self.db;
-                let here = crate::db::Fqcn::from_str(db, &resolved_fqn);
-                if let Some(f) = crate::db::find_function(db, here) {
-                    if let Some((used, canonical)) =
-                        crate::fqcn_case_mismatch(&resolved_fqn, f.fqn.as_ref())
-                    {
-                        let span = if name_expr.span.start < name_expr.span.end {
-                            name_expr.span
-                        } else {
-                            outer_span
-                        };
-                        self.emit(
-                            mir_issues::IssueKind::WrongCaseFunction { used, canonical },
-                            mir_issues::Severity::Info,
-                            span,
-                        );
-                    }
-                    let return_ty = f
-                        .return_type
-                        .as_deref()
-                        .cloned()
-                        .unwrap_or_else(Type::mixed);
-                    let params: Vec<mir_types::atomic::FnParam> = f
-                        .params
-                        .iter()
-                        .map(|p| mir_types::atomic::FnParam {
-                            name: mir_types::Name::from(p.name.as_ref()),
-                            ty: p
-                                .ty
-                                .as_deref()
-                                .cloned()
-                                .map(mir_types::compact::SimpleType::from_union),
-                            default: if p.has_default {
-                                Some(mir_types::compact::SimpleType::from_union(Type::mixed()))
+        match &cc.kind {
+            CallableCreateKind::Function(name_expr) => {
+                if let ExprKind::Identifier(name) = &name_expr.kind {
+                    let resolved_fqn =
+                        crate::db::resolve_name(self.db, self.file.as_ref(), name.as_ref());
+                    let db = self.db;
+                    let here = crate::db::Fqcn::from_str(db, &resolved_fqn);
+                    if let Some(f) = crate::db::find_function(db, here) {
+                        if let Some((used, canonical)) =
+                            crate::fqcn_case_mismatch(&resolved_fqn, f.fqn.as_ref())
+                        {
+                            let span = if name_expr.span.start < name_expr.span.end {
+                                name_expr.span
                             } else {
-                                None
-                            },
-                            is_variadic: p.is_variadic,
-                            is_byref: p.is_byref,
-                            is_optional: p.is_optional,
-                        })
-                        .collect();
-                    return Type::single(Atomic::TClosure {
-                        params,
-                        return_type: Box::new(return_ty),
-                        this_type: None,
-                    });
+                                outer_span
+                            };
+                            self.emit(
+                                mir_issues::IssueKind::WrongCaseFunction { used, canonical },
+                                mir_issues::Severity::Info,
+                                span,
+                            );
+                        }
+                        let return_ty = f
+                            .return_type
+                            .as_deref()
+                            .cloned()
+                            .unwrap_or_else(Type::mixed);
+                        let params: Vec<mir_types::atomic::FnParam> = f
+                            .params
+                            .iter()
+                            .map(|p| mir_types::atomic::FnParam {
+                                name: mir_types::Name::from(p.name.as_ref()),
+                                ty: p
+                                    .ty
+                                    .as_deref()
+                                    .cloned()
+                                    .map(mir_types::compact::SimpleType::from_union),
+                                default: if p.has_default {
+                                    Some(mir_types::compact::SimpleType::from_union(Type::mixed()))
+                                } else {
+                                    None
+                                },
+                                is_variadic: p.is_variadic,
+                                is_byref: p.is_byref,
+                                is_optional: p.is_optional,
+                            })
+                            .collect();
+                        return Type::single(Atomic::TClosure {
+                            params,
+                            return_type: Box::new(return_ty),
+                            this_type: None,
+                        });
+                    }
                 }
+                Type::single(Atomic::TCallable {
+                    params: None,
+                    return_type: None,
+                })
+            }
+
+            CallableCreateKind::Method { object, method }
+            | CallableCreateKind::NullsafeMethod { object, method } => {
+                let nullsafe = matches!(&cc.kind, CallableCreateKind::NullsafeMethod { .. });
+                let obj_ty = self.analyze(object, ctx);
+                let method_name = match &method.kind {
+                    ExprKind::Identifier(name) => name.clone(),
+                    _ => {
+                        return Type::single(Atomic::TCallable {
+                            params: None,
+                            return_type: None,
+                        })
+                    }
+                };
+                let method_name_lower = crate::util::php_ident_lowercase(method_name.as_ref());
+                if let Some(fqcn) = obj_ty
+                    .remove_null()
+                    .types
+                    .iter()
+                    .find_map(|a| a.named_object_fqcn())
+                {
+                    let fqcn_resolved = crate::db::resolve_name(self.db, self.file.as_ref(), fqcn);
+                    let fqcn_arc: Arc<str> = Arc::from(fqcn_resolved.as_str());
+                    if let Some(resolved) = crate::call::method::resolve_method_from_db(
+                        self,
+                        &fqcn_arc,
+                        &method_name_lower,
+                    ) {
+                        let closure = Self::build_closure_from_resolved_params(
+                            &resolved.params,
+                            resolved.return_ty_raw,
+                        );
+                        return if nullsafe {
+                            Type::nullable(closure)
+                        } else {
+                            Type::single(closure)
+                        };
+                    }
+                }
+                Type::single(Atomic::TCallable {
+                    params: None,
+                    return_type: None,
+                })
+            }
+
+            CallableCreateKind::StaticMethod { class, method } => {
+                let method_name = match &method.kind {
+                    ExprKind::Identifier(name) => name.clone(),
+                    _ => {
+                        return Type::single(Atomic::TCallable {
+                            params: None,
+                            return_type: None,
+                        })
+                    }
+                };
+                let method_name_lower = crate::util::php_ident_lowercase(method_name.as_ref());
+                let fqcn = match &class.kind {
+                    ExprKind::Identifier(name) => {
+                        let resolved =
+                            crate::db::resolve_name(self.db, self.file.as_ref(), name.as_ref());
+                        match crate::util::php_ident_lowercase(&resolved).as_str() {
+                            "self" => ctx.self_fqcn.as_deref().unwrap_or("self").to_string(),
+                            "parent" => ctx.parent_fqcn.as_deref().unwrap_or("parent").to_string(),
+                            "static" => ctx
+                                .static_fqcn
+                                .as_deref()
+                                .unwrap_or(ctx.self_fqcn.as_deref().unwrap_or("static"))
+                                .to_string(),
+                            _ => resolved,
+                        }
+                    }
+                    _ => {
+                        let ty = self.analyze(class, ctx);
+                        match ty
+                            .types
+                            .iter()
+                            .find_map(|a| a.named_object_fqcn())
+                            .map(str::to_string)
+                        {
+                            Some(fqcn) => fqcn,
+                            None => {
+                                return Type::single(Atomic::TCallable {
+                                    params: None,
+                                    return_type: None,
+                                })
+                            }
+                        }
+                    }
+                };
+                let fqcn_arc: Arc<str> = Arc::from(fqcn.as_str());
+                if let Some(resolved) =
+                    crate::call::method::resolve_method_from_db(self, &fqcn_arc, &method_name_lower)
+                {
+                    return Type::single(Self::build_closure_from_resolved_params(
+                        &resolved.params,
+                        resolved.return_ty_raw,
+                    ));
+                }
+                Type::single(Atomic::TCallable {
+                    params: None,
+                    return_type: None,
+                })
             }
         }
-        Type::single(Atomic::TCallable {
-            params: None,
-            return_type: None,
-        })
+    }
+
+    fn build_closure_from_resolved_params(
+        params: &[mir_codebase::storage::FnParam],
+        return_ty: Type,
+    ) -> Atomic {
+        let fn_params: Vec<mir_types::atomic::FnParam> = params
+            .iter()
+            .map(|p| mir_types::atomic::FnParam {
+                name: mir_types::Name::from(p.name.as_ref()),
+                ty: p
+                    .ty
+                    .as_deref()
+                    .cloned()
+                    .map(mir_types::compact::SimpleType::from_union),
+                default: if p.has_default {
+                    Some(mir_types::compact::SimpleType::from_union(Type::mixed()))
+                } else {
+                    None
+                },
+                is_variadic: p.is_variadic,
+                is_byref: p.is_byref,
+                is_optional: p.is_optional,
+            })
+            .collect();
+        Atomic::TClosure {
+            params: fn_params,
+            return_type: Box::new(return_ty),
+            this_type: None,
+        }
     }
 
     /// Record a reference location for `symbol_key` at `span`, unless in inference-only mode.
