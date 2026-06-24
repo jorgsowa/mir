@@ -90,7 +90,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let fqcn: Arc<str> = Arc::from(resolved.as_str());
                 if !matches!(resolved.as_str(), "self" | "static" | "parent") {
                     if !crate::db::class_exists(self.db, &fqcn)
-                        && !ctx.class_exists_guards.contains(fqcn.as_ref())
+                        && !ctx.is_class_guarded(fqcn.as_ref())
                     {
                         self.emit(
                             IssueKind::UndefinedClass { name: resolved },

@@ -195,6 +195,11 @@ pub struct FlowState {
     /// `expr_key` is a compact string like `"this->notification"` or `"foo"`.
     pub method_exists_guards: FxHashSet<(Arc<str>, Arc<str>)>,
 
+    /// Extension names proven to be loaded via an `extension_loaded('name')` guard.
+    /// When non-empty, `UndefinedClass` is suppressed for any class in the guarded
+    /// block — the calling code explicitly verified the extension is present.
+    pub extension_loaded_guards: FxHashSet<Arc<str>>,
+
     /// Narrowed/refined types for instance-property accesses tracked through
     /// the current scope.  Key: `(object_var, prop_name)` e.g. `("this", "id")`.
     /// Set by property assignments and null-guard narrowing; read by
@@ -276,8 +281,17 @@ impl FlowState {
             defined_guards: FxHashSet::default(),
             function_exists_guards: FxHashSet::default(),
             method_exists_guards: FxHashSet::default(),
+            extension_loaded_guards: FxHashSet::default(),
             prop_refined: Arc::new(FxHashMap::default()),
         }
+    }
+
+    /// Returns true if the given FQCN is suppressed by a `class_exists()` or
+    /// `extension_loaded()` guard in the current branch. Use this instead of
+    /// directly consulting `class_exists_guards` so that both guard kinds are
+    /// respected uniformly.
+    pub fn is_class_guarded(&self, fqcn: &str) -> bool {
+        self.class_exists_guards.contains(fqcn) || !self.extension_loaded_guards.is_empty()
     }
 
     /// Create a context seeded with the given parameters.
@@ -881,6 +895,11 @@ impl FlowState {
         result.method_exists_guards = if_ctx
             .method_exists_guards
             .intersection(&else_ctx.method_exists_guards)
+            .cloned()
+            .collect();
+        result.extension_loaded_guards = if_ctx
+            .extension_loaded_guards
+            .intersection(&else_ctx.extension_loaded_guards)
             .cloned()
             .collect();
 

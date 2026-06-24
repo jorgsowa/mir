@@ -372,6 +372,22 @@ pub fn narrow_from_condition(
                             }
                         }
                     }
+                } else if bare.eq_ignore_ascii_case("extension_loaded") {
+                    // `if (extension_loaded('ext')) { ... }` — record the extension
+                    // name so that `UndefinedClass` is suppressed for any class used
+                    // inside the guarded block (the caller verified the extension is
+                    // present). The false-branch / early-exit pattern also works via
+                    // the normal divergence+narrowing mechanism.
+                    if is_true {
+                        if let Some(arg) = call.args.first() {
+                            if let ExprKind::String(ext) = &arg.value.kind {
+                                if !ext.is_empty() {
+                                    ctx.extension_loaded_guards
+                                        .insert(std::sync::Arc::from(ext.as_ref()));
+                                }
+                            }
+                        }
+                    }
                 } else if fn_name.eq_ignore_ascii_case("assert") {
                     // assert($condition) — narrow as if the condition is is_true
                     if let Some(arg_expr) = call.args.first() {

@@ -183,7 +183,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let type_exists = crate::db::class_exists(self.db, fqcn.as_ref());
                 if !matches!(resolved.as_str(), "self" | "static" | "parent")
                     && !type_exists
-                    && !ctx.class_exists_guards.contains(fqcn.as_ref())
+                    && !ctx.is_class_guarded(fqcn.as_ref())
                 {
                     self.emit(
                         IssueKind::UndefinedClass {
@@ -538,7 +538,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                 }
             } else if !crate::db::class_exists(self.db, &resolved)
-                && !ctx.class_exists_guards.contains(resolved.as_str())
+                && !ctx.is_class_guarded(resolved.as_str())
             {
                 self.emit(
                     IssueKind::UndefinedClass { name: resolved },
@@ -729,9 +729,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             _ => return Type::mixed(),
         };
 
-        if !crate::db::class_exists(self.db, &fqcn)
-            && !ctx.class_exists_guards.contains(fqcn.as_str())
-        {
+        if !crate::db::class_exists(self.db, &fqcn) && !ctx.is_class_guarded(fqcn.as_str()) {
             self.emit(
                 IssueKind::UndefinedClass { name: fqcn },
                 Severity::Error,
