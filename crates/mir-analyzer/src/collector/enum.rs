@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use mir_codebase::storage::{ConstantDef, EnumCaseDef};
+use mir_issues::{Issue, IssueKind};
 use mir_types::Type;
 use php_ast::owned::EnumMemberKind;
 
@@ -60,11 +61,44 @@ impl DefinitionCollector<'_> {
                                 None
                             }
                         });
+
+                    // Extract the literal type from the case value expression (e.g. `= 'foo'`, `= 42`).
+                    // Falls back to mixed when the expression is not a simple literal (class constant,
+                    // const expression) — those can't be statically checked at collection time.
+                    let value_ty = c
+                        .value
+                        .as_ref()
+                        .and_then(|expr| super::infer_const_value(&expr.kind));
+
+                    // Validate the case value's type against the backing scalar type.
+                    if let (Some(backing), Some(case_val_ty)) = (&scalar_type, &value_ty) {
+                        if !case_val_ty.is_subtype_structural(backing) {
+                            let lc = self.source_map.offset_to_line_col(member.span.start);
+                            let line = lc.line + 1;
+                            self.issues.add(Issue::new(
+                                IssueKind::BackedEnumCaseTypeMismatch {
+                                    enum_name: fqcn.clone(),
+                                    case_name: case_name.to_string(),
+                                    expected: backing.to_string(),
+                                    actual: case_val_ty.to_string(),
+                                },
+                                mir_issues::Location {
+                                    file: self.file.clone(),
+                                    line,
+                                    line_end: line,
+                                    col_start: 0,
+                                    col_end: 0,
+                                },
+                            ));
+                        }
+                    }
+
                     cases.insert(
                         Arc::from(case_name),
                         EnumCaseDef {
                             name: Arc::from(case_name),
-                            value: c.value.as_ref().map(|_| Type::mixed()),
+                            // Store the inferred literal type; fall back to mixed for non-literal values.
+                            value: Some(value_ty.unwrap_or_else(Type::mixed)),
                             location: Some(self.location(member.span.start, member.span.end)),
                             deprecated: case_deprecated,
                         },

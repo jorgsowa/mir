@@ -371,6 +371,14 @@ pub enum IssueKind {
         expected: String,
         actual: String,
     },
+    /// Emitted by `mir-analyzer/src/collector/enum.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/backed_enum_case_type_mismatch/`.
+    BackedEnumCaseTypeMismatch {
+        enum_name: String,
+        case_name: String,
+        expected: String,
+        actual: String,
+    },
     /// Emitted by `mir-analyzer/src/call/method.rs`.
     /// Fixtures: `tests/fixtures/by-kind/undefined_method/direct_constructor_call*.phpt`.
     DirectConstructorCall { class: String },
@@ -693,6 +701,7 @@ impl IssueKind {
             | IssueKind::InvalidToString { .. }
             | IssueKind::TypeCheckMismatch { .. }
             | IssueKind::PropertyTypeRedeclarationMismatch { .. }
+            | IssueKind::BackedEnumCaseTypeMismatch { .. }
             | IssueKind::ParentNotFound => Severity::Error,
             IssueKind::Trace { .. } => Severity::Info,
 
@@ -940,6 +949,7 @@ impl IssueKind {
             IssueKind::OverriddenMethodAccess { .. } => "MIR0703",
             IssueKind::OverriddenPropertyAccess { .. } => "MIR0710",
             IssueKind::PropertyTypeRedeclarationMismatch { .. } => "MIR0712",
+            IssueKind::BackedEnumCaseTypeMismatch { .. } => "MIR0713",
             IssueKind::InvalidExtendClass { .. } => "MIR0704",
             IssueKind::FinalMethodOverridden { .. } => "MIR0705",
             IssueKind::AbstractInstantiation { .. } => "MIR0706",
@@ -1031,11 +1041,10 @@ impl IssueKind {
             | "MIR0010" | "MIR0011" | "MIR0200" | "MIR0201" | "MIR0202" | "MIR0203" | "MIR0204"
             | "MIR0205" | "MIR0212" | "MIR0215" | "MIR0216" | "MIR0217" | "MIR0224" | "MIR0600"
             | "MIR0700" | "MIR0701" | "MIR0702" | "MIR0704" | "MIR0705" | "MIR0706" | "MIR0707"
-            | "MIR0708" | "MIR0709" | "MIR0711" | "MIR0712" | "MIR0800" | "MIR0801" | "MIR0802"
-            | "MIR0803" | "MIR0804" | "MIR0900" | "MIR1205" | "MIR1207" | "MIR1300" | "MIR1400"
-            | "MIR1500" | "MIR1503" | "MIR1602" | "MIR1603" | "MIR1604" | "MIR1605" | "MIR1606" => {
-                Some(Severity::Error)
-            }
+            | "MIR0708" | "MIR0709" | "MIR0711" | "MIR0712" | "MIR0713" | "MIR0800" | "MIR0801"
+            | "MIR0802" | "MIR0803" | "MIR0804" | "MIR0900" | "MIR1205" | "MIR1207" | "MIR1300"
+            | "MIR1400" | "MIR1500" | "MIR1503" | "MIR1602" | "MIR1603" | "MIR1604" | "MIR1605"
+            | "MIR1606" => Some(Severity::Error),
 
             // Warnings
             "MIR0006" | "MIR0008" | "MIR0100" | "MIR0101" | "MIR0102" | "MIR0103" | "MIR0109"
@@ -1152,6 +1161,7 @@ impl IssueKind {
             IssueKind::PropertyTypeRedeclarationMismatch { .. } => {
                 "PropertyTypeRedeclarationMismatch"
             }
+            IssueKind::BackedEnumCaseTypeMismatch { .. } => "BackedEnumCaseTypeMismatch",
             IssueKind::InvalidExtendClass { .. } => "InvalidExtendClass",
             IssueKind::FinalMethodOverridden { .. } => "FinalMethodOverridden",
             IssueKind::AbstractInstantiation { .. } => "AbstractInstantiation",
@@ -1524,6 +1534,16 @@ impl IssueKind {
             } => {
                 format!(
                     "Type of {class}::${property} must be {expected} (as in parent class), {actual} given"
+                )
+            }
+            IssueKind::BackedEnumCaseTypeMismatch {
+                enum_name,
+                case_name,
+                expected,
+                actual,
+            } => {
+                format!(
+                    "Backed enum case {enum_name}::{case_name} has value of type {actual}, but backing type is {expected}"
                 )
             }
             IssueKind::ReadonlyPropertyAssignment { class, property } => {
@@ -2114,6 +2134,12 @@ mod code_tests {
             IssueKind::PropertyTypeRedeclarationMismatch {
                 class: s(),
                 property: s(),
+                expected: s(),
+                actual: s(),
+            },
+            IssueKind::BackedEnumCaseTypeMismatch {
+                enum_name: s(),
+                case_name: s(),
                 expected: s(),
                 actual: s(),
             },

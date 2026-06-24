@@ -175,7 +175,7 @@ pub(crate) fn print_collector_stats() {
 
 /// Infer the type of a constant value from its AST expression (owned AST).
 /// This handles literal values like integers, strings, etc. used in define().
-fn infer_const_value(expr_kind: &php_ast::owned::ExprKind) -> Option<Type> {
+pub(super) fn infer_const_value(expr_kind: &php_ast::owned::ExprKind) -> Option<Type> {
     use php_ast::ast::UnaryPrefixOp;
 
     match expr_kind {
