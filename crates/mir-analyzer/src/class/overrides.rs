@@ -453,6 +453,39 @@ impl<'a> ClassAnalyzer<'a> {
                 }
                 issues.push(issue);
             }
+            // PHP requires redeclared typed properties to keep the same type (invariant).
+            // Only flag when both sides carry a native type hint — docblock-only types are
+            // not enforced by the runtime.
+            if own_prop.has_native_type && parent_prop.has_native_type {
+                if let (Some(own_t), Some(parent_t)) =
+                    (own_prop.ty.as_deref(), parent_prop.ty.as_deref())
+                {
+                    if own_t != parent_t {
+                        let loc = issue_location(
+                            own_prop.location.as_ref(),
+                            own_prop
+                                .location
+                                .as_ref()
+                                .and_then(|l| self.sources.get(&l.file).copied()),
+                        );
+                        let mut issue = Issue::new(
+                            IssueKind::PropertyTypeRedeclarationMismatch {
+                                class: fqcn.to_string(),
+                                property: prop_name.to_string(),
+                                expected: format!("{}", parent_t),
+                                actual: format!("{}", own_t),
+                            },
+                            loc,
+                        );
+                        if let Some(snippet) =
+                            extract_snippet(own_prop.location.as_ref(), &self.sources)
+                        {
+                            issue = issue.with_snippet(snippet);
+                        }
+                        issues.push(issue);
+                    }
+                }
+            }
         }
     }
 

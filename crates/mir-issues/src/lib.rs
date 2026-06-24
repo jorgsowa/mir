@@ -363,6 +363,14 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/class/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/overridden_property_access/`.
     OverriddenPropertyAccess { class: String, property: String },
+    /// Emitted by `mir-analyzer/src/class/overrides.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/property_type_redeclaration_mismatch/`.
+    PropertyTypeRedeclarationMismatch {
+        class: String,
+        property: String,
+        expected: String,
+        actual: String,
+    },
     /// Emitted by `mir-analyzer/src/call/method.rs`.
     /// Fixtures: `tests/fixtures/by-kind/undefined_method/direct_constructor_call*.phpt`.
     DirectConstructorCall { class: String },
@@ -684,6 +692,7 @@ impl IssueKind {
             | IssueKind::InvalidClone { .. }
             | IssueKind::InvalidToString { .. }
             | IssueKind::TypeCheckMismatch { .. }
+            | IssueKind::PropertyTypeRedeclarationMismatch { .. }
             | IssueKind::ParentNotFound => Severity::Error,
             IssueKind::Trace { .. } => Severity::Info,
 
@@ -930,6 +939,7 @@ impl IssueKind {
             IssueKind::MethodSignatureMismatch { .. } => "MIR0702",
             IssueKind::OverriddenMethodAccess { .. } => "MIR0703",
             IssueKind::OverriddenPropertyAccess { .. } => "MIR0710",
+            IssueKind::PropertyTypeRedeclarationMismatch { .. } => "MIR0712",
             IssueKind::InvalidExtendClass { .. } => "MIR0704",
             IssueKind::FinalMethodOverridden { .. } => "MIR0705",
             IssueKind::AbstractInstantiation { .. } => "MIR0706",
@@ -1021,9 +1031,9 @@ impl IssueKind {
             | "MIR0010" | "MIR0011" | "MIR0200" | "MIR0201" | "MIR0202" | "MIR0203" | "MIR0204"
             | "MIR0205" | "MIR0212" | "MIR0215" | "MIR0216" | "MIR0217" | "MIR0224" | "MIR0600"
             | "MIR0700" | "MIR0701" | "MIR0702" | "MIR0704" | "MIR0705" | "MIR0706" | "MIR0707"
-            | "MIR0708" | "MIR0709" | "MIR0711" | "MIR0800" | "MIR0801" | "MIR0802" | "MIR0803"
-            | "MIR0804" | "MIR0900" | "MIR1205" | "MIR1207" | "MIR1300" | "MIR1400" | "MIR1500"
-            | "MIR1503" | "MIR1602" | "MIR1603" | "MIR1604" | "MIR1605" | "MIR1606" => {
+            | "MIR0708" | "MIR0709" | "MIR0711" | "MIR0712" | "MIR0800" | "MIR0801" | "MIR0802"
+            | "MIR0803" | "MIR0804" | "MIR0900" | "MIR1205" | "MIR1207" | "MIR1300" | "MIR1400"
+            | "MIR1500" | "MIR1503" | "MIR1602" | "MIR1603" | "MIR1604" | "MIR1605" | "MIR1606" => {
                 Some(Severity::Error)
             }
 
@@ -1139,6 +1149,9 @@ impl IssueKind {
             IssueKind::MethodSignatureMismatch { .. } => "MethodSignatureMismatch",
             IssueKind::OverriddenMethodAccess { .. } => "OverriddenMethodAccess",
             IssueKind::OverriddenPropertyAccess { .. } => "OverriddenPropertyAccess",
+            IssueKind::PropertyTypeRedeclarationMismatch { .. } => {
+                "PropertyTypeRedeclarationMismatch"
+            }
             IssueKind::InvalidExtendClass { .. } => "InvalidExtendClass",
             IssueKind::FinalMethodOverridden { .. } => "FinalMethodOverridden",
             IssueKind::AbstractInstantiation { .. } => "AbstractInstantiation",
@@ -1502,6 +1515,16 @@ impl IssueKind {
             }
             IssueKind::OverriddenPropertyAccess { class, property } => {
                 format!("Property {class}::${property} overrides with less visibility")
+            }
+            IssueKind::PropertyTypeRedeclarationMismatch {
+                class,
+                property,
+                expected,
+                actual,
+            } => {
+                format!(
+                    "Type of {class}::${property} must be {expected} (as in parent class), {actual} given"
+                )
             }
             IssueKind::ReadonlyPropertyAssignment { class, property } => {
                 format!(
@@ -2088,6 +2111,12 @@ mod code_tests {
                 class: s(),
                 property: s(),
             },
+            IssueKind::PropertyTypeRedeclarationMismatch {
+                class: s(),
+                property: s(),
+                expected: s(),
+                actual: s(),
+            },
             IssueKind::InvalidExtendClass {
                 parent: s(),
                 child: s(),
@@ -2318,6 +2347,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 139);
+        assert_eq!(one_of_each().len(), 140);
     }
 }
