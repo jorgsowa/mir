@@ -74,6 +74,18 @@ impl CallAnalyzer {
                     ea.emit(IssueKind::MixedFunctionCall, Severity::Info, span);
                 }
 
+                // Extract typed params once — used for both pre-marking (before arg
+                // analysis) and output writeback (after the call).
+                let callee_params = typed_params_from_callee(&callee_ty, ea);
+
+                // Pre-mark by-ref parameter variables as defined BEFORE evaluating
+                // args, so a previously-undefined variable passed to an out-param
+                // (e.g. `$fn($x, $out)` where $out is fresh) is not flagged as
+                // UndefinedVariable when the argument expression is analyzed.
+                if let Some((_, ref params)) = callee_params {
+                    super::premark_byref_arg_vars(params, &call.args, ctx);
+                }
+
                 // Collect arg types, spans, names and byref flags for type checking.
                 let mut inner_arg_types: Vec<Type> = Vec::with_capacity(call.args.len());
                 for arg in call.args.iter() {
@@ -98,13 +110,13 @@ impl CallAnalyzer {
                     .collect();
                 let has_spread = call.args.iter().any(|a| a.unpack);
 
-                if let Some((callee_fn_name, params)) = typed_params_from_callee(&callee_ty, ea) {
+                if let Some((ref callee_fn_name, ref params)) = callee_params {
                     // Full type + arity checking via check_args.
                     check_args(
                         ea,
                         CheckArgsParams {
-                            fn_name: &callee_fn_name,
-                            params: &params,
+                            fn_name: callee_fn_name,
+                            params,
                             arg_types: &inner_arg_types,
                             arg_spans: &inner_arg_spans,
                             arg_names: &inner_arg_names,
@@ -145,6 +157,34 @@ impl CallAnalyzer {
                             Severity::Error,
                             span,
                         );
+                    }
+                }
+
+                // Write back output types to by-ref argument variables.
+                if let Some((_, ref params)) = callee_params {
+                    for (i, param) in params.iter().enumerate() {
+                        if param.is_byref {
+                            let output_ty = param
+                                .out_ty
+                                .as_ref()
+                                .or(param.ty.as_ref())
+                                .map(|t| (**t).clone())
+                                .unwrap_or_else(Type::mixed);
+                            if param.is_variadic {
+                                for arg in call.args.iter().skip(i) {
+                                    if let ExprKind::Variable(name) = &arg.value.kind {
+                                        ctx.set_var(
+                                            name.trim_start_matches('$'),
+                                            output_ty.clone(),
+                                        );
+                                    }
+                                }
+                            } else if let Some(arg) = call.args.get(i) {
+                                if let ExprKind::Variable(name) = &arg.value.kind {
+                                    ctx.set_var(name.trim_start_matches('$'), output_ty);
+                                }
+                            }
+                        }
                     }
                 }
 
