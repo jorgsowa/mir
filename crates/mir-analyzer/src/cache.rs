@@ -31,6 +31,75 @@ pub fn hash_content(content: &str) -> String {
     blake3::hash(content.as_bytes()).to_hex().to_string()
 }
 
+/// BLAKE3 hex digest of `source` with the body of every **declared-return**
+/// function and method removed.
+///
+/// This is the cache's *cross-file surface* key: a dependent file's diagnostics
+/// are a function of what it can observe of this file, and a declared-return
+/// callable exposes only its declared return type (the analyzer prefers the
+/// declared type over the body-inferred one). So edits confined to such a body
+/// leave this digest — and every dependent's result — unchanged, and don't need
+/// to cascade re-analysis.
+///
+/// Bodies of callables *without* a declared return type are deliberately kept:
+/// their inferred return type is body-derived and observable across files
+/// (`infer_file_return_types`), so a change there must still cascade. Keeping a
+/// body that could have been stripped only ever over-cascades (re-analyzes a
+/// dependent needlessly) — never serves a stale result — so this is sound by
+/// construction even if a future callable form is missed here.
+pub fn surface_fingerprint(source: &str, program: &php_ast::owned::Program) -> String {
+    use php_ast::owned::visitor::{
+        walk_owned_class_member, walk_owned_program, walk_owned_stmt, OwnedVisitor,
+    };
+    use php_ast::owned::{ClassMember, ClassMemberKind, Stmt, StmtKind};
+    use std::ops::ControlFlow;
+
+    struct BodySpans {
+        spans: Vec<(u32, u32)>,
+    }
+    impl OwnedVisitor for BodySpans {
+        fn visit_stmt(&mut self, stmt: &Stmt) -> ControlFlow<()> {
+            if let StmtKind::Function(f) = &stmt.kind {
+                if f.return_type.is_some() {
+                    self.spans.push((f.body.span.start, f.body.span.end));
+                }
+            }
+            walk_owned_stmt(self, stmt)
+        }
+        fn visit_class_member(&mut self, member: &ClassMember) -> ControlFlow<()> {
+            if let ClassMemberKind::Method(m) = &member.kind {
+                if m.return_type.is_some() {
+                    if let Some(body) = &m.body {
+                        self.spans.push((body.span.start, body.span.end));
+                    }
+                }
+            }
+            walk_owned_class_member(self, member)
+        }
+    }
+
+    let mut collector = BodySpans { spans: Vec::new() };
+    let _ = walk_owned_program(&mut collector, program);
+    collector.spans.sort_unstable();
+
+    let bytes = source.as_bytes();
+    let mut hasher = blake3::Hasher::new();
+    let mut cursor = 0usize;
+    for (start, end) in collector.spans {
+        let start = (start as usize).min(bytes.len());
+        let end = (end as usize).min(bytes.len());
+        // Skip malformed or nested (already-covered) spans; never walk backwards.
+        if start < cursor || end < start {
+            continue;
+        }
+        hasher.update(&bytes[cursor..start]);
+        hasher.update(b"\x00body\x00");
+        cursor = end;
+    }
+    hasher.update(&bytes[cursor..]);
+    hasher.finalize().to_hex().to_string()
+}
+
 /// Memoized identity of the running mir build. Computed once per process.
 ///
 /// This is the hash of the running executable's own bytes. Any new mir build —
@@ -120,6 +189,13 @@ struct CacheEntry {
     /// analyze_bodies.
     #[serde(default)]
     reference_locations: Vec<(String, u32, u16, u16)>,
+    /// Digest of this file's cross-file surface (see [`surface_fingerprint`]).
+    /// Dependents are evicted only when this changes between runs — a body-only
+    /// edit to a declared-return callable leaves it untouched. Empty for entries
+    /// written before this field existed; an empty stored value is treated as
+    /// "unknown" and conservatively cascades.
+    #[serde(default)]
+    surface_hash: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -249,12 +325,13 @@ impl AnalysisCache {
     }
 
     /// Store `issues` and `reference_locations` for `file_path` with the given
-    /// `content_hash`. `reference_locations` is a list of
+    /// `content_hash` and `surface_hash`. `reference_locations` is a list of
     /// `(symbol_key, line, col_start, col_end)` recorded during body analysis.
     pub fn put(
         &self,
         file_path: &str,
         content_hash: String,
+        surface_hash: String,
         issues: Vec<Issue>,
         reference_locations: Vec<(String, u32, u16, u16)>,
     ) {
@@ -266,9 +343,19 @@ impl AnalysisCache {
                 content_hash,
                 issues,
                 reference_locations,
+                surface_hash,
             },
         );
         self.dirty.store(true, Ordering::Relaxed);
+    }
+
+    /// The stored cross-file surface digest for `file_path`, if an entry exists.
+    /// `None` means no entry; an entry written before surface tracking returns
+    /// an empty string (treated as "unknown" by callers).
+    pub fn surface_hash(&self, file_path: &str) -> Option<String> {
+        let id = self.file_id_map.lock().get(file_path)?;
+        let entries = self.entries.lock();
+        entries.get(&id).map(|e| e.surface_hash.clone())
     }
 
     /// Persist the in-memory cache to `{cache_dir}/cache.bin`.
@@ -465,7 +552,63 @@ mod tests {
     }
 
     fn seed(cache: &AnalysisCache, file: &str) {
-        cache.put(file, "hash".to_string(), vec![], vec![]);
+        cache.put(file, "hash".to_string(), String::new(), vec![], vec![]);
+    }
+
+    fn surface(src: &str) -> String {
+        let parsed = php_rs_parser::parse(src);
+        surface_fingerprint(src, &parsed.program)
+    }
+
+    #[test]
+    fn surface_stable_across_declared_return_method_body_edit() {
+        let a = "<?php\nclass C { public function f(): int { return 1; } }\n";
+        let b = "<?php\nclass C { public function f(): int { $x = 2; return $x; } }\n";
+        assert_eq!(
+            surface(a),
+            surface(b),
+            "declared-return body edits must not change the surface"
+        );
+    }
+
+    #[test]
+    fn surface_stable_across_declared_return_body_line_shift() {
+        // The common edit: adding lines inside a body shifts every later
+        // declaration's position. The surface must ignore that.
+        let a = "<?php\nfunction f(): int { return 1; }\nfunction g(): int { return 2; }\n";
+        let b = "<?php\nfunction f(): int {\n    $a = 0;\n    $b = 1;\n    return $a + $b;\n}\nfunction g(): int { return 2; }\n";
+        assert_eq!(surface(a), surface(b));
+    }
+
+    #[test]
+    fn surface_changes_on_return_type_edit() {
+        let a = "<?php\nclass C { public function f(): int { return 1; } }\n";
+        let b = "<?php\nclass C { public function f(): string { return 1; } }\n";
+        assert_ne!(surface(a), surface(b));
+    }
+
+    #[test]
+    fn surface_changes_on_param_type_edit() {
+        let a = "<?php\nclass C { public function f(int $x): int { return $x; } }\n";
+        let b = "<?php\nclass C { public function f(string $x): int { return $x; } }\n";
+        assert_ne!(surface(a), surface(b));
+    }
+
+    #[test]
+    fn surface_changes_on_untyped_method_body_edit() {
+        // No declared return type: the body feeds the inferred return type,
+        // which is observable across files, so its bytes are kept.
+        let a = "<?php\nclass C { public function f() { return 1; } }\n";
+        let b = "<?php\nclass C { public function f() { return 'x'; } }\n";
+        assert_ne!(surface(a), surface(b));
+    }
+
+    #[test]
+    fn surface_changes_on_constructor_body_edit() {
+        // Constructors have no declared return type — their body is kept.
+        let a = "<?php\nclass C { public function __construct() { $this->x = 1; } }\n";
+        let b = "<?php\nclass C { public function __construct() { $this->x = 2; } }\n";
+        assert_ne!(surface(a), surface(b));
     }
 
     #[test]
@@ -594,7 +737,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         {
             let cache = make_cache(&dir);
-            cache.put("a.php", "h1".to_string(), vec![], vec![]);
+            cache.put("a.php", "h1".to_string(), String::new(), vec![], vec![]);
             cache.flush();
         }
         let cache = AnalysisCache::open(dir.path(), TEST_PHP_V, 0);
@@ -619,6 +762,7 @@ mod tests {
                 content_hash: "h1".to_string(),
                 issues: vec![],
                 reference_locations: vec![],
+                surface_hash: String::new(),
             },
         );
         let reverse_deps: HashMap<String, HashSet<String>> = HashMap::default();
@@ -649,7 +793,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         {
             let cache = AnalysisCache::open(dir.path(), 74, 0); // analyzed as PHP 7.4
-            cache.put("a.php", "h1".to_string(), vec![], vec![]);
+            cache.put("a.php", "h1".to_string(), String::new(), vec![], vec![]);
             cache.flush();
         }
         let same = AnalysisCache::open(dir.path(), 74, 0);
@@ -672,7 +816,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         {
             let cache = AnalysisCache::open(dir.path(), TEST_PHP_V, 0xAAAA);
-            cache.put("a.php", "h1".to_string(), vec![], vec![]);
+            cache.put("a.php", "h1".to_string(), String::new(), vec![], vec![]);
             cache.flush();
         }
         let same = AnalysisCache::open(dir.path(), TEST_PHP_V, 0xAAAA);
@@ -703,6 +847,7 @@ mod tests {
                 content_hash: "h1".to_string(),
                 issues: vec![],
                 reference_locations: vec![],
+                surface_hash: String::new(),
             },
         );
         let reverse_deps: HashMap<String, HashSet<String>> = HashMap::default();

@@ -21,7 +21,7 @@ use mir_issues::Issue;
 use mir_types::{Atomic, Type};
 
 use crate::body_analysis::BodyAnalyzer;
-use crate::cache::hash_content;
+use crate::cache::{hash_content, surface_fingerprint};
 use crate::db::{
     collect_file_definitions, FileDefinitions, MirDatabase, MirDbStorage, RefLoc, SourceFile,
 };

@@ -36,40 +36,32 @@ impl AnalysisSession {
             .map(|parsed| (parsed.file.clone(), parsed.source.clone()))
             .collect();
 
-        // ---- Pre-analysis invalidation: evict dependents of changed/removed files
+        // ---- Detect files deleted since the last run ------------------------
+        // A file analyzed previously but now gone from disk leaves dependents
+        // holding results that assume its definitions still exist. (A file
+        // merely absent from this run's path set but still on disk is NOT a
+        // deletion — checking disk existence avoids evicting during partial-path
+        // analysis.) Drop their own entries here; dependent eviction happens
+        // below, once per-file surface fingerprints are known.
+        //
+        // `topology_changed` tracks whether this run touched the cache (any file
+        // changed, added, or removed). When nothing changed, the reverse-dep
+        // graph loaded from disk is still accurate, so the rebuild + full
+        // cache.bin rewrite at the end of this pass is skipped.
+        let mut topology_changed = false;
+        let mut removed_files: Vec<String> = Vec::new();
         if let Some(cache) = &self.cache {
-            let mut invalidated: Vec<String> = file_data
-                .par_iter()
-                .filter_map(|(f, src)| {
-                    let h = hash_content(src.as_ref());
-                    if cache.get(f, &h).is_none() {
-                        Some(f.to_string())
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-
-            // Files analyzed in a previous run but now gone from disk: their
-            // dependents hold stale results that still assume the deleted
-            // definitions exist. A file merely absent from this run's path set
-            // (but still on disk) is NOT a deletion — checking disk existence
-            // avoids evicting dependents during partial-path analysis.
             let current: std::collections::HashSet<&str> =
                 file_data.iter().map(|(f, _)| f.as_ref()).collect();
-            let removed: Vec<String> = cache
+            removed_files = cache
                 .cached_files()
                 .into_iter()
                 .filter(|f| !current.contains(f.as_str()) && !std::path::Path::new(f).exists())
                 .collect();
-            for f in &removed {
+            for f in &removed_files {
                 cache.evict(f);
             }
-            invalidated.extend(removed);
-
-            if !invalidated.is_empty() {
-                cache.evict_with_dependents(&invalidated);
-            }
+            topology_changed = !removed_files.is_empty();
         }
 
         // ---- Register Salsa source inputs for incremental follow-up calls ----
@@ -84,7 +76,7 @@ impl AnalysisSession {
         // ---- Definition collection from the already-parsed AST -------
         // Returns (FileDefinitions, content_hash, has_hard_parse_errors) so we
         // can prime the parse cache before the pre-warm loop below.
-        type Pass1Entry = (FileDefinitions, [u8; 32], bool);
+        type Pass1Entry = (FileDefinitions, [u8; 32], bool, String);
         let file_defs: Vec<Pass1Entry> = parsed_files
             .par_iter()
             .map(|parsed| {
@@ -118,16 +110,66 @@ impl AnalysisSession {
                     slice: Arc::new(slice),
                     issues: Arc::new(all_issues),
                 };
-                (defs, content_hash, has_hard_parse_errors)
+                let surface_hash = surface_fingerprint(parsed.source(), parsed.owned());
+                (defs, content_hash, has_hard_parse_errors, surface_hash)
             })
             .collect();
         let _t_collect_defs = _t0.elapsed();
+
+        // Pair each file with its cross-file surface fingerprint (par_iter().map
+        // preserves order, so file_defs aligns with parsed_files).
+        let surface_hashes: HashMap<Arc<str>, String> = parsed_files
+            .iter()
+            .zip(file_defs.iter())
+            .map(|(parsed, (_defs, _h, _e, surface))| (parsed.file.clone(), surface.clone()))
+            .collect();
+
+        // ---- Cross-file invalidation: evict dependents whose surface changed --
+        // A file whose content changed re-analyzes itself regardless (its body
+        // pass misses the cache below). It cascades to dependents only when its
+        // declaration-level surface changed: a body-only edit to a declared-
+        // return callable leaves every dependent's result intact. A missing or
+        // pre-firewall (empty) stored surface is treated as unknown and cascades.
+        if let Some(cache) = &self.cache {
+            let content_changed: Vec<String> = file_data
+                .par_iter()
+                .filter_map(|(f, src)| {
+                    let h = hash_content(src.as_ref());
+                    if cache.get(f, &h).is_none() {
+                        Some(f.to_string())
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            if !content_changed.is_empty() {
+                topology_changed = true;
+            }
+            let mut seeds: Vec<String> = content_changed
+                .into_iter()
+                .filter(|f| {
+                    let new_surface = surface_hashes
+                        .get(f.as_str())
+                        .map(String::as_str)
+                        .unwrap_or("");
+                    // Keep (cascade) unless the stored surface is known and equal.
+                    !matches!(
+                        cache.surface_hash(f),
+                        Some(stored) if !stored.is_empty() && stored == new_surface
+                    )
+                })
+                .collect();
+            seeds.extend(removed_files.iter().cloned());
+            if !seeds.is_empty() {
+                cache.evict_with_dependents(&seeds);
+            }
+        }
 
         // Prime the in-process parse cache so the pre-warm loop below avoids
         // re-parsing every project file through collect_file_definitions.
         {
             let guard = self.db.salsa.read();
-            for (defs, hash, has_hard_parse_errors) in &file_defs {
+            for (defs, hash, has_hard_parse_errors, _surface) in &file_defs {
                 if !*has_hard_parse_errors {
                     guard.prime_parse_cache(*hash, Arc::clone(&defs.slice));
                 }
@@ -135,7 +177,7 @@ impl AnalysisSession {
         }
 
         let mut files_with_parse_errors: HashSet<Arc<str>> = HashSet::default();
-        for (defs, _hash, _hard_err) in file_defs {
+        for (defs, _hash, _hard_err, _surface) in file_defs {
             for issue in defs.issues.iter() {
                 if matches!(issue.kind, mir_issues::IssueKind::ParseError { .. })
                     && issue.severity == mir_issues::Severity::Error
@@ -255,7 +297,11 @@ impl AnalysisSession {
                         .iter()
                         .map(|r| (r.symbol_key.to_string(), r.line, r.col_start, r.col_end))
                         .collect();
-                    cache.put(&parsed.file, h, issues.clone(), cache_locs);
+                    let surface = surface_hashes
+                        .get(parsed.file.as_ref())
+                        .cloned()
+                        .unwrap_or_default();
+                    cache.put(&parsed.file, h, surface, issues.clone(), cache_locs);
                     if let Some(cb) = &opts.on_file_done {
                         cb();
                     }
@@ -323,13 +369,15 @@ impl AnalysisSession {
         // fresh each session) that map is empty, so only structural edges
         // (parent/interface/trait/declared types) survive — and any dependent
         // reachable only through a call site or inferred type goes stale.
-        if let Some(cache) = &self.cache {
-            let db_snapshot = {
-                let guard = self.db.salsa.read();
-                (**guard).clone()
-            };
-            let rev = build_reverse_deps(&db_snapshot);
-            cache.set_reverse_deps(rev);
+        if topology_changed {
+            if let Some(cache) = &self.cache {
+                let db_snapshot = {
+                    let guard = self.db.salsa.read();
+                    (**guard).clone()
+                };
+                let rev = build_reverse_deps(&db_snapshot);
+                cache.set_reverse_deps(rev);
+            }
         }
 
         // Persist cache hits/misses to disk
@@ -452,13 +500,14 @@ impl AnalysisSession {
             }
         }
 
-        let symbols = {
+        let (symbols, surface_hash) = {
             let guard = self.db.salsa.write();
 
             let parsed = php_rs_parser::parse(new_content);
+            let surface_hash = surface_fingerprint(new_content, &parsed.program);
 
             let has_hard_errors = parsed.errors.iter().any(crate::parser::is_hard_parse_error);
-            if !has_hard_errors {
+            let symbols = if !has_hard_errors {
                 let db_ref: &dyn MirDatabase = &**guard;
                 let driver = BodyAnalyzer::new(db_ref, php_version);
                 let (body_issues, symbols) = driver.analyze_bodies(
@@ -473,7 +522,8 @@ impl AnalysisSession {
                 symbols
             } else {
                 Vec::new()
-            }
+            };
+            (symbols, surface_hash)
         };
 
         // Bake inline-suppression marks in *before* caching: suppression is a
@@ -490,10 +540,19 @@ impl AnalysisSession {
 
         if let Some(cache) = &self.cache {
             let h = hash_content(new_content);
-            cache.evict_with_dependents(&[file_path.to_string()]);
+            // Cascade to dependents only when this file's cross-file surface
+            // changed; a body-only edit to a declared-return callable leaves
+            // their results valid. Unknown (absent/empty) stored surface cascades.
+            let surface_changed = match cache.surface_hash(file_path) {
+                Some(stored) if !stored.is_empty() => stored != surface_hash,
+                _ => true,
+            };
+            if surface_changed {
+                cache.evict_with_dependents(&[file_path.to_string()]);
+            }
             let db = self.snapshot_db();
             let ref_locs = extract_reference_locations(&db, &file);
-            cache.put(file_path, h, all_issues.clone(), ref_locs);
+            cache.put(file_path, h, surface_hash, all_issues.clone(), ref_locs);
         }
 
         opts.apply(&mut all_issues);

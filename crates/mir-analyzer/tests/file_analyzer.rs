@@ -679,8 +679,20 @@ fn invalidate_file_releases_all_per_file_state() {
         child.clone(),
         Arc::from("<?php\nclass Child extends Base {}\n"),
     );
-    cache.put(base.as_ref(), "h1".to_string(), Vec::new(), Vec::new());
-    cache.put(child.as_ref(), "h2".to_string(), Vec::new(), Vec::new());
+    cache.put(
+        base.as_ref(),
+        "h1".to_string(),
+        String::new(),
+        Vec::new(),
+        Vec::new(),
+    );
+    cache.put(
+        child.as_ref(),
+        "h2".to_string(),
+        String::new(),
+        Vec::new(),
+        Vec::new(),
+    );
     assert_eq!(session.tracked_file_count(), stub_count + 2);
 
     session.invalidate_file(child.as_ref());
@@ -697,7 +709,13 @@ fn invalidate_file_releases_all_per_file_state() {
 
     // Re-evict from Base to confirm Child is no longer a dependent of Base
     // (its outgoing edge to Base must have been dropped on invalidate).
-    cache.put(child.as_ref(), "h3".to_string(), Vec::new(), Vec::new());
+    cache.put(
+        child.as_ref(),
+        "h3".to_string(),
+        String::new(),
+        Vec::new(),
+        Vec::new(),
+    );
     let evicted = cache.evict_with_dependents(&[base.as_ref().to_string()]);
     assert_eq!(
         evicted, 0,
@@ -781,10 +799,17 @@ fn ingest_file_maintains_reverse_dep_graph_for_session_callers() {
     );
 
     // Seed dummy cache entries so eviction is observable.
-    cache.put(base_path.as_ref(), "h1".to_string(), Vec::new(), Vec::new());
+    cache.put(
+        base_path.as_ref(),
+        "h1".to_string(),
+        String::new(),
+        Vec::new(),
+        Vec::new(),
+    );
     cache.put(
         child_path.as_ref(),
         "h2".to_string(),
+        String::new(),
         Vec::new(),
         Vec::new(),
     );

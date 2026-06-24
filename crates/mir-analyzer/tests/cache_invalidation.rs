@@ -105,3 +105,140 @@ fn unrelated_file_cache_entry_survives() {
         "unrelated file should produce no issues: {issues_for_unrelated:?}"
     );
 }
+
+/// Count how many files the body pass actually (re)analyzes on `paths`.
+/// `on_file_done` fires once per analyzed file; cache hits return before it,
+/// so this measures real re-analysis, not cache replays.
+fn reanalyzed_count(cache_dir: &std::path::Path, paths: &[std::path::PathBuf]) -> usize {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+    let n = Arc::new(AtomicUsize::new(0));
+    let counter = n.clone();
+    let opts = BatchOptions::new().with_progress_callback(Arc::new(move || {
+        counter.fetch_add(1, Ordering::Relaxed);
+    }));
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir);
+    session.analyze_paths(paths, &opts);
+    n.load(Ordering::Relaxed)
+}
+
+#[test]
+fn body_only_change_to_base_does_not_reanalyze_dependent() {
+    // The firewall: editing the *body* of a declared-return method in Base
+    // (signature unchanged) must re-analyze Base but leave Child's cached
+    // result in place.
+    let src_dir = create_temp_dir("firewall: src");
+    let cache_dir = create_temp_dir("firewall: cache");
+
+    let base = write_file(
+        &src_dir,
+        "Base.php",
+        "<?php\nclass Base { public function foo(): int { return 1; } }\n",
+    );
+    let child = write_file(
+        &src_dir,
+        "Child.php",
+        "<?php\nclass Child extends Base {\n    public function bar(): int { return $this->foo(); }\n}\n",
+    );
+
+    // Cold run populates the cache for both files.
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    session.analyze_paths(&[base.clone(), child.clone()], &BatchOptions::new());
+
+    // Body-only edit to Base::foo — declared return type `int` is unchanged.
+    write_file(
+        &src_dir,
+        "Base.php",
+        "<?php\nclass Base { public function foo(): int { $x = 41; return $x + 1; } }\n",
+    );
+
+    let reanalyzed = reanalyzed_count(cache_dir.path(), &[base.clone(), child.clone()]);
+    assert_eq!(
+        reanalyzed, 1,
+        "only Base should be re-analyzed; Child's cached result must survive a body-only change"
+    );
+}
+
+#[test]
+fn signature_change_to_base_reanalyzes_dependent() {
+    // Control for the firewall: changing Base's *signature* (return type) must
+    // cascade to Child, so both are re-analyzed.
+    let src_dir = create_temp_dir("firewall_control: src");
+    let cache_dir = create_temp_dir("firewall_control: cache");
+
+    let base = write_file(
+        &src_dir,
+        "Base.php",
+        "<?php\nclass Base { public function foo(): int { return 1; } }\n",
+    );
+    let child = write_file(
+        &src_dir,
+        "Child.php",
+        "<?php\nclass Child extends Base {\n    public function bar(): int { return $this->foo(); }\n}\n",
+    );
+
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    session.analyze_paths(&[base.clone(), child.clone()], &BatchOptions::new());
+
+    // Signature change: foo(): int -> foo(): string.
+    write_file(
+        &src_dir,
+        "Base.php",
+        "<?php\nclass Base { public function foo(): string { return 'x'; } }\n",
+    );
+
+    let reanalyzed = reanalyzed_count(cache_dir.path(), &[base.clone(), child.clone()]);
+    assert_eq!(
+        reanalyzed, 2,
+        "a signature change to Base must cascade re-analysis to Child"
+    );
+}
+
+#[test]
+fn warm_run_without_changes_does_not_rewrite_cache() {
+    // A re-run over an unchanged file set must not recompute the reverse-dep
+    // graph or rewrite cache.bin: every file hits the cache, so the on-disk
+    // graph is already accurate. We assert the cache file's mtime is unchanged
+    // across the second run, and that results stay correct.
+    let src_dir = create_temp_dir("warm_run: source files");
+    let cache_dir = create_temp_dir("warm_run: cache");
+
+    let base = write_file(
+        &src_dir,
+        "Base.php",
+        "<?php\nclass Base {\n    public function foo(): void {}\n}\n",
+    );
+    let child = write_file(
+        &src_dir,
+        "Child.php",
+        "<?php\nclass Child extends Base {}\nfunction test(): void {\n    (new Child())->foo();\n}\n",
+    );
+
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    let result1 = session.analyze_paths(&[base.clone(), child.clone()], &BatchOptions::new());
+
+    let cache_bin = cache_dir.path().join("cache.bin");
+    let mtime1 = std::fs::metadata(&cache_bin)
+        .expect("cache.bin should exist after first run")
+        .modified()
+        .unwrap();
+
+    // Advance the clock past filesystem mtime granularity so a real rewrite
+    // during the second run would be observable.
+    std::thread::sleep(std::time::Duration::from_millis(20));
+
+    let session2 = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    let result2 = session2.analyze_paths(&[base.clone(), child.clone()], &BatchOptions::new());
+
+    let mtime2 = std::fs::metadata(&cache_bin).unwrap().modified().unwrap();
+
+    assert_eq!(
+        mtime1, mtime2,
+        "an unchanged warm run must not rewrite cache.bin"
+    );
+    assert_eq!(
+        result1.issues.len(),
+        result2.issues.len(),
+        "warm run must produce the same diagnostics"
+    );
+}

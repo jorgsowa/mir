@@ -109,13 +109,39 @@ impl RefIndex {
         }
     }
 
-    /// Replace `file`'s reference set wholesale with `locs`. The caller must
-    /// know `locs` is the file's *complete* set (e.g. fresh analysis output
-    /// or a cache replay); entries in `locs` belonging to other files are
-    /// appended without clearing those files.
+    /// Replace `file`'s reference set wholesale with `locs`, which must be
+    /// `file`'s own complete reference set (every `loc.file == file` — the
+    /// batch + incremental pipelines that call this all satisfy that).
+    ///
+    /// Dedups *within the batch only*, which is sound here and avoids the
+    /// O(total-refs-to-symbol) scan [`append_batch`] performs per entry:
+    /// `clear_file` just removed `file`'s prior tuples, and every other file's
+    /// tuples carry a different interned id, so no incoming tuple can collide
+    /// with one already in `by_symbol`. Scanning the full per-symbol vector
+    /// each time made committing a hot symbol (one referenced by many files)
+    /// quadratic in the number of referencing files.
     pub fn set_file_refs(&mut self, file: &str, locs: Vec<RefLoc>) {
         self.clear_file(file);
-        self.append_batch(locs);
+        let mut seen: FxHashSet<(Arc<str>, LocTuple)> = FxHashSet::default();
+        for loc in locs {
+            let file_id = self.intern(&loc.file);
+            let tuple = (file_id, loc.line, loc.col_start, loc.col_end);
+            if !seen.insert((loc.symbol_key.clone(), tuple)) {
+                continue;
+            }
+            self.file_symbols
+                .entry(file_id)
+                .or_default()
+                .insert(loc.symbol_key.clone());
+            self.referencers
+                .entry(loc.symbol_key.clone())
+                .or_default()
+                .insert(file_id);
+            self.by_symbol
+                .entry(loc.symbol_key)
+                .or_default()
+                .push(tuple);
+        }
     }
 
     /// All locations of one symbol: `(file, line, col_start, col_end)`.
@@ -252,6 +278,40 @@ mod tests {
             vec![Arc::<str>::from("b.php")]
         );
         assert_eq!(idx.file_locations("a.php").len(), 1);
+    }
+
+    #[test]
+    fn set_file_refs_dedups_within_batch() {
+        let mut idx = RefIndex::default();
+        idx.set_file_refs(
+            "a.php",
+            vec![
+                loc("fn:foo", "a.php", 1),
+                loc("fn:foo", "a.php", 1), // same position, dropped
+                loc("fn:foo", "a.php", 2),
+            ],
+        );
+        assert_eq!(idx.locations_of("fn:foo").len(), 2);
+    }
+
+    #[test]
+    fn set_file_refs_hot_symbol_across_many_files() {
+        // One symbol referenced by many files — the case that used to be
+        // quadratic. Views must stay exact and replace-on-recommit must work.
+        let mut idx = RefIndex::default();
+        for f in 0..50 {
+            let file = format!("f{f}.php");
+            idx.set_file_refs(
+                &file,
+                vec![loc("m:Base::foo", &file, 1), loc("m:Base::foo", &file, 2)],
+            );
+        }
+        assert_eq!(idx.locations_of("m:Base::foo").len(), 100);
+        assert_eq!(idx.referencers_of("m:Base::foo").len(), 50);
+        // Re-commit one file with fewer refs: only its entries change.
+        idx.set_file_refs("f0.php", vec![loc("m:Base::foo", "f0.php", 9)]);
+        assert_eq!(idx.locations_of("m:Base::foo").len(), 99);
+        assert_eq!(idx.referencers_of("m:Base::foo").len(), 50);
     }
 
     #[test]
