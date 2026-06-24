@@ -433,7 +433,12 @@ impl<'a> ClassAnalyzer<'a> {
             let Some((_parent_fqcn, parent_prop)) = parent_prop else {
                 continue;
             };
-            if visibility_reduced(own_prop.visibility, parent_prop.visibility) {
+            // Only enforce visibility rules against real PHP properties.
+            // Magic @property/@property-read/@property-write entries (from_docblock=true)
+            // are not runtime properties and establish no visibility contract.
+            if !parent_prop.from_docblock
+                && visibility_reduced(own_prop.visibility, parent_prop.visibility)
+            {
                 let loc = issue_location(
                     own_prop.location.as_ref(),
                     own_prop

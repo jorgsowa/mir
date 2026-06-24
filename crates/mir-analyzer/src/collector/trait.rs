@@ -89,6 +89,7 @@ impl<'a> DefinitionCollector<'a> {
                                     ),
                                     deprecated: None,
                                     has_native_type: p.type_hint.is_some(),
+                                    from_docblock: false,
                                 };
                                 own_properties.insert(Arc::from(param_name), prop);
                             }
@@ -138,6 +139,7 @@ impl<'a> DefinitionCollector<'a> {
                             location: Some(self.location(member.span.start, member.span.end)),
                             deprecated: prop_doc.deprecated.as_deref().map(Arc::from),
                             has_native_type: p.type_hint.is_some(),
+                            from_docblock: false,
                         },
                     );
                 }

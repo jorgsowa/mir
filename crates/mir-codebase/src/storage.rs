@@ -491,6 +491,12 @@ pub struct PropertyDef {
     /// assignment regardless of the advisory docblock type.
     #[serde(default)]
     pub has_native_type: bool,
+    /// True when this entry was synthesised from a `@property` / `@property-read` /
+    /// `@property-write` docblock tag rather than a real PHP property declaration.
+    /// Such entries describe magic properties accessible via `__get`/`__set` and
+    /// do **not** participate in PHP's inheritance visibility rules.
+    #[serde(default)]
+    pub from_docblock: bool,
 }
 
 // ---------------------------------------------------------------------------
