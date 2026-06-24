@@ -129,8 +129,18 @@ impl<'a> StatementsAnalyzer<'a> {
         let resolved = crate::db::resolve_name(self.db, &self.file, class_name);
         let fqcn: Arc<str> = Arc::from(resolved.as_str());
         let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
-        let parent_fqcn =
-            crate::db::find_class_like(self.db, here).and_then(|c| c.parent().cloned());
+        // Anonymous classes are not collected into the DB (the collector skips
+        // them), so `find_class_like` always returns None for them. Derive the
+        // parent FQCN directly from the AST extends clause instead.
+        let parent_fqcn = if decl.name.as_ref().and_then(|i| i.as_deref()).is_some() {
+            crate::db::find_class_like(self.db, here).and_then(|c| c.parent().cloned())
+        } else {
+            decl.extends.as_ref().map(|parent_name| {
+                let parent_str = crate::parser::name_to_string_owned(parent_name);
+                let resolved_parent = crate::db::resolve_name(self.db, &self.file, &parent_str);
+                Arc::from(resolved_parent.as_str())
+            })
+        };
 
         let mut param_default_ctx = ctx.clone();
         param_default_ctx.self_fqcn = Some(fqcn.clone());
