@@ -857,7 +857,7 @@ fn type_param_to_storage_param(p: &TypeFnParam) -> FnParam {
     FnParam {
         name: p.name,
         ty: p.ty.as_ref().map(|t| Arc::new(t.to_union())),
-        out_ty: None,
+        out_ty: p.out_ty.as_ref().map(|t| Arc::new(t.to_union())),
         has_default: p.default.is_some(),
         is_variadic: p.is_variadic,
         is_byref: p.is_byref,

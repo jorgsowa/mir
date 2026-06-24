@@ -174,6 +174,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     .ty
                     .as_ref()
                     .map(|arc| mir_types::SimpleType::from_union((**arc).clone())),
+                out_ty: None,
                 default: if p.has_default {
                     Some(mir_types::SimpleType::from_union(Type::mixed()))
                 } else {
@@ -303,6 +304,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     .ty
                     .as_ref()
                     .map(|arc| mir_types::SimpleType::from_union((**arc).clone())),
+                out_ty: None,
                 default: if p.has_default {
                     Some(mir_types::SimpleType::from_union(Type::mixed()))
                 } else {

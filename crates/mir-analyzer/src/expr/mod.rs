@@ -413,6 +413,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     .as_deref()
                                     .cloned()
                                     .map(mir_types::compact::SimpleType::from_union),
+                                out_ty: p
+                                    .out_ty
+                                    .as_deref()
+                                    .cloned()
+                                    .map(mir_types::compact::SimpleType::from_union),
                                 default: if p.has_default {
                                     Some(mir_types::compact::SimpleType::from_union(Type::mixed()))
                                 } else {
@@ -551,6 +556,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                 name: mir_types::Name::from(p.name.as_ref()),
                 ty: p
                     .ty
+                    .as_deref()
+                    .cloned()
+                    .map(mir_types::compact::SimpleType::from_union),
+                out_ty: p
+                    .out_ty
                     .as_deref()
                     .cloned()
                     .map(mir_types::compact::SimpleType::from_union),

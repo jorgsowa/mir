@@ -17,6 +17,12 @@ pub struct FnParam {
     /// Parameter type stored as SimpleType for compact representation.
     /// Most params are simple scalars (string, int, etc.) and fit inline.
     pub ty: Option<crate::compact::SimpleType>,
+    /// `@param-out` / `@psalm-param-out` writeback type. When `Some`, the
+    /// variable passed for this by-ref param is set to this type after the call
+    /// instead of the declared in-type (`ty`). Preserved through `TClosure` so
+    /// first-class callables honour out-param annotations.
+    #[serde(default)]
+    pub out_ty: Option<crate::compact::SimpleType>,
     /// Default value stored as SimpleType. Usually None or a simple scalar.
     pub default: Option<crate::compact::SimpleType>,
     pub is_variadic: bool,
@@ -475,6 +481,7 @@ impl Hash for FnParam {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.name.hash(state);
         self.ty.hash(state);
+        self.out_ty.hash(state);
         self.default.hash(state);
         self.is_variadic.hash(state);
         self.is_byref.hash(state);

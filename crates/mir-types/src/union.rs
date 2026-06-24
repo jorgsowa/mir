@@ -1155,6 +1155,11 @@ fn substitute_in_fn_param(
             let substituted = u.substitute_templates(bindings);
             crate::compact::SimpleType::from_union(substituted)
         }),
+        out_ty: p.out_ty.as_ref().map(|t| {
+            let u = t.to_union();
+            let substituted = u.substitute_templates(bindings);
+            crate::compact::SimpleType::from_union(substituted)
+        }),
         default: p.default.as_ref().map(|d| {
             let u = d.to_union();
             let substituted = u.substitute_templates(bindings);
@@ -1830,6 +1835,7 @@ mod tests {
             params: Some(vec![FnParam {
                 name: Name::new("x"),
                 ty: Some(crate::compact::SimpleType::from_union(t_param("T"))),
+                out_ty: None,
                 default: None,
                 is_variadic: false,
                 is_byref: false,
@@ -1876,6 +1882,7 @@ mod tests {
             params: vec![FnParam {
                 name: Name::new("a"),
                 ty: Some(crate::compact::SimpleType::from_union(t_param("T"))),
+                out_ty: None,
                 default: Some(crate::compact::SimpleType::from_union(t_param("T"))),
                 is_variadic: true,
                 is_byref: true,
