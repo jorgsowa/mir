@@ -14,4 +14,5 @@ function takesString(string $s) : void {
     if ($s === "c") {}
 }
 ===expect===
+ImpossibleIdenticalComparison@9:8-9:18: '===' between '"a"|"b"' and '"c"' is always false — these types can never be identical
 DocblockTypeContradiction@9:8-9:18: Type '"a"|"b"' makes '$s === "c"' impossible — this can never hold

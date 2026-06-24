@@ -1,9 +1,11 @@
 ===description===
-reports null check on non nullable
+A non-nullable string-typed variable can never be === to null.
+===config===
+suppress=UnusedVariable,UnusedParam
 ===file===
 <?php
-function f(string $x): void {
-    if ($x === null) {}
+function test(string $s): void {
+    if ($s === null) {}
 }
 ===expect===
 ImpossibleIdenticalComparison@3:8-3:19: '===' between 'string' and 'null' is always false — these types can never be identical

@@ -1,16 +1,20 @@
-//! Detection of statically-impossible comparisons against docblock-derived
-//! types, surfaced as `DocblockTypeContradiction`.
+//! Detection of statically-impossible comparisons, surfaced as either
+//! `DocblockTypeContradiction` or `ImpossibleIdenticalComparison`.
 //!
-//! A docblock can pin a variable to a type that makes a later comparison or
-//! assertion provably unsatisfiable — e.g. `@param int<5, max> $a` followed by
-//! `assert($a < 4)`, or `@assert "a"|"b" $s` followed by `if ($s === "c")`.
-//! We only flag comparisons against a literal when the controlling type came
-//! from a docblock (`Type::from_docblock`); native-typed redundancy is left to
-//! the existing `RedundantCondition` / `TypeDoesNotContainType` machinery.
+//! **DocblockTypeContradiction** — A docblock can pin a variable to a type
+//! that makes a later comparison provably unsatisfiable, e.g. `@param
+//! int<5, max> $a` with `assert($a < 4)`, or `@assert "a"|"b" $s` with
+//! `if ($s === "c")`. Only fired when the type is *closed and precise*
+//! (bounded range or multi-literal union from a docblock).
 //!
-//! The analysis is deliberately conservative: an atomic is treated as "could
-//! still match the literal" unless it is *definitely* incompatible, so unknown
-//! or open atomics never produce a false contradiction.
+//! **ImpossibleIdenticalComparison** — A `===`/`!==` between two inferred
+//! types that belong to different PHP type families (int vs string, object vs
+//! null, …) is always constant and almost certainly a logic bug. Fired from
+//! `expr/binary.rs` for every `===`/`!==` node whose operand types are
+//! categorically disjoint.
+//!
+//! Both analyses are conservative: open atomics (mixed, scalar, callable,
+//! template params) are never treated as disjoint.
 use php_ast::ast::{BinaryOp, UnaryPrefixOp};
 use php_ast::owned::{Expr, ExprKind};
 
@@ -295,6 +299,128 @@ pub(crate) fn gettype_possible_values(ty: &Type) -> Option<Vec<&'static str>> {
         }
     }
     Some(out)
+}
+
+// ---------------------------------------------------------------------------
+// Strict-equality disjointness (ImpossibleIdenticalComparison)
+// ---------------------------------------------------------------------------
+
+/// PHP type family for `===` identity: two values can only be identical if
+/// they belong to the same family.
+#[derive(PartialEq)]
+enum TypeFamily {
+    Int,
+    Float,
+    String,
+    Bool,
+    Null,
+    Array,
+    Object,
+}
+
+/// Map an atomic to its PHP type family for `===` purposes.
+/// Returns `None` for open / unknown atomics (mixed, scalar, numeric,
+/// callable, template params, conditionals) — callers treat `None` as
+/// "could be anything" and return `true` conservatively.
+fn atomic_family(a: &Atomic) -> Option<TypeFamily> {
+    Some(match a {
+        Atomic::TInt
+        | Atomic::TLiteralInt(_)
+        | Atomic::TIntRange { .. }
+        | Atomic::TPositiveInt
+        | Atomic::TNegativeInt
+        | Atomic::TNonNegativeInt => TypeFamily::Int,
+
+        Atomic::TFloat | Atomic::TLiteralFloat(..) => TypeFamily::Float,
+
+        Atomic::TString
+        | Atomic::TLiteralString(_)
+        | Atomic::TCallableString
+        | Atomic::TClassString(_)
+        | Atomic::TNonEmptyString
+        | Atomic::TNumericString
+        | Atomic::TInterfaceString
+        | Atomic::TEnumString
+        | Atomic::TTraitString => TypeFamily::String,
+
+        Atomic::TBool | Atomic::TTrue | Atomic::TFalse => TypeFamily::Bool,
+
+        Atomic::TNull => TypeFamily::Null,
+
+        Atomic::TArray { .. }
+        | Atomic::TList { .. }
+        | Atomic::TNonEmptyArray { .. }
+        | Atomic::TNonEmptyList { .. }
+        | Atomic::TKeyedArray { .. } => TypeFamily::Array,
+
+        Atomic::TObject
+        | Atomic::TNamedObject { .. }
+        | Atomic::TStaticObject { .. }
+        | Atomic::TSelf { .. }
+        | Atomic::TParent { .. }
+        | Atomic::TClosure { .. }
+        | Atomic::TLiteralEnumCase { .. }
+        | Atomic::TIntersection { .. } => TypeFamily::Object,
+
+        // Open / unknown — cannot determine family.
+        Atomic::TMixed
+        | Atomic::TScalar
+        | Atomic::TNumeric
+        | Atomic::TVoid
+        | Atomic::TNever
+        | Atomic::TCallable { .. }
+        | Atomic::TTemplateParam { .. }
+        | Atomic::TConditional { .. } => return None,
+    })
+}
+
+/// Can two atomics ever be strictly identical (`===`)?
+///
+/// Returns `true` conservatively when either atomic has no definite family.
+/// Within the same family, also checks specific literal disjointness
+/// (`TTrue !== TFalse`, `TLiteralInt(5) !== TLiteralInt(6)`, etc.).
+fn atomics_can_be_identical(left: &Atomic, right: &Atomic) -> bool {
+    let (Some(lf), Some(rf)) = (atomic_family(left), atomic_family(right)) else {
+        return true;
+    };
+    if lf != rf {
+        return false;
+    }
+    // Same family — check specific literal disjointness.
+    match (left, right) {
+        (Atomic::TTrue, Atomic::TFalse) | (Atomic::TFalse, Atomic::TTrue) => false,
+        (Atomic::TLiteralInt(a), Atomic::TLiteralInt(b)) => a == b,
+        (Atomic::TLiteralString(a), Atomic::TLiteralString(b)) => a == b,
+        (Atomic::TLiteralFloat(a1, a2), Atomic::TLiteralFloat(b1, b2)) => a1 == b1 && a2 == b2,
+        (
+            Atomic::TLiteralEnumCase {
+                enum_fqcn: ef1,
+                case_name: cn1,
+            },
+            Atomic::TLiteralEnumCase {
+                enum_fqcn: ef2,
+                case_name: cn2,
+            },
+        ) => ef1 == ef2 && cn1 == cn2,
+        _ => true,
+    }
+}
+
+/// Whether any atom in `left` could ever be strictly identical (`===`) to any
+/// atom in `right`.
+///
+/// Returns `true` (conservative: comparison is possible) when either type is
+/// empty (never/unknown) or when any atom pair has an unknown family.
+pub(crate) fn types_can_be_identical(left: &Type, right: &Type) -> bool {
+    if left.types.is_empty() || right.types.is_empty() {
+        return true;
+    }
+    left.types.iter().any(|la| {
+        right
+            .types
+            .iter()
+            .any(|ra| atomics_can_be_identical(la, ra))
+    })
 }
 
 /// If `expr` is a comparison of a docblock-typed variable against a literal

@@ -262,6 +262,16 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/narrowing.rs`.
     /// Fixtures: `tests/fixtures/by-kind/docblock_type_contradiction/`.
     DocblockTypeContradiction { expr: String, declared: String },
+    /// A `===` or `!==` comparison between two types that can never be strictly
+    /// equal — e.g. `$int === $string` or `$obj !== null` where `$obj` is a
+    /// non-nullable typed value.
+    /// Emitted by `mir-analyzer/src/expr/binary.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/impossible_identical_comparison/`.
+    ImpossibleIdenticalComparison {
+        op: String,
+        left: String,
+        right: String,
+    },
     /// A `switch`/`match` arm that can never be reached given the subject's
     /// inferred type — most often a `gettype()` arm tested against a string
     /// that `gettype()` never returns (e.g. `case "int"` — it returns
@@ -735,6 +745,7 @@ impl IssueKind {
             | IssueKind::ParadoxicalCondition { .. }
             | IssueKind::UnhandledMatchCondition { .. }
             | IssueKind::InvalidStringClass { .. }
+            | IssueKind::ImpossibleIdenticalComparison { .. }
             | IssueKind::ForbiddenCode { .. } => Severity::Warning,
 
             // PossiblyUndefined: shown at default error level (same as Warning)
@@ -914,6 +925,7 @@ impl IssueKind {
             IssueKind::UnhandledMatchCondition { .. } => "MIR0405",
             IssueKind::DocblockTypeContradiction { .. } => "MIR0406",
             IssueKind::UnevaluatedCode { .. } => "MIR0407",
+            IssueKind::ImpossibleIdenticalComparison { .. } => "MIR0408",
 
             // Dead code (0500-0599)
             IssueKind::UnusedVariable { .. } => "MIR0500",
@@ -1049,9 +1061,9 @@ impl IssueKind {
             // Warnings
             "MIR0006" | "MIR0008" | "MIR0100" | "MIR0101" | "MIR0102" | "MIR0103" | "MIR0109"
             | "MIR0206" | "MIR0208" | "MIR0211" | "MIR0218" | "MIR0219" | "MIR0220" | "MIR0222"
-            | "MIR0300" | "MIR0301" | "MIR0302" | "MIR0404" | "MIR0405" | "MIR0500" | "MIR0506"
-            | "MIR0703" | "MIR0710" | "MIR1301" | "MIR1501" | "MIR1502" | "MIR1700" | "MIR1701"
-            | "MIR1702" | "MIR1703" | "MIR1704" | "MIR1506" => Some(Severity::Warning),
+            | "MIR0300" | "MIR0301" | "MIR0302" | "MIR0404" | "MIR0405" | "MIR0408" | "MIR0500"
+            | "MIR0506" | "MIR0703" | "MIR0710" | "MIR1301" | "MIR1501" | "MIR1502" | "MIR1700"
+            | "MIR1701" | "MIR1702" | "MIR1703" | "MIR1704" | "MIR1506" => Some(Severity::Warning),
 
             // Info
             "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207" | "MIR0209"
@@ -1119,6 +1131,7 @@ impl IssueKind {
             IssueKind::MismatchingDocblockParamType { .. } => "MismatchingDocblockParamType",
             IssueKind::TypeCheckMismatch { .. } => "TypeCheckMismatch",
             IssueKind::DocblockTypeContradiction { .. } => "DocblockTypeContradiction",
+            IssueKind::ImpossibleIdenticalComparison { .. } => "ImpossibleIdenticalComparison",
             IssueKind::UnevaluatedCode { .. } => "UnevaluatedCode",
             IssueKind::IfThisIsMismatch { .. } => "IfThisIsMismatch",
             IssueKind::Trace { .. } => "Trace",
@@ -1436,6 +1449,10 @@ impl IssueKind {
             }
             IssueKind::DocblockTypeContradiction { expr, declared } => {
                 format!("Type '{declared}' makes '{expr}' impossible — this can never hold")
+            }
+            IssueKind::ImpossibleIdenticalComparison { op, left, right } => {
+                let result = if op == "===" { "false" } else { "true" };
+                format!("'{op}' between '{left}' and '{right}' is always {result} — these types can never be identical")
             }
             IssueKind::UnevaluatedCode { reason } => {
                 format!("Unevaluated code: {reason}")

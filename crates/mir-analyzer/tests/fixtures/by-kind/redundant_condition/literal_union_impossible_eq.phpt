@@ -15,4 +15,5 @@ function test_ne_impossible($n): void {
     }
 }
 ===expect===
+ImpossibleIdenticalComparison@6:8-6:16: '!==' between '1|2|3' and '5' is always true — these types can never be identical
 RedundantCondition@6:8-6:16: Condition is always true/false for type 'bool'

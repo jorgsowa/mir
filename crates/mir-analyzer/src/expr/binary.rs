@@ -241,10 +241,28 @@ impl<'a> ExpressionAnalyzer<'a> {
                 Type::single(Atomic::TString)
             }
 
+            BinaryOp::Identical | BinaryOp::NotIdentical => {
+                if !crate::contradiction::types_can_be_identical(&left_ty, &right_ty) {
+                    let op = if b.op == BinaryOp::Identical {
+                        "==="
+                    } else {
+                        "!=="
+                    };
+                    self.emit(
+                        IssueKind::ImpossibleIdenticalComparison {
+                            op: op.to_string(),
+                            left: left_ty.to_string(),
+                            right: right_ty.to_string(),
+                        },
+                        Severity::Warning,
+                        span,
+                    );
+                }
+                Type::single(Atomic::TBool)
+            }
+
             BinaryOp::Equal
             | BinaryOp::NotEqual
-            | BinaryOp::Identical
-            | BinaryOp::NotIdentical
             | BinaryOp::Less
             | BinaryOp::Greater
             | BinaryOp::LessOrEqual
