@@ -527,6 +527,10 @@ pub struct ClassDef {
     pub is_readonly: bool,
     pub deprecated: Option<Arc<str>>,
     pub is_internal: bool,
+    /// Set when the class carries `@psalm-immutable` — non-constructor methods must not
+    /// assign to `$this` properties.
+    #[serde(default)]
+    pub is_immutable: bool,
     /// Attribute target flags if this class has `#[Attribute]` annotation.
     /// `None` = not an attribute class. The value is a bitmask of PHP's
     /// `Attribute::TARGET_*` constants (e.g. `Attribute::TARGET_CLASS = 1`).

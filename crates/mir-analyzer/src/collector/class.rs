@@ -433,6 +433,7 @@ impl<'a> DefinitionCollector<'a> {
                 }
             }),
             is_internal: class_doc.is_internal,
+            is_immutable: class_doc.is_immutable,
             attribute_flags: parse_attribute_flags(&decl.attributes),
             location: Some(self.location(stmt_span.start, stmt_span.end)),
             type_aliases: type_aliases

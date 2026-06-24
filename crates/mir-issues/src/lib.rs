@@ -343,6 +343,10 @@ pub enum IssueKind {
     /// non-pure named function.
     /// Fixtures: `tests/fixtures/by-kind/impure_function_call/`.
     ImpureFunctionCall { fn_name: String },
+    /// Emitted when a non-constructor method of a `@psalm-immutable` class assigns to a
+    /// `$this` property.
+    /// Fixtures: `tests/fixtures/by-kind/immutable_property_modification/`.
+    ImmutablePropertyModification { property: String },
 
     // --- Readonly -----------------------------------------------------------
     /// Emitted by `mir-analyzer/src/expr/assignment.rs`.
@@ -741,6 +745,7 @@ impl IssueKind {
             | IssueKind::ImpureGlobalVariable { .. }
             | IssueKind::ImpureStaticVariable { .. }
             | IssueKind::ImpureFunctionCall { .. }
+            | IssueKind::ImmutablePropertyModification { .. }
             | IssueKind::UnsupportedReferenceUsage
             | IssueKind::ParadoxicalCondition { .. }
             | IssueKind::UnhandledMatchCondition { .. }
@@ -944,6 +949,7 @@ impl IssueKind {
             IssueKind::ImpureGlobalVariable { .. } => "MIR1702",
             IssueKind::ImpureStaticVariable { .. } => "MIR1703",
             IssueKind::ImpureFunctionCall { .. } => "MIR1704",
+            IssueKind::ImmutablePropertyModification { .. } => "MIR1705",
             IssueKind::UnsupportedReferenceUsage => "MIR1506",
             IssueKind::NoInterfaceProperties { .. } => "MIR1504",
             IssueKind::UndefinedDocblockClass { .. } => "MIR1505",
@@ -1063,7 +1069,9 @@ impl IssueKind {
             | "MIR0206" | "MIR0208" | "MIR0211" | "MIR0218" | "MIR0219" | "MIR0220" | "MIR0222"
             | "MIR0300" | "MIR0301" | "MIR0302" | "MIR0404" | "MIR0405" | "MIR0408" | "MIR0500"
             | "MIR0506" | "MIR0703" | "MIR0710" | "MIR1301" | "MIR1501" | "MIR1502" | "MIR1700"
-            | "MIR1701" | "MIR1702" | "MIR1703" | "MIR1704" | "MIR1506" => Some(Severity::Warning),
+            | "MIR1701" | "MIR1702" | "MIR1703" | "MIR1704" | "MIR1705" | "MIR1506" => {
+                Some(Severity::Warning)
+            }
 
             // Info
             "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207" | "MIR0209"
@@ -1160,6 +1168,7 @@ impl IssueKind {
             IssueKind::ImpureGlobalVariable { .. } => "ImpureGlobalVariable",
             IssueKind::ImpureStaticVariable { .. } => "ImpureStaticVariable",
             IssueKind::ImpureFunctionCall { .. } => "ImpureFunctionCall",
+            IssueKind::ImmutablePropertyModification { .. } => "ImmutablePropertyModification",
             IssueKind::UnsupportedReferenceUsage => "UnsupportedReferenceUsage",
             IssueKind::NoInterfaceProperties { .. } => "NoInterfaceProperties",
             IssueKind::UndefinedDocblockClass { .. } => "UndefinedDocblockClass",
@@ -1518,6 +1527,9 @@ impl IssueKind {
             }
             IssueKind::ImpureFunctionCall { fn_name } => {
                 format!("Calling impure function {fn_name}() in a @pure function")
+            }
+            IssueKind::ImmutablePropertyModification { property } => {
+                format!("Assigning to property {property} of $this in a @psalm-immutable class")
             }
 
             IssueKind::UnimplementedAbstractMethod { class, method } => {
@@ -2122,6 +2134,7 @@ mod code_tests {
             IssueKind::ImpureGlobalVariable { variable: s() },
             IssueKind::ImpureStaticVariable { variable: s() },
             IssueKind::ImpureFunctionCall { fn_name: s() },
+            IssueKind::ImmutablePropertyModification { property: s() },
             IssueKind::ReadonlyPropertyAssignment {
                 class: s(),
                 property: s(),
@@ -2390,6 +2403,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 140);
+        assert_eq!(one_of_each().len(), 142);
     }
 }

@@ -136,6 +136,17 @@ impl<'a> BodyAnalyzer<'a> {
             ctx.is_in_pure_fn = method_storage.is_pure;
         }
 
+        // Set is_in_immutable_method for non-constructor methods of @psalm-immutable classes.
+        if !is_ctor {
+            if let Some(crate::db::ClassLike::Class(cls)) =
+                crate::db::find_class_like(self.db, crate::db::Fqcn::from_str(self.db, fqcn))
+            {
+                if cls.is_immutable {
+                    ctx.is_in_immutable_method = true;
+                }
+            }
+        }
+
         seed_param_locations(&mut ctx, &method.params, source, source_map);
         record_param_symbols(all_symbols, file, source, &method.params, &ctx);
 

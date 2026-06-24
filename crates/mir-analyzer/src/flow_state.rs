@@ -82,6 +82,10 @@ pub struct FlowState {
     /// Whether we are inside a @pure function/method body.
     pub is_in_pure_fn: bool,
 
+    /// Whether we are inside a non-constructor method of a `@psalm-immutable` class.
+    /// Triggers `ImmutablePropertyModification` on `$this->prop = ...` assignments.
+    pub is_in_immutable_method: bool,
+
     /// Whether we are inside a static method body.
     pub inside_static_method: bool,
 
@@ -251,6 +255,7 @@ impl FlowState {
             is_generator: false,
             inside_constructor: false,
             is_in_pure_fn: false,
+            is_in_immutable_method: false,
             inside_static_method: false,
             strict_types: false,
             tainted_vars: FxHashSet::default(),

@@ -276,6 +276,22 @@ impl<'a> ExpressionAnalyzer<'a> {
                         }
                     }
                 }
+                // Immutability check: assigning to $this->prop in a @psalm-immutable class.
+                if ctx.is_in_immutable_method {
+                    if let ExprKind::Variable(recv_name) = &pa.object.kind {
+                        if recv_name.trim_start_matches('$') == "this" {
+                            if let Some(prop_name) = extract_string_from_expr(&pa.property) {
+                                self.emit(
+                                    IssueKind::ImmutablePropertyModification {
+                                        property: prop_name,
+                                    },
+                                    Severity::Warning,
+                                    span,
+                                );
+                            }
+                        }
+                    }
+                }
                 let obj_ty = self.analyze(&pa.object, ctx);
                 let prop_name_opt = extract_string_from_expr(&pa.property);
                 if prop_name_opt.is_none() {

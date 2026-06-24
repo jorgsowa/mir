@@ -268,7 +268,7 @@ impl DocblockParser {
                 "pure" => result.is_pure = true,
                 "seal-properties" | "psalm-seal-properties" => result.seal_properties = true,
                 "no-named-arguments" => result.no_named_arguments = true,
-                "immutable" => result.is_immutable = true,
+                "immutable" | "psalm-immutable" => result.is_immutable = true,
                 "readonly" => result.is_readonly = true,
                 "final" => result.is_final = true,
                 "inheritDoc" | "inheritdoc" => result.is_inherit_doc = true,
