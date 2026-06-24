@@ -400,8 +400,14 @@ impl Atomic {
     }
 
     /// Whether this atomic is a callable variant.
+    ///
+    /// `TCallableString` is included: it denotes a string *known* to be a
+    /// valid callable, so `!is_callable()` must remove it from the type.
     pub fn is_callable(&self) -> bool {
-        matches!(self, Atomic::TCallable { .. } | Atomic::TClosure { .. })
+        matches!(
+            self,
+            Atomic::TCallable { .. } | Atomic::TClosure { .. } | Atomic::TCallableString
+        )
     }
 
     /// Returns the FQCN if this is a named object type.
