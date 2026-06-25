@@ -715,6 +715,34 @@ impl<'a> DefinitionCollector<'a> {
         }
     }
 
+    /// Substitute alias names in `union` with their pre-built definitions.
+    /// Does not touch FQN resolution; that is left to the caller's resolution pass.
+    fn expand_aliases_only(&self, union: Type, aliases: &FxHashMap<String, Type>) -> Type {
+        if aliases.is_empty() {
+            return union;
+        }
+        let from_docblock = union.from_docblock;
+        let mut result = Type::empty();
+        result.possibly_undefined = union.possibly_undefined;
+        result.from_docblock = from_docblock;
+        for atomic in union.types {
+            match atomic {
+                mir_types::Atomic::TNamedObject {
+                    ref fqcn,
+                    ref type_params,
+                } if type_params.is_empty() => {
+                    if let Some(alias_ty) = aliases.get(fqcn.as_ref()) {
+                        result.merge_with(alias_ty);
+                    } else {
+                        result.add_type(atomic);
+                    }
+                }
+                other => result.add_type(other),
+            }
+        }
+        result
+    }
+
     fn build_type_aliases(&self, doc: &crate::parser::ParsedDocblock) -> FxHashMap<String, Type> {
         let mut aliases = FxHashMap::default();
         for alias in &doc.type_aliases {
@@ -1098,6 +1126,24 @@ impl<'a> DefinitionCollector<'a> {
             return None;
         }
 
+        // Merge method-level type aliases with the class-level ones. Method aliases
+        // (defined via `@psalm-type` / `@phpstan-type` on the method docblock) take
+        // precedence; class aliases fill in the rest.
+        let method_type_aliases = self.build_type_aliases(&doc);
+        let merged_aliases: FxHashMap<String, mir_types::Type> = if method_type_aliases.is_empty() {
+            aliases.cloned().unwrap_or_default()
+        } else {
+            let mut merged = aliases.cloned().unwrap_or_default();
+            merged.extend(method_type_aliases);
+            merged
+        };
+        let effective_aliases: Option<&FxHashMap<String, mir_types::Type>> =
+            if merged_aliases.is_empty() {
+                None
+            } else {
+                Some(&merged_aliases)
+            };
+
         // Build combined template name set before param resolution so docblock param types
         // that reference class-level template params (e.g. `TRelatedModel`) are stored as
         // TTemplateParam instead of being wrongly namespace-qualified.
@@ -1179,7 +1225,7 @@ impl<'a> DefinitionCollector<'a> {
                         // After that, run a template-only substitution pass to convert
                         // bare names matching class/method template params (e.g. TRelatedModel)
                         // into TTemplateParam without touching other names.
-                        let resolved = aliases
+                        let resolved = effective_aliases
                             .map(|a| self.resolve_union_doc_with_aliases(u.clone(), a))
                             .unwrap_or_else(|| self.resolve_union_doc(u));
                         let doc_ty = self.substitute_template_params(
@@ -1219,7 +1265,7 @@ impl<'a> DefinitionCollector<'a> {
             }
 
             let out_ty = doc.get_out_param_type(param_name).cloned().map(|u| {
-                let resolved = aliases
+                let resolved = effective_aliases
                     .map(|a| self.resolve_union_doc_with_aliases(u.clone(), a))
                     .unwrap_or_else(|| self.resolve_union_doc(u));
                 let mut resolved = self.substitute_template_params(
@@ -1285,20 +1331,21 @@ impl<'a> DefinitionCollector<'a> {
         ) {
             (Some(mut ty), _) => {
                 ty.from_docblock = true;
+                // Expand type aliases first (no FQN change), then resolve.
+                let expanded = effective_aliases
+                    .map_or(ty.clone(), |a| self.expand_aliases_only(ty.clone(), a));
                 let resolved = if !template_names.is_empty() {
                     // Use template-aware resolution: FQN-qualifies the outer class in
                     // generic return types (e.g. ObjectProphecy<T>) and converts T to
                     // TTemplateParam.
                     self.resolve_union_doc_with_templates(
-                        ty,
+                        expanded,
                         &template_names,
                         class_fqcn,
                         template_params_for_resolve,
                     )
                 } else {
-                    aliases
-                        .map(|a| self.resolve_union_doc_with_aliases(ty.clone(), a))
-                        .unwrap_or_else(|| self.resolve_union_doc(ty))
+                    self.resolve_union_doc(expanded)
                 };
                 Some(Self::fill_self_static_parent(resolved, class_fqcn))
             }

@@ -354,6 +354,14 @@ impl<'a> BodyAnalyzer<'a> {
                 crate::diagnostics::offset_to_line_col(source, fn_span.start, source_map);
             let (fn_line_end, fn_col_end) =
                 crate::diagnostics::offset_to_line_col(source, fn_span.end, source_map);
+            // Type alias names defined on this function (@psalm-type / @psalm-import-type).
+            // These are not class names and must not be flagged as UndefinedDocblockClass.
+            let type_alias_names: std::collections::HashSet<&str> = doc
+                .type_aliases
+                .iter()
+                .map(|a| a.name.as_str())
+                .chain(doc.import_types.iter().map(|i| i.local.as_str()))
+                .collect();
             for ast_param in decl.params.iter() {
                 let raw_name = ast_param.name.as_deref().unwrap_or_default();
                 let Some(doc_raw) = doc.get_param_type(raw_name) else {
@@ -378,8 +386,11 @@ impl<'a> BodyAnalyzer<'a> {
                         let is_template = template_names
                             .iter()
                             .any(|t| *t == fqcn.as_ref() || *t == last_segment);
+                        let is_alias = type_alias_names.contains(last_segment)
+                            || type_alias_names.contains(fqcn.as_ref());
                         if looks_like_class
                             && !is_template
+                            && !is_alias
                             && !crate::db::class_exists(self.db, fqcn.as_ref())
                         {
                             issues.push(mir_issues::Issue::new(

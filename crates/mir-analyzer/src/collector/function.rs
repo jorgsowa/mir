@@ -167,6 +167,8 @@ impl DefinitionCollector<'_> {
             return;
         }
 
+        let type_aliases = self.build_type_aliases(&doc);
+
         // Build template names first so bound resolution below can recognise template-param
         // names and avoid FQN-qualifying them (e.g. `@template T of K` where K is another param).
         let template_names: std::collections::HashSet<String> = doc
@@ -211,10 +213,9 @@ impl DefinitionCollector<'_> {
                 .map(|s| crate::parser::docblock::parse_type_string(&s))
                 .or_else(|| {
                     doc.get_param_type(param_name).cloned().map(|u| {
-                        // If the type is a simple named object that matches a template param,
-                        // convert it to a TTemplateParam
+                        let expanded = self.expand_aliases_only(u, &type_aliases);
                         let doc_ty = self.resolve_union_doc_with_templates(
-                            u,
+                            expanded,
                             &template_names,
                             &fqn,
                             &template_params,
@@ -249,13 +250,13 @@ impl DefinitionCollector<'_> {
             }
 
             let out_ty = doc.get_out_param_type(param_name).cloned().map(|u| {
-                let doc_ty = self.resolve_union_doc_with_templates(
-                    u,
+                let expanded = self.expand_aliases_only(u, &type_aliases);
+                let mut doc_ty = self.resolve_union_doc_with_templates(
+                    expanded,
                     &template_names,
                     &fqn,
                     &template_params,
                 );
-                let mut doc_ty = doc_ty;
                 doc_ty.from_docblock = true;
                 doc_ty
             });
@@ -303,13 +304,20 @@ impl DefinitionCollector<'_> {
         let return_type = if let Some(s) = self.version_attr_type_string(&decl.attributes) {
             let mut ty = crate::parser::docblock::parse_type_string(&s);
             ty.from_docblock = true;
-            Some(self.resolve_union_doc_with_templates(ty, &template_names, &fqn, &template_params))
+            let expanded = self.expand_aliases_only(ty, &type_aliases);
+            Some(self.resolve_union_doc_with_templates(
+                expanded,
+                &template_names,
+                &fqn,
+                &template_params,
+            ))
         } else {
             match (doc.return_type.clone(), decl.return_type.as_ref()) {
                 (Some(mut ty), _) => {
                     ty.from_docblock = true;
+                    let expanded = self.expand_aliases_only(ty, &type_aliases);
                     Some(self.resolve_union_doc_with_templates(
-                        ty,
+                        expanded,
                         &template_names,
                         &fqn,
                         &template_params,
