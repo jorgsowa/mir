@@ -423,6 +423,127 @@ pub(crate) fn types_can_be_identical(left: &Type, right: &Type) -> bool {
     })
 }
 
+// ---------------------------------------------------------------------------
+// Loose-equality disjointness (ImpossibleLooseComparison)
+// ---------------------------------------------------------------------------
+
+fn is_open_atomic(a: &Atomic) -> bool {
+    matches!(
+        a,
+        Atomic::TMixed
+            | Atomic::TScalar
+            | Atomic::TNumeric
+            | Atomic::TVoid
+            | Atomic::TNever
+            | Atomic::TCallable { .. }
+            | Atomic::TTemplateParam { .. }
+            | Atomic::TConditional { .. }
+    )
+}
+
+fn is_object_atomic(a: &Atomic) -> bool {
+    matches!(
+        a,
+        Atomic::TObject
+            | Atomic::TNamedObject { .. }
+            | Atomic::TStaticObject { .. }
+            | Atomic::TSelf { .. }
+            | Atomic::TParent { .. }
+            | Atomic::TClosure { .. }
+            | Atomic::TLiteralEnumCase { .. }
+            | Atomic::TIntersection { .. }
+    )
+}
+
+fn is_array_atomic(a: &Atomic) -> bool {
+    matches!(
+        a,
+        Atomic::TArray { .. }
+            | Atomic::TList { .. }
+            | Atomic::TNonEmptyArray { .. }
+            | Atomic::TNonEmptyList { .. }
+            | Atomic::TKeyedArray { .. }
+    )
+}
+
+fn is_nonempty_array_atomic(a: &Atomic) -> bool {
+    matches!(
+        a,
+        Atomic::TNonEmptyArray { .. } | Atomic::TNonEmptyList { .. }
+    )
+}
+
+/// Can two atomics ever be loosely equal (`==`) in PHP?
+///
+/// Conservative: returns `true` for open atomics (mixed, scalar, etc.) and for
+/// complex scalar-vs-scalar coercions (null vs 0, "" vs false, etc.) — PHP's
+/// type juggling is too intricate to enumerate safely there.
+///
+/// Only returns `false` for provably-impossible cases:
+/// - any object vs null, false, int, float, string, or array
+/// - any array vs null, int, float, string, or object
+/// - a non-empty array vs false (non-empty arrays are always truthy)
+fn atomics_can_be_loose_equal(left: &Atomic, right: &Atomic) -> bool {
+    if is_open_atomic(left) || is_open_atomic(right) {
+        return true;
+    }
+
+    let left_obj = is_object_atomic(left);
+    let right_obj = is_object_atomic(right);
+    let left_arr = is_array_atomic(left);
+    let right_arr = is_array_atomic(right);
+
+    // Object vs ...
+    if left_obj || right_obj {
+        let other = if left_obj { right } else { left };
+        return match other {
+            // obj == another object: possible (same class, same identity)
+            _ if is_object_atomic(other) => true,
+            // obj == true: always true (objects are truthy) — possible
+            Atomic::TTrue | Atomic::TBool => true,
+            // Everything else: null, false, int, float, string, array → always false
+            _ => false,
+        };
+    }
+
+    // Array vs ...
+    if left_arr || right_arr {
+        let arr_side = if left_arr { left } else { right };
+        let other = if left_arr { right } else { left };
+        return match other {
+            // arr == another array: possible (same contents)
+            _ if is_array_atomic(other) => true,
+            // arr == true: possible (non-empty array is truthy)
+            Atomic::TTrue | Atomic::TBool => true,
+            // arr == false: only possible when the array could be empty;
+            // a non-empty array is always truthy so == false is impossible
+            Atomic::TFalse => !is_nonempty_array_atomic(arr_side),
+            // arr vs null/int/float/string/object → always false in PHP
+            _ => false,
+        };
+    }
+
+    // Scalar vs scalar: complex coercion rules, be conservative.
+    true
+}
+
+/// Whether any atom in `left` could ever be loosely equal (`==`) to any atom
+/// in `right`.
+///
+/// Returns `true` conservatively when either type is empty or when any atom
+/// pair might be loosely equal.
+pub(crate) fn types_can_be_loose_equal(left: &Type, right: &Type) -> bool {
+    if left.types.is_empty() || right.types.is_empty() {
+        return true;
+    }
+    left.types.iter().any(|la| {
+        right
+            .types
+            .iter()
+            .any(|ra| atomics_can_be_loose_equal(la, ra))
+    })
+}
+
 /// If `expr` is a comparison of a docblock-typed variable against a literal
 /// that can never be satisfied, return `(rendered_comparison, declared_type)`
 /// for a `DocblockTypeContradiction`.

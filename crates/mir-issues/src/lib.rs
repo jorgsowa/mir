@@ -272,6 +272,17 @@ pub enum IssueKind {
         left: String,
         right: String,
     },
+    /// A `==` or `!=` comparison between two types that can never be loosely
+    /// equal in PHP — e.g. `$obj == null`, `$arr == "foo"`, or a non-empty
+    /// array `== false`.  PHP's type-juggling rules make these always false (or
+    /// always true for `!=`), which almost certainly indicates a logic bug.
+    /// Emitted by `mir-analyzer/src/expr/binary.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/impossible_loose_comparison/`.
+    ImpossibleLooseComparison {
+        op: String,
+        left: String,
+        right: String,
+    },
     /// A `switch`/`match` arm that can never be reached given the subject's
     /// inferred type — most often a `gettype()` arm tested against a string
     /// that `gettype()` never returns (e.g. `case "int"` — it returns
@@ -751,6 +762,7 @@ impl IssueKind {
             | IssueKind::UnhandledMatchCondition { .. }
             | IssueKind::InvalidStringClass { .. }
             | IssueKind::ImpossibleIdenticalComparison { .. }
+            | IssueKind::ImpossibleLooseComparison { .. }
             | IssueKind::ForbiddenCode { .. } => Severity::Warning,
 
             // PossiblyUndefined: shown at default error level (same as Warning)
@@ -931,6 +943,7 @@ impl IssueKind {
             IssueKind::DocblockTypeContradiction { .. } => "MIR0406",
             IssueKind::UnevaluatedCode { .. } => "MIR0407",
             IssueKind::ImpossibleIdenticalComparison { .. } => "MIR0408",
+            IssueKind::ImpossibleLooseComparison { .. } => "MIR0409",
 
             // Dead code (0500-0599)
             IssueKind::UnusedVariable { .. } => "MIR0500",
@@ -1140,6 +1153,7 @@ impl IssueKind {
             IssueKind::TypeCheckMismatch { .. } => "TypeCheckMismatch",
             IssueKind::DocblockTypeContradiction { .. } => "DocblockTypeContradiction",
             IssueKind::ImpossibleIdenticalComparison { .. } => "ImpossibleIdenticalComparison",
+            IssueKind::ImpossibleLooseComparison { .. } => "ImpossibleLooseComparison",
             IssueKind::UnevaluatedCode { .. } => "UnevaluatedCode",
             IssueKind::IfThisIsMismatch { .. } => "IfThisIsMismatch",
             IssueKind::Trace { .. } => "Trace",
@@ -1462,6 +1476,10 @@ impl IssueKind {
             IssueKind::ImpossibleIdenticalComparison { op, left, right } => {
                 let result = if op == "===" { "false" } else { "true" };
                 format!("'{op}' between '{left}' and '{right}' is always {result} — these types can never be identical")
+            }
+            IssueKind::ImpossibleLooseComparison { op, left, right } => {
+                let result = if op == "==" { "false" } else { "true" };
+                format!("'{op}' between '{left}' and '{right}' is always {result} — these types can never be loosely equal")
             }
             IssueKind::UnevaluatedCode { reason } => {
                 format!("Unevaluated code: {reason}")

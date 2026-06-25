@@ -261,9 +261,23 @@ impl<'a> ExpressionAnalyzer<'a> {
                 Type::single(Atomic::TBool)
             }
 
-            BinaryOp::Equal
-            | BinaryOp::NotEqual
-            | BinaryOp::Less
+            BinaryOp::Equal | BinaryOp::NotEqual => {
+                if !crate::contradiction::types_can_be_loose_equal(&left_ty, &right_ty) {
+                    let op = if b.op == BinaryOp::Equal { "==" } else { "!=" };
+                    self.emit(
+                        IssueKind::ImpossibleLooseComparison {
+                            op: op.to_string(),
+                            left: left_ty.to_string(),
+                            right: right_ty.to_string(),
+                        },
+                        Severity::Warning,
+                        span,
+                    );
+                }
+                Type::single(Atomic::TBool)
+            }
+
+            BinaryOp::Less
             | BinaryOp::Greater
             | BinaryOp::LessOrEqual
             | BinaryOp::GreaterOrEqual => Type::single(Atomic::TBool),
