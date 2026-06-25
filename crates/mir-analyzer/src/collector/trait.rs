@@ -81,6 +81,7 @@ impl<'a> DefinitionCollector<'a> {
                                     visibility: Self::convert_visibility(p.visibility),
                                     is_static: false,
                                     is_readonly: p.is_readonly,
+                                    has_native_readonly: p.is_readonly,
                                     default: mir_codebase::storage::wrap_property_type(
                                         p.default.as_ref().map(|_| Type::mixed()),
                                     ),
@@ -135,6 +136,7 @@ impl<'a> DefinitionCollector<'a> {
                             visibility: Self::convert_visibility(p.visibility),
                             is_static: p.is_static,
                             is_readonly: p.is_readonly,
+                            has_native_readonly: p.is_readonly,
                             default: None,
                             location: Some(self.location(member.span.start, member.span.end)),
                             deprecated: prop_doc.deprecated.as_deref().map(Arc::from),

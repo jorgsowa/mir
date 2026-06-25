@@ -331,12 +331,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 continue;
                             }
                             let db = self.db;
-                            let prop_def = crate::db::find_property_in_chain(
+                            let prop_found = crate::db::find_property_in_chain(
                                 db,
                                 crate::db::Fqcn::new(db, *fqcn),
                                 &prop_name,
-                            )
-                            .map(|(_, p)| p);
+                            );
+                            let prop_declaring_class =
+                                prop_found.as_ref().map(|(cls, _)| cls.clone());
+                            let prop_def = prop_found.map(|(_, p)| p);
                             // Emit DeprecatedProperty if the property is deprecated
                             if let Some(ref p) = prop_def {
                                 if let Some(msg) = &p.deprecated {
@@ -351,11 +353,39 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     );
                                 }
                             }
-                            let prop_info: Option<(bool, Option<Type>, bool)> = prop_def.map(|p| {
-                                (p.is_readonly, p.ty.as_deref().cloned(), p.has_native_type)
-                            });
-                            if let Some((is_readonly, prop_ty, prop_has_native_type)) = prop_info {
-                                if is_readonly && !ctx.inside_constructor {
+                            let prop_info: Option<(bool, Option<Type>, bool, bool)> =
+                                prop_def.map(|p| {
+                                    (
+                                        p.is_readonly,
+                                        p.ty.as_deref().cloned(),
+                                        p.has_native_type,
+                                        p.has_native_readonly,
+                                    )
+                                });
+                            if let Some((
+                                is_readonly,
+                                prop_ty,
+                                prop_has_native_type,
+                                has_native_readonly,
+                            )) = prop_info
+                            {
+                                // PHP 8.1: native readonly (keyword) properties may be initialized
+                                // from any method of the declaring class, not just the constructor.
+                                // @readonly docblock annotations are advisory and do not get this
+                                // exemption.
+                                let in_declaring_scope = match (
+                                    ctx.self_fqcn.as_deref(),
+                                    prop_declaring_class.as_deref(),
+                                ) {
+                                    (Some(self_cls), Some(decl_cls)) => {
+                                        self_cls.eq_ignore_ascii_case(decl_cls)
+                                    }
+                                    _ => false,
+                                };
+                                if is_readonly
+                                    && !ctx.inside_constructor
+                                    && !(has_native_readonly && in_declaring_scope)
+                                {
                                     self.emit(
                                         IssueKind::ReadonlyPropertyAssignment {
                                             class: fqcn.to_string(),

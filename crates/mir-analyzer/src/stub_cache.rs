@@ -40,7 +40,7 @@ const MAGIC: u32 = 0x0152_494D;
 /// Bumped when the on-disk header layout changes OR a serialized `StubSlice`
 /// struct changes shape (e.g. `inferred_return_type: Option<Type>` →
 /// `Option<Arc<Type>>`), so stale entries are rejected.
-const FORMAT_VERSION: u8 = 6;
+const FORMAT_VERSION: u8 = 7;
 
 /// Cache header. Any mismatch (magic, version, content_hash, php_version)
 /// forces the consumer to treat the entry as a miss and recompute.

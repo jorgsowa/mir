@@ -780,6 +780,7 @@ impl<'a> DefinitionCollector<'a> {
                     default: None,
                     location: location.clone(),
                     deprecated: None,
+                    has_native_readonly: false,
                     // Magic `@property` declarations carry no PHP native type.
                     has_native_type: false,
                     from_docblock: true,

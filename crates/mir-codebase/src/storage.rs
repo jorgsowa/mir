@@ -497,6 +497,11 @@ pub struct PropertyDef {
     /// do **not** participate in PHP's inheritance visibility rules.
     #[serde(default)]
     pub from_docblock: bool,
+    /// True when `readonly` comes from a native PHP keyword (`readonly` modifier or
+    /// `readonly class`). False when only a `@readonly` docblock annotation is present.
+    /// Distinguishes PHP-enforced read-only from advisory documentation.
+    #[serde(default)]
+    pub has_native_readonly: bool,
 }
 
 // ---------------------------------------------------------------------------

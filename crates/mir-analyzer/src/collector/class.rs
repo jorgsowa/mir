@@ -147,6 +147,8 @@ impl<'a> DefinitionCollector<'a> {
                                     visibility: Self::convert_visibility(p.visibility),
                                     is_static: false,
                                     is_readonly: decl.modifiers.is_readonly || p.is_readonly,
+                                    has_native_readonly: decl.modifiers.is_readonly
+                                        || p.is_readonly,
                                     default: mir_codebase::storage::wrap_property_type(
                                         p.default.as_ref().map(|_| mir_types::Type::mixed()),
                                     ),
@@ -219,6 +221,7 @@ impl<'a> DefinitionCollector<'a> {
                         is_readonly: p.is_readonly
                             || decl.modifiers.is_readonly
                             || prop_doc.is_readonly,
+                        has_native_readonly: p.is_readonly || decl.modifiers.is_readonly,
                         default: mir_codebase::storage::wrap_property_type(
                             p.default.as_ref().map(|_| mir_types::Type::mixed()),
                         ),
