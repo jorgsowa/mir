@@ -444,6 +444,10 @@ pub struct MethodDef {
     /// class, but scoped to this single method).
     #[serde(default)]
     pub is_mutation_free: bool,
+    /// `@psalm-external-mutation-free` — this method must not mutate any objects
+    /// passed as arguments, but is allowed to modify `$this`.
+    #[serde(default)]
+    pub is_external_mutation_free: bool,
 }
 
 impl MethodDef {

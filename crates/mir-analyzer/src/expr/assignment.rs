@@ -276,6 +276,28 @@ impl<'a> ExpressionAnalyzer<'a> {
                         }
                     }
                 }
+                // External-mutation-free check: assigning to a parameter's property in
+                // a @psalm-external-mutation-free method is forbidden.
+                if ctx.is_in_external_mutation_free_method {
+                    if let ExprKind::Variable(recv_name) = &pa.object.kind {
+                        let recv_stripped = recv_name.trim_start_matches('$');
+                        if recv_stripped != "this"
+                            && ctx
+                                .param_names
+                                .contains(&mir_types::Name::from(recv_stripped))
+                        {
+                            if let Some(prop_name) = extract_string_from_expr(&pa.property) {
+                                self.emit(
+                                    IssueKind::ImpurePropertyAssignment {
+                                        property: prop_name,
+                                    },
+                                    Severity::Warning,
+                                    span,
+                                );
+                            }
+                        }
+                    }
+                }
                 // Immutability check: assigning to $this->prop in a @psalm-immutable class.
                 if ctx.is_in_immutable_method {
                     if let ExprKind::Variable(recv_name) = &pa.object.kind {

@@ -19,4 +19,4 @@ function filterOdd(int $i, A $a) : ?int {
     return null;
 }
 ===expect===
-ImpurePropertyAssignment@10:4-10:14: Assigning to property a of a parameter in a @pure function
+ImpurePropertyAssignment@10:4-10:14: Assigning to property a of a parameter in a pure or external-mutation-free context

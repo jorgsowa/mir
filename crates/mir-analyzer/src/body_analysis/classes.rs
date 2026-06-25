@@ -129,8 +129,9 @@ impl<'a> BodyAnalyzer<'a> {
         );
         ctx.current_method_name = Some(Arc::from(method_name));
 
-        // Set is_in_pure_fn if the method is annotated @pure, and
-        // is_in_immutable_method if it's annotated @psalm-mutation-free.
+        // Set is_in_pure_fn if the method is annotated @pure,
+        // is_in_immutable_method if it's annotated @psalm-mutation-free, and
+        // is_in_external_mutation_free_method if annotated @psalm-external-mutation-free.
         if let Some((_, method_storage)) = crate::db::find_method_in_chain(
             self.db,
             crate::db::Fqcn::from_str(self.db, fqcn),
@@ -139,6 +140,9 @@ impl<'a> BodyAnalyzer<'a> {
             ctx.is_in_pure_fn = method_storage.is_pure;
             if !is_ctor && method_storage.is_mutation_free {
                 ctx.is_in_immutable_method = true;
+            }
+            if !is_ctor && method_storage.is_external_mutation_free {
+                ctx.is_in_external_mutation_free_method = true;
             }
         }
 

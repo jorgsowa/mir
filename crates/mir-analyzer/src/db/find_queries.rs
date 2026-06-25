@@ -681,6 +681,7 @@ pub fn find_method_in_class<'db>(
                 if_this_is: None,
                 is_inherit_doc: false,
                 is_mutation_free: false,
+                is_external_mutation_free: false,
             }));
         }
         if is_backed && (lower == "from" || lower == "tryfrom") {
@@ -737,6 +738,7 @@ pub fn find_method_in_class<'db>(
                 if_this_is: None,
                 is_inherit_doc: false,
                 is_mutation_free: false,
+                is_external_mutation_free: false,
             }));
         }
     }

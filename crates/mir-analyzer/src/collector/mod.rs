@@ -856,6 +856,7 @@ impl<'a> DefinitionCollector<'a> {
                     if_this_is: None,
                     is_inherit_doc: false,
                     is_mutation_free: false,
+                    is_external_mutation_free: false,
                 }),
             );
         }
@@ -1386,6 +1387,7 @@ impl<'a> DefinitionCollector<'a> {
             if_this_is: if_this_is_resolved,
             is_inherit_doc: doc.is_inherit_doc,
             is_mutation_free: doc.is_mutation_free,
+            is_external_mutation_free: doc.is_external_mutation_free,
         })
     }
 }

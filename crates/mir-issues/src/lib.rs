@@ -1532,7 +1532,7 @@ impl IssueKind {
                 format!("Property ${property} expects '{expected}', cannot assign '{actual}' — coercion may fail at runtime")
             }
             IssueKind::ImpurePropertyAssignment { property } => {
-                format!("Assigning to property {property} of a parameter in a @pure function")
+                format!("Assigning to property {property} of a parameter in a pure or external-mutation-free context")
             }
             IssueKind::ImpureMethodCall { method } => {
                 format!("Calling impure method {method}() in a pure or immutable context")

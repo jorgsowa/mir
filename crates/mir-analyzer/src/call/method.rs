@@ -645,6 +645,33 @@ fn resolve_method_return<'a>(
                 span,
             );
         }
+        // External-mutation-free check: calling a method that can mutate its receiver
+        // (`$this` inside the callee) on a parameter is forbidden in a
+        // @psalm-external-mutation-free method — it would indirectly mutate the
+        // argument. Only @pure and @mutation-free callees are safe because they
+        // guarantee not to mutate their own `$this`.
+        if ctx.is_in_external_mutation_free_method
+            && !resolved.is_pure
+            && !resolved.is_mutation_free
+            && !resolved.is_static
+        {
+            if let ExprKind::Variable(recv_name) = &call.object.kind {
+                let recv_stripped = recv_name.trim_start_matches('$');
+                if recv_stripped != "this"
+                    && ctx
+                        .param_names
+                        .contains(&mir_types::Name::from(recv_stripped))
+                {
+                    ea.emit(
+                        IssueKind::ImpureMethodCall {
+                            method: method_name.to_string(),
+                        },
+                        Severity::Warning,
+                        span,
+                    );
+                }
+            }
+        }
         if resolved.is_internal {
             let calling_ns = ea.db.file_namespace(&ea.file);
             let calling_root = namespace_root(calling_ns.as_deref());

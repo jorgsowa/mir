@@ -90,6 +90,11 @@ pub struct FlowState {
     /// Triggers `ImmutablePropertyModification` on `$this->prop = ...` assignments.
     pub is_in_immutable_method: bool,
 
+    /// Whether we are inside a `@psalm-external-mutation-free` method.
+    /// Triggers `ImpureMethodCall`/`ImpurePropertyAssignment` when mutating objects
+    /// received as parameters (but allows `$this` mutations).
+    pub is_in_external_mutation_free_method: bool,
+
     /// Whether we are inside a static method body.
     pub inside_static_method: bool,
 
@@ -266,6 +271,7 @@ impl FlowState {
             current_method_name: None,
             is_in_pure_fn: false,
             is_in_immutable_method: false,
+            is_in_external_mutation_free_method: false,
             inside_static_method: false,
             strict_types: false,
             tainted_vars: FxHashSet::default(),
