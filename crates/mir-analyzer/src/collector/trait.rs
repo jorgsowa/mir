@@ -165,7 +165,7 @@ impl<'a> DefinitionCollector<'a> {
                             visibility: None,
                             is_final: c.is_final,
                             location: Some(self.location(member.span.start, member.span.end)),
-                            deprecated: None,
+                            deprecated: const_doc.deprecated.as_deref().map(Arc::from),
                         },
                     );
                 }

@@ -674,6 +674,19 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 expr_span,
                             );
                         }
+                        if let Some((_, ref c)) = found {
+                            if let Some(msg) = &c.deprecated {
+                                self.emit(
+                                    IssueKind::DeprecatedConstant {
+                                        class: self_fqcn.to_string(),
+                                        constant: const_name.clone(),
+                                        message: Some(msg.clone()).filter(|m| !m.is_empty()),
+                                    },
+                                    Severity::Info,
+                                    cca.member.span,
+                                );
+                            }
+                        }
                         let const_ty = found
                             .as_ref()
                             .map(|(_, c)| c.ty.clone())
@@ -715,6 +728,19 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 Severity::Error,
                                 expr_span,
                             );
+                        }
+                        if let Some((_, ref c)) = found {
+                            if let Some(msg) = &c.deprecated {
+                                self.emit(
+                                    IssueKind::DeprecatedConstant {
+                                        class: parent_fqcn.to_string(),
+                                        constant: const_name.clone(),
+                                        message: Some(msg.clone()).filter(|m| !m.is_empty()),
+                                    },
+                                    Severity::Info,
+                                    cca.member.span,
+                                );
+                            }
                         }
                         let const_ty = found
                             .as_ref()
