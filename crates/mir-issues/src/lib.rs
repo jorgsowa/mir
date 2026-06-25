@@ -1535,7 +1535,7 @@ impl IssueKind {
                 format!("Assigning to property {property} of a parameter in a @pure function")
             }
             IssueKind::ImpureMethodCall { method } => {
-                format!("Calling impure method {method}() in a @pure function")
+                format!("Calling impure method {method}() in a pure or immutable context")
             }
             IssueKind::ImpureGlobalVariable { variable } => {
                 format!("Using global variable ${variable} in a @pure function")

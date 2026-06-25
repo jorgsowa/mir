@@ -23,4 +23,4 @@ function filterOdd(int $i, A $a) : ?int {
     return null;
 }
 ===expect===
-ImpureMethodCall@14:4-14:13: Calling impure method foo() in a @pure function
+ImpureMethodCall@14:4-14:13: Calling impure method foo() in a pure or immutable context

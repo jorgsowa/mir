@@ -47,6 +47,8 @@ pub(crate) struct ResolvedMethod {
     pub(crate) is_internal: bool,
     pub(crate) is_static: bool,
     pub(crate) is_abstract: bool,
+    pub(crate) is_pure: bool,
+    pub(crate) is_mutation_free: bool,
     pub(crate) params: Vec<FnParam>,
     pub(crate) template_params: Vec<TemplateParam>,
     pub(crate) return_ty_raw: Type,
@@ -164,6 +166,8 @@ pub(crate) fn resolve_method_from_db(
             is_internal: storage.is_internal,
             is_static: storage.is_static,
             is_abstract: storage.is_abstract,
+            is_pure: storage.is_pure,
+            is_mutation_free: storage.is_mutation_free,
             params,
             template_params,
             return_ty_raw,
@@ -619,6 +623,26 @@ fn resolve_method_return<'a>(
                 },
                 Severity::Info,
                 call.method.span,
+            );
+        }
+        // Immutability check: calling a non-mutation-free instance method on $this
+        // inside a @psalm-immutable class or @psalm-mutation-free method is forbidden
+        // because it may indirectly mutate object state.
+        if ctx.is_in_immutable_method
+            && !resolved.is_mutation_free
+            && !resolved.is_pure
+            && !resolved.is_static
+            && matches!(
+                &call.object.kind,
+                ExprKind::Variable(n) if n.trim_start_matches('$') == "this"
+            )
+        {
+            ea.emit(
+                IssueKind::ImpureMethodCall {
+                    method: method_name.to_string(),
+                },
+                Severity::Warning,
+                span,
             );
         }
         if resolved.is_internal {
