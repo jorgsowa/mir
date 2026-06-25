@@ -274,6 +274,7 @@ impl<'a> DefinitionCollector<'a> {
                             )
                         })
                         .or(hint_ty)
+                        .or_else(|| super::infer_const_value(&c.value.kind))
                         .unwrap_or_else(mir_types::Type::mixed);
                     let constant = ConstantDef {
                         name: Arc::from(const_name),

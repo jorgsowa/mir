@@ -650,15 +650,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                         let Some(self_fqcn) = &ctx.self_fqcn else {
                             return Type::mixed();
                         };
-                        let exists = crate::db::class_constant_exists_in_chain(
-                            self.db,
-                            self_fqcn,
-                            &const_name,
-                        );
+                        let here = crate::db::Fqcn::from_str(self.db, self_fqcn);
+                        let found =
+                            crate::db::find_class_constant_in_chain(self.db, here, &const_name);
                         // Inside a trait, `self::`/`static::CONST` may be
                         // defined on the using class via late static binding,
                         // not the trait itself — skip the undefined check.
-                        if !exists
+                        if found.is_none()
                             && !crate::db::has_unknown_ancestor(self.db, self_fqcn)
                             && !crate::flow_state::self_is_trait(self.db, ctx)
                         {
@@ -670,6 +668,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 expr_span,
                             );
                         }
+                        let const_ty = found
+                            .as_ref()
+                            .map(|(_, c)| c.ty.clone())
+                            .unwrap_or_else(Type::mixed);
                         self.record_ref(
                             Arc::from(format!("{}::{}", self_fqcn, const_name)),
                             cca.member.span,
@@ -680,9 +682,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 class: self_fqcn.clone(),
                                 constant: Arc::from(const_name.as_str()),
                             },
-                            Type::mixed(),
+                            const_ty.clone(),
                         );
-                        return Type::mixed();
+                        return const_ty;
                     }
                     "parent" => {
                         let Some(parent_fqcn) = &ctx.parent_fqcn else {
@@ -695,12 +697,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                             }
                             return Type::mixed();
                         };
-                        let exists = crate::db::class_constant_exists_in_chain(
-                            self.db,
-                            parent_fqcn,
-                            &const_name,
-                        );
-                        if !exists && !crate::db::has_unknown_ancestor(self.db, parent_fqcn) {
+                        let here = crate::db::Fqcn::from_str(self.db, parent_fqcn);
+                        let found =
+                            crate::db::find_class_constant_in_chain(self.db, here, &const_name);
+                        if found.is_none() && !crate::db::has_unknown_ancestor(self.db, parent_fqcn)
+                        {
                             self.emit(
                                 IssueKind::UndefinedConstant {
                                     name: format!("{parent_fqcn}::{const_name}"),
@@ -709,6 +710,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 expr_span,
                             );
                         }
+                        let const_ty = found
+                            .as_ref()
+                            .map(|(_, c)| c.ty.clone())
+                            .unwrap_or_else(Type::mixed);
                         self.record_ref(
                             Arc::from(format!("{}::{}", parent_fqcn, const_name)),
                             cca.member.span,
@@ -719,9 +724,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 class: parent_fqcn.clone(),
                                 constant: Arc::from(const_name.as_str()),
                             },
-                            Type::mixed(),
+                            const_ty.clone(),
                         );
-                        return Type::mixed();
+                        return const_ty;
                     }
                     _ => resolved,
                 }
