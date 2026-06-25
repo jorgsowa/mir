@@ -522,15 +522,63 @@ fn parse_case_constrained_string() {
 }
 
 #[test]
-fn parse_int_mask() {
-    assert!(matches!(
-        parse_type_string("int-mask<1, 2, 4>").types[0],
-        Atomic::TInt
-    ));
-    assert!(matches!(
-        parse_type_string("int-mask-of<Foo::*>").types[0],
-        Atomic::TInt
-    ));
+fn parse_int_mask_expands_to_literal_union() {
+    // int-mask<1, 2, 4> → all OR-combinations: 0,1,2,3,4,5,6,7
+    let u = parse_type_string("int-mask<1, 2, 4>");
+    assert_eq!(
+        u.types.len(),
+        8,
+        "expected 2^3=8 members, got {}",
+        u.types.len()
+    );
+    for n in 0i64..8 {
+        assert!(
+            u.contains(|t| matches!(t, Atomic::TLiteralInt(m) if *m == n)),
+            "missing literal {n} in int-mask<1,2,4> union: {u}"
+        );
+    }
+}
+
+#[test]
+fn parse_int_mask_single_member() {
+    // int-mask<4> → {0, 4}
+    let u = parse_type_string("int-mask<4>");
+    assert_eq!(u.types.len(), 2);
+    assert!(u.contains(|t| matches!(t, Atomic::TLiteralInt(0))));
+    assert!(u.contains(|t| matches!(t, Atomic::TLiteralInt(4))));
+}
+
+#[test]
+fn parse_int_mask_with_zero_member_deduplicates() {
+    // int-mask<0, 1> → {0, 1} (0 is already included as the empty subset)
+    let u = parse_type_string("int-mask<0, 1>");
+    assert_eq!(u.types.len(), 2);
+    assert!(u.contains(|t| matches!(t, Atomic::TLiteralInt(0))));
+    assert!(u.contains(|t| matches!(t, Atomic::TLiteralInt(1))));
+}
+
+#[test]
+fn parse_int_mask_too_many_members_falls_back() {
+    // > 8 members → fall back to int
+    let u = parse_type_string("int-mask<1, 2, 4, 8, 16, 32, 64, 128, 256>");
+    assert_eq!(u.types.len(), 1);
+    assert!(matches!(u.types[0], Atomic::TInt));
+}
+
+#[test]
+fn parse_int_mask_of_always_falls_back() {
+    // int-mask-of cannot resolve class constants at parse time → always int
+    let u = parse_type_string("int-mask-of<Foo::*>");
+    assert_eq!(u.types.len(), 1);
+    assert!(matches!(u.types[0], Atomic::TInt));
+}
+
+#[test]
+fn parse_int_mask_class_constants_fall_back() {
+    // Members that are not integer literals → fall back to int
+    let u = parse_type_string("int-mask<SORT_ASC, SORT_DESC>");
+    assert_eq!(u.types.len(), 1);
+    assert!(matches!(u.types[0], Atomic::TInt));
 }
 
 // ---------------------------------------------------------------------------

@@ -313,9 +313,43 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
             let inner_ty = parse_type_string(inner.trim());
             eval_value_of(&inner_ty).unwrap_or_else(Type::mixed)
         }
-        // `int-mask<...>` / `int-mask-of<T>` — a bitmask of int flags. mir does
-        // not track the exact set of representable values; approximate as `int`.
-        "int-mask" | "int-mask-of" => Type::single(Atomic::TInt),
+        // `int-mask<V1, V2, ...>` — when all members are non-negative integer
+        // literals and the set is small (≤ 8), expand to the union of all
+        // possible OR-combinations (including 0 for "no flags set"). This lets
+        // the call checker reject out-of-range literals statically. Falls back
+        // to `int` when members include class constants or the set is too large.
+        "int-mask" => {
+            let parts = split_generics(inner);
+            let members: Vec<i64> = parts
+                .iter()
+                .filter_map(|s| s.trim().parse::<i64>().ok())
+                .collect();
+            if !members.is_empty()
+                && members.len() == parts.len()
+                && members.iter().all(|&v| v >= 0)
+                && members.len() <= 8
+            {
+                let mut values = std::collections::BTreeSet::new();
+                for subset in 0u32..(1u32 << members.len()) {
+                    let value = members
+                        .iter()
+                        .enumerate()
+                        .filter(|(i, _)| subset & (1 << i) != 0)
+                        .fold(0i64, |acc, (_, &v)| acc | v);
+                    values.insert(value);
+                }
+                let mut u = Type::empty();
+                for v in values {
+                    u.add_type(Atomic::TLiteralInt(v));
+                }
+                u
+            } else {
+                Type::single(Atomic::TInt)
+            }
+        }
+        // `int-mask-of<T::*>` requires resolving class constants which are not
+        // available at docblock-parse time; approximate as `int`.
+        "int-mask-of" => Type::single(Atomic::TInt),
         // Named class with type params
         _ => {
             let params: Vec<Type> = split_generics(inner)
