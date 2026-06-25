@@ -1617,6 +1617,58 @@ fn callback_name_for_diagnostic(callback_ty: &Type) -> String {
 ///
 /// Returns the original array type unchanged when inference is not possible (mixed input,
 /// no pushed values, etc.).
+/// Build `list<string>` or `list<array{0: string, 1: int}>` for `preg_match` `$matches`.
+///
+/// When bit 256 (`PREG_OFFSET_CAPTURE`) is set in `flags`, each entry is a shape
+/// `array{0: string, 1: int}` holding the matched text and its byte offset.
+pub(crate) fn preg_match_matches_type(flags: i64) -> Type {
+    Type::single(Atomic::TList {
+        value: Box::new(preg_match_leaf(flags)),
+    })
+}
+
+/// Build `list<list<string>>` or `list<list<array{0: string, 1: int}>>` for `preg_match_all`.
+///
+/// `PREG_SET_ORDER` changes the ordering (sets vs. groups outer) but not the
+/// per-match element types; `PREG_OFFSET_CAPTURE` adds an int offset to each leaf.
+pub(crate) fn preg_match_all_matches_type(flags: i64) -> Type {
+    let inner = Type::single(Atomic::TList {
+        value: Box::new(preg_match_leaf(flags)),
+    });
+    Type::single(Atomic::TList {
+        value: Box::new(inner),
+    })
+}
+
+fn preg_match_leaf(flags: i64) -> Type {
+    const PREG_OFFSET_CAPTURE: i64 = 256;
+    if flags & PREG_OFFSET_CAPTURE != 0 {
+        // array{0: string, 1: int}
+        let mut props = indexmap::IndexMap::new();
+        props.insert(
+            mir_types::atomic::ArrayKey::Int(0),
+            mir_types::atomic::KeyedProperty {
+                ty: Type::single(Atomic::TString),
+                optional: false,
+            },
+        );
+        props.insert(
+            mir_types::atomic::ArrayKey::Int(1),
+            mir_types::atomic::KeyedProperty {
+                ty: Type::single(Atomic::TInt),
+                optional: false,
+            },
+        );
+        Type::single(Atomic::TKeyedArray {
+            properties: props,
+            is_open: false,
+            is_list: true,
+        })
+    } else {
+        Type::single(Atomic::TString)
+    }
+}
+
 pub(crate) fn array_push_unshift_byref_type(arr: &Type, push_types: &[Type]) -> Type {
     if arr.is_mixed() || push_types.is_empty() {
         return arr.clone();

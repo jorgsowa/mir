@@ -717,6 +717,36 @@ impl CallAnalyzer {
                 }
             }
 
+            // preg_match / preg_match_all: the by-ref loop above wrote the stub's
+            // generic `string[]` to `$matches`. Override with the flag-aware type:
+            // no PREG_OFFSET_CAPTURE → list<string>; with it → list<array{0:string,1:int}>.
+            // preg_match_all wraps one more list level.
+            if matches!(resolved_fn_name.as_str(), "preg_match" | "preg_match_all") {
+                if let Some(matches_arg) = call.args.get(2) {
+                    if let ExprKind::Variable(name) = &matches_arg.value.kind {
+                        let var_name = name.as_ref().trim_start_matches('$');
+                        let flags: i64 = arg_types
+                            .get(3)
+                            .and_then(|t| {
+                                t.types.iter().find_map(|a| {
+                                    if let Atomic::TLiteralInt(v) = a {
+                                        Some(*v)
+                                    } else {
+                                        None
+                                    }
+                                })
+                            })
+                            .unwrap_or(0);
+                        let new_type = if resolved_fn_name.as_str() == "preg_match" {
+                            super::callable::preg_match_matches_type(flags)
+                        } else {
+                            super::callable::preg_match_all_matches_type(flags)
+                        };
+                        ctx.set_var(var_name, new_type);
+                    }
+                }
+            }
+
             super::ARG_TYPES_BUF.with(|b| {
                 let mut g = b.borrow_mut();
                 if g.as_ref().map_or(0, |v| v.capacity()) < arg_types.capacity() {
