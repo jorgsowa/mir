@@ -127,6 +127,8 @@ impl<'a> BodyAnalyzer<'a> {
             method.is_static,
             templates,
         );
+        ctx.current_method_name = Some(Arc::from(method_name));
+
         // Set is_in_pure_fn if the method is annotated @pure.
         if let Some((_, method_storage)) = crate::db::find_method_in_chain(
             self.db,

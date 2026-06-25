@@ -205,6 +205,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 is_ctor,
                 method.is_static,
             );
+            method_ctx.current_method_name = Some(Arc::from(method_name));
             for p in method.params.iter() {
                 if let Some(raw) = p.name.as_deref() {
                     let trimmed = raw.trim_start_matches('$');

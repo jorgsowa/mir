@@ -199,18 +199,31 @@ impl CallAnalyzer {
             }
         };
 
-        // Flag explicit __construct() calls
+        // Flag explicit __construct() calls.
+        // Exception: $this->__construct() inside __wakeup/__clone is a documented
+        // PHP re-initialization pattern (e.g. after unserialization or cloning).
         if method_name.eq_ignore_ascii_case("__construct") {
-            // Detect the class from the object type
+            let receiver_is_this = matches!(
+                &call.object.kind,
+                ExprKind::Variable(n) if n.trim_start_matches('$') == "this"
+            );
+            let in_lifecycle_method = ctx.current_method_name.as_deref().is_some_and(|m| {
+                m.eq_ignore_ascii_case("__wakeup") || m.eq_ignore_ascii_case("__clone")
+            });
             for atomic in &obj_ty.types {
                 if let mir_types::Atomic::TNamedObject { fqcn, .. } = atomic {
-                    ea.emit(
-                        IssueKind::DirectConstructorCall {
-                            class: fqcn.to_string(),
-                        },
-                        Severity::Error,
-                        span,
-                    );
+                    let exempt = receiver_is_this
+                        && ctx.self_fqcn.as_deref() == Some(fqcn.as_ref())
+                        && in_lifecycle_method;
+                    if !exempt {
+                        ea.emit(
+                            IssueKind::DirectConstructorCall {
+                                class: fqcn.to_string(),
+                            },
+                            Severity::Error,
+                            span,
+                        );
+                    }
                     break;
                 }
             }

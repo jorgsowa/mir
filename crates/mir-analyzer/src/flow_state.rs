@@ -79,6 +79,10 @@ pub struct FlowState {
     /// Whether we are inside a constructor.
     pub inside_constructor: bool,
 
+    /// The name of the method currently being analyzed (e.g. `"__wakeup"`).
+    /// `None` for free functions and closures.
+    pub current_method_name: Option<Arc<str>>,
+
     /// Whether we are inside a @pure function/method body.
     pub is_in_pure_fn: bool,
 
@@ -259,6 +263,7 @@ impl FlowState {
             inside_finally: false,
             is_generator: false,
             inside_constructor: false,
+            current_method_name: None,
             is_in_pure_fn: false,
             is_in_immutable_method: false,
             inside_static_method: false,
