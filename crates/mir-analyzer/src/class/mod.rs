@@ -28,15 +28,6 @@ pub struct ClassAnalyzer<'a> {
 }
 
 impl<'a> ClassAnalyzer<'a> {
-    #[allow(dead_code)]
-    pub fn new(db: &'a dyn MirDatabase) -> Self {
-        Self {
-            db,
-            analyzed_files: HashSet::default(),
-            sources: HashMap::default(),
-        }
-    }
-
     pub fn with_files(
         db: &'a dyn MirDatabase,
         files: HashSet<Arc<str>>,

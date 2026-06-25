@@ -232,7 +232,6 @@ pub(crate) fn load_stubs(db: &mut MirDbStorage) {
 /// the target, or whose `@removed` is at or before the target, are skipped —
 /// so multiple declarations of the same name (e.g. `each` on PHP 7 vs.
 /// PHP 8) gated by `@since`/`@removed` collapse to the one matching variant.
-#[allow(dead_code)]
 pub(crate) fn load_stubs_for_version(db: &mut MirDbStorage, php_version: PhpVersion) {
     // Wire the target version before registering any SourceFile inputs so
     // collect_file_definitions reads the right version for @since/@removed filtering.
@@ -256,18 +255,6 @@ pub(crate) fn builtin_stub_slices_for_version(php_version: PhpVersion) -> Vec<St
         .collect()
 }
 
-pub(crate) fn user_stub_slices(files: &[PathBuf], dirs: &[PathBuf]) -> Vec<StubSlice> {
-    let mut all_paths: Vec<PathBuf> = files.to_vec();
-    for dir in dirs {
-        collect_stub_dir_paths(dir, &mut all_paths);
-    }
-
-    all_paths
-        .par_iter()
-        .filter_map(|path| parse_stub_file_slice(path))
-        .collect()
-}
-
 pub(crate) fn stub_slice_from_source(
     filename: &str,
     content: &str,
@@ -284,21 +271,6 @@ pub(crate) fn stub_slice_from_source(
     let (mut slice, _) = collector.collect_slice(&result.program);
     mir_codebase::storage::deduplicate_params_in_slice(&mut slice);
     slice
-}
-
-fn parse_stub_file_slice(path: &Path) -> Option<StubSlice> {
-    let content = match std::fs::read_to_string(path) {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("mir: cannot read stub file {}: {}", path.display(), e);
-            return None;
-        }
-    };
-    Some(stub_slice_from_source(
-        path.to_string_lossy().as_ref(),
-        &content,
-        None,
-    ))
 }
 
 pub(crate) fn collect_stub_dir_paths(dir: &Path, paths: &mut Vec<PathBuf>) {
@@ -348,17 +320,6 @@ pub(crate) fn user_stub_fingerprint(files: &[PathBuf], dirs: &[PathBuf]) -> u64 
     }
     let bytes = hasher.finalize();
     u64::from_le_bytes(bytes.as_bytes()[..8].try_into().unwrap())
-}
-
-/// Parse user-provided stub files and directories into `codebase`.
-///
-/// Called after built-in stubs are loaded so user definitions can override or
-/// supplement built-ins (e.g. framework-specific classes, IDE helpers).
-#[allow(dead_code)]
-pub(crate) fn load_user_stubs(_db: &mut MirDbStorage, files: &[PathBuf], dirs: &[PathBuf]) {
-    // No-op: user stub registration now happens through db::ingest_user_stubs
-    // which registers SourceFile inputs directly for the pull-based salsa path.
-    let _ = user_stub_slices(files, dirs);
 }
 
 // ---------------------------------------------------------------------------

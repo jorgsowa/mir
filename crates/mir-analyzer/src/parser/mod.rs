@@ -4,8 +4,6 @@ pub(crate) mod type_from_hint;
 use std::sync::Arc;
 
 use php_ast::Span;
-use php_rs_parser::ParserContext;
-use thiserror::Error;
 
 pub use docblock::{DocblockParser, ParsedDocblock};
 pub use type_from_hint::{type_from_hint, type_from_hint_owned};
@@ -82,78 +80,6 @@ pub(crate) fn is_hard_parse_error(err: &php_rs_parser::diagnostics::ParseError) 
 }
 
 // ---------------------------------------------------------------------------
-// ParseError
-// ---------------------------------------------------------------------------
-
-#[allow(dead_code)]
-#[derive(Debug, Error)]
-pub(crate) enum ParseError {
-    #[error("PHP parse error in {file}: {message}")]
-    SyntaxError { file: Arc<str>, message: String },
-}
-
-// ---------------------------------------------------------------------------
-// ParsedFile — result of parsing a single PHP file
-// ---------------------------------------------------------------------------
-
-#[allow(dead_code)]
-pub(crate) struct ParsedFile<'arena, 'src> {
-    pub(crate) program: php_ast::ast::Program<'arena, 'src>,
-    pub(crate) errors: Vec<ParseError>,
-    pub(crate) file: Arc<str>,
-}
-
-// ---------------------------------------------------------------------------
-// FileParser
-// ---------------------------------------------------------------------------
-
-#[allow(dead_code)]
-pub(crate) struct FileParser {
-    ctx: ParserContext,
-}
-
-impl FileParser {
-    #[allow(dead_code)]
-    pub(crate) fn new() -> Self {
-        Self {
-            ctx: ParserContext::new(),
-        }
-    }
-
-    /// Parse a PHP source string, reusing the internal arena (O(1) reset).
-    /// The returned `ParsedFile` borrows from both `self` and `src`.
-    /// The previous `ParsedFile` must be dropped before calling `parse` again.
-    #[allow(dead_code)]
-    pub(crate) fn parse<'arena, 'src>(
-        &'arena mut self,
-        src: &'src str,
-        file: Arc<str>,
-    ) -> ParsedFile<'arena, 'src> {
-        let result = self.ctx.reparse(src);
-        let errors = result
-            .errors
-            .iter()
-            .map(|e| ParseError::SyntaxError {
-                file: file.clone(),
-                message: e.to_string(),
-            })
-            .collect();
-
-        ParsedFile {
-            program: result.program,
-            errors,
-            file,
-        }
-    }
-}
-
-impl Default for FileParser {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Source location helpers
 // ---------------------------------------------------------------------------
 
@@ -167,18 +93,6 @@ pub(crate) fn span_text(src: &str, span: Span) -> Option<String> {
     src.get(s..e)
         .map(|t| t.trim().to_string())
         .filter(|t| !t.is_empty())
-}
-
-/// Extract the source line containing a span.
-#[allow(dead_code)]
-pub(crate) fn span_snippet(src: &str, span: Span) -> String {
-    let offset = span.start as usize;
-    let line_start = src[..offset].rfind('\n').map(|p| p + 1).unwrap_or(0);
-    let line_end = src[offset..]
-        .find('\n')
-        .map(|p| offset + p)
-        .unwrap_or(src.len());
-    src[line_start..line_end].to_string()
 }
 
 // ---------------------------------------------------------------------------

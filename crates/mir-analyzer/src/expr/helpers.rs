@@ -5,11 +5,6 @@ use rustc_hash::FxHashSet;
 
 use crate::subtype::is_subtype;
 
-#[allow(dead_code)]
-pub fn widen_array_with_value(current: &Type, new_value: &Type) -> Type {
-    widen_array_with_value_and_key(current, new_value, &Type::mixed())
-}
-
 pub fn widen_array_with_value_and_key(current: &Type, new_value: &Type, new_key: &Type) -> Type {
     let mut result = Type::empty();
     result.possibly_undefined = current.possibly_undefined;
