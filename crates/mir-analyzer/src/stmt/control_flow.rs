@@ -330,7 +330,7 @@ impl<'a> StatementsAnalyzer<'a> {
             entry.record_write(vname.as_str(), line, col_start, line_end, col_end);
             // Emit ResolvedSymbol for value variable at binding position
             self.record_symbol_for_var(fe.value.span, vname, value_ty.clone());
-            if value_ty.is_mixed() {
+            if value_ty.is_mixed_not_template() {
                 self.issues.add(
                     Issue::new(
                         IssueKind::MixedAssignment { var: vname.clone() },

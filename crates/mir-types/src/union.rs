@@ -153,6 +153,18 @@ impl Type {
         })
     }
 
+    /// True only when the type contains `TMixed` atoms and no `TTemplateParam` atoms.
+    /// Unlike [`is_mixed`], this does not treat an unconstrained template parameter as
+    /// "mixed" — a `T` placeholder is an intentionally parameterised type that will be
+    /// instantiated at the call site, so it must not trigger `MixedAssignment` warnings.
+    pub fn is_mixed_not_template(&self) -> bool {
+        self.is_mixed()
+            && !self
+                .types
+                .iter()
+                .any(|t| matches!(t, Atomic::TTemplateParam { .. }))
+    }
+
     pub fn is_never(&self) -> bool {
         self.types.iter().all(|t| matches!(t, Atomic::TNever)) && !self.types.is_empty()
     }

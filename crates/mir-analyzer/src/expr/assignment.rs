@@ -197,7 +197,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         span,
                     );
                 }
-                if ty.is_mixed() && name_str != "this" {
+                if ty.is_mixed_not_template() && name_str != "this" {
                     self.emit(
                         IssueKind::MixedAssignment {
                             var: name_str.clone(),
