@@ -21,6 +21,7 @@ use php_ast::owned::{Expr, ExprKind};
 use mir_types::{Atomic, Type};
 
 use crate::flow_state::FlowState;
+use crate::php_version::PhpVersion;
 
 enum Lit {
     Int(i64),
@@ -473,6 +474,42 @@ fn is_nonempty_array_atomic(a: &Atomic) -> bool {
     )
 }
 
+fn is_int_atomic(a: &Atomic) -> bool {
+    matches!(
+        a,
+        Atomic::TInt
+            | Atomic::TLiteralInt(_)
+            | Atomic::TIntRange { .. }
+            | Atomic::TPositiveInt
+            | Atomic::TNonNegativeInt
+            | Atomic::TNegativeInt
+    )
+}
+
+fn is_float_atomic(a: &Atomic) -> bool {
+    matches!(a, Atomic::TFloat | Atomic::TLiteralFloat(..))
+}
+
+/// Whether `s` could be a PHP numeric string (conservative: returns `true` when unsure).
+///
+/// PHP considers a string numeric if it consists of optional whitespace, an optional
+/// sign, digits, and an optional decimal / exponent part. Used to determine whether
+/// a literal-string atom can be loosely equal to an integer or float.
+fn is_php_numeric_string(s: &str) -> bool {
+    let t = s.trim();
+    if t.is_empty() {
+        return false;
+    }
+    if t.parse::<i64>().is_ok() {
+        return true;
+    }
+    // Reject inf/nan: PHP does not consider those numeric strings.
+    if let Ok(f) = t.parse::<f64>() {
+        return f.is_finite();
+    }
+    false
+}
+
 /// Can two atomics ever be loosely equal (`==`) in PHP?
 ///
 /// Conservative: returns `true` for open atomics (mixed, scalar, etc.) and for
@@ -483,7 +520,9 @@ fn is_nonempty_array_atomic(a: &Atomic) -> bool {
 /// - any object vs null, false, int, float, string, or array
 /// - any array vs null, int, float, string, or object
 /// - a non-empty array vs false (non-empty arrays are always truthy)
-fn atomics_can_be_loose_equal(left: &Atomic, right: &Atomic) -> bool {
+/// - a non-numeric literal string vs any integer/float (PHP 8.0+)
+/// - a non-numeric literal string vs a non-zero literal integer (all versions)
+fn atomics_can_be_loose_equal(left: &Atomic, right: &Atomic, php_version: PhpVersion) -> bool {
     if is_open_atomic(left) || is_open_atomic(right) {
         return true;
     }
@@ -523,7 +562,42 @@ fn atomics_can_be_loose_equal(left: &Atomic, right: &Atomic) -> bool {
         };
     }
 
-    // Scalar vs scalar: complex coercion rules, be conservative.
+    // Scalar vs scalar: most coercions are complex, but literal-string vs
+    // integer/float cases are statically decidable.
+    //
+    // PHP 8.0+ changed string-vs-int comparison: when one operand is a
+    // non-numeric string, the integer is converted *to* string instead of
+    // the string being converted to an integer.  A non-numeric literal like
+    // "foo" can therefore never equal any integer/float in PHP 8+.
+    //
+    // In all PHP versions: a non-numeric string converts to int(0) under the
+    // PHP 7 rules, so comparing it against a non-zero literal int is still
+    // impossible regardless of version.
+    if php_version >= PhpVersion::new(8, 0) {
+        if let Atomic::TLiteralString(s) = left {
+            if !is_php_numeric_string(s) && (is_int_atomic(right) || is_float_atomic(right)) {
+                return false;
+            }
+        }
+        if let Atomic::TLiteralString(s) = right {
+            if !is_php_numeric_string(s) && (is_int_atomic(left) || is_float_atomic(left)) {
+                return false;
+            }
+        }
+    } else {
+        // PHP < 8: non-numeric string → (int)0 under comparison, so it can
+        // equal 0 but never any non-zero literal integer.
+        match (left, right) {
+            (Atomic::TLiteralString(s), Atomic::TLiteralInt(n))
+            | (Atomic::TLiteralInt(n), Atomic::TLiteralString(s))
+                if !is_php_numeric_string(s) && *n != 0 =>
+            {
+                return false;
+            }
+            _ => {}
+        }
+    }
+
     true
 }
 
@@ -532,7 +606,7 @@ fn atomics_can_be_loose_equal(left: &Atomic, right: &Atomic) -> bool {
 ///
 /// Returns `true` conservatively when either type is empty or when any atom
 /// pair might be loosely equal.
-pub(crate) fn types_can_be_loose_equal(left: &Type, right: &Type) -> bool {
+pub(crate) fn types_can_be_loose_equal(left: &Type, right: &Type, php_version: PhpVersion) -> bool {
     if left.types.is_empty() || right.types.is_empty() {
         return true;
     }
@@ -540,7 +614,7 @@ pub(crate) fn types_can_be_loose_equal(left: &Type, right: &Type) -> bool {
         right
             .types
             .iter()
-            .any(|ra| atomics_can_be_loose_equal(la, ra))
+            .any(|ra| atomics_can_be_loose_equal(la, ra, php_version))
     })
 }
 

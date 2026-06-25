@@ -262,7 +262,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
 
             BinaryOp::Equal | BinaryOp::NotEqual => {
-                if !crate::contradiction::types_can_be_loose_equal(&left_ty, &right_ty) {
+                if !crate::contradiction::types_can_be_loose_equal(
+                    &left_ty,
+                    &right_ty,
+                    self.php_version,
+                ) {
                     let op = if b.op == BinaryOp::Equal { "==" } else { "!=" };
                     self.emit(
                         IssueKind::ImpossibleLooseComparison {
