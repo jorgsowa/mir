@@ -855,6 +855,7 @@ impl<'a> DefinitionCollector<'a> {
                     taint_sink_params: vec![],
                     if_this_is: None,
                     is_inherit_doc: false,
+                    is_mutation_free: false,
                 }),
             );
         }
@@ -1384,6 +1385,7 @@ impl<'a> DefinitionCollector<'a> {
                 .collect(),
             if_this_is: if_this_is_resolved,
             is_inherit_doc: doc.is_inherit_doc,
+            is_mutation_free: doc.is_mutation_free,
         })
     }
 }

@@ -16,5 +16,5 @@ class Rect {
     }
 }
 ===expect===
-ImmutablePropertyModification@11:8-11:26: Assigning to property width of $this in a @psalm-immutable class
-ImmutablePropertyModification@12:8-12:27: Assigning to property height of $this in a @psalm-immutable class
+ImmutablePropertyModification@11:8-11:26: Assigning to property width of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
+ImmutablePropertyModification@12:8-12:27: Assigning to property height of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)

@@ -129,13 +129,17 @@ impl<'a> BodyAnalyzer<'a> {
         );
         ctx.current_method_name = Some(Arc::from(method_name));
 
-        // Set is_in_pure_fn if the method is annotated @pure.
+        // Set is_in_pure_fn if the method is annotated @pure, and
+        // is_in_immutable_method if it's annotated @psalm-mutation-free.
         if let Some((_, method_storage)) = crate::db::find_method_in_chain(
             self.db,
             crate::db::Fqcn::from_str(self.db, fqcn),
             &method_name.to_ascii_lowercase(),
         ) {
             ctx.is_in_pure_fn = method_storage.is_pure;
+            if !is_ctor && method_storage.is_mutation_free {
+                ctx.is_in_immutable_method = true;
+            }
         }
 
         // Set is_in_immutable_method for non-constructor methods of @psalm-immutable classes.

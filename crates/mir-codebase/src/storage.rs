@@ -439,6 +439,11 @@ pub struct MethodDef {
     /// template params when this method has none of its own.
     #[serde(default)]
     pub is_inherit_doc: bool,
+    /// `@psalm-mutation-free` / `@phpstan-mutation-free` — this method must not
+    /// assign to `$this` properties (same constraint as `@psalm-immutable` on the
+    /// class, but scoped to this single method).
+    #[serde(default)]
+    pub is_mutation_free: bool,
 }
 
 impl MethodDef {

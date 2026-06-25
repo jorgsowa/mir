@@ -282,6 +282,9 @@ impl DocblockParser {
                 "pure" => result.is_pure = true,
                 "seal-properties" | "psalm-seal-properties" => result.seal_properties = true,
                 "no-named-arguments" => result.no_named_arguments = true,
+                "mutation-free" | "psalm-mutation-free" | "phpstan-mutation-free" => {
+                    result.is_mutation_free = true
+                }
                 "immutable" | "psalm-immutable" => result.is_immutable = true,
                 "readonly" => result.is_readonly = true,
                 "final" => result.is_final = true,
@@ -497,6 +500,7 @@ pub struct ParsedDocblock {
     pub is_deprecated: bool,
     pub is_internal: bool,
     pub is_pure: bool,
+    pub is_mutation_free: bool,
     pub no_named_arguments: bool,
     pub is_immutable: bool,
     pub is_readonly: bool,

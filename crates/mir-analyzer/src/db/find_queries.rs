@@ -680,6 +680,7 @@ pub fn find_method_in_class<'db>(
                 taint_sink_params: vec![],
                 if_this_is: None,
                 is_inherit_doc: false,
+                is_mutation_free: false,
             }));
         }
         if is_backed && (lower == "from" || lower == "tryfrom") {
@@ -735,6 +736,7 @@ pub fn find_method_in_class<'db>(
                 taint_sink_params: vec![],
                 if_this_is: None,
                 is_inherit_doc: false,
+                is_mutation_free: false,
             }));
         }
     }

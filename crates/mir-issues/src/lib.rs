@@ -1547,7 +1547,7 @@ impl IssueKind {
                 format!("Calling impure function {fn_name}() in a @pure function")
             }
             IssueKind::ImmutablePropertyModification { property } => {
-                format!("Assigning to property {property} of $this in a @psalm-immutable class")
+                format!("Assigning to property {property} of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)")
             }
 
             IssueKind::UnimplementedAbstractMethod { class, method } => {

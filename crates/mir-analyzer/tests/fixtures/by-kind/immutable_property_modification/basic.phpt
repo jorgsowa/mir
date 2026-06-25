@@ -16,4 +16,4 @@ class Point {
     }
 }
 ===expect===
-ImmutablePropertyModification@11:8-11:22: Assigning to property x of $this in a @psalm-immutable class
+ImmutablePropertyModification@11:8-11:22: Assigning to property x of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
