@@ -635,3 +635,44 @@ fn key_of_unresolvable_falls_back_to_mixed() {
     let u = parse_type_string("key-of<\\SplStack>");
     assert!(u.is_mixed());
 }
+
+// ---------------------------------------------------------------------------
+// parse_param_line: first-match / depth-tracking
+// ---------------------------------------------------------------------------
+
+#[test]
+fn parse_param_line_description_with_dollar_var_ignored() {
+    // Description text that contains a $var reference must not bleed into
+    // the type or replace the param name with the var from the description.
+    let doc = "/** @param bool $flag Whether the $option should be enabled */";
+    let parsed = DocblockParser::parse(doc);
+    assert_eq!(parsed.params.len(), 1, "should register exactly one param");
+    let (name, ty) = &parsed.params[0];
+    assert_eq!(name, "flag", "param name must be 'flag', not 'option'");
+    assert!(
+        ty.contains(|t| matches!(t, Atomic::TBool)),
+        "param type must be bool, got {ty}"
+    );
+}
+
+#[test]
+fn parse_param_line_callable_dollar_inside_parens_not_the_name() {
+    // $a inside callable(int $a) is at depth > 0 and must not be chosen as
+    // the parameter name; $callback at depth 0 is the correct match.
+    let doc = "/** @param callable(int $a): void $callback The callback to invoke */";
+    let parsed = DocblockParser::parse(doc);
+    assert_eq!(parsed.params.len(), 1);
+    let (name, _ty) = &parsed.params[0];
+    assert_eq!(name, "callback", "param name must be 'callback', not 'a'");
+}
+
+#[test]
+fn parse_param_line_byref_param_name_correct() {
+    // &$out — the leading & must be stripped; the param name is 'out'.
+    let doc = "/** @param string &$out The output buffer */";
+    let parsed = DocblockParser::parse(doc);
+    assert_eq!(parsed.params.len(), 1);
+    let (name, ty) = &parsed.params[0];
+    assert_eq!(name, "out");
+    assert!(ty.contains(|t| matches!(t, Atomic::TString)));
+}

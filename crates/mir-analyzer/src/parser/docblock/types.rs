@@ -696,37 +696,39 @@ pub(super) fn parse_import_type(body: &str) -> Option<DocImportType> {
 
 pub(super) fn parse_param_line(s: &str) -> Option<(String, String)> {
     // Formats: `Type $name`, `Type $name description`, or `Type &$name ...` (byref)
-    // Types can contain spaces (e.g., `array<string, int>`), so we need to find the variable name.
-    // The variable name is the `$identifier` that comes after whitespace (not part of type syntax).
-    //
-    // Only examine the first line to avoid matching `$var` references in multi-line descriptions.
+    // Types can contain $-named params inside callable syntax (`callable(int $a): void`),
+    // so we track bracket depth and return the FIRST `$identifier` found at depth 0.
+    // Using first-match (not last) prevents description text that contains $var references
+    // from being mistaken for the parameter name.
     let first_line = s.lines().next().unwrap_or(s);
-
-    // Strategy: find the last sequence of whitespace followed by `$identifier` or `&$identifier`
-    // on the first line. This handles both simple types and types with generics/spaces.
-    let mut best_split: Option<(String, String)> = None;
+    let mut depth: i32 = 0;
 
     for (i, ch) in first_line.char_indices() {
-        if ch.is_whitespace() {
-            let after = first_line[i..].trim_start();
-            // Accept `$name` or `&$name` (by-reference params in PHPDoc)
-            let after_stripped = after.strip_prefix('&').unwrap_or(after);
-            if after_stripped.starts_with('$') {
-                let mut var_parts = after_stripped.split(char::is_whitespace);
-                if let Some(name_with_dollar) = var_parts.next() {
-                    let name = name_with_dollar.trim_start_matches('$').to_string();
-                    if !name.is_empty() {
-                        let type_part = first_line[..i].trim().to_string();
-                        if !type_part.is_empty() {
-                            best_split = Some((type_part, name));
+        match ch {
+            '<' | '(' | '{' => depth += 1,
+            '>' | ')' | '}' => depth = (depth - 1).max(0),
+            _ if ch.is_whitespace() && depth == 0 => {
+                let after = first_line[i..].trim_start();
+                // Accept `$name` or `&$name` (by-reference params in PHPDoc)
+                let after_stripped = after.strip_prefix('&').unwrap_or(after);
+                if after_stripped.starts_with('$') {
+                    if let Some(name_with_dollar) = after_stripped.split(char::is_whitespace).next()
+                    {
+                        let name = name_with_dollar.trim_start_matches('$').to_string();
+                        if !name.is_empty() {
+                            let type_part = first_line[..i].trim().to_string();
+                            if !type_part.is_empty() {
+                                return Some((type_part, name));
+                            }
                         }
                     }
                 }
             }
+            _ => {}
         }
     }
 
-    best_split
+    None
 }
 
 pub(super) fn extract_return_type(s: &str) -> String {
