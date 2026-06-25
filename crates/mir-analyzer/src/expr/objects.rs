@@ -375,13 +375,19 @@ impl<'a> ExpressionAnalyzer<'a> {
             extract_string_from_expr(&pa.property).unwrap_or_else(|| "<dynamic>".to_string());
 
         if obj_ty.is_mixed() {
-            self.emit(
-                IssueKind::MixedPropertyFetch {
-                    property: prop_name.clone(),
-                },
-                Severity::Info,
-                expr_span,
-            );
+            let is_only_template_params = obj_ty
+                .types
+                .iter()
+                .all(|t| matches!(t, Atomic::TTemplateParam { .. }));
+            if !is_only_template_params {
+                self.emit(
+                    IssueKind::MixedPropertyFetch {
+                        property: prop_name.clone(),
+                    },
+                    Severity::Info,
+                    expr_span,
+                );
+            }
             return Type::mixed();
         }
 
