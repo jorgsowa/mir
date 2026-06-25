@@ -4,7 +4,8 @@ use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{atomic::Atomic, Type};
-use php_ast::owned::{ExprKind, MatchArm, MatchExpr, NullCoalesceExpr, TernaryExpr};
+use php_ast::ast::UnaryPrefixOp;
+use php_ast::owned::{Expr, ExprKind, MatchArm, MatchExpr, NullCoalesceExpr, TernaryExpr};
 
 impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_ternary(&mut self, t: &TernaryExpr, ctx: &mut FlowState) -> Type {
@@ -270,6 +271,44 @@ impl<'a> ExpressionAnalyzer<'a> {
             return None;
         }
 
+        // Case 1b: Subject is a finite union of integer literals.
+        let int_atoms: Vec<i64> = subject_ty
+            .types
+            .iter()
+            .filter_map(|a| {
+                if let Atomic::TLiteralInt(n) = a {
+                    Some(*n)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        if !int_atoms.is_empty() && int_atoms.len() == subject_ty.types.len() {
+            let covered: rustc_hash::FxHashSet<i64> = arms
+                .iter()
+                .filter_map(|a| a.conditions.as_deref())
+                .flatten()
+                .filter_map(extract_literal_int)
+                .collect();
+
+            let mut uncovered: Vec<i64> = int_atoms
+                .iter()
+                .filter(|n| !covered.contains(*n))
+                .copied()
+                .collect();
+            uncovered.sort_unstable();
+
+            if !uncovered.is_empty() {
+                let cases = uncovered
+                    .iter()
+                    .map(|n| n.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                return Some(cases);
+            }
+            return None;
+        }
+
         // Case 2: Subject is a single named object (or self/static) that is a pure
         // (non-backed) enum. Extract the FQCN from TNamedObject, TSelf, or TStaticObject.
         let enum_fqcn_opt: Option<String> = if subject_ty.types.len() == 1 {
@@ -352,6 +391,23 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
 
         None
+    }
+}
+
+/// Extract a literal integer value from a match-arm condition expression.
+/// PHP parses `-1` as `UnaryPrefix(Negate, Int(1))`, not `Int(-1)`.
+fn extract_literal_int(expr: &Expr) -> Option<i64> {
+    match &expr.kind {
+        ExprKind::Int(n) => Some(*n),
+        ExprKind::UnaryPrefix(u) if u.op == UnaryPrefixOp::Negate => {
+            if let ExprKind::Int(n) = &u.operand.kind {
+                n.checked_neg()
+            } else {
+                None
+            }
+        }
+        ExprKind::Parenthesized(inner) => extract_literal_int(inner),
+        _ => None,
     }
 }
 
