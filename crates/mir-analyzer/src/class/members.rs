@@ -189,6 +189,99 @@ impl<'a> ClassAnalyzer<'a> {
     }
 
     // -----------------------------------------------------------------------
+    // Check: enum interface methods implemented
+    // -----------------------------------------------------------------------
+
+    /// Built-in PHP enum interfaces fulfilled implicitly by the runtime.
+    /// Their methods (cases, from, tryFrom) are synthesized and must not be
+    /// required from user-defined enum own_methods.
+    fn is_builtin_enum_interface(fqcn: &str) -> bool {
+        let bare = fqcn.to_lowercase();
+        let bare = bare.trim_start_matches('\\');
+        matches!(
+            bare,
+            "unitenum" | "backedenum" | "intbackedenum" | "stringbackedenum"
+        )
+    }
+
+    /// Enums cannot extend parent classes, so the only concrete implementations
+    /// come from `own_methods` (trait usage is not modeled yet). Walk all
+    /// transitively required interfaces — skipping built-in PHP enum contracts —
+    /// and emit `UnimplementedInterfaceMethod` for each missing method.
+    pub(super) fn check_enum_interface_methods_implemented(
+        &self,
+        enum_fqcn: &Arc<str>,
+        cls_location: Option<&Location>,
+        issues: &mut Vec<Issue>,
+    ) {
+        let here = crate::db::Fqcn::from_str(self.db, enum_fqcn.as_ref());
+
+        // `class_ancestors_by_fqcn` starts from the enum itself and DFS-walks
+        // its interface chain (via `ancestor_fqcns` which returns `e.interfaces`
+        // for enums). Filter to user-defined interfaces only.
+        let iface_fqcns: Vec<Arc<str>> = crate::db::class_ancestors_by_fqcn(self.db, here)
+            .iter()
+            .filter(|f| {
+                !Self::is_builtin_enum_interface(f.as_ref())
+                    && crate::db::class_kind(self.db, f.as_ref()).is_some_and(|k| k.is_interface)
+            })
+            .cloned()
+            .collect();
+
+        if iface_fqcns.is_empty() {
+            return;
+        }
+
+        // Look up the enum's own methods once.
+        let Some(enum_class) = crate::db::find_class_like(self.db, here) else {
+            return;
+        };
+        let own = enum_class.own_methods();
+
+        for iface_fqcn in &iface_fqcns {
+            let iface_here = crate::db::Fqcn::from_str(self.db, iface_fqcn.as_ref());
+            let method_names: Vec<Arc<str>> = match crate::db::find_class_like(self.db, iface_here)
+            {
+                Some(c) => c
+                    .own_methods()
+                    .iter()
+                    .filter(|(_, m)| !m.is_virtual)
+                    .map(|(_, m)| m.name.clone())
+                    .collect(),
+                None => continue,
+            };
+
+            for method_name in method_names {
+                let lower = crate::util::php_ident_lowercase(&method_name);
+                // Enum trait usage is not modeled yet, so only own_methods can
+                // satisfy an interface requirement. This is conservative: if an
+                // enum uses a trait to implement the method, mir may report a
+                // false positive until trait support is added.
+                let implemented = own.get(lower.as_str()).is_some_and(|m| !m.is_abstract);
+
+                if !implemented {
+                    let loc = issue_location(
+                        cls_location,
+                        cls_location.and_then(|l| self.sources.get(&l.file).copied()),
+                    );
+                    let mut issue = Issue::new(
+                        IssueKind::UnimplementedInterfaceMethod {
+                            class: enum_fqcn.to_string(),
+                            interface: iface_fqcn.to_string(),
+                            method: method_name.to_string(),
+                        },
+                        loc,
+                    );
+                    if let Some(snippet) = extract_snippet(cls_location, &self.sources) {
+                        issue = issue.with_snippet(snippet);
+                    }
+                    issues.push(issue);
+                }
+            }
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // Check: override compatibility
     // -----------------------------------------------------------------------
 

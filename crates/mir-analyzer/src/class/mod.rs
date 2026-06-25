@@ -374,6 +374,13 @@ impl<'a> ClassAnalyzer<'a> {
                 }
             }
             self.check_magic_method_casing(&enum_fqcn, &mut issues);
+
+            // ---- Enum interface methods must be implemented --------------------
+            self.check_enum_interface_methods_implemented(
+                &enum_fqcn,
+                location.as_ref(),
+                &mut issues,
+            );
         }
 
         // ---- 5c. DeprecatedTrait: trait uses a deprecated trait ---------------
