@@ -1,5 +1,5 @@
 ===description===
-Implicit cast
+No ImplicitToStringCast when class defines __toString — PHP coerces implicitly, no warning needed
 ===config===
 suppress=UnusedParam
 ===file===
@@ -15,4 +15,3 @@ class A {
 function fooFoo(string $b): void {}
 fooFoo(new A());
 ===expect===
-ImplicitToStringCast@11:7-11:14: Class A is implicitly cast to string

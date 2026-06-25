@@ -14,14 +14,4 @@ try {
 } catch (\Throwable $e) {
     reportLike($e);
 }
-
-class HasToString {
-    public function __toString(): string { return 'x'; }
-}
-/**
- * @param string|int $val
- */
-function takesStringOrInt($val): void {}
-takesStringOrInt(new HasToString());
 ===expect===
-ImplicitToStringCast@20:17-20:34: Class HasToString is implicitly cast to string

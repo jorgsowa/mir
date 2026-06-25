@@ -1,5 +1,5 @@
 ===description===
-No ImplicitToStringCast when arg implements \Stringable — that interface signals intentional string use
+No ImplicitToStringCast when class implements \Stringable — and also no warning for __toString-only classes
 ===config===
 suppress=UnusedParam
 ===file===
@@ -15,10 +15,10 @@ function process(string $value): void {}
 
 process(new FluentString());
 
-// A class with __toString but NOT implementing \Stringable still warns
+// A class with __toString but NOT implementing \Stringable is also fine —
+// __toString is sufficient for PHP's coercive string conversion.
 class HasToString {
     public function __toString(): string { return 'x'; }
 }
 process(new HasToString());
 ===expect===
-ImplicitToStringCast@17:8-17:25: Class HasToString is implicitly cast to string

@@ -242,47 +242,6 @@ pub(crate) fn check_one(
             arg_span,
         );
     }
-
-    // When a named-object with __toString (but not the \Stringable interface) is passed where
-    // `string` is expected, emit ImplicitToStringCast. Check each named-object atomic separately:
-    // - Skip if it implements \Stringable — that interface signals the cast is intentional.
-    // - Skip if it directly fits a non-string arm of the param union — no coercion occurs
-    //   (e.g. Arrayable arg where param is Arrayable|string: Arrayable matches Arrayable arm, not string).
-    if !ea.strict_types && param_ty.types.iter().any(|p| matches!(p, Atomic::TString)) {
-        for a in &arg_ty.types {
-            let fqcn = match a {
-                Atomic::TNamedObject { fqcn, .. }
-                | Atomic::TSelf { fqcn }
-                | Atomic::TStaticObject { fqcn } => fqcn.to_string(),
-                _ => continue,
-            };
-            let resolved = crate::db::resolve_name(ea.db, &ea.file, &fqcn);
-            // Implements \Stringable interface — cast is intentional, no warning.
-            if crate::db::extends_or_implements(ea.db, &resolved, "Stringable")
-                || crate::db::extends_or_implements(ea.db, &fqcn, "Stringable")
-            {
-                continue;
-            }
-            // Only warn for objects that have __toString — without it, passing to `string`
-            // is an error (caught by InvalidArgument), not an implicit cast.
-            if !crate::db::has_method_in_chain(ea.db, &resolved, "__toString")
-                && !crate::db::has_method_in_chain(ea.db, fqcn.as_str(), "__toString")
-            {
-                continue;
-            }
-            // Skip if this specific type directly fits a non-string arm of the param —
-            // no coercion to string occurs when the arg matches another arm.
-            let single_arg = Type::single(a.clone());
-            if named_object_subtype(&single_arg, param_ty, ea) {
-                continue;
-            }
-            ea.emit(
-                IssueKind::ImplicitToStringCast { class: fqcn },
-                Severity::Warning,
-                arg_span,
-            );
-        }
-    }
 }
 
 // ---------------------------------------------------------------------------

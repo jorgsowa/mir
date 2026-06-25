@@ -1,5 +1,5 @@
 ===description===
-Implicit cast from interface
+No ImplicitToStringCast when passing a type that declares __toString via interface — __toString is sufficient
 ===config===
 suppress=MissingReturnType,UnusedParam
 ===file===
@@ -16,4 +16,3 @@ function takesI(I $i): void
     takesString($i);
 }
 ===expect===
-ImplicitToStringCast@11:16-11:18: Class I is implicitly cast to string

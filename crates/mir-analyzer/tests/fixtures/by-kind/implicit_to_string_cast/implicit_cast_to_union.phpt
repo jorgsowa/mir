@@ -1,5 +1,5 @@
 ===description===
-Implicit cast to union
+No ImplicitToStringCast when class defines __toString and param is a union containing string
 ===config===
 suppress=UnusedParam
 ===file===
@@ -18,4 +18,3 @@ class A {
 function fooFoo($b): void {}
 fooFoo(new A());
 ===expect===
-ImplicitToStringCast@14:7-14:14: Class A is implicitly cast to string
