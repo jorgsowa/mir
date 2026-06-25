@@ -11,4 +11,3 @@ foo(3.7);
 
 ===expect===
 ImplicitFloatToIntCast@6:4-6:7: Implicit cast from 3.7 to int truncates the fractional part
-InvalidArgument@6:4-6:7: Argument $n of foo() expects 'int', got '3.7'

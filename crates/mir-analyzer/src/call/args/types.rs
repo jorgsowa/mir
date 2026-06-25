@@ -127,10 +127,16 @@ pub(crate) fn check_one(
         }
     }
 
-    // Check for float → int implicit coercion
+    // Check for float → int implicit coercion.
+    // In non-strict mode PHP silently truncates (deprecated in 8.1+), so
+    // ImplicitFloatToIntCast (Warning) is the right diagnostic — InvalidArgument
+    // would be a false positive because PHP accepts the call.  Return early to
+    // suppress the InvalidArgument check below.
+    // In strict mode PHP throws TypeError; fall through to InvalidArgument.
     if arg_ty.contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..)))
         && param_ty.is_single()
         && param_ty.contains(|t| t.is_int())
+        && !ea.strict_types
     {
         ea.emit(
             IssueKind::ImplicitFloatToIntCast {
@@ -139,6 +145,7 @@ pub(crate) fn check_one(
             Severity::Warning,
             arg_span,
         );
+        return;
     }
 
     let arg_core = arg_ty.core_type();
