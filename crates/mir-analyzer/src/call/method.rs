@@ -204,15 +204,17 @@ impl CallAnalyzer {
         };
 
         // Flag explicit __construct() calls.
-        // Exception: $this->__construct() inside __wakeup/__clone is a documented
-        // PHP re-initialization pattern (e.g. after unserialization or cloning).
+        // Exception: $this->__construct() inside __wakeup/__clone/__unserialize is a
+        // documented PHP re-initialization pattern (e.g. after unserialization or cloning).
         if method_name.eq_ignore_ascii_case("__construct") {
             let receiver_is_this = matches!(
                 &call.object.kind,
                 ExprKind::Variable(n) if n.trim_start_matches('$') == "this"
             );
             let in_lifecycle_method = ctx.current_method_name.as_deref().is_some_and(|m| {
-                m.eq_ignore_ascii_case("__wakeup") || m.eq_ignore_ascii_case("__clone")
+                m.eq_ignore_ascii_case("__wakeup")
+                    || m.eq_ignore_ascii_case("__clone")
+                    || m.eq_ignore_ascii_case("__unserialize")
             });
             for atomic in &obj_ty.types {
                 if let mir_types::Atomic::TNamedObject { fqcn, .. } = atomic {
