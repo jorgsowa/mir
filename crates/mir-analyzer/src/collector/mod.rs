@@ -50,6 +50,7 @@ fn is_simple_scalar(u: &Type) -> bool {
         Atomic::TString
             | Atomic::TInt
             | Atomic::TFloat
+            | Atomic::TIntegralFloat
             | Atomic::TBool
             | Atomic::TMixed
             | Atomic::TNull

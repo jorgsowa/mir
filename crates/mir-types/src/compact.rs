@@ -33,7 +33,7 @@ impl SimpleType {
             match &u.types[0] {
                 Atomic::TString => return Self::String,
                 Atomic::TInt => return Self::Int,
-                Atomic::TFloat => return Self::Float,
+                Atomic::TFloat | Atomic::TIntegralFloat => return Self::Float,
                 Atomic::TBool => return Self::Bool,
                 Atomic::TMixed => return Self::Mixed,
                 Atomic::TNull => return Self::Null,

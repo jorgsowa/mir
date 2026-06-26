@@ -605,7 +605,7 @@ mod docblock_hint_compat {
             | Atomic::TPositiveInt
             | Atomic::TNegativeInt
             | Atomic::TNonNegativeInt => INT,
-            Atomic::TFloat | Atomic::TLiteralFloat(..) => FLOAT,
+            Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..) => FLOAT,
             Atomic::TString
             | Atomic::TLiteralString(_)
             | Atomic::TNonEmptyString
@@ -641,7 +641,7 @@ mod docblock_hint_compat {
     fn hint_mask(a: &Atomic) -> u32 {
         match a {
             Atomic::TMixed => ALL,
-            Atomic::TFloat => FLOAT | INT,
+            Atomic::TFloat | Atomic::TIntegralFloat => FLOAT | INT,
             Atomic::TCallable { .. } | Atomic::TCallableString => {
                 CALLABLE | STRING | ARRAY | OBJECT
             }

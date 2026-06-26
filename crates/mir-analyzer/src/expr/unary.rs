@@ -65,9 +65,12 @@ impl<'a> ExpressionAnalyzer<'a> {
             UnaryPrefixOp::PreIncrement | UnaryPrefixOp::PreDecrement => {
                 if let Some(var_name) = extract_simple_var(&u.operand) {
                     let ty = ctx.get_var(&var_name);
-                    let new_ty = if ty
-                        .contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..)))
-                    {
+                    let new_ty = if ty.contains(|t| {
+                        matches!(
+                            t,
+                            Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..)
+                        )
+                    }) {
                         Type::single(Atomic::TFloat)
                     } else {
                         let op = if u.op == UnaryPrefixOp::PreIncrement {
@@ -121,9 +124,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                     );
                 }
                 if let Some(var_name) = extract_simple_var(&u.operand) {
-                    let new_ty = if operand_ty
-                        .contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..)))
-                    {
+                    let new_ty = if operand_ty.contains(|t| {
+                        matches!(
+                            t,
+                            Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..)
+                        )
+                    }) {
                         Type::single(Atomic::TFloat)
                     } else {
                         let op = if u.op == UnaryPostfixOp::PostIncrement {
@@ -192,7 +198,7 @@ fn negate_type(ty: &Type) -> Type {
                     },
                 }
             }
-            Atomic::TFloat | Atomic::TLiteralFloat(..) => Atomic::TFloat,
+            Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..) => Atomic::TFloat,
             _ => {
                 // Non-numeric operands: fallback to int (PHP coerces to 0 then negates).
                 if ty.contains(|t| t.is_int()) {

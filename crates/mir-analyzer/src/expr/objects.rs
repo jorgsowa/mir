@@ -402,6 +402,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         | Atomic::TIntRange { .. }
                         | Atomic::TPositiveInt
                         | Atomic::TFloat
+                        | Atomic::TIntegralFloat
                         | Atomic::TLiteralFloat(_, _)
                         | Atomic::TString
                         | Atomic::TNonEmptyString

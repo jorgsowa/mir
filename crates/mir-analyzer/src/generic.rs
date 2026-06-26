@@ -290,6 +290,9 @@ fn atomics_match_for_filter(concrete: &Atomic, arg: &Atomic) -> bool {
             | (Atomic::TFalse, Atomic::TFalse)
             | (Atomic::TInt, Atomic::TInt)
             | (Atomic::TFloat, Atomic::TFloat)
+            | (Atomic::TIntegralFloat, Atomic::TIntegralFloat)
+            | (Atomic::TFloat, Atomic::TIntegralFloat)
+            | (Atomic::TIntegralFloat, Atomic::TFloat)
             | (Atomic::TString, Atomic::TString)
     )
 }

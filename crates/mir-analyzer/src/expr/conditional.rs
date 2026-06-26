@@ -423,6 +423,7 @@ fn is_scalar_union(ty: &Type) -> bool {
                 | Atomic::TInt
                 | Atomic::TLiteralInt(_)
                 | Atomic::TFloat
+                | Atomic::TIntegralFloat
                 | Atomic::TLiteralFloat(..)
                 | Atomic::TBool
                 | Atomic::TTrue

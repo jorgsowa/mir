@@ -111,6 +111,7 @@ fn atomic_can_equal(a: &Atomic, lit: &Lit) -> bool {
             | Atomic::TLiteralString(_)
             | Atomic::TClassString { .. }
             | Atomic::TFloat
+            | Atomic::TIntegralFloat
             | Atomic::TLiteralFloat(..)
             | Atomic::TBool
             | Atomic::TTrue
@@ -128,6 +129,7 @@ fn atomic_can_equal(a: &Atomic, lit: &Lit) -> bool {
             | Atomic::TNonNegativeInt
             | Atomic::TNegativeInt
             | Atomic::TFloat
+            | Atomic::TIntegralFloat
             | Atomic::TLiteralFloat(..)
             | Atomic::TBool
             | Atomic::TTrue
@@ -284,7 +286,7 @@ pub(crate) fn gettype_possible_values(ty: &Type) -> Option<Vec<&'static str>> {
             | Atomic::TPositiveInt
             | Atomic::TNonNegativeInt
             | Atomic::TNegativeInt => "integer",
-            Atomic::TFloat | Atomic::TLiteralFloat(..) => "double",
+            Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..) => "double",
             Atomic::TString
             | Atomic::TLiteralString(_)
             | Atomic::TNonEmptyString
@@ -332,7 +334,7 @@ fn atomic_family(a: &Atomic) -> Option<TypeFamily> {
         | Atomic::TNegativeInt
         | Atomic::TNonNegativeInt => TypeFamily::Int,
 
-        Atomic::TFloat | Atomic::TLiteralFloat(..) => TypeFamily::Float,
+        Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..) => TypeFamily::Float,
 
         Atomic::TString
         | Atomic::TLiteralString(_)
@@ -487,7 +489,10 @@ fn is_int_atomic(a: &Atomic) -> bool {
 }
 
 fn is_float_atomic(a: &Atomic) -> bool {
-    matches!(a, Atomic::TFloat | Atomic::TLiteralFloat(..))
+    matches!(
+        a,
+        Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..)
+    )
 }
 
 /// Whether `s` could be a PHP numeric string (conservative: returns `true` when unsure).

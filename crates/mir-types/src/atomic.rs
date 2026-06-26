@@ -125,6 +125,10 @@ pub enum Atomic {
 
     /// `float`
     TFloat,
+    /// `float` that is always integral (whole-number value, no fractional part).
+    /// Returned by `floor()`, `ceil()`, and zero-precision `round()`. Can be passed to `int`
+    /// parameters without `ImplicitFloatToIntCast` because the conversion is lossless.
+    TIntegralFloat,
     /// `3.14` — a specific float literal
     TLiteralFloat(i64, i64), // stored as (int_bits, frac_bits) to be PartialEq+Hash-friendly
     // We use ordered_float or just store as ordered pair for equality purposes.
@@ -306,6 +310,7 @@ impl Atomic {
                 | Atomic::TNegativeInt
                 | Atomic::TNonNegativeInt
                 | Atomic::TFloat
+                | Atomic::TIntegralFloat
                 | Atomic::TLiteralFloat(..)
                 | Atomic::TNumeric
                 | Atomic::TNumericString
@@ -389,6 +394,7 @@ impl Atomic {
                 | Atomic::TNegativeInt
                 | Atomic::TNonNegativeInt
                 | Atomic::TFloat
+                | Atomic::TIntegralFloat
                 | Atomic::TLiteralFloat(..)
                 | Atomic::TBool
                 | Atomic::TTrue
@@ -440,7 +446,7 @@ impl Atomic {
             Atomic::TPositiveInt => "positive-int",
             Atomic::TNegativeInt => "negative-int",
             Atomic::TNonNegativeInt => "non-negative-int",
-            Atomic::TFloat | Atomic::TLiteralFloat(..) => "float",
+            Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..) => "float",
             Atomic::TBool => "bool",
             Atomic::TTrue => "true",
             Atomic::TFalse => "false",
@@ -506,6 +512,7 @@ enum AtomicTag {
     TNegativeInt,
     TNonNegativeInt,
     TFloat,
+    TIntegralFloat,
     TLiteralFloat,
     TBool,
     TTrue,
@@ -551,6 +558,7 @@ impl Hash for Atomic {
             Atomic::TNegativeInt => (T::TNegativeInt as u8).hash(state),
             Atomic::TNonNegativeInt => (T::TNonNegativeInt as u8).hash(state),
             Atomic::TFloat => (T::TFloat as u8).hash(state),
+            Atomic::TIntegralFloat => (T::TIntegralFloat as u8).hash(state),
             Atomic::TBool => (T::TBool as u8).hash(state),
             Atomic::TTrue => (T::TTrue as u8).hash(state),
             Atomic::TFalse => (T::TFalse as u8).hash(state),

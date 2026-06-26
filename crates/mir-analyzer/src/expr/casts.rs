@@ -79,6 +79,7 @@ fn is_scalar_safe(t: &Atomic) -> bool {
         || matches!(
             t,
             Atomic::TFloat
+                | Atomic::TIntegralFloat
                 | Atomic::TLiteralFloat(..)
                 | Atomic::TBool
                 | Atomic::TTrue

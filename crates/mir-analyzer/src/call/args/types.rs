@@ -127,6 +127,17 @@ pub(crate) fn check_one(
         }
     }
 
+    // TIntegralFloat (floor/ceil/round result) is always a whole-valued float, so passing it to
+    // an int param is lossless — silently accept in non-strict mode with no diagnostic.
+    // In strict mode PHP still rejects it (TypeError), so fall through to InvalidArgument.
+    if arg_ty.contains(|t| matches!(t, Atomic::TIntegralFloat))
+        && param_ty.is_single()
+        && param_ty.contains(|t| t.is_int())
+        && !ea.strict_types
+    {
+        return;
+    }
+
     // Check for float → int implicit coercion.
     // In non-strict mode PHP silently truncates (deprecated in 8.1+), so
     // ImplicitFloatToIntCast (Warning) is the right diagnostic — InvalidArgument
@@ -323,6 +334,7 @@ fn scalar_coercion_ok(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -> 
                     | Atomic::TNegativeInt
                     | Atomic::TNonNegativeInt
                     | Atomic::TFloat
+                    | Atomic::TIntegralFloat
                     | Atomic::TLiteralFloat(..)
             )
         });

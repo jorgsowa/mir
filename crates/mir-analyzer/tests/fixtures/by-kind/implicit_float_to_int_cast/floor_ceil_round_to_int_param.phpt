@@ -1,26 +1,15 @@
 ===description===
-floor()/ceil()/round() return float. Passing their result to an int-typed parameter
-emits ImplicitFloatToIntCast (Warning) but never InvalidArgument in non-strict mode —
-PHP coerces the value silently.
-
-===config===
-php_version=8.1
-suppress=UnusedParam
+floor()/ceil()/round() return TIntegralFloat (always a whole-valued float), so passing
+their result to an int-typed parameter is lossless — no ImplicitFloatToIntCast fires.
+round() with an explicit precision of 0 is also covered.
 
 ===file===
 <?php
-function takes_int(int $n): void {}
+function takes_int(int $n): void { echo $n; }
 
-$a = floor(3.7);
-takes_int($a);
-
-$b = ceil(3.1);
-takes_int($b);
-
-$c = round(3.5);
-takes_int($c);
+takes_int(floor(3.7));
+takes_int(ceil(3.1));
+takes_int(round(3.5));
+takes_int(round(3.5, 0));
 
 ===expect===
-ImplicitFloatToIntCast@5:10-5:12: Implicit cast from float to int truncates the fractional part
-ImplicitFloatToIntCast@8:10-8:12: Implicit cast from float to int truncates the fractional part
-ImplicitFloatToIntCast@11:10-11:12: Implicit cast from float to int truncates the fractional part

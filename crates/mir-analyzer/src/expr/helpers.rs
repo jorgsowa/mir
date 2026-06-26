@@ -294,9 +294,18 @@ pub fn infer_arithmetic(left: &Type, right: &Type) -> Type {
         return merged_left;
     }
 
-    let left_is_float = left.contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..)));
-    let right_is_float =
-        right.contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..)));
+    let left_is_float = left.contains(|t| {
+        matches!(
+            t,
+            Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..)
+        )
+    });
+    let right_is_float = right.contains(|t| {
+        matches!(
+            t,
+            Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..)
+        )
+    });
     if left_is_float || right_is_float {
         Type::single(Atomic::TFloat)
     } else if left.contains(coerces_to_int_in_arithmetic)
@@ -317,9 +326,18 @@ pub fn infer_div(left: &Type, right: &Type) -> Type {
     if left.is_mixed() || right.is_mixed() {
         return Type::mixed();
     }
-    let left_is_float = left.contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..)));
-    let right_is_float =
-        right.contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..)));
+    let left_is_float = left.contains(|t| {
+        matches!(
+            t,
+            Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..)
+        )
+    });
+    let right_is_float = right.contains(|t| {
+        matches!(
+            t,
+            Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..)
+        )
+    });
     if left_is_float || right_is_float {
         return Type::single(Atomic::TFloat);
     }
@@ -352,7 +370,7 @@ pub fn is_non_empty_when_concat(ty: &Type) -> bool {
             | Atomic::TNonNegativeInt
             | Atomic::TIntRange { .. } => true,
             // Any float casts to a non-empty string ("0", "1.5", …)
-            Atomic::TFloat | Atomic::TLiteralFloat(..) => true,
+            Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..) => true,
             // true → "1"; false → "" so TBool and TFalse are excluded
             Atomic::TTrue => true,
             _ => false,

@@ -573,6 +573,20 @@ impl CallAnalyzer {
                 }
                 "strlen" | "mb_strlen" => super::callable::strlen_return_type(&arg_types),
                 "abs" => super::callable::abs_return_type(&arg_types).unwrap_or(return_ty),
+                // floor() and ceil() always return a whole-valued float — represent as
+                // TIntegralFloat so passing the result to an int param doesn't emit a FP.
+                "floor" | "ceil" => Type::single(Atomic::TIntegralFloat),
+                // round() without a precision arg (or with precision=0) is also always integral.
+                "round" => {
+                    let precision_is_integral = arg_types
+                        .get(1)
+                        .is_none_or(|t| t.types.len() == 1 && t.types[0] == Atomic::TLiteralInt(0));
+                    if precision_is_integral {
+                        Type::single(Atomic::TIntegralFloat)
+                    } else {
+                        return_ty
+                    }
+                }
                 "intdiv" => super::callable::intdiv_return_type(&arg_types).unwrap_or(return_ty),
                 "min" => super::callable::min_return_type(&arg_types).unwrap_or(return_ty),
                 "max" => super::callable::max_return_type(&arg_types).unwrap_or(return_ty),

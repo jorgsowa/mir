@@ -33,8 +33,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             let array_key = if let Some(key_expr) = &elem.key {
                 is_list = false;
                 let key_ty = self.analyze(key_expr, ctx);
-                // Float keys are silently truncated to int in PHP
-                if key_ty.contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..))) {
+                // Float keys are silently truncated to int in PHP; TIntegralFloat is always
+                // whole-valued so the truncation is lossless — suppress the warning for it.
+                if key_ty.contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..)))
+                    && !key_ty.contains(|t| matches!(t, Atomic::TIntegralFloat))
+                {
                     self.emit(
                         IssueKind::ImplicitFloatToIntCast {
                             from: key_ty.to_string(),
@@ -88,8 +91,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                 all_value_types.merge_with(&value_ty);
                 if let Some(key_expr) = &elem.key {
                     let key_ty = self.analyze(key_expr, ctx);
-                    // Float keys are silently truncated to int in PHP
+                    // Float keys are silently truncated to int in PHP; TIntegralFloat is
+                    // always whole-valued so the truncation is lossless — no warning.
                     if key_ty.contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..)))
+                        && !key_ty.contains(|t| matches!(t, Atomic::TIntegralFloat))
                     {
                         self.emit(
                             IssueKind::ImplicitFloatToIntCast {
@@ -182,6 +187,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         | Atomic::TIntRange { .. }
                         | Atomic::TPositiveInt
                         | Atomic::TFloat
+                        | Atomic::TIntegralFloat
                         | Atomic::TLiteralFloat(_, _)
                         | Atomic::TBool
                         | Atomic::TTrue

@@ -1562,6 +1562,7 @@ fn narrow_from_type_fn(ctx: &mut FlowState, fn_name: &str, var_name: &str, is_tr
                         && !matches!(
                             t,
                             Atomic::TFloat
+                                | Atomic::TIntegralFloat
                                 | Atomic::TLiteralFloat(..)
                                 | Atomic::TBool
                                 | Atomic::TTrue
@@ -1611,6 +1612,7 @@ fn narrow_from_type_fn(ctx: &mut FlowState, fn_name: &str, var_name: &str, is_tr
                         | Atomic::TNegativeInt
                         | Atomic::TLiteralInt(_)
                         | Atomic::TFloat
+                        | Atomic::TIntegralFloat
                         | Atomic::TLiteralFloat(..)
                         | Atomic::TNumeric
                         | Atomic::TNumericString => {
@@ -1641,6 +1643,7 @@ fn narrow_from_type_fn(ctx: &mut FlowState, fn_name: &str, var_name: &str, is_tr
                             | Atomic::TNonNegativeInt
                             | Atomic::TNegativeInt
                             | Atomic::TFloat
+                            | Atomic::TIntegralFloat
                             | Atomic::TNumeric
                             | Atomic::TNumericString
                             | Atomic::TLiteralInt(_)

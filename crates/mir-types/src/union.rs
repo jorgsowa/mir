@@ -526,6 +526,7 @@ impl Type {
             matches!(
                 t,
                 Atomic::TFloat
+                    | Atomic::TIntegralFloat
                     | Atomic::TLiteralFloat(..)
                     | Atomic::TMixed
                     | Atomic::TScalar
@@ -655,6 +656,7 @@ impl Type {
                 || matches!(
                     t,
                     Atomic::TFloat
+                        | Atomic::TIntegralFloat
                         | Atomic::TLiteralFloat(..)
                         | Atomic::TBool
                         | Atomic::TTrue
@@ -1323,10 +1325,12 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
 
         (Atomic::TInt, Atomic::TNumeric) => true,
         (Atomic::TFloat, Atomic::TNumeric) => true,
+        (Atomic::TIntegralFloat, Atomic::TNumeric) => true,
         (Atomic::TNumericString, Atomic::TNumeric) => true,
 
         (Atomic::TInt, Atomic::TScalar) => true,
         (Atomic::TFloat, Atomic::TScalar) => true,
+        (Atomic::TIntegralFloat, Atomic::TScalar) => true,
         (Atomic::TString, Atomic::TScalar) => true,
         (Atomic::TBool, Atomic::TScalar) => true,
         (Atomic::TNumeric, Atomic::TScalar) => true,
@@ -1359,6 +1363,9 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
             sub_fqcn == sup_fqcn
                 && (sup_params.is_empty() || type_params_compatible(sub_params, sup_params))
         }
+
+        // TIntegralFloat is a subtype of float (all integral floats are floats)
+        (Atomic::TIntegralFloat, Atomic::TFloat) => true,
 
         // Literal int widens to float in PHP
         (Atomic::TLiteralInt(_), Atomic::TFloat) => true,

@@ -121,6 +121,7 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
                     | Atomic::TIntRange { .. },
                     Atomic::TFloat,
                 ) => true,
+                (Atomic::TIntegralFloat, Atomic::TFloat) => true,
                 _ => false,
             }
         })
