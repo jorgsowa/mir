@@ -117,7 +117,7 @@ impl Config {
 
 fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
     use quick_xml::events::Event;
-    use quick_xml::Reader;
+    use quick_xml::{Reader, XmlVersion};
 
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(true);
@@ -200,7 +200,7 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
 
             Ok(Event::Text(t)) => {
                 text_buf = t
-                    .xml_content()
+                    .xml_content(XmlVersion::Implicit1_0)
                     .map_err(|e| ConfigError::Parse(e.to_string()))?
                     .to_string();
             }
@@ -379,7 +379,7 @@ fn xml_escape_attr(s: &str) -> String {
 
 fn parse_baseline_xml(xml: &str) -> Result<Baseline, ConfigError> {
     use quick_xml::events::Event;
-    use quick_xml::Reader;
+    use quick_xml::{Reader, XmlVersion};
 
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(true);
@@ -430,7 +430,7 @@ fn parse_baseline_xml(xml: &str) -> Result<Baseline, ConfigError> {
             }
             Ok(Event::Text(t)) => {
                 let s = t
-                    .xml_content()
+                    .xml_content(XmlVersion::Implicit1_0)
                     .map_err(|e| ConfigError::Parse(e.to_string()))?;
                 let trimmed = s.trim().to_string();
                 if !trimmed.is_empty() {

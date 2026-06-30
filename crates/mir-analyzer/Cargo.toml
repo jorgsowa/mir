@@ -26,7 +26,7 @@ rustc-hash    = { workspace = true }
 serde         = { workspace = true }
 serde_json    = { workspace = true }
 bincode       = { workspace = true }
-quick-xml     = "0.40"
+quick-xml     = "0.41"
 salsa         = { workspace = true }
 
 [build-dependencies]
