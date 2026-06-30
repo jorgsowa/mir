@@ -251,6 +251,7 @@ export default defineConfig({
               ],
             },
             { label: 'Docblock Annotations', link: '/reference/docblock/' },
+            { label: 'Suppressions', link: '/reference/suppressions/' },
             { label: 'Architecture', link: '/reference/architecture/' },
           ],
         },
