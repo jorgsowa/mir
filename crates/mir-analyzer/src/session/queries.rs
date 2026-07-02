@@ -253,6 +253,23 @@ impl AnalysisSession {
         symbol: &crate::Name,
         files: &[Arc<str>],
     ) -> Vec<(Arc<str>, crate::Range)> {
+        self.references_to_in_files_cancellable(symbol, files, &|| false)
+            .unwrap_or_default()
+    }
+
+    /// Cancellable variant of [`Self::references_to_in_files`].
+    ///
+    /// `should_cancel` is polled at Phase-1 file boundaries and between
+    /// Phase-2 retry attempts; when it returns `true` the query aborts with
+    /// `None`. Without it a sustained write stream (rapid edits, background
+    /// indexing) keeps cancelling Phase 2's snapshot reads and the retry loop
+    /// spins with no way for the caller to abandon the now-stale request.
+    pub fn references_to_in_files_cancellable(
+        &self,
+        symbol: &crate::Name,
+        files: &[Arc<str>],
+        should_cancel: &(dyn Fn() -> bool + Sync),
+    ) -> Option<Vec<(Arc<str>, crate::Range)>> {
         use crate::db::MirDatabase;
         use rayon::prelude::*;
         use std::panic::AssertUnwindSafe;
@@ -267,15 +284,28 @@ impl AnalysisSession {
         // before warming up. Runs ONCE, outside the retry loop: re-running its
         // writes per retry would amplify cancellation (each write cancels
         // sibling readers). Mirrors `reanalyze_dependents`.
+        //
+        // Files already warmed against their current text skip the parse +
+        // AST walk entirely (`prepared_files`), so a warm repeat query pays
+        // one map lookup per candidate instead of a serial parse sweep.
         for path in files {
-            let parsed = {
+            if should_cancel() {
+                return None;
+            }
+            let generation = self.prepare_generation_snapshot();
+            let (parsed, text) = {
                 let db = self.snapshot_db();
                 let Some(sf) = db.lookup_source_file(path.as_ref()) else {
                     continue;
                 };
-                crate::db::parse_file(&db as &dyn MirDatabase, sf).0
+                let text = sf.text(&db as &dyn MirDatabase);
+                if self.is_prepared_for_analysis(path.as_ref(), &text, generation) {
+                    continue;
+                }
+                (crate::db::parse_file(&db as &dyn MirDatabase, sf).0, text)
             };
             self.prepare_ast_for_analysis(&parsed.program, path.as_ref());
+            self.mark_prepared_for_analysis(path, text, generation);
         }
 
         // Phase 2 (parallel, pure) under a `salsa::Cancelled` retry loop: every
@@ -318,7 +348,12 @@ impl AnalysisSession {
                     .collect::<Vec<_>>()
             }));
             if let Ok(refs) = attempt {
-                return refs;
+                return Some(refs);
+            }
+            // A write landed mid-read. Before retrying, let the caller decide
+            // whether the request is still worth answering.
+            if should_cancel() {
+                return None;
             }
         }
     }

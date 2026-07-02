@@ -139,6 +139,11 @@ impl AnalysisSession {
         // can still produce edges to files referencing the now-gone symbols.
         let deleted: Vec<Arc<str>> = old_symbols.difference(&new_symbols).cloned().collect();
         let re_added: Vec<Arc<str>> = new_symbols.difference(&old_symbols).cloned().collect();
+        if !deleted.is_empty() {
+            // A deleted symbol may unshadow a lazy-loadable one (e.g. a vendor
+            // class with the same FQCN); prepared files must re-run warm-up.
+            self.bump_prepare_generation();
+        }
         if !deleted.is_empty() || !re_added.is_empty() {
             let mut stale = self.stale_defined_symbols.write();
             let entry = stale.entry(file.as_ref().to_string()).or_default();
@@ -456,6 +461,10 @@ impl AnalysisSession {
         // Clear stale symbol tracking for this file — it's fully gone.
         self.stale_defined_symbols.write().remove(file);
         self.last_ingested_symbols.write().remove(file);
+        // Declarations this file provided are gone; other prepared files may
+        // now need their warm-up re-run to lazy-load replacements.
+        self.forget_prepared(file);
+        self.bump_prepare_generation();
         if let Some(cache) = &self.cache {
             cache.update_reverse_deps_for_file(file, &HashSet::default());
             cache.evict_with_dependents(&[file.to_string()]);

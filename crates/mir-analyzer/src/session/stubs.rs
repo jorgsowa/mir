@@ -183,6 +183,60 @@ impl AnalysisSession {
         self.priority_index_for_ast(program, file);
     }
 
+    /// Current warm-up generation; capture before a prepare + mark pair so a
+    /// concurrent [`Self::bump_prepare_generation`] invalidates the mark.
+    pub(crate) fn prepare_generation_snapshot(&self) -> u64 {
+        self.prepare_generation
+            .load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    /// Whether `file`'s warm-up already ran against `current_text` in
+    /// `generation`. See the `prepared_files` field docs for the invalidation
+    /// rules.
+    pub(crate) fn is_prepared_for_analysis(
+        &self,
+        file: &str,
+        current_text: &std::sync::Arc<str>,
+        generation: u64,
+    ) -> bool {
+        self.prepared_files
+            .read()
+            .get(file)
+            .is_some_and(|(text, prepared_gen)| {
+                *prepared_gen == generation && std::sync::Arc::ptr_eq(text, current_text)
+            })
+    }
+
+    /// Record that `file`'s warm-up ran against `text`. `generation` must be
+    /// the [`Self::prepare_generation_snapshot`] taken *before* the warm-up —
+    /// a bump in between leaves the entry stale, which is the safe direction.
+    pub(crate) fn mark_prepared_for_analysis(
+        &self,
+        file: &std::sync::Arc<str>,
+        text: std::sync::Arc<str>,
+        generation: u64,
+    ) {
+        self.prepared_files
+            .write()
+            .insert(file.clone(), (text, generation));
+    }
+
+    /// Drop `file`'s warm-up skip entry (its loaded state is being removed).
+    pub(crate) fn forget_prepared(&self, file: &str) {
+        self.prepared_files.write().remove(file);
+    }
+
+    /// Invalidate every warm-up skip entry. Call when previously loaded
+    /// declarations may have been removed outside [`Self::ingest_file`] /
+    /// [`Self::invalidate_file`] — e.g. a host that writes file text straight
+    /// into the salsa layer and detects a declaration-level change. A prepared
+    /// file might then need its warm-up re-run to lazy-load a replacement
+    /// (a vendor class shadowed by a since-deleted project class).
+    pub fn bump_prepare_generation(&self) {
+        self.prepare_generation
+            .fetch_add(1, std::sync::atomic::Ordering::Release);
+    }
+
     /// Priority-index the classes directly referenced by `file`'s AST.
     ///
     /// In the eager-static-input model the background indexer

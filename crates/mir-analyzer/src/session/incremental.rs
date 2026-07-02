@@ -83,14 +83,26 @@ impl AnalysisSession {
             if cancel.is_cancelled() {
                 return Vec::new();
             }
-            let parsed = {
+            // Same warm-up skip as `references_to_in_files`: a dependent
+            // already prepared against its current text can't discover new
+            // lazy-load targets — skip the parse + AST walk.
+            let generation = self.prepare_generation_snapshot();
+            let (parsed, text) = {
                 let db = self.snapshot_db();
                 let Some(sf) = db.lookup_source_file(file.as_ref()) else {
                     continue;
                 };
-                crate::db::parse_file(&db as &dyn crate::db::MirDatabase, sf).0
+                let text = sf.text(&db as &dyn crate::db::MirDatabase);
+                if self.is_prepared_for_analysis(file.as_ref(), &text, generation) {
+                    continue;
+                }
+                (
+                    crate::db::parse_file(&db as &dyn crate::db::MirDatabase, sf).0,
+                    text,
+                )
             };
             self.prepare_ast_for_analysis(&parsed.program, file.as_ref());
+            self.mark_prepared_for_analysis(file, text, generation);
         }
 
         // Phase 2b: drive each dependent through the `analyze_file` tracked

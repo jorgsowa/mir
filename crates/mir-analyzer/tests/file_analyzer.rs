@@ -996,3 +996,83 @@ fn vendor_autoload_files_functions_lazy_loaded_automatically() {
         result.issues
     );
 }
+
+/// Cancellable references: a pre-cancelled request aborts with `None` before
+/// doing any warm-up or analysis work.
+#[test]
+fn references_to_in_files_cancellable_aborts_when_cancelled() {
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let file: Arc<str> = Arc::from("/proj/cancel_refs.php");
+    let src = "<?php
+function helper(): string { return 'a'; }
+function caller(): string { return helper(); }
+";
+    session.ingest_file(file.clone(), Arc::from(src));
+
+    let refs = session.references_to_in_files_cancellable(
+        &mir_analyzer::Name::function("helper"),
+        std::slice::from_ref(&file),
+        &|| true,
+    );
+    assert!(refs.is_none(), "cancelled request must return None");
+}
+
+/// The cancellable variant with a never-cancelling closure matches the plain
+/// `references_to_in_files`, and repeated queries (now served through the
+/// warm-up skip set) keep returning the same locations.
+#[test]
+fn references_to_in_files_warm_repeat_is_stable() {
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let file: Arc<str> = Arc::from("/proj/warm_refs.php");
+    let src = "<?php
+function helper(): string { return 'a'; }
+function caller(): string { return helper(); }
+";
+    session.ingest_file(file.clone(), Arc::from(src));
+
+    let name = mir_analyzer::Name::function("helper");
+    let first = session.references_to_in_files(&name, std::slice::from_ref(&file));
+    assert!(
+        !first.is_empty(),
+        "helper() must have a recorded reference; got none"
+    );
+
+    let cancellable = session
+        .references_to_in_files_cancellable(&name, std::slice::from_ref(&file), &|| false)
+        .expect("uncancelled request must return Some");
+    assert_eq!(first, cancellable);
+
+    // Second call takes the prepared-files skip path; results must not change.
+    let second = session.references_to_in_files(&name, std::slice::from_ref(&file));
+    assert_eq!(first, second);
+}
+
+/// Editing a file invalidates its warm-up skip entry: references added by the
+/// new text are found by the next query.
+#[test]
+fn references_to_in_files_sees_new_refs_after_edit() {
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let file: Arc<str> = Arc::from("/proj/edit_refs.php");
+    let v1 = "<?php
+function helper(): string { return 'a'; }
+function caller(): string { return helper(); }
+";
+    session.ingest_file(file.clone(), Arc::from(v1));
+
+    let name = mir_analyzer::Name::function("helper");
+    let refs_v1 = session.references_to_in_files(&name, std::slice::from_ref(&file));
+
+    let v2 = "<?php
+function helper(): string { return 'a'; }
+function caller(): string { return helper(); }
+function caller2(): string { return helper(); }
+";
+    session.ingest_file(file.clone(), Arc::from(v2));
+
+    let refs_v2 = session.references_to_in_files(&name, std::slice::from_ref(&file));
+    assert!(
+        refs_v2.len() > refs_v1.len(),
+        "after adding a call site the query must find more references \
+         (v1: {refs_v1:?}, v2: {refs_v2:?})"
+    );
+}

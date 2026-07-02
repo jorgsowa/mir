@@ -84,11 +84,29 @@ pub struct AnalysisSession {
     /// block until indexing is complete rather than proceeding with a stale
     /// workspace snapshot.
     pub(crate) pending_eager_function_files: Arc<parking_lot::Mutex<Option<Vec<PathBuf>>>>,
+    /// Warm-up skip set: files whose [`Self::prepare_ast_for_analysis`] has
+    /// already run against their current text. Value is `(text, generation)` —
+    /// the entry is live while the file's input text is pointer-equal to `text`
+    /// (a text edit self-invalidates) and `generation` matches
+    /// [`Self::prepare_generation`]. Lets the per-request Phase-1 warm-up in
+    /// `references_to_in_files` / `reanalyze_dependents` skip the serial
+    /// parse + AST walk for files already faulted in.
+    prepared_files: PreparedFilesCache,
+    /// Bumped whenever previously loaded declarations may have been removed
+    /// (`invalidate_file`, symbol deletions on `ingest_file`, or a host calling
+    /// [`Self::bump_prepare_generation`]) — a prepared file might then need its
+    /// warm-up re-run to lazy-load a replacement (e.g. a vendor class shadowed
+    /// by a since-deleted project class).
+    prepare_generation: Arc<std::sync::atomic::AtomicU64>,
 }
 
 /// FQCN → optional resolver-mapped path. See the field doc on
 /// `AnalysisSession::unresolvable_fqcns`.
 type UnresolvableCache = Arc<RwLock<HashMap<Arc<str>, Option<Arc<str>>>>>;
+
+/// Warm-up skip set keyed by file path. See the field doc on
+/// `AnalysisSession::prepared_files`.
+type PreparedFilesCache = Arc<RwLock<HashMap<Arc<str>, (Arc<str>, u64)>>>;
 
 /// Cap on the negative-resolution cache. Sized to accommodate a large
 /// workspace's worth of genuinely-missing references without unbounded
@@ -116,6 +134,8 @@ impl AnalysisSession {
             unresolvable_fqcns: Arc::new(RwLock::new(HashMap::default())),
             source_provider: Arc::new(crate::FsSourceProvider),
             pending_eager_function_files: Arc::new(parking_lot::Mutex::new(Some(Vec::new()))),
+            prepared_files: Arc::new(RwLock::new(HashMap::default())),
+            prepare_generation: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         }
     }
 
