@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.50.2] - 2026-07-02
+
+### Fixed
+
+- **Process abort (SIGABRT) under concurrent workspace indexing:** Fetching the workspace revision epoch (`index_generation`) and deriving a file's defined symbols during `ingest_file` ran salsa queries on the shared, non-snapshot database handle. Two threads doing so at once raced its single thread-local query stack, tripping a debug-assertion `unreachable_unchecked` that aborted the whole process (in release builds it would silently corrupt state). The revision epoch is now read from an off-salsa atomic mirror, and `ingest_file` derives its symbol set from the `FileDefinitions` it already computed — neither touches salsa on the shared handle.
+
 ## [0.50.1] - 2026-07-02
 
 ### Changed
