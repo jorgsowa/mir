@@ -60,8 +60,13 @@ impl AnalysisSession {
     }
 
     /// Run `f` with shared access to the canonical (non-snapshot) salsa db,
-    /// under the read lock. For host-owned read-only queries that must observe
-    /// the live db rather than a clone.
+    /// under the read lock. For host-owned reads of off-salsa state that must
+    /// observe the live db rather than a clone.
+    ///
+    /// `f` MUST NOT run salsa queries/input reads (tracked fns, `X.field(db)`):
+    /// the shared handle has one `ZalsaLocal` query stack, so doing so races any
+    /// concurrent salsa read on this handle and aborts the process. Use
+    /// [`Self::snapshot_db`] for salsa queries.
     ///
     /// **Internal API — exposes Salsa types.** Subject to change without notice.
     #[doc(hidden)]
@@ -122,15 +127,17 @@ impl AnalysisSession {
             let mut guard = self.db.salsa.write();
             guard.remove_file_definitions(file.as_ref());
         }
-        let _file_defs =
+        let file_defs =
             self.db
                 .collect_and_ingest_file(file.clone(), source.as_ref(), self.php_version);
 
-        // Snapshot symbols after ingesting — O(symbols_in_file).
-        let new_symbols: HashSet<Arc<str>> = {
-            let guard = self.db.salsa.read();
-            guard.file_defined_symbols(file.as_ref())
-        };
+        // Derive this file's defined symbols from the `FileDefinitions` just
+        // computed above — do NOT re-read them via a salsa query on the shared
+        // `.salsa.read()` handle. That query (`collect_file_definitions`) borrows
+        // the handle's single `ZalsaLocal` query stack, so two concurrent
+        // `ingest_file` calls doing it would race and abort the process under
+        // debug assertions. Reusing `file_defs` needs no db access at all.
+        let new_symbols: HashSet<Arc<str>> = file_defs.defined_symbols();
         self.last_ingested_symbols
             .write()
             .insert(file.as_ref().to_string(), new_symbols.clone());

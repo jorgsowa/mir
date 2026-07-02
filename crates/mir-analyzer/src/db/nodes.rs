@@ -23,6 +23,39 @@ pub struct FileDefinitions {
     pub issues: Arc<Vec<Issue>>,
 }
 
+impl FileDefinitions {
+    /// FQ names this file defines (classes, interfaces, traits, enums,
+    /// functions, constants, global vars). Lets callers that already hold a
+    /// `FileDefinitions` derive the symbol set without re-running the
+    /// `collect_file_definitions` salsa query.
+    pub(crate) fn defined_symbols(&self) -> rustc_hash::FxHashSet<Arc<str>> {
+        let mut out = rustc_hash::FxHashSet::default();
+        for c in self.slice.classes.iter() {
+            out.insert(c.fqcn.clone());
+        }
+        for i in self.slice.interfaces.iter() {
+            out.insert(i.fqcn.clone());
+        }
+        for t in self.slice.traits.iter() {
+            out.insert(t.fqcn.clone());
+        }
+        for e in self.slice.enums.iter() {
+            out.insert(e.fqcn.clone());
+        }
+        for f in self.slice.functions.iter() {
+            out.insert(f.fqn.clone());
+        }
+        for (name, _) in self.slice.constants.iter() {
+            out.insert(name.clone());
+        }
+        for (name, _) in self.slice.global_vars.iter() {
+            let gname: Arc<str> = Arc::from(name.strip_prefix('$').unwrap_or(name.as_ref()));
+            out.insert(gname);
+        }
+        out
+    }
+}
+
 impl PartialEq for FileDefinitions {
     fn eq(&self, other: &Self) -> bool {
         // Structural comparison on the slice lets salsa skip workspace_symbol_index

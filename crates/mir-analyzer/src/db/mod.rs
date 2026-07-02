@@ -1,4 +1,4 @@
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
 use mir_types::{Name, Type};
@@ -43,14 +43,6 @@ pub trait MirDatabase: salsa::Database {
 
     /// Return the defining file for a symbol, if known.
     fn symbol_defining_file(&self, symbol: &str) -> Option<Arc<str>>;
-
-    /// Return all symbols whose defining file is `file`.
-    fn symbols_defined_in_file(&self, file: &str) -> Vec<Arc<str>>;
-
-    /// Return the set of symbol FQNs currently defined in `file`.
-    /// O(1) via the forward index; use instead of `symbols_defined_in_file`
-    /// when a `HashSet` is more convenient.
-    fn file_defined_symbols(&self, file: &str) -> FxHashSet<Arc<str>>;
 
     /// Return all files that reference `symbol_key`.
     /// O(1) via the `symbol_referencers` reverse index; valid even after

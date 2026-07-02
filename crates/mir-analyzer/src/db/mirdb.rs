@@ -153,6 +153,13 @@ pub struct MirDbStorage {
     /// file add/remove so workspace-enumeration tracked queries
     /// (`workspace_classes`, `workspace_functions`) invalidate.
     workspace_revision_input: Arc<parking_lot::RwLock<Option<WorkspaceRevision>>>,
+    /// Off-salsa mirror of the workspace revision, kept in lockstep with
+    /// `workspace_revision_input`. Read by [`Self::workspace_revision_value`]
+    /// (the background-indexing epoch) so that fetching the generation never
+    /// executes a salsa input read on the shared handle — doing so borrows the
+    /// handle's single `ZalsaLocal` query stack, which races (and aborts under
+    /// debug assertions) when other threads run salsa reads on it concurrently.
+    workspace_revision_counter: Arc<std::sync::atomic::AtomicU64>,
     /// Paths of user-provided stub files (registered via `ingest_user_stubs`).
     /// Used by `workspace_symbol_index` to give user stubs priority over
     /// native stubs when two files define the same symbol.
@@ -254,6 +261,7 @@ impl Default for MirDbStorage {
             deleted_files: Arc::default(),
             resolver_state: Arc::default(),
             workspace_revision_input: Arc::default(),
+            workspace_revision_counter: Arc::default(),
             user_stub_paths: Arc::default(),
             php_version: Arc::new(parking_lot::RwLock::new(Arc::from("8.2"))),
             analyze_config_input: Arc::default(),
@@ -338,41 +346,6 @@ impl MirDatabase for MirDbStorage {
             };
             sf.path(self)
         })
-    }
-
-    fn symbols_defined_in_file(&self, file: &str) -> Vec<Arc<str>> {
-        self.file_defined_symbols(file).into_iter().collect()
-    }
-
-    fn file_defined_symbols(&self, file: &str) -> HashSet<Arc<str>> {
-        let Some(sf) = self.source_files.get(file).copied() else {
-            return HashSet::default();
-        };
-        let defs = crate::db::collect_file_definitions(self, sf);
-        let mut out = HashSet::default();
-        for c in defs.slice.classes.iter() {
-            out.insert(c.fqcn.clone());
-        }
-        for i in defs.slice.interfaces.iter() {
-            out.insert(i.fqcn.clone());
-        }
-        for t in defs.slice.traits.iter() {
-            out.insert(t.fqcn.clone());
-        }
-        for e in defs.slice.enums.iter() {
-            out.insert(e.fqcn.clone());
-        }
-        for f in defs.slice.functions.iter() {
-            out.insert(f.fqn.clone());
-        }
-        for (name, _) in defs.slice.constants.iter() {
-            out.insert(name.clone());
-        }
-        for (name, _) in defs.slice.global_vars.iter() {
-            let gname: Arc<str> = Arc::from(name.strip_prefix('$').unwrap_or(name.as_ref()));
-            out.insert(gname);
-        }
-        out
     }
 
     fn symbol_referencers_of(&self, symbol_key: &str) -> Vec<Arc<str>> {
@@ -1156,6 +1129,8 @@ impl MirDbStorage {
                 *self.workspace_revision_input.write() = Some(rev);
             }
         }
+        self.workspace_revision_counter
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Subtract one file's declarations from the singleton without re-adding
@@ -1214,10 +1189,8 @@ impl MirDbStorage {
     /// Exposed as the "are we up to date" epoch for background indexing
     /// ([`crate::AnalysisSession::index_generation`]).
     pub fn workspace_revision_value(&self) -> u64 {
-        self.workspace_revision_input
-            .read()
-            .map(|r| r.revision(self))
-            .unwrap_or(0)
+        self.workspace_revision_counter
+            .load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// Number of source files currently registered.
