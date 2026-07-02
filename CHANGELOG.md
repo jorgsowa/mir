@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.50.1] - 2026-07-02
+
+### Changed
+
+- **Warm-up skip cache for repeated reference queries:** `references_to_in_files` and `reanalyze_dependents` no longer re-run the serial parse + AST warm-up walk for a file whose lazy-load state hasn't changed since the last prepare. A per-file `(text, generation)` entry lets a repeat query against unchanged text skip straight to the parallel analysis phase; a text edit or a declaration-level invalidation (`invalidate_file`, symbol deletions) invalidates the entry so it re-runs. `references_to_in_files_cancellable` adds a cancellable variant polled at Phase-1 file boundaries and between Phase-2 retries, so a caller under a sustained write stream can abandon a stale request instead of spinning in the `salsa::Cancelled` retry loop.
+
 ## [0.50.0] - 2026-06-30
 
 ### Added
