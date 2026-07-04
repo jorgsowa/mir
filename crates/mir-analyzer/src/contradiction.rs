@@ -342,7 +342,7 @@ fn atomic_family(a: &Atomic) -> Option<TypeFamily> {
         | Atomic::TClassString(_)
         | Atomic::TNonEmptyString
         | Atomic::TNumericString
-        | Atomic::TInterfaceString
+        | Atomic::TInterfaceString(_)
         | Atomic::TEnumString
         | Atomic::TTraitString => TypeFamily::String,
 

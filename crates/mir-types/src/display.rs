@@ -150,7 +150,8 @@ impl fmt::Display for Atomic {
                 None => write!(f, "({subject} is ? {if_true} : {if_false})"),
             },
 
-            Atomic::TInterfaceString => write!(f, "interface-string"),
+            Atomic::TInterfaceString(None) => write!(f, "interface-string"),
+            Atomic::TInterfaceString(Some(iface)) => write!(f, "interface-string<{iface}>"),
             Atomic::TEnumString => write!(f, "enum-string"),
             Atomic::TTraitString => write!(f, "trait-string"),
             Atomic::TLiteralEnumCase {

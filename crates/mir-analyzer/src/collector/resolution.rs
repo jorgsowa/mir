@@ -110,6 +110,10 @@ pub(super) fn resolve_atomic_inner(
             let resolved = resolve_type_name(cls.as_str(), full_qualify, namespace, use_aliases);
             Atomic::TClassString(Some(resolved))
         }
+        Atomic::TInterfaceString(Some(iface)) => {
+            let resolved = resolve_type_name(iface.as_str(), full_qualify, namespace, use_aliases);
+            Atomic::TInterfaceString(Some(resolved))
+        }
         Atomic::TArray { key, value } => Atomic::TArray {
             key: Box::new(resolve_union_inner(
                 *key,

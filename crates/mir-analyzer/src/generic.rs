@@ -212,11 +212,12 @@ fn compute_template_residual(
     for a in &param_ty.types {
         if is_template_atomic(a, template_names) {
             has_template = true;
-        } else if matches!(a, Atomic::TClassString(Some(n)) if template_names.contains(n)) {
-            // `class-string<T>` alongside a bare `T` (Mockery's
-            // `class-string<TMock>|TMock` pattern): the class-string
-            // alternative binds class-string args itself, so the bare
-            // template must not also absorb them.
+        } else if matches!(a, Atomic::TClassString(Some(n)) | Atomic::TInterfaceString(Some(n)) if template_names.contains(n))
+        {
+            // `class-string<T>`/`interface-string<T>` alongside a bare `T`
+            // (Mockery's `class-string<TMock>|TMock` pattern): the
+            // class-string/interface-string alternative binds those args
+            // itself, so the bare template must not also absorb them.
             has_template_class_string = true;
         } else {
             concrete.push(a);
@@ -231,7 +232,7 @@ fn compute_template_residual(
     let mut class_string_consumed = false;
     for a in &arg_ty.types {
         let consumed_by_class_string = has_template_class_string
-            && matches!(a, Atomic::TClassString(_))
+            && matches!(a, Atomic::TClassString(_) | Atomic::TInterfaceString(_))
             || matches!(a, Atomic::TLiteralString(s) if has_template_class_string && literal_is_class_like(s));
         if consumed_by_class_string {
             class_string_consumed = true;
@@ -561,6 +562,36 @@ fn infer_from_pair(
                         Atomic::TClassString(None) => Some(Type::single(Atomic::TObject)),
                         // A class-name-shaped string literal coerces to
                         // class-string (Psalm-style): `m::mock('Foo\Bar')`.
+                        Atomic::TLiteralString(s) if literal_is_class_like(s) => {
+                            Some(Type::single(Atomic::TNamedObject {
+                                fqcn: Name::new(s.trim_start_matches('\\')),
+                                type_params: empty_type_params(),
+                            }))
+                        }
+                        _ => None,
+                    };
+                    if let Some(cls_ty) = cls_ty {
+                        let entry = bindings.entry(*param_name).or_insert_with(Type::empty);
+                        entry.merge_with(&cls_ty);
+                    }
+                }
+            }
+
+            // interface-string<T> matched against interface-string<SomeIface> or
+            // class-string<SomeIface> (e.g. `SomeIface::class` types as class-string).
+            Atomic::TInterfaceString(Some(param_name)) if template_names.contains(param_name) => {
+                for a_atomic in &arg_ty.types {
+                    let cls_ty = match a_atomic {
+                        Atomic::TInterfaceString(Some(arg_cls))
+                        | Atomic::TClassString(Some(arg_cls)) => {
+                            Some(Type::single(Atomic::TNamedObject {
+                                fqcn: *arg_cls,
+                                type_params: empty_type_params(),
+                            }))
+                        }
+                        Atomic::TInterfaceString(None) | Atomic::TClassString(None) => {
+                            Some(Type::single(Atomic::TObject))
+                        }
                         Atomic::TLiteralString(s) if literal_is_class_like(s) => {
                             Some(Type::single(Atomic::TNamedObject {
                                 fqcn: Name::new(s.trim_start_matches('\\')),

@@ -455,7 +455,7 @@ fn is_non_empty_string(ty: &Type) -> bool {
                 a,
                 Atomic::TNonEmptyString
                     | Atomic::TClassString(_)
-                    | Atomic::TInterfaceString
+                    | Atomic::TInterfaceString(_)
                     | Atomic::TEnumString
                     | Atomic::TTraitString
             ) || matches!(a, Atomic::TLiteralString(s) if !s.is_empty())

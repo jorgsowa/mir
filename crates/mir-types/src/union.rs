@@ -708,6 +708,25 @@ impl Type {
         out
     }
 
+    /// Narrow as if `interface_exists($x)` returned true for a string variable.
+    /// String atoms become `interface-string`; existing interface-string atoms pass
+    /// through; mixed/scalar becomes `interface-string`. Non-string atoms are dropped
+    /// (returning empty so the caller can mark the branch as diverging).
+    pub fn narrow_to_interface_string(&self) -> Type {
+        let mut out = Type::empty();
+        out.from_docblock = self.from_docblock;
+        for t in &self.types {
+            match t {
+                Atomic::TInterfaceString(_) => out.add_type(t.clone()),
+                _ if t.is_string() || matches!(t, Atomic::TMixed | Atomic::TScalar) => {
+                    out.add_type(Atomic::TInterfaceString(None));
+                }
+                _ => {}
+            }
+        }
+        out
+    }
+
     // --- Merge (branch join) ------------------------------------------------
 
     /// Merge two unions at a branch join point (e.g. after if/else).
@@ -981,6 +1000,21 @@ impl Type {
                         result.add_type(atomic.clone());
                     }
                 }
+                // interface-string<T> → substitute T from bindings
+                Atomic::TInterfaceString(Some(param_name)) => {
+                    if let Some(resolved) = bindings.get(param_name) {
+                        for r_atomic in &resolved.types {
+                            let iface_name = if let Atomic::TNamedObject { fqcn, .. } = r_atomic {
+                                Some(*fqcn)
+                            } else {
+                                None
+                            };
+                            result.add_type(Atomic::TInterfaceString(iface_name));
+                        }
+                    } else {
+                        result.add_type(atomic.clone());
+                    }
+                }
                 _ => {
                     result.add_type(atomic.clone());
                 }
@@ -1115,6 +1149,7 @@ fn is_string_atomic(a: &Atomic) -> bool {
             | Atomic::TLiteralString(_)
             | Atomic::TNumericString
             | Atomic::TClassString(_)
+            | Atomic::TInterfaceString(_)
             | Atomic::TCallableString
     )
 }
@@ -1309,6 +1344,9 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         // A literal string is type-compatible with class-string; validate_class_string_argument
         // separately checks whether the string names a real class (UndefinedClass).
         (Atomic::TLiteralString(_), Atomic::TClassString(_)) => true,
+        // Same, for interface-string; validate_interface_string_argument checks existence
+        // and that the name actually resolves to an interface.
+        (Atomic::TLiteralString(_), Atomic::TInterfaceString(_)) => true,
         (Atomic::TLiteralString(_), Atomic::TScalar) => true,
         (Atomic::TNonEmptyString, Atomic::TString) => true,
         (Atomic::TCallableString, Atomic::TString) => true,
@@ -1316,7 +1354,13 @@ fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         (Atomic::TNumericString, Atomic::TNonEmptyString) => true,
         (Atomic::TNumericString, Atomic::TString) => true,
         (Atomic::TClassString(_), Atomic::TString) => true,
-        (Atomic::TInterfaceString, Atomic::TString) => true,
+        (Atomic::TInterfaceString(_), Atomic::TString) => true,
+        // Every interface-string is a valid class-string: PHP doesn't distinguish
+        // the two at runtime — both are just strings naming a class-like symbol.
+        // Instantiability (`new $x()`) is guarded separately, since an interface
+        // name can never be `new`-ed even though it satisfies class-string.
+        (Atomic::TInterfaceString(_), Atomic::TClassString(None)) => true,
+        (Atomic::TInterfaceString(Some(a)), Atomic::TClassString(Some(b))) => a == b,
         (Atomic::TEnumString, Atomic::TString) => true,
         (Atomic::TTraitString, Atomic::TString) => true,
 

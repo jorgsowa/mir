@@ -505,7 +505,9 @@ impl<'a> ClassAnalyzer<'a> {
         use mir_types::Atomic;
         ty.types.iter().any(|atomic| match atomic {
             Atomic::TTemplateParam { .. } => true,
-            Atomic::TClassString(Some(inner)) => !crate::db::class_exists(self.db, inner.as_ref()),
+            Atomic::TClassString(Some(inner)) | Atomic::TInterfaceString(Some(inner)) => {
+                !crate::db::class_exists(self.db, inner.as_ref())
+            }
             Atomic::TNamedObject { fqcn, type_params } => {
                 // Bare name with no namespace separator is likely a template param
                 (!fqcn.contains('\\') && !crate::db::class_exists(self.db, fqcn.as_ref()))

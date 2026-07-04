@@ -1,8 +1,8 @@
 ===description===
-FP-A(b): class_exists($var) / interface_exists($var) / trait_exists($var) narrow the
-variable from string to class-string in the true branch.  @mir-check assertions
-verify the narrowed type inside the guard, after a negative early-exit, and that
-the false branch is unchanged.
+FP-A(b): class_exists($var) / trait_exists($var) narrow the variable from string
+to class-string in the true branch; interface_exists($var) narrows to the more
+precise interface-string.  @mir-check assertions verify the narrowed type inside
+the guard, after a negative early-exit, and that the false branch is unchanged.
 ===config===
 suppress=UnusedVariable,UnusedParam
 ===file===
@@ -17,7 +17,7 @@ function test_class_exists_true_branch(string $cls): void {
 
 function test_interface_exists_true_branch(string $iface): void {
     if (interface_exists($iface)) {
-        /** @mir-check $iface is class-string */
+        /** @mir-check $iface is interface-string */
         $_ = $iface;
     }
 }

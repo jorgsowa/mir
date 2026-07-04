@@ -358,7 +358,7 @@ pub fn is_non_empty_when_concat(ty: &Type) -> bool {
             | Atomic::TNumericString
             | Atomic::TCallableString
             | Atomic::TClassString(_)
-            | Atomic::TInterfaceString
+            | Atomic::TInterfaceString(_)
             | Atomic::TEnumString
             | Atomic::TTraitString => true,
             Atomic::TLiteralString(s) => !s.is_empty(),

@@ -93,6 +93,7 @@ pub(crate) fn native_hint_wins_over_docblock_scalar(native: &Type, doc: &Type) -
             Atomic::TString
                 | Atomic::TLiteralString(_)
                 | Atomic::TClassString(_)
+                | Atomic::TInterfaceString(_)
                 | Atomic::TNumericString
         )
     };

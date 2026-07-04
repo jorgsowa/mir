@@ -50,6 +50,33 @@ pub(crate) fn named_object_return_compatible(
                     .iter()
                     .any(|d| matches!(d, Atomic::TClassString(_) | Atomic::TString));
             }
+            // interface-string<X> is compatible with interface-string<Y> (or
+            // class-string<Y>, since every interface-string is a valid class-string)
+            // if X extends/implements Y.
+            Atomic::TInterfaceString(Some(actual_iface)) => {
+                return declared.types.iter().any(|d| match d {
+                    Atomic::TInterfaceString(None) | Atomic::TClassString(None) => true,
+                    Atomic::TInterfaceString(Some(declared_iface))
+                    | Atomic::TClassString(Some(declared_iface)) => {
+                        actual_iface == declared_iface
+                            || extends_or_implements(
+                                db,
+                                actual_iface.as_ref(),
+                                declared_iface.as_ref(),
+                            )
+                    }
+                    Atomic::TString => true,
+                    _ => false,
+                });
+            }
+            Atomic::TInterfaceString(None) => {
+                return declared.types.iter().any(|d| {
+                    matches!(
+                        d,
+                        Atomic::TInterfaceString(_) | Atomic::TClassString(_) | Atomic::TString
+                    )
+                });
+            }
             // Non-object atom (scalar, array, closure, …): this function only
             // resolves the object-inheritance dimension, so check this atom
             // structurally against the declared union. Splitting the check

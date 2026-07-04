@@ -610,7 +610,7 @@ mod docblock_hint_compat {
             | Atomic::TLiteralString(_)
             | Atomic::TNonEmptyString
             | Atomic::TNumericString
-            | Atomic::TInterfaceString
+            | Atomic::TInterfaceString(_)
             | Atomic::TEnumString
             | Atomic::TTraitString
             | Atomic::TClassString(_) => STRING,

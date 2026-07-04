@@ -113,6 +113,7 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         | "non-empty-lowercase-string"
         | "non-empty-uppercase-string" => Type::single(Atomic::TString),
         "class-string" => Type::single(Atomic::TClassString(None)),
+        "interface-string" => Type::single(Atomic::TInterfaceString(None)),
         "int" | "integer" => Type::single(Atomic::TInt),
         "positive-int" => Type::single(Atomic::TPositiveInt),
         "negative-int" => Type::single(Atomic::TNegativeInt),
@@ -284,6 +285,9 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
             u
         }
         "class-string" => Type::single(Atomic::TClassString(Some(
+            normalize_fqcn(inner.trim()).into(),
+        ))),
+        "interface-string" => Type::single(Atomic::TInterfaceString(Some(
             normalize_fqcn(inner.trim()).into(),
         ))),
         "int" => {

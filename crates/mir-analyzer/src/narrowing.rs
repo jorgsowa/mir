@@ -334,6 +334,7 @@ pub fn narrow_from_condition(
                     // suppressed for all usages within the guarded block.
                     // Variable form: `if (class_exists($var)) { ... }` — narrow $var to
                     // class-string so it satisfies class-string-typed parameters.
+                    // `interface_exists($var)` narrows to the more precise interface-string.
                     if is_true {
                         if let Some(arg_expr) = call.args.first() {
                             if let Some(fqcn) =
@@ -342,7 +343,11 @@ pub fn narrow_from_condition(
                                 ctx.class_exists_guards.insert(fqcn);
                             } else if let Some(var_name) = extract_var_name(&arg_expr.value) {
                                 let current = ctx.get_var(&var_name);
-                                let narrowed = current.narrow_to_class_string();
+                                let narrowed = if bare == "interface_exists" {
+                                    current.narrow_to_interface_string()
+                                } else {
+                                    current.narrow_to_class_string()
+                                };
                                 set_narrowed(ctx, &var_name, &current, narrowed, true);
                             }
                         }
@@ -1712,7 +1717,7 @@ fn narrow_var_literal_string(ctx: &mut FlowState, name: &str, value: &str, is_va
                 }
                 Atomic::TCallableString
                 | Atomic::TClassString(_)
-                | Atomic::TInterfaceString
+                | Atomic::TInterfaceString(_)
                 | Atomic::TEnumString
                 | Atomic::TTraitString => {
                     result.add_type(Atomic::TLiteralString(lit.clone()));

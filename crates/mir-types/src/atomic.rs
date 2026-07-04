@@ -220,8 +220,8 @@ pub enum Atomic {
     },
 
     // --- Special object strings ---
-    /// `interface-string`
-    TInterfaceString,
+    /// `interface-string` or `interface-string<T>`
+    TInterfaceString(Option<Name>),
     /// `enum-string`
     TEnumString,
     /// `trait-string`
@@ -340,7 +340,7 @@ impl Atomic {
                 | Atomic::TClassString(_)
                 | Atomic::TNonEmptyString
                 | Atomic::TNumericString
-                | Atomic::TInterfaceString
+                | Atomic::TInterfaceString(_)
                 | Atomic::TEnumString
                 | Atomic::TTraitString
         )
@@ -384,7 +384,7 @@ impl Atomic {
                 | Atomic::TClassString(_)
                 | Atomic::TNonEmptyString
                 | Atomic::TNumericString
-                | Atomic::TInterfaceString
+                | Atomic::TInterfaceString(_)
                 | Atomic::TEnumString
                 | Atomic::TTraitString
                 | Atomic::TInt
@@ -470,7 +470,7 @@ impl Atomic {
             Atomic::TKeyedArray { .. } => "array",
             Atomic::TTemplateParam { .. } => "template-param",
             Atomic::TConditional { .. } => "conditional-type",
-            Atomic::TInterfaceString => "interface-string",
+            Atomic::TInterfaceString(_) => "interface-string",
             Atomic::TEnumString => "enum-string",
             Atomic::TTraitString => "trait-string",
             Atomic::TLiteralEnumCase { .. } => "enum-case",
@@ -569,7 +569,6 @@ impl Hash for Atomic {
             Atomic::TScalar => (T::TScalar as u8).hash(state),
             Atomic::TNumeric => (T::TNumeric as u8).hash(state),
             Atomic::TObject => (T::TObject as u8).hash(state),
-            Atomic::TInterfaceString => (T::TInterfaceString as u8).hash(state),
             Atomic::TEnumString => (T::TEnumString as u8).hash(state),
             Atomic::TTraitString => (T::TTraitString as u8).hash(state),
 
@@ -580,6 +579,10 @@ impl Hash for Atomic {
             }
             Atomic::TClassString(opt) => {
                 (T::TClassString as u8).hash(state);
+                opt.hash(state);
+            }
+            Atomic::TInterfaceString(opt) => {
+                (T::TInterfaceString as u8).hash(state);
                 opt.hash(state);
             }
             Atomic::TLiteralInt(n) => {

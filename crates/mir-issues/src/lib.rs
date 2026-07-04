@@ -85,6 +85,10 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/expr/objects.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_string_class/`.
     InvalidStringClass { actual: String },
+    /// Emitted by `mir-analyzer/src/call/args/types.rs` when an `interface-string`-typed
+    /// argument names a class or trait that exists but is not an interface.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_argument/interface_string_*.phpt`.
+    NotAnInterface { name: String },
 
     // --- Nullability --------------------------------------------------------
     /// Emitted by `mir-analyzer/src/call/args.rs`.
@@ -690,6 +694,7 @@ impl IssueKind {
             | IssueKind::UndefinedFunction { .. }
             | IssueKind::UndefinedMethod { .. }
             | IssueKind::UndefinedClass { .. }
+            | IssueKind::NotAnInterface { .. }
             | IssueKind::UndefinedConstant { .. }
             | IssueKind::InaccessibleClassConstant { .. }
             | IssueKind::InvalidReturnType { .. }
@@ -923,6 +928,7 @@ impl IssueKind {
             IssueKind::MismatchingDocblockReturnType { .. } => "MIR0209",
             IssueKind::MismatchingDocblockParamType { .. } => "MIR0210",
             IssueKind::InvalidStringClass { .. } => "MIR0211",
+            IssueKind::NotAnInterface { .. } => "MIR0228",
             IssueKind::TypeCheckMismatch { .. } => "MIR0212",
             IssueKind::Trace { .. } => "MIR0221",
             IssueKind::ArgumentTypeCoercion { .. } => "MIR0225",
@@ -1072,10 +1078,10 @@ impl IssueKind {
             | "MIR0010" | "MIR0011" | "MIR0200" | "MIR0201" | "MIR0202" | "MIR0203" | "MIR0204"
             | "MIR0205" | "MIR0212" | "MIR0215" | "MIR0216" | "MIR0217" | "MIR0224" | "MIR0600"
             | "MIR0700" | "MIR0701" | "MIR0702" | "MIR0704" | "MIR0705" | "MIR0706" | "MIR0707"
-            | "MIR0708" | "MIR0709" | "MIR0711" | "MIR0712" | "MIR0713" | "MIR0800" | "MIR0801"
-            | "MIR0802" | "MIR0803" | "MIR0804" | "MIR0900" | "MIR1205" | "MIR1207" | "MIR1300"
-            | "MIR1400" | "MIR1500" | "MIR1503" | "MIR1602" | "MIR1603" | "MIR1604" | "MIR1605"
-            | "MIR1606" => Some(Severity::Error),
+            | "MIR0708" | "MIR0709" | "MIR0711" | "MIR0712" | "MIR0713" | "MIR0228" | "MIR0800"
+            | "MIR0801" | "MIR0802" | "MIR0803" | "MIR0804" | "MIR0900" | "MIR1205" | "MIR1207"
+            | "MIR1300" | "MIR1400" | "MIR1500" | "MIR1503" | "MIR1602" | "MIR1603" | "MIR1604"
+            | "MIR1605" | "MIR1606" => Some(Severity::Error),
 
             // Warnings
             "MIR0006" | "MIR0008" | "MIR0100" | "MIR0101" | "MIR0102" | "MIR0103" | "MIR0109"
@@ -1119,6 +1125,7 @@ impl IssueKind {
             IssueKind::UndefinedTrait { .. } => "UndefinedTrait",
             IssueKind::ParentNotFound => "ParentNotFound",
             IssueKind::InvalidStringClass { .. } => "InvalidStringClass",
+            IssueKind::NotAnInterface { .. } => "NotAnInterface",
             IssueKind::NullArgument { .. } => "NullArgument",
             IssueKind::NullPropertyFetch { .. } => "NullPropertyFetch",
             IssueKind::NullMethodCall { .. } => "NullMethodCall",
@@ -1297,6 +1304,9 @@ impl IssueKind {
             }
             IssueKind::InvalidStringClass { actual } => {
                 format!("Dynamic class instantiation requires string or class-string type, got '{actual}'")
+            }
+            IssueKind::NotAnInterface { name } => {
+                format!("{name} is not an interface")
             }
 
             IssueKind::NullArgument { param, fn_name } => {
@@ -1994,6 +2004,7 @@ mod code_tests {
                 method: s(),
             },
             IssueKind::UndefinedClass { name: s() },
+            IssueKind::NotAnInterface { name: s() },
             IssueKind::UndefinedProperty {
                 class: s(),
                 property: s(),
@@ -2421,6 +2432,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 142);
+        assert_eq!(one_of_each().len(), 143);
     }
 }

@@ -513,7 +513,7 @@ pub(crate) fn collect_fqcns_in_atomic(a: &Atomic, out: &mut Vec<String>) {
         Atomic::TLiteralEnumCase { enum_fqcn, .. } => {
             out.push(enum_fqcn.to_string());
         }
-        Atomic::TClassString(Some(s)) => {
+        Atomic::TClassString(Some(s)) | Atomic::TInterfaceString(Some(s)) => {
             out.push(s.to_string());
         }
         Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value } => {

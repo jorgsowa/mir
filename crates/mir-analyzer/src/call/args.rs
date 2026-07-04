@@ -310,7 +310,7 @@ fn param_contains_template_or_unknown(
                     .iter()
                     .any(|tp| has_template_param(tp, template_names))
             }
-            Atomic::TClassString(Some(inner)) => {
+            Atomic::TClassString(Some(inner)) | Atomic::TInterfaceString(Some(inner)) => {
                 !inner.contains('\\') && template_names.contains(inner.as_ref())
             }
             _ => false,
@@ -331,7 +331,7 @@ fn param_contains_template_or_unknown(
             // Check nested type_params for template parameters only
             !type_params.is_empty() && has_template_param(param_ty, &template_names)
         }
-        Atomic::TClassString(Some(inner)) => {
+        Atomic::TClassString(Some(inner)) | Atomic::TInterfaceString(Some(inner)) => {
             // Check if this name is a template parameter
             if !inner.contains('\\') && template_names.contains(inner.as_ref()) {
                 return true;

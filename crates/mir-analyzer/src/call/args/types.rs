@@ -80,6 +80,7 @@ pub(crate) fn check_one(
         validate_callable_argument(ea, param_ty, arg_ty, arg_span);
     }
     validate_class_string_argument(ea, param_ty, arg_ty, arg_span);
+    validate_interface_string_argument(ea, param_ty, arg_ty, arg_span);
     validate_callable_type(ea, param_ty, arg_ty, arg_span);
 
     // Null checks run here to preserve the original emission order
@@ -456,6 +457,36 @@ fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -
                 return param.types.iter().any(|p| match p {
                     Atomic::TClassString(None) | Atomic::TString => true,
                     Atomic::TClassString(Some(param_cls)) => {
+                        arg_cls == param_cls
+                            || crate::db::extends_or_implements(
+                                ea.db,
+                                arg_cls.as_ref(),
+                                param_cls.as_ref(),
+                            )
+                    }
+                    // A class-string is a valid interface-string when the name it
+                    // holds actually names an interface (e.g. `SomeInterface::class`
+                    // types as `class-string<SomeInterface>`, not `interface-string`).
+                    Atomic::TInterfaceString(None) => is_interface(ea, arg_cls.as_ref()),
+                    Atomic::TInterfaceString(Some(param_cls)) => {
+                        is_interface(ea, arg_cls.as_ref())
+                            && (arg_cls == param_cls
+                                || crate::db::extends_or_implements(
+                                    ea.db,
+                                    arg_cls.as_ref(),
+                                    param_cls.as_ref(),
+                                ))
+                    }
+                    _ => false,
+                });
+            }
+            Atomic::TInterfaceString(Some(arg_cls)) => {
+                return param.types.iter().any(|p| match p {
+                    Atomic::TClassString(None)
+                    | Atomic::TInterfaceString(None)
+                    | Atomic::TString => true,
+                    Atomic::TClassString(Some(param_cls))
+                    | Atomic::TInterfaceString(Some(param_cls)) => {
                         arg_cls == param_cls
                             || crate::db::extends_or_implements(
                                 ea.db,
@@ -1063,6 +1094,57 @@ fn validate_class_string_argument(
         if !crate::db::class_exists(ea.db, &resolved) {
             ea.emit(
                 IssueKind::UndefinedClass { name: resolved },
+                Severity::Error,
+                arg_span,
+            );
+        }
+    }
+}
+
+/// Validate interface-string arguments: check that the string references an
+/// existing interface (not just any class-like symbol).
+fn validate_interface_string_argument(
+    ea: &mut ExpressionAnalyzer<'_>,
+    param_ty: &Type,
+    arg_ty: &Type,
+    arg_span: Span,
+) {
+    // Only validate if parameter is interface-string
+    let has_interface_string = param_ty
+        .types
+        .iter()
+        .any(|t| matches!(t, Atomic::TInterfaceString(_)));
+    if !has_interface_string {
+        return;
+    }
+
+    // When the parameter also accepts a plain `string` or bare `class-string`
+    // (e.g. `class-string|interface-string<T>`), a literal string satisfies the
+    // wider alternative — don't force the interface-only check on it.
+    let has_wider_alternative = param_ty.types.iter().any(|t| {
+        matches!(
+            t,
+            Atomic::TString | Atomic::TNonEmptyString | Atomic::TClassString(_)
+        )
+    });
+    if has_wider_alternative {
+        return;
+    }
+
+    if let Some(Atomic::TLiteralString(s)) = arg_ty.types.first() {
+        if !is_possible_class_name(s) {
+            return;
+        }
+        let resolved = crate::db::resolve_name(ea.db, &ea.file, s.as_ref());
+        if !crate::db::class_exists(ea.db, &resolved) {
+            ea.emit(
+                IssueKind::UndefinedClass { name: resolved },
+                Severity::Error,
+                arg_span,
+            );
+        } else if !is_interface(ea, &resolved) {
+            ea.emit(
+                IssueKind::NotAnInterface { name: resolved },
                 Severity::Error,
                 arg_span,
             );
