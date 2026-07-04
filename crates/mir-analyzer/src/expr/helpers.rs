@@ -448,6 +448,43 @@ pub(crate) fn ast_params_to_fn_params_resolved(
         .collect()
 }
 
+/// Merge `@param` docblock types into already-resolved closure/arrow-function params,
+/// matching by parameter name.
+///
+/// Docblock types win over native hints — the same precedence used for top-level
+/// function/method declarations — except when the native hint is a concrete scalar
+/// whose family is entirely absent from the docblock type (e.g. `@param int $x` on a
+/// `bool $x` hint), in which case the native hint is the runtime truth and wins.
+pub(crate) fn apply_doc_param_types(
+    params: &mut [mir_codebase::FnParam],
+    ast_params: &[php_ast::owned::Param],
+    doc_params: &[(String, Type)],
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) {
+    if doc_params.is_empty() {
+        return;
+    }
+    for (param, ast_param) in params.iter_mut().zip(ast_params.iter()) {
+        let name = ast_param
+            .name
+            .as_deref()
+            .unwrap_or("")
+            .trim_start_matches('$');
+        let Some((_, doc_ty)) = doc_params.iter().find(|(n, _)| n == name) else {
+            continue;
+        };
+        let mut doc_ty = resolve_named_objects_in_union(doc_ty.clone(), db, file);
+        if let Some(native_ty) = param.ty.as_deref() {
+            if crate::collector::native_hint_wins_over_docblock_scalar(native_ty, &doc_ty) {
+                continue;
+            }
+        }
+        doc_ty.from_docblock = true;
+        param.ty = mir_codebase::wrap_param_type(Some(doc_ty));
+    }
+}
+
 pub(crate) fn resolve_named_objects_in_union(
     union: Type,
     db: &dyn crate::db::MirDatabase,

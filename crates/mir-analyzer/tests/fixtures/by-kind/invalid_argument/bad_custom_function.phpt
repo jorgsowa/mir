@@ -15,3 +15,4 @@ function myFunction( string $foo ) : bool {
 
 takesFunction("myFunction");
 ===expect===
+InvalidArgument@11:14-11:26: Argument $callback of typed_callable() expects 'callable whose parameter #1 accepts 'int'', got 'callable whose parameter #1 only accepts 'string''

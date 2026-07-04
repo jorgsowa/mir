@@ -11,3 +11,4 @@ function f(callable $_p): void {}
 
 f("strcmp");
 ===expect===
+InvalidArgument@7:2-7:10: Argument $callback of typed_callable() expects 'callable whose parameter #1 accepts 'int'', got 'callable whose parameter #1 only accepts 'string''

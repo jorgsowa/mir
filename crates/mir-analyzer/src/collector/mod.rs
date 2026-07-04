@@ -69,7 +69,7 @@ fn is_simple_scalar(u: &Type) -> bool {
 /// Does NOT fire when the docblock is a refinement of the hint (e.g. `positive-int` + `int`
 /// hint, or `non-empty-string` + `string` hint): a refinement always contains atoms from the
 /// same family, so `docblock_contains_hint_family` would be true and this returns false.
-fn native_hint_wins_over_docblock_scalar(native: &Type, doc: &Type) -> bool {
+pub(crate) fn native_hint_wins_over_docblock_scalar(native: &Type, doc: &Type) -> bool {
     use mir_types::atomic::Atomic;
     if native.types.len() != 1 || doc.types.is_empty() {
         return false;

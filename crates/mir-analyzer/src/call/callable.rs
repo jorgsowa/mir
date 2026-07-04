@@ -11,6 +11,66 @@ use crate::expr::ExpressionAnalyzer;
 pub(crate) struct ParamInfo {
     pub(crate) is_optional: bool,
     pub(crate) is_variadic: bool,
+    /// The parameter's declared type, when known — used for the parameter-type
+    /// contravariance check in `check_typed_callable_arg`. `None` for untyped params
+    /// (treated as accepting anything).
+    pub(crate) ty: Option<Type>,
+}
+
+/// Collect the resolvable callable parameter lists for *every* candidate atomic in a
+/// union (closures, resolvable named functions, intersection members) — not just the
+/// first match. A union like `Closure(string):void|Closure(string,string):void` (e.g.
+/// produced by a ternary) must have every branch checked, since the runtime value could
+/// be either one; stopping at the first match silently ignores the others.
+fn extract_all_callable_candidates(
+    union: &Type,
+    ea: &ExpressionAnalyzer<'_>,
+) -> Vec<Vec<ParamInfo>> {
+    let mut out = Vec::new();
+    for atomic in &union.types {
+        match atomic {
+            Atomic::TClosure { params, .. } => {
+                out.push(
+                    params
+                        .iter()
+                        .map(|p| ParamInfo {
+                            is_optional: p.is_optional,
+                            is_variadic: p.is_variadic,
+                            ty: p.ty.as_ref().map(|t| t.to_union()),
+                        })
+                        .collect(),
+                );
+            }
+            Atomic::TLiteralString(fn_name) => {
+                if fn_name.is_empty() {
+                    continue;
+                }
+
+                // Try to resolve the function name. Only collect params if found (don't fail for unknown strings).
+                // This allows arity checking for both documented callables and literal function names in code.
+                let here = crate::db::Fqcn::from_str(ea.db, fn_name.as_ref());
+                if let Some(f) = crate::db::find_function(ea.db, here) {
+                    out.push(
+                        f.params
+                            .iter()
+                            .map(|p| ParamInfo {
+                                is_optional: p.is_optional,
+                                is_variadic: p.is_variadic,
+                                ty: p.ty.as_deref().cloned(),
+                            })
+                            .collect(),
+                    );
+                }
+            }
+            Atomic::TIntersection { parts } => {
+                for part in parts.iter() {
+                    out.extend(extract_all_callable_candidates(part, ea));
+                }
+            }
+            _ => {}
+        }
+    }
+    out
 }
 
 /// Extract callable parameter list for arity checking from a union when it can be determined statically:
@@ -18,6 +78,10 @@ pub(crate) struct ParamInfo {
 /// - TLiteralString: resolve to function only if from documented type annotation (issue #5)
 /// - TIntersection: check parts for callable/closure types
 /// - Everything else: None (param list is unknown at compile time)
+///
+/// Returns only the *first* resolvable candidate — callers that must consider every
+/// union member (e.g. a union of closures with different arities) should use
+/// `extract_all_callable_candidates` instead.
 pub(crate) fn extract_callable_params(
     union: &Type,
     ea: &ExpressionAnalyzer<'_>,
@@ -32,50 +96,9 @@ pub(crate) fn extract_callable_params(
         return None;
     }
 
-    for atomic in &union.types {
-        match atomic {
-            Atomic::TClosure { params, .. } => {
-                return Some(
-                    params
-                        .iter()
-                        .map(|p| ParamInfo {
-                            is_optional: p.is_optional,
-                            is_variadic: p.is_variadic,
-                        })
-                        .collect(),
-                );
-            }
-            Atomic::TLiteralString(fn_name) => {
-                if fn_name.is_empty() {
-                    continue;
-                }
-
-                // Try to resolve the function name. Only return params if found (don't fail for unknown strings).
-                // This allows arity checking for both documented callables and literal function names in code.
-                let here = crate::db::Fqcn::from_str(ea.db, fn_name.as_ref());
-                if let Some(f) = crate::db::find_function(ea.db, here) {
-                    return Some(
-                        f.params
-                            .iter()
-                            .map(|p| ParamInfo {
-                                is_optional: p.is_optional,
-                                is_variadic: p.is_variadic,
-                            })
-                            .collect(),
-                    );
-                }
-            }
-            Atomic::TIntersection { parts } => {
-                for part in parts.iter() {
-                    if let Some(params) = extract_callable_params(part, ea) {
-                        return Some(params);
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-    None
+    extract_all_callable_candidates(union, ea)
+        .into_iter()
+        .next()
 }
 
 /// Check if a union type is valid for use as a callable.
@@ -1409,35 +1432,116 @@ pub(crate) fn check_min_arity_callback(
     }
 }
 
+/// True when `ty` contains an unresolved bareword named-object or an explicit template
+/// param — almost certainly an unsubstituted generic (e.g. `TValue` in a Laravel-style
+/// `callable(TValue): bool` docblock) rather than a real, checkable type. Comparing
+/// against these would produce false positives for generic callable signatures.
+fn contains_unresolvable_named_type(ty: &Type, ea: &ExpressionAnalyzer<'_>) -> bool {
+    ty.types.iter().any(|a| match a {
+        Atomic::TNamedObject { fqcn, .. } => {
+            !fqcn.contains('\\') && !crate::db::class_exists(ea.db, fqcn.as_ref())
+        }
+        Atomic::TTemplateParam { .. } => true,
+        _ => false,
+    })
+}
+
 /// Validate a callback argument against a typed callable parameter (e.g., callable(str,str,str):bool).
-/// Emits InvalidArgument if the provided callable has more required params than expected.
+/// Emits InvalidArgument if the provided callable has more required params than expected, or if a
+/// resolvable parameter type is declared too narrow to accept what the signature promises to pass.
 pub(crate) fn check_typed_callable_arg(
     ea: &mut ExpressionAnalyzer<'_>,
     arg_ty: &Type,
     expected_params: &[FnParam],
     arg_span: Span,
 ) {
-    if let Some(actual_params) = extract_callable_params(arg_ty, ea) {
-        let expected_required = expected_params
-            .iter()
-            .filter(|p| !p.is_optional && !p.is_variadic)
-            .count();
-        let actual_required = actual_params
-            .iter()
-            .filter(|p| !p.is_optional && !p.is_variadic)
-            .count();
+    // A bare `callable` (unknown arity) anywhere in the union means we can't check
+    // statically — bail out to avoid false positives from sibling closure members.
+    if arg_ty
+        .types
+        .iter()
+        .any(|a| matches!(a, Atomic::TCallable { params: None, .. }))
+    {
+        return;
+    }
+    // A union of closures (e.g. from a ternary) must have every candidate checked —
+    // the runtime value could be any of them, not just the first.
+    let candidates = extract_all_callable_candidates(arg_ty, ea);
+    if candidates.is_empty() {
+        return;
+    }
 
-        if actual_required > expected_required {
-            ea.emit(
-                IssueKind::InvalidArgument {
-                    param: "callback".to_string(),
-                    fn_name: "typed_callable".to_string(),
-                    expected: format!("callable with {} required parameter(s)", expected_required),
-                    actual: format!("callable with {} required parameter(s)", actual_required),
-                },
-                Severity::Error,
-                arg_span,
-            );
+    let expected_required = expected_params
+        .iter()
+        .filter(|p| !p.is_optional && !p.is_variadic)
+        .count();
+    let actual_required = candidates
+        .iter()
+        .map(|params| {
+            params
+                .iter()
+                .filter(|p| !p.is_optional && !p.is_variadic)
+                .count()
+        })
+        .max()
+        .unwrap_or(0);
+
+    if actual_required > expected_required {
+        ea.emit(
+            IssueKind::InvalidArgument {
+                param: "callback".to_string(),
+                fn_name: "typed_callable".to_string(),
+                expected: format!("callable with {} required parameter(s)", expected_required),
+                actual: format!("callable with {} required parameter(s)", actual_required),
+            },
+            Severity::Error,
+            arg_span,
+        );
+        return;
+    }
+
+    // Parameter-type contravariance: every candidate closure must be able to accept
+    // whatever the documented signature promises to pass it. Only fires for simple,
+    // fully-resolved types on both sides — templates/unresolved docblock types are
+    // skipped entirely to avoid false positives on generic callable signatures.
+    for params in &candidates {
+        for (i, expected) in expected_params.iter().enumerate() {
+            let Some(actual) = params.get(i) else {
+                break;
+            };
+            let Some(expected_ty) = expected.ty.as_ref().map(|t| t.to_union()) else {
+                continue;
+            };
+            let Some(actual_ty) = actual.ty.as_ref() else {
+                continue;
+            };
+            if expected_ty.is_mixed() || actual_ty.is_mixed() {
+                continue;
+            }
+            if contains_unresolvable_named_type(&expected_ty, ea)
+                || contains_unresolvable_named_type(actual_ty, ea)
+            {
+                continue;
+            }
+            if !crate::subtype::is_subtype(ea.db, &expected_ty, actual_ty) {
+                ea.emit(
+                    IssueKind::InvalidArgument {
+                        param: "callback".to_string(),
+                        fn_name: "typed_callable".to_string(),
+                        expected: format!(
+                            "callable whose parameter #{} accepts '{expected_ty}'",
+                            i + 1
+                        ),
+                        actual: format!(
+                            "callable whose parameter #{} only accepts '{actual_ty}'",
+                            i + 1
+                        ),
+                    },
+                    Severity::Error,
+                    arg_span,
+                );
+                return;
+            }
         }
     }
 }

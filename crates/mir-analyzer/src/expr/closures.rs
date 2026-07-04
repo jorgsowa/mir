@@ -1,4 +1,6 @@
-use super::helpers::{ast_params_to_fn_params_resolved, resolve_named_objects_in_union};
+use super::helpers::{
+    apply_doc_param_types, ast_params_to_fn_params_resolved, resolve_named_objects_in_union,
+};
 use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
 use crate::stmt::{mir_check_matches, widen_for_check};
@@ -45,12 +47,18 @@ impl<'a> ExpressionAnalyzer<'a> {
             self.check_type_hint(hint);
         }
 
-        let params = ast_params_to_fn_params_resolved(
+        let leading_doc = crate::parser::find_preceding_docblock(self.source, expr_span.start)
+            .map(|doc| crate::parser::DocblockParser::parse(&doc));
+
+        let mut params = ast_params_to_fn_params_resolved(
             &c.params,
             ctx.self_fqcn.as_deref(),
             self.db,
             &self.file,
         );
+        if let Some(doc) = &leading_doc {
+            apply_doc_param_types(&mut params, &c.params, &doc.params, self.db, &self.file);
+        }
         let return_ty_hint = c
             .return_type
             .as_ref()
@@ -58,8 +66,9 @@ impl<'a> ExpressionAnalyzer<'a> {
             .map(|u| resolve_named_objects_in_union(u, self.db, &self.file))
             .or_else(|| {
                 // Fall back to `@return` docblock preceding the `function` keyword.
-                crate::parser::find_preceding_docblock(self.source, expr_span.start)
-                    .and_then(|doc| crate::parser::DocblockParser::parse(&doc).return_type)
+                leading_doc
+                    .as_ref()
+                    .and_then(|doc| doc.return_type.clone())
                     .map(|ty| resolve_named_objects_in_union(ty, self.db, &self.file))
             });
 
@@ -201,6 +210,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_arrow_function(
         &mut self,
         af: &ArrowFunctionExpr,
+        expr_span: php_ast::Span,
         ctx: &mut FlowState,
     ) -> Type {
         for param in af.params.iter() {
@@ -212,17 +222,31 @@ impl<'a> ExpressionAnalyzer<'a> {
             self.check_type_hint(hint);
         }
 
-        let params = ast_params_to_fn_params_resolved(
+        let leading_doc = crate::parser::find_preceding_docblock(self.source, expr_span.start)
+            .map(|doc| crate::parser::DocblockParser::parse(&doc));
+
+        let mut params = ast_params_to_fn_params_resolved(
             &af.params,
             ctx.self_fqcn.as_deref(),
             self.db,
             &self.file,
         );
+        if let Some(doc) = &leading_doc {
+            apply_doc_param_types(&mut params, &af.params, &doc.params, self.db, &self.file);
+        }
         let return_ty_hint = af
             .return_type
             .as_ref()
             .map(|h| crate::parser::type_from_hint_owned(h, ctx.self_fqcn.as_deref()))
-            .map(|u| resolve_named_objects_in_union(u, self.db, &self.file));
+            .map(|u| resolve_named_objects_in_union(u, self.db, &self.file))
+            .or_else(|| {
+                // Fall back to `@return` docblock preceding the `fn` keyword — mirrors
+                // the same fallback in `analyze_closure` for `function(...) {...}`.
+                leading_doc
+                    .as_ref()
+                    .and_then(|doc| doc.return_type.clone())
+                    .map(|ty| resolve_named_objects_in_union(ty, self.db, &self.file))
+            });
 
         let mut arrow_ctx = crate::flow_state::FlowState::for_function(
             &params,

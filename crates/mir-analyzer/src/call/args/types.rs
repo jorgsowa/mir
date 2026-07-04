@@ -50,15 +50,19 @@ pub(crate) fn check_one(
     arg_idx: usize,
     template_params: &[TemplateParam],
 ) {
-    // Check typed callable signature compatibility when param type is callable(T1,T2,...):R
+    // Check typed callable signature compatibility when param type is
+    // `callable(T1,T2,...):R` or the equivalent `Closure(T1,T2,...):R` docblock syntax —
+    // both parse to a concrete param list and must be checked the same way.
     for param_atomic in &param_ty.types {
-        if let Atomic::TCallable {
-            params: Some(expected_params),
-            ..
-        } = param_atomic
-        {
-            super::super::callable::check_typed_callable_arg(ea, arg_ty, expected_params, arg_span);
-        }
+        let expected_params = match param_atomic {
+            Atomic::TCallable {
+                params: Some(expected_params),
+                ..
+            } => expected_params,
+            Atomic::TClosure { params, .. } => params,
+            _ => continue,
+        };
+        super::super::callable::check_typed_callable_arg(ea, arg_ty, expected_params, arg_span);
     }
 
     // Validate callable and class-string arguments.

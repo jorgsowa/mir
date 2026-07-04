@@ -299,7 +299,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             // --- Closures / arrow functions --------------------------------
             ExprKind::Closure(c) => self.analyze_closure(c, expr.span, ctx),
 
-            ExprKind::ArrowFunction(af) => self.analyze_arrow_function(af, ctx),
+            ExprKind::ArrowFunction(af) => self.analyze_arrow_function(af, expr.span, ctx),
 
             ExprKind::CallableCreate(cc) => self.callable_create_type(cc, expr.span, ctx),
 
