@@ -73,6 +73,10 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
                 return parse_keyed_array(inner, false);
             } else if prefix == "list" {
                 return parse_keyed_array(inner, true);
+            } else if prefix == "object" {
+                // `object{prop: Type, ...}` — mir has no object-shape atom,
+                // so approximate as a plain `object` (property shape is lost).
+                return Type::single(Atomic::TObject);
             }
         }
     }
@@ -152,6 +156,22 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         }
         "scalar" => Type::single(Atomic::TScalar),
         "numeric" => Type::single(Atomic::TNumeric),
+        // `empty` — Psalm's falsy pseudo-type. mir has no single "falsy" atom,
+        // so approximate as the union of all falsy literals it can express.
+        "empty" => {
+            let mut u = Type::single(Atomic::TFalse);
+            u.add_type(Atomic::TNull);
+            u.add_type(Atomic::TLiteralInt(0));
+            u.add_type(Atomic::TLiteralFloat(0, 0));
+            u.add_type(Atomic::TLiteralString(Arc::from("")));
+            u.add_type(Atomic::TLiteralString(Arc::from("0")));
+            u.add_type(Atomic::TKeyedArray {
+                properties: IndexMap::new(),
+                is_open: false,
+                is_list: true,
+            });
+            u
+        }
         "array-key" => {
             let mut u = Type::single(Atomic::TInt);
             u.add_type(Atomic::TString);
@@ -354,6 +374,21 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
         // `int-mask-of<T::*>` requires resolving class constants which are not
         // available at docblock-parse time; approximate as `int`.
         "int-mask-of" => Type::single(Atomic::TInt),
+        // `class-string-map<T, V>` — maps `class-string<T>` keys to `V` values.
+        // mir does not tie the value type to the specific class looked up (that
+        // needs flow-sensitive template binding at each access site), so
+        // approximate as a plain array from `class-string` to `V`.
+        "class-string-map" => {
+            let params = split_generics(inner);
+            let value = params
+                .get(1)
+                .map(|p| parse_type_string(p.trim()))
+                .unwrap_or_else(Type::mixed);
+            Type::single(Atomic::TArray {
+                key: Box::new(Type::single(Atomic::TClassString(None))),
+                value: Box::new(value),
+            })
+        }
         // Named class with type params
         _ => {
             let params: Vec<Type> = split_generics(inner)
@@ -529,16 +564,24 @@ pub(super) fn parse_keyed_array(inner: &str, is_list: bool) -> Type {
 pub(super) fn parse_callable_syntax(s: &str) -> Option<Type> {
     let s = s.trim_start_matches('\\');
     let lower = s.to_lowercase();
+    // `pure-callable(...)` / `pure-Closure(...)` — mir does not track purity
+    // on the type itself, so parse the structural shape and drop the
+    // purity qualifier (purity is tracked separately at the function level).
+    let (lower, pure_prefix_len) = match lower.strip_prefix("pure-") {
+        Some(rest) => (rest.to_string(), "pure-".len()),
+        None => (lower, 0),
+    };
     let is_closure = lower.starts_with("closure");
     let is_callable = lower.starts_with("callable");
     if !is_closure && !is_callable {
         return None;
     }
-    let prefix_len = if is_closure {
-        "closure".len()
-    } else {
-        "callable".len()
-    };
+    let prefix_len = pure_prefix_len
+        + if is_closure {
+            "closure".len()
+        } else {
+            "callable".len()
+        };
     let rest = s[prefix_len..].trim_start();
     if !rest.starts_with('(') {
         return None;
