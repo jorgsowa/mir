@@ -10,9 +10,9 @@
 //! ad-hoc inheritance check (`named_object_subtype`, `named_object_return_compatible`)
 //! don't need to switch — but new call sites should reach for this function
 //! first.
-use mir_types::{Atomic, Type};
+use mir_types::{Atomic, Type, Variance};
 
-use crate::db::{extends_or_implements, MirDatabase};
+use crate::db::{class_template_params, extends_or_implements, MirDatabase};
 
 /// A supertype type-parameter that's effectively wildcarded — an unbound
 /// template var or `mixed`. When the supertype's params are all free, we
@@ -23,6 +23,34 @@ fn sup_param_is_free(ty: &Type) -> bool {
             .types
             .iter()
             .all(|a| matches!(a, Atomic::TTemplateParam { .. }))
+}
+
+/// Per-position variance check for two parameterizations of the SAME class
+/// (`Box<Dog>` vs `Box<Animal>`): a `@template-covariant`/`-contravariant`
+/// param may differ in the declared direction; invariant params must match
+/// exactly (the `sub_params == sup_params` fast path in `is_subtype` already
+/// covers the all-invariant case, so a mismatch here only survives when at
+/// least one param is variant).
+fn variance_compatible(
+    db: &dyn MirDatabase,
+    fqcn: &str,
+    sub_params: &[Type],
+    sup_params: &[Type],
+) -> bool {
+    if sub_params.len() != sup_params.len() {
+        return false;
+    }
+    let Some(tps) = class_template_params(db, fqcn) else {
+        return false;
+    };
+    tps.iter()
+        .zip(sub_params)
+        .zip(sup_params)
+        .all(|((tp, sub_p), sup_p)| match tp.variance {
+            Variance::Covariant => is_subtype(db, sub_p, sup_p),
+            Variance::Contravariant => is_subtype(db, sup_p, sub_p),
+            Variance::Invariant => sub_p == sup_p,
+        })
 }
 
 /// Returns true if `sub` is a subtype of `sup`, considering the codebase's
@@ -80,7 +108,9 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
                         || sub_params == sup_params
                         || sup_params.iter().all(sup_param_is_free)
                         || (!sub_params.is_empty()
-                            && sub_params.iter().all(|p| p.is_mixed() || p.is_never()));
+                            && sub_params.iter().all(|p| p.is_mixed() || p.is_never()))
+                        || (sub_fqcn == sup_fqcn
+                            && variance_compatible(db, sub_fqcn.as_ref(), sub_params, sup_params));
                     params_ok && extends_or_implements(db, sub_fqcn.as_ref(), sup_fqcn.as_ref())
                 }
                 (Atomic::TNamedObject { fqcn: sub_fqcn, .. }, Atomic::TIntersection { parts }) => {
@@ -94,6 +124,17 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
                         })
                     })
                 }
+                // A&B&C satisfies a required X&Y iff every required part is
+                // covered by some part of sub — a value with MORE capabilities
+                // than required still satisfies the narrower requirement.
+                (
+                    Atomic::TIntersection { parts: sub_parts },
+                    Atomic::TIntersection { parts: sup_parts },
+                ) => sup_parts.iter().all(|sup_part| {
+                    sub_parts
+                        .iter()
+                        .any(|sub_part| is_subtype(db, sub_part, sup_part))
+                }),
                 // An intersection type is a subtype of C if any of its parts is a subtype of C
                 // (a value satisfying A&B is also an A and also a B).
                 (Atomic::TIntersection { parts }, b) => {

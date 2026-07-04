@@ -980,6 +980,27 @@ fn narrow_instanceof_preserving_subtypes(
                 result.add_type(narrowed_ty.clone());
             }
             Atomic::TObject | Atomic::TMixed => result.add_type(narrowed_ty.clone()),
+            // `$x instanceof C` on an `A&B`-typed value adds C to the
+            // intersection rather than replacing it — the value is still
+            // guaranteed to be an A and a B, so dropping them here would
+            // falsely reject valid uses of the original intersection.
+            Atomic::TIntersection { parts } => {
+                let already_covered = parts.iter().any(|p| {
+                    p.types.iter().any(|a| {
+                        matches!(a, Atomic::TNamedObject { fqcn, .. }
+                            if named_object_matches_instanceof(fqcn, class_name, db))
+                    })
+                });
+                if already_covered {
+                    result.add_type(atomic.clone());
+                } else {
+                    let mut new_parts: Vec<Type> = parts.iter().cloned().collect();
+                    new_parts.push(Type::single(narrowed_ty.clone()));
+                    result.add_type(Atomic::TIntersection {
+                        parts: std::sync::Arc::from(new_parts),
+                    });
+                }
+            }
             _ => {}
         }
     }

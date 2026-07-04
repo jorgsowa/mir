@@ -6,6 +6,10 @@ use php_ast::Span;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Type};
 
+use mir_codebase::storage::FnParam;
+use mir_types::Name;
+use rustc_hash::FxHashMap;
+
 use crate::expr::ExpressionAnalyzer;
 use crate::flow_state::{self_is_trait, FlowState};
 use crate::symbol::ReferenceKind;
@@ -393,11 +397,37 @@ impl CallAnalyzer {
                 .iter()
                 .map(|a| expr_can_be_passed_by_reference_owned(&a.value))
                 .collect();
+            // `Foo::bar()` has no receiver value to carry type params, so the
+            // seed is empty — class-level bindings come solely from `fqcn`'s
+            // own `@extends`/`@implements` chain.
+            let class_bindings =
+                crate::db::inherited_template_bindings(ea.db, &fqcn, &FxHashMap::default());
+            let mut param_bindings = class_bindings.clone();
+            for tp in resolved.template_params.iter() {
+                param_bindings.remove(&Name::from(tp.name.as_ref()));
+            }
+            let substituted_params: Vec<FnParam>;
+            let effective_params: &[FnParam] = if param_bindings.is_empty() {
+                &resolved.params
+            } else {
+                substituted_params = resolved
+                    .params
+                    .iter()
+                    .map(|p| FnParam {
+                        ty: mir_codebase::wrap_param_type(
+                            p.ty.as_ref()
+                                .map(|t| t.substitute_templates(&param_bindings)),
+                        ),
+                        ..p.clone()
+                    })
+                    .collect();
+                &substituted_params
+            };
             check_args(
                 ea,
                 CheckArgsParams {
                     fn_name: method_name,
-                    params: &resolved.params,
+                    params: effective_params,
                     arg_types: &arg_types,
                     arg_spans: &arg_spans,
                     arg_names: &arg_names,
@@ -411,10 +441,15 @@ impl CallAnalyzer {
             let owner_fqcn = resolved.owner_fqcn.clone();
             let ret_raw = resolved.return_ty_raw;
             let ret_substituted = substitute_static_in_return(ret_raw, &fqcn_arc);
+            let ret_substituted = if class_bindings.is_empty() {
+                ret_substituted
+            } else {
+                ret_substituted.substitute_templates(&class_bindings)
+            };
             let ret = if !resolved.template_params.is_empty() {
                 let bindings = infer_template_bindings(
                     &resolved.template_params,
-                    &resolved.params,
+                    effective_params,
                     &arg_types,
                 );
                 ret_substituted.substitute_templates(&bindings)

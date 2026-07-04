@@ -15,10 +15,19 @@ pub(super) fn normalize_fqcn(s: &str) -> String {
 /// Detects:
 /// - unclosed generics (`array<`, `Foo<Bar`)
 /// - `$variable` in type position (only `$this` is valid)
+/// - a stray `@` (an adjacent tag glued on with no separating space)
 pub(super) fn validate_type_str(s: &str, tag: &str) -> Option<String> {
     let s = s.trim();
     if s.is_empty() {
         return None;
+    }
+    // A bare `@` inside a type expression means an adjacent tag got glued to
+    // this one with no separating whitespace (`@template T@extends Foo`) —
+    // PHP type syntax never contains `@`.
+    if s.contains('@') {
+        return Some(format!(
+            "@{tag} has a malformed type `{s}` — a neighboring tag may be missing a space"
+        ));
     }
     if is_inside_generics(s) {
         return Some(format!("@{tag} has unclosed generic type `{s}`"));

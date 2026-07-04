@@ -722,7 +722,7 @@ fn resolve_method_return<'a>(
             .map(|tps| tps.to_vec())
             .unwrap_or_default();
         let mut bindings = build_class_bindings(&class_tps, receiver_type_params);
-        for (k, v) in crate::db::inherited_template_bindings(ea.db, fqcn) {
+        for (k, v) in crate::db::inherited_template_bindings(ea.db, fqcn, &bindings) {
             bindings.entry(k).or_insert(v);
         }
 

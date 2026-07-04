@@ -105,6 +105,9 @@ impl DocblockParser {
                     if let Some((name, bound)) =
                         parse_template_line(tag.name.as_str(), body_text(&tag.body))
                     {
+                        if let Some(msg) = validate_type_str(&name, "template") {
+                            result.invalid_annotations.push(msg);
+                        }
                         if let Some(b) = &bound {
                             if let Some(msg) = validate_type_str(b, "template") {
                                 result.invalid_annotations.push(msg);
@@ -121,6 +124,9 @@ impl DocblockParser {
                     if let Some((name, bound)) =
                         parse_template_line(tag.name.as_str(), body_text(&tag.body))
                     {
+                        if let Some(msg) = validate_type_str(&name, "template-covariant") {
+                            result.invalid_annotations.push(msg);
+                        }
                         if let Some(b) = &bound {
                             if let Some(msg) = validate_type_str(b, "template-covariant") {
                                 result.invalid_annotations.push(msg);
@@ -137,6 +143,9 @@ impl DocblockParser {
                     if let Some((name, bound)) =
                         parse_template_line(tag.name.as_str(), body_text(&tag.body))
                     {
+                        if let Some(msg) = validate_type_str(&name, "template-contravariant") {
+                            result.invalid_annotations.push(msg);
+                        }
                         if let Some(b) = &bound {
                             if let Some(msg) = validate_type_str(b, "template-contravariant") {
                                 result.invalid_annotations.push(msg);
@@ -151,12 +160,20 @@ impl DocblockParser {
                 }
                 "extends" | "template-extends" | "phpstan-extends" => {
                     if let Some(body_str) = body_text(&tag.body) {
-                        result.extends = Some(parse_type_string(body_str.trim()));
+                        let trimmed = body_str.trim();
+                        if let Some(msg) = validate_type_str(trimmed, "extends") {
+                            result.invalid_annotations.push(msg);
+                        }
+                        result.extends = Some(parse_type_string(trimmed));
                     }
                 }
                 "implements" | "template-implements" | "phpstan-implements" => {
                     if let Some(body_str) = body_text(&tag.body) {
-                        result.implements.push(parse_type_string(body_str.trim()));
+                        let trimmed = body_str.trim();
+                        if let Some(msg) = validate_type_str(trimmed, "implements") {
+                            result.invalid_annotations.push(msg);
+                        }
+                        result.implements.push(parse_type_string(trimmed));
                     }
                 }
                 "assert" | "psalm-assert" | "phpstan-assert" => {

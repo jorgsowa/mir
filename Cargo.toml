@@ -28,7 +28,7 @@ mir-analyzer   = { path = "crates/mir-analyzer",   version = "0.50.2" }
 php-rs-parser   = "0.18.1"
 php-ast         = "0.18.1"
 php-lexer       = "0.18.1"
-phpdoc-parser   = "0.18.1"
+phpdoc-parser   = "0.18.2"
 # Data structures
 indexmap = { version = "2", features = ["serde"] }
 smallvec = { version = "1", features = ["union", "serde"] }

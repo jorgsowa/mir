@@ -99,11 +99,24 @@ pub fn class_template_params(db: &dyn MirDatabase, fqcn: &str) -> Option<Arc<[Te
     Some(Arc::from(class.template_params().to_vec()))
 }
 
-/// Walk the parent chain collecting template bindings from `@extends` type
-/// args. For `class UserRepo extends BaseRepo` with `@extends BaseRepo<User>`,
-/// returns `{ T → User }` where `T` is `BaseRepo`'s declared template parameter.
-pub fn inherited_template_bindings(db: &dyn MirDatabase, fqcn: &str) -> FxHashMap<Name, Type> {
+/// Walk the parent chain collecting template bindings from `@extends` and
+/// `@implements` type args. For `class UserRepo extends BaseRepo` with
+/// `@extends BaseRepo<User>`, returns `{ T → User }` where `T` is `BaseRepo`'s
+/// declared template parameter — likewise for `@implements Iface<V>` at any
+/// level of the chain.
+///
+/// `own_bindings` seeds the walk with the starting class's own template
+/// bindings (e.g. `T → int` from a `Box<int>` receiver), so a type arg that
+/// references that class's own template (`class Box<T> implements
+/// Container<T>`) resolves to the concrete type instead of leaking the bare
+/// placeholder name.
+pub fn inherited_template_bindings(
+    db: &dyn MirDatabase,
+    fqcn: &str,
+    own_bindings: &FxHashMap<Name, Type>,
+) -> FxHashMap<Name, Type> {
     let mut bindings: FxHashMap<Name, Type> = FxHashMap::default();
+    let mut substitution: FxHashMap<Name, Type> = own_bindings.clone();
     let mut visited: FxHashSet<Arc<str>> = FxHashSet::default();
     let mut current: Arc<str> = Arc::from(fqcn);
     loop {
@@ -115,6 +128,20 @@ pub fn inherited_template_bindings(db: &dyn MirDatabase, fqcn: &str) -> FxHashMa
         else {
             break;
         };
+
+        for (iface, args) in class.implements_type_args() {
+            let Some(iface_tps) = class_template_params(db, iface.as_ref()) else {
+                continue;
+            };
+            for (tp, ty) in iface_tps.iter().zip(args.iter()) {
+                let resolved_ty = ty.substitute_templates(&substitution);
+                substitution
+                    .entry(tp.name)
+                    .or_insert_with(|| resolved_ty.clone());
+                bindings.entry(tp.name).or_insert(resolved_ty);
+            }
+        }
+
         let Some(parent) = class.parent().cloned() else {
             break;
         };
@@ -122,7 +149,16 @@ pub fn inherited_template_bindings(db: &dyn MirDatabase, fqcn: &str) -> FxHashMa
         if !extends_type_args.is_empty() {
             if let Some(parent_tps) = class_template_params(db, parent.as_ref()) {
                 for (tp, ty) in parent_tps.iter().zip(extends_type_args.iter()) {
-                    bindings.entry(tp.name).or_insert_with(|| ty.clone());
+                    // Substitute bindings gathered so far — an ancestor's own
+                    // extends args may reference a template that was only
+                    // just bound one level down (e.g. `@extends Grand<U>`
+                    // where `U` is this class's own template, itself bound
+                    // by the descendant we walked from).
+                    let resolved_ty = ty.substitute_templates(&substitution);
+                    substitution
+                        .entry(tp.name)
+                        .or_insert_with(|| resolved_ty.clone());
+                    bindings.entry(tp.name).or_insert(resolved_ty);
                 }
             }
         }

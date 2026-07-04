@@ -123,7 +123,9 @@ pub fn check_template_bounds_with_inheritance<'a>(
                         || name.eq_ignore_ascii_case("static")
                         || name.eq_ignore_ascii_case("parent")
                         || template_params.iter().any(|tp| tp.name.as_ref() == name)
-                }) || type_params.iter().any(is_unresolved_shallow)
+                }) || type_params
+                    .iter()
+                    .any(|t| is_unresolved_shallow(t, template_params))
             }
             _ => false,
         })
@@ -152,17 +154,23 @@ pub fn check_template_bounds_with_inheritance<'a>(
 
 /// Shallow variant of the unresolved-placeholder check for nested type params
 /// (one level is enough: `Collection<TKey, ...>` with a bare `TKey` inside).
-fn is_unresolved_shallow(ty: &Type) -> bool {
+/// Must check the name against the actual declared `template_params` — an
+/// ordinary concrete class name is also a bare, namespace-less `TNamedObject`
+/// and must not be mistaken for an unbound placeholder.
+fn is_unresolved_shallow(ty: &Type, template_params: &[TemplateParam]) -> bool {
     ty.types.iter().any(|a| match a {
         Atomic::TTemplateParam { .. }
         | Atomic::TSelf { .. }
         | Atomic::TStaticObject { .. }
         | Atomic::TParent { .. } => true,
         Atomic::TNamedObject { fqcn, type_params } => {
-            type_params.is_empty()
-                && !fqcn.contains('\\')
-                && fqcn.chars().next().is_some_and(|c| c.is_ascii_uppercase())
-                && fqcn.as_str() != "Closure"
+            type_params.is_empty() && !fqcn.contains('\\') && {
+                let name = fqcn.as_str();
+                name.eq_ignore_ascii_case("self")
+                    || name.eq_ignore_ascii_case("static")
+                    || name.eq_ignore_ascii_case("parent")
+                    || template_params.iter().any(|tp| tp.name.as_ref() == name)
+            }
         }
         _ => false,
     })

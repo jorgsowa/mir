@@ -478,13 +478,31 @@ fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -
             Atomic::TIntersection { parts } => {
                 // An intersection of named types is an object; check if param accepts
                 // `object` or if any part of the intersection satisfies the param.
-                return param
+                if param
                     .types
                     .iter()
                     .any(|p| matches!(p, Atomic::TObject | Atomic::TMixed))
-                    || parts
-                        .iter()
-                        .any(|part| named_object_subtype(part, param, ea));
+                {
+                    return true;
+                }
+                // If param itself requires an intersection, every required part must
+                // be covered by SOME part of arg — checking any single arg part
+                // against the whole param (the fallback below) wrongly rejects an
+                // arg with MORE capabilities than required, e.g. passing `A&B&C`
+                // where only `A&B` is needed.
+                if let Some(param_parts) = param.types.iter().find_map(|p| match p {
+                    Atomic::TIntersection { parts } => Some(parts),
+                    _ => None,
+                }) {
+                    return param_parts.iter().all(|param_part| {
+                        parts
+                            .iter()
+                            .any(|arg_part| named_object_subtype(arg_part, param_part, ea))
+                    });
+                }
+                return parts
+                    .iter()
+                    .any(|part| named_object_subtype(part, param, ea));
             }
             // Bare `object` satisfies any param that accepts `object` or `mixed`.
             Atomic::TObject => {

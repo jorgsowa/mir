@@ -632,15 +632,16 @@ pub(super) fn parse_template_line(
     if body.is_empty() {
         return None;
     }
-    if let Some((name, bound)) = body.split_once(" of ").or_else(|| body.split_once(" as ")) {
-        let bound = bound.trim();
-        Some((
-            name.trim().to_string(),
-            (!bound.is_empty()).then(|| bound.to_string()),
-        ))
+    // Whitespace-split rather than matching a literal " of "/" as " substring
+    // — a tab-separated docblock (`@template\tT\tof\tBound`) must bind the
+    // bound too, not silently fall through to the no-bound case.
+    let mut tokens = body.split_whitespace().peekable();
+    let name = tokens.next()?;
+    if matches!(tokens.peek(), Some(&"of") | Some(&"as")) {
+        tokens.next();
+        let bound: String = tokens.collect::<Vec<_>>().join(" ");
+        Some((name.to_string(), (!bound.is_empty()).then_some(bound)))
     } else {
-        // No bound: take just the first whitespace-delimited token as the name.
-        let name = body.split_whitespace().next().unwrap_or(body);
         Some((name.to_string(), None))
     }
 }
@@ -709,8 +710,11 @@ pub(super) fn parse_param_line(s: &str) -> Option<(String, String)> {
             '>' | ')' | '}' => depth = (depth - 1).max(0),
             _ if ch.is_whitespace() && depth == 0 => {
                 let after = first_line[i..].trim_start();
-                // Accept `$name` or `&$name` (by-reference params in PHPDoc)
+                // Accept `$name`, `&$name` (by-reference), and `...$name` /
+                // `&...$name` (variadic) — a variadic docblock param must
+                // still resolve to a name or the whole @param line is lost.
                 let after_stripped = after.strip_prefix('&').unwrap_or(after);
+                let after_stripped = after_stripped.strip_prefix("...").unwrap_or(after_stripped);
                 if after_stripped.starts_with('$') {
                     if let Some(name_with_dollar) = after_stripped.split(char::is_whitespace).next()
                     {
