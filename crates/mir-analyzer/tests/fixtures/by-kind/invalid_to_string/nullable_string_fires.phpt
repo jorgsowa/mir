@@ -9,4 +9,4 @@ class NullableReturn {
 }
 new NullableReturn();
 ===expect===
-InvalidToString@3:42-5:43: Method NullableReturn::__toString() must return a string
+InvalidToString@3:42-5:5: Method NullableReturn::__toString() must return a string

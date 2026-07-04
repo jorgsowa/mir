@@ -25,6 +25,6 @@ class Foo {
     }
 }
 ===expect===
-InvalidReturnType@3:32-4:33: Return type 'void' is not compatible with declared 'never'
-InvalidReturnType@6:37-8:38: Return type 'void' is not compatible with declared 'never'
-InvalidReturnType@15:50-16:51: Return type 'void' is not compatible with declared 'never'
+InvalidReturnType@3:32-4:1: Return type 'void' is not compatible with declared 'never'
+InvalidReturnType@6:37-8:1: Return type 'void' is not compatible with declared 'never'
+InvalidReturnType@15:50-16:5: Return type 'void' is not compatible with declared 'never'

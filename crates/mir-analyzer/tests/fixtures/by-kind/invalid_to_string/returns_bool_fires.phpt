@@ -9,4 +9,4 @@ class BoolReturn {
 }
 new BoolReturn();
 ===expect===
-InvalidToString@3:39-5:40: Method BoolReturn::__toString() must return a string
+InvalidToString@3:39-5:5: Method BoolReturn::__toString() must return a string

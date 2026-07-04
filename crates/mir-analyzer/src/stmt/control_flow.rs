@@ -75,7 +75,9 @@ impl<'a> StatementsAnalyzer<'a> {
                             line,
                             line_end,
                             col_start,
-                            col_end: col_end.max(col_start + 1),
+                            col_end: crate::diagnostics::clamp_col_end(
+                                line, line_end, col_start, col_end,
+                            ),
                         },
                     )
                     .with_snippet(
@@ -155,7 +157,9 @@ impl<'a> StatementsAnalyzer<'a> {
                         line,
                         line_end,
                         col_start,
-                        col_end: col_end.max(col_start + 1),
+                        col_end: crate::diagnostics::clamp_col_end(
+                            line, line_end, col_start, col_end,
+                        ),
                     },
                 )
                 .with_snippet(
@@ -339,7 +343,9 @@ impl<'a> StatementsAnalyzer<'a> {
                             line,
                             line_end,
                             col_start,
-                            col_end: col_end.max(col_start + 1),
+                            col_end: crate::diagnostics::clamp_col_end(
+                                line, line_end, col_start, col_end,
+                            ),
                         },
                     )
                     .with_snippet(
@@ -394,7 +400,9 @@ impl<'a> StatementsAnalyzer<'a> {
                         line,
                         line_end,
                         col_start,
-                        col_end: col_end.max(col_start + 1),
+                        col_end: crate::diagnostics::clamp_col_end(
+                            line, line_end, col_start, col_end,
+                        ),
                     },
                 )
                 .with_snippet(parser::span_text(self.source, span).unwrap_or_default()),
@@ -445,7 +453,9 @@ impl<'a> StatementsAnalyzer<'a> {
                                 line,
                                 line_end,
                                 col_start,
-                                col_end: col_end.max(col_start + 1),
+                                col_end: crate::diagnostics::clamp_col_end(
+                                    line, line_end, col_start, col_end,
+                                ),
                             },
                         )
                         .with_snippet(parser::span_text(self.source, val.span).unwrap_or_default()),
@@ -495,7 +505,9 @@ impl<'a> StatementsAnalyzer<'a> {
                                         line,
                                         line_end,
                                         col_start,
-                                        col_end: col_end.max(col_start + 1),
+                                        col_end: crate::diagnostics::clamp_col_end(
+                                            line, line_end, col_start, col_end,
+                                        ),
                                     },
                                 )
                                 .with_snippet(
@@ -601,13 +613,15 @@ impl<'a> StatementsAnalyzer<'a> {
                     if !matches!(resolved.as_str(), "self" | "static" | "parent") {
                         let span = catch_ty.span;
                         let (line, col_start) = self.offset_to_line_col(span.start);
-                        let (_, col_end) = self.offset_to_line_col(span.end);
+                        let (line_end, col_end) = self.offset_to_line_col(span.end);
                         self.db.record_reference_location(crate::db::RefLoc {
                             symbol_key: Arc::from(resolved.as_str()),
                             file: self.file.clone(),
                             line,
                             col_start,
-                            col_end: col_end.max(col_start + 1),
+                            col_end: crate::diagnostics::clamp_col_end(
+                                line, line_end, col_start, col_end,
+                            ),
                         });
                         // Check if the caught type extends Throwable
                         if crate::db::class_exists(self.db, &resolved) {
@@ -627,7 +641,9 @@ impl<'a> StatementsAnalyzer<'a> {
                                             line,
                                             line_end,
                                             col_start,
-                                            col_end: col_end2.max(col_start + 1),
+                                            col_end: crate::diagnostics::clamp_col_end(
+                                                line, line_end, col_start, col_end2,
+                                            ),
                                         },
                                     ));
                                 }
@@ -650,7 +666,9 @@ impl<'a> StatementsAnalyzer<'a> {
                                         line,
                                         line_end,
                                         col_start,
-                                        col_end: col_end2.max(col_start + 1),
+                                        col_end: crate::diagnostics::clamp_col_end(
+                                            line, line_end, col_start, col_end2,
+                                        ),
                                     },
                                 ));
                             }

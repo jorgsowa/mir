@@ -9,4 +9,4 @@ class InferredReturn {
 }
 new InferredReturn();
 ===expect===
-InvalidToString@3:33-5:34: Method InferredReturn::__toString() must return a string
+InvalidToString@3:33-5:5: Method InferredReturn::__toString() must return a string

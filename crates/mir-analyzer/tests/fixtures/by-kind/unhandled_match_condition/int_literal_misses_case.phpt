@@ -10,4 +10,4 @@ function label(int $n): string {
     };
 }
 ===expect===
-UnhandledMatchCondition@4:11-7:12: Unhandled match condition: 3
+UnhandledMatchCondition@4:11-7:5: Unhandled match condition: 3

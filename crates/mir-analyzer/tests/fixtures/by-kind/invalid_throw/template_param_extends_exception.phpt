@@ -12,4 +12,3 @@ function rethrow($e): never {
     throw $e;
 }
 ===expect===
-

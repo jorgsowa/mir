@@ -27,4 +27,3 @@ function test_nonneg(int $x): void {
     }
 }
 ===expect===
-

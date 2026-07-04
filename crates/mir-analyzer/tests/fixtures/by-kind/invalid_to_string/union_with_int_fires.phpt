@@ -12,4 +12,4 @@ class UnionReturn {
 }
 new UnionReturn();
 ===expect===
-InvalidToString@4:33-6:34: Method UnionReturn::__toString() must return a string
+InvalidToString@4:33-6:5: Method UnionReturn::__toString() must return a string

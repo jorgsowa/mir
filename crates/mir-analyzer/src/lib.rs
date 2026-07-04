@@ -375,7 +375,7 @@ pub fn location_from_span(
         line,
         line_end,
         col_start,
-        col_end: col_end.max(col_start.saturating_add(1)),
+        col_end: diagnostics::clamp_col_end(line, line_end, col_start, col_end),
     }
 }
 pub use symbol::{DeclarationKind, DocumentSymbol, ReferenceKind, ResolvedSymbol};

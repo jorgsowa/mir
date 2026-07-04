@@ -19,5 +19,5 @@ class Pipe {
     }
 }
 ===expect===
-ImpureMethodCall@14:18-14:28: Calling impure method read() in a pure or immutable context
 ImpureMethodCall@14:8-14:29: Calling impure method write() in a pure or immutable context
+ImpureMethodCall@14:18-14:28: Calling impure method read() in a pure or immutable context

@@ -26,4 +26,3 @@ function test(Child $c): void {
     echo get_class($result);
 }
 ===expect===
-

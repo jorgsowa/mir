@@ -64,4 +64,3 @@ function test_already_class_string(string $cls): void {
     }
 }
 ===expect===
-

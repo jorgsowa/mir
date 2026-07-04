@@ -15,4 +15,3 @@ function test(int $n): void {
     }
 }
 ===expect===
-

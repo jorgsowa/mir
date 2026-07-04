@@ -10,4 +10,4 @@ function label(string $color): string {
     };
 }
 ===expect===
-UnhandledMatchCondition@4:11-7:12: Unhandled match condition: "blue"
+UnhandledMatchCondition@4:11-7:5: Unhandled match condition: "blue"

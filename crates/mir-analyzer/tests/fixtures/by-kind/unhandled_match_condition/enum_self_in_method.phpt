@@ -16,4 +16,4 @@ enum Direction {
     }
 }
 ===expect===
-UnhandledMatchCondition@9:15-12:16: Unhandled match condition: Direction::East, Direction::West
+UnhandledMatchCondition@9:15-12:9: Unhandled match condition: Direction::East, Direction::West

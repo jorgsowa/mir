@@ -11,4 +11,4 @@ function label(Direction $d): string {
     };
 }
 ===expect===
-UnhandledMatchCondition@5:11-8:12: Unhandled match condition: Direction::East, Direction::West
+UnhandledMatchCondition@5:11-8:5: Unhandled match condition: Direction::East, Direction::West

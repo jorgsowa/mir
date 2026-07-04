@@ -529,14 +529,14 @@ impl<'a> BodyAnalyzer<'a> {
             for (fqcn, span) in collect_type_hint_class_refs(hint, self.db, file) {
                 let (line, col_start) =
                     crate::diagnostics::offset_to_line_col(source, span.start, source_map);
-                let (_, col_end) =
+                let (line_end, col_end) =
                     crate::diagnostics::offset_to_line_col(source, span.end, source_map);
                 self.db.record_reference_location(crate::db::RefLoc {
                     symbol_key: fqcn,
                     file: file.clone(),
                     line,
                     col_start,
-                    col_end: col_end.max(col_start + 1),
+                    col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
                 });
             }
         }
@@ -759,27 +759,23 @@ fn fn_header_name_span(source: &str, decl: &php_ast::owned::FunctionDecl) -> php
         .map(|p| p.span.start)
         .unwrap_or(decl.body.span.start) as usize;
     let anchor = anchor.min(source.len());
-    let fallback = php_ast::Span {
-        start: decl.body.span.start,
-        end: decl.body.span.start + 1,
-    };
+    // `decl.body.span` always covers a real `{ ... }` block, so it's never
+    // degenerate — unlike a synthesized single-byte span, it's a safe fallback.
+    let fallback = decl.body.span;
     let Some(name) = decl.name.as_deref() else {
         return fallback;
     };
     if name.is_empty() {
         return fallback;
     }
-    let search_start = anchor.saturating_sub(name.len() + 256);
-    // Align to UTF-8 char boundaries to avoid a panic on multi-byte characters.
-    let search_start = (search_start..=anchor.min(source.len()))
-        .find(|&i| source.is_char_boundary(i))
-        .unwrap_or(anchor);
+    // Search the whole prefix rather than a fixed lookback window, so long
+    // attribute lists or doc comments before the name can't push it out of range.
     let anchor = (anchor..=source.len())
         .find(|&i| source.is_char_boundary(i))
         .unwrap_or(source.len());
-    match source[search_start..anchor].rfind(name) {
+    match source[..anchor].rfind(name) {
         Some(rel) => {
-            let start = (search_start + rel) as u32;
+            let start = rel as u32;
             php_ast::Span {
                 start,
                 end: start + name.len() as u32,
@@ -864,7 +860,7 @@ pub(crate) fn check_use_decl_casing(
             line,
             line_end,
             col_start,
-            col_end: col_end.max(col_start + 1),
+            col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
         };
         match effective_kind {
             UseKind::Normal => {

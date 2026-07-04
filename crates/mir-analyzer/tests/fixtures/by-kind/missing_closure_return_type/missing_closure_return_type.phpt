@@ -8,4 +8,4 @@ $a = function() {
     return "foo";
 };
 ===expect===
-MissingClosureReturnType@2:5-4:6: Closure has no return type annotation
+MissingClosureReturnType@2:5-4:1: Closure has no return type annotation

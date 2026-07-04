@@ -39,4 +39,3 @@ function test_neg_minus_one(int $a): void {
     $_ = $x;
 }
 ===expect===
-

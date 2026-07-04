@@ -16,4 +16,4 @@ foreach (Suit::cases() as $case) {
     };
 }
 ===expect===
-UnhandledMatchCondition@10:9-13:10: Unhandled match condition: Suit::Spades
+UnhandledMatchCondition@10:9-13:5: Unhandled match condition: Suit::Spades

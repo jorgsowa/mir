@@ -664,7 +664,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 line,
                 line_end,
                 col_start,
-                col_end: col_end.max(col_start + 1),
+                col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
             },
         );
         issue.severity = severity;
@@ -915,14 +915,28 @@ mod tests {
 
     #[test]
     fn col_end_minimum_width() {
-        // Ensure col_end is at least col_start + 1 (1 character minimum)
-        let col_start = 0u16;
-        let col_end = 0u16; // Would happen if span.start == span.end
-        let effective_col_end = col_end.max(col_start + 1);
-
+        // Same-line span: ensure col_end is at least col_start + 1 (1 character minimum).
+        let effective_col_end = crate::diagnostics::clamp_col_end(1, 1, 0, 0);
         assert_eq!(
             effective_col_end, 1,
-            "col_end should be at least col_start + 1"
+            "col_end should be at least col_start + 1 on the same line"
+        );
+    }
+
+    #[test]
+    fn col_end_not_clamped_across_lines() {
+        // A multi-line span (e.g. a `new Foo(\n ...\n)` call) legitimately has
+        // col_end smaller than col_start, since they're columns on different
+        // lines. Regression for a bug where `.max(col_start + 1)` was applied
+        // unconditionally, producing a nonsensical column past the end of the
+        // end line's actual content (see `TooManyArguments` on 0-arg `new` calls).
+        let col_start = 11u16; // e.g. "    return new Foo(" — "new" starts at col 11
+        let col_end = 5u16; // e.g. "    );" — ")" ends at col 5
+        let effective_col_end = crate::diagnostics::clamp_col_end(1, 8, col_start, col_end);
+
+        assert_eq!(
+            effective_col_end, col_end,
+            "col_end on a different line must not be clamped up to col_start + 1"
         );
     }
 

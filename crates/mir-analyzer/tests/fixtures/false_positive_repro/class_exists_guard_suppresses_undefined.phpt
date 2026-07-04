@@ -25,4 +25,3 @@ if (interface_exists(\Countable::class)) {
     };
 }
 ===expect===
-

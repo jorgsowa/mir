@@ -10,4 +10,3 @@ php_version=8.2
 // ISO 8601 repeating interval form — only 1 required arg across all DatePeriod overloads
 $_ = new DatePeriod('R5/2023-01-01T00:00:00Z/P1D');
 ===expect===
-

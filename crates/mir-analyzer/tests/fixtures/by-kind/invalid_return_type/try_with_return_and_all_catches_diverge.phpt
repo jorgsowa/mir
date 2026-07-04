@@ -30,4 +30,4 @@ function noReturnStillErrors(): bool {
     }
 }
 ===expect===
-InvalidReturnType@20:37-26:38: Return type 'void' is not compatible with declared 'bool'
+InvalidReturnType@20:37-26:1: Return type 'void' is not compatible with declared 'bool'

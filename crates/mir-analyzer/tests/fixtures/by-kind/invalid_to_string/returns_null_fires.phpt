@@ -11,4 +11,4 @@ class NullReturn {
 }
 new NullReturn();
 ===expect===
-InvalidToString@3:39-5:40: Method NullReturn::__toString() must return a string
+InvalidToString@3:39-5:5: Method NullReturn::__toString() must return a string

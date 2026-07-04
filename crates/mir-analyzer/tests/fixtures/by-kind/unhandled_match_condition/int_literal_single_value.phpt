@@ -11,4 +11,4 @@ function check(int $n): string {
     };
 }
 ===expect===
-UnhandledMatchCondition@4:11-6:12: Unhandled match condition: 42
+UnhandledMatchCondition@4:11-6:5: Unhandled match condition: 42

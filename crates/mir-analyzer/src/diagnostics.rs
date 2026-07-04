@@ -58,6 +58,19 @@ pub(crate) fn offset_to_line_col(
     (line, col)
 }
 
+/// Widen a same-line span by at least one column so a genuinely zero-width
+/// span (e.g. `start == end`) still renders as a visible range. Must NOT be
+/// applied across lines: `col_start`/`col_end` are columns on different lines
+/// there, so comparing them is meaningless — taking their max produces a
+/// nonsensical column past the end of `line_end`'s actual content.
+pub(crate) fn clamp_col_end(line: u32, line_end: u32, col_start: u16, col_end: u16) -> u16 {
+    if line == line_end {
+        col_end.max(col_start.saturating_add(1))
+    } else {
+        col_end
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Type-hint class existence checker
 // ---------------------------------------------------------------------------
@@ -115,7 +128,7 @@ pub(crate) fn check_type_hint_classes(
                             line,
                             line_end,
                             col_start,
-                            col_end: col_end.max(col_start + 1),
+                            col_end: clamp_col_end(line, line_end, col_start, col_end),
                         },
                     )
                     .with_snippet(crate::parser::span_text(source, hint.span).unwrap_or_default()),
@@ -144,7 +157,7 @@ pub(crate) fn check_type_hint_classes(
                                 line,
                                 line_end,
                                 col_start,
-                                col_end: col_end.max(col_start + 1),
+                                col_end: clamp_col_end(line, line_end, col_start, col_end),
                             },
                         ));
                     }
@@ -166,7 +179,7 @@ pub(crate) fn check_type_hint_classes(
                                 line,
                                 line_end,
                                 col_start,
-                                col_end: col_end.max(col_start + 1),
+                                col_end: clamp_col_end(line, line_end, col_start, col_end),
                             },
                         ));
                     }
@@ -309,7 +322,7 @@ fn check_name_class_with_context(
                     line,
                     line_end,
                     col_start,
-                    col_end: col_end.max(col_start + 1),
+                    col_end: clamp_col_end(line, line_end, col_start, col_end),
                 },
             )
             .with_snippet(crate::parser::span_text(source, span).unwrap_or_default()),
@@ -336,7 +349,7 @@ fn check_name_class_with_context(
                             line,
                             line_end,
                             col_start,
-                            col_end: col_end.max(col_start + 1),
+                            col_end: clamp_col_end(line, line_end, col_start, col_end),
                         },
                     )
                     .with_snippet(crate::parser::span_text(source, span).unwrap_or_default()),
@@ -396,7 +409,7 @@ pub(crate) fn check_expr_for_undefined_classes(
                             line,
                             line_end,
                             col_start,
-                            col_end: col_end.max(col_start + 1),
+                            col_end: clamp_col_end(line, line_end, col_start, col_end),
                         },
                     )
                     .with_snippet(
@@ -456,7 +469,7 @@ pub(crate) fn emit_unused_params(
                         line,
                         line_end,
                         col_start,
-                        col_end: col_end.max(col_start + 1),
+                        col_end: clamp_col_end(line, line_end, col_start, col_end),
                     },
                 )
                 .with_snippet(format!("${name}")),
@@ -498,7 +511,7 @@ pub(crate) fn check_to_string_return(
             line,
             line_end,
             col_start,
-            col_end: col_end.max(col_start + 1),
+            col_end: clamp_col_end(line, line_end, col_start, col_end),
         },
     ));
 }
@@ -583,7 +596,7 @@ pub(crate) fn check_missing_return(
             line,
             line_end,
             col_start,
-            col_end: col_end.max(col_start + 1),
+            col_end: clamp_col_end(line, line_end, col_start, col_end),
         },
     ));
 }
@@ -652,7 +665,7 @@ pub(crate) fn emit_unused_variables(
                     line,
                     line_end,
                     col_start,
-                    col_end: col_end.max(col_start + 1),
+                    col_end: clamp_col_end(line, line_end, col_start, col_end),
                 },
             ));
         }

@@ -32,5 +32,5 @@ function calls_never(bool $flag): never {
     always_throws($flag);
 }
 ===expect===
-InvalidReturnType@4:46-8:47: Return type 'void' is not compatible with declared 'never'
-InvalidReturnType@11:45-15:46: Return type 'void' is not compatible with declared 'never'
+InvalidReturnType@4:46-8:1: Return type 'void' is not compatible with declared 'never'
+InvalidReturnType@11:45-15:1: Return type 'void' is not compatible with declared 'never'

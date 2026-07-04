@@ -30,4 +30,3 @@ if (!class_exists(\NonExistent\AnotherOptional::class)) {
 
 class UsesAnotherOptional extends \NonExistent\AnotherOptional {}
 ===expect===
-

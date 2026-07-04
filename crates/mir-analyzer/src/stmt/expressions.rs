@@ -67,7 +67,9 @@ impl<'a> StatementsAnalyzer<'a> {
                         line,
                         line_end,
                         col_start,
-                        col_end: col_end.max(col_start + 1),
+                        col_end: crate::diagnostics::clamp_col_end(
+                            line, line_end, col_start, col_end,
+                        ),
                     },
                 );
                 let start = stmt_span.start as usize;
@@ -107,7 +109,9 @@ impl<'a> StatementsAnalyzer<'a> {
                             line,
                             line_end,
                             col_start,
-                            col_end: col_end.max(col_start + 1),
+                            col_end: crate::diagnostics::clamp_col_end(
+                                line, line_end, col_start, col_end,
+                            ),
                         },
                     ));
                 }

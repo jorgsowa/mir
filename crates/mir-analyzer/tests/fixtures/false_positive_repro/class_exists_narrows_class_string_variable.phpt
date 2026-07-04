@@ -41,4 +41,3 @@ function describeIfExists(string $iface): string {
     return 'not found';
 }
 ===expect===
-

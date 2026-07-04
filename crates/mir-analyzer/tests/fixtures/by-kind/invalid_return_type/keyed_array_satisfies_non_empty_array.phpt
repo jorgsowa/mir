@@ -7,4 +7,3 @@ function test(): array {
     return ['a' => 1, 'b' => 2];
 }
 ===expect===
-

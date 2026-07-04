@@ -13,4 +13,4 @@ class A {
     }
 }
 ===expect===
-InvalidReturnType@4:29-10:30: Return type 'void' is not compatible with declared 'bool'
+InvalidReturnType@4:29-10:5: Return type 'void' is not compatible with declared 'bool'
