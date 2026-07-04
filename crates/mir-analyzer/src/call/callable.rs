@@ -1436,14 +1436,82 @@ pub(crate) fn check_min_arity_callback(
 /// param — almost certainly an unsubstituted generic (e.g. `TValue` in a Laravel-style
 /// `callable(TValue): bool` docblock) rather than a real, checkable type. Comparing
 /// against these would produce false positives for generic callable signatures.
-fn contains_unresolvable_named_type(ty: &Type, ea: &ExpressionAnalyzer<'_>) -> bool {
-    ty.types.iter().any(|a| match a {
-        Atomic::TNamedObject { fqcn, .. } => {
-            !fqcn.contains('\\') && !crate::db::class_exists(ea.db, fqcn.as_ref())
+///
+/// `template_names` additionally catches the rare case where a bareword happens to name a
+/// *real* class that shadows an unrelated `@template` of the same name (e.g. a project
+/// class literally named `T`) — a plain `class_exists` check alone would treat that as a
+/// resolvable type and compare against it, which is wrong: within this function/method,
+/// the name refers to the template, not the shadowed class.
+///
+/// Recurses into containers (array/list key & value, keyed-array shapes, intersections,
+/// generic type arguments, nested callable/closure signatures) — a shallow top-level-only
+/// check would miss e.g. `array<TKey, TValue>` or `Collection<TValue>` used as a typed
+/// callable's own parameter type.
+fn contains_unresolvable_named_type(
+    ty: &Type,
+    ea: &ExpressionAnalyzer<'_>,
+    template_names: &rustc_hash::FxHashSet<&str>,
+) -> bool {
+    ty.types
+        .iter()
+        .any(|a| atomic_contains_unresolvable_named_type(a, ea, template_names))
+}
+
+fn atomic_contains_unresolvable_named_type(
+    a: &Atomic,
+    ea: &ExpressionAnalyzer<'_>,
+    template_names: &rustc_hash::FxHashSet<&str>,
+) -> bool {
+    match a {
+        Atomic::TNamedObject { fqcn, type_params } => {
+            (!fqcn.contains('\\')
+                && (template_names.contains(fqcn.as_ref())
+                    || !crate::db::class_exists(ea.db, fqcn.as_ref())))
+                || type_params
+                    .iter()
+                    .any(|tp| contains_unresolvable_named_type(tp, ea, template_names))
         }
         Atomic::TTemplateParam { .. } => true,
+        Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value } => {
+            contains_unresolvable_named_type(key, ea, template_names)
+                || contains_unresolvable_named_type(value, ea, template_names)
+        }
+        Atomic::TList { value } | Atomic::TNonEmptyList { value } => {
+            contains_unresolvable_named_type(value, ea, template_names)
+        }
+        Atomic::TKeyedArray { properties, .. } => properties
+            .values()
+            .any(|p| contains_unresolvable_named_type(&p.ty, ea, template_names)),
+        Atomic::TIntersection { parts } => parts
+            .iter()
+            .any(|p| contains_unresolvable_named_type(p, ea, template_names)),
+        Atomic::TCallable {
+            params,
+            return_type,
+        } => {
+            params.as_ref().is_some_and(|ps| {
+                ps.iter().any(|p| {
+                    p.ty.as_ref().is_some_and(|t| {
+                        contains_unresolvable_named_type(&t.to_union(), ea, template_names)
+                    })
+                })
+            }) || return_type
+                .as_ref()
+                .is_some_and(|r| contains_unresolvable_named_type(r, ea, template_names))
+        }
+        Atomic::TClosure {
+            params,
+            return_type,
+            ..
+        } => {
+            params.iter().any(|p| {
+                p.ty.as_ref().is_some_and(|t| {
+                    contains_unresolvable_named_type(&t.to_union(), ea, template_names)
+                })
+            }) || contains_unresolvable_named_type(return_type, ea, template_names)
+        }
         _ => false,
-    })
+    }
 }
 
 /// True when a scalar union consists entirely of int/float atoms (no bool, no string).
@@ -1499,7 +1567,10 @@ pub(crate) fn check_typed_callable_arg(
     arg_ty: &Type,
     expected_params: &[FnParam],
     arg_span: Span,
+    template_params: &[mir_codebase::storage::TemplateParam],
 ) {
+    let template_names: rustc_hash::FxHashSet<&str> =
+        template_params.iter().map(|tp| tp.name.as_ref()).collect();
     // A bare `callable` (unknown arity) anywhere in the union means we can't check
     // statically — bail out to avoid false positives from sibling closure members.
     if arg_ty
@@ -1570,8 +1641,8 @@ pub(crate) fn check_typed_callable_arg(
             if expected_ty.is_mixed() || actual_ty.is_mixed() {
                 continue;
             }
-            if contains_unresolvable_named_type(&expected_ty, ea)
-                || contains_unresolvable_named_type(actual_ty, ea)
+            if contains_unresolvable_named_type(&expected_ty, ea, &template_names)
+                || contains_unresolvable_named_type(actual_ty, ea, &template_names)
             {
                 continue;
             }

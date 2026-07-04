@@ -62,7 +62,13 @@ pub(crate) fn check_one(
             Atomic::TClosure { params, .. } => params,
             _ => continue,
         };
-        super::super::callable::check_typed_callable_arg(ea, arg_ty, expected_params, arg_span);
+        super::super::callable::check_typed_callable_arg(
+            ea,
+            arg_ty,
+            expected_params,
+            arg_span,
+            template_params,
+        );
     }
 
     // Validate callable and class-string arguments.
