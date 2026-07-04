@@ -1446,6 +1446,51 @@ fn contains_unresolvable_named_type(ty: &Type, ea: &ExpressionAnalyzer<'_>) -> b
     })
 }
 
+/// True when a scalar union consists entirely of int/float atoms (no bool, no string).
+fn is_int_or_float(t: &Type) -> bool {
+    !t.types.is_empty()
+        && t.types.iter().all(|a| {
+            matches!(
+                a,
+                Atomic::TInt
+                    | Atomic::TLiteralInt(_)
+                    | Atomic::TIntRange { .. }
+                    | Atomic::TPositiveInt
+                    | Atomic::TNegativeInt
+                    | Atomic::TNonNegativeInt
+                    | Atomic::TFloat
+                    | Atomic::TIntegralFloat
+                    | Atomic::TLiteralFloat(..)
+            )
+        })
+}
+
+/// Returns `true` when a value of type `expected` (what the documented callable signature
+/// promises to pass) can safely reach a parameter declared as `actual` (the closure's own
+/// parameter type).
+///
+/// Beyond structural/class-hierarchy subtyping (`is_subtype`), the only extra allowance is
+/// int/float interconverting — mirroring `call/args/types.rs`'s `ImplicitFloatToIntCast`
+/// handling, since PHP treats a lossy float->int narrowing as a deprecation notice, not a
+/// `TypeError`, even in coercive mode (int->float is already covered by `is_subtype`
+/// itself). Every other cross-scalar-family mismatch (`bool<->int`, `int/float->string`,
+/// `string->int/float/bool`, ...) is deliberately left as a hard mismatch: it matches how
+/// the same conversions are treated for direct argument checks (`InvalidArgument`, not a
+/// silent pass), so this check stays consistent with the rest of the analyzer's severity
+/// choices rather than inventing a more lenient policy just for typed-callable signatures.
+fn expected_fits_actual_param(expected: &Type, actual: &Type, ea: &ExpressionAnalyzer<'_>) -> bool {
+    if expected.is_mixed() || actual.is_mixed() {
+        return true;
+    }
+    if crate::subtype::is_subtype(ea.db, expected, actual) {
+        return true;
+    }
+    if ea.strict_types {
+        return false;
+    }
+    is_int_or_float(expected) && is_int_or_float(actual)
+}
+
 /// Validate a callback argument against a typed callable parameter (e.g., callable(str,str,str):bool).
 /// Emits InvalidArgument if the provided callable has more required params than expected, or if a
 /// resolvable parameter type is declared too narrow to accept what the signature promises to pass.
@@ -1509,6 +1554,13 @@ pub(crate) fn check_typed_callable_arg(
             let Some(actual) = params.get(i) else {
                 break;
             };
+            // A default value (including a variadic's implicit default of "none passed")
+            // often means the real accepted type is wider than the declared hint — the
+            // common legacy `int $a = null` implicit-nullable pattern being the prime
+            // example. Skip rather than risk a false positive we can't fully verify.
+            if actual.is_optional || actual.is_variadic {
+                continue;
+            }
             let Some(expected_ty) = expected.ty.as_ref().map(|t| t.to_union()) else {
                 continue;
             };
@@ -1523,7 +1575,7 @@ pub(crate) fn check_typed_callable_arg(
             {
                 continue;
             }
-            if !crate::subtype::is_subtype(ea.db, &expected_ty, actual_ty) {
+            if !expected_fits_actual_param(&expected_ty, actual_ty, ea) {
                 ea.emit(
                     IssueKind::InvalidArgument {
                         param: "callback".to_string(),
