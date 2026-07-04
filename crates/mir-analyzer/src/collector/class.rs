@@ -92,6 +92,32 @@ impl<'a> DefinitionCollector<'a> {
             )
             .collect();
 
+        // Pre-scan literal-int class constants so `int-mask-of<self::*>` in a
+        // method/property docblock below can resolve regardless of source
+        // order (a constant declared after the method that references it is
+        // still valid PHP).
+        let self_int_constants: Arc<rustc_hash::FxHashMap<Arc<str>, i64>> = Arc::new(
+            decl.body
+                .members
+                .iter()
+                .filter_map(|m| match &m.kind {
+                    ClassMemberKind::ClassConst(c) => {
+                        let name = c.name.as_deref()?;
+                        match super::infer_const_value(&c.value.kind) {
+                            Some(t) if t.types.len() == 1 => match &t.types[0] {
+                                Atomic::TLiteralInt(n) => Some((Arc::from(name), *n)),
+                                _ => None,
+                            },
+                            _ => None,
+                        }
+                    }
+                    _ => None,
+                })
+                .collect(),
+        );
+        let _int_mask_guard =
+            crate::parser::docblock::SelfIntConstantsGuard::activate(&fqcn, &self_int_constants);
+
         for member in decl.body.members.iter() {
             match &member.kind {
                 ClassMemberKind::Method(m) => {

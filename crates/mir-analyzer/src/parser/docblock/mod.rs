@@ -606,6 +606,7 @@ mod tests;
 mod types;
 mod validate;
 
+pub(crate) use types::SelfIntConstantsGuard;
 use types::*;
 use validate::*;
 

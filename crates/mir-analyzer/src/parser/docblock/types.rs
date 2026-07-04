@@ -1,4 +1,6 @@
 use super::*;
+use rustc_hash::FxHashMap;
+use std::cell::RefCell;
 
 pub(crate) fn parse_type_string(s: &str) -> Type {
     let s = s.trim();
@@ -348,32 +350,18 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
                 .iter()
                 .filter_map(|s| s.trim().parse::<i64>().ok())
                 .collect();
-            if !members.is_empty()
-                && members.len() == parts.len()
-                && members.iter().all(|&v| v >= 0)
-                && members.len() <= 8
-            {
-                let mut values = std::collections::BTreeSet::new();
-                for subset in 0u32..(1u32 << members.len()) {
-                    let value = members
-                        .iter()
-                        .enumerate()
-                        .filter(|(i, _)| subset & (1 << i) != 0)
-                        .fold(0i64, |acc, (_, &v)| acc | v);
-                    values.insert(value);
-                }
-                let mut u = Type::empty();
-                for v in values {
-                    u.add_type(Atomic::TLiteralInt(v));
-                }
-                u
+            if !members.is_empty() && members.len() == parts.len() {
+                expand_int_mask_members(&members).unwrap_or_else(|| Type::single(Atomic::TInt))
             } else {
                 Type::single(Atomic::TInt)
             }
         }
-        // `int-mask-of<T::*>` requires resolving class constants which are not
-        // available at docblock-parse time; approximate as `int`.
-        "int-mask-of" => Type::single(Atomic::TInt),
+        // `int-mask-of<T::CONST_*>` — resolves against the constants of the
+        // *currently-collected* class when `T` is `self`/`static`/the class's
+        // own name (see `SelfIntConstantsGuard`); any other class reference
+        // needs cross-file lookup that isn't available here, so it falls back
+        // to `int`.
+        "int-mask-of" => resolve_int_mask_of(inner).unwrap_or_else(|| Type::single(Atomic::TInt)),
         // `class-string-map<T, V>` — maps `class-string<T>` keys to `V` values.
         // mir does not tie the value type to the specific class looked up (that
         // needs flow-sensitive template binding at each access site), so
@@ -482,6 +470,94 @@ pub(super) fn eval_value_of(t: &Type) -> Option<Type> {
         }
     }
     (!result.types.is_empty()).then_some(result)
+}
+
+/// Expand a small set of non-negative int-literal flags into the union of
+/// every OR-combination (including 0 for "no flags set"). Shared by
+/// `int-mask<...>` (literal members) and `int-mask-of<...>` (members read
+/// from resolved class constants). Returns `None` when the set is empty,
+/// contains a negative value, or is too large to enumerate (> 8 members).
+pub(super) fn expand_int_mask_members(members: &[i64]) -> Option<Type> {
+    if members.is_empty() || members.len() > 8 || members.iter().any(|&v| v < 0) {
+        return None;
+    }
+    let mut values = std::collections::BTreeSet::new();
+    for subset in 0u32..(1u32 << members.len()) {
+        let value = members
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| subset & (1 << i) != 0)
+            .fold(0i64, |acc, (_, &v)| acc | v);
+        values.insert(value);
+    }
+    let mut u = Type::empty();
+    for v in values {
+        u.add_type(Atomic::TLiteralInt(v));
+    }
+    Some(u)
+}
+
+/// `(declaring class FQCN, its own literal-int constants)`.
+type SelfIntConstants = (Arc<str>, Arc<FxHashMap<Arc<str>, i64>>);
+
+thread_local! {
+    /// Ambient constants of the class currently being collected, so
+    /// `int-mask-of<self::*>` can resolve without threading a context
+    /// parameter through every recursive `parse_type_string` call. Set for
+    /// the duration of one class's member loop by `SelfIntConstantsGuard`;
+    /// cleared (restored) on drop.
+    static SELF_INT_CONSTANTS: RefCell<Option<SelfIntConstants>> = const {
+        RefCell::new(None)
+    };
+}
+
+/// RAII guard that makes a class's literal-int constants available to
+/// `int-mask-of<...>` parsing for as long as it is alive. Only classes/traits
+/// resolve `self`/`static`/own-name references this way; any other class
+/// reference (needing cross-file lookup) keeps the `int` fallback.
+pub(crate) struct SelfIntConstantsGuard {
+    previous: Option<SelfIntConstants>,
+}
+
+impl SelfIntConstantsGuard {
+    pub(crate) fn activate(fqcn: &str, constants: &Arc<FxHashMap<Arc<str>, i64>>) -> Self {
+        let previous = SELF_INT_CONSTANTS
+            .with(|cell| cell.replace(Some((Arc::from(fqcn), constants.clone()))));
+        Self { previous }
+    }
+}
+
+impl Drop for SelfIntConstantsGuard {
+    fn drop(&mut self) {
+        SELF_INT_CONSTANTS.with(|cell| *cell.borrow_mut() = self.previous.take());
+    }
+}
+
+/// Resolve `int-mask-of<T::CONST_PREFIX*>` (or bare `T::*`) using the ambient
+/// class constants set by `SelfIntConstantsGuard`. Returns `None` when there
+/// is no active guard, `T` isn't a self-reference, no constants match the
+/// prefix, or the match set can't be expanded (see `expand_int_mask_members`).
+pub(super) fn resolve_int_mask_of(inner: &str) -> Option<Type> {
+    let (class_ref, pattern) = inner.trim().split_once("::")?;
+    let class_ref = class_ref.trim();
+    let prefix = pattern.trim().strip_suffix('*')?;
+    SELF_INT_CONSTANTS.with(|cell| {
+        let active = cell.borrow();
+        let (fqcn, constants) = active.as_ref()?;
+        let is_self_ref = matches!(class_ref, "self" | "static" | "$this")
+            || normalize_fqcn(class_ref).eq_ignore_ascii_case(fqcn);
+        if !is_self_ref {
+            return None;
+        }
+        let mut members: Vec<i64> = constants
+            .iter()
+            .filter(|(name, _)| name.starts_with(prefix))
+            .map(|(_, &v)| v)
+            .collect();
+        members.sort_unstable();
+        members.dedup();
+        expand_int_mask_members(&members)
+    })
 }
 
 pub(super) fn strip_quotes(s: &str) -> &str {
