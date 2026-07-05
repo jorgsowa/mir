@@ -482,6 +482,36 @@ impl CallAnalyzer {
                     }
                 }
             }
+            // `@psalm-self-out Type` on a method reached through self::/static::/
+            // parent:: retypes the implicit `$this` receiver, mirroring the
+            // instance-call-syntax handling in `analyze_method_call`. A plain
+            // `Foo::bar()` (not a self-referential call) has no `$this` receiver
+            // for this call to have narrowed, so it's left alone.
+            if is_self_parent_call {
+                if let Some(self_out_raw) = resolved.self_out.clone() {
+                    let self_out_ty =
+                        substitute_static_in_return((*self_out_raw).clone(), &fqcn_arc);
+                    let self_out_ty = if class_bindings.is_empty() {
+                        self_out_ty
+                    } else {
+                        self_out_ty.substitute_templates(&class_bindings)
+                    };
+                    let self_out_ty = if !resolved.template_params.is_empty() {
+                        let mut method_bindings = infer_template_bindings(
+                            &resolved.template_params,
+                            effective_params,
+                            &arg_types,
+                        );
+                        for v in method_bindings.values_mut() {
+                            *v = crate::stmt::widen_for_check(v.clone());
+                        }
+                        self_out_ty.substitute_templates(&method_bindings)
+                    } else {
+                        self_out_ty
+                    };
+                    ctx.set_var("this", self_out_ty);
+                }
+            }
             ea.record_symbol(
                 call.method.span,
                 ReferenceKind::StaticCall {
