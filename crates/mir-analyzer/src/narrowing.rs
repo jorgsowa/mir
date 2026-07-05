@@ -1023,6 +1023,20 @@ fn filter_out_instanceof_match(current: &Type, class_name: &str, db: &dyn MirDat
         | Atomic::TSelf { fqcn }
         | Atomic::TStaticObject { fqcn }
         | Atomic::TParent { fqcn } => !named_object_matches_instanceof(fqcn, class_name, db),
+        // A&B is provably excluded by `!($x instanceof C)` when EITHER part
+        // alone would satisfy it — a value that's simultaneously an A and a B
+        // is also a C the moment either A or B extends/implements C, so the
+        // whole intersection can't survive the negation, not just its own
+        // (nonexistent) direct name.
+        Atomic::TIntersection { parts } => !parts.iter().any(|part| {
+            part.types.iter().any(|inner| match inner {
+                Atomic::TNamedObject { fqcn, .. }
+                | Atomic::TSelf { fqcn }
+                | Atomic::TStaticObject { fqcn }
+                | Atomic::TParent { fqcn } => named_object_matches_instanceof(fqcn, class_name, db),
+                _ => false,
+            })
+        }),
         _ => true,
     })
 }
