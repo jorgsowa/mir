@@ -141,8 +141,15 @@ pub(super) fn validate_array_key_inner(inner: &str, tag: &str) -> Option<String>
 }
 
 pub(super) fn has_empty_generics(s: &str) -> bool {
+    // `{}` is exempt: it's the shape-literal delimiter (`object{}`, `array{}`,
+    // `list{}`), where an empty shape is a legitimate, meaningful type (no
+    // known properties / definitely-empty array) — unlike an empty `<>`/`()`,
+    // which is never valid. `openers` only tracks bracket identity so the
+    // exemption can be applied at the point a depth-0 group closes; the
+    // depth/prev_open logic otherwise matches the original implementation.
     let mut depth = 0;
     let mut prev_open = false;
+    let mut openers: Vec<char> = Vec::new();
     for ch in s.chars() {
         match ch {
             '<' | '(' | '{' => {
@@ -151,11 +158,13 @@ pub(super) fn has_empty_generics(s: &str) -> bool {
                 }
                 prev_open = true;
                 depth += 1;
+                openers.push(ch);
             }
             '>' | ')' | '}' => {
+                let opener = openers.pop();
                 depth -= 1;
                 if depth == 0 {
-                    if prev_open {
+                    if prev_open && opener != Some('{') {
                         return true;
                     }
                     prev_open = false;

@@ -8,6 +8,7 @@ suppress=UnusedParam
 /** @param object{name: string, age: int} $x */
 function takeShape($x): void {
     /** @mir-check $x is object */
+    $_ = 1;
 }
 
 /** @return object{ok: bool} */
