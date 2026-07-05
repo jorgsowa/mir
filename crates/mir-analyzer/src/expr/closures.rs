@@ -164,6 +164,16 @@ impl<'a> ExpressionAnalyzer<'a> {
         );
         sa.analyze_stmts(&c.body.stmts, &mut closure_ctx);
         let inferred_return = crate::body_analysis::merge_return_types(&sa.return_types);
+        // A closure containing `yield` always returns a Generator, regardless
+        // of what (if anything) it `return`s — same inference as a top-level
+        // function/method (see `build_generator_return_type`), which this
+        // closure-local `sa` otherwise silently dropped by only reading
+        // `return_types`.
+        let inferred_return = if sa.yielded_types.is_empty() {
+            inferred_return
+        } else {
+            crate::body_analysis::build_generator_return_type(&sa.yielded_types, inferred_return)
+        };
 
         // If the closure reads an outer-scope variable without capturing it via `use`,
         // mark that variable as read in the outer context to suppress false UnusedParam.
