@@ -10,6 +10,6 @@ function gen() {
 }
 
 $g = gen();
-/** @mir-check $g is Generator<int, int, mixed, void> */
-
+/** @mir-check $g is Generator<int, 1|2|3, mixed, void> */
+$_ = 1;
 ===expect===
