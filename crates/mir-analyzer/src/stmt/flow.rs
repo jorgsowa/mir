@@ -200,6 +200,13 @@ impl<'a> StatementsAnalyzer<'a> {
                     && !declared.is_mixed()
                     && !declared.contains(|t| matches!(t, Atomic::TNull))
                     && !declared.contains(|t| matches!(t, Atomic::TConditional { .. }))
+                    // A bare (unresolved-to-call-site) template param's own atom is
+                    // never TNull even when its bound is nullable (e.g. `T of empty`,
+                    // whose expansion includes null) — the body-internal `check_ty`
+                    // below IS resolved against the bound, so comparing it against
+                    // this unresolved `declared` would otherwise false-positive on
+                    // every such template. Skip rather than risk that mismatch.
+                    && !declared.contains(|t| matches!(t, Atomic::TTemplateParam { .. }))
                     && check_ty.contains(|t| matches!(t, Atomic::TNull))
                     && !check_ty.remove_null().is_empty()
                     && !return_type_is_invalid(
