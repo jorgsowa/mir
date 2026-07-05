@@ -180,21 +180,47 @@ pub fn narrow_from_condition(
                     }
                 }
             }
-            // `$x === SomeClass::class`
-            else if let ExprKind::ClassConstAccess(cca) = &b.right.kind {
+            // `$x === EnumName::CaseName` (real enum-case access parses as
+            // ClassConstAccess, the same node `Foo::class` uses — try case
+            // narrowing first, falling back to the class-string case below).
+            else if let ExprKind::ClassConstAccess(_) = &b.right.kind {
                 if let Some(var_name) = extract_var_name(&b.left) {
-                    if let Some(fqcn) =
-                        extract_class_const_fqcn(cca, ctx.self_fqcn.as_deref(), db, file)
+                    if let Some((enum_fqcn, case_name)) =
+                        extract_enum_case(&b.right, ctx.self_fqcn.as_deref(), db, file)
                     {
-                        narrow_var_to_class_string(ctx, &var_name, &fqcn, effective_true);
+                        narrow_var_to_literal_enum_case(
+                            ctx,
+                            &var_name,
+                            &enum_fqcn,
+                            &case_name,
+                            effective_true,
+                        );
+                    } else if let ExprKind::ClassConstAccess(cca) = &b.right.kind {
+                        if let Some(fqcn) =
+                            extract_class_const_fqcn(cca, ctx.self_fqcn.as_deref(), db, file)
+                        {
+                            narrow_var_to_class_string(ctx, &var_name, &fqcn, effective_true);
+                        }
                     }
                 }
-            } else if let ExprKind::ClassConstAccess(cca) = &b.left.kind {
+            } else if let ExprKind::ClassConstAccess(_) = &b.left.kind {
                 if let Some(var_name) = extract_var_name(&b.right) {
-                    if let Some(fqcn) =
-                        extract_class_const_fqcn(cca, ctx.self_fqcn.as_deref(), db, file)
+                    if let Some((enum_fqcn, case_name)) =
+                        extract_enum_case(&b.left, ctx.self_fqcn.as_deref(), db, file)
                     {
-                        narrow_var_to_class_string(ctx, &var_name, &fqcn, effective_true);
+                        narrow_var_to_literal_enum_case(
+                            ctx,
+                            &var_name,
+                            &enum_fqcn,
+                            &case_name,
+                            effective_true,
+                        );
+                    } else if let ExprKind::ClassConstAccess(cca) = &b.left.kind {
+                        if let Some(fqcn) =
+                            extract_class_const_fqcn(cca, ctx.self_fqcn.as_deref(), db, file)
+                        {
+                            narrow_var_to_class_string(ctx, &var_name, &fqcn, effective_true);
+                        }
                     }
                 }
             }
@@ -2046,15 +2072,31 @@ fn extract_enum_case(
     db: &dyn MirDatabase,
     file: &str,
 ) -> Option<(String, String)> {
-    if let ExprKind::StaticPropertyAccess(spa) = &expr.kind {
-        if let Some(enum_short_name) = extract_class_name(&spa.class, self_fqcn) {
-            let enum_fqcn = crate::db::resolve_name(db, file, &enum_short_name);
-            if let ExprKind::Identifier(case_name) = &spa.member.kind {
-                return Some((enum_fqcn, case_name.to_string()));
-            }
-        }
+    // Real `EnumName::CaseName` syntax parses as `ClassConstAccess` (the same
+    // node shape used for `Foo::class` and plain class constants) — not
+    // `StaticPropertyAccess`, which is reserved for `Foo::$prop` (the `$`
+    // sigil enum-case access never has). Accept both node kinds structurally
+    // and disambiguate by confirming the target actually is a declared case
+    // of a real enum, so `Foo::BAR` (a plain class constant) and `Foo::class`
+    // aren't misread as case narrowing.
+    let spa = match &expr.kind {
+        ExprKind::StaticPropertyAccess(spa) => spa,
+        ExprKind::ClassConstAccess(cca) => cca,
+        _ => return None,
+    };
+    let enum_short_name = extract_class_name(&spa.class, self_fqcn)?;
+    let enum_fqcn = crate::db::resolve_name(db, file, &enum_short_name);
+    let ExprKind::Identifier(case_name) = &spa.member.kind else {
+        return None;
+    };
+    let is_declared_case = matches!(
+        crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, &enum_fqcn)),
+        Some(crate::db::ClassLike::Enum(e)) if e.cases.contains_key(case_name.as_ref())
+    );
+    if !is_declared_case {
+        return None;
     }
-    None
+    Some((enum_fqcn, case_name.to_string()))
 }
 
 fn extract_class_const_fqcn(

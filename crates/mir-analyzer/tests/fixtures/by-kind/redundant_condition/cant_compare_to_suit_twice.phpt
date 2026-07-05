@@ -1,5 +1,8 @@
 ===description===
-Cant compare to suit twice
+Comparing an already-narrowed enum-case variable against the same case again
+is now recognized as always true, once EnumName::CaseName (real syntax,
+ClassConstAccess) is recognized by narrowing instead of only the unreachable
+StaticPropertyAccess shape.
 ===file===
 <?php
 enum Suit {
@@ -17,3 +20,4 @@ function foo(Suit $s): void {
     }
 }
 ===expect===
+RedundantCondition@11:12-11:30: Condition is always true/false for type 'bool'
