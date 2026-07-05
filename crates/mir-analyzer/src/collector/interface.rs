@@ -68,6 +68,31 @@ impl<'a> DefinitionCollector<'a> {
         let mut own_methods = indexmap::IndexMap::new();
         let mut own_constants = indexmap::IndexMap::new();
 
+        // See `collector/class.rs` for why this runs before the loop: it lets
+        // `int-mask-of<self::*>` in a method docblock below resolve against
+        // this interface's own literal-int constants.
+        let self_int_constants: Arc<rustc_hash::FxHashMap<Arc<str>, i64>> = Arc::new(
+            decl.body
+                .members
+                .iter()
+                .filter_map(|m| match &m.kind {
+                    ClassMemberKind::ClassConst(c) => {
+                        let name = c.name.as_deref()?;
+                        match super::infer_const_value(&c.value.kind) {
+                            Some(t) if t.types.len() == 1 => match &t.types[0] {
+                                mir_types::Atomic::TLiteralInt(n) => Some((Arc::from(name), *n)),
+                                _ => None,
+                            },
+                            _ => None,
+                        }
+                    }
+                    _ => None,
+                })
+                .collect(),
+        );
+        let _int_mask_guard =
+            crate::parser::docblock::SelfIntConstantsGuard::activate(&fqcn, &self_int_constants);
+
         for member in decl.body.members.iter() {
             match &member.kind {
                 ClassMemberKind::Method(m) => {

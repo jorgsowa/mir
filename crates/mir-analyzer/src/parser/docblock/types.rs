@@ -544,8 +544,14 @@ pub(super) fn resolve_int_mask_of(inner: &str) -> Option<Type> {
     SELF_INT_CONSTANTS.with(|cell| {
         let active = cell.borrow();
         let (fqcn, constants) = active.as_ref()?;
+        // A bare (non-backslash-qualified) reference to the class's own short
+        // name is the common case for a namespaced class referencing itself
+        // (`int-mask-of<Flags::*>` inside `namespace App; class Flags {...}`)
+        // — `class_ref` here is the raw docblock text, never namespace-resolved.
+        let short_name = fqcn.rsplit('\\').next().unwrap_or(fqcn);
         let is_self_ref = matches!(class_ref, "self" | "static" | "$this")
-            || normalize_fqcn(class_ref).eq_ignore_ascii_case(fqcn);
+            || normalize_fqcn(class_ref).eq_ignore_ascii_case(fqcn)
+            || (!class_ref.contains('\\') && class_ref.eq_ignore_ascii_case(short_name));
         if !is_self_ref {
             return None;
         }

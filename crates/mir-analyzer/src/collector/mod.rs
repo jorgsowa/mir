@@ -178,7 +178,7 @@ pub(crate) fn print_collector_stats() {
 /// Infer the type of a constant value from its AST expression (owned AST).
 /// This handles literal values like integers, strings, etc. used in define().
 pub(super) fn infer_const_value(expr_kind: &php_ast::owned::ExprKind) -> Option<Type> {
-    use php_ast::ast::UnaryPrefixOp;
+    use php_ast::ast::{BinaryOp, UnaryPrefixOp};
 
     match expr_kind {
         php_ast::owned::ExprKind::Int(i) => Some(Type::single(Atomic::TLiteralInt(*i))),
@@ -206,6 +206,35 @@ pub(super) fn infer_const_value(expr_kind: &php_ast::owned::ExprKind) -> Option<
             }
             _ => None,
         },
+        php_ast::owned::ExprKind::Parenthesized(inner) => infer_const_value(&inner.kind),
+        // Idiomatic bitflag declarations (`const FLAG_A = 1 << 0;`) and other
+        // literal-int arithmetic. Only evaluated when both operands are
+        // themselves literal ints, so `self::OTHER_CONST | 1` still falls
+        // through to `None` rather than guessing.
+        php_ast::owned::ExprKind::Binary(b) => {
+            let as_int = |t: Type| -> Option<i64> {
+                (t.types.len() == 1)
+                    .then(|| match t.types[0] {
+                        Atomic::TLiteralInt(n) => Some(n),
+                        _ => None,
+                    })
+                    .flatten()
+            };
+            let l = as_int(infer_const_value(&b.left.kind)?)?;
+            let r = as_int(infer_const_value(&b.right.kind)?)?;
+            let result = match b.op {
+                BinaryOp::BitwiseOr => l | r,
+                BinaryOp::BitwiseAnd => l & r,
+                BinaryOp::BitwiseXor => l ^ r,
+                BinaryOp::ShiftLeft => l.checked_shl(u32::try_from(r).ok()?)?,
+                BinaryOp::ShiftRight => l.checked_shr(u32::try_from(r).ok()?)?,
+                BinaryOp::Add => l.checked_add(r)?,
+                BinaryOp::Sub => l.checked_sub(r)?,
+                BinaryOp::Mul => l.checked_mul(r)?,
+                _ => return None,
+            };
+            Some(Type::single(Atomic::TLiteralInt(result)))
+        }
         _ => None,
     }
 }
