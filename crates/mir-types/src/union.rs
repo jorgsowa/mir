@@ -718,6 +718,12 @@ impl Type {
         for t in &self.types {
             match t {
                 Atomic::TInterfaceString(_) => out.add_type(t.clone()),
+                // A known class-string keeps its name — every interface-string is
+                // also a valid class-string, so `interface_exists()` returning true
+                // narrows the atom without losing which class it names.
+                Atomic::TClassString(name) => {
+                    out.add_type(Atomic::TInterfaceString(*name));
+                }
                 _ if t.is_string() || matches!(t, Atomic::TMixed | Atomic::TScalar) => {
                     out.add_type(Atomic::TInterfaceString(None));
                 }

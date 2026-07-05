@@ -163,8 +163,47 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
                     Atomic::TFloat,
                 ) => true,
                 (Atomic::TIntegralFloat, Atomic::TFloat) => true,
+                // class-string<X> is a subtype of class-string<Y> (or interface-string<Y>,
+                // provided X actually names an interface) when X extends/implements Y —
+                // structural equality alone (checked above) misses the inheritance case.
+                (Atomic::TClassString(Some(sub_cls)), Atomic::TClassString(Some(sup_cls))) => {
+                    sub_cls == sup_cls
+                        || extends_or_implements(db, sub_cls.as_ref(), sup_cls.as_ref())
+                }
+                (Atomic::TClassString(Some(sub_cls)), Atomic::TInterfaceString(None)) => {
+                    is_interface(db, sub_cls.as_ref())
+                }
+                (
+                    Atomic::TClassString(Some(sub_cls)),
+                    Atomic::TInterfaceString(Some(sup_iface)),
+                ) => {
+                    is_interface(db, sub_cls.as_ref())
+                        && (sub_cls == sup_iface
+                            || extends_or_implements(db, sub_cls.as_ref(), sup_iface.as_ref()))
+                }
+                // An unresolved class-string could name an interface — stay permissive
+                // rather than definitely reject, matching the None-vs-Some convention above.
+                (Atomic::TClassString(None), Atomic::TInterfaceString(_)) => true,
+                (
+                    Atomic::TInterfaceString(Some(sub_iface)),
+                    Atomic::TInterfaceString(Some(sup_iface)),
+                ) => {
+                    sub_iface == sup_iface
+                        || extends_or_implements(db, sub_iface.as_ref(), sup_iface.as_ref())
+                }
+                (
+                    Atomic::TInterfaceString(Some(sub_iface)),
+                    Atomic::TClassString(Some(sup_cls)),
+                ) => {
+                    sub_iface == sup_cls
+                        || extends_or_implements(db, sub_iface.as_ref(), sup_cls.as_ref())
+                }
                 _ => false,
             }
         })
     })
+}
+
+fn is_interface(db: &dyn MirDatabase, fqcn: &str) -> bool {
+    crate::db::class_kind(db, fqcn).is_some_and(|k| k.is_interface)
 }

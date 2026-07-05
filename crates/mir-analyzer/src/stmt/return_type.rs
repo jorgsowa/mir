@@ -2,6 +2,10 @@ use mir_types::{Atomic, Name, Type};
 
 use crate::db::{extends_or_implements, MirDatabase};
 
+fn is_interface(db: &dyn MirDatabase, fqcn: &str) -> bool {
+    crate::db::class_kind(db, fqcn).is_some_and(|k| k.is_interface)
+}
+
 // ---------------------------------------------------------------------------
 // Named-object return type compatibility check
 // ---------------------------------------------------------------------------
@@ -40,15 +44,30 @@ pub(crate) fn named_object_return_compatible(
                         actual_cls == declared_cls
                             || extends_or_implements(db, actual_cls.as_ref(), declared_cls.as_ref())
                     }
+                    // A class-string is a valid interface-string when the name it
+                    // holds actually names an interface (e.g. `SomeInterface::class`
+                    // types as `class-string<SomeInterface>`, not `interface-string`).
+                    Atomic::TInterfaceString(None) => is_interface(db, actual_cls.as_ref()),
+                    Atomic::TInterfaceString(Some(declared_iface)) => {
+                        is_interface(db, actual_cls.as_ref())
+                            && (actual_cls == declared_iface
+                                || extends_or_implements(
+                                    db,
+                                    actual_cls.as_ref(),
+                                    declared_iface.as_ref(),
+                                ))
+                    }
                     Atomic::TString => true,
                     _ => false,
                 });
             }
             Atomic::TClassString(None) => {
-                return declared
-                    .types
-                    .iter()
-                    .any(|d| matches!(d, Atomic::TClassString(_) | Atomic::TString));
+                return declared.types.iter().any(|d| {
+                    matches!(
+                        d,
+                        Atomic::TClassString(_) | Atomic::TInterfaceString(_) | Atomic::TString
+                    )
+                });
             }
             // interface-string<X> is compatible with interface-string<Y> (or
             // class-string<Y>, since every interface-string is a valid class-string)
