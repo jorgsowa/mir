@@ -159,6 +159,19 @@ pub(crate) fn resolve_method_from_db(
             storage.throws.clone().into()
         };
 
+        // `@inheritDoc` with no own `@if-this-is`/`@psalm-self-out` inherits the
+        // ancestor's, same as return type/params/throws above — an override
+        // that only exists to narrow visibility or add a body shouldn't have
+        // to redeclare these to keep them.
+        let if_this_is = storage
+            .if_this_is
+            .clone()
+            .or_else(|| parent.as_ref().and_then(|p| p.if_this_is.clone()));
+        let self_out = storage
+            .self_out
+            .clone()
+            .or_else(|| parent.as_ref().and_then(|p| p.self_out.clone()));
+
         return Some(ResolvedMethod {
             owner_fqcn,
             name,
@@ -175,8 +188,8 @@ pub(crate) fn resolve_method_from_db(
             throws,
             no_named_arguments: storage.no_named_arguments,
             taint_sink_params: storage.taint_sink_params.clone(),
-            if_this_is: storage.if_this_is.clone(),
-            self_out: storage.self_out.clone(),
+            if_this_is,
+            self_out,
         });
     }
 
@@ -349,6 +362,13 @@ impl CallAnalyzer {
         // `TNamedObject` branch feeds it — the recording loop matches
         // top-level `TNamedObject` atomics only.
         let mut declaring = None;
+        // `@psalm-self-out` per-atomic accumulator: a union receiver (e.g.
+        // `A|B`) must keep every branch that doesn't declare self-out
+        // unchanged, and union in the substituted type for every branch that
+        // does — not just overwrite the receiver with whichever atomic
+        // happened to be processed last.
+        let mut self_out_union = Type::empty();
+        let mut self_out_used = false;
 
         for atomic in &receiver.types {
             match atomic {
@@ -358,6 +378,7 @@ impl CallAnalyzer {
                 } => {
                     let fqcn_resolved = crate::db::resolve_name(ea.db, &ea.file, fqcn);
                     let fqcn = &std::sync::Arc::from(fqcn_resolved.as_str());
+                    let mut this_self_out = None;
                     result.merge_with(&resolve_method_return(
                         ea,
                         ctx,
@@ -369,7 +390,15 @@ impl CallAnalyzer {
                         &arg_types,
                         &arg_spans,
                         &mut declaring,
+                        &mut this_self_out,
                     ));
+                    match this_self_out {
+                        Some(ty) => {
+                            self_out_used = true;
+                            self_out_union.merge_with(&ty);
+                        }
+                        None => self_out_union.merge_with(&Type::single(atomic.clone())),
+                    }
                     // Fallback for unresolvable calls (__call, unknown methods):
                     // key the symbol on the receiver type itself.
                     if declaring.is_none() {
@@ -381,6 +410,7 @@ impl CallAnalyzer {
                 | mir_types::Atomic::TParent { fqcn } => {
                     let fqcn_resolved = crate::db::resolve_name(ea.db, &ea.file, fqcn);
                     let fqcn = &std::sync::Arc::from(fqcn_resolved.as_str());
+                    let mut this_self_out = None;
                     result.merge_with(&resolve_method_return(
                         ea,
                         ctx,
@@ -392,7 +422,15 @@ impl CallAnalyzer {
                         &arg_types,
                         &arg_spans,
                         &mut None,
+                        &mut this_self_out,
                     ));
+                    match this_self_out {
+                        Some(ty) => {
+                            self_out_used = true;
+                            self_out_union.merge_with(&ty);
+                        }
+                        None => self_out_union.merge_with(&Type::single(atomic.clone())),
+                    }
                 }
                 mir_types::Atomic::TIntersection { parts } => {
                     let mut intersection_result = Type::empty();
@@ -420,6 +458,7 @@ impl CallAnalyzer {
                                         &arg_types,
                                         &arg_spans,
                                         &mut None,
+                                        &mut None,
                                     ));
                                 }
                             }
@@ -430,9 +469,13 @@ impl CallAnalyzer {
                     } else {
                         result.add_type(mir_types::Atomic::TMixed);
                     }
+                    // self-out isn't tracked through intersection receivers —
+                    // preserve this branch as-is in the retyped union.
+                    self_out_union.merge_with(&Type::single(atomic.clone()));
                 }
                 mir_types::Atomic::TObject | mir_types::Atomic::TTemplateParam { .. } => {
                     result.add_type(mir_types::Atomic::TMixed);
+                    self_out_union.merge_with(&Type::single(atomic.clone()));
                 }
                 mir_types::Atomic::TClosure {
                     params,
@@ -480,12 +523,15 @@ impl CallAnalyzer {
                                 &arg_types,
                                 &arg_spans,
                                 &mut None,
+                                &mut None,
                             ));
                         }
                     }
+                    self_out_union.merge_with(&Type::single(atomic.clone()));
                 }
                 _ => {
                     result.add_type(mir_types::Atomic::TMixed);
+                    self_out_union.merge_with(&Type::single(atomic.clone()));
                 }
             }
         }
@@ -499,6 +545,21 @@ impl CallAnalyzer {
 
         if nullsafe && obj_ty.is_nullable() {
             result.add_type(mir_types::Atomic::TNull);
+        }
+
+        // Write the merged self-out union once, after every atomic has had a
+        // chance to contribute — not per-atomic — so a partially-self-out'd
+        // union receiver (e.g. `A|B` where only A declares self-out) keeps
+        // the untouched branch instead of collapsing to the last one visited.
+        if self_out_used {
+            if nullsafe && obj_ty.is_nullable() {
+                // `$x?->touch()` never ran the call at all when $x was null,
+                // so $x is still possibly null afterward.
+                self_out_union.add_type(mir_types::Atomic::TNull);
+            }
+            if let ExprKind::Variable(recv_name) = &call.object.kind {
+                ctx.set_var(recv_name.trim_start_matches('$'), self_out_union);
+            }
         }
 
         let final_ty = if result.is_empty() {
@@ -539,6 +600,12 @@ impl CallAnalyzer {
 /// `declaring_class` is set (first resolution wins) to the FQCN of the class
 /// that declares the method — reused by the caller for symbol recording so
 /// the ancestor chain is only walked once.
+///
+/// `self_out_out`, if the resolved method declares `@psalm-self-out`, is set
+/// to the substituted self-out type for this one atomic — the caller is
+/// responsible for merging every atomic's contribution into the receiver's
+/// final retyped union (a single atomic's resolution must not unilaterally
+/// overwrite a union receiver's other branches).
 #[allow(clippy::too_many_arguments)]
 fn resolve_method_return<'a>(
     ea: &mut ExpressionAnalyzer<'a>,
@@ -551,6 +618,7 @@ fn resolve_method_return<'a>(
     arg_types: &[Type],
     arg_spans: &[Span],
     declaring_class: &mut Option<Arc<str>>,
+    self_out_out: &mut Option<Type>,
 ) -> Type {
     let method_name_lower = crate::util::php_ident_lowercase(method_name);
     let resolved = resolve_method_from_db(ea, fqcn, &method_name_lower);
@@ -891,9 +959,11 @@ fn resolve_method_return<'a>(
             }
         }
 
-        // `@psalm-self-out Type` — retype the receiver variable (including
-        // `$this`) to reflect how this call narrows/changes it, the same way
-        // a by-ref `@param-out` retypes its argument above.
+        // `@psalm-self-out Type` — report how this call narrows/changes the
+        // receiver (including `$this`) for this one atomic. The caller merges
+        // every atomic's contribution and writes the receiver variable once
+        // (including `$this`), the same way a by-ref `@param-out` retypes its
+        // argument above.
         if let Some(self_out_raw) = resolved.self_out.clone() {
             let self_out_ty = substitute_static_in_return((*self_out_raw).clone(), fqcn);
             let self_out_ty = if !bindings.is_empty() {
@@ -909,9 +979,7 @@ fn resolve_method_return<'a>(
             } else {
                 self_out_ty
             };
-            if let ExprKind::Variable(recv_name) = &call.object.kind {
-                ctx.set_var(recv_name.trim_start_matches('$'), self_out_ty);
-            }
+            *self_out_out = Some(self_out_ty);
         }
 
         let return_ty = if !bindings.is_empty() {
