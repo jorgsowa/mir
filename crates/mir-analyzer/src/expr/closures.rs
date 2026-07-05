@@ -90,6 +90,12 @@ impl<'a> ExpressionAnalyzer<'a> {
             ctx.strict_types,
             c.is_static,
         );
+        // Closures see the enclosing function/method's template params (e.g. a
+        // captured `@template T`-typed variable assigned to a typed property
+        // inside the closure body) — without this, `type_refs_any_template`
+        // checks against an empty set and treats the value as a concrete type,
+        // producing spurious InvalidPropertyAssignment/instanceof narrowing bugs.
+        closure_ctx.template_param_names = Arc::clone(&ctx.template_param_names);
         for p in c.params.iter() {
             if let Some(raw) = p.name.as_deref() {
                 let trimmed = raw.trim_start_matches('$');
@@ -268,6 +274,9 @@ impl<'a> ExpressionAnalyzer<'a> {
             ctx.strict_types,
             af.is_static,
         );
+        // See analyze_closure: propagate the enclosing scope's template params
+        // so captured template-typed variables aren't misjudged as concrete.
+        arrow_ctx.template_param_names = Arc::clone(&ctx.template_param_names);
         let this_sym = mir_types::Name::from("this");
         for (name, ty) in ctx.vars.iter() {
             // Static arrow functions don't capture $this from the outer scope.
