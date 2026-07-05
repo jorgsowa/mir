@@ -106,37 +106,62 @@ pub fn spread_element_type(arr_ty: &Type) -> Type {
     }
 }
 
-fn substitute_static_in_type(t: Type, receiver_fqcn: &Arc<str>) -> Type {
+fn substitute_static_in_type(
+    t: Type,
+    receiver_fqcn: &Arc<str>,
+    receiver_type_params: &[Type],
+) -> Type {
     let from_docblock = t.from_docblock;
     let types: Vec<Atomic> = t
         .types
         .into_iter()
-        .map(|a| substitute_static_atom(a, receiver_fqcn))
+        .map(|a| substitute_static_atom(a, receiver_fqcn, receiver_type_params))
         .collect();
     let mut result = Type::from_vec(types);
     result.from_docblock = from_docblock;
     result
 }
 
-fn substitute_static_atom(a: Atomic, fqcn: &Arc<str>) -> Atomic {
+fn substitute_static_atom(a: Atomic, fqcn: &Arc<str>, receiver_type_params: &[Type]) -> Atomic {
     match a {
+        // Preserve the receiver's own inferred type params (e.g. `Box<int>`)
+        // rather than erasing them to a bare `Box` — otherwise a fluent
+        // `: static`-returning method loses generic tracking for the rest of
+        // the call chain (`$box->withValue($v)->get()` would return `mixed`
+        // instead of the receiver's actual template binding).
         Atomic::TStaticObject { .. } | Atomic::TSelf { .. } => Atomic::TNamedObject {
             fqcn: Name::from(fqcn.as_ref()),
-            type_params: mir_types::union::empty_type_params(),
+            type_params: mir_types::union::vec_to_type_params(receiver_type_params.to_vec()),
         },
         Atomic::TList { value } => Atomic::TList {
-            value: Box::new(substitute_static_in_type(*value, fqcn)),
+            value: Box::new(substitute_static_in_type(
+                *value,
+                fqcn,
+                receiver_type_params,
+            )),
         },
         Atomic::TNonEmptyList { value } => Atomic::TNonEmptyList {
-            value: Box::new(substitute_static_in_type(*value, fqcn)),
+            value: Box::new(substitute_static_in_type(
+                *value,
+                fqcn,
+                receiver_type_params,
+            )),
         },
         Atomic::TArray { key, value } => Atomic::TArray {
-            key: Box::new(substitute_static_in_type(*key, fqcn)),
-            value: Box::new(substitute_static_in_type(*value, fqcn)),
+            key: Box::new(substitute_static_in_type(*key, fqcn, receiver_type_params)),
+            value: Box::new(substitute_static_in_type(
+                *value,
+                fqcn,
+                receiver_type_params,
+            )),
         },
         Atomic::TNonEmptyArray { key, value } => Atomic::TNonEmptyArray {
-            key: Box::new(substitute_static_in_type(*key, fqcn)),
-            value: Box::new(substitute_static_in_type(*value, fqcn)),
+            key: Box::new(substitute_static_in_type(*key, fqcn, receiver_type_params)),
+            value: Box::new(substitute_static_in_type(
+                *value,
+                fqcn,
+                receiver_type_params,
+            )),
         },
         other => other,
     }
@@ -144,8 +169,15 @@ fn substitute_static_atom(a: Atomic, fqcn: &Arc<str>) -> Atomic {
 
 /// Replace `TStaticObject` / `TSelf` in a method's return type with the actual receiver FQCN.
 /// Also recurses into array and list value types so `@return static[]` is correctly resolved.
-pub(crate) fn substitute_static_in_return(ret: Type, receiver_fqcn: &Arc<str>) -> Type {
-    substitute_static_in_type(ret, receiver_fqcn)
+/// `receiver_type_params` carries the receiver's own inferred type params (empty for a
+/// receiver with no known params, e.g. a plain `Foo::bar()` static call) so a `: static`
+/// return doesn't erase them.
+pub(crate) fn substitute_static_in_return(
+    ret: Type,
+    receiver_fqcn: &Arc<str>,
+    receiver_type_params: &[Type],
+) -> Type {
+    substitute_static_in_type(ret, receiver_fqcn, receiver_type_params)
 }
 
 pub(crate) fn check_method_visibility(

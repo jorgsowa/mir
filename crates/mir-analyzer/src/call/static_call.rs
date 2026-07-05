@@ -440,7 +440,7 @@ impl CallAnalyzer {
             );
             let owner_fqcn = resolved.owner_fqcn.clone();
             let ret_raw = resolved.return_ty_raw;
-            let ret_substituted = substitute_static_in_return(ret_raw, &fqcn_arc);
+            let ret_substituted = substitute_static_in_return(ret_raw, &fqcn_arc, &[]);
             let ret_substituted = if class_bindings.is_empty() {
                 ret_substituted
             } else {
@@ -490,7 +490,7 @@ impl CallAnalyzer {
             if is_self_parent_call {
                 if let Some(self_out_raw) = resolved.self_out.clone() {
                     let self_out_ty =
-                        substitute_static_in_return((*self_out_raw).clone(), &fqcn_arc);
+                        substitute_static_in_return((*self_out_raw).clone(), &fqcn_arc, &[]);
                     let self_out_ty = if class_bindings.is_empty() {
                         self_out_ty
                     } else {
