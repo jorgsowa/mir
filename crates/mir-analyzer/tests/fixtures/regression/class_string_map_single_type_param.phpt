@@ -1,13 +1,14 @@
 ===description===
-`class-string-map<T, V>` is approximated as `array<class-string, V>` instead
-of being misparsed as a bogus named class.
+`class-string-map<T>` (Psalm's one-arg shorthand) reuses T as the value
+type, matching `class-string-map<T, T>`, instead of silently degrading the
+value type to `mixed`.
 ===config===
 suppress=UnusedParam,UnusedVariable
 ===file===
 <?php
 class Foo {}
 
-/** @return class-string-map<Foo, Foo> */
+/** @return class-string-map<Foo> */
 function makeMap() {
     return [];
 }

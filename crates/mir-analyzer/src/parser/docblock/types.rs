@@ -140,9 +140,23 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         "list" => Type::single(Atomic::TList {
             value: Box::new(Type::mixed()),
         }),
-        "callable" => Type::single(Atomic::TCallable {
+        // Bare `pure-callable`/`pure-Closure` with no `(...)` signature — the
+        // parenthesized form is handled above by `parse_callable_syntax`
+        // (which already strips the purity qualifier), but a bare keyword
+        // with no signature never reaches it and would otherwise fall through
+        // to the named-class catch-all below as a bogus class literally named
+        // "pure-callable". Purity is tracked separately at the function level.
+        "callable" | "pure-callable" => Type::single(Atomic::TCallable {
             params: None,
             return_type: None,
+        }),
+        // Bare `Closure` isn't listed here — it's a real PHP class, so it
+        // already resolves correctly via the named-class fallthrough below.
+        // `pure-closure` isn't a real class name, so it needs the same
+        // explicit mapping.
+        "pure-closure" => Type::single(Atomic::TNamedObject {
+            fqcn: mir_types::Name::from("Closure"),
+            type_params: Default::default(),
         }),
         "callable-string" => Type::single(Atomic::TCallableString),
         "iterable" => {
@@ -368,8 +382,12 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
         // approximate as a plain array from `class-string` to `V`.
         "class-string-map" => {
             let params = split_generics(inner);
+            // The two-arg form (`class-string-map<T, V>`) is canonical, but
+            // Psalm also accepts the one-arg shorthand (`class-string-map<T>`)
+            // where the value type defaults to `T` itself, not `mixed`.
             let value = params
                 .get(1)
+                .or(params.first())
                 .map(|p| parse_type_string(p.trim()))
                 .unwrap_or_else(Type::mixed);
             Type::single(Atomic::TArray {
