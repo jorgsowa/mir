@@ -56,6 +56,7 @@ pub(crate) struct ResolvedMethod {
     pub(crate) no_named_arguments: bool,
     pub(crate) taint_sink_params: Vec<(Arc<str>, Arc<str>)>,
     pub(crate) if_this_is: Option<Arc<Type>>,
+    pub(crate) self_out: Option<Arc<Type>>,
 }
 
 /// Resolve a method via the Salsa db, walking the class ancestor chain.
@@ -175,6 +176,7 @@ pub(crate) fn resolve_method_from_db(
             no_named_arguments: storage.no_named_arguments,
             taint_sink_params: storage.taint_sink_params.clone(),
             if_this_is: storage.if_this_is.clone(),
+            self_out: storage.self_out.clone(),
         });
     }
 
@@ -886,6 +888,21 @@ fn resolve_method_return<'a>(
                 if let php_ast::owned::ExprKind::Variable(name) = &arg.value.kind {
                     ctx.set_var(name.as_ref().trim_start_matches('$'), out_ty);
                 }
+            }
+        }
+
+        // `@psalm-self-out Type` — retype the receiver variable (including
+        // `$this`) to reflect how this call narrows/changes it, the same way
+        // a by-ref `@param-out` retypes its argument above.
+        if let Some(self_out_raw) = resolved.self_out.clone() {
+            let self_out_ty = substitute_static_in_return((*self_out_raw).clone(), fqcn);
+            let self_out_ty = if !bindings.is_empty() {
+                self_out_ty.substitute_templates(&bindings)
+            } else {
+                self_out_ty
+            };
+            if let ExprKind::Variable(recv_name) = &call.object.kind {
+                ctx.set_var(recv_name.trim_start_matches('$'), self_out_ty);
             }
         }
 

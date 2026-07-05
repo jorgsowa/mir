@@ -884,6 +884,7 @@ impl<'a> DefinitionCollector<'a> {
                     is_virtual: true,
                     taint_sink_params: vec![],
                     if_this_is: None,
+                    self_out: None,
                     is_inherit_doc: false,
                     is_mutation_free: false,
                     is_external_mutation_free: false,
@@ -1382,6 +1383,22 @@ impl<'a> DefinitionCollector<'a> {
             Arc::new(Self::fill_self_static_parent(resolved, class_fqcn))
         });
 
+        // Resolve `@psalm-self-out` the same way as `@if-this-is` above.
+        let self_out_resolved: Option<Arc<Type>> = doc.self_out.clone().map(|mut ty| {
+            ty.from_docblock = true;
+            let resolved = if template_names.is_empty() {
+                self.resolve_union_doc(ty)
+            } else {
+                self.resolve_union_doc_with_templates(
+                    ty,
+                    &template_names,
+                    class_fqcn,
+                    template_params_for_resolve,
+                )
+            };
+            Arc::new(Self::fill_self_static_parent(resolved, class_fqcn))
+        });
+
         let method_name = m.name.as_deref().unwrap_or_default();
         let is_override = m.attributes.iter().any(|a| {
             a.name
@@ -1434,6 +1451,7 @@ impl<'a> DefinitionCollector<'a> {
                 .map(|(param, kind)| (Arc::from(param.as_str()), Arc::from(kind.as_str())))
                 .collect(),
             if_this_is: if_this_is_resolved,
+            self_out: self_out_resolved,
             is_inherit_doc: doc.is_inherit_doc,
             is_mutation_free: doc.is_mutation_free,
             is_external_mutation_free: doc.is_external_mutation_free,

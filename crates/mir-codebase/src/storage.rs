@@ -434,6 +434,11 @@ pub struct MethodDef {
     /// satisfy for this method to be callable. `None` when absent.
     #[serde(default)]
     pub if_this_is: Option<Arc<Type>>,
+    /// `@psalm-self-out Type` / `@phpstan-self-out Type` — the receiver's type
+    /// after this call returns (e.g. a fluent builder that narrows `$this` as
+    /// it's configured). `None` when absent.
+    #[serde(default)]
+    pub self_out: Option<Arc<Type>>,
     /// True when the method has `@inheritDoc` / `{@inheritDoc}` in its docblock.
     /// The analyzer inherits the parent's return type, param types, throws, and
     /// template params when this method has none of its own.

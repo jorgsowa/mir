@@ -191,6 +191,14 @@ impl DocblockParser {
                         }
                     }
                 }
+                "self-out" | "psalm-self-out" | "phpstan-self-out" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        let trimmed = body_str.trim();
+                        if !trimmed.is_empty() {
+                            result.self_out = Some(parse_type_string(trimmed));
+                        }
+                    }
+                }
                 "suppress" | "psalm-suppress" => {
                     if let Some(body_str) = body_text(&tag.body) {
                         for rule in body_str.split([',', ' ']) {
@@ -567,6 +575,10 @@ pub struct ParsedDocblock {
     /// called when `$this` satisfies this type. Stored as the raw parsed type;
     /// class names are resolved later by the collector.
     pub if_this_is: Option<Type>,
+    /// `@psalm-self-out Type` / `@phpstan-self-out Type` — the receiver's type
+    /// after this call returns. Stored as the raw parsed type; class names
+    /// (and `self`/`static`) are resolved later by the collector.
+    pub self_out: Option<Type>,
 }
 
 impl ParsedDocblock {
