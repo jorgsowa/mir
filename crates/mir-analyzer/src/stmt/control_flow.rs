@@ -174,12 +174,42 @@ impl<'a> StatementsAnalyzer<'a> {
         }
     }
 
+    /// Emit `RedundantCondition` for a condition whose type-narrowing proves
+    /// it can only ever resolve one way.
+    fn emit_redundant_condition(&mut self, cond_ty: &Type, span: php_ast::Span) {
+        let (line, line_end, col_start, col_end) = self.span_to_location(span);
+        self.issues.add(
+            Issue::new(
+                IssueKind::RedundantCondition {
+                    ty: format!("{cond_ty}"),
+                },
+                Location {
+                    file: self.file.clone(),
+                    line,
+                    line_end,
+                    col_start,
+                    col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
+                },
+            )
+            .with_snippet(parser::span_text(self.source, span).unwrap_or_default()),
+        );
+    }
+
     pub(super) fn analyze_while_stmt(&mut self, w: &WhileStmt, ctx: &mut FlowState) {
-        self.expr_analyzer(ctx).analyze(&w.condition, ctx);
+        let cond_type = self.expr_analyzer(ctx).analyze(&w.condition, ctx);
+        self.check_docblock_contradiction(&w.condition, ctx);
+        let pre_diverges = ctx.diverges;
         let pre = ctx.clone();
 
         let mut entry = ctx.branch();
         narrow_from_condition(&w.condition, &mut entry, true, self.db, &self.file);
+        // A condition narrowed to always-false makes the loop body dead code on
+        // every entry — the same redundancy `if` reports when its then-branch
+        // is unreachable. `while (true)` (the idiomatic infinite loop) is
+        // exempted since it narrows the other way and is always intentional.
+        if !pre_diverges && entry.diverges {
+            self.emit_redundant_condition(&cond_type, w.condition.span);
+        }
 
         let is_infinite = matches!(w.condition.kind, ExprKind::Bool(true));
         let condition = w.condition.clone();
@@ -211,6 +241,7 @@ impl<'a> StatementsAnalyzer<'a> {
             |sa, iter| {
                 sa.analyze_stmt(&dw.body, iter);
                 sa.expr_analyzer(iter).analyze(&dw.condition, iter);
+                sa.check_docblock_contradiction(&dw.condition, iter);
             },
             true,
             false,
@@ -251,10 +282,25 @@ impl<'a> StatementsAnalyzer<'a> {
         for init in f.init.iter() {
             self.expr_analyzer(ctx).analyze(init, ctx);
         }
+        let pre_diverges = ctx.diverges;
         let pre = ctx.clone();
         let mut entry = ctx.branch();
+        let mut last_cond_type = None;
         for cond in f.condition.iter() {
-            self.expr_analyzer(&entry).analyze(cond, &mut entry);
+            last_cond_type = Some(self.expr_analyzer(&entry).analyze(cond, &mut entry));
+            self.check_docblock_contradiction(cond, &mut entry);
+        }
+        // Only the last comma-separated condition's truthiness controls the
+        // loop (PHP evaluates the others and discards their value), so only
+        // it is narrowed/checked for redundancy — same as `while`'s single
+        // condition.
+        if let Some(last_cond) = f.condition.last() {
+            narrow_from_condition(last_cond, &mut entry, true, self.db, &self.file);
+            if !pre_diverges && entry.diverges {
+                if let Some(cond_type) = &last_cond_type {
+                    self.emit_redundant_condition(cond_type, last_cond.span);
+                }
+            }
         }
 
         let is_infinite = f.condition.is_empty();
