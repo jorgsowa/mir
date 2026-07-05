@@ -882,17 +882,16 @@ fn narrow_or_instanceof_true(
         if let Some(vn) = var_name {
             if !class_names.is_empty() {
                 let current = ctx.get_var(&vn);
-                // Narrow to the union of all instanceof types: take union of narrow_instanceof results
-                let mut narrowed = Type::empty();
-                for cn in &class_names {
-                    let n = narrow_instanceof_preserving_subtypes(
-                        &current,
-                        cn,
-                        db,
-                        &ctx.template_param_names,
-                    );
-                    narrowed.merge_with(&n);
-                }
+                // Narrow to the union of all instanceof types, classifying each
+                // union member against every disjunct at once (see
+                // narrow_or_instanceof_union's doc comment for why this can't
+                // be done by narrowing per-class and merging afterward).
+                let narrowed = narrow_or_instanceof_union(
+                    &current,
+                    &class_names,
+                    db,
+                    &ctx.template_param_names,
+                );
                 // Fall back to current if narrowed is empty (e.g. mixed)
                 let result = if narrowed.is_empty() {
                     current.clone()
@@ -1041,6 +1040,93 @@ fn narrow_instanceof_preserving_subtypes(
     } else {
         result
     }
+}
+
+/// Like [`narrow_instanceof_preserving_subtypes`], but for an OR-chain of
+/// `instanceof` checks against several classes at once (`$x instanceof A ||
+/// $x instanceof B`) — narrowing per-class-then-merging (as opposed to
+/// per-atom-across-all-classes) double-counts `TIntersection` union members
+/// unrelated to any single disjunct: `(A&B)|C|D` narrowed by `instanceof C ||
+/// instanceof D` would otherwise produce two separate `A&B&C`/`A&B&D`
+/// members instead of one `A&B&(C|D)` member, bloating the displayed type
+/// and hiding it from later, more precise checks.
+fn narrow_or_instanceof_union(
+    current: &Type,
+    class_names: &[String],
+    db: &dyn MirDatabase,
+    template_param_names: &rustc_hash::FxHashSet<mir_types::Name>,
+) -> Type {
+    let class_atom = |cn: &str| Atomic::TNamedObject {
+        fqcn: cn.into(),
+        type_params: mir_types::union::empty_type_params(),
+    };
+
+    if current.is_empty() || current.is_mixed() {
+        let mut out = Type::empty();
+        for cn in class_names {
+            out.add_type(class_atom(cn));
+        }
+        return out;
+    }
+
+    let mut result = Type::empty();
+    result.possibly_undefined = current.possibly_undefined;
+    result.from_docblock = current.from_docblock;
+
+    for atomic in &current.types {
+        match atomic {
+            Atomic::TNamedObject { fqcn, .. }
+            | Atomic::TSelf { fqcn }
+            | Atomic::TStaticObject { fqcn }
+            | Atomic::TParent { fqcn }
+                if class_names
+                    .iter()
+                    .any(|cn| named_object_matches_instanceof(fqcn, cn, db)) =>
+            {
+                result.add_type(atomic.clone());
+            }
+            Atomic::TNamedObject { fqcn, type_params }
+                if type_params.is_empty()
+                    && !fqcn.contains('\\')
+                    && template_param_names.contains(fqcn) =>
+            {
+                for cn in class_names {
+                    result.add_type(class_atom(cn));
+                }
+            }
+            Atomic::TTemplateParam { .. } | Atomic::TObject | Atomic::TMixed => {
+                for cn in class_names {
+                    result.add_type(class_atom(cn));
+                }
+            }
+            Atomic::TIntersection { parts } => {
+                let mut remaining = Type::empty();
+                for cn in class_names {
+                    let already_covered = parts.iter().any(|p| {
+                        p.types.iter().any(|a| {
+                            matches!(a, Atomic::TNamedObject { fqcn, .. }
+                                if named_object_matches_instanceof(fqcn, cn, db))
+                        })
+                    });
+                    if !already_covered {
+                        remaining.add_type(class_atom(cn));
+                    }
+                }
+                if remaining.is_empty() {
+                    result.add_type(atomic.clone());
+                } else {
+                    let mut new_parts: Vec<Type> = parts.iter().cloned().collect();
+                    new_parts.push(remaining);
+                    result.add_type(Atomic::TIntersection {
+                        parts: std::sync::Arc::from(new_parts),
+                    });
+                }
+            }
+            _ => {}
+        }
+    }
+
+    result
 }
 
 fn filter_out_instanceof_match(current: &Type, class_name: &str, db: &dyn MirDatabase) -> Type {
