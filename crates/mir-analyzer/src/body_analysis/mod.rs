@@ -951,3 +951,34 @@ pub fn merge_return_types(return_types: &[Type]) -> Type {
         acc
     })
 }
+
+/// Build a generator function's inferred return type as
+/// `Generator<TKey, TValue, TSend, TReturn>` from every `yield`/`yield from`
+/// site's `(key, value)` contribution plus the merged type of its `return`
+/// statements (`TReturn`; `void` when there are none). `TSend` is always
+/// `mixed` — mir does not infer it from how a yielded value is subsequently
+/// used. Callers gate this on the body actually containing a `yield`
+/// (`FlowState::is_generator`); an empty `yielded` never reaches here.
+pub fn build_generator_return_type(yielded: &[(Type, Type)], return_ty: Type) -> Type {
+    let mut key_ty = Type::empty();
+    let mut value_ty = Type::empty();
+    for (k, v) in yielded {
+        key_ty.merge_with(k);
+        value_ty.merge_with(v);
+    }
+    if key_ty.types.is_empty() {
+        key_ty = Type::mixed();
+    }
+    if value_ty.types.is_empty() {
+        value_ty = Type::mixed();
+    }
+    Type::single(mir_types::Atomic::TNamedObject {
+        fqcn: Name::from("Generator"),
+        type_params: mir_types::union::vec_to_type_params(vec![
+            key_ty,
+            value_ty,
+            Type::mixed(),
+            return_ty,
+        ]),
+    })
+}

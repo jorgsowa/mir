@@ -119,6 +119,11 @@ impl<'a> BodyAnalyzer<'a> {
         ctx.is_generator = body_has_yield(&decl.body.stmts);
         sa.analyze_stmts(&decl.body.stmts, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
+        let inferred = if sa.yielded_types.is_empty() {
+            inferred
+        } else {
+            build_generator_return_type(&sa.yielded_types, inferred)
+        };
         let body_diverges = ctx.diverges;
         drop(sa);
 
@@ -549,6 +554,11 @@ impl<'a> BodyAnalyzer<'a> {
         ctx.is_generator = body_has_yield(&decl.body.stmts);
         sa.analyze_stmts(&decl.body.stmts, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
+        let inferred = if sa.yielded_types.is_empty() {
+            inferred
+        } else {
+            build_generator_return_type(&sa.yielded_types, inferred)
+        };
         drop(sa);
 
         emit_unused_params(&params, &ctx, "", file, &mut issues);
@@ -662,6 +672,11 @@ impl<'a> BodyAnalyzer<'a> {
         ctx.is_generator = body_has_yield(&decl.body.stmts);
         sa.analyze_stmts(&decl.body.stmts, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
+        let inferred = if sa.yielded_types.is_empty() {
+            inferred
+        } else {
+            build_generator_return_type(&sa.yielded_types, inferred)
+        };
         drop(sa);
 
         let scope_name = fqn.clone().unwrap_or_else(|| Arc::from(fn_name));

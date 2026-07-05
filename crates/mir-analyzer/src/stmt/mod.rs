@@ -100,6 +100,9 @@ pub struct StatementsAnalyzer<'a> {
     pub mode: AnalysisMode,
     /// Accumulated inferred return types for the current function.
     pub return_types: Vec<Type>,
+    /// `(key type, value type)` for every `yield`/`yield from` seen so far in
+    /// the current function body — see `ExpressionAnalyzer::yielded_types`.
+    pub yielded_types: Vec<(Type, Type)>,
     /// Break-context stack: one entry per active loop nesting level.
     /// Each entry collects the context states at every `break` in that loop.
     break_ctx_stack: Vec<Vec<FlowState>>,
@@ -127,6 +130,7 @@ impl<'a> StatementsAnalyzer<'a> {
             php_version,
             mode,
             return_types: Vec::new(),
+            yielded_types: Vec::new(),
             break_ctx_stack: Vec::new(),
         }
     }
@@ -437,6 +441,7 @@ impl<'a> StatementsAnalyzer<'a> {
             self.symbols,
             self.php_version,
             self.mode,
+            &mut self.yielded_types,
         );
         ea.strict_types = ctx.strict_types;
         ea

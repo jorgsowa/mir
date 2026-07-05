@@ -51,6 +51,14 @@ pub struct ExpressionAnalyzer<'a> {
     /// When true, we are inside an existence-check context (isset/empty/??) where missing
     /// variables and missing array offsets are not errors — they are what is being tested.
     in_existence_check: bool,
+    /// `(key type, value type)` for every `yield`/`yield from` encountered so
+    /// far in the enclosing function body, regardless of which branch/loop it
+    /// syntactically sits in — the AST is walked once, so no branch-merge
+    /// logic is needed. Borrowed from the owning `StatementsAnalyzer` so it
+    /// survives across the many short-lived `ExpressionAnalyzer`s created
+    /// while walking one function body. Read back by `body_analysis` to
+    /// build the function's inferred `Generator<K, V, S, R>` return type.
+    pub(crate) yielded_types: &'a mut Vec<(Type, Type)>,
 }
 
 impl<'a> ExpressionAnalyzer<'a> {
@@ -64,6 +72,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         symbols: &'a mut Vec<ResolvedSymbol>,
         php_version: PhpVersion,
         mode: AnalysisMode,
+        yielded_types: &'a mut Vec<(Type, Type)>,
     ) -> Self {
         Self {
             db,
@@ -76,6 +85,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             mode,
             strict_types: false,
             in_existence_check: false,
+            yielded_types,
         }
     }
 

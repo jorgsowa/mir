@@ -7,15 +7,38 @@ use php_ast::owned::YieldExpr;
 
 impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_yield(&mut self, y: &YieldExpr, ctx: &mut FlowState) -> Type {
-        if let Some(key) = &y.key {
-            self.analyze(key, ctx);
-        }
-        if let Some(value) = &y.value {
+        let key_ty = y.key.as_ref().map(|key| self.analyze(key, ctx));
+        let value_ty = y.value.as_ref().map(|value| {
             let ty = self.analyze(value, ctx);
             if y.is_from {
                 self.check_yield_from_iterable(&ty, value.span);
             }
-        }
+            ty
+        });
+
+        // Record this yield's (key, value) contribution so the enclosing
+        // function's inferred return type can be built as
+        // `Generator<TKey, TValue, TSend, TReturn>`. `yield from $iterable`
+        // has no explicit key/value sub-expressions — its contribution comes
+        // from the delegated iterable's own key/value types instead.
+        let (contributed_key, contributed_value) = if y.is_from {
+            value_ty
+                .as_ref()
+                .map(extract_iterable_key_value)
+                .unwrap_or_else(|| (Type::mixed(), Type::mixed()))
+        } else {
+            (
+                key_ty.unwrap_or_else(|| Type::single(Atomic::TInt)),
+                value_ty.unwrap_or_else(|| Type::single(Atomic::TNull)),
+            )
+        };
+        self.yielded_types
+            .push((contributed_key, contributed_value));
+
+        // The value of a `yield` expression itself is whatever a future
+        // `Generator::send()` call provides — mir does not infer that from
+        // usage, so it stays `mixed` (also mir's `TSend` for the inferred
+        // `Generator<K, V, TSend, R>`).
         Type::mixed()
     }
 
@@ -88,5 +111,59 @@ impl<'a> ExpressionAnalyzer<'a> {
             | MagicConstKind::Trait
             | MagicConstKind::Property => Type::single(Atomic::TString),
         }
+    }
+}
+
+/// (key, value) that `yield` contributes when delegating to `$iterable` via
+/// `yield from`. Arrays/lists/shapes contribute their own key/value types; a
+/// `Generator<K, V, ...>` (or other named object with type params, taken
+/// positionally as `K, V`) contributes its first one or two type params.
+/// Anything else (plain `Traversable`, `mixed`, …) falls back to
+/// `mixed`/`mixed` — no false precision from a source mir can't see into.
+fn extract_iterable_key_value(ty: &Type) -> (Type, Type) {
+    let mut key = Type::empty();
+    let mut value = Type::empty();
+    let mut matched_any = false;
+
+    for atomic in &ty.types {
+        match atomic {
+            Atomic::TArray { key: k, value: v } | Atomic::TNonEmptyArray { key: k, value: v } => {
+                key.merge_with(k);
+                value.merge_with(v);
+                matched_any = true;
+            }
+            Atomic::TList { value: v } | Atomic::TNonEmptyList { value: v } => {
+                key.add_type(Atomic::TInt);
+                value.merge_with(v);
+                matched_any = true;
+            }
+            Atomic::TKeyedArray { properties, .. } => {
+                for (k, prop) in properties.iter() {
+                    key.add_type(match k {
+                        mir_types::atomic::ArrayKey::Int(_) => Atomic::TInt,
+                        mir_types::atomic::ArrayKey::String(_) => Atomic::TString,
+                    });
+                    value.merge_with(&prop.ty);
+                }
+                matched_any = true;
+            }
+            Atomic::TNamedObject { type_params, .. } if type_params.len() >= 2 => {
+                key.merge_with(&type_params[0]);
+                value.merge_with(&type_params[1]);
+                matched_any = true;
+            }
+            Atomic::TNamedObject { type_params, .. } if type_params.len() == 1 => {
+                key.add_type(Atomic::TInt);
+                value.merge_with(&type_params[0]);
+                matched_any = true;
+            }
+            _ => {}
+        }
+    }
+
+    if matched_any {
+        (key, value)
+    } else {
+        (Type::mixed(), Type::mixed())
     }
 }
