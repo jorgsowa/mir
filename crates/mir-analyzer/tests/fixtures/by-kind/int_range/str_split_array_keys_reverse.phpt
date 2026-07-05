@@ -16,7 +16,9 @@ function test_str_split(string $s): void {
 /** @param non-empty-list<string> $arr */
 function test_array_keys(array $arr): void {
     $keys = array_keys($arr);
-    /** @mir-check $keys is non-empty-list<int|string> */
+    // A list's keys are always sequential integers, so TKey now binds to
+    // int (not its int|string bound) once the list shape itself is matched.
+    /** @mir-check $keys is non-empty-list<int> */
     $_ = $keys;
 }
 

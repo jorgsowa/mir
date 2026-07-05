@@ -341,7 +341,8 @@ fn infer_from_pair(
                 entry.merge_with(bind);
             }
 
-            // non-empty-array<K, V> matched against array<k_ty, v_ty> or array{...}
+            // non-empty-array<K, V> matched against array<k_ty, v_ty>, array{...}
+            // or a list<t_ty> (a list is a subtype of array<int, t_ty>).
             // Same inference logic as TArray below — delegates to the TArray handler.
             Atomic::TNonEmptyArray { key: pk, value: pv } => {
                 for a_atomic in &arg_ty.types {
@@ -351,6 +352,15 @@ fn infer_from_pair(
                             infer_from_pair(pk, ak, template_names, bindings);
                             infer_from_pair(pv, av, template_names, bindings);
                         }
+                        Atomic::TList { value: av } | Atomic::TNonEmptyList { value: av } => {
+                            infer_from_pair(
+                                pk,
+                                &Type::single(Atomic::TInt),
+                                template_names,
+                                bindings,
+                            );
+                            infer_from_pair(pv, av, template_names, bindings);
+                        }
                         Atomic::TKeyedArray { properties, .. } => {
                             let mut key_union = Type::empty();
                             let mut val_union = Type::empty();
@@ -372,7 +382,8 @@ fn infer_from_pair(
                 }
             }
 
-            // array<K, V> matched against array<k_ty, v_ty> or array{...}
+            // array<K, V> matched against array<k_ty, v_ty>, array{...} or
+            // list<t_ty> (a list is a subtype of array<int, t_ty>).
             Atomic::TArray { key: pk, value: pv } => {
                 for a_atomic in &arg_ty.types {
                     match a_atomic {
@@ -381,6 +392,15 @@ fn infer_from_pair(
                             infer_from_pair(pk, ak, template_names, bindings);
                             infer_from_pair(pv, av, template_names, bindings);
                         }
+                        Atomic::TList { value: av } | Atomic::TNonEmptyList { value: av } => {
+                            infer_from_pair(
+                                pk,
+                                &Type::single(Atomic::TInt),
+                                template_names,
+                                bindings,
+                            );
+                            infer_from_pair(pv, av, template_names, bindings);
+                        }
                         Atomic::TKeyedArray { properties, .. } => {
                             let mut key_union = Type::empty();
                             let mut val_union = Type::empty();
@@ -402,12 +422,27 @@ fn infer_from_pair(
                 }
             }
 
-            // list<T> matched against list<t_ty>
+            // list<T> matched against list<t_ty> or a literal/keyed array whose
+            // shape is a list (`array_is_list()`-true `TKeyedArray`, e.g. array
+            // literals like `['a', 'b']`, which never construct `TList` directly).
             Atomic::TList { value: pv } | Atomic::TNonEmptyList { value: pv } => {
                 for a_atomic in &arg_ty.types {
                     match a_atomic {
                         Atomic::TList { value: av } | Atomic::TNonEmptyList { value: av } => {
                             infer_from_pair(pv, av, template_names, bindings);
+                        }
+                        Atomic::TKeyedArray {
+                            properties,
+                            is_list: true,
+                            ..
+                        } => {
+                            let mut val_union = Type::empty();
+                            for prop in properties.values() {
+                                val_union.merge_with(&prop.ty);
+                            }
+                            if !val_union.types.is_empty() {
+                                infer_from_pair(pv, &val_union, template_names, bindings);
+                            }
                         }
                         _ => {}
                     }
