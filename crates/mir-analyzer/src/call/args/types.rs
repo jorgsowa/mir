@@ -1084,11 +1084,16 @@ fn validate_class_string_argument(
         return;
     }
 
-    if let Some(Atomic::TLiteralString(s)) = arg_ty.types.first() {
+    // Check every literal-string atom, not just the first — a union arg
+    // (e.g. `$cond ? 'Real' : 'Bogus'`) must have each branch validated.
+    for s in arg_ty.types.iter().filter_map(|t| match t {
+        Atomic::TLiteralString(s) => Some(s),
+        _ => None,
+    }) {
         // Skip strings that cannot be valid PHP class names (e.g. 'string[]', 'int|null').
         // A class name only contains letters, digits, underscores, and namespace separators.
         if !is_possible_class_name(s) {
-            return;
+            continue;
         }
         let resolved = crate::db::resolve_name(ea.db, &ea.file, s.as_ref());
         if !crate::db::class_exists(ea.db, &resolved) {
@@ -1131,9 +1136,14 @@ fn validate_interface_string_argument(
         return;
     }
 
-    if let Some(Atomic::TLiteralString(s)) = arg_ty.types.first() {
+    // Check every literal-string atom, not just the first — see the identical
+    // comment in `validate_class_string_argument`.
+    for s in arg_ty.types.iter().filter_map(|t| match t {
+        Atomic::TLiteralString(s) => Some(s),
+        _ => None,
+    }) {
         if !is_possible_class_name(s) {
-            return;
+            continue;
         }
         let resolved = crate::db::resolve_name(ea.db, &ea.file, s.as_ref());
         if !crate::db::class_exists(ea.db, &resolved) {
