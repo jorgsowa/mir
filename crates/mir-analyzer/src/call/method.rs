@@ -897,7 +897,15 @@ fn resolve_method_return<'a>(
         if let Some(self_out_raw) = resolved.self_out.clone() {
             let self_out_ty = substitute_static_in_return((*self_out_raw).clone(), fqcn);
             let self_out_ty = if !bindings.is_empty() {
-                self_out_ty.substitute_templates(&bindings)
+                // Widen literal argument types (e.g. a bare `"hello"` binding
+                // `U`) before substituting — carrying a literal into the
+                // receiver's type params is over-narrow and risks false
+                // positives downstream, same as `widen_type_param` for `new`.
+                let mut widened_bindings = bindings.clone();
+                for v in widened_bindings.values_mut() {
+                    *v = crate::stmt::widen_for_check(v.clone());
+                }
+                self_out_ty.substitute_templates(&widened_bindings)
             } else {
                 self_out_ty
             };

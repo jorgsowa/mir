@@ -14,5 +14,5 @@ class Sub extends Base {}
 $s = new Sub();
 $s->touch();
 /** @mir-check $s is Sub */
-
+$_ = 1;
 ===expect===

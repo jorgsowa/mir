@@ -12,6 +12,7 @@ class MaybeString {
     public function chain(): void {
         $this->withValue("x");
         /** @mir-check $this is ReadyString */
+        $_ = 1;
     }
 }
 class ReadyString extends MaybeString {}

@@ -20,5 +20,5 @@ class Box {
 $box = new Box();
 $box->set("hello");
 /** @mir-check $box is Box<string> */
-
+$_ = 1;
 ===expect===

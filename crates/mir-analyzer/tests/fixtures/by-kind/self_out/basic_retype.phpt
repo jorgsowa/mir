@@ -14,5 +14,5 @@ class ReadyString extends MaybeString {}
 $m = new MaybeString();
 $m->withValue("hi");
 /** @mir-check $m is ReadyString */
-
+$_ = 1;
 ===expect===

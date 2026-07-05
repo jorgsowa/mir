@@ -652,8 +652,10 @@ pub(crate) fn mir_check_matches(expected: &Type, actual: &Type) -> bool {
         || expected_str == widen_for_check(actual.clone()).to_string()
 }
 
-/// Widen literal types to their base scalar type for `@mir-check` comparisons.
-/// `TLiteralInt(42)` → `TInt`, `TLiteralString("s")` → `TString`, etc.
+/// Widen literal types to their base scalar type. `TLiteralInt(42)` → `TInt`,
+/// `TLiteralString("s")` → `TString`, etc. Used both for `@mir-check`
+/// comparisons and to avoid carrying an over-narrow literal into a
+/// substituted template binding.
 pub(crate) fn widen_for_check(u: Type) -> Type {
     let mut out = Type::empty();
     for atomic in u.types {
