@@ -245,6 +245,27 @@ impl<'a> ClassAnalyzer<'a> {
                 }
             }
 
+            // ---- 1c. Generic type-arg bound checks -----------------------------
+            // `@implements`/`@extends` type args were never checked against the
+            // target's own `@template T of Bound` — only method/function calls and
+            // (as of the `new`-bound fix) constructor-argument inference were.
+            // A concrete violation here (e.g. `@implements Container<Unrelated>`
+            // where `Container`'s `T` is bounded to `Base`) was silently accepted.
+            for (iface, args) in class.implements_type_args() {
+                self.check_generic_type_args(iface.as_ref(), args, location.as_ref(), &mut issues);
+            }
+            if let Some(parent_fqcn) = parent_fqcn.as_ref() {
+                let extends_args = class.extends_type_args();
+                if !extends_args.is_empty() {
+                    self.check_generic_type_args(
+                        parent_fqcn.as_ref(),
+                        extends_args,
+                        location.as_ref(),
+                        &mut issues,
+                    );
+                }
+            }
+
             // Skip abstract classes for "must implement" checks
             if is_abstract {
                 // Still check override compatibility for abstract classes
@@ -420,6 +441,51 @@ impl<'a> ClassAnalyzer<'a> {
         self.check_circular_interface_inheritance(&mut issues);
 
         issues
+    }
+
+    /// Check `@implements Target<args>` / `@extends Target<args>` type args
+    /// against `Target`'s own declared `@template ... of Bound` constraints —
+    /// the same bound-violation check applied to call-site/constructor-site
+    /// template bindings, but for the type args a class declares when
+    /// implementing/extending a generic interface/class.
+    fn check_generic_type_args(
+        &self,
+        target_fqcn: &str,
+        args: &[mir_types::Type],
+        location: Option<&mir_types::Location>,
+        issues: &mut Vec<Issue>,
+    ) {
+        let Some(target_tps) = crate::db::class_template_params(self.db, target_fqcn) else {
+            return;
+        };
+        let bindings: HashMap<mir_types::Name, mir_types::Type> = target_tps
+            .iter()
+            .zip(args.iter())
+            .map(|(tp, ty)| (tp.name, ty.clone()))
+            .collect();
+        if bindings.is_empty() {
+            return;
+        }
+        for (name, inferred, bound) in
+            crate::generic::check_template_bounds_with_inheritance(self.db, &bindings, &target_tps)
+        {
+            let loc = issue_location(
+                location,
+                location.and_then(|l| self.sources.get(&l.file).copied()),
+            );
+            let mut issue = Issue::new(
+                IssueKind::InvalidTemplateParam {
+                    name: name.to_string(),
+                    expected_bound: format!("{bound}"),
+                    actual: format!("{inferred}"),
+                },
+                loc,
+            );
+            if let Some(snippet) = extract_snippet(location, &self.sources) {
+                issue = issue.with_snippet(snippet);
+            }
+            issues.push(issue);
+        }
     }
 
     // -----------------------------------------------------------------------
