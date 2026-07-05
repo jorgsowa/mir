@@ -78,10 +78,11 @@ impl<'a> ExpressionAnalyzer<'a> {
     /// empty params when the class is non-generic or nothing could be inferred,
     /// preserving the previous behaviour for ordinary instantiations.
     fn infer_new_type_params(
-        &self,
+        &mut self,
         fqcn: &Arc<str>,
         ctor_params: Option<&[mir_codebase::storage::FnParam]>,
         arg_types: &[Type],
+        call_span: php_ast::Span,
     ) -> Arc<[Type]> {
         let empty = mir_types::union::empty_type_params();
         let class_tps = match crate::db::class_template_params(self.db, fqcn) {
@@ -101,6 +102,41 @@ impl<'a> ExpressionAnalyzer<'a> {
         // must be bare `Repo`, never `Repo<Base>`).
         let bindings =
             crate::generic::infer_arg_template_bindings(&class_tps, ctor_params, arg_types);
+
+        // A class-level `@template T of Bound` was previously enforced only at
+        // method-call sites (against a method's OWN template params), never
+        // here — the dominant real-world path (constructor-arg inference on
+        // `new`) bypassed bound checking entirely. Check it the same way
+        // method/function calls do.
+        //
+        // Restricted to classes declared outside the bundled stubs: a stub
+        // constructor with multiple declared PHP overloads (e.g. DatePeriod's
+        // DateTimeInterface-pair vs. ISO-8601-string forms) is collapsed by
+        // `merge_method_overloads` into a single permissive signature that
+        // keeps only the longest overload's param *types* — the other
+        // overload's own param types are discarded entirely, not unioned in.
+        // Binding a template from an argument that actually satisfies a
+        // *different, now-invisible* overload would be a false positive that
+        // this approximation can't distinguish from a real violation.
+        let violations =
+            crate::generic::check_template_bounds_with_inheritance(self.db, &bindings, &class_tps);
+        let is_stub_class = !violations.is_empty()
+            && crate::db::class_like_decl_file(self.db, crate::db::Fqcn::from_str(self.db, fqcn))
+                .is_some_and(|f| crate::stubs::StubVfs::new().is_stub_file(f.as_ref()));
+        for (name, inferred, bound) in violations {
+            if is_stub_class {
+                continue;
+            }
+            self.emit(
+                IssueKind::InvalidTemplateParam {
+                    name: name.to_string(),
+                    expected_bound: format!("{bound}"),
+                    actual: format!("{inferred}"),
+                },
+                Severity::Error,
+                call_span,
+            );
+        }
 
         // Emit the inferred bindings in the class's declared template-param order
         // so `build_class_bindings` zips them back correctly at the call site.
@@ -316,6 +352,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             .as_ref()
                             .map(|(p, _, _)| p.as_slice()),
                         &arg_types,
+                        call_span,
                     );
                 }
                 crate::call::ARG_TYPES_BUF.with(|b| {
