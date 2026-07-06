@@ -877,7 +877,7 @@ fn resolve_method_return<'a>(
             substitute_static_in_return(resolved.return_ty_raw, fqcn, receiver_type_params);
 
         if !resolved.template_params.is_empty() {
-            let method_bindings =
+            let (method_bindings, unchecked) =
                 infer_template_bindings(&resolved.template_params, &resolved.params, arg_types);
             // Only warn about template shadowing when the declaring class lives
             // in the file under analysis — a shadow inside a stub or vendor
@@ -901,9 +901,12 @@ fn resolve_method_return<'a>(
                 }
             }
             bindings.extend(method_bindings);
-            for (name, inferred, bound) in
-                check_template_bounds_with_inheritance(ea.db, &bindings, &resolved.template_params)
-            {
+            for (name, inferred, bound) in check_template_bounds_with_inheritance(
+                ea.db,
+                &bindings,
+                &resolved.template_params,
+                &unchecked,
+            ) {
                 ea.emit(
                     IssueKind::InvalidTemplateParam {
                         name: name.to_string(),

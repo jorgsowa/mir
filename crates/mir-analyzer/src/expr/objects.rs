@@ -100,7 +100,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         // call would falsely substitute the param to the bound and reject valid
         // args (e.g. `@template T of Base`, `__construct(int $id)` → `new Repo(5)`
         // must be bare `Repo`, never `Repo<Base>`).
-        let bindings =
+        let (bindings, unchecked) =
             crate::generic::infer_arg_template_bindings(&class_tps, ctor_params, arg_types);
 
         // A class-level `@template T of Bound` was previously enforced only at
@@ -118,8 +118,9 @@ impl<'a> ExpressionAnalyzer<'a> {
         // Binding a template from an argument that actually satisfies a
         // *different, now-invisible* overload would be a false positive that
         // this approximation can't distinguish from a real violation.
-        let violations =
-            crate::generic::check_template_bounds_with_inheritance(self.db, &bindings, &class_tps);
+        let violations = crate::generic::check_template_bounds_with_inheritance(
+            self.db, &bindings, &class_tps, &unchecked,
+        );
         let is_stub_class = !violations.is_empty()
             && crate::db::class_like_decl_file(self.db, crate::db::Fqcn::from_str(self.db, fqcn))
                 .is_some_and(|f| crate::stubs::StubVfs::new().is_stub_file(f.as_ref()));

@@ -1,6 +1,6 @@
 /// Generic type inference — infer template bindings from argument types and
 /// substitute them into return types.
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use mir_codebase::storage::{FnParam, TemplateParam};
 use mir_types::{atomic::ArrayKey, union::empty_type_params, Atomic, Name, Type};
@@ -17,12 +17,16 @@ use crate::subtype::is_subtype;
 ///
 /// For example, given `function identity<T>(T $x): T` called with `"hello"`,
 /// this returns `{ T → string }`.
+///
+/// The second element of the pair is the set of template names whose binding
+/// must be excluded from [`check_template_bounds_with_inheritance`] — see
+/// [`infer_arg_template_bindings`].
 pub fn infer_template_bindings(
     template_params: &[TemplateParam],
     params: &[FnParam],
     arg_types: &[Type],
-) -> FxHashMap<Name, Type> {
-    let mut bindings = infer_arg_template_bindings(template_params, params, arg_types);
+) -> (FxHashMap<Name, Type>, FxHashSet<Name>) {
+    let (mut bindings, unchecked) = infer_arg_template_bindings(template_params, params, arg_types);
 
     // For any template not bound through arguments, fall back to its bound
     // (or mixed if no bound is declared).
@@ -32,7 +36,7 @@ pub fn infer_template_bindings(
             .or_insert_with(|| tp.bound.as_deref().cloned().unwrap_or_else(Type::mixed));
     }
 
-    bindings
+    (bindings, unchecked)
 }
 
 /// Infer template parameter bindings ONLY from the argument types, without the
@@ -43,12 +47,23 @@ pub fn infer_template_bindings(
 /// parameterising a `new` receiver: a bounded template the constructor never
 /// references must stay `mixed` (bare) downstream, so a later `T`-typed method
 /// call does not falsely substitute the param to the bound and reject valid args.
+///
+/// The second element of the returned pair holds template names whose binding
+/// was fully explained by a concrete alternative in a `T|<concrete>`-shaped
+/// param union (e.g. a bare `null` argument matching `T|null`) rather than by
+/// `T` itself. The binding is still filled in — callers that substitute it into
+/// a return type (e.g. propagating a literal `null` through `T|null`) still
+/// need a value — but such a call gives no real evidence about what `T` is, so
+/// [`check_template_bounds_with_inheritance`] must skip bound-checking these
+/// specific names to avoid rejecting a perfectly valid `null` argument against
+/// `T`'s bound.
 pub fn infer_arg_template_bindings(
     template_params: &[TemplateParam],
     params: &[FnParam],
     arg_types: &[Type],
-) -> FxHashMap<Name, Type> {
+) -> (FxHashMap<Name, Type>, FxHashSet<Name>) {
     let mut bindings: FxHashMap<Name, Type> = FxHashMap::default();
+    let mut unchecked: FxHashSet<Name> = FxHashSet::default();
     let template_names: std::collections::HashSet<Name> = template_params
         .iter()
         .map(|tp| Name::from(tp.name.as_ref()))
@@ -71,14 +86,20 @@ pub fn infer_arg_template_bindings(
                 // (`@param array<X> $args`); each individual argument is an
                 // `X`, so unwrap one array layer before matching.
                 let elem = variadic_element_type(param_ty);
-                infer_from_pair(elem, arg_ty, &template_names, &mut bindings);
+                infer_from_pair(elem, arg_ty, &template_names, &mut bindings, &mut unchecked);
             } else {
-                infer_from_pair(param_ty, arg_ty, &template_names, &mut bindings);
+                infer_from_pair(
+                    param_ty,
+                    arg_ty,
+                    &template_names,
+                    &mut bindings,
+                    &mut unchecked,
+                );
             }
         }
     }
 
-    bindings
+    (bindings, unchecked)
 }
 
 /// For a variadic parameter declared aggregate-style (`@param array<X> $args`
@@ -105,6 +126,7 @@ pub fn check_template_bounds_with_inheritance<'a>(
     db: &dyn MirDatabase,
     bindings: &'a FxHashMap<Name, Type>,
     template_params: &'a [TemplateParam],
+    unchecked: &FxHashSet<Name>,
 ) -> Vec<(&'a Name, &'a Type, &'a Type)> {
     // An inferred type that still contains unresolved template placeholders or
     // self/static cannot be meaningfully checked against the bound here — it
@@ -133,6 +155,9 @@ pub fn check_template_bounds_with_inheritance<'a>(
 
     let mut violations = Vec::new();
     for tp in template_params {
+        if unchecked.contains(&tp.name) {
+            continue;
+        }
         if let Some(bound) = &tp.bound {
             if let Some(inferred) = bindings.get(&tp.name) {
                 // Substitute already-bound template params into the bound before
@@ -198,14 +223,47 @@ pub fn build_class_bindings(
 // Internal helpers
 // ---------------------------------------------------------------------------
 
+/// Outcome of matching a param union's template/concrete alternatives against
+/// an arg for a single call site.
+enum TemplateResidual {
+    /// No filtering applies (no concrete alternatives in the union, or none of
+    /// them matched anything in the arg): bind the template directly to the
+    /// full `arg_ty`.
+    UseArg,
+    /// A concrete alternative absorbed part of the arg; bind the template to
+    /// what's left after subtracting it.
+    Filtered(Type),
+    /// Every arg atomic was already explained by a concrete alternative in the
+    /// union (e.g. the `null` in `T|null` matching a bare `null` argument).
+    /// `T` itself was never actually exercised by this call — the wrapped
+    /// value is still `arg_ty`, so a caller that substitutes the binding into
+    /// a return type keeps propagating it (e.g. `T|null` called with `null`
+    /// still returns `null`, not `mixed|null`) — but the binding must be
+    /// excluded from bound-checking: it proves nothing about what `T` is.
+    FullyExplainedByAlternative(Type),
+}
+
+impl TemplateResidual {
+    fn bind_value<'a>(&'a self, arg_ty: &'a Type) -> &'a Type {
+        match self {
+            TemplateResidual::UseArg => arg_ty,
+            TemplateResidual::Filtered(t) | TemplateResidual::FullyExplainedByAlternative(t) => t,
+        }
+    }
+
+    fn is_risky(&self) -> bool {
+        matches!(self, TemplateResidual::FullyExplainedByAlternative(_))
+    }
+}
+
 /// If `param_ty` is a union mixing template placeholders with concrete atomics,
-/// return `arg_ty` with the concrete atomics filtered out — what the template
-/// should actually bind to. Returns `None` when no filtering is needed.
+/// compute what the template should actually bind to after subtracting the
+/// concrete atomics matched in `arg_ty` — see [`TemplateResidual`].
 fn compute_template_residual(
     param_ty: &Type,
     arg_ty: &Type,
     template_names: &std::collections::HashSet<Name>,
-) -> Option<Type> {
+) -> TemplateResidual {
     let mut has_template = false;
     let mut has_template_class_string = false;
     let mut concrete: Vec<&Atomic> = Vec::new();
@@ -224,7 +282,7 @@ fn compute_template_residual(
         }
     }
     if !has_template || (concrete.is_empty() && !has_template_class_string) {
-        return None;
+        return TemplateResidual::UseArg;
     }
     let mut residual = Type::empty();
     residual.from_docblock = arg_ty.from_docblock;
@@ -244,15 +302,19 @@ fn compute_template_residual(
     }
     if residual.types.is_empty() {
         // An EMPTY residual is meaningful when a `class-string<T>` alternative
-        // consumed the args: the bare template binds nothing at all. Otherwise
-        // (all args matched concrete atomics) keep the legacy behavior of
-        // binding the full arg type.
-        return class_string_consumed.then_some(residual);
+        // consumed the args: the bare template binds nothing at all.
+        if class_string_consumed {
+            return TemplateResidual::Filtered(residual);
+        }
+        // Otherwise every arg atomic matched a plain concrete alternative
+        // (e.g. `null` against `T|null`) — bind the raw arg for substitution
+        // purposes, but flag it as unfit for bound-checking.
+        return TemplateResidual::FullyExplainedByAlternative(arg_ty.clone());
     }
     if residual.types.len() == arg_ty.types.len() && !class_string_consumed {
-        return None;
+        return TemplateResidual::UseArg;
     }
-    Some(residual)
+    TemplateResidual::Filtered(residual)
 }
 
 /// Whether a string literal is shaped like a class reference: backslash-
@@ -319,6 +381,7 @@ fn infer_from_pair(
     arg_ty: &Type,
     template_names: &std::collections::HashSet<Name>,
     bindings: &mut FxHashMap<Name, Type>,
+    risky: &mut FxHashSet<Name>,
 ) {
     // When the parameter is a union mixing template placeholders with concrete
     // atomics (e.g. `T|null` against `Bar|null`), the template should bind to
@@ -330,7 +393,7 @@ fn infer_from_pair(
         match p_atomic {
             // Direct template placeholder: T → bind T = residual(arg_ty)
             Atomic::TTemplateParam { name, .. } => {
-                let bind = template_residual.as_ref().unwrap_or(arg_ty);
+                let bind = template_residual.bind_value(arg_ty);
                 if bind.types.is_empty() {
                     // Empty residual: every arg atomic was consumed by another
                     // union alternative (e.g. `class-string<T>`); nothing left
@@ -339,6 +402,9 @@ fn infer_from_pair(
                 }
                 let entry = bindings.entry(*name).or_insert_with(Type::empty);
                 entry.merge_with(bind);
+                if template_residual.is_risky() {
+                    risky.insert(*name);
+                }
             }
 
             // non-empty-array<K, V> matched against array<k_ty, v_ty>, array{...}
@@ -349,8 +415,8 @@ fn infer_from_pair(
                     match a_atomic {
                         Atomic::TArray { key: ak, value: av }
                         | Atomic::TNonEmptyArray { key: ak, value: av } => {
-                            infer_from_pair(pk, ak, template_names, bindings);
-                            infer_from_pair(pv, av, template_names, bindings);
+                            infer_from_pair(pk, ak, template_names, bindings, risky);
+                            infer_from_pair(pv, av, template_names, bindings, risky);
                         }
                         Atomic::TList { value: av } | Atomic::TNonEmptyList { value: av } => {
                             infer_from_pair(
@@ -358,8 +424,9 @@ fn infer_from_pair(
                                 &Type::single(Atomic::TInt),
                                 template_names,
                                 bindings,
+                                risky,
                             );
-                            infer_from_pair(pv, av, template_names, bindings);
+                            infer_from_pair(pv, av, template_names, bindings, risky);
                         }
                         Atomic::TKeyedArray { properties, .. } => {
                             let mut key_union = Type::empty();
@@ -373,8 +440,8 @@ fn infer_from_pair(
                                 val_union.merge_with(&prop.ty);
                             }
                             if !key_union.types.is_empty() {
-                                infer_from_pair(pk, &key_union, template_names, bindings);
-                                infer_from_pair(pv, &val_union, template_names, bindings);
+                                infer_from_pair(pk, &key_union, template_names, bindings, risky);
+                                infer_from_pair(pv, &val_union, template_names, bindings, risky);
                             }
                         }
                         _ => {}
@@ -389,8 +456,8 @@ fn infer_from_pair(
                     match a_atomic {
                         Atomic::TArray { key: ak, value: av }
                         | Atomic::TNonEmptyArray { key: ak, value: av } => {
-                            infer_from_pair(pk, ak, template_names, bindings);
-                            infer_from_pair(pv, av, template_names, bindings);
+                            infer_from_pair(pk, ak, template_names, bindings, risky);
+                            infer_from_pair(pv, av, template_names, bindings, risky);
                         }
                         Atomic::TList { value: av } | Atomic::TNonEmptyList { value: av } => {
                             infer_from_pair(
@@ -398,8 +465,9 @@ fn infer_from_pair(
                                 &Type::single(Atomic::TInt),
                                 template_names,
                                 bindings,
+                                risky,
                             );
-                            infer_from_pair(pv, av, template_names, bindings);
+                            infer_from_pair(pv, av, template_names, bindings, risky);
                         }
                         Atomic::TKeyedArray { properties, .. } => {
                             let mut key_union = Type::empty();
@@ -413,8 +481,8 @@ fn infer_from_pair(
                                 val_union.merge_with(&prop.ty);
                             }
                             if !key_union.types.is_empty() {
-                                infer_from_pair(pk, &key_union, template_names, bindings);
-                                infer_from_pair(pv, &val_union, template_names, bindings);
+                                infer_from_pair(pk, &key_union, template_names, bindings, risky);
+                                infer_from_pair(pv, &val_union, template_names, bindings, risky);
                             }
                         }
                         _ => {}
@@ -429,7 +497,7 @@ fn infer_from_pair(
                 for a_atomic in &arg_ty.types {
                     match a_atomic {
                         Atomic::TList { value: av } | Atomic::TNonEmptyList { value: av } => {
-                            infer_from_pair(pv, av, template_names, bindings);
+                            infer_from_pair(pv, av, template_names, bindings, risky);
                         }
                         Atomic::TKeyedArray {
                             properties,
@@ -441,7 +509,7 @@ fn infer_from_pair(
                                 val_union.merge_with(&prop.ty);
                             }
                             if !val_union.types.is_empty() {
-                                infer_from_pair(pv, &val_union, template_names, bindings);
+                                infer_from_pair(pv, &val_union, template_names, bindings, risky);
                             }
                         }
                         _ => {}
@@ -456,12 +524,15 @@ fn infer_from_pair(
                 type_params: pp,
             } => {
                 if pp.is_empty() && !pfqcn.contains('\\') && template_names.contains(pfqcn) {
-                    let bind = template_residual.as_ref().unwrap_or(arg_ty);
+                    let bind = template_residual.bind_value(arg_ty);
                     if bind.types.is_empty() {
                         continue; // see TTemplateParam arm above
                     }
                     let entry = bindings.entry(*pfqcn).or_insert_with(Type::empty);
                     entry.merge_with(bind);
+                    if template_residual.is_risky() {
+                        risky.insert(*pfqcn);
+                    }
                     continue;
                 }
                 for a_atomic in &arg_ty.types {
@@ -472,7 +543,7 @@ fn infer_from_pair(
                     {
                         if pfqcn == afqcn {
                             for (p_param, a_param) in pp.iter().zip(ap.iter()) {
-                                infer_from_pair(p_param, a_param, template_names, bindings);
+                                infer_from_pair(p_param, a_param, template_names, bindings, risky);
                             }
                         }
                     }
@@ -499,10 +570,11 @@ fn infer_from_pair(
                                         &at.to_union(),
                                         template_names,
                                         bindings,
+                                        risky,
                                     );
                                 }
                             }
-                            infer_from_pair(p_ret, a_ret, template_names, bindings);
+                            infer_from_pair(p_ret, a_ret, template_names, bindings, risky);
                         }
                         Atomic::TCallable {
                             params: Some(a_params),
@@ -515,10 +587,11 @@ fn infer_from_pair(
                                         &at.to_union(),
                                         template_names,
                                         bindings,
+                                        risky,
                                     );
                                 }
                             }
-                            infer_from_pair(p_ret, a_ret, template_names, bindings);
+                            infer_from_pair(p_ret, a_ret, template_names, bindings, risky);
                         }
                         _ => {}
                     }
@@ -543,10 +616,11 @@ fn infer_from_pair(
                                         &at.to_union(),
                                         template_names,
                                         bindings,
+                                        risky,
                                     );
                                 }
                             }
-                            infer_from_pair(p_ret, a_ret, template_names, bindings);
+                            infer_from_pair(p_ret, a_ret, template_names, bindings, risky);
                         }
                         Atomic::TClosure {
                             params: a_params,
@@ -560,10 +634,11 @@ fn infer_from_pair(
                                         &at.to_union(),
                                         template_names,
                                         bindings,
+                                        risky,
                                     );
                                 }
                             }
-                            infer_from_pair(p_ret, a_ret, template_names, bindings);
+                            infer_from_pair(p_ret, a_ret, template_names, bindings, risky);
                         }
                         _ => {}
                     }
@@ -575,12 +650,12 @@ fn infer_from_pair(
             // atomics consumed by sibling alternatives (e.g. `class-string<T>`)
             // must not leak into bare-template parts of the intersection.
             Atomic::TIntersection { parts } => {
-                let arg = template_residual.as_ref().unwrap_or(arg_ty);
+                let arg = template_residual.bind_value(arg_ty);
                 if arg.types.is_empty() {
                     continue;
                 }
                 for part in parts.iter() {
-                    infer_from_pair(part, arg, template_names, bindings);
+                    infer_from_pair(part, arg, template_names, bindings, risky);
                 }
             }
 

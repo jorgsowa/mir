@@ -466,9 +466,12 @@ impl<'a> ClassAnalyzer<'a> {
         if bindings.is_empty() {
             return;
         }
-        for (name, inferred, bound) in
-            crate::generic::check_template_bounds_with_inheritance(self.db, &bindings, &target_tps)
-        {
+        for (name, inferred, bound) in crate::generic::check_template_bounds_with_inheritance(
+            self.db,
+            &bindings,
+            &target_tps,
+            &HashSet::default(),
+        ) {
             let loc = issue_location(
                 location,
                 location.and_then(|l| self.sources.get(&l.file).copied()),

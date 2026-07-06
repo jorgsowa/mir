@@ -458,10 +458,14 @@ impl CallAnalyzer {
             }
 
             let template_bindings = if !template_params.is_empty() {
-                let bindings = infer_template_bindings(&template_params, &params, &arg_types);
-                for (name, inferred, bound) in
-                    check_template_bounds_with_inheritance(ea.db, &bindings, &template_params)
-                {
+                let (bindings, unchecked) =
+                    infer_template_bindings(&template_params, &params, &arg_types);
+                for (name, inferred, bound) in check_template_bounds_with_inheritance(
+                    ea.db,
+                    &bindings,
+                    &template_params,
+                    &unchecked,
+                ) {
                     ea.emit(
                         IssueKind::InvalidTemplateParam {
                             name: name.to_string(),

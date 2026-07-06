@@ -447,7 +447,7 @@ impl CallAnalyzer {
                 ret_substituted.substitute_templates(&class_bindings)
             };
             let ret = if !resolved.template_params.is_empty() {
-                let bindings = infer_template_bindings(
+                let (bindings, _unchecked) = infer_template_bindings(
                     &resolved.template_params,
                     effective_params,
                     &arg_types,
@@ -497,7 +497,7 @@ impl CallAnalyzer {
                         self_out_ty.substitute_templates(&class_bindings)
                     };
                     let self_out_ty = if !resolved.template_params.is_empty() {
-                        let mut method_bindings = infer_template_bindings(
+                        let (mut method_bindings, _unchecked) = infer_template_bindings(
                             &resolved.template_params,
                             effective_params,
                             &arg_types,
