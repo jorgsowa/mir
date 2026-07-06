@@ -153,9 +153,13 @@ pub fn narrow_from_condition(
             // `$x === EnumName::CaseName`
             else if let ExprKind::StaticPropertyAccess(_) = &b.right.kind {
                 if let Some(var_name) = extract_var_name(&b.left) {
-                    if let Some((enum_fqcn, case_name)) =
-                        extract_enum_case(&b.right, ctx.self_fqcn.as_deref(), db, file)
-                    {
+                    if let Some((enum_fqcn, case_name)) = extract_enum_case(
+                        &b.right,
+                        ctx.self_fqcn.as_deref(),
+                        ctx.parent_fqcn.as_deref(),
+                        db,
+                        file,
+                    ) {
                         narrow_var_to_literal_enum_case(
                             ctx,
                             &var_name,
@@ -167,9 +171,13 @@ pub fn narrow_from_condition(
                 }
             } else if let ExprKind::StaticPropertyAccess(_) = &b.left.kind {
                 if let Some(var_name) = extract_var_name(&b.right) {
-                    if let Some((enum_fqcn, case_name)) =
-                        extract_enum_case(&b.left, ctx.self_fqcn.as_deref(), db, file)
-                    {
+                    if let Some((enum_fqcn, case_name)) = extract_enum_case(
+                        &b.left,
+                        ctx.self_fqcn.as_deref(),
+                        ctx.parent_fqcn.as_deref(),
+                        db,
+                        file,
+                    ) {
                         narrow_var_to_literal_enum_case(
                             ctx,
                             &var_name,
@@ -185,9 +193,13 @@ pub fn narrow_from_condition(
             // narrowing first, falling back to the class-string case below).
             else if let ExprKind::ClassConstAccess(_) = &b.right.kind {
                 if let Some(var_name) = extract_var_name(&b.left) {
-                    if let Some((enum_fqcn, case_name)) =
-                        extract_enum_case(&b.right, ctx.self_fqcn.as_deref(), db, file)
-                    {
+                    if let Some((enum_fqcn, case_name)) = extract_enum_case(
+                        &b.right,
+                        ctx.self_fqcn.as_deref(),
+                        ctx.parent_fqcn.as_deref(),
+                        db,
+                        file,
+                    ) {
                         narrow_var_to_literal_enum_case(
                             ctx,
                             &var_name,
@@ -196,18 +208,26 @@ pub fn narrow_from_condition(
                             effective_true,
                         );
                     } else if let ExprKind::ClassConstAccess(cca) = &b.right.kind {
-                        if let Some(fqcn) =
-                            extract_class_const_fqcn(cca, ctx.self_fqcn.as_deref(), db, file)
-                        {
+                        if let Some(fqcn) = extract_class_const_fqcn(
+                            cca,
+                            ctx.self_fqcn.as_deref(),
+                            ctx.parent_fqcn.as_deref(),
+                            db,
+                            file,
+                        ) {
                             narrow_var_to_class_string(ctx, &var_name, &fqcn, effective_true);
                         }
                     }
                 }
             } else if let ExprKind::ClassConstAccess(_) = &b.left.kind {
                 if let Some(var_name) = extract_var_name(&b.right) {
-                    if let Some((enum_fqcn, case_name)) =
-                        extract_enum_case(&b.left, ctx.self_fqcn.as_deref(), db, file)
-                    {
+                    if let Some((enum_fqcn, case_name)) = extract_enum_case(
+                        &b.left,
+                        ctx.self_fqcn.as_deref(),
+                        ctx.parent_fqcn.as_deref(),
+                        db,
+                        file,
+                    ) {
                         narrow_var_to_literal_enum_case(
                             ctx,
                             &var_name,
@@ -216,9 +236,13 @@ pub fn narrow_from_condition(
                             effective_true,
                         );
                     } else if let ExprKind::ClassConstAccess(cca) = &b.left.kind {
-                        if let Some(fqcn) =
-                            extract_class_const_fqcn(cca, ctx.self_fqcn.as_deref(), db, file)
-                        {
+                        if let Some(fqcn) = extract_class_const_fqcn(
+                            cca,
+                            ctx.self_fqcn.as_deref(),
+                            ctx.parent_fqcn.as_deref(),
+                            db,
+                            file,
+                        ) {
                             narrow_var_to_class_string(ctx, &var_name, &fqcn, effective_true);
                         }
                     }
@@ -320,7 +344,11 @@ pub fn narrow_from_condition(
         // $x instanceof ClassName  /  $this->prop instanceof ClassName
         ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => {
             if let Some(var_name) = extract_var_name(&b.left) {
-                if let Some(raw_name) = extract_class_name(&b.right, ctx.self_fqcn.as_deref()) {
+                if let Some(raw_name) = extract_class_name(
+                    &b.right,
+                    ctx.self_fqcn.as_deref(),
+                    ctx.parent_fqcn.as_deref(),
+                ) {
                     // Resolve the short name to its FQCN using file imports
                     let class_name = crate::db::resolve_name(db, file, &raw_name);
                     let current = ctx.get_var(&var_name);
@@ -337,7 +365,11 @@ pub fn narrow_from_condition(
                     set_narrowed(ctx, &var_name, &current, narrowed, true);
                 }
             } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
-                if let Some(raw_name) = extract_class_name(&b.right, ctx.self_fqcn.as_deref()) {
+                if let Some(raw_name) = extract_class_name(
+                    &b.right,
+                    ctx.self_fqcn.as_deref(),
+                    ctx.parent_fqcn.as_deref(),
+                ) {
                     let class_name = crate::db::resolve_name(db, file, &raw_name);
                     narrow_prop_instanceof(ctx, &obj, &prop, &class_name, db, file, is_true);
                 }
@@ -827,11 +859,13 @@ fn narrow_or_instanceof_true(
     file: &str,
 ) {
     let self_fqcn = ctx.self_fqcn.as_deref();
+    let parent_fqcn = ctx.parent_fqcn.as_deref();
 
     // Collect all class names from instanceof checks on the same variable.
     let mut var_name: Option<String> = None;
     let mut class_names: Vec<String> = vec![];
 
+    #[allow(clippy::too_many_arguments)]
     fn collect_instanceof(
         expr: &php_ast::owned::Expr,
         var_name: &mut Option<String>,
@@ -839,12 +873,13 @@ fn narrow_or_instanceof_true(
         db: &dyn MirDatabase,
         file: &str,
         self_fqcn: Option<&str>,
+        parent_fqcn: Option<&str>,
     ) -> bool {
         match &expr.kind {
             ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => {
                 if let (Some(vn), Some(cn)) = (
                     extract_var_name(&b.left),
-                    extract_class_name(&b.right, self_fqcn),
+                    extract_class_name(&b.right, self_fqcn, parent_fqcn),
                 ) {
                     let resolved = crate::db::resolve_name(db, file, &cn);
                     match var_name {
@@ -864,19 +899,56 @@ fn narrow_or_instanceof_true(
                 }
             }
             ExprKind::Binary(b) if b.op == BinaryOp::BooleanOr || b.op == BinaryOp::LogicalOr => {
-                collect_instanceof(&b.left, var_name, class_names, db, file, self_fqcn)
-                    && collect_instanceof(&b.right, var_name, class_names, db, file, self_fqcn)
+                collect_instanceof(
+                    &b.left,
+                    var_name,
+                    class_names,
+                    db,
+                    file,
+                    self_fqcn,
+                    parent_fqcn,
+                ) && collect_instanceof(
+                    &b.right,
+                    var_name,
+                    class_names,
+                    db,
+                    file,
+                    self_fqcn,
+                    parent_fqcn,
+                )
             }
-            ExprKind::Parenthesized(inner) => {
-                collect_instanceof(inner, var_name, class_names, db, file, self_fqcn)
-            }
+            ExprKind::Parenthesized(inner) => collect_instanceof(
+                inner,
+                var_name,
+                class_names,
+                db,
+                file,
+                self_fqcn,
+                parent_fqcn,
+            ),
             _ => false,
         }
     }
 
     // Wrap left and right into a fake OR so we can reuse the collector
-    let left_ok = collect_instanceof(left, &mut var_name, &mut class_names, db, file, self_fqcn);
-    let right_ok = collect_instanceof(right, &mut var_name, &mut class_names, db, file, self_fqcn);
+    let left_ok = collect_instanceof(
+        left,
+        &mut var_name,
+        &mut class_names,
+        db,
+        file,
+        self_fqcn,
+        parent_fqcn,
+    );
+    let right_ok = collect_instanceof(
+        right,
+        &mut var_name,
+        &mut class_names,
+        db,
+        file,
+        self_fqcn,
+        parent_fqcn,
+    );
 
     if left_ok && right_ok {
         if let Some(vn) = var_name {
@@ -2141,9 +2213,24 @@ fn peel_parens(expr: &php_ast::owned::Expr) -> &php_ast::owned::Expr {
     }
 }
 
-fn extract_class_name(expr: &php_ast::owned::Expr, self_fqcn: Option<&str>) -> Option<String> {
+/// `self`/`static`/`parent` are bare keywords, not real class names —
+/// `db::resolve_name` deliberately returns them unresolved (it has no class
+/// context), so they must be resolved to a concrete FQCN here, where the
+/// surrounding class context (`self_fqcn`/`parent_fqcn`) is available.
+/// `static` resolves to `self_fqcn` too: it's late-static-binding, so the
+/// exact runtime class is unknown, but `self_fqcn` is its precise lower
+/// bound — the same approximation `Atomic::TStaticObject` uses elsewhere.
+fn extract_class_name(
+    expr: &php_ast::owned::Expr,
+    self_fqcn: Option<&str>,
+    parent_fqcn: Option<&str>,
+) -> Option<String> {
     match &expr.kind {
-        ExprKind::Identifier(name) => Some(name.to_string()),
+        ExprKind::Identifier(name) => match name.to_ascii_lowercase().as_str() {
+            "self" | "static" => self_fqcn.map(|s| s.to_string()),
+            "parent" => parent_fqcn.map(|s| s.to_string()),
+            _ => Some(name.to_string()),
+        },
         ExprKind::Variable(name) if name.trim_start_matches('$') == "this" => {
             self_fqcn.map(|s| s.to_string())
         }
@@ -2155,6 +2242,7 @@ fn extract_class_name(expr: &php_ast::owned::Expr, self_fqcn: Option<&str>) -> O
 fn extract_enum_case(
     expr: &php_ast::owned::Expr,
     self_fqcn: Option<&str>,
+    parent_fqcn: Option<&str>,
     db: &dyn MirDatabase,
     file: &str,
 ) -> Option<(String, String)> {
@@ -2170,7 +2258,7 @@ fn extract_enum_case(
         ExprKind::ClassConstAccess(cca) => cca,
         _ => return None,
     };
-    let enum_short_name = extract_class_name(&spa.class, self_fqcn)?;
+    let enum_short_name = extract_class_name(&spa.class, self_fqcn, parent_fqcn)?;
     let enum_fqcn = crate::db::resolve_name(db, file, &enum_short_name);
     let ExprKind::Identifier(case_name) = &spa.member.kind else {
         return None;
@@ -2188,6 +2276,7 @@ fn extract_enum_case(
 fn extract_class_const_fqcn(
     cca: &php_ast::owned::StaticAccessExpr,
     self_fqcn: Option<&str>,
+    parent_fqcn: Option<&str>,
     db: &dyn MirDatabase,
     file: &str,
 ) -> Option<String> {
@@ -2195,7 +2284,7 @@ fn extract_class_const_fqcn(
     if !is_class {
         return None;
     }
-    let short = extract_class_name(&cca.class, self_fqcn)?;
+    let short = extract_class_name(&cca.class, self_fqcn, parent_fqcn)?;
     Some(crate::db::resolve_name(db, file, &short))
 }
 
