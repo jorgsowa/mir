@@ -10,9 +10,13 @@
 //! ad-hoc inheritance check (`named_object_subtype`, `named_object_return_compatible`)
 //! don't need to switch — but new call sites should reach for this function
 //! first.
-use mir_types::{Atomic, Type, Variance};
+use rustc_hash::FxHashMap;
 
-use crate::db::{class_template_params, extends_or_implements, MirDatabase};
+use mir_types::{Atomic, Name, Type, Variance};
+
+use crate::db::{
+    class_template_params, extends_or_implements, inherited_template_bindings, MirDatabase,
+};
 
 /// A supertype type-parameter that's effectively wildcarded — an unbound
 /// template var or `mixed`. When the supertype's params are all free, we
@@ -51,6 +55,50 @@ fn variance_compatible(
             Variance::Contravariant => is_subtype(db, sup_p, sub_p),
             Variance::Invariant => sub_p == sup_p,
         })
+}
+
+/// Per-position variance check across an inheritance/`@implements` chain:
+/// `sub_fqcn<sub_params>` may satisfy `sup_fqcn<sup_params>` — a DIFFERENT
+/// class/interface — when `sup_fqcn`'s own template params are declared
+/// covariant/contravariant and the type args `sub_fqcn` actually supplies for
+/// `sup_fqcn` (resolved through its `@extends`/`@implements` chain) satisfy
+/// them in the declared direction. Without this, `variance_compatible`'s
+/// `sub_fqcn == sup_fqcn` gate only ever matches two instantiations of the
+/// SAME class, so e.g. `TypedList<Dog> implements Collection<T>` could never
+/// satisfy a `Collection<Animal>` parameter even though `Collection`'s `T` is
+/// `@template-covariant`.
+fn variance_compatible_across_hierarchy(
+    db: &dyn MirDatabase,
+    sub_fqcn: &str,
+    sub_params: &[Type],
+    sup_fqcn: &str,
+    sup_params: &[Type],
+) -> bool {
+    if sub_fqcn == sup_fqcn || sub_params.is_empty() {
+        return false;
+    }
+    let Some(sub_tps) = class_template_params(db, sub_fqcn) else {
+        return false;
+    };
+    let own_bindings: FxHashMap<Name, Type> = sub_tps
+        .iter()
+        .zip(sub_params)
+        .map(|(tp, ty)| (tp.name, ty.clone()))
+        .collect();
+    let ancestor_bindings = inherited_template_bindings(db, sub_fqcn, &own_bindings);
+    let Some(sup_tps) = class_template_params(db, sup_fqcn) else {
+        return false;
+    };
+    let resolved_sup_params: Vec<Type> = sup_tps
+        .iter()
+        .map(|tp| {
+            ancestor_bindings
+                .get(&tp.name)
+                .cloned()
+                .unwrap_or_else(Type::mixed)
+        })
+        .collect();
+    variance_compatible(db, sup_fqcn, &resolved_sup_params, sup_params)
 }
 
 /// Returns true if `sub` is a subtype of `sup`, considering the codebase's
@@ -110,7 +158,14 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
                         || (!sub_params.is_empty()
                             && sub_params.iter().all(|p| p.is_mixed() || p.is_never()))
                         || (sub_fqcn == sup_fqcn
-                            && variance_compatible(db, sub_fqcn.as_ref(), sub_params, sup_params));
+                            && variance_compatible(db, sub_fqcn.as_ref(), sub_params, sup_params))
+                        || variance_compatible_across_hierarchy(
+                            db,
+                            sub_fqcn.as_ref(),
+                            sub_params,
+                            sup_fqcn.as_ref(),
+                            sup_params,
+                        );
                     params_ok && extends_or_implements(db, sub_fqcn.as_ref(), sup_fqcn.as_ref())
                 }
                 (Atomic::TNamedObject { fqcn: sub_fqcn, .. }, Atomic::TIntersection { parts }) => {

@@ -398,10 +398,12 @@ fn project_generic_ancestor_type(
         }
 
         let resolved_param = crate::db::resolve_name(ea.db, &ea.file, param_fqcn.as_ref());
-        let ancestor_args = generic_ancestor_type_args(arg_fqcn.as_ref(), &resolved_param, ea)
-            .or_else(|| generic_ancestor_type_args(&resolved_arg, &resolved_param, ea))
-            .or_else(|| generic_ancestor_type_args(arg_fqcn.as_ref(), param_fqcn.as_ref(), ea))
-            .or_else(|| generic_ancestor_type_args(&resolved_arg, param_fqcn.as_ref(), ea))?;
+        // `arg_ty.is_single()` + the empty-type_params check above guarantee
+        // the arg class carries no live type params of its own here.
+        let ancestor_args = generic_ancestor_type_args(arg_fqcn.as_ref(), &[], &resolved_param, ea)
+            .or_else(|| generic_ancestor_type_args(&resolved_arg, &[], &resolved_param, ea))
+            .or_else(|| generic_ancestor_type_args(arg_fqcn.as_ref(), &[], param_fqcn.as_ref(), ea))
+            .or_else(|| generic_ancestor_type_args(&resolved_arg, &[], param_fqcn.as_ref(), ea))?;
         if ancestor_args.is_empty() {
             continue;
         }
@@ -631,21 +633,44 @@ fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -
                     _ => &[],
                 };
                 if !param_type_params.is_empty() {
-                    let ancestor_args =
-                        generic_ancestor_type_args(arg_fqcn.as_ref(), &resolved_param, ea)
-                            .or_else(|| {
-                                generic_ancestor_type_args(&resolved_arg, &resolved_param, ea)
-                            })
-                            .or_else(|| {
-                                generic_ancestor_type_args(
-                                    arg_fqcn.as_ref(),
-                                    param_fqcn.as_ref(),
-                                    ea,
-                                )
-                            })
-                            .or_else(|| {
-                                generic_ancestor_type_args(&resolved_arg, param_fqcn.as_ref(), ea)
-                            });
+                    // The arg's own declared type params (e.g. `Dog` in
+                    // `TypedList<Dog>`) — needed to resolve an `@implements
+                    // Collection<T>` declaration where `T` is the arg class's
+                    // OWN template, not yet substituted to a concrete type.
+                    let arg_own_params = match a_atomic {
+                        Atomic::TNamedObject { type_params, .. } => &type_params[..],
+                        _ => &[],
+                    };
+                    let ancestor_args = generic_ancestor_type_args(
+                        arg_fqcn.as_ref(),
+                        arg_own_params,
+                        &resolved_param,
+                        ea,
+                    )
+                    .or_else(|| {
+                        generic_ancestor_type_args(
+                            &resolved_arg,
+                            arg_own_params,
+                            &resolved_param,
+                            ea,
+                        )
+                    })
+                    .or_else(|| {
+                        generic_ancestor_type_args(
+                            arg_fqcn.as_ref(),
+                            arg_own_params,
+                            param_fqcn.as_ref(),
+                            ea,
+                        )
+                    })
+                    .or_else(|| {
+                        generic_ancestor_type_args(
+                            &resolved_arg,
+                            arg_own_params,
+                            param_fqcn.as_ref(),
+                            ea,
+                        )
+                    });
                     if let Some(arg_as_param_params) = ancestor_args {
                         let class_tps = class_template_params(ea, &resolved_param);
                         return generic_type_params_compatible(
@@ -847,13 +872,38 @@ fn generic_type_params_compatible(
     true
 }
 
+/// Resolve the type args `child` supplies for `ancestor` through its
+/// `@extends`/`@implements` chain. `child_own_args` is `child`'s OWN live
+/// type params (e.g. `[Dog]` for a `TypedList<Dog>` receiver) — needed
+/// because a direct `@implements Ancestor<T>` declaration where `T` is
+/// `child`'s own template names that template, not a concrete type; without
+/// substituting `child_own_args` in, the returned args would still contain
+/// the bare, unbound template placeholder.
 fn generic_ancestor_type_args(
     child: &str,
+    child_own_args: &[Type],
     ancestor: &str,
     ea: &ExpressionAnalyzer<'_>,
 ) -> Option<Vec<Type>> {
     let mut seen = std::collections::HashSet::new();
-    generic_ancestor_type_args_inner(child, ancestor, ea, &mut seen)
+    let raw = generic_ancestor_type_args_inner(child, ancestor, ea, &mut seen)?;
+    if child_own_args.is_empty() || raw.is_empty() {
+        return Some(raw);
+    }
+    let own_tps = class_template_params(ea, child);
+    if own_tps.is_empty() {
+        return Some(raw);
+    }
+    let own_bindings: FxHashMap<Name, Type> = own_tps
+        .iter()
+        .zip(child_own_args)
+        .map(|(tp, ty)| (Name::from(tp.name.as_ref()), ty.clone()))
+        .collect();
+    Some(
+        raw.into_iter()
+            .map(|ty| ty.substitute_templates(&own_bindings))
+            .collect(),
+    )
 }
 
 fn generic_ancestor_type_args_inner(
