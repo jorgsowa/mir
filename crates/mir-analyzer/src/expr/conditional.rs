@@ -177,16 +177,28 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                 }
             }
-            // Narrow the arm context based on the condition expressions
+            // Narrow the arm context based on the condition expressions.
+            // Comma-separated conditions are OR semantics (the arm fires if
+            // ANY is true) — `$x instanceof A, $x instanceof B` must narrow
+            // $x to A|B, not have each instanceof applied in sequence (which
+            // would AND-compose them and collapse to the last disjunct).
             if let Some(conditions) = &arm.conditions {
-                for cond in conditions.iter() {
-                    crate::narrowing::narrow_from_condition(
-                        cond,
-                        &mut arm_ctx,
-                        true,
-                        self.db,
-                        &self.file,
-                    );
+                let refs: Vec<&php_ast::owned::Expr> = conditions.iter().collect();
+                if !crate::narrowing::narrow_instanceof_disjuncts(
+                    &refs,
+                    &mut arm_ctx,
+                    self.db,
+                    &self.file,
+                ) {
+                    for cond in conditions.iter() {
+                        crate::narrowing::narrow_from_condition(
+                            cond,
+                            &mut arm_ctx,
+                            true,
+                            self.db,
+                            &self.file,
+                        );
+                    }
                 }
             }
             let arm_body_ty = self.analyze(&arm.body, &mut arm_ctx);

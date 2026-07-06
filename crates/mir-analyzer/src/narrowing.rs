@@ -849,6 +849,142 @@ fn apply_docblock_assertions(
     applied
 }
 
+/// Collect class names from `instanceof` checks on the SAME variable across
+/// an arbitrary expression — recursing through `||`/`or` and parens. Returns
+/// `false` as soon as something doesn't fit the shape (a non-instanceof leaf,
+/// or an instanceof on a different variable), signaling the caller should not
+/// treat the whole set as one OR-chain over a single variable.
+#[allow(clippy::too_many_arguments)]
+fn collect_instanceof(
+    expr: &php_ast::owned::Expr,
+    var_name: &mut Option<String>,
+    class_names: &mut Vec<String>,
+    db: &dyn MirDatabase,
+    file: &str,
+    self_fqcn: Option<&str>,
+    parent_fqcn: Option<&str>,
+) -> bool {
+    match &expr.kind {
+        ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => {
+            if let (Some(vn), Some(cn)) = (
+                extract_var_name(&b.left),
+                extract_class_name(&b.right, self_fqcn, parent_fqcn),
+            ) {
+                let resolved = crate::db::resolve_name(db, file, &cn);
+                match var_name {
+                    None => {
+                        *var_name = Some(vn);
+                        class_names.push(resolved);
+                        true
+                    }
+                    Some(existing) if existing == &vn => {
+                        class_names.push(resolved);
+                        true
+                    }
+                    _ => false, // different variable — bail out
+                }
+            } else {
+                false
+            }
+        }
+        ExprKind::Binary(b) if b.op == BinaryOp::BooleanOr || b.op == BinaryOp::LogicalOr => {
+            collect_instanceof(
+                &b.left,
+                var_name,
+                class_names,
+                db,
+                file,
+                self_fqcn,
+                parent_fqcn,
+            ) && collect_instanceof(
+                &b.right,
+                var_name,
+                class_names,
+                db,
+                file,
+                self_fqcn,
+                parent_fqcn,
+            )
+        }
+        ExprKind::Parenthesized(inner) => collect_instanceof(
+            inner,
+            var_name,
+            class_names,
+            db,
+            file,
+            self_fqcn,
+            parent_fqcn,
+        ),
+        _ => false,
+    }
+}
+
+/// Narrow `$x` to the union of every `instanceof` class collected from
+/// `conditions`, when EVERY condition is an `instanceof` (or OR-chain/parens
+/// thereof) on the SAME variable — e.g. `$x instanceof A, $x instanceof B`
+/// comma-separated `match(true)` arm conditions, or the two sides of an
+/// `if ($x instanceof A || $x instanceof B)`.
+///
+/// Returns `true` when it fully narrowed (every condition fit the shape and
+/// shared one variable) — the caller should then skip narrowing those
+/// conditions again individually, since re-applying each `instanceof` in
+/// sequence would AND-compose them and collapse the result to the last
+/// disjunct (no value can be simultaneously exactly-A and exactly-B).
+/// Returns `false` when the shape doesn't apply (mixed condition kinds, or
+/// instanceof checks on different variables) — the caller should fall back
+/// to narrowing each condition normally.
+pub(crate) fn narrow_instanceof_disjuncts(
+    conditions: &[&php_ast::owned::Expr],
+    ctx: &mut FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> bool {
+    if conditions.len() < 2 {
+        return false;
+    }
+    let self_fqcn = ctx.self_fqcn.as_deref();
+    let parent_fqcn = ctx.parent_fqcn.as_deref();
+
+    let mut var_name: Option<String> = None;
+    let mut class_names: Vec<String> = vec![];
+    let all_ok = conditions.iter().all(|cond| {
+        collect_instanceof(
+            cond,
+            &mut var_name,
+            &mut class_names,
+            db,
+            file,
+            self_fqcn,
+            parent_fqcn,
+        )
+    });
+
+    if !all_ok || class_names.len() < 2 {
+        return false;
+    }
+    let Some(vn) = var_name else {
+        return false;
+    };
+
+    let current = ctx.get_var(&vn);
+    // Narrow to the union of all instanceof types, classifying each union
+    // member against every disjunct at once (see narrow_or_instanceof_union's
+    // doc comment for why this can't be done by narrowing per-class and
+    // merging afterward).
+    let narrowed =
+        narrow_or_instanceof_union(&current, &class_names, db, &ctx.template_param_names);
+    // Fall back to current if narrowed is empty (e.g. mixed)
+    let result = if narrowed.is_empty() {
+        current.clone()
+    } else {
+        narrowed
+    };
+    if !result.is_empty() {
+        ctx.set_var(&vn, result);
+    }
+    true
+}
+
 /// For `$x instanceof A || $x instanceof B` (true branch): narrow $x to A|B.
 /// Handles OR chains recursively, e.g. `$x instanceof A || $x instanceof B || $x instanceof C`.
 fn narrow_or_instanceof_true(
@@ -858,124 +994,7 @@ fn narrow_or_instanceof_true(
     db: &dyn MirDatabase,
     file: &str,
 ) {
-    let self_fqcn = ctx.self_fqcn.as_deref();
-    let parent_fqcn = ctx.parent_fqcn.as_deref();
-
-    // Collect all class names from instanceof checks on the same variable.
-    let mut var_name: Option<String> = None;
-    let mut class_names: Vec<String> = vec![];
-
-    #[allow(clippy::too_many_arguments)]
-    fn collect_instanceof(
-        expr: &php_ast::owned::Expr,
-        var_name: &mut Option<String>,
-        class_names: &mut Vec<String>,
-        db: &dyn MirDatabase,
-        file: &str,
-        self_fqcn: Option<&str>,
-        parent_fqcn: Option<&str>,
-    ) -> bool {
-        match &expr.kind {
-            ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => {
-                if let (Some(vn), Some(cn)) = (
-                    extract_var_name(&b.left),
-                    extract_class_name(&b.right, self_fqcn, parent_fqcn),
-                ) {
-                    let resolved = crate::db::resolve_name(db, file, &cn);
-                    match var_name {
-                        None => {
-                            *var_name = Some(vn);
-                            class_names.push(resolved);
-                            true
-                        }
-                        Some(existing) if existing == &vn => {
-                            class_names.push(resolved);
-                            true
-                        }
-                        _ => false, // different variable — bail out
-                    }
-                } else {
-                    false
-                }
-            }
-            ExprKind::Binary(b) if b.op == BinaryOp::BooleanOr || b.op == BinaryOp::LogicalOr => {
-                collect_instanceof(
-                    &b.left,
-                    var_name,
-                    class_names,
-                    db,
-                    file,
-                    self_fqcn,
-                    parent_fqcn,
-                ) && collect_instanceof(
-                    &b.right,
-                    var_name,
-                    class_names,
-                    db,
-                    file,
-                    self_fqcn,
-                    parent_fqcn,
-                )
-            }
-            ExprKind::Parenthesized(inner) => collect_instanceof(
-                inner,
-                var_name,
-                class_names,
-                db,
-                file,
-                self_fqcn,
-                parent_fqcn,
-            ),
-            _ => false,
-        }
-    }
-
-    // Wrap left and right into a fake OR so we can reuse the collector
-    let left_ok = collect_instanceof(
-        left,
-        &mut var_name,
-        &mut class_names,
-        db,
-        file,
-        self_fqcn,
-        parent_fqcn,
-    );
-    let right_ok = collect_instanceof(
-        right,
-        &mut var_name,
-        &mut class_names,
-        db,
-        file,
-        self_fqcn,
-        parent_fqcn,
-    );
-
-    if left_ok && right_ok {
-        if let Some(vn) = var_name {
-            if !class_names.is_empty() {
-                let current = ctx.get_var(&vn);
-                // Narrow to the union of all instanceof types, classifying each
-                // union member against every disjunct at once (see
-                // narrow_or_instanceof_union's doc comment for why this can't
-                // be done by narrowing per-class and merging afterward).
-                let narrowed = narrow_or_instanceof_union(
-                    &current,
-                    &class_names,
-                    db,
-                    &ctx.template_param_names,
-                );
-                // Fall back to current if narrowed is empty (e.g. mixed)
-                let result = if narrowed.is_empty() {
-                    current.clone()
-                } else {
-                    narrowed
-                };
-                if !result.is_empty() {
-                    ctx.set_var(&vn, result);
-                }
-            }
-        }
-    }
+    narrow_instanceof_disjuncts(&[left, right], ctx, db, file);
 }
 
 /// Apply short-circuit narrowing for isset() in || expressions (true branch).
@@ -1198,7 +1217,20 @@ fn narrow_or_instanceof_union(
         }
     }
 
-    result
+    if result.is_empty() {
+        // No atomic in `current` extends/implements any disjunct (e.g.
+        // `current` is an interface the disjuncts implement, not vice versa)
+        // — mirrors narrow_instanceof_preserving_subtypes's fallback: assume
+        // the instanceof check(s) narrow to the union of the checked classes
+        // rather than silently keeping the pre-narrowing type.
+        let mut out = Type::empty();
+        for cn in class_names {
+            out.add_type(class_atom(cn));
+        }
+        out
+    } else {
+        result
+    }
 }
 
 fn filter_out_instanceof_match(current: &Type, class_name: &str, db: &dyn MirDatabase) -> Type {
