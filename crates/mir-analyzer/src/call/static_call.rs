@@ -20,7 +20,7 @@ use super::args::{
 };
 use super::method::resolve_method_from_db;
 use super::CallAnalyzer;
-use crate::generic::infer_template_bindings;
+use crate::generic::{check_template_bounds_with_inheritance, infer_template_bindings};
 
 fn extract_namespace(fqcn: &str) -> Option<&str> {
     if let Some(pos) = fqcn.rfind('\\') {
@@ -447,11 +447,30 @@ impl CallAnalyzer {
                 ret_substituted.substitute_templates(&class_bindings)
             };
             let ret = if !resolved.template_params.is_empty() {
-                let (bindings, _unchecked) = infer_template_bindings(
+                let (bindings, unchecked) = infer_template_bindings(
                     &resolved.template_params,
                     effective_params,
                     &arg_types,
                 );
+                // Static calls (`Foo::bar()`, `self::bar()`, `parent::bar()`)
+                // previously never checked the method's own `@template ... of
+                // Bound` at all — only instance-method and function calls did.
+                for (name, inferred, bound) in check_template_bounds_with_inheritance(
+                    ea.db,
+                    &bindings,
+                    &resolved.template_params,
+                    &unchecked,
+                ) {
+                    ea.emit(
+                        IssueKind::InvalidTemplateParam {
+                            name: name.to_string(),
+                            expected_bound: format!("{bound}"),
+                            actual: format!("{inferred}"),
+                        },
+                        Severity::Error,
+                        span,
+                    );
+                }
                 ret_substituted.substitute_templates(&bindings)
             } else {
                 ret_substituted
