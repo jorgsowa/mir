@@ -516,9 +516,15 @@ impl<'a> StatementsAnalyzer<'a> {
         let has_default = sw.body.cases.iter().any(|c| c.value.is_none());
 
         let mut case_results: Vec<FlowState> = Vec::new();
+        // Case labels immediately preceding this one whose bodies were empty
+        // — a `case` with a non-empty body executes whenever ANY of those
+        // fell-through conditions matched too, OR semantics, not just this
+        // case's own. Accumulated here and reset once a body actually runs.
+        let mut pending_conditions: Vec<&php_ast::owned::Expr> = Vec::new();
         for case in sw.body.cases.iter() {
             let mut case_ctx = pre_ctx.branch();
             if let Some(val) = &case.value {
+                pending_conditions.push(val);
                 if switch_on_true {
                     narrow_from_condition(val, &mut case_ctx, true, self.db, &self.file);
                 } else if let Some(ref var_name) = subject_var {
@@ -566,8 +572,56 @@ impl<'a> StatementsAnalyzer<'a> {
                 }
                 self.expr_analyzer(&case_ctx).analyze(val, &mut case_ctx);
             }
+
+            let body_is_empty = case.body.is_empty();
+
+            // A body reached via multiple fallen-through labels executes
+            // under the UNION of their conditions, not just this case's own
+            // — re-narrow from each condition's original (pre-case) type,
+            // since `case_ctx` above was already narrowed by this case's
+            // single condition alone.
+            if !body_is_empty && pending_conditions.len() > 1 {
+                if switch_on_true {
+                    let mut union_ctx = pre_ctx.branch();
+                    if let Some(vn) = crate::narrowing::narrow_instanceof_disjuncts(
+                        &pending_conditions,
+                        &mut union_ctx,
+                        self.db,
+                        &self.file,
+                    ) {
+                        case_ctx.set_var(&vn, union_ctx.get_var(&vn));
+                    }
+                } else if let Some(ref var_name) = subject_var {
+                    let mut union_ty = Type::empty();
+                    let all_literal = pending_conditions.iter().all(|cond| {
+                        let atom = match &cond.kind {
+                            ExprKind::Int(n) => Some(Atomic::TLiteralInt(*n)),
+                            ExprKind::String(s) => Some(Atomic::TLiteralString(Arc::from(&**s))),
+                            ExprKind::Bool(b) => {
+                                Some(if *b { Atomic::TTrue } else { Atomic::TFalse })
+                            }
+                            ExprKind::Null => Some(Atomic::TNull),
+                            _ => None,
+                        };
+                        match atom {
+                            Some(a) => {
+                                union_ty.add_type(a);
+                                true
+                            }
+                            None => false,
+                        }
+                    });
+                    if all_literal && !union_ty.is_empty() {
+                        case_ctx.set_var(var_name, union_ty);
+                    }
+                }
+            }
+
             self.analyze_stmts(&case.body, &mut case_ctx);
             case_results.push(case_ctx);
+            if !body_is_empty {
+                pending_conditions.clear();
+            }
         }
 
         let n = case_results.len();

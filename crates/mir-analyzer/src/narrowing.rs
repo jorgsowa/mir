@@ -933,14 +933,17 @@ fn collect_instanceof(
 /// Returns `false` when the shape doesn't apply (mixed condition kinds, or
 /// instanceof checks on different variables) — the caller should fall back
 /// to narrowing each condition normally.
+/// Returns the discovered variable name on success (the caller may want to
+/// know which variable was narrowed, e.g. to re-apply the result on top of a
+/// different context — see `analyze_switch_stmt`'s fallthrough handling).
 pub(crate) fn narrow_instanceof_disjuncts(
     conditions: &[&php_ast::owned::Expr],
     ctx: &mut FlowState,
     db: &dyn MirDatabase,
     file: &str,
-) -> bool {
+) -> Option<String> {
     if conditions.len() < 2 {
-        return false;
+        return None;
     }
     let self_fqcn = ctx.self_fqcn.as_deref();
     let parent_fqcn = ctx.parent_fqcn.as_deref();
@@ -960,11 +963,9 @@ pub(crate) fn narrow_instanceof_disjuncts(
     });
 
     if !all_ok || class_names.len() < 2 {
-        return false;
+        return None;
     }
-    let Some(vn) = var_name else {
-        return false;
-    };
+    let vn = var_name?;
 
     let current = ctx.get_var(&vn);
     // Narrow to the union of all instanceof types, classifying each union
@@ -982,7 +983,7 @@ pub(crate) fn narrow_instanceof_disjuncts(
     if !result.is_empty() {
         ctx.set_var(&vn, result);
     }
-    true
+    Some(vn)
 }
 
 /// For `$x instanceof A || $x instanceof B` (true branch): narrow $x to A|B.
