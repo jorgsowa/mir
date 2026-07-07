@@ -376,13 +376,17 @@ impl Type {
 
     /// Keep only truthy atomics (e.g. after `if ($x)`).
     pub fn narrow_to_truthy(&self) -> Type {
-        if self.is_mixed() {
+        if self.is_mixed_not_template() {
             return Type::mixed();
         }
         let mut result = Type::empty();
         result.from_docblock = self.from_docblock;
         for t in &self.types {
             match t {
+                // An unconstrained/bounded template could resolve to anything at
+                // runtime, truthy or falsy — preserve it rather than dropping or
+                // widening it, the same way narrow_to_string/_int/etc. already do.
+                Atomic::TTemplateParam { .. } => result.add_type(t.clone()),
                 // Always-falsy — exclude entirely.
                 Atomic::TLiteralInt(0)
                 | Atomic::TLiteralFloat(0, 0)
@@ -441,7 +445,7 @@ impl Type {
 
     /// Keep only falsy atomics (e.g. after `if (!$x)`).
     pub fn narrow_to_falsy(&self) -> Type {
-        if self.is_mixed() {
+        if self.is_mixed_not_template() {
             return Type::from_vec(vec![
                 Atomic::TNull,
                 Atomic::TFalse,
@@ -453,6 +457,11 @@ impl Type {
         result.from_docblock = self.from_docblock;
         for t in &self.types {
             match t {
+                // An unconstrained/bounded template could resolve to anything at
+                // runtime, truthy or falsy — preserve it rather than dropping it
+                // (its own `can_be_falsy()` conservatively defaults to `false`,
+                // which would otherwise wrongly exclude it here).
+                Atomic::TTemplateParam { .. } => result.add_type(t.clone()),
                 // bool: only false is falsy; falsy branch is false.
                 Atomic::TBool => result.add_type(Atomic::TFalse),
                 // int: only 0 is falsy.
