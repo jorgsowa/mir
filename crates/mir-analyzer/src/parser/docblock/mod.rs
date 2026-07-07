@@ -101,7 +101,7 @@ impl DocblockParser {
                     result.is_deprecated = true;
                     result.deprecated = Some(body_text(&tag.body).unwrap_or_default().to_string());
                 }
-                "template" => {
+                "template" | "psalm-template" | "phpstan-template" => {
                     if let Some((name, bound)) =
                         parse_template_line(tag.name.as_str(), body_text(&tag.body))
                     {
@@ -120,7 +120,9 @@ impl DocblockParser {
                         ));
                     }
                 }
-                "template-covariant" => {
+                "template-covariant"
+                | "psalm-template-covariant"
+                | "phpstan-template-covariant" => {
                     if let Some((name, bound)) =
                         parse_template_line(tag.name.as_str(), body_text(&tag.body))
                     {
@@ -139,7 +141,9 @@ impl DocblockParser {
                         ));
                     }
                 }
-                "template-contravariant" => {
+                "template-contravariant"
+                | "psalm-template-contravariant"
+                | "phpstan-template-contravariant" => {
                     if let Some((name, bound)) =
                         parse_template_line(tag.name.as_str(), body_text(&tag.body))
                     {
