@@ -361,7 +361,28 @@ fn param_contains_template_or_unknown(
                 return true;
             }
             // Check nested type_params for template parameters only
-            !type_params.is_empty() && has_template_param(param_ty, &template_names)
+            if type_params.is_empty() || !has_template_param(param_ty, &template_names) {
+                return false;
+            }
+            // A generic param like `Bar<T>` should only forgive the argument when
+            // it could plausibly BE a `Bar` regardless of what `T` resolves to —
+            // mirroring how the TIntersection arm below forgives only the
+            // templated part while still enforcing the concrete parts. An
+            // argument whose own type can never satisfy `Bar` at the class level
+            // (a bare scalar, or an unrelated, unrelated-by-inheritance class) is
+            // still a real mismatch no `T` binding could ever paper over.
+            arg_ty.types.iter().any(|arg_atomic| match arg_atomic {
+                Atomic::TNamedObject { fqcn: arg_fqcn, .. }
+                | Atomic::TStaticObject { fqcn: arg_fqcn }
+                | Atomic::TSelf { fqcn: arg_fqcn } => {
+                    arg_fqcn == fqcn
+                        || crate::db::extends_or_implements(ea.db, arg_fqcn.as_ref(), fqcn.as_ref())
+                        || crate::db::extends_or_implements(ea.db, fqcn.as_ref(), arg_fqcn.as_ref())
+                        || crate::db::has_unknown_ancestor(ea.db, arg_fqcn.as_ref())
+                }
+                Atomic::TObject | Atomic::TMixed | Atomic::TTemplateParam { .. } => true,
+                _ => false,
+            })
         }
         Atomic::TClassString(Some(inner)) | Atomic::TInterfaceString(Some(inner)) => {
             // Check if this name is a template parameter
