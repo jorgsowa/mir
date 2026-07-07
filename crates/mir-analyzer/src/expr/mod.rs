@@ -498,10 +498,18 @@ impl<'a> ExpressionAnalyzer<'a> {
                         {
                             bindings.entry(k).or_insert(v);
                         }
+                        let own_template_names: Vec<mir_types::Name> = resolved
+                            .template_params
+                            .iter()
+                            .map(|tp| mir_types::Name::from(tp.name.as_ref()))
+                            .collect();
                         let closure = Self::build_closure_from_resolved_params(
                             &resolved.params,
                             resolved.return_ty_raw,
                             &bindings,
+                            &own_template_names,
+                            &fqcn_arc,
+                            &receiver_type_params,
                         );
                         return if nullsafe {
                             Type::nullable(closure)
@@ -585,10 +593,18 @@ impl<'a> ExpressionAnalyzer<'a> {
                     {
                         bindings.entry(k).or_insert(v);
                     }
+                    let own_template_names: Vec<mir_types::Name> = resolved
+                        .template_params
+                        .iter()
+                        .map(|tp| mir_types::Name::from(tp.name.as_ref()))
+                        .collect();
                     return Type::single(Self::build_closure_from_resolved_params(
                         &resolved.params,
                         resolved.return_ty_raw,
                         &bindings,
+                        &own_template_names,
+                        &fqcn_arc,
+                        &receiver_type_params,
                     ));
                 }
                 Type::single(Atomic::TCallable {
@@ -603,7 +619,26 @@ impl<'a> ExpressionAnalyzer<'a> {
         params: &[mir_codebase::storage::FnParam],
         return_ty: Type,
         bindings: &rustc_hash::FxHashMap<mir_types::Name, Type>,
+        own_template_names: &[mir_types::Name],
+        receiver_fqcn: &Arc<str>,
+        receiver_type_params: &[Type],
     ) -> Atomic {
+        // A method-level `@template` SHADOWS a same-named class template — its
+        // occurrences must stay unbound here rather than getting the class-level
+        // binding baked in, the same way method.rs's direct-call path keeps them
+        // unbound for `check_args` to infer (see `param_bindings.remove` there).
+        let mut bindings = bindings.clone();
+        for name in own_template_names {
+            bindings.remove(name);
+        }
+        let resolve = |t: Type| -> Type {
+            // `self`/`static` must resolve to the receiver's concrete class, the
+            // same way a direct call's return type already does — otherwise a
+            // late-static-bound method's FCC closure carries the class that
+            // physically declares the method instead of the real receiver.
+            crate::call::substitute_static_in_return(t, receiver_fqcn, receiver_type_params)
+                .substitute_templates(&bindings)
+        };
         let fn_params: Vec<mir_types::atomic::FnParam> = params
             .iter()
             .map(|p| mir_types::atomic::FnParam {
@@ -612,13 +647,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                     .ty
                     .as_deref()
                     .cloned()
-                    .map(|t| t.substitute_templates(bindings))
+                    .map(resolve)
                     .map(mir_types::compact::SimpleType::from_union),
                 out_ty: p
                     .out_ty
                     .as_deref()
                     .cloned()
-                    .map(|t| t.substitute_templates(bindings))
+                    .map(resolve)
                     .map(mir_types::compact::SimpleType::from_union),
                 default: if p.has_default {
                     Some(mir_types::compact::SimpleType::from_union(Type::mixed()))
@@ -632,7 +667,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             .collect();
         Atomic::TClosure {
             params: fn_params,
-            return_type: Box::new(return_ty.substitute_templates(bindings)),
+            return_type: Box::new(resolve(return_ty)),
             this_type: None,
         }
     }
