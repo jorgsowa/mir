@@ -954,14 +954,22 @@ fn resolve_method_return<'a>(
         }
 
         // Write @param-out types back to caller variables for by-ref params.
-        // Use effective_params (not resolved.params) so a generic method's
-        // out-type is substituted with this receiver's own bound type param
-        // (e.g. Box<int>'s T -> int) the same way the in-type already is.
-        for (i, param) in effective_params.iter().enumerate() {
+        // Substitute the full `bindings` map — the receiver's own bound class
+        // template (e.g. Box<int>'s T -> int) plus this call's own inferred
+        // method-level template bindings, merged in above — the same combined
+        // approach static_call.rs's out_bindings already uses. `effective_params`
+        // deliberately strips the method's own template names (so check_args can
+        // still infer them from the arguments), so it can't be reused here: its
+        // out_ty would leak the bare method template atom to the caller.
+        for (i, param) in resolved.params.iter().enumerate() {
             let Some(out_ty) = param.out_ty.as_ref() else {
                 continue;
             };
-            let out_ty = (**out_ty).clone();
+            let out_ty = if bindings.is_empty() {
+                (**out_ty).clone()
+            } else {
+                out_ty.substitute_templates(&bindings)
+            };
             if param.is_variadic {
                 for arg in call.args.iter().skip(i) {
                     if let php_ast::owned::ExprKind::Variable(name) = &arg.value.kind {
