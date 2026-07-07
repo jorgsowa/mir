@@ -465,11 +465,16 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                 };
                 let method_name_lower = crate::util::php_ident_lowercase(method_name.as_ref());
-                if let Some(fqcn) = obj_ty
-                    .remove_null()
-                    .types
-                    .iter()
-                    .find_map(|a| a.named_object_fqcn())
+                if let Some((fqcn, receiver_type_params)) =
+                    obj_ty.remove_null().types.iter().find_map(|a| {
+                        a.named_object_fqcn().map(|fqcn| {
+                            let type_params = match a {
+                                Atomic::TNamedObject { type_params, .. } => type_params.to_vec(),
+                                _ => Vec::new(),
+                            };
+                            (fqcn, type_params)
+                        })
+                    })
                 {
                     let fqcn_resolved = crate::db::resolve_name(self.db, self.file.as_ref(), fqcn);
                     let fqcn_arc: Arc<str> = Arc::from(fqcn_resolved.as_str());
@@ -478,9 +483,25 @@ impl<'a> ExpressionAnalyzer<'a> {
                         &fqcn_arc,
                         &method_name_lower,
                     ) {
+                        // Substitute this receiver's own bound type params (e.g.
+                        // `Box<int>`'s T -> int) into the method's raw param/return
+                        // types before building the callable — otherwise a
+                        // first-class-callable on a generic method loses the
+                        // binding that the direct-call path already applies.
+                        let class_tps = crate::db::class_template_params(self.db, &fqcn_arc)
+                            .map(|tps| tps.to_vec())
+                            .unwrap_or_default();
+                        let mut bindings =
+                            crate::generic::build_class_bindings(&class_tps, &receiver_type_params);
+                        for (k, v) in
+                            crate::db::inherited_template_bindings(self.db, &fqcn_arc, &bindings)
+                        {
+                            bindings.entry(k).or_insert(v);
+                        }
                         let closure = Self::build_closure_from_resolved_params(
                             &resolved.params,
                             resolved.return_ty_raw,
+                            &bindings,
                         );
                         return if nullsafe {
                             Type::nullable(closure)
@@ -506,6 +527,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                 };
                 let method_name_lower = crate::util::php_ident_lowercase(method_name.as_ref());
+                let mut receiver_type_params: Vec<Type> = Vec::new();
                 let fqcn = match &class.kind {
                     ExprKind::Identifier(name) => {
                         let resolved =
@@ -523,13 +545,21 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                     _ => {
                         let ty = self.analyze(class, ctx);
-                        match ty
-                            .types
-                            .iter()
-                            .find_map(|a| a.named_object_fqcn())
-                            .map(str::to_string)
-                        {
-                            Some(fqcn) => fqcn,
+                        match ty.types.iter().find_map(|a| {
+                            a.named_object_fqcn().map(|fqcn| {
+                                let type_params = match a {
+                                    Atomic::TNamedObject { type_params, .. } => {
+                                        type_params.to_vec()
+                                    }
+                                    _ => Vec::new(),
+                                };
+                                (fqcn.to_string(), type_params)
+                            })
+                        }) {
+                            Some((fqcn, type_params)) => {
+                                receiver_type_params = type_params;
+                                fqcn
+                            }
                             None => {
                                 return Type::single(Atomic::TCallable {
                                     params: None,
@@ -543,9 +573,22 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if let Some(resolved) =
                     crate::call::method::resolve_method_from_db(self, &fqcn_arc, &method_name_lower)
                 {
+                    // Same reasoning as the instance-method FCC case above: substitute
+                    // the receiver's own bound type params before building the callable.
+                    let class_tps = crate::db::class_template_params(self.db, &fqcn_arc)
+                        .map(|tps| tps.to_vec())
+                        .unwrap_or_default();
+                    let mut bindings =
+                        crate::generic::build_class_bindings(&class_tps, &receiver_type_params);
+                    for (k, v) in
+                        crate::db::inherited_template_bindings(self.db, &fqcn_arc, &bindings)
+                    {
+                        bindings.entry(k).or_insert(v);
+                    }
                     return Type::single(Self::build_closure_from_resolved_params(
                         &resolved.params,
                         resolved.return_ty_raw,
+                        &bindings,
                     ));
                 }
                 Type::single(Atomic::TCallable {
@@ -559,6 +602,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     fn build_closure_from_resolved_params(
         params: &[mir_codebase::storage::FnParam],
         return_ty: Type,
+        bindings: &rustc_hash::FxHashMap<mir_types::Name, Type>,
     ) -> Atomic {
         let fn_params: Vec<mir_types::atomic::FnParam> = params
             .iter()
@@ -568,11 +612,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                     .ty
                     .as_deref()
                     .cloned()
+                    .map(|t| t.substitute_templates(bindings))
                     .map(mir_types::compact::SimpleType::from_union),
                 out_ty: p
                     .out_ty
                     .as_deref()
                     .cloned()
+                    .map(|t| t.substitute_templates(bindings))
                     .map(mir_types::compact::SimpleType::from_union),
                 default: if p.has_default {
                     Some(mir_types::compact::SimpleType::from_union(Type::mixed()))
@@ -586,7 +632,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             .collect();
         Atomic::TClosure {
             params: fn_params,
-            return_type: Box::new(return_ty),
+            return_type: Box::new(return_ty.substitute_templates(bindings)),
             this_type: None,
         }
     }
