@@ -69,7 +69,7 @@ impl DocblockParser {
                         result.return_type = Some(parse_type_string(&ty_s));
                     }
                 }
-                "var" => {
+                "var" | "psalm-var" | "phpstan-var" => {
                     if let Some(body_str) = body_text(&tag.body) {
                         if let Some((ty_s, name)) = parse_param_line(&body_str) {
                             if let Some(msg) = validate_type_str(&ty_s, "var") {
@@ -308,7 +308,7 @@ impl DocblockParser {
                     }
                 }
                 "internal" => result.is_internal = true,
-                "pure" => result.is_pure = true,
+                "pure" | "psalm-pure" | "phpstan-pure" => result.is_pure = true,
                 "seal-properties" | "psalm-seal-properties" => result.seal_properties = true,
                 "no-named-arguments" => result.no_named_arguments = true,
                 "mutation-free" | "psalm-mutation-free" | "phpstan-mutation-free" => {
@@ -316,7 +316,7 @@ impl DocblockParser {
                 }
                 "psalm-external-mutation-free" => result.is_external_mutation_free = true,
                 "immutable" | "psalm-immutable" => result.is_immutable = true,
-                "readonly" => result.is_readonly = true,
+                "readonly" | "psalm-readonly" | "phpstan-readonly" => result.is_readonly = true,
                 "final" => result.is_final = true,
                 "inheritDoc" | "inheritdoc" => result.is_inherit_doc = true,
                 "api" | "psalm-api" => result.is_api = true,
