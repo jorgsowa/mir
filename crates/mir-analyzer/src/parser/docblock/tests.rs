@@ -118,6 +118,8 @@ fn parse_template_extends_alias() {
         let parsed = DocblockParser::parse(&doc);
         let extends = parsed
             .extends
+            .first()
+            .cloned()
             .unwrap_or_else(|| panic!("@{tag} should populate extends"));
         assert!(
             extends.contains(|t| matches!(

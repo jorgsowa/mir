@@ -872,13 +872,6 @@ fn generic_type_params_compatible(
     true
 }
 
-/// Resolve the type args `child` supplies for `ancestor` through its
-/// `@extends`/`@implements` chain. `child_own_args` is `child`'s OWN live
-/// type params (e.g. `[Dog]` for a `TypedList<Dog>` receiver) — needed
-/// because a direct `@implements Ancestor<T>` declaration where `T` is
-/// `child`'s own template names that template, not a concrete type; without
-/// substituting `child_own_args` in, the returned args would still contain
-/// the bare, unbound template placeholder.
 fn generic_ancestor_type_args(
     child: &str,
     child_own_args: &[Type],
@@ -887,17 +880,29 @@ fn generic_ancestor_type_args(
 ) -> Option<Vec<Type>> {
     let mut seen = std::collections::HashSet::new();
     let raw = generic_ancestor_type_args_inner(child, ancestor, ea, &mut seen)?;
-    if child_own_args.is_empty() || raw.is_empty() {
+    if raw.is_empty() {
         return Some(raw);
     }
     let own_tps = class_template_params(ea, child);
     if own_tps.is_empty() {
         return Some(raw);
     }
+    // A `child` template param not supplied by `child_own_args` (e.g. a bare,
+    // unparameterized `Generator` return with no `@return Generator<...>`
+    // annotation) is effectively unbound — default it to its declared bound
+    // (or `mixed`), the same fallback `infer_template_bindings` uses, so a
+    // bare ancestor placeholder doesn't leak through unresolved and then read
+    // as a concrete mismatch against the expected type.
     let own_bindings: FxHashMap<Name, Type> = own_tps
         .iter()
-        .zip(child_own_args)
-        .map(|(tp, ty)| (Name::from(tp.name.as_ref()), ty.clone()))
+        .enumerate()
+        .map(|(i, tp)| {
+            let ty = child_own_args
+                .get(i)
+                .cloned()
+                .unwrap_or_else(|| tp.bound.as_deref().cloned().unwrap_or_else(Type::mixed));
+            (Name::from(tp.name.as_ref()), ty)
+        })
         .collect();
     Some(
         raw.into_iter()
@@ -921,39 +926,58 @@ fn generic_ancestor_type_args_inner(
 
     let here = crate::db::Fqcn::from_str(ea.db, child);
     let cl = crate::db::find_class_like(ea.db, here)?;
-    let parent = cl.parent().cloned();
-    let extends_type_args: Vec<Type> = cl.extends_type_args().to_vec();
-    let implements_type_args = cl.implements_type_args();
 
-    for (iface, args) in implements_type_args.iter() {
-        if iface.as_ref() == ancestor {
-            return Some(args.to_vec());
+    // Resolve `ancestor`'s type args through a single typed edge — either
+    // directly (`edge == ancestor`) or by recursing past it and substituting
+    // `edge`'s own template params (bound by `edge_args`) into whatever the
+    // recursive search found further up. Shared by every kind of typed edge
+    // below (`@implements`, an interface's own `@extends`, and a class's
+    // single parent `@extends`) so an ancestor declared past the FIRST hop
+    // — e.g. `Collection extends GrandCollection<T>` reached through
+    // `TypedList implements Collection<T>` — is not silently missed.
+    let resolve_through = |edge: &str,
+                           edge_args: &[Type],
+                           seen: &mut std::collections::HashSet<String>|
+     -> Option<Vec<Type>> {
+        if edge == ancestor {
+            return Some(edge_args.to_vec());
+        }
+        let found = generic_ancestor_type_args_inner(edge, ancestor, ea, seen)?;
+        if found.is_empty() {
+            return Some(found);
+        }
+        let edge_template_params = class_template_params(ea, edge);
+        let bindings: FxHashMap<Name, Type> = edge_template_params
+            .iter()
+            .zip(edge_args.iter())
+            .map(|(tp, ty)| (Name::from(tp.name.as_ref()), ty.clone()))
+            .collect();
+        Some(
+            found
+                .into_iter()
+                .map(|ty| ty.substitute_templates(&bindings))
+                .collect(),
+        )
+    };
+
+    for (iface, args) in cl.implements_type_args() {
+        if let Some(result) = resolve_through(iface.as_ref(), args, seen) {
+            return Some(result);
+        }
+    }
+    for (iface, args) in cl.interface_extends_type_args() {
+        if let Some(result) = resolve_through(iface.as_ref(), args, seen) {
+            return Some(result);
+        }
+    }
+    if let Some(parent) = cl.parent() {
+        let extends_type_args = cl.extends_type_args();
+        if let Some(result) = resolve_through(parent.as_ref(), extends_type_args, seen) {
+            return Some(result);
         }
     }
 
-    let parent = parent?;
-    if parent.as_ref() == ancestor {
-        return Some(extends_type_args);
-    }
-
-    let parent_args = generic_ancestor_type_args_inner(parent.as_ref(), ancestor, ea, seen)?;
-    if parent_args.is_empty() {
-        return Some(parent_args);
-    }
-
-    let parent_template_params = class_template_params(ea, parent.as_ref());
-    let bindings: FxHashMap<Name, Type> = parent_template_params
-        .iter()
-        .zip(extends_type_args.iter())
-        .map(|(tp, ty)| (Name::from(tp.name.as_ref()), ty.clone()))
-        .collect();
-
-    Some(
-        parent_args
-            .into_iter()
-            .map(|ty| ty.substitute_templates(&bindings))
-            .collect(),
-    )
+    None
 }
 
 fn union_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>) -> bool {

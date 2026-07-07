@@ -351,7 +351,7 @@ fn collect_class_refs_from_ast(program: &php_ast::owned::Program) -> Vec<String>
         if let Some(var) = &parsed.var_type {
             collect_from_type(var, out);
         }
-        if let Some(ext) = &parsed.extends {
+        for ext in &parsed.extends {
             collect_from_type(ext, out);
         }
         for impl_ty in &parsed.implements {

@@ -244,6 +244,16 @@ impl ClassLike {
         }
     }
 
+    /// `@extends BaseIface<T1, T2>` type args, keyed by base interface FQCN
+    /// (interface only — unlike a class's single-parent `extends_type_args`,
+    /// an interface's native `extends A, B` clause may name several bases).
+    pub fn interface_extends_type_args(&self) -> &[(Arc<str>, Vec<mir_types::Type>)] {
+        match self {
+            ClassLike::Interface(i) => &i.extends_type_args,
+            _ => &[],
+        }
+    }
+
     /// Per-`use SomeTrait;` declaration locations (class + trait).
     pub fn trait_use_locations(&self) -> &[(Arc<str>, mir_types::Location)] {
         match self {

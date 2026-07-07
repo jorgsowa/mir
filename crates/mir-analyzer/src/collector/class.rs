@@ -393,7 +393,7 @@ impl<'a> DefinitionCollector<'a> {
 
         let extends_type_args: Vec<mir_types::Type> = class_doc
             .extends
-            .as_ref()
+            .first()
             .and_then(|ty| {
                 if let Some(Atomic::TNamedObject { type_params, .. }) = ty.types.first() {
                     Some(

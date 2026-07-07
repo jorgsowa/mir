@@ -99,17 +99,6 @@ pub fn class_template_params(db: &dyn MirDatabase, fqcn: &str) -> Option<Arc<[Te
     Some(Arc::from(class.template_params().to_vec()))
 }
 
-/// Walk the parent chain collecting template bindings from `@extends` and
-/// `@implements` type args. For `class UserRepo extends BaseRepo` with
-/// `@extends BaseRepo<User>`, returns `{ T → User }` where `T` is `BaseRepo`'s
-/// declared template parameter — likewise for `@implements Iface<V>` at any
-/// level of the chain.
-///
-/// `own_bindings` seeds the walk with the starting class's own template
-/// bindings (e.g. `T → int` from a `Box<int>` receiver), so a type arg that
-/// references that class's own template (`class Box<T> implements
-/// Container<T>`) resolves to the concrete type instead of leaking the bare
-/// placeholder name.
 pub fn inherited_template_bindings(
     db: &dyn MirDatabase,
     fqcn: &str,
@@ -118,51 +107,61 @@ pub fn inherited_template_bindings(
     let mut bindings: FxHashMap<Name, Type> = FxHashMap::default();
     let mut substitution: FxHashMap<Name, Type> = own_bindings.clone();
     let mut visited: FxHashSet<Arc<str>> = FxHashSet::default();
-    let mut current: Arc<str> = Arc::from(fqcn);
-    loop {
+    // A worklist, not a linear `current = parent` chain: an interface's
+    // native `extends A, B` clause may name several bases at once, and each
+    // of THOSE may further extend other generic interfaces — walking only
+    // the class/parent spine (as this used to) silently drops any template
+    // parameterization declared past the first interface hop.
+    let mut worklist: Vec<Arc<str>> = vec![Arc::from(fqcn)];
+
+    let apply_type_args = |iface: &Arc<str>,
+                           args: &[Type],
+                           bindings: &mut FxHashMap<Name, Type>,
+                           substitution: &mut FxHashMap<Name, Type>| {
+        let Some(iface_tps) = class_template_params(db, iface.as_ref()) else {
+            return;
+        };
+        for (tp, ty) in iface_tps.iter().zip(args.iter()) {
+            let resolved_ty = ty.substitute_templates(substitution);
+            substitution
+                .entry(tp.name)
+                .or_insert_with(|| resolved_ty.clone());
+            bindings.entry(tp.name).or_insert(resolved_ty);
+        }
+    };
+
+    while let Some(current) = worklist.pop() {
         if !visited.insert(current.clone()) {
-            break;
+            continue;
         }
         let Some(class) =
             crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, current.as_ref()))
         else {
-            break;
+            continue;
         };
 
         for (iface, args) in class.implements_type_args() {
-            let Some(iface_tps) = class_template_params(db, iface.as_ref()) else {
-                continue;
-            };
-            for (tp, ty) in iface_tps.iter().zip(args.iter()) {
-                let resolved_ty = ty.substitute_templates(&substitution);
-                substitution
-                    .entry(tp.name)
-                    .or_insert_with(|| resolved_ty.clone());
-                bindings.entry(tp.name).or_insert(resolved_ty);
+            apply_type_args(iface, args, &mut bindings, &mut substitution);
+        }
+        for (iface, args) in class.interface_extends_type_args() {
+            apply_type_args(iface, args, &mut bindings, &mut substitution);
+        }
+        if let Some(parent) = class.parent() {
+            let extends_type_args = class.extends_type_args();
+            if !extends_type_args.is_empty() {
+                apply_type_args(parent, extends_type_args, &mut bindings, &mut substitution);
             }
         }
 
-        let Some(parent) = class.parent().cloned() else {
-            break;
-        };
-        let extends_type_args = class.extends_type_args();
-        if !extends_type_args.is_empty() {
-            if let Some(parent_tps) = class_template_params(db, parent.as_ref()) {
-                for (tp, ty) in parent_tps.iter().zip(extends_type_args.iter()) {
-                    // Substitute bindings gathered so far — an ancestor's own
-                    // extends args may reference a template that was only
-                    // just bound one level down (e.g. `@extends Grand<U>`
-                    // where `U` is this class's own template, itself bound
-                    // by the descendant we walked from).
-                    let resolved_ty = ty.substitute_templates(&substitution);
-                    substitution
-                        .entry(tp.name)
-                        .or_insert_with(|| resolved_ty.clone());
-                    bindings.entry(tp.name).or_insert(resolved_ty);
-                }
-            }
+        // Keep walking every ancestor edge — typed or not — so a base
+        // interface/class that itself parameterizes a further generic
+        // ancestor still gets picked up even when the edge leading to it
+        // carried no type args of its own.
+        worklist.extend(class.interfaces().iter().cloned());
+        worklist.extend(class.extends().iter().cloned());
+        if let Some(parent) = class.parent() {
+            worklist.push(parent.clone());
         }
-        current = parent;
     }
     bindings
 }

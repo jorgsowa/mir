@@ -642,6 +642,11 @@ pub struct InterfaceDef {
     /// `@seal-properties` / `@psalm-seal-properties` — disallows undeclared property access.
     #[serde(default)]
     pub seal_properties: bool,
+    /// Type arguments from `@extends BaseIface<T1, T2>` docblock lines, keyed by the
+    /// extended interface's FQCN — an interface's native `extends` list (unlike a
+    /// class's single parent) may name several base interfaces at once.
+    #[serde(default)]
+    pub extends_type_args: Vec<(Arc<str>, Vec<Type>)>,
 }
 
 // ---------------------------------------------------------------------------

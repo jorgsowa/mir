@@ -164,7 +164,7 @@ impl DocblockParser {
                         if let Some(msg) = validate_type_str(trimmed, "extends") {
                             result.invalid_annotations.push(msg);
                         }
-                        result.extends = Some(parse_type_string(trimmed));
+                        result.extends.push(parse_type_string(trimmed));
                     }
                 }
                 "implements" | "template-implements" | "phpstan-implements" => {
@@ -509,8 +509,10 @@ pub struct ParsedDocblock {
     pub var_name: Option<String>,
     /// `@template T` / `@template T of Bound` / `@template-covariant T` / `@template-contravariant T`
     pub templates: Vec<(String, Option<Type>, Variance)>,
-    /// `@extends ClassName<T>`
-    pub extends: Option<Type>,
+    /// `@extends ClassName<T>` — a class has at most one entry (its single
+    /// parent); an interface may have several, one per base interface named
+    /// in its native `extends A, B` clause.
+    pub extends: Vec<Type>,
     /// `@implements InterfaceName<T>`
     pub implements: Vec<Type>,
     /// `@throws ClassName`

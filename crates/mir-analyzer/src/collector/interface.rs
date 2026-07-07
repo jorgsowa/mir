@@ -1,7 +1,7 @@
 use super::DefinitionCollector;
 use crate::parser::name_to_string_owned;
 use mir_codebase::storage::{wrap_template_bound, ConstantDef, InterfaceDef, TemplateParam};
-use mir_types::Type;
+use mir_types::{Atomic, Type};
 use php_ast::owned::{ClassMemberKind, InterfaceDecl};
 use std::ops::ControlFlow;
 use std::sync::Arc;
@@ -63,6 +63,27 @@ impl<'a> DefinitionCollector<'a> {
             .extends
             .iter()
             .map(|n| self.resolve_name(&name_to_string_owned(n)).into())
+            .collect();
+
+        // Type args from `@extends BaseIface<T1, T2>` docblock lines — keyed by
+        // FQCN (not positional) since a native `extends A, B` clause may list
+        // several base interfaces, matched independently of docblock tag order.
+        let extends_type_args: Vec<(Arc<str>, Vec<Type>)> = iface_doc
+            .extends
+            .iter()
+            .filter_map(|ty| {
+                if let Some(Atomic::TNamedObject { fqcn, type_params }) = ty.types.first() {
+                    Some((
+                        self.resolve_type_name(fqcn.as_str(), true).into(),
+                        type_params
+                            .iter()
+                            .map(|tp| self.resolve_union(tp.clone()))
+                            .collect(),
+                    ))
+                } else {
+                    None
+                }
+            })
             .collect();
 
         let mut own_methods = indexmap::IndexMap::new();
@@ -155,6 +176,7 @@ impl<'a> DefinitionCollector<'a> {
                 fqcn: fqcn.into(),
                 short_name: Arc::from(interface_name.as_str()),
                 extends,
+                extends_type_args,
                 own_methods,
                 own_constants,
                 template_params,
