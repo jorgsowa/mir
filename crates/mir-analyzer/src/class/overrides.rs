@@ -16,6 +16,12 @@ impl<'a> ClassAnalyzer<'a> {
             .iter()
             .map(|(k, m)| (k.clone(), m.clone()))
             .collect();
+        // What this class's own `@extends`/`@implements` chain binds an ancestor's
+        // template params to (e.g. `@extends Box<int>` -> T => int). Lets an ancestor
+        // method's still-templated param/return type be checked against a concrete
+        // type instead of being skipped outright just because it mentions a template.
+        let inherited_bindings =
+            crate::db::inherited_template_bindings(self.db, fqcn.as_ref(), &HashMap::default());
         for (_, own) in own_methods {
             let method_name: Arc<str> = own.name.clone();
 
@@ -188,13 +194,35 @@ impl<'a> ClassAnalyzer<'a> {
             // two interfaces with conflicting return types must be flagged even if
             // it satisfies the first interface's contract.
             let own_return_type = own.return_type.as_deref().cloned();
-            if let Some(child_ret) = own_return_type.as_ref() {
+            if let Some(child_ret_raw) = own_return_type.as_ref() {
+                // A child override can itself just repeat the ancestor's bare template
+                // (e.g. copying `@return T` instead of the interface's own bound type) —
+                // substitute the same inherited bindings on both sides so the comparison
+                // isn't a false mismatch between "T" and what T concretely resolves to.
+                let child_ret = if self.return_type_has_template(child_ret_raw) {
+                    child_ret_raw.substitute_templates(&inherited_bindings)
+                } else {
+                    child_ret_raw.clone()
+                };
+                let child_ret = &child_ret;
                 let child_file = own_location.as_ref().map(|l| l.file.as_ref()).unwrap_or("");
                 for (idx, (p_fqcn, p)) in all_parent_methods.iter().enumerate() {
-                    let Some(parent_ret) = p.return_type.as_deref() else {
+                    let Some(parent_ret_raw) = p.return_type.as_deref() else {
                         continue;
                     };
-                    if parent_ret.from_docblock
+                    // Substitute this class's own inherited bindings (e.g. `@extends
+                    // Box<int>` -> T => int) before deciding whether the ancestor's
+                    // return type is still an unresolved template — a docblock-only
+                    // return type is normally an intentional, unenforced refinement,
+                    // but a generic contract this class itself concretely bound is not.
+                    let had_template = self.return_type_has_template(parent_ret_raw);
+                    let parent_ret = if had_template {
+                        parent_ret_raw.substitute_templates(&inherited_bindings)
+                    } else {
+                        parent_ret_raw.clone()
+                    };
+                    let parent_ret = &parent_ret;
+                    if (parent_ret_raw.from_docblock && !had_template)
                         || parent_ret.is_mixed()
                         || child_ret.is_mixed()
                         || self.return_type_has_template(parent_ret)
@@ -352,10 +380,18 @@ impl<'a> ClassAnalyzer<'a> {
                 let parent_param = &parent_params[i];
                 let child_param = &own_params[i];
 
-                let (parent_ty, child_ty) = match (&parent_param.ty, &child_param.ty) {
+                let (parent_ty_raw, child_ty_raw) = match (&parent_param.ty, &child_param.ty) {
                     (Some(p), Some(c)) => (p, c),
                     _ => continue,
                 };
+
+                // As with return types: substitute this class's own inherited bindings
+                // before giving up on a still-templated param type, so a concretely
+                // bound generic contract (`@extends Box<int>`) is still checked.
+                let parent_ty = parent_ty_raw.substitute_templates(&inherited_bindings);
+                let child_ty = child_ty_raw.substitute_templates(&inherited_bindings);
+                let parent_ty = &parent_ty;
+                let child_ty = &child_ty;
 
                 if parent_ty.is_mixed()
                     || child_ty.is_mixed()
