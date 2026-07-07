@@ -448,6 +448,7 @@ impl CallAnalyzer {
             };
             let ret = if !resolved.template_params.is_empty() {
                 let (bindings, unchecked) = infer_template_bindings(
+                    ea.db,
                     &resolved.template_params,
                     effective_params,
                     &arg_types,
@@ -517,6 +518,7 @@ impl CallAnalyzer {
                     };
                     let self_out_ty = if !resolved.template_params.is_empty() {
                         let (mut method_bindings, _unchecked) = infer_template_bindings(
+                            ea.db,
                             &resolved.template_params,
                             effective_params,
                             &arg_types,

@@ -100,8 +100,12 @@ impl<'a> ExpressionAnalyzer<'a> {
         // call would falsely substitute the param to the bound and reject valid
         // args (e.g. `@template T of Base`, `__construct(int $id)` → `new Repo(5)`
         // must be bare `Repo`, never `Repo<Base>`).
-        let (bindings, unchecked) =
-            crate::generic::infer_arg_template_bindings(&class_tps, ctor_params, arg_types);
+        let (bindings, unchecked) = crate::generic::infer_arg_template_bindings(
+            self.db,
+            &class_tps,
+            ctor_params,
+            arg_types,
+        );
 
         // A class-level `@template T of Bound` was previously enforced only at
         // method-call sites (against a method's OWN template params), never

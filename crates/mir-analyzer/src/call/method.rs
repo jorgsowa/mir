@@ -877,8 +877,12 @@ fn resolve_method_return<'a>(
             substitute_static_in_return(resolved.return_ty_raw, fqcn, receiver_type_params);
 
         if !resolved.template_params.is_empty() {
-            let (method_bindings, unchecked) =
-                infer_template_bindings(&resolved.template_params, &resolved.params, arg_types);
+            let (method_bindings, unchecked) = infer_template_bindings(
+                ea.db,
+                &resolved.template_params,
+                &resolved.params,
+                arg_types,
+            );
             // Only warn about template shadowing when the declaring class lives
             // in the file under analysis — a shadow inside a stub or vendor
             // class is the library's concern, not this call site's.

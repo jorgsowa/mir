@@ -849,7 +849,7 @@ fn apply_docblock_assertions(
                     .unwrap_or_else(Type::mixed)
             })
             .collect();
-        Some(crate::generic::infer_template_bindings(&f.template_params, params, &arg_types).0)
+        Some(crate::generic::infer_template_bindings(db, &f.template_params, params, &arg_types).0)
     };
 
     let mut applied = false;

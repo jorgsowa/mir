@@ -12,21 +12,14 @@ use crate::subtype::is_subtype;
 // Public API
 // ---------------------------------------------------------------------------
 
-/// Infer template parameter bindings by matching parameter types against
-/// argument types.
-///
-/// For example, given `function identity<T>(T $x): T` called with `"hello"`,
-/// this returns `{ T → string }`.
-///
-/// The second element of the pair is the set of template names whose binding
-/// must be excluded from [`check_template_bounds_with_inheritance`] — see
-/// [`infer_arg_template_bindings`].
 pub fn infer_template_bindings(
+    db: &dyn MirDatabase,
     template_params: &[TemplateParam],
     params: &[FnParam],
     arg_types: &[Type],
 ) -> (FxHashMap<Name, Type>, FxHashSet<Name>) {
-    let (mut bindings, unchecked) = infer_arg_template_bindings(template_params, params, arg_types);
+    let (mut bindings, unchecked) =
+        infer_arg_template_bindings(db, template_params, params, arg_types);
 
     // For any template not bound through arguments, fall back to its bound
     // (or mixed if no bound is declared).
@@ -39,25 +32,8 @@ pub fn infer_template_bindings(
     (bindings, unchecked)
 }
 
-/// Infer template parameter bindings ONLY from the argument types, without the
-/// bound/mixed fallback fill that [`infer_template_bindings`] applies.
-///
-/// A template that no argument binds is simply ABSENT from the returned map —
-/// it is *not* inferred to its declared bound. This is the correct primitive for
-/// parameterising a `new` receiver: a bounded template the constructor never
-/// references must stay `mixed` (bare) downstream, so a later `T`-typed method
-/// call does not falsely substitute the param to the bound and reject valid args.
-///
-/// The second element of the returned pair holds template names whose binding
-/// was fully explained by a concrete alternative in a `T|<concrete>`-shaped
-/// param union (e.g. a bare `null` argument matching `T|null`) rather than by
-/// `T` itself. The binding is still filled in — callers that substitute it into
-/// a return type (e.g. propagating a literal `null` through `T|null`) still
-/// need a value — but such a call gives no real evidence about what `T` is, so
-/// [`check_template_bounds_with_inheritance`] must skip bound-checking these
-/// specific names to avoid rejecting a perfectly valid `null` argument against
-/// `T`'s bound.
 pub fn infer_arg_template_bindings(
+    db: &dyn MirDatabase,
     template_params: &[TemplateParam],
     params: &[FnParam],
     arg_types: &[Type],
@@ -86,9 +62,17 @@ pub fn infer_arg_template_bindings(
                 // (`@param array<X> $args`); each individual argument is an
                 // `X`, so unwrap one array layer before matching.
                 let elem = variadic_element_type(param_ty);
-                infer_from_pair(elem, arg_ty, &template_names, &mut bindings, &mut unchecked);
+                infer_from_pair(
+                    db,
+                    elem,
+                    arg_ty,
+                    &template_names,
+                    &mut bindings,
+                    &mut unchecked,
+                );
             } else {
                 infer_from_pair(
+                    db,
                     param_ty,
                     arg_ty,
                     &template_names,
@@ -368,15 +352,8 @@ fn atomics_match_for_filter(concrete: &Atomic, arg: &Atomic) -> bool {
     )
 }
 
-/// Recursively match `param_ty` (which may contain template placeholders)
-/// against `arg_ty` (a concrete type), updating `bindings`.
-///
-/// `template_names` is the set of template names declared on the surrounding
-/// function/method. Bare unqualified `TNamedObject` references whose fqcn is in
-/// that set are treated as template-param references — the docblock parser
-/// emits them that way because it lacks template context at parse time
-/// (mirrors the workaround in `Type::substitute_templates`).
 fn infer_from_pair(
+    db: &dyn MirDatabase,
     param_ty: &Type,
     arg_ty: &Type,
     template_names: &std::collections::HashSet<Name>,
@@ -415,18 +392,19 @@ fn infer_from_pair(
                     match a_atomic {
                         Atomic::TArray { key: ak, value: av }
                         | Atomic::TNonEmptyArray { key: ak, value: av } => {
-                            infer_from_pair(pk, ak, template_names, bindings, risky);
-                            infer_from_pair(pv, av, template_names, bindings, risky);
+                            infer_from_pair(db, pk, ak, template_names, bindings, risky);
+                            infer_from_pair(db, pv, av, template_names, bindings, risky);
                         }
                         Atomic::TList { value: av } | Atomic::TNonEmptyList { value: av } => {
                             infer_from_pair(
+                                db,
                                 pk,
                                 &Type::single(Atomic::TInt),
                                 template_names,
                                 bindings,
                                 risky,
                             );
-                            infer_from_pair(pv, av, template_names, bindings, risky);
+                            infer_from_pair(db, pv, av, template_names, bindings, risky);
                         }
                         Atomic::TKeyedArray { properties, .. } => {
                             let mut key_union = Type::empty();
@@ -440,8 +418,22 @@ fn infer_from_pair(
                                 val_union.merge_with(&prop.ty);
                             }
                             if !key_union.types.is_empty() {
-                                infer_from_pair(pk, &key_union, template_names, bindings, risky);
-                                infer_from_pair(pv, &val_union, template_names, bindings, risky);
+                                infer_from_pair(
+                                    db,
+                                    pk,
+                                    &key_union,
+                                    template_names,
+                                    bindings,
+                                    risky,
+                                );
+                                infer_from_pair(
+                                    db,
+                                    pv,
+                                    &val_union,
+                                    template_names,
+                                    bindings,
+                                    risky,
+                                );
                             }
                         }
                         _ => {}
@@ -456,18 +448,19 @@ fn infer_from_pair(
                     match a_atomic {
                         Atomic::TArray { key: ak, value: av }
                         | Atomic::TNonEmptyArray { key: ak, value: av } => {
-                            infer_from_pair(pk, ak, template_names, bindings, risky);
-                            infer_from_pair(pv, av, template_names, bindings, risky);
+                            infer_from_pair(db, pk, ak, template_names, bindings, risky);
+                            infer_from_pair(db, pv, av, template_names, bindings, risky);
                         }
                         Atomic::TList { value: av } | Atomic::TNonEmptyList { value: av } => {
                             infer_from_pair(
+                                db,
                                 pk,
                                 &Type::single(Atomic::TInt),
                                 template_names,
                                 bindings,
                                 risky,
                             );
-                            infer_from_pair(pv, av, template_names, bindings, risky);
+                            infer_from_pair(db, pv, av, template_names, bindings, risky);
                         }
                         Atomic::TKeyedArray { properties, .. } => {
                             let mut key_union = Type::empty();
@@ -481,8 +474,22 @@ fn infer_from_pair(
                                 val_union.merge_with(&prop.ty);
                             }
                             if !key_union.types.is_empty() {
-                                infer_from_pair(pk, &key_union, template_names, bindings, risky);
-                                infer_from_pair(pv, &val_union, template_names, bindings, risky);
+                                infer_from_pair(
+                                    db,
+                                    pk,
+                                    &key_union,
+                                    template_names,
+                                    bindings,
+                                    risky,
+                                );
+                                infer_from_pair(
+                                    db,
+                                    pv,
+                                    &val_union,
+                                    template_names,
+                                    bindings,
+                                    risky,
+                                );
                             }
                         }
                         _ => {}
@@ -497,7 +504,7 @@ fn infer_from_pair(
                 for a_atomic in &arg_ty.types {
                     match a_atomic {
                         Atomic::TList { value: av } | Atomic::TNonEmptyList { value: av } => {
-                            infer_from_pair(pv, av, template_names, bindings, risky);
+                            infer_from_pair(db, pv, av, template_names, bindings, risky);
                         }
                         Atomic::TKeyedArray {
                             properties,
@@ -509,7 +516,14 @@ fn infer_from_pair(
                                 val_union.merge_with(&prop.ty);
                             }
                             if !val_union.types.is_empty() {
-                                infer_from_pair(pv, &val_union, template_names, bindings, risky);
+                                infer_from_pair(
+                                    db,
+                                    pv,
+                                    &val_union,
+                                    template_names,
+                                    bindings,
+                                    risky,
+                                );
                             }
                         }
                         _ => {}
@@ -543,8 +557,32 @@ fn infer_from_pair(
                     {
                         if pfqcn == afqcn {
                             for (p_param, a_param) in pp.iter().zip(ap.iter()) {
-                                infer_from_pair(p_param, a_param, template_names, bindings, risky);
+                                infer_from_pair(
+                                    db,
+                                    p_param,
+                                    a_param,
+                                    template_names,
+                                    bindings,
+                                    risky,
+                                );
                             }
+                        } else if !pp.is_empty() {
+                            // `afqcn` may be a DIFFERENT, more specific class than
+                            // `pfqcn` (e.g. a param typed `Collection<T>` matched
+                            // against a `TypedList<Dog>` argument where `TypedList
+                            // implements Collection<T>`) — resolve what `afqcn`
+                            // supplies for `pfqcn`'s own template params through
+                            // its `@extends`/`@implements` chain before giving up.
+                            infer_from_generic_ancestor(
+                                db,
+                                pfqcn.as_ref(),
+                                pp,
+                                afqcn.as_ref(),
+                                ap,
+                                template_names,
+                                bindings,
+                                risky,
+                            );
                         }
                     }
                 }
@@ -566,6 +604,7 @@ fn infer_from_pair(
                             for (pp, ap) in p_params.iter().zip(a_params.iter()) {
                                 if let (Some(pt), Some(at)) = (pp.ty.as_ref(), ap.ty.as_ref()) {
                                     infer_from_pair(
+                                        db,
                                         &pt.to_union(),
                                         &at.to_union(),
                                         template_names,
@@ -574,7 +613,7 @@ fn infer_from_pair(
                                     );
                                 }
                             }
-                            infer_from_pair(p_ret, a_ret, template_names, bindings, risky);
+                            infer_from_pair(db, p_ret, a_ret, template_names, bindings, risky);
                         }
                         Atomic::TCallable {
                             params: Some(a_params),
@@ -583,6 +622,7 @@ fn infer_from_pair(
                             for (pp, ap) in p_params.iter().zip(a_params.iter()) {
                                 if let (Some(pt), Some(at)) = (pp.ty.as_ref(), ap.ty.as_ref()) {
                                     infer_from_pair(
+                                        db,
                                         &pt.to_union(),
                                         &at.to_union(),
                                         template_names,
@@ -591,7 +631,7 @@ fn infer_from_pair(
                                     );
                                 }
                             }
-                            infer_from_pair(p_ret, a_ret, template_names, bindings, risky);
+                            infer_from_pair(db, p_ret, a_ret, template_names, bindings, risky);
                         }
                         _ => {}
                     }
@@ -612,6 +652,7 @@ fn infer_from_pair(
                             for (pp, ap) in p_params.iter().zip(a_params.iter()) {
                                 if let (Some(pt), Some(at)) = (pp.ty.as_ref(), ap.ty.as_ref()) {
                                     infer_from_pair(
+                                        db,
                                         &pt.to_union(),
                                         &at.to_union(),
                                         template_names,
@@ -620,7 +661,7 @@ fn infer_from_pair(
                                     );
                                 }
                             }
-                            infer_from_pair(p_ret, a_ret, template_names, bindings, risky);
+                            infer_from_pair(db, p_ret, a_ret, template_names, bindings, risky);
                         }
                         Atomic::TClosure {
                             params: a_params,
@@ -630,6 +671,7 @@ fn infer_from_pair(
                             for (pp, ap) in p_params.iter().zip(a_params.iter()) {
                                 if let (Some(pt), Some(at)) = (pp.ty.as_ref(), ap.ty.as_ref()) {
                                     infer_from_pair(
+                                        db,
                                         &pt.to_union(),
                                         &at.to_union(),
                                         template_names,
@@ -638,7 +680,7 @@ fn infer_from_pair(
                                     );
                                 }
                             }
-                            infer_from_pair(p_ret, a_ret, template_names, bindings, risky);
+                            infer_from_pair(db, p_ret, a_ret, template_names, bindings, risky);
                         }
                         _ => {}
                     }
@@ -655,7 +697,7 @@ fn infer_from_pair(
                     continue;
                 }
                 for part in parts.iter() {
-                    infer_from_pair(part, arg, template_names, bindings, risky);
+                    infer_from_pair(db, part, arg, template_names, bindings, risky);
                 }
             }
 
@@ -722,5 +764,47 @@ fn infer_from_pair(
             // solver that doesn't exist here.
             _ => {}
         }
+    }
+}
+
+/// When a param typed `PFqcn<...pp>` is matched against an arg of a
+/// DIFFERENT, more specific class `AFqcn<...ap>`, resolve what `AFqcn`
+/// supplies for `PFqcn`'s own template params through its
+/// `@extends`/`@implements` chain (the same chain
+/// `variance_compatible_across_hierarchy` walks for subtype checks — this is
+/// the analogous walk for the inference direction) and recurse `infer_from_pair`
+/// on each resolved pair. A no-op if `AFqcn` isn't actually an ancestor of
+/// `PFqcn`, or if `PFqcn` declares no template params of its own.
+#[allow(clippy::too_many_arguments)]
+fn infer_from_generic_ancestor(
+    db: &dyn MirDatabase,
+    pfqcn: &str,
+    pp: &[Type],
+    afqcn: &str,
+    ap: &[Type],
+    template_names: &std::collections::HashSet<Name>,
+    bindings: &mut FxHashMap<Name, Type>,
+    risky: &mut FxHashSet<Name>,
+) {
+    let Some(pfqcn_tps) = crate::db::class_template_params(db, pfqcn) else {
+        return;
+    };
+    if pfqcn_tps.is_empty() || !crate::db::extends_or_implements(db, afqcn, pfqcn) {
+        return;
+    }
+    let Some(afqcn_tps) = crate::db::class_template_params(db, afqcn) else {
+        return;
+    };
+    let own_bindings: FxHashMap<Name, Type> = afqcn_tps
+        .iter()
+        .zip(ap)
+        .map(|(tp, ty)| (tp.name, ty.clone()))
+        .collect();
+    let ancestor_bindings = crate::db::inherited_template_bindings(db, afqcn, &own_bindings);
+    for (p_param, tp) in pp.iter().zip(pfqcn_tps.iter()) {
+        let Some(resolved) = ancestor_bindings.get(&tp.name) else {
+            continue;
+        };
+        infer_from_pair(db, p_param, resolved, template_names, bindings, risky);
     }
 }

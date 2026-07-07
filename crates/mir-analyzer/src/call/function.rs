@@ -459,7 +459,7 @@ impl CallAnalyzer {
 
             let template_bindings = if !template_params.is_empty() {
                 let (bindings, unchecked) =
-                    infer_template_bindings(&template_params, &params, &arg_types);
+                    infer_template_bindings(ea.db, &template_params, &params, &arg_types);
                 for (name, inferred, bound) in check_template_bounds_with_inheritance(
                     ea.db,
                     &bindings,
