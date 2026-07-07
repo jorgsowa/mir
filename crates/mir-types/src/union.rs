@@ -510,13 +510,26 @@ impl Type {
 
     /// Narrow as if `is_string($x)` is true.
     pub fn narrow_to_string(&self) -> Type {
-        self.filter(|t| t.is_string() || matches!(t, Atomic::TMixed | Atomic::TScalar))
+        self.filter(|t| {
+            t.is_string()
+                || matches!(
+                    t,
+                    Atomic::TMixed | Atomic::TScalar | Atomic::TTemplateParam { .. }
+                )
+        })
     }
 
     /// Narrow as if `is_int($x)` is true.
     pub fn narrow_to_int(&self) -> Type {
         self.filter(|t| {
-            t.is_int() || matches!(t, Atomic::TMixed | Atomic::TScalar | Atomic::TNumeric)
+            t.is_int()
+                || matches!(
+                    t,
+                    Atomic::TMixed
+                        | Atomic::TScalar
+                        | Atomic::TNumeric
+                        | Atomic::TTemplateParam { .. }
+                )
         })
     }
 
@@ -531,6 +544,7 @@ impl Type {
                     | Atomic::TMixed
                     | Atomic::TScalar
                     | Atomic::TNumeric
+                    | Atomic::TTemplateParam { .. }
             )
         })
     }
@@ -540,19 +554,29 @@ impl Type {
         self.filter(|t| {
             matches!(
                 t,
-                Atomic::TBool | Atomic::TTrue | Atomic::TFalse | Atomic::TMixed | Atomic::TScalar
+                Atomic::TBool
+                    | Atomic::TTrue
+                    | Atomic::TFalse
+                    | Atomic::TMixed
+                    | Atomic::TScalar
+                    | Atomic::TTemplateParam { .. }
             )
         })
     }
 
     /// Narrow as if `is_null($x)` is true.
     pub fn narrow_to_null(&self) -> Type {
-        self.filter(|t| matches!(t, Atomic::TNull | Atomic::TMixed))
+        self.filter(|t| {
+            matches!(
+                t,
+                Atomic::TNull | Atomic::TMixed | Atomic::TTemplateParam { .. }
+            )
+        })
     }
 
     /// Narrow as if `is_array($x)` is true.
     pub fn narrow_to_array(&self) -> Type {
-        self.filter(|t| t.is_array() || matches!(t, Atomic::TMixed))
+        self.filter(|t| t.is_array() || matches!(t, Atomic::TMixed | Atomic::TTemplateParam { .. }))
     }
 
     /// Narrow array/list types to their non-empty variants (for `count() > 0` etc.).
@@ -621,7 +645,7 @@ impl Type {
         for t in &self.types {
             if matches!(t, Atomic::TMixed) {
                 out.add_type(Atomic::TObject);
-            } else if t.is_object() {
+            } else if t.is_object() || matches!(t, Atomic::TTemplateParam { .. }) {
                 out.add_type(t.clone());
             }
         }
@@ -644,7 +668,7 @@ impl Type {
                 || t.is_string()
                 || t.is_array()
                 || t.is_object()
-                || matches!(t, Atomic::TMixed)
+                || matches!(t, Atomic::TMixed | Atomic::TTemplateParam { .. })
         })
     }
 
@@ -665,6 +689,7 @@ impl Type {
                         | Atomic::TNumeric
                         | Atomic::TNumericString
                         | Atomic::TMixed
+                        | Atomic::TTemplateParam { .. }
                 )
         })
     }
@@ -672,13 +697,21 @@ impl Type {
     /// Narrow as if `is_iterable($x)` is true (array | Traversable).
     /// For simplicity, this narrows to arrays or objects (can't easily verify interfaces).
     pub fn narrow_to_iterable(&self) -> Type {
-        self.filter(|t| t.is_array() || t.is_object() || matches!(t, Atomic::TMixed))
+        self.filter(|t| {
+            t.is_array()
+                || t.is_object()
+                || matches!(t, Atomic::TMixed | Atomic::TTemplateParam { .. })
+        })
     }
 
     /// Narrow as if `is_countable($x)` is true (array | Countable).
     /// For simplicity, this narrows to arrays or objects (can't easily verify Countable interface).
     pub fn narrow_to_countable(&self) -> Type {
-        self.filter(|t| t.is_array() || t.is_object() || matches!(t, Atomic::TMixed))
+        self.filter(|t| {
+            t.is_array()
+                || t.is_object()
+                || matches!(t, Atomic::TMixed | Atomic::TTemplateParam { .. })
+        })
     }
 
     /// Narrow as if `is_resource($x)` is true.
