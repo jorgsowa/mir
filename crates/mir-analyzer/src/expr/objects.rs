@@ -154,7 +154,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         let mut any_concrete = false;
         for tp in class_tps.iter() {
             match bindings.get(&mir_types::Name::from(tp.name.as_ref())) {
-                Some(ty) if !ty.is_mixed() => {
+                Some(ty) if !ty.is_mixed_not_template() => {
                     // Widen scalar literals to their base type so the receiver
                     // does not carry an over-narrow type param (e.g. `new Box(5)`
                     // → `Box<int>`, not `Box<5>`, so a later `$box->set(6)` for
