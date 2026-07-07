@@ -1221,6 +1221,17 @@ fn is_list_atomic(a: &Atomic) -> bool {
     }
 }
 
+fn is_float_atomic(a: &Atomic) -> bool {
+    matches!(
+        a,
+        Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..)
+    )
+}
+
+fn is_bool_atomic(a: &Atomic) -> bool {
+    matches!(a, Atomic::TBool | Atomic::TTrue | Atomic::TFalse)
+}
+
 /// Resolve one branch of a conditional return type given the subject discriminant
 /// atomic and the actual argument type at the call site.
 ///
@@ -1239,6 +1250,9 @@ fn resolve_conditional_branch(
         Atomic::TString => is_string_atomic,
         Atomic::TList { .. } => is_list_atomic,
         Atomic::TArray { .. } => is_array_atomic,
+        Atomic::TInt => Atomic::is_int,
+        Atomic::TFloat => is_float_atomic,
+        Atomic::TBool => is_bool_atomic,
         _ => return None,
     };
 
