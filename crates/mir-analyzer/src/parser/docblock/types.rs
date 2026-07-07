@@ -1071,7 +1071,14 @@ pub(super) fn is_inside_generics(s: &str) -> bool {
 /// Parses `$param is TypeName ? TrueType : FalseType` or `T is TypeName ? TrueType : FalseType`
 /// (template-type conditional, no `$`) into a `TConditional`.
 pub(super) fn parse_conditional_type(s: &str) -> Option<Type> {
-    let is_pos = s.find(" is ")?;
+    // `$x is not T ? A : B` is sugar for `$x is T ? B : A` (Psalm/PHPStan both
+    // support the negated form) — check for it first since " is not " also
+    // contains " is " as a substring at the same position.
+    let (is_pos, is_marker_len, negated) = if let Some(pos) = s.find(" is not ") {
+        (pos, " is not ".len(), true)
+    } else {
+        (s.find(" is ")?, " is ".len(), false)
+    };
     let param_raw = s[..is_pos].trim();
 
     // Accept either `$identifier` (regular param) or a bare identifier (template name).
@@ -1093,18 +1100,23 @@ pub(super) fn parse_conditional_type(s: &str) -> Option<Type> {
         param_raw
     };
     let param_name = Some(mir_types::Name::new(param_name_str));
-    let after_is = s[is_pos + 4..].trim();
+    let after_is = s[is_pos + is_marker_len..].trim();
     let q_pos = find_char_at_depth(after_is, '?')?;
     let subject_str = after_is[..q_pos].trim();
     let rest = after_is[q_pos + 1..].trim();
     let colon_pos = find_char_at_depth(rest, ':')?;
     let true_str = rest[..colon_pos].trim();
     let false_str = rest[colon_pos + 1..].trim();
+    let (if_true_str, if_false_str) = if negated {
+        (false_str, true_str)
+    } else {
+        (true_str, false_str)
+    };
     Some(Type::single(Atomic::TConditional {
         param_name,
         subject: Box::new(parse_type_string(subject_str)),
-        if_true: Box::new(parse_type_string(true_str)),
-        if_false: Box::new(parse_type_string(false_str)),
+        if_true: Box::new(parse_type_string(if_true_str)),
+        if_false: Box::new(parse_type_string(if_false_str)),
     }))
 }
 
