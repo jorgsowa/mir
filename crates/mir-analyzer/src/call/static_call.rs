@@ -20,7 +20,33 @@ use super::args::{
 };
 use super::method::resolve_method_from_db;
 use super::CallAnalyzer;
-use crate::generic::{check_template_bounds_with_inheritance, infer_template_bindings};
+use crate::generic::{
+    check_template_bounds_with_inheritance, infer_arg_template_bindings, infer_template_bindings,
+};
+
+/// Widen scalar literal atomics to their base type before attaching an
+/// inferred binding as a receiver's generic type param — mirrors
+/// `expr::objects::widen_type_param` (kept separate since that module is
+/// private to `expr`). Carrying a literal type param into the receiver
+/// (e.g. `Box<42>` from `Box::make(42)`) is over-narrow and risks false
+/// positives downstream (e.g. `$box->set(43)` where `set(T)` and `T=42`
+/// would wrongly reject `43`).
+fn widen_own_type_param(ty: &Type) -> Type {
+    let mut out = Type::empty();
+    out.from_docblock = ty.from_docblock;
+    out.possibly_undefined = ty.possibly_undefined;
+    for atomic in &ty.types {
+        let widened = match atomic {
+            Atomic::TLiteralInt(_) | Atomic::TIntRange { .. } => Atomic::TInt,
+            Atomic::TLiteralString(_) => Atomic::TString,
+            Atomic::TLiteralFloat(_, _) => Atomic::TFloat,
+            Atomic::TTrue | Atomic::TFalse => Atomic::TBool,
+            other => other.clone(),
+        };
+        out.add_type(widened);
+    }
+    out
+}
 
 fn extract_namespace(fqcn: &str) -> Option<&str> {
     if let Some(pos) = fqcn.rfind('\\') {
@@ -440,13 +466,8 @@ impl CallAnalyzer {
             );
             let owner_fqcn = resolved.owner_fqcn.clone();
             let ret_raw = resolved.return_ty_raw;
-            let ret_substituted = substitute_static_in_return(ret_raw, &fqcn_arc, &[]);
-            let ret_substituted = if class_bindings.is_empty() {
-                ret_substituted
-            } else {
-                ret_substituted.substitute_templates(&class_bindings)
-            };
-            let ret = if !resolved.template_params.is_empty() {
+
+            let method_bindings = if !resolved.template_params.is_empty() {
                 let (bindings, unchecked) = infer_template_bindings(
                     ea.db,
                     &resolved.template_params,
@@ -472,9 +493,65 @@ impl CallAnalyzer {
                         span,
                     );
                 }
-                ret_substituted.substitute_templates(&bindings)
+                Some(bindings)
             } else {
+                None
+            };
+
+            // The CLASS's own template (as opposed to `resolved.template_params`,
+            // the METHOD's own separately-declared templates) isn't otherwise
+            // bound for a bare `Foo::make(...)` call with no concretizing
+            // subclass — infer it from the call's arguments the same way `new
+            // Foo(...)` does for constructors (`infer_new_type_params`), so a
+            // `@return static`/`@return T` on a static factory resolves to
+            // the concrete type instead of leaking the bare class template. A
+            // declared binding (from `@extends`/`@implements`, e.g. a
+            // concretizing subclass) still takes precedence over one merely
+            // inferred from this call's arguments.
+            let class_tps = crate::db::class_template_params(ea.db, &fqcn).unwrap_or_default();
+            let class_arg_bindings: FxHashMap<Name, Type> = if class_tps.is_empty() {
+                FxHashMap::default()
+            } else {
+                infer_arg_template_bindings(ea.db, &class_tps, &resolved.params, &arg_types)
+                    .0
+                    .into_iter()
+                    .map(|(name, ty)| (name, widen_own_type_param(&ty)))
+                    .collect()
+            };
+            let return_class_bindings: FxHashMap<Name, Type> = if class_arg_bindings.is_empty() {
+                class_bindings.clone()
+            } else {
+                let mut merged = class_arg_bindings;
+                for (name, ty) in class_bindings.iter() {
+                    merged.insert(*name, ty.clone());
+                }
+                merged
+            };
+
+            // `static`'s receiver type params come from the CLASS's own
+            // template params, not the method's — attach them before
+            // substituting `static`/`self` in the return type, or a bare
+            // `@return static` resolves to an unparameterized `Box` and
+            // erases them entirely.
+            let own_type_params: Vec<Type> = class_tps
+                .iter()
+                .map(|tp| {
+                    return_class_bindings
+                        .get(&Name::from(tp.name.as_ref()))
+                        .cloned()
+                        .unwrap_or_else(Type::mixed)
+                })
+                .collect();
+
+            let ret_substituted = substitute_static_in_return(ret_raw, &fqcn_arc, &own_type_params);
+            let ret_substituted = if return_class_bindings.is_empty() {
                 ret_substituted
+            } else {
+                ret_substituted.substitute_templates(&return_class_bindings)
+            };
+            let ret = match &method_bindings {
+                Some(bindings) => ret_substituted.substitute_templates(bindings),
+                None => ret_substituted,
             };
             let ret = ret.resolve_conditional_returns(|param_name| {
                 resolved
