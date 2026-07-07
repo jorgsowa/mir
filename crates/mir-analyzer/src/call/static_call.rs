@@ -562,11 +562,25 @@ impl CallAnalyzer {
                     .cloned()
             });
             // Write @param-out types back to caller variables for by-ref params.
+            // Substitute the same bindings the return type uses (class template
+            // from `@extends`/inferred-from-args, then the method's own), so a
+            // generic method's out-type resolves the class's bound type param
+            // instead of leaking the bare template name to the caller.
+            let mut out_bindings = return_class_bindings.clone();
+            if let Some(mb) = &method_bindings {
+                for (k, v) in mb.iter() {
+                    out_bindings.insert(*k, v.clone());
+                }
+            }
             for (i, param) in resolved.params.iter().enumerate() {
                 let Some(out_ty) = param.out_ty.as_ref() else {
                     continue;
                 };
-                let out_ty = (**out_ty).clone();
+                let out_ty = if out_bindings.is_empty() {
+                    (**out_ty).clone()
+                } else {
+                    out_ty.substitute_templates(&out_bindings)
+                };
                 if param.is_variadic {
                     for arg in call.args.iter().skip(i) {
                         if let ExprKind::Variable(name) = &arg.value.kind {

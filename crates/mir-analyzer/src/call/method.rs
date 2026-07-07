@@ -817,6 +817,11 @@ fn resolve_method_return<'a>(
                         p.ty.as_ref()
                             .map(|t| t.substitute_templates(&param_bindings)),
                     ),
+                    out_ty: mir_codebase::wrap_param_type(
+                        p.out_ty
+                            .as_ref()
+                            .map(|t| t.substitute_templates(&param_bindings)),
+                    ),
                     ..p.clone()
                 })
                 .collect();
@@ -949,7 +954,10 @@ fn resolve_method_return<'a>(
         }
 
         // Write @param-out types back to caller variables for by-ref params.
-        for (i, param) in resolved.params.iter().enumerate() {
+        // Use effective_params (not resolved.params) so a generic method's
+        // out-type is substituted with this receiver's own bound type param
+        // (e.g. Box<int>'s T -> int) the same way the in-type already is.
+        for (i, param) in effective_params.iter().enumerate() {
             let Some(out_ty) = param.out_ty.as_ref() else {
                 continue;
             };
