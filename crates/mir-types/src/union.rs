@@ -797,13 +797,22 @@ impl Type {
         if other.is_mixed() {
             return self.clone();
         }
-        // Keep atomics from self that are also in other (by equality or subtype)
+        // Keep the more specific of each overlapping (self, other) atomic
+        // pair — e.g. intersecting `int` with `1|2` must keep `1|2` (the
+        // narrower side), not `int` (self's own, wider atomic): the whole
+        // point of narrowing a variable against a match/switch arm's
+        // literal conditions is to end up with the literal, not the bare
+        // declared type it already had. Every matching pair is kept (not
+        // just the first), so `int ∩ (1|2)` keeps both `1` and `2`.
         let mut result = Type::empty();
         for a in &self.types {
             for b in &other.types {
-                if a == b || atomic_subtype(a, b) || atomic_subtype(b, a) {
+                if a == b {
                     result.add_type(a.clone());
-                    break;
+                } else if atomic_subtype(b, a) {
+                    result.add_type(b.clone());
+                } else if atomic_subtype(a, b) {
+                    result.add_type(a.clone());
                 }
             }
         }
@@ -1708,6 +1717,23 @@ mod tests {
         let b = Type::single(Atomic::TInt);
         let merged = Type::merge(&a, &b);
         assert_eq!(merged.types.len(), 2);
+    }
+
+    #[test]
+    fn intersect_keeps_narrower_side_not_self() {
+        // int ∩ (1|2) must keep the narrower `1|2`, not the wider `int` —
+        // this is exactly what a `match ($x) { 1, 2 => ... }` arm relies on
+        // to narrow $x inside its body.
+        let int_ty = Type::single(Atomic::TInt);
+        let mut literals = Type::empty();
+        literals.add_type(Atomic::TLiteralInt(1));
+        literals.add_type(Atomic::TLiteralInt(2));
+
+        let narrowed = int_ty.intersect_with(&literals);
+        assert_eq!(narrowed.types.len(), 2);
+        assert!(narrowed.contains(|t| matches!(t, Atomic::TLiteralInt(1))));
+        assert!(narrowed.contains(|t| matches!(t, Atomic::TLiteralInt(2))));
+        assert!(!narrowed.contains(|t| matches!(t, Atomic::TInt)));
     }
 
     #[test]
