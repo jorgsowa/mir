@@ -79,11 +79,14 @@ impl<'a> DefinitionCollector<'a> {
                 |(name, bound, variance)| mir_codebase::storage::TemplateParam {
                     name: name.as_str().into(),
                     bound: mir_codebase::storage::wrap_template_bound(bound.clone().map(|b| {
-                        self.resolve_union_doc_with_templates(
-                            b,
-                            &class_template_names,
+                        Self::fill_self_static_parent(
+                            self.resolve_union_doc_with_templates(
+                                b,
+                                &class_template_names,
+                                fqcn.as_str(),
+                                &[],
+                            ),
                             fqcn.as_str(),
-                            &[],
                         )
                     })),
                     defining_entity: fqcn.as_str().into(),

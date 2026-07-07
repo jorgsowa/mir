@@ -185,7 +185,15 @@ impl DefinitionCollector<'_> {
             .map(|(name, bound, variance)| TemplateParam {
                 name: name.as_str().into(),
                 bound: wrap_template_bound(bound.clone().map(|b| {
-                    self.resolve_union_doc_with_templates(b, &template_names, fqn.as_str(), &[])
+                    Self::fill_self_static_parent(
+                        self.resolve_union_doc_with_templates(
+                            b,
+                            &template_names,
+                            fqn.as_str(),
+                            &[],
+                        ),
+                        fqn.as_str(),
+                    )
                 })),
                 defining_entity: fqn.as_str().into(),
                 variance: *variance,

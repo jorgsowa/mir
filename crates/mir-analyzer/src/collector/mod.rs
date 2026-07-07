@@ -1200,11 +1200,14 @@ impl<'a> DefinitionCollector<'a> {
             .map(|(name, bound, variance)| TemplateParam {
                 name: name.as_str().into(),
                 bound: wrap_template_bound(bound.clone().map(|b| {
-                    self.resolve_union_doc_with_templates(
-                        b,
-                        &template_names,
+                    Self::fill_self_static_parent(
+                        self.resolve_union_doc_with_templates(
+                            b,
+                            &template_names,
+                            class_fqcn,
+                            class_template_params,
+                        ),
                         class_fqcn,
-                        class_template_params,
                     )
                 })),
                 defining_entity: class_fqcn.into(),
