@@ -926,7 +926,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     ) -> Type {
         for atomic in &obj_ty.types {
             match atomic {
-                Atomic::TNamedObject { fqcn, .. }
+                Atomic::TNamedObject { fqcn, type_params }
                     if crate::db::class_kind(self.db, fqcn.as_ref())
                         .is_some_and(|k| !k.is_interface && !k.is_trait && !k.is_enum) =>
                 {
@@ -948,6 +948,33 @@ impl<'a> ExpressionAnalyzer<'a> {
                             );
                         }
                         let ty = p.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
+                        // Substitute the receiver's own concrete type params (e.g.
+                        // `Box<int>`'s `T → int`) into a property declared with a
+                        // bare `@var T` — plus, when the property is inherited from
+                        // an ancestor with its own separate template, resolve THAT
+                        // ancestor's params through the same `@extends`/`@implements`
+                        // chain walk used everywhere else for inherited bindings.
+                        let ty = if type_params.is_empty() {
+                            ty
+                        } else if let Some(class_tps) =
+                            crate::db::class_template_params(self.db, fqcn.as_ref())
+                        {
+                            let own_bindings: rustc_hash::FxHashMap<mir_types::Name, Type> =
+                                class_tps
+                                    .iter()
+                                    .zip(type_params.iter())
+                                    .map(|(tp, t)| (tp.name, t.clone()))
+                                    .collect();
+                            let mut substitution = own_bindings.clone();
+                            substitution.extend(crate::db::inherited_template_bindings(
+                                self.db,
+                                fqcn.as_ref(),
+                                &own_bindings,
+                            ));
+                            ty.substitute_templates(&substitution)
+                        } else {
+                            ty
+                        };
                         self.record_ref(Arc::from(format!("{}::{}", owner, prop_name)), span);
                         *declaring_class = Some(owner);
                         return ty;
