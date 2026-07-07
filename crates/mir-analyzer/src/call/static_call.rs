@@ -576,8 +576,12 @@ impl CallAnalyzer {
                 let Some(out_ty) = param.out_ty.as_ref() else {
                     continue;
                 };
+                // `@param-out self`/`@param-out static` must resolve to the receiver's
+                // concrete class, the same way `@return static` already does.
+                let out_ty =
+                    substitute_static_in_return((**out_ty).clone(), &fqcn_arc, &own_type_params);
                 let out_ty = if out_bindings.is_empty() {
-                    (**out_ty).clone()
+                    out_ty
                 } else {
                     out_ty.substitute_templates(&out_bindings)
                 };
