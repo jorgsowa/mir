@@ -432,31 +432,6 @@ impl CallAnalyzer {
                 }
             }
 
-            for (i, param) in params.iter().enumerate() {
-                if param.is_byref {
-                    // Prefer @param-out type if declared; fall back to declared in-type.
-                    let output_ty = param
-                        .out_ty
-                        .as_ref()
-                        .or(param.ty.as_ref())
-                        .map(|t| (**t).clone())
-                        .unwrap_or_else(Type::mixed);
-                    if param.is_variadic {
-                        for arg in call.args.iter().skip(i) {
-                            if let ExprKind::Variable(name) = &arg.value.kind {
-                                let var_name = name.as_ref().trim_start_matches('$');
-                                ctx.set_var(var_name, output_ty.clone());
-                            }
-                        }
-                    } else if let Some(arg) = call.args.get(i) {
-                        if let ExprKind::Variable(name) = &arg.value.kind {
-                            let var_name = name.as_ref().trim_start_matches('$');
-                            ctx.set_var(var_name, output_ty);
-                        }
-                    }
-                }
-            }
-
             let template_bindings = if !template_params.is_empty() {
                 let (bindings, unchecked) =
                     infer_template_bindings(ea.db, &template_params, &params, &arg_types);
@@ -480,6 +455,38 @@ impl CallAnalyzer {
             } else {
                 None
             };
+
+            for (i, param) in params.iter().enumerate() {
+                if param.is_byref {
+                    // Prefer @param-out type if declared; fall back to declared in-type.
+                    // Substitute the function's own inferred template bindings so a
+                    // generic identity/setter-style helper reports the concrete
+                    // argument type, not the raw template atom.
+                    let output_ty = param
+                        .out_ty
+                        .as_ref()
+                        .or(param.ty.as_ref())
+                        .map(|t| (**t).clone())
+                        .unwrap_or_else(Type::mixed);
+                    let output_ty = match &template_bindings {
+                        Some(bindings) => output_ty.substitute_templates(bindings),
+                        None => output_ty,
+                    };
+                    if param.is_variadic {
+                        for arg in call.args.iter().skip(i) {
+                            if let ExprKind::Variable(name) = &arg.value.kind {
+                                let var_name = name.as_ref().trim_start_matches('$');
+                                ctx.set_var(var_name, output_ty.clone());
+                            }
+                        }
+                    } else if let Some(arg) = call.args.get(i) {
+                        if let ExprKind::Variable(name) = &arg.value.kind {
+                            let var_name = name.as_ref().trim_start_matches('$');
+                            ctx.set_var(var_name, output_ty);
+                        }
+                    }
+                }
+            }
 
             for assertion in resolved
                 .assertions
