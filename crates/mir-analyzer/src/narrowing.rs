@@ -1117,7 +1117,7 @@ fn narrow_instanceof_preserving_subtypes(
         type_params: mir_types::union::empty_type_params(),
     };
 
-    if current.is_empty() || current.is_mixed() {
+    if current.is_empty() || current.is_mixed_not_template() {
         return Type::single(narrowed_ty);
     }
 
@@ -1136,18 +1136,30 @@ fn narrow_instanceof_preserving_subtypes(
                 result.add_type(atomic.clone());
             }
             // Handle template parameters: if a bare unqualified name matches a template param,
-            // treat it as matching any typeof and keep it in the result (it represents the narrowed bound)
+            // intersect it with the checked class rather than replacing it — the value is
+            // still guaranteed to be a T (e.g. for a later `@return T`), just now also
+            // known to be an instance of `class_name`.
             Atomic::TNamedObject { fqcn, type_params }
                 if type_params.is_empty()
                     && !fqcn.contains('\\')
                     && template_param_names.contains(fqcn) =>
             {
-                // Keep the template parameter in the result — it will be constrained by the instanceof check
-                result.add_type(narrowed_ty.clone());
+                result.add_type(Atomic::TIntersection {
+                    parts: std::sync::Arc::from(vec![
+                        Type::single(atomic.clone()),
+                        Type::single(narrowed_ty.clone()),
+                    ]),
+                });
             }
-            // Handle TTemplateParam: narrow it to the instanceof check class
+            // Handle TTemplateParam: intersect it with the instanceof check class instead
+            // of discarding the template binding (see comment above).
             Atomic::TTemplateParam { .. } => {
-                result.add_type(narrowed_ty.clone());
+                result.add_type(Atomic::TIntersection {
+                    parts: std::sync::Arc::from(vec![
+                        Type::single(atomic.clone()),
+                        Type::single(narrowed_ty.clone()),
+                    ]),
+                });
             }
             Atomic::TObject | Atomic::TMixed => result.add_type(narrowed_ty.clone()),
             // `$x instanceof C` on an `A&B`-typed value adds C to the
@@ -1201,7 +1213,7 @@ fn narrow_or_instanceof_union(
         type_params: mir_types::union::empty_type_params(),
     };
 
-    if current.is_empty() || current.is_mixed() {
+    if current.is_empty() || current.is_mixed_not_template() {
         let mut out = Type::empty();
         for cn in class_names {
             out.add_type(class_atom(cn));
@@ -1225,16 +1237,31 @@ fn narrow_or_instanceof_union(
             {
                 result.add_type(atomic.clone());
             }
+            // As in narrow_instanceof_preserving_subtypes, keep the template atom by
+            // intersecting it with the union of checked classes rather than replacing it.
             Atomic::TNamedObject { fqcn, type_params }
                 if type_params.is_empty()
                     && !fqcn.contains('\\')
                     && template_param_names.contains(fqcn) =>
             {
+                let mut classes = Type::empty();
                 for cn in class_names {
-                    result.add_type(class_atom(cn));
+                    classes.add_type(class_atom(cn));
                 }
+                result.add_type(Atomic::TIntersection {
+                    parts: std::sync::Arc::from(vec![Type::single(atomic.clone()), classes]),
+                });
             }
-            Atomic::TTemplateParam { .. } | Atomic::TObject | Atomic::TMixed => {
+            Atomic::TTemplateParam { .. } => {
+                let mut classes = Type::empty();
+                for cn in class_names {
+                    classes.add_type(class_atom(cn));
+                }
+                result.add_type(Atomic::TIntersection {
+                    parts: std::sync::Arc::from(vec![Type::single(atomic.clone()), classes]),
+                });
+            }
+            Atomic::TObject | Atomic::TMixed => {
                 for cn in class_names {
                     result.add_type(class_atom(cn));
                 }
@@ -1328,7 +1355,7 @@ fn narrow_strict_subclass_of(
         type_params: mir_types::union::empty_type_params(),
     };
 
-    if current.is_empty() || current.is_mixed() {
+    if current.is_empty() || current.is_mixed_not_template() {
         return Type::single(narrowed_ty);
     }
 
@@ -1348,16 +1375,27 @@ fn narrow_strict_subclass_of(
             {
                 result.add_type(atomic.clone());
             }
-            // Template parameter — narrow to the named class as the bound.
+            // Template parameter — intersect with the named class rather than replacing it,
+            // so the value is still known to be a T as well as a strict subclass of it.
             Atomic::TNamedObject { fqcn, type_params }
                 if type_params.is_empty()
                     && !fqcn.contains('\\')
                     && template_param_names.contains(fqcn) =>
             {
-                result.add_type(narrowed_ty.clone());
+                result.add_type(Atomic::TIntersection {
+                    parts: std::sync::Arc::from(vec![
+                        Type::single(atomic.clone()),
+                        Type::single(narrowed_ty.clone()),
+                    ]),
+                });
             }
             Atomic::TTemplateParam { .. } => {
-                result.add_type(narrowed_ty.clone());
+                result.add_type(Atomic::TIntersection {
+                    parts: std::sync::Arc::from(vec![
+                        Type::single(atomic.clone()),
+                        Type::single(narrowed_ty.clone()),
+                    ]),
+                });
             }
             Atomic::TObject | Atomic::TMixed => result.add_type(narrowed_ty.clone()),
             _ => {}
