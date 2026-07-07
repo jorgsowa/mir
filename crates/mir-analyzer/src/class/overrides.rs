@@ -226,6 +226,7 @@ impl<'a> ClassAnalyzer<'a> {
                         || parent_ret.is_mixed()
                         || child_ret.is_mixed()
                         || self.return_type_has_template(parent_ret)
+                        || self.return_type_has_template(child_ret)
                     {
                         continue;
                     }
