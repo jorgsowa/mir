@@ -831,6 +831,27 @@ fn apply_docblock_assertions(
     let assertions = &f.assertions;
     let params = &f.params;
 
+    // An assertion type written in terms of the function's own `@template`s
+    // (e.g. `@psalm-assert-if-true T $value` alongside `@param
+    // class-string<T> $class`) must resolve T from this call's actual
+    // arguments before narrowing — otherwise the variable narrows to the
+    // bare, unresolved template atom instead of the concrete type.
+    let template_bindings = if f.template_params.is_empty() {
+        None
+    } else {
+        let arg_types: Vec<Type> = params
+            .iter()
+            .enumerate()
+            .map(|(i, _)| {
+                call.args
+                    .get(i)
+                    .map(|arg| assertion_arg_type(&arg.value, ctx, db, file))
+                    .unwrap_or_else(Type::mixed)
+            })
+            .collect();
+        Some(crate::generic::infer_template_bindings(&f.template_params, params, &arg_types).0)
+    };
+
     let mut applied = false;
     for assertion in assertions
         .iter()
@@ -839,7 +860,11 @@ fn apply_docblock_assertions(
         if let Some(index) = params.iter().position(|p| p.name == assertion.param) {
             if let Some(arg) = call.args.get(index) {
                 if let Some(var_name) = extract_var_name(&arg.value) {
-                    ctx.set_var(&var_name, assertion.ty.clone());
+                    let ty = match &template_bindings {
+                        Some(b) => assertion.ty.substitute_templates(b),
+                        None => assertion.ty.clone(),
+                    };
+                    ctx.set_var(&var_name, ty);
                     applied = true;
                 }
             }
@@ -847,6 +872,29 @@ fn apply_docblock_assertions(
     }
 
     applied
+}
+
+/// Best-effort type of a call argument for inferring `@template` bindings on
+/// an assert-if-true/-false narrowing call — not a full expression
+/// evaluator, just enough to resolve the common `class-string<T>`/`T
+/// $x`-typed guard-function shapes (e.g. `isInstanceOf($value,
+/// Foo::class)`). Anything else falls back to `mixed`, which leaves the
+/// template unbound rather than mis-bound.
+fn assertion_arg_type(
+    expr: &php_ast::owned::Expr,
+    ctx: &FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Type {
+    if let Some(var_name) = extract_var_name(expr) {
+        return ctx.get_var(&var_name);
+    }
+    if let Some(fqcn) = extract_class_fqcn_from_expr(expr, db, file) {
+        return Type::single(Atomic::TClassString(Some(mir_types::Name::from(
+            fqcn.as_ref(),
+        ))));
+    }
+    Type::mixed()
 }
 
 /// Collect class names from `instanceof` checks on the SAME variable across
