@@ -115,8 +115,10 @@ pub fn check_template_bounds_with_inheritance<'a>(
     // An inferred type that still contains unresolved template placeholders or
     // self/static cannot be meaningfully checked against the bound here — it
     // resolves only at a concrete call site (e.g. Eloquent's TRelatedModel
-    // bound by `self`/`static` inside the defining class).
-    let is_unresolved = |ty: &Type| {
+    // bound by `self`/`static` inside the defining class). An intersection
+    // (e.g. `TChild&Countable`) is unresolved as a whole if any part is, since
+    // `is_subtype` would otherwise compare the still-templated part literally.
+    fn is_unresolved(ty: &Type, template_params: &[TemplateParam]) -> bool {
         ty.types.iter().any(|a| match a {
             Atomic::TTemplateParam { .. }
             | Atomic::TSelf { .. }
@@ -133,9 +135,12 @@ pub fn check_template_bounds_with_inheritance<'a>(
                     .iter()
                     .any(|t| is_unresolved_shallow(t, template_params))
             }
+            Atomic::TIntersection { parts } => {
+                parts.iter().any(|p| is_unresolved(p, template_params))
+            }
             _ => false,
         })
-    };
+    }
 
     let mut violations = Vec::new();
     for tp in template_params {
@@ -150,7 +155,7 @@ pub fn check_template_bounds_with_inheritance<'a>(
                 let resolved_bound = bound.substitute_templates(bindings);
                 if !resolved_bound.is_mixed()
                     && !inferred.is_mixed()
-                    && !is_unresolved(inferred)
+                    && !is_unresolved(inferred, template_params)
                     && !is_subtype(db, inferred, &resolved_bound)
                 {
                     violations.push((&tp.name, inferred, bound.as_ref()));

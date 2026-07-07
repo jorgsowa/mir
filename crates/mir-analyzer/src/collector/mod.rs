@@ -652,6 +652,22 @@ impl<'a> DefinitionCollector<'a> {
                         type_params: mir_types::union::vec_to_type_params(new_params),
                     });
                 }
+                mir_types::Atomic::TIntersection { parts } => {
+                    let new_parts: Vec<Type> = parts
+                        .iter()
+                        .map(|p| {
+                            self.substitute_template_params(
+                                p.clone(),
+                                template_names,
+                                template_params,
+                                defining_entity,
+                            )
+                        })
+                        .collect();
+                    result.add_type(mir_types::Atomic::TIntersection {
+                        parts: mir_types::union::vec_to_type_params(new_parts),
+                    });
+                }
                 mir_types::Atomic::TArray { key, value } => {
                     result.add_type(mir_types::Atomic::TArray {
                         key: Box::new(self.substitute_template_params(
