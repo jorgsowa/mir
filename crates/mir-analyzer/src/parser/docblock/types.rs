@@ -1072,13 +1072,12 @@ pub(super) fn is_inside_generics(s: &str) -> bool {
 /// (template-type conditional, no `$`) into a `TConditional`.
 pub(super) fn parse_conditional_type(s: &str) -> Option<Type> {
     // `$x is not T ? A : B` is sugar for `$x is T ? B : A` (Psalm/PHPStan both
-    // support the negated form) — check for it first since " is not " also
-    // contains " is " as a substring at the same position.
-    let (is_pos, is_marker_len, negated) = if let Some(pos) = s.find(" is not ") {
-        (pos, " is not ".len(), true)
-    } else {
-        (s.find(" is ")?, " is ".len(), false)
-    };
+    // support the negated form). The marker must be found at nesting depth 0 —
+    // a plain substring search would also match an `is`/`is not` that belongs
+    // to a nested conditional inside the true/false branch (e.g.
+    // `$x is string ? int : ($x is not int ? bool : float)`), splitting the
+    // outer conditional at the wrong position.
+    let (is_pos, is_marker_len, negated) = find_is_marker_at_depth(s)?;
     let param_raw = s[..is_pos].trim();
 
     // Accept either `$identifier` (regular param) or a bare identifier (template name).
@@ -1118,6 +1117,30 @@ pub(super) fn parse_conditional_type(s: &str) -> Option<Type> {
         if_true: Box::new(parse_type_string(if_true_str)),
         if_false: Box::new(parse_type_string(if_false_str)),
     }))
+}
+
+/// Finds the leftmost ` is not ` or ` is ` marker in `s` at nesting depth 0
+/// (not inside `<>`, `()`, `{}`), preferring the longer `is not` marker when
+/// both start at the same position. Returns `(position, marker_len, negated)`.
+fn find_is_marker_at_depth(s: &str) -> Option<(usize, usize, bool)> {
+    let mut depth = 0i32;
+    let bytes = s.as_bytes();
+    for (i, ch) in s.char_indices() {
+        match ch {
+            '<' | '(' | '{' => depth += 1,
+            '>' | ')' | '}' => depth -= 1,
+            ' ' if depth == 0 => {
+                if bytes[i..].starts_with(b" is not ") {
+                    return Some((i, " is not ".len(), true));
+                }
+                if bytes[i..].starts_with(b" is ") {
+                    return Some((i, " is ".len(), false));
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 /// Finds `target` in `s` at nesting depth 0 (not inside `<>`, `()`, `{}`).
