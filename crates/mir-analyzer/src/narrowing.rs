@@ -1550,7 +1550,7 @@ fn narrow_prop_instanceof(
         prop_ty
     };
 
-    if current.is_mixed() {
+    if current.is_mixed_not_template() {
         return;
     }
     let narrowed = if is_true {
