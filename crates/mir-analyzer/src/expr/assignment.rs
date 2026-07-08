@@ -817,11 +817,16 @@ impl<'a> ExpressionAnalyzer<'a> {
                             } else {
                                 None
                             };
-                            // Wrap the assigned value with intermediate keys (outermost first).
-                            // For single-level ($arr[$k] = $v): no wrapping, value stays as-is.
+                            // Wrap the assigned value with intermediate keys, innermost
+                            // (closest to the value) first. `key_chain` is populated
+                            // outermost-AST-node-first, i.e. index 0 is the innermost path
+                            // segment (`$a['x']['y']['z'] = 1` pushes 'z' before 'y' before
+                            // 'x'), so iterating it in its natural order already applies
+                            // keys innermost-to-outermost — do NOT reverse it, or a 3+-level
+                            // chain wraps its middle keys in the wrong order.
                             // None entries ([] push) produce TList instead of TArray.
                             let mut wrapped_value = ty.clone();
-                            for k_opt in key_chain[..key_chain.len() - 1].iter().rev() {
+                            for k_opt in key_chain[..key_chain.len() - 1].iter() {
                                 wrapped_value = match k_opt {
                                     None => Type::single(Atomic::TList {
                                         value: Box::new(wrapped_value),
