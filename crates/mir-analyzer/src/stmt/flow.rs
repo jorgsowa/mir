@@ -559,6 +559,27 @@ impl<'a> StatementsAnalyzer<'a> {
                 // uses — otherwise a foreach value used only as an unset key is
                 // wrongly reported UnusedForeachValue.
                 self.expr_analyzer(ctx).analyze(var, ctx);
+                // `unset($arr['key'])` genuinely removes that key from the
+                // array's tracked shape — without this, a later `$arr['key']`
+                // read still sees the (now-stale) pre-unset type instead of
+                // being flagged as a non-existent offset.
+                if let php_ast::owned::ExprKind::ArrayAccess(aa) = &var.kind {
+                    if let (Some(name), Some(idx)) = (
+                        crate::expr::helpers::extract_simple_var(&aa.array),
+                        &aa.index,
+                    ) {
+                        if let Some(key) =
+                            crate::expr::helpers::literal_array_key_of_kind(&idx.kind)
+                        {
+                            let current = ctx.get_var(&name);
+                            let updated =
+                                crate::expr::helpers::remove_key_from_shapes(&current, &key);
+                            if updated != current {
+                                ctx.set_var(&name, updated);
+                            }
+                        }
+                    }
+                }
             }
         }
     }

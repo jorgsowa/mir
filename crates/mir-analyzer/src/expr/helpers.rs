@@ -110,6 +110,42 @@ pub fn set_nested_keyed_value(
     Some(result)
 }
 
+/// Remove `key` from every `TKeyedArray` atomic in `ty`'s union that has it,
+/// leaving all other atoms and properties unchanged. Used for
+/// `unset($arr['key'])`, which genuinely removes the key from the array
+/// (regardless of whether the shape is open or closed) rather than merely
+/// marking it optional.
+pub fn remove_key_from_shapes(ty: &Type, key: &ArrayKey) -> Type {
+    let mut changed = false;
+    let mut result = Type::empty();
+    for a in &ty.types {
+        if let Atomic::TKeyedArray {
+            properties,
+            is_open,
+            is_list,
+        } = a
+        {
+            if properties.contains_key(key) {
+                changed = true;
+                let mut new_props = properties.clone();
+                new_props.shift_remove(key);
+                result.add_type(Atomic::TKeyedArray {
+                    properties: new_props,
+                    is_open: *is_open,
+                    is_list: *is_list,
+                });
+                continue;
+            }
+        }
+        result.add_type(a.clone());
+    }
+    if !changed {
+        return ty.clone();
+    }
+    result.from_docblock = ty.from_docblock;
+    result
+}
+
 pub fn widen_array_with_value_and_key(
     current: &Type,
     new_value: &Type,
