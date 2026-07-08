@@ -96,6 +96,14 @@ impl<'a> ExpressionAnalyzer<'a> {
         // checks against an empty set and treats the value as a concrete type,
         // producing spurious InvalidPropertyAssignment/instanceof narrowing bugs.
         closure_ctx.template_param_names = Arc::clone(&ctx.template_param_names);
+        // A closure invoked from inside a @pure/@psalm-immutable/
+        // @psalm-external-mutation-free body can still smuggle out an
+        // observable side effect, so it must inherit that purity context
+        // rather than starting fresh — an immediately-invoked closure that
+        // mutates a captured object would otherwise go completely unchecked.
+        closure_ctx.is_in_pure_fn = ctx.is_in_pure_fn;
+        closure_ctx.is_in_immutable_method = ctx.is_in_immutable_method;
+        closure_ctx.is_in_external_mutation_free_method = ctx.is_in_external_mutation_free_method;
         for p in c.params.iter() {
             if let Some(raw) = p.name.as_deref() {
                 let trimmed = raw.trim_start_matches('$');
@@ -156,6 +164,29 @@ impl<'a> ExpressionAnalyzer<'a> {
             // consume its pending write so it isn't reported as a dead write.
             ctx.read_vars.insert(mir_types::Name::from(name));
             ctx.mark_consumed(name);
+        }
+
+        // A by-value capture of a variable that is itself a parameter of the
+        // enclosing function is still externally owned by the caller, so
+        // calling a mutating method on it inside the closure body is an
+        // externally observable side effect — exactly like calling one on a
+        // real parameter. Extend `param_names` so the existing pure/
+        // immutable/external-mutation-free method-call checks (which key off
+        // that set) also catch such captures. A capture of a locally-created
+        // object stays out of this set, matching the "local objects are
+        // exempt" rule the same checks already apply to real params.
+        if closure_ctx.is_in_pure_fn
+            || closure_ctx.is_in_immutable_method
+            || closure_ctx.is_in_external_mutation_free_method
+        {
+            let mut extended_param_names = (*closure_ctx.param_names).clone();
+            for use_var in c.use_vars.iter().filter(|uv| !uv.by_ref) {
+                let name = use_var.name.trim_start_matches('$');
+                if ctx.param_names.contains(&Name::from(name)) {
+                    extended_param_names.insert(Name::from(name));
+                }
+            }
+            closure_ctx.param_names = Arc::new(extended_param_names);
         }
 
         let mut sa = crate::stmt::StatementsAnalyzer::new(
