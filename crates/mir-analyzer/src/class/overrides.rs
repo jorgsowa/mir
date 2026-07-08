@@ -22,6 +22,25 @@ impl<'a> ClassAnalyzer<'a> {
         // type instead of being skipped outright just because it mentions a template.
         let inherited_bindings =
             crate::db::inherited_template_bindings(self.db, fqcn.as_ref(), &HashMap::default());
+
+        // `insteadof` exclusions declared by ANY class in the ancestor chain
+        // (e.g. `use T1, T2 { T2::f insteadof T1; }`) — collected once so the
+        // per-method ancestor walk below can skip a trait's LOSING copy of a
+        // method instead of treating it as a real "parent" to check against.
+        let mut excluded_trait_methods: HashSet<(Arc<str>, Arc<str>)> = HashSet::default();
+        for anc in crate::db::class_ancestors_by_fqcn(self.db, here).iter() {
+            let anc_fqcn = crate::db::Fqcn::from_str(self.db, anc.as_ref());
+            if let Some(crate::db::ClassLike::Class(cls)) =
+                crate::db::find_class_like(self.db, anc_fqcn)
+            {
+                for (method_lower, losers) in cls.trait_insteadof.iter() {
+                    for loser in losers {
+                        excluded_trait_methods.insert((loser.clone(), method_lower.clone()));
+                    }
+                }
+            }
+        }
+
         for (_, own) in own_methods {
             let method_name: Arc<str> = own.name.clone();
 
@@ -47,9 +66,57 @@ impl<'a> ClassAnalyzer<'a> {
                     .iter()
                     .skip(1)
                     .filter_map(|anc| {
+                        // A trait excluded via `insteadof` for this method
+                        // never contributes its own copy — it lost precedence
+                        // to another trait's version.
+                        if excluded_trait_methods
+                            .contains(&(anc.clone(), method_name_lower.clone()))
+                        {
+                            return None;
+                        }
                         let here2 = crate::db::Fqcn::from_str(self.db, anc.as_ref());
-                        crate::db::find_method_in_class(self.db, here2, method_name_lower.as_ref())
-                            .map(|m| (anc.clone(), m))
+                        if let Some(m) = crate::db::find_method_in_class(
+                            self.db,
+                            here2,
+                            method_name_lower.as_ref(),
+                        ) {
+                            return Some((anc.clone(), m));
+                        }
+                        // Trait method alias (`use T { orig as alias; }`): the
+                        // alias name is invisible to a plain own-methods
+                        // lookup on the using class, so resolve it explicitly
+                        // — mirrors the alias handling
+                        // `find_method_respecting_precedence` already does
+                        // for normal calls, which this ancestor walk
+                        // otherwise never consults.
+                        let crate::db::ClassLike::Class(cls) =
+                            crate::db::find_class_like(self.db, here2)?
+                        else {
+                            return None;
+                        };
+                        let (opt_trait_fqcn, orig_method, vis_override, alias_cased) =
+                            cls.trait_aliases.get(method_name_lower.as_ref())?;
+                        let search_traits: Vec<Arc<str>> = match opt_trait_fqcn {
+                            Some(t) => vec![t.clone()],
+                            None => cls.traits.clone(),
+                        };
+                        for trait_fqcn in &search_traits {
+                            let trait_here =
+                                crate::db::Fqcn::from_str(self.db, trait_fqcn.as_ref());
+                            if let Some(m) = crate::db::find_method_in_class(
+                                self.db,
+                                trait_here,
+                                orig_method.as_ref(),
+                            ) {
+                                let mut m_clone = (*m).clone();
+                                m_clone.name = alias_cased.clone();
+                                if let Some(vis) = vis_override {
+                                    m_clone.visibility = *vis;
+                                }
+                                return Some((anc.clone(), Arc::new(m_clone)));
+                            }
+                        }
+                        None
                     })
                     .collect();
             let parent_method = all_parent_methods.first().cloned();
