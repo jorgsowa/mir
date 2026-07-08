@@ -560,6 +560,9 @@ pub(crate) fn apply_doc_param_types(
             if crate::collector::native_hint_wins_over_docblock_scalar(native_ty, &doc_ty) {
                 continue;
             }
+            // Partial conflict: strip atoms foreign to the native hint's
+            // scalar family instead of storing the raw docblock union.
+            doc_ty = crate::collector::resolve_docblock_scalar_conflict(native_ty, doc_ty);
         }
         doc_ty.from_docblock = true;
         param.ty = mir_codebase::wrap_param_type(Some(doc_ty));

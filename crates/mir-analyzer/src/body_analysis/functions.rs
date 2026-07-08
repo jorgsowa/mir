@@ -89,6 +89,19 @@ impl<'a> BodyAnalyzer<'a> {
             );
         }
 
+        // A docblock @return that conflicts with the native hint must not
+        // make the function's own valid `return` statements look invalid —
+        // the native hint is runtime truth. This only affects body-statement
+        // checking below; the MismatchingDocblockReturnType check further
+        // down in this function still compares against the raw, unfiltered
+        // docblock value (via `stored`, independent of `return_ty`).
+        let return_ty = super::return_ty_for_body_check(
+            self.db,
+            file.as_ref(),
+            return_ty,
+            decl.return_type.as_ref(),
+            None,
+        );
         let declared_return = return_ty.clone();
         let mut ctx = FlowState::for_method_with_templates(
             &params,

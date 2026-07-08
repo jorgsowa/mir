@@ -663,6 +663,48 @@ mod docblock_hint_compat {
     }
 }
 
+/// When the stored return type came from a docblock that conflicts with the
+/// native return-type hint, resolve it against the hint for BODY STATEMENT
+/// CHECKING (e.g. `InvalidReturnType` on a `return` statement) instead of
+/// trusting the docblock outright — PHP enforces the native hint at runtime,
+/// so it's the ground truth regardless of what the docblock claims. Returns
+/// the stored type unchanged when there's no conflict (or no native hint to
+/// conflict with).
+///
+/// Deliberately does NOT change what's stored on the function/method
+/// definition itself — `MismatchingDocblockReturnType` needs the raw,
+/// unfiltered docblock value to report the contradiction to the user, so
+/// this correction is applied only at the body-checking call site.
+pub(crate) fn return_ty_for_body_check(
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+    return_ty: Option<mir_types::Type>,
+    native_hint: Option<&php_ast::owned::TypeHint>,
+    self_fqcn: Option<&str>,
+) -> Option<mir_types::Type> {
+    let doc_ty = return_ty?;
+    if !doc_ty.from_docblock {
+        return Some(doc_ty);
+    }
+    let Some(hint) = native_hint else {
+        return Some(doc_ty);
+    };
+    let hint_ty = crate::expr::helpers::resolve_named_objects_in_union(
+        crate::parser::type_from_hint_owned(hint, self_fqcn),
+        db,
+        file,
+    );
+    if hint_ty.is_mixed() {
+        return Some(doc_ty);
+    }
+    if crate::collector::native_hint_wins_over_docblock_scalar(&hint_ty, &doc_ty) {
+        return Some(hint_ty);
+    }
+    Some(crate::collector::resolve_docblock_scalar_conflict(
+        &hint_ty, doc_ty,
+    ))
+}
+
 /// Whether the docblock type CONTRADICTS the native hint (vs merely refining
 /// it). See [`docblock_hint_compat`] for the family model.
 fn docblock_conflicts_with_hint(

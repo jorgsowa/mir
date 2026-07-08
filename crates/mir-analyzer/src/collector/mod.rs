@@ -69,48 +69,103 @@ fn is_simple_scalar(u: &Type) -> bool {
 /// Does NOT fire when the docblock is a refinement of the hint (e.g. `positive-int` + `int`
 /// hint, or `non-empty-string` + `string` hint): a refinement always contains atoms from the
 /// same family, so `docblock_contains_hint_family` would be true and this returns false.
-pub(crate) fn native_hint_wins_over_docblock_scalar(native: &Type, doc: &Type) -> bool {
+fn in_bool_family(a: &mir_types::atomic::Atomic) -> bool {
     use mir_types::atomic::Atomic;
-    if native.types.len() != 1 || doc.types.is_empty() {
-        return false;
+    matches!(a, Atomic::TBool | Atomic::TTrue | Atomic::TFalse)
+}
+fn in_int_family(a: &mir_types::atomic::Atomic) -> bool {
+    use mir_types::atomic::Atomic;
+    matches!(
+        a,
+        Atomic::TInt
+            | Atomic::TLiteralInt(_)
+            | Atomic::TIntRange { .. }
+            | Atomic::TPositiveInt
+            | Atomic::TNegativeInt
+            | Atomic::TNonNegativeInt
+    )
+}
+fn in_float_family(a: &mir_types::atomic::Atomic) -> bool {
+    use mir_types::atomic::Atomic;
+    matches!(a, Atomic::TFloat | Atomic::TLiteralFloat(_, _))
+}
+fn in_string_family(a: &mir_types::atomic::Atomic) -> bool {
+    use mir_types::atomic::Atomic;
+    matches!(
+        a,
+        Atomic::TString
+            | Atomic::TLiteralString(_)
+            | Atomic::TClassString(_)
+            | Atomic::TInterfaceString(_)
+            | Atomic::TNumericString
+    )
+}
+fn is_any_scalar_family(a: &mir_types::atomic::Atomic) -> bool {
+    in_bool_family(a) || in_int_family(a) || in_float_family(a) || in_string_family(a)
+}
+
+/// When `native` is a single concrete scalar (int/string/bool/float), returns
+/// the family-membership check for that scalar's family. `None` when native
+/// isn't such a type (no family-based conflict is detectable).
+fn native_scalar_family(native: &Type) -> Option<fn(&mir_types::atomic::Atomic) -> bool> {
+    if native.types.len() != 1 {
+        return None;
     }
-    let in_bool_family = |a: &Atomic| matches!(a, Atomic::TBool | Atomic::TTrue | Atomic::TFalse);
-    let in_int_family = |a: &Atomic| {
-        matches!(
-            a,
-            Atomic::TInt
-                | Atomic::TLiteralInt(_)
-                | Atomic::TIntRange { .. }
-                | Atomic::TPositiveInt
-                | Atomic::TNegativeInt
-                | Atomic::TNonNegativeInt
-        )
-    };
-    let in_float_family = |a: &Atomic| matches!(a, Atomic::TFloat | Atomic::TLiteralFloat(_, _));
-    let in_string_family = |a: &Atomic| {
-        matches!(
-            a,
-            Atomic::TString
-                | Atomic::TLiteralString(_)
-                | Atomic::TClassString(_)
-                | Atomic::TInterfaceString(_)
-                | Atomic::TNumericString
-        )
-    };
-    let family_check: fn(&Atomic) -> bool = match &native.types[0] {
+    Some(match &native.types[0] {
         a if in_bool_family(a) => in_bool_family,
         a if in_int_family(a) => in_int_family,
         a if in_float_family(a) => in_float_family,
         a if in_string_family(a) => in_string_family,
-        _ => return false,
+        _ => return None,
+    })
+}
+
+pub(crate) fn native_hint_wins_over_docblock_scalar(native: &Type, doc: &Type) -> bool {
+    if doc.types.is_empty() {
+        return false;
+    }
+    let Some(family_check) = native_scalar_family(native) else {
+        return false;
     };
     // Docblock must contain ONLY scalar atoms from other families (no mixed/null/object that
     // could be a union refinement, and none from the hint's own family).
-    doc.types.iter().all(|a| {
-        let is_scalar =
-            in_bool_family(a) || in_int_family(a) || in_float_family(a) || in_string_family(a);
-        is_scalar && !family_check(a)
-    })
+    doc.types
+        .iter()
+        .all(|a| is_any_scalar_family(a) && !family_check(a))
+}
+
+/// When `native` is a concrete scalar and `doc` contains scalar atoms from a
+/// DIFFERENT family, those atoms describe a value the native hint can never
+/// actually hold at runtime — PHP enforces the native hint, so it's the
+/// runtime truth. Strips such foreign atoms from `doc` (keeping any
+/// same-family or non-scalar atoms, e.g. `null`, untouched), falling back to
+/// `native` entirely when nothing scalar-compatible survives. Returns `doc`
+/// unchanged when `native` isn't a single concrete scalar (no conflict is
+/// detectable this way) or when nothing needed stripping.
+pub(crate) fn resolve_docblock_scalar_conflict(native: &Type, doc: Type) -> Type {
+    let Some(family_check) = native_scalar_family(native) else {
+        return doc;
+    };
+    let has_foreign_scalar = doc
+        .types
+        .iter()
+        .any(|a| is_any_scalar_family(a) && !family_check(a));
+    if !has_foreign_scalar {
+        return doc;
+    }
+    let mut filtered = Type::empty();
+    filtered.from_docblock = doc.from_docblock;
+    filtered.possibly_undefined = doc.possibly_undefined;
+    for a in doc.types.iter() {
+        if !is_any_scalar_family(a) || family_check(a) {
+            filtered.add_type(a.clone());
+        }
+    }
+    if filtered.types.is_empty() {
+        native.clone()
+    } else {
+        filtered
+    }
 }
 
 /// Returns true for PHP built-in type keywords and Psalm pseudo-types that must never be
@@ -1294,10 +1349,16 @@ impl<'a> DefinitionCollector<'a> {
                         {
                             return native_ty.clone().unwrap();
                         }
+                        // Partial conflict (e.g. `@param int|string` on a native `int`
+                        // hint): strip the atoms foreign to the hint's family instead
+                        // of storing the raw union.
+                        let mut doc_ty = match native_ty.as_ref() {
+                            Some(n) => resolve_docblock_scalar_conflict(n, doc_ty),
+                            None => doc_ty,
+                        };
                         // Mark the type as docblock-sourced so signature checks (e.g.
                         // param contravariance) can tell a `@param` refinement apart
                         // from a native type hint.
-                        let mut doc_ty = doc_ty;
                         doc_ty.from_docblock = true;
                         doc_ty
                     })

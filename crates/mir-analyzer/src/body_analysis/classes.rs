@@ -138,6 +138,18 @@ impl<'a> BodyAnalyzer<'a> {
         let (params, return_ty, template_params, declared_throws) =
             method_chain_signature(self.db, fqcn, method_name);
 
+        // A docblock @return that conflicts with the native hint must not
+        // make the method's own valid `return` statements look invalid — the
+        // native hint is runtime truth. This only affects body-statement
+        // checking below; MismatchingDocblockReturnType (computed elsewhere)
+        // still compares against the raw, unfiltered docblock value.
+        let return_ty = super::return_ty_for_body_check(
+            self.db,
+            file.as_ref(),
+            return_ty,
+            method.return_type.as_ref(),
+            Some(fqcn),
+        );
         let declared_return = return_ty.clone();
         let is_ctor = cx.detect_ctor && method_name == "__construct";
         let templates: Option<&[mir_codebase::storage::TemplateParam]> = if cx.with_templates {
