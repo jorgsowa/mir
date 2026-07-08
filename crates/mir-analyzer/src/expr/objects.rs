@@ -592,6 +592,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         spa: &StaticAccessExpr,
         ctx: &FlowState,
     ) -> Type {
+        let mut result_ty = Type::mixed();
         if let ExprKind::Identifier(id) = &spa.class.kind {
             let resolved = crate::db::resolve_name(self.db, &self.file, id.as_ref());
             if matches!(resolved.as_str(), "self" | "static" | "parent") {
@@ -611,6 +612,16 @@ impl<'a> ExpressionAnalyzer<'a> {
                             Arc::from(format!("{}::{}", fqcn, prop_name)),
                             spa.member.span,
                         );
+                        if let Some(refined) = ctx.get_prop_refined(fqcn.as_ref(), prop_name) {
+                            result_ty = refined.clone();
+                        } else {
+                            let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
+                            if let Some((_, p)) =
+                                crate::db::find_property_in_chain(self.db, here, prop_name)
+                            {
+                                result_ty = p.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
+                            }
+                        }
                     }
                 }
             } else if !crate::db::class_exists(self.db, &resolved)
@@ -628,25 +639,31 @@ impl<'a> ExpressionAnalyzer<'a> {
                         Arc::from(format!("{}::{}", resolved, prop_name)),
                         spa.member.span,
                     );
-                    // Check if the static property is deprecated
-                    let here = crate::db::Fqcn::from_str(self.db, resolved.as_str());
-                    if let Some(p) = crate::db::find_property_in_chain(self.db, here, prop_name) {
-                        if let Some(msg) = &p.1.deprecated {
-                            self.emit(
-                                IssueKind::DeprecatedProperty {
-                                    class: resolved.clone(),
-                                    property: prop_name.to_string(),
-                                    message: Some(msg.clone()).filter(|m| !m.is_empty()),
-                                },
-                                Severity::Info,
-                                spa.member.span,
-                            );
+                    if let Some(refined) = ctx.get_prop_refined(resolved.as_str(), prop_name) {
+                        result_ty = refined.clone();
+                    } else {
+                        // Check if the static property is deprecated
+                        let here = crate::db::Fqcn::from_str(self.db, resolved.as_str());
+                        if let Some(p) = crate::db::find_property_in_chain(self.db, here, prop_name)
+                        {
+                            if let Some(msg) = &p.1.deprecated {
+                                self.emit(
+                                    IssueKind::DeprecatedProperty {
+                                        class: resolved.clone(),
+                                        property: prop_name.to_string(),
+                                        message: Some(msg.clone()).filter(|m| !m.is_empty()),
+                                    },
+                                    Severity::Info,
+                                    spa.member.span,
+                                );
+                            }
+                            result_ty = p.1.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
                         }
                     }
                 }
             }
         }
-        Type::mixed()
+        result_ty
     }
 
     pub(super) fn analyze_class_const_access(

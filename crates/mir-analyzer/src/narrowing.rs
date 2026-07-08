@@ -93,12 +93,20 @@ pub fn narrow_from_condition(
                     narrow_var_null(ctx, &name, effective_true);
                 } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
                     narrow_prop_null(ctx, &obj, &prop, db, file, effective_true);
+                } else if let Some((fqcn, prop)) =
+                    extract_static_prop_access(&b.left, ctx, db, file)
+                {
+                    narrow_static_prop_null(ctx, &fqcn, &prop, db, effective_true);
                 }
             } else if matches!(b.left.kind, ExprKind::Null) {
                 if let Some(name) = extract_var_name(&b.right) {
                     narrow_var_null(ctx, &name, effective_true);
                 } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
                     narrow_prop_null(ctx, &obj, &prop, db, file, effective_true);
+                } else if let Some((fqcn, prop)) =
+                    extract_static_prop_access(&b.right, ctx, db, file)
+                {
+                    narrow_static_prop_null(ctx, &fqcn, &prop, db, effective_true);
                 }
             }
             // `$x === true` / `$x === false`
@@ -1695,6 +1703,38 @@ fn narrow_prop_null(
     }
 }
 
+/// Narrow a static property access `self::$prop`/`Class::$prop` by a null
+/// check. `prop_refined` is keyed by FQCN here instead of a receiver
+/// variable name — a FQCN string can never collide with a real PHP variable.
+fn narrow_static_prop_null(
+    ctx: &mut FlowState,
+    fqcn: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    is_null: bool,
+) {
+    let current = if let Some(refined) = ctx.get_prop_refined(fqcn, prop) {
+        refined.clone()
+    } else {
+        let here = crate::db::Fqcn::from_str(db, fqcn);
+        crate::db::find_property_in_chain(db, here, prop)
+            .and_then(|(_, p)| p.ty.as_deref().cloned())
+            .unwrap_or_else(mir_types::Type::mixed)
+    };
+
+    if current.is_mixed() {
+        return;
+    }
+    let narrowed = if is_null {
+        current.narrow_to_null()
+    } else {
+        current.remove_null()
+    };
+    if narrowed != current {
+        ctx.set_prop_refined(fqcn, prop, narrowed);
+    }
+}
+
 fn narrow_prop_instanceof(
     ctx: &mut FlowState,
     obj_var: &str,
@@ -2520,6 +2560,40 @@ fn extract_prop_access(expr: &php_ast::owned::Expr) -> Option<(String, String)> 
             Some((obj, prop))
         }
         ExprKind::Parenthesized(inner) => extract_prop_access(inner),
+        _ => None,
+    }
+}
+
+/// Extract `(fqcn, prop_name)` from a `self::$prop` / `static::$prop` /
+/// `parent::$prop` / `ClassName::$prop` expression, resolving relative
+/// keywords through the current `FlowState`.
+fn extract_static_prop_access(
+    expr: &php_ast::owned::Expr,
+    ctx: &FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<(std::sync::Arc<str>, String)> {
+    match &expr.kind {
+        ExprKind::StaticPropertyAccess(spa) => {
+            let id = match &spa.class.kind {
+                ExprKind::Identifier(id) => id,
+                _ => return None,
+            };
+            let resolved = crate::db::resolve_name(db, file, id.as_ref());
+            let fqcn = match resolved.as_str() {
+                "self" | "static" => ctx.self_fqcn.clone().or_else(|| ctx.static_fqcn.clone())?,
+                "parent" => ctx.parent_fqcn.clone()?,
+                s => std::sync::Arc::from(s),
+            };
+            let prop = match &spa.member.kind {
+                ExprKind::Variable(name) | ExprKind::Identifier(name) => {
+                    name.trim_start_matches('$').to_string()
+                }
+                _ => return None,
+            };
+            Some((fqcn, prop))
+        }
+        ExprKind::Parenthesized(inner) => extract_static_prop_access(inner, ctx, db, file),
         _ => None,
     }
 }

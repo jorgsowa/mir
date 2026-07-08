@@ -656,7 +656,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 );
                             }
                         }
-                        if let Some(prop_name) = prop_name_opt {
+                        if let Some(prop_name) = prop_name_opt.clone() {
                             let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
                             if let Some((_, prop_def)) =
                                 crate::db::find_property_in_chain(self.db, here, &prop_name)
@@ -746,6 +746,28 @@ impl<'a> ExpressionAnalyzer<'a> {
                                         }
                                     }
                                 }
+                            }
+                        }
+                        // Narrow the static property type the same way an instance
+                        // property is narrowed on assignment (reusing prop_refined,
+                        // keyed by the FQCN instead of a receiver variable name — a
+                        // FQCN can never collide with a real PHP variable name).
+                        if let Some(prop_name) = prop_name_opt {
+                            let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
+                            let declared_opt =
+                                crate::db::find_property_in_chain(self.db, here, &prop_name)
+                                    .and_then(|(_, p)| p.ty.clone());
+                            let should_refine = !ty.is_mixed()
+                                && declared_opt
+                                    .as_deref()
+                                    .map(|declared| {
+                                        crate::subtype::is_subtype(self.db, &ty, declared)
+                                    })
+                                    .unwrap_or(true);
+                            if should_refine {
+                                ctx.set_prop_refined(fqcn.as_ref(), &prop_name, ty.clone());
+                            } else {
+                                ctx.clear_prop_refined(fqcn.as_ref(), &prop_name);
                             }
                         }
                     }
