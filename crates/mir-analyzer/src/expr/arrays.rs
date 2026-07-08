@@ -258,6 +258,55 @@ impl<'a> ExpressionAnalyzer<'a> {
 
         let idx_span = aa.index.as_ref().map(|i| i.span).unwrap_or(expr.span);
 
+        // When every atomic in the union is a shape and the index is a
+        // literal key, merge the key's type across every union member
+        // instead of returning as soon as the first shape happens to match —
+        // `array{a: int}|array{a: string}` accessed via `$x['a']` must yield
+        // `int|string`, not just the first arm's `int`.
+        if let Some(ref key) = literal_key {
+            if !arr_ty.types.is_empty()
+                && arr_ty
+                    .types
+                    .iter()
+                    .all(|a| matches!(a, Atomic::TKeyedArray { .. }))
+            {
+                let mut result = Type::empty();
+                for atomic in &arr_ty.types {
+                    let Atomic::TKeyedArray {
+                        properties,
+                        is_open,
+                        ..
+                    } = atomic
+                    else {
+                        unreachable!("filtered to TKeyedArray above")
+                    };
+                    if let Some(prop) = properties.get(key) {
+                        result.merge_with(&prop.ty);
+                    } else if !is_open && !self.in_existence_check {
+                        let key_str = match key {
+                            mir_types::atomic::ArrayKey::String(s) => s.to_string(),
+                            mir_types::atomic::ArrayKey::Int(i) => i.to_string(),
+                        };
+                        self.emit(
+                            IssueKind::NonExistentArrayOffset { key: key_str },
+                            Severity::Error,
+                            idx_span,
+                        );
+                        return Type::mixed();
+                    } else {
+                        for prop in properties.values() {
+                            result.merge_with(&prop.ty);
+                        }
+                    }
+                }
+                return if result.types.is_empty() {
+                    Type::mixed()
+                } else {
+                    result
+                };
+            }
+        }
+
         for atomic in &arr_ty.types {
             match atomic {
                 Atomic::TKeyedArray {
