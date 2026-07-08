@@ -402,6 +402,16 @@ impl<'a> ClassAnalyzer<'a> {
                 location.as_ref(),
                 &mut issues,
             );
+
+            // ---- Enum method override/signature compatibility ------------------
+            // check_enum_interface_methods_implemented only verifies a method
+            // with the right NAME exists — it never compares signatures against
+            // the interface method it's satisfying, so a covariance violation,
+            // wrong param count, or static/instance mismatch on an enum method
+            // went completely undetected. `ClassLike::Enum::ancestor_fqcns`
+            // already walks the enum's interface chain, so check_overrides
+            // (built for classes/interfaces) works unchanged here too.
+            self.check_overrides(&enum_fqcn, location.as_ref(), &mut issues);
         }
 
         // ---- 5c. DeprecatedTrait: trait uses a deprecated trait ---------------
