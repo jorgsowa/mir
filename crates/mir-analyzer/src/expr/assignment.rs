@@ -625,6 +625,21 @@ impl<'a> ExpressionAnalyzer<'a> {
                             // Base key: innermost index in the chain (closest to $arr).
                             let base_key_opt = key_chain.last().unwrap().clone();
                             let base_key = base_key_opt.unwrap_or_else(Type::mixed);
+                            // Only a single-level write ($arr[<key>] = $val, no
+                            // nested chain) has a directly-known literal key —
+                            // used to update just that one shape property
+                            // in place instead of widening the whole shape.
+                            let literal_key: Option<mir_types::ArrayKey> = if key_chain.len() == 1 {
+                                aa.index.as_ref().and_then(|idx| match &idx.kind {
+                                    ExprKind::String(s) => Some(mir_types::ArrayKey::String(
+                                        std::sync::Arc::from(s.as_ref()),
+                                    )),
+                                    ExprKind::Int(i) => Some(mir_types::ArrayKey::Int(*i)),
+                                    _ => None,
+                                })
+                            } else {
+                                None
+                            };
                             // Wrap the assigned value with intermediate keys (outermost first).
                             // For single-level ($arr[$k] = $v): no wrapping, value stays as-is.
                             // None entries ([] push) produce TList instead of TArray.
@@ -696,6 +711,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                         &current,
                                         &wrapped_value,
                                         &base_key,
+                                        literal_key.as_ref(),
                                     ),
                                 };
                                 ctx.set_var(name_str, updated);

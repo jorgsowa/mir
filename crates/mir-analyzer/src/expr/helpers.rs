@@ -5,7 +5,56 @@ use rustc_hash::FxHashSet;
 
 use crate::subtype::is_subtype;
 
-pub fn widen_array_with_value_and_key(current: &Type, new_value: &Type, new_key: &Type) -> Type {
+pub fn widen_array_with_value_and_key(
+    current: &Type,
+    new_value: &Type,
+    new_key: &Type,
+    literal_key: Option<&mir_types::ArrayKey>,
+) -> Type {
+    // Overwriting an EXISTING literal key on a shape (`$arr['a'] = 2;` where
+    // 'a' is already a known property) updates just that one property,
+    // leaving every other key's type untouched — routing this through the
+    // generic accumulator below would collapse the whole shape into a wide
+    // `array<K, V>` union even though no other key was affected by the write.
+    if let Some(key) = literal_key {
+        let all_shapes_have_key = !current.types.is_empty()
+            && current.types.iter().all(|a| match a {
+                Atomic::TKeyedArray { properties, .. } => properties.contains_key(key),
+                _ => false,
+            });
+        if all_shapes_have_key {
+            let mut result = Type::empty();
+            result.possibly_undefined = current.possibly_undefined;
+            result.from_docblock = current.from_docblock;
+            for atomic in &current.types {
+                let Atomic::TKeyedArray {
+                    properties,
+                    is_open,
+                    is_list,
+                } = atomic
+                else {
+                    unreachable!("filtered to TKeyedArray above")
+                };
+                let mut new_properties = properties.clone();
+                // The key is now definitely assigned on this path, regardless
+                // of whether it was previously optional.
+                new_properties.insert(
+                    key.clone(),
+                    mir_types::atomic::KeyedProperty {
+                        ty: new_value.clone(),
+                        optional: false,
+                    },
+                );
+                result.add_type(Atomic::TKeyedArray {
+                    properties: new_properties,
+                    is_open: *is_open,
+                    is_list: *is_list,
+                });
+            }
+            return result;
+        }
+    }
+
     let mut result = Type::empty();
     result.possibly_undefined = current.possibly_undefined;
     result.from_docblock = current.from_docblock;
