@@ -331,7 +331,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                         unreachable!("filtered to TKeyedArray above")
                     };
                     if let Some(prop) = properties.get(key) {
-                        result.merge_with(&prop.ty);
+                        // An optional key (`array{b?: string}`) may be absent at
+                        // runtime — accessing it can yield null via the array's
+                        // undefined-offset warning-then-null semantics, so the
+                        // result must include null, not just the declared value type.
+                        if prop.optional {
+                            let mut widened = prop.ty.clone();
+                            widened.add_type(Atomic::TNull);
+                            result.merge_with(&widened);
+                        } else {
+                            result.merge_with(&prop.ty);
+                        }
                     } else if !is_open && !self.in_existence_check {
                         let key_str = match key {
                             mir_types::atomic::ArrayKey::String(s) => s.to_string(),
@@ -366,6 +376,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                 } => {
                     if let Some(ref key) = literal_key {
                         if let Some(prop) = properties.get(key) {
+                            if prop.optional {
+                                let mut widened = prop.ty.clone();
+                                widened.add_type(Atomic::TNull);
+                                return widened;
+                            }
                             return prop.ty.clone();
                         }
                         if !is_open && !self.in_existence_check {
