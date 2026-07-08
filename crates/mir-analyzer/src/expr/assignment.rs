@@ -638,6 +638,24 @@ impl<'a> ExpressionAnalyzer<'a> {
                             }
                             _ => None,
                         };
+                        if let Some(prop_name) = &prop_name_opt {
+                            // Purity check: assigning to a static property in a @pure
+                            // function. Unlike an instance property assignment (only
+                            // impure through a parameter/captured receiver), a static
+                            // property IS the shared external state — same as a
+                            // global variable — so every write is impure, not just
+                            // ones through a specific receiver.
+                            if ctx.is_in_pure_fn {
+                                self.emit(
+                                    IssueKind::ImpureStaticPropertyAssignment {
+                                        class: fqcn.to_string(),
+                                        property: prop_name.clone(),
+                                    },
+                                    Severity::Warning,
+                                    span,
+                                );
+                            }
+                        }
                         if let Some(prop_name) = prop_name_opt {
                             let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
                             if let Some((_, prop_def)) =

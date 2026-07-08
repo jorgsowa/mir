@@ -354,6 +354,10 @@ pub enum IssueKind {
     ImpureGlobalVariable { variable: String },
     /// Emitted when a @pure function uses a static variable.
     ImpureStaticVariable { variable: String },
+    /// Emitted when a @pure function assigns to a class static property
+    /// (`self::$x = ...`, `Foo::$x = ...`) — static properties are shared
+    /// external state, same as a global variable.
+    ImpureStaticPropertyAssignment { class: String, property: String },
     /// Emitted by `mir-analyzer/src/call/function.rs` when a `@pure` function calls a
     /// non-pure named function.
     /// Fixtures: `tests/fixtures/by-kind/impure_function_call/`.
@@ -782,6 +786,7 @@ impl IssueKind {
             | IssueKind::ImpureMethodCall { .. }
             | IssueKind::ImpureGlobalVariable { .. }
             | IssueKind::ImpureStaticVariable { .. }
+            | IssueKind::ImpureStaticPropertyAssignment { .. }
             | IssueKind::ImpureFunctionCall { .. }
             | IssueKind::ImmutablePropertyModification { .. }
             | IssueKind::UnsupportedReferenceUsage
@@ -989,6 +994,7 @@ impl IssueKind {
             IssueKind::ImpureMethodCall { .. } => "MIR1701",
             IssueKind::ImpureGlobalVariable { .. } => "MIR1702",
             IssueKind::ImpureStaticVariable { .. } => "MIR1703",
+            IssueKind::ImpureStaticPropertyAssignment { .. } => "MIR1706",
             IssueKind::ImpureFunctionCall { .. } => "MIR1704",
             IssueKind::ImmutablePropertyModification { .. } => "MIR1705",
             IssueKind::UnsupportedReferenceUsage => "MIR1506",
@@ -1112,7 +1118,7 @@ impl IssueKind {
             | "MIR0206" | "MIR0208" | "MIR0211" | "MIR0218" | "MIR0219" | "MIR0220" | "MIR0222"
             | "MIR0300" | "MIR0301" | "MIR0302" | "MIR0404" | "MIR0405" | "MIR0408" | "MIR0500"
             | "MIR0506" | "MIR0703" | "MIR0710" | "MIR1301" | "MIR1501" | "MIR1502" | "MIR1700"
-            | "MIR1701" | "MIR1702" | "MIR1703" | "MIR1704" | "MIR1705" | "MIR1506" => {
+            | "MIR1701" | "MIR1702" | "MIR1703" | "MIR1704" | "MIR1705" | "MIR1706" | "MIR1506" => {
                 Some(Severity::Warning)
             }
 
@@ -1212,6 +1218,7 @@ impl IssueKind {
             IssueKind::ImpureMethodCall { .. } => "ImpureMethodCall",
             IssueKind::ImpureGlobalVariable { .. } => "ImpureGlobalVariable",
             IssueKind::ImpureStaticVariable { .. } => "ImpureStaticVariable",
+            IssueKind::ImpureStaticPropertyAssignment { .. } => "ImpureStaticPropertyAssignment",
             IssueKind::ImpureFunctionCall { .. } => "ImpureFunctionCall",
             IssueKind::ImmutablePropertyModification { .. } => "ImmutablePropertyModification",
             IssueKind::UnsupportedReferenceUsage => "UnsupportedReferenceUsage",
@@ -1582,6 +1589,9 @@ impl IssueKind {
             }
             IssueKind::ImpureStaticVariable { variable } => {
                 format!("Using static variable ${variable} in a @pure function")
+            }
+            IssueKind::ImpureStaticPropertyAssignment { class, property } => {
+                format!("Assigning to static property {class}::${property} in a @pure function")
             }
             IssueKind::ImpureFunctionCall { fn_name } => {
                 format!("Calling impure function {fn_name}() in a @pure function")
@@ -2224,6 +2234,10 @@ mod code_tests {
             IssueKind::ImpureMethodCall { method: s() },
             IssueKind::ImpureGlobalVariable { variable: s() },
             IssueKind::ImpureStaticVariable { variable: s() },
+            IssueKind::ImpureStaticPropertyAssignment {
+                class: s(),
+                property: s(),
+            },
             IssueKind::ImpureFunctionCall { fn_name: s() },
             IssueKind::ImmutablePropertyModification { property: s() },
             IssueKind::ReadonlyPropertyAssignment {
@@ -2506,6 +2520,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 145);
+        assert_eq!(one_of_each().len(), 146);
     }
 }
