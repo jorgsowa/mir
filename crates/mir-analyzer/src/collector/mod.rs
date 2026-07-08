@@ -644,6 +644,79 @@ impl<'a> DefinitionCollector<'a> {
                         )),
                     });
                 }
+                // Closure/callable param & return types: recurse with template awareness so
+                // a bare template name used inside `Closure(T): R` (e.g. a higher-order
+                // function's predicate/mapper param) is converted to TTemplateParam instead
+                // of falling through to resolve_union_doc, which has no template context and
+                // would leave it as an unresolved bare class-like reference to "T".
+                mir_types::Atomic::TClosure {
+                    params,
+                    return_type,
+                    this_type,
+                } => {
+                    let new_params = params
+                        .iter()
+                        .map(|p| {
+                            let mut p = p.clone();
+                            p.ty = p.ty.as_ref().map(|t| {
+                                mir_types::compact::SimpleType::from_union(
+                                    self.resolve_union_doc_with_templates(
+                                        t.to_union(),
+                                        template_names,
+                                        defining_entity,
+                                        template_params,
+                                    ),
+                                )
+                            });
+                            p
+                        })
+                        .collect();
+                    result.add_type(mir_types::Atomic::TClosure {
+                        params: new_params,
+                        return_type: Box::new(self.resolve_union_doc_with_templates(
+                            *return_type.clone(),
+                            template_names,
+                            defining_entity,
+                            template_params,
+                        )),
+                        this_type: this_type.clone(),
+                    });
+                }
+                mir_types::Atomic::TCallable {
+                    params,
+                    return_type,
+                } => {
+                    let new_params = params.as_ref().map(|ps| {
+                        ps.iter()
+                            .map(|p| {
+                                let mut p = p.clone();
+                                p.ty = p.ty.as_ref().map(|t| {
+                                    mir_types::compact::SimpleType::from_union(
+                                        self.resolve_union_doc_with_templates(
+                                            t.to_union(),
+                                            template_names,
+                                            defining_entity,
+                                            template_params,
+                                        ),
+                                    )
+                                });
+                                p
+                            })
+                            .collect()
+                    });
+                    let new_return_type = return_type.as_deref().map(|t| {
+                        Box::new(self.resolve_union_doc_with_templates(
+                            t.clone(),
+                            template_names,
+                            defining_entity,
+                            template_params,
+                        ))
+                    });
+                    result.add_type(mir_types::Atomic::TCallable {
+                        params: new_params,
+                        return_type: new_return_type,
+                    });
+                }
                 _ => {
                     let resolved_union = self.resolve_union_doc(Type::single(atomic.clone()));
                     for resolved_atomic in resolved_union.types {
@@ -763,6 +836,74 @@ impl<'a> DefinitionCollector<'a> {
                             template_params,
                             defining_entity,
                         )),
+                    });
+                }
+                mir_types::Atomic::TClosure {
+                    params,
+                    return_type,
+                    this_type,
+                } => {
+                    let new_params = params
+                        .iter()
+                        .map(|p| {
+                            let mut p = p.clone();
+                            p.ty = p.ty.as_ref().map(|t| {
+                                mir_types::compact::SimpleType::from_union(
+                                    self.substitute_template_params(
+                                        t.to_union(),
+                                        template_names,
+                                        template_params,
+                                        defining_entity,
+                                    ),
+                                )
+                            });
+                            p
+                        })
+                        .collect();
+                    result.add_type(mir_types::Atomic::TClosure {
+                        params: new_params,
+                        return_type: Box::new(self.substitute_template_params(
+                            *return_type.clone(),
+                            template_names,
+                            template_params,
+                            defining_entity,
+                        )),
+                        this_type: this_type.clone(),
+                    });
+                }
+                mir_types::Atomic::TCallable {
+                    params,
+                    return_type,
+                } => {
+                    let new_params = params.as_ref().map(|ps| {
+                        ps.iter()
+                            .map(|p| {
+                                let mut p = p.clone();
+                                p.ty = p.ty.as_ref().map(|t| {
+                                    mir_types::compact::SimpleType::from_union(
+                                        self.substitute_template_params(
+                                            t.to_union(),
+                                            template_names,
+                                            template_params,
+                                            defining_entity,
+                                        ),
+                                    )
+                                });
+                                p
+                            })
+                            .collect()
+                    });
+                    let new_return_type = return_type.as_deref().map(|t| {
+                        Box::new(self.substitute_template_params(
+                            t.clone(),
+                            template_names,
+                            template_params,
+                            defining_entity,
+                        ))
+                    });
+                    result.add_type(mir_types::Atomic::TCallable {
+                        params: new_params,
+                        return_type: new_return_type,
                     });
                 }
                 _ => result.add_type(atomic),
