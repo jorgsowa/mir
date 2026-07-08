@@ -509,11 +509,22 @@ impl<'a> StatementsAnalyzer<'a> {
     // Break
     // -----------------------------------------------------------------------
 
-    pub(super) fn analyze_break_stmt(&mut self, ctx: &mut crate::flow_state::FlowState) {
-        // Save the context at the break point so the post-loop context
-        // accounts for this early-exit path.
-        if let Some(break_ctxs) = self.break_ctx_stack.last_mut() {
-            break_ctxs.push(ctx.clone());
+    pub(super) fn analyze_break_stmt(
+        &mut self,
+        ctx: &mut crate::flow_state::FlowState,
+        level: usize,
+    ) {
+        // Save the context at the break point so the post-loop context of
+        // the TARGETED loop accounts for this early-exit path. `break 1`
+        // (the default) targets the innermost loop (top of the stack);
+        // `break N` skips N-1 enclosing loops and targets the one N levels
+        // out, so it must land in that loop's bucket, not the innermost
+        // one — otherwise the intervening loops' own post-loop state wrongly
+        // treats the path as "fell through to loop end" instead of "skipped
+        // entirely", producing false-positive UnreachableCode after them.
+        let stack_len = self.break_ctx_stack.len();
+        if level >= 1 && level <= stack_len {
+            self.break_ctx_stack[stack_len - level].push(ctx.clone());
         }
         // FlowState after an unconditional break is dead; don't continue
         // emitting issues for code after this point.

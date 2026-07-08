@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 use crate::parser::docblock::parse_type_string;
 
-use php_ast::owned::StmtKind;
+use php_ast::owned::{Expr, ExprKind, StmtKind};
 
 use mir_issues::{Issue, IssueBuffer, IssueKind, Location};
 use mir_types::{Atomic, Type};
@@ -323,8 +323,8 @@ impl<'a> StatementsAnalyzer<'a> {
             }
 
             // ---- Break --------------------------------------------------------
-            StmtKind::Break(_) => {
-                self.analyze_break_stmt(ctx);
+            StmtKind::Break(level) => {
+                self.analyze_break_stmt(ctx, break_continue_level(level));
             }
 
             // ---- Continue ----------------------------------------------------
@@ -634,6 +634,17 @@ impl<'a> StatementsAnalyzer<'a> {
         }
 
         current
+    }
+}
+
+/// The loop-nesting level a `break`/`continue` statement targets. PHP only
+/// accepts an integer-literal argument here (a non-literal is a compile
+/// error), so any other shape (including `None`, i.e. bare `break;`) is
+/// treated as the default level 1.
+fn break_continue_level(level_expr: &Option<Box<Expr>>) -> usize {
+    match level_expr.as_deref().map(|e| &e.kind) {
+        Some(ExprKind::Int(n)) if *n >= 1 => *n as usize,
+        _ => 1,
     }
 }
 
