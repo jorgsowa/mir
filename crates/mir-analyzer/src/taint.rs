@@ -141,6 +141,8 @@ pub fn is_expr_tainted(expr: &Expr, ctx: &FlowState) -> bool {
 
         ExprKind::Match(m) => m.arms.iter().any(|arm| is_expr_tainted(&arm.body, ctx)),
 
+        ExprKind::Array(elements) => elements.iter().any(|el| is_expr_tainted(&el.value, ctx)),
+
         // Conservative: function call results are not tracked as tainted
         // unless it's a known pass-through built-in (htmlspecialchars sanitizes)
         _ => false,
