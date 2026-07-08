@@ -1183,6 +1183,42 @@ fn narrow_instanceof_preserving_subtypes(
                     });
                 }
             }
+            // `class_name` is a (possibly indirect) subtype of the atom's own class
+            // — e.g. atom is the `Foo` interface and class_name is `A implements
+            // Foo` — so the instanceof check's result subsumes and is strictly
+            // more specific than what's already known; replace outright rather
+            // than forming a redundant `Foo&A` intersection.
+            Atomic::TNamedObject { fqcn, .. }
+            | Atomic::TSelf { fqcn }
+            | Atomic::TStaticObject { fqcn }
+            | Atomic::TParent { fqcn }
+                if named_object_matches_instanceof(class_name, fqcn, db) =>
+            {
+                result.add_type(narrowed_ty.clone());
+            }
+            // A named object unrelated to `class_name` by inheritance in either
+            // direction (e.g. two interfaces neither of which extends the other,
+            // as in `$x instanceof A && $x instanceof B`) must not be silently
+            // discarded — the instanceof check proved the value ALSO satisfies
+            // class_name. Form an intersection when that's actually possible
+            // (at least one side is an interface, so a single object can
+            // implement both); otherwise the atom's own class and class_name are
+            // both concrete classes, which PHP's single inheritance makes
+            // mutually exclusive, so the atom is provably impossible here and is
+            // correctly dropped.
+            Atomic::TNamedObject { fqcn, .. }
+            | Atomic::TSelf { fqcn }
+            | Atomic::TStaticObject { fqcn }
+            | Atomic::TParent { fqcn }
+                if classes_can_coexist(fqcn, class_name, db) =>
+            {
+                result.add_type(Atomic::TIntersection {
+                    parts: std::sync::Arc::from(vec![
+                        Type::single(atomic.clone()),
+                        Type::single(narrowed_ty.clone()),
+                    ]),
+                });
+            }
             _ => {}
         }
     }
@@ -1289,6 +1325,50 @@ fn narrow_or_instanceof_union(
                     });
                 }
             }
+            // Some disjunct(s) are a (possibly indirect) subtype of the atom's own
+            // class — e.g. atom is `Foo` and one label checks `instanceof A` where
+            // `A implements Foo` — so the instanceof result subsumes and is
+            // strictly more specific; narrow to just the subsuming disjunct(s)
+            // rather than forming a redundant `Foo&A` intersection.
+            Atomic::TNamedObject { fqcn, .. }
+            | Atomic::TSelf { fqcn }
+            | Atomic::TStaticObject { fqcn }
+            | Atomic::TParent { fqcn }
+                if class_names
+                    .iter()
+                    .any(|cn| named_object_matches_instanceof(cn, fqcn, db)) =>
+            {
+                for cn in class_names {
+                    if named_object_matches_instanceof(cn, fqcn, db) {
+                        result.add_type(class_atom(cn));
+                    }
+                }
+            }
+            // A named object matching none of the disjuncts by inheritance in
+            // either direction must not be silently discarded — the
+            // (already-true) instanceof check proved the value ALSO satisfies
+            // one of class_names. Intersect with only the disjuncts that could
+            // actually coexist with this atom (at least one side an interface);
+            // a disjunct that's a concrete class unrelated to this atom's own
+            // concrete class is impossible under PHP's single inheritance and is
+            // dropped instead. Mirrors the equivalent fix in
+            // narrow_instanceof_preserving_subtypes for the single-class case.
+            Atomic::TNamedObject { fqcn, .. }
+            | Atomic::TSelf { fqcn }
+            | Atomic::TStaticObject { fqcn }
+            | Atomic::TParent { fqcn } => {
+                let mut classes = Type::empty();
+                for cn in class_names {
+                    if classes_can_coexist(fqcn, cn, db) {
+                        classes.add_type(class_atom(cn));
+                    }
+                }
+                if !classes.is_empty() {
+                    result.add_type(Atomic::TIntersection {
+                        parts: std::sync::Arc::from(vec![Type::single(atomic.clone()), classes]),
+                    });
+                }
+            }
             _ => {}
         }
     }
@@ -1307,6 +1387,16 @@ fn narrow_or_instanceof_union(
     } else {
         result
     }
+}
+
+/// Whether a value could simultaneously be (a subtype of) both `a` and `b` —
+/// true when either is an interface (a class can implement any number of
+/// interfaces), false when both are concrete classes, which PHP's single
+/// inheritance makes mutually exclusive unless one already extends the other
+/// (checked separately by the caller via `named_object_matches_instanceof`).
+fn classes_can_coexist(a: &str, b: &str, db: &dyn MirDatabase) -> bool {
+    crate::db::class_kind(db, a).is_some_and(|k| k.is_interface)
+        || crate::db::class_kind(db, b).is_some_and(|k| k.is_interface)
 }
 
 fn filter_out_instanceof_match(current: &Type, class_name: &str, db: &dyn MirDatabase) -> Type {
