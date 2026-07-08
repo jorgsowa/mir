@@ -322,6 +322,21 @@ impl CallAnalyzer {
                     span,
                 );
             }
+            // Purity check: a static call has no receiver to scope the
+            // "only externally-visible mutations matter" exception to (unlike
+            // instance calls on a local object) — any non-pure static/self::/
+            // parent:: call inside a @pure function can touch static state,
+            // so it's flagged unconditionally, mirroring the plain
+            // function-call check in call/function.rs.
+            if ctx.is_in_pure_fn && !resolved.is_pure {
+                ea.emit(
+                    IssueKind::ImpureMethodCall {
+                        method: method_name.to_string(),
+                    },
+                    Severity::Warning,
+                    span,
+                );
+            }
             if method_name != resolved.name.as_ref()
                 && method_name.eq_ignore_ascii_case(resolved.name.as_ref())
             {
