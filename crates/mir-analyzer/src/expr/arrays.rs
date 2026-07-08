@@ -5,6 +5,47 @@ use mir_types::{Atomic, Type};
 use php_ast::owned::{ArrayAccessExpr, ArrayElement, Expr, ExprKind};
 use std::sync::Arc;
 
+/// For a spread (`...`) element in an array literal, return the union of key types
+/// across all array atomics. Mirrors [`crate::call::spread_element_type`], which does
+/// the same for value types. E.g. `array<string, int>` → `string`, `list<int>` → `int`.
+fn spread_key_type(arr_ty: &Type) -> Type {
+    use mir_types::atomic::ArrayKey;
+
+    let mut result = Type::empty();
+    for atomic in arr_ty.types.iter() {
+        match atomic {
+            Atomic::TArray { key, .. } | Atomic::TNonEmptyArray { key, .. } => {
+                for t in key.types.iter() {
+                    result.add_type(t.clone());
+                }
+            }
+            Atomic::TList { .. } | Atomic::TNonEmptyList { .. } => {
+                result.add_type(Atomic::TInt);
+            }
+            Atomic::TKeyedArray { properties, .. } => {
+                for key in properties.keys() {
+                    match key {
+                        ArrayKey::Int(_) => result.add_type(Atomic::TInt),
+                        ArrayKey::String(s) => result.add_type(Atomic::TLiteralString(s.clone())),
+                    }
+                }
+            }
+            // Traversable<K, V>, Iterator<K, V>, Generator<K, V, ...> — key is param[0].
+            Atomic::TNamedObject { type_params, .. } if type_params.len() >= 2 => {
+                for t in type_params[0].types.iter() {
+                    result.add_type(t.clone());
+                }
+            }
+            _ => return Type::mixed(),
+        }
+    }
+    if result.types.is_empty() {
+        Type::mixed()
+    } else {
+        result
+    }
+}
+
 impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_array(&mut self, elements: &[ArrayElement], ctx: &mut FlowState) -> Type {
         use mir_types::atomic::{ArrayKey, KeyedProperty};
@@ -92,11 +133,15 @@ impl<'a> ExpressionAnalyzer<'a> {
         // Fallback: generic TArray
         let mut all_value_types = Type::empty();
         let mut key_union = Type::empty();
-        let mut has_unpack = false;
         for elem in elements.iter() {
             let value_ty = self.analyze(&elem.value, ctx);
             if elem.unpack {
-                has_unpack = true;
+                // Merge the spread source's own key/value types instead of
+                // giving up on the whole literal — `[...$x, ...$y]` should
+                // type as the union of $x's and $y's key/value types, not
+                // unconditionally collapse to `array<mixed, mixed>`.
+                all_value_types.merge_with(&crate::call::spread_element_type(&value_ty));
+                key_union.merge_with(&spread_key_type(&value_ty));
             } else {
                 all_value_types.merge_with(&value_ty);
                 if let Some(key_expr) = &elem.key {
@@ -119,12 +164,6 @@ impl<'a> ExpressionAnalyzer<'a> {
                     key_union.add_type(Atomic::TInt);
                 }
             }
-        }
-        if has_unpack {
-            return Type::single(Atomic::TArray {
-                key: Box::new(Type::single(Atomic::TMixed)),
-                value: Box::new(Type::mixed()),
-            });
         }
         if key_union.is_empty() {
             key_union.add_type(Atomic::TInt);
