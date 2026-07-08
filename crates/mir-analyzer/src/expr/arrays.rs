@@ -180,6 +180,26 @@ impl<'a> ExpressionAnalyzer<'a> {
         expr: &Expr,
         ctx: &mut FlowState,
     ) -> Type {
+        // Purity check: `$GLOBALS['x']` reaches the same external mutable
+        // state as `global $x;`, but only the `global` statement was ever
+        // checked — accessing the superglobal array directly inside a
+        // @pure function bypassed the check entirely.
+        if ctx.is_in_pure_fn {
+            if let ExprKind::Variable(name) = &aa.array.kind {
+                if name.trim_start_matches('$') == "GLOBALS" {
+                    let variable = aa
+                        .index
+                        .as_ref()
+                        .and_then(|idx| super::helpers::extract_string_from_expr(idx))
+                        .unwrap_or_else(|| "GLOBALS".to_string());
+                    self.emit(
+                        IssueKind::ImpureGlobalVariable { variable },
+                        Severity::Warning,
+                        expr.span,
+                    );
+                }
+            }
+        }
         let arr_ty = self.analyze(&aa.array, ctx);
         if let Some(idx) = &aa.index {
             let idx_ty = self.analyze(idx, ctx);
