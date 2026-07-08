@@ -1807,24 +1807,39 @@ fn narrow_prop_array_key_exists(
     }
 }
 
-/// For each `TKeyedArray` in `ty` that is sealed (`is_open == false`) and does not
-/// already contain `key`, return a version with `key` added as non-optional `mixed`.
+/// For each `TKeyedArray` in `ty` that does not already contain `key`: if
+/// it's open, add `key` as non-optional `mixed` (an open shape might
+/// genuinely carry it at runtime).
+///
+/// If it's sealed (`is_open == false`) AND `ty` is a real union of more than
+/// one shape, exclude that member entirely instead — among a known finite
+/// set of shape *alternatives*, one lacking the key can never satisfy
+/// `array_key_exists()`, so keeping it let an impossible arm survive into
+/// the true branch and widen later reads of that key to `mixed`.
+///
+/// A single (non-union) sealed shape lacking the key still falls back to
+/// adding it as `mixed`, same as an open shape: a lone `@var array{a: T}`
+/// docblock is a hint, not proof the underlying array can hold no other
+/// key, so treating `array_key_exists` on an undeclared key as definitely
+/// impossible would be a real false positive on ordinary runtime arrays.
 fn add_key_to_sealed_shapes(
     ty: &mir_types::Type,
     key: &mir_types::atomic::ArrayKey,
 ) -> mir_types::Type {
     use mir_types::atomic::KeyedProperty;
-    let new_types: Vec<Atomic> = ty
-        .types
-        .iter()
-        .map(|a| {
-            if let Atomic::TKeyedArray {
-                properties,
-                is_open,
-                is_list,
-            } = a
-            {
-                if !is_open && !properties.contains_key(key) {
+    let is_real_union = ty.types.len() > 1;
+    let mut changed = false;
+    let mut result = mir_types::Type::empty();
+    for a in &ty.types {
+        if let Atomic::TKeyedArray {
+            properties,
+            is_open,
+            is_list,
+        } = a
+        {
+            if !properties.contains_key(key) {
+                changed = true;
+                if *is_open || !is_real_union {
                     let mut new_props = properties.clone();
                     new_props.insert(
                         key.clone(),
@@ -1833,17 +1848,25 @@ fn add_key_to_sealed_shapes(
                             optional: false,
                         },
                     );
-                    return Atomic::TKeyedArray {
+                    result.add_type(Atomic::TKeyedArray {
                         properties: new_props,
                         is_open: *is_open,
                         is_list: *is_list,
-                    };
+                    });
                 }
+                continue;
             }
-            a.clone()
-        })
-        .collect();
-    let mut result = mir_types::Type::from_vec(new_types);
+        }
+        result.add_type(a.clone());
+    }
+    if !changed {
+        return ty.clone();
+    }
+    // Every union member turned out to be an impossible closed shape — keep
+    // the original type rather than narrowing to an empty union.
+    if result.types.is_empty() {
+        return ty.clone();
+    }
     result.from_docblock = ty.from_docblock;
     result
 }
