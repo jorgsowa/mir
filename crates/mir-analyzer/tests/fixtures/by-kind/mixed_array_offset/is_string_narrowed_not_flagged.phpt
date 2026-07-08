@@ -1,5 +1,5 @@
 ===description===
-MixedArrayOffset still fires inside an is_string() guard when the variable was declared @var mixed — TMixed is not narrowed away by is_string()
+MixedArrayOffset does not fire inside an is_string() guard when the variable was declared @var mixed — is_string() narrows mixed to a concrete string type.
 ===config===
 suppress=UnusedVariable
 ===file===
@@ -11,4 +11,3 @@ if (is_string($key)) {
     $val = $arr[$key];
 }
 ===expect===
-MixedArrayOffset@6:16-6:20: Mixed type used as array offset

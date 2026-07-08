@@ -517,75 +517,76 @@ impl Type {
         }
     }
 
-    /// Narrow as if `is_string($x)` is true.
+    /// Narrow as if `is_string($x)` is true. `mixed`/`scalar` become a concrete
+    /// `string` (rather than staying `mixed`) so downstream string-only
+    /// operations see a usable type instead of reporting `Mixed*`.
     pub fn narrow_to_string(&self) -> Type {
-        self.filter(|t| {
-            t.is_string()
-                || matches!(
-                    t,
-                    Atomic::TMixed | Atomic::TScalar | Atomic::TTemplateParam { .. }
-                )
-        })
+        self.filter_replacing(
+            |t| t.is_string() || matches!(t, Atomic::TTemplateParam { .. }),
+            |t| matches!(t, Atomic::TMixed | Atomic::TScalar),
+            Atomic::TString,
+        )
     }
 
     /// Narrow as if `is_int($x)` is true.
     pub fn narrow_to_int(&self) -> Type {
-        self.filter(|t| {
-            t.is_int()
-                || matches!(
-                    t,
-                    Atomic::TMixed
-                        | Atomic::TScalar
-                        | Atomic::TNumeric
-                        | Atomic::TTemplateParam { .. }
-                )
-        })
+        self.filter_replacing(
+            |t| t.is_int() || matches!(t, Atomic::TTemplateParam { .. }),
+            |t| matches!(t, Atomic::TMixed | Atomic::TScalar | Atomic::TNumeric),
+            Atomic::TInt,
+        )
     }
 
     /// Narrow as if `is_float($x)` is true.
     pub fn narrow_to_float(&self) -> Type {
-        self.filter(|t| {
-            matches!(
-                t,
-                Atomic::TFloat
-                    | Atomic::TIntegralFloat
-                    | Atomic::TLiteralFloat(..)
-                    | Atomic::TMixed
-                    | Atomic::TScalar
-                    | Atomic::TNumeric
-                    | Atomic::TTemplateParam { .. }
-            )
-        })
+        self.filter_replacing(
+            |t| {
+                matches!(
+                    t,
+                    Atomic::TFloat
+                        | Atomic::TIntegralFloat
+                        | Atomic::TLiteralFloat(..)
+                        | Atomic::TTemplateParam { .. }
+                )
+            },
+            |t| matches!(t, Atomic::TMixed | Atomic::TScalar | Atomic::TNumeric),
+            Atomic::TFloat,
+        )
     }
 
     /// Narrow as if `is_bool($x)` is true.
     pub fn narrow_to_bool(&self) -> Type {
-        self.filter(|t| {
-            matches!(
-                t,
-                Atomic::TBool
-                    | Atomic::TTrue
-                    | Atomic::TFalse
-                    | Atomic::TMixed
-                    | Atomic::TScalar
-                    | Atomic::TTemplateParam { .. }
-            )
-        })
+        self.filter_replacing(
+            |t| {
+                matches!(
+                    t,
+                    Atomic::TBool | Atomic::TTrue | Atomic::TFalse | Atomic::TTemplateParam { .. }
+                )
+            },
+            |t| matches!(t, Atomic::TMixed | Atomic::TScalar),
+            Atomic::TBool,
+        )
     }
 
     /// Narrow as if `is_null($x)` is true.
     pub fn narrow_to_null(&self) -> Type {
-        self.filter(|t| {
-            matches!(
-                t,
-                Atomic::TNull | Atomic::TMixed | Atomic::TTemplateParam { .. }
-            )
-        })
+        self.filter_replacing(
+            |t| matches!(t, Atomic::TNull | Atomic::TTemplateParam { .. }),
+            |t| matches!(t, Atomic::TMixed),
+            Atomic::TNull,
+        )
     }
 
     /// Narrow as if `is_array($x)` is true.
     pub fn narrow_to_array(&self) -> Type {
-        self.filter(|t| t.is_array() || matches!(t, Atomic::TMixed | Atomic::TTemplateParam { .. }))
+        self.filter_replacing(
+            |t| t.is_array() || matches!(t, Atomic::TTemplateParam { .. }),
+            |t| matches!(t, Atomic::TMixed),
+            Atomic::TArray {
+                key: Box::new(Type::mixed()),
+                value: Box::new(Type::mixed()),
+            },
+        )
     }
 
     /// Narrow array/list types to their non-empty variants (for `count() > 0` etc.).
@@ -683,24 +684,27 @@ impl Type {
 
     /// Narrow as if `is_scalar($x)` is true (int | string | float | bool).
     pub fn narrow_to_scalar(&self) -> Type {
-        self.filter(|t| {
-            t.is_string()
-                || t.is_int()
-                || matches!(
-                    t,
-                    Atomic::TFloat
-                        | Atomic::TIntegralFloat
-                        | Atomic::TLiteralFloat(..)
-                        | Atomic::TBool
-                        | Atomic::TTrue
-                        | Atomic::TFalse
-                        | Atomic::TScalar
-                        | Atomic::TNumeric
-                        | Atomic::TNumericString
-                        | Atomic::TMixed
-                        | Atomic::TTemplateParam { .. }
-                )
-        })
+        self.filter_replacing(
+            |t| {
+                t.is_string()
+                    || t.is_int()
+                    || matches!(
+                        t,
+                        Atomic::TFloat
+                            | Atomic::TIntegralFloat
+                            | Atomic::TLiteralFloat(..)
+                            | Atomic::TBool
+                            | Atomic::TTrue
+                            | Atomic::TFalse
+                            | Atomic::TScalar
+                            | Atomic::TNumeric
+                            | Atomic::TNumericString
+                            | Atomic::TTemplateParam { .. }
+                    )
+            },
+            |t| matches!(t, Atomic::TMixed),
+            Atomic::TScalar,
+        )
     }
 
     /// Narrow as if `is_iterable($x)` is true (array | Traversable).
@@ -1176,6 +1180,29 @@ impl Type {
         for atomic in &self.types {
             if f(atomic) {
                 result.types.push(atomic.clone());
+            }
+        }
+        result
+    }
+
+    /// Like `filter`, but atoms matching `placeholder` are substituted with
+    /// `replacement` instead of passing through unchanged. Used so narrowing
+    /// an unrefined `mixed`/`scalar`/`numeric` value (e.g. via `is_int($x)`)
+    /// yields the concrete narrowed type instead of staying `mixed`.
+    fn filter_replacing<K: Fn(&Atomic) -> bool, P: Fn(&Atomic) -> bool>(
+        &self,
+        keep: K,
+        placeholder: P,
+        replacement: Atomic,
+    ) -> Type {
+        let mut result = Type::empty();
+        result.possibly_undefined = self.possibly_undefined;
+        result.from_docblock = self.from_docblock;
+        for atomic in &self.types {
+            if keep(atomic) {
+                result.add_type(atomic.clone());
+            } else if placeholder(atomic) {
+                result.add_type(replacement.clone());
             }
         }
         result
