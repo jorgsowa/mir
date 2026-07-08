@@ -12,6 +12,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         let cond_ty = self.analyze(&t.condition, ctx);
         match &t.then_expr {
             Some(then_expr) => {
+                let pre_ctx = ctx.clone();
                 let mut then_ctx = ctx.branch();
                 crate::narrowing::narrow_from_condition(
                     &t.condition,
@@ -32,8 +33,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                 );
                 let else_ty = self.analyze(&t.else_expr, &mut else_ctx);
 
-                ctx.absorb_branch_reads(&then_ctx);
-                ctx.absorb_branch_reads(&else_ctx);
+                // A variable assigned inside a branch expression (e.g. `$c ? ($z =
+                // "yes") : ($z = "no")`) is a real, permanent assignment on
+                // whichever side actually ran — merge full variable state back,
+                // not just read/consumed-write bookkeeping.
+                *ctx = FlowState::merge_branches(&pre_ctx, then_ctx, Some(else_ctx));
                 let mut merged = then_ty;
                 merged.merge_with(&else_ty);
                 merged
@@ -136,7 +140,9 @@ impl<'a> ExpressionAnalyzer<'a> {
             _ => None,
         };
 
+        let pre_ctx = ctx.clone();
         let mut result = Type::empty();
+        let mut arm_ctxs: Vec<FlowState> = Vec::new();
         for arm in m.arms.iter() {
             let mut arm_ctx = ctx.branch();
             // Always analyze conditions to check for undefined classes and get
@@ -205,7 +211,22 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
             let arm_body_ty = self.analyze(&arm.body, &mut arm_ctx);
             result.merge_with(&arm_body_ty);
-            ctx.absorb_branch_reads(&arm_ctx);
+            arm_ctxs.push(arm_ctx);
+        }
+
+        // Exactly one arm's body runs (or PHP throws UnhandledMatchError), so a
+        // variable assigned inside every arm — `$y = match($x) { 1 => $z = "a",
+        // default => $z = "b" }` — is a real, permanent assignment; merge full
+        // variable state back rather than just read/consumed-write bookkeeping.
+        let mut merged: Option<FlowState> = None;
+        for arm_ctx in arm_ctxs {
+            merged = Some(match merged {
+                Some(m) => FlowState::merge_branches(&pre_ctx, arm_ctx, Some(m)),
+                None => arm_ctx,
+            });
+        }
+        if let Some(m) = merged {
+            *ctx = m;
         }
 
         // Exhaustiveness check: emit UnhandledMatchCondition if the match does not
