@@ -1002,7 +1002,36 @@ fn union_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>)
                     union_compatible(value, pv_val, ea)
                 });
             }
-            Atomic::TKeyedArray { .. } => return true,
+            // An open shape may carry additional keys of unknown type — stay
+            // permissive, matching atomic_subtype's treatment of open shapes.
+            // A closed shape is only array/list-compatible when every one of its
+            // property values fits the param's element type (checked per-property
+            // rather than as one merged union, so a mix of a compatible and an
+            // incompatible property value is correctly rejected). A TKeyedArray
+            // param atom (shape-to-shape) is left permissive: `atomic_subtype` has
+            // no shape-vs-shape arm at all, so this is the only path that currently
+            // accepts a structurally-fine shape argument (e.g. an int literal where
+            // the param property is `float`) — precise shape-vs-shape checking is
+            // a separate, larger gap than the scalar/array-param one this fixes.
+            Atomic::TKeyedArray {
+                properties,
+                is_open,
+                ..
+            } => {
+                if *is_open {
+                    return true;
+                }
+                return param_ty.types.iter().any(|pv| match pv {
+                    Atomic::TArray { value, .. }
+                    | Atomic::TNonEmptyArray { value, .. }
+                    | Atomic::TList { value }
+                    | Atomic::TNonEmptyList { value } => properties
+                        .values()
+                        .all(|p| union_compatible(&p.ty, value, ea)),
+                    Atomic::TKeyedArray { .. } => true,
+                    _ => false,
+                });
+            }
             _ => return scalar_arg_fits_param(&Type::single(av.clone()), param_ty),
         };
 
@@ -1035,7 +1064,34 @@ fn array_list_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer
             | Atomic::TNonEmptyArray { value, .. }
             | Atomic::TList { value }
             | Atomic::TNonEmptyList { value } => value,
-            Atomic::TKeyedArray { .. } => return true,
+            // An open shape may carry additional keys of unknown type — stay
+            // permissive, matching atomic_subtype's treatment of open shapes.
+            // A closed shape is only array/list-compatible when every one of its
+            // property values fits the param's element type. A TKeyedArray param
+            // atom (shape-to-shape) is left permissive: `atomic_subtype` has no
+            // shape-vs-shape arm at all, so this is the only path that currently
+            // accepts a structurally-fine shape argument (e.g. an int literal
+            // where the param property is `float`) — precise shape-vs-shape
+            // checking is a separate, larger gap than the one this fixes.
+            Atomic::TKeyedArray {
+                properties,
+                is_open,
+                ..
+            } => {
+                if *is_open {
+                    return true;
+                }
+                return param_ty.types.iter().any(|p_atomic| match p_atomic {
+                    Atomic::TArray { value, .. }
+                    | Atomic::TNonEmptyArray { value, .. }
+                    | Atomic::TList { value }
+                    | Atomic::TNonEmptyList { value } => properties
+                        .values()
+                        .all(|p| union_compatible(&p.ty, value, ea)),
+                    Atomic::TKeyedArray { .. } => true,
+                    _ => false,
+                });
+            }
             _ => return false,
         };
 
