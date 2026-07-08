@@ -143,7 +143,19 @@ pub fn check_template_bounds_with_inheritance<'a>(
     }
 
     let mut violations = Vec::new();
+    // A template name declared twice (e.g. a bare `@template T` alongside a
+    // bounded `@template T of X`, or two conflicting bounds) collapses to one
+    // binding in `bindings` — checking that single binding against EVERY
+    // duplicate's own bound treats each extra declaration as an unrelated,
+    // additional constraint the caller never actually agreed to satisfy. Only
+    // check the first declaration for a given name, matching the "first
+    // wins" convention `infer_template_bindings`'s unbound-fallback already
+    // uses for the same malformed-docblock case.
+    let mut seen_names: FxHashSet<&Name> = FxHashSet::default();
     for tp in template_params {
+        if !seen_names.insert(&tp.name) {
+            continue;
+        }
         if unchecked.contains(&tp.name) {
             continue;
         }
