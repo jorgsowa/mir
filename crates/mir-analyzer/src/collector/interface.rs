@@ -1,5 +1,5 @@
 use super::DefinitionCollector;
-use crate::parser::name_to_string_owned;
+use crate::parser::{name_to_string_owned, type_from_hint_owned};
 use mir_codebase::storage::{wrap_template_bound, ConstantDef, InterfaceDef, TemplateParam};
 use mir_types::{Atomic, Type};
 use php_ast::owned::{ClassMemberKind, InterfaceDecl};
@@ -145,11 +145,32 @@ impl<'a> DefinitionCollector<'a> {
                         continue;
                     }
                     let const_name = c.name.as_deref().unwrap_or_default();
+                    // PHP 8.3: typed interface constants (`const int FOO;`).
+                    // Prefer @var docblock, then the native type hint, then the
+                    // literal value, then mixed — same precedence as class.rs.
+                    let hint_ty = self.resolve_union_opt(
+                        c.type_hint
+                            .as_ref()
+                            .map(|h| type_from_hint_owned(h, Some(&fqcn))),
+                    );
+                    let const_ty = const_doc
+                        .var_type
+                        .map(|t| {
+                            self.resolve_union_doc_with_templates(
+                                t,
+                                &iface_template_names,
+                                &fqcn,
+                                &iface_template_params,
+                            )
+                        })
+                        .or(hint_ty)
+                        .or_else(|| super::infer_const_value(&c.value.kind))
+                        .unwrap_or_else(Type::mixed);
                     own_constants.insert(
                         Arc::from(const_name),
                         ConstantDef {
                             name: Arc::from(const_name),
-                            ty: Type::mixed(),
+                            ty: const_ty,
                             visibility: c.visibility.map(|v| Self::convert_visibility(Some(v))),
                             is_final: c.is_final,
                             location: Some(self.location(member.span.start, member.span.end)),
