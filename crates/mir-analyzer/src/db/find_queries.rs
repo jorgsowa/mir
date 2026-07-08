@@ -1152,7 +1152,7 @@ fn find_property_in_mixins<'db>(
 
 /// Existence-check for "is `name` concretely implemented (non-abstract,
 /// non-interface) somewhere reachable from `fqcn`'s inheritance chain?".
-/// Used to flag UnimplementedAbstractMethod.
+/// Used to flag UnimplementedAbstractMethod and UnimplementedInterfaceMethod.
 pub fn is_method_concretely_implemented(
     db: &dyn MirDatabase,
     fqcn: &str,
@@ -1177,6 +1177,25 @@ pub fn is_method_concretely_implemented(
         for (k, m) in class.own_methods().iter() {
             if k.as_ref().eq_ignore_ascii_case(&lower) && !m.is_abstract {
                 return true;
+            }
+        }
+        // A method fulfilled only via `use Trait { orig as alias; }` never
+        // materializes a literally-named entry in any ancestor's `own_methods()` —
+        // resolve the alias to its original trait method and check that instead.
+        if let ClassLike::Class(cls) = &class {
+            if let Some((opt_trait_fqcn, orig_method, _vis_override, _alias_cased)) =
+                cls.trait_aliases.get(lower.as_str())
+            {
+                let search_traits: &[Arc<str>] = match opt_trait_fqcn {
+                    Some(tfqcn) => std::slice::from_ref(tfqcn),
+                    None => &cls.traits,
+                };
+                if search_traits
+                    .iter()
+                    .any(|t| is_method_concretely_implemented(db, t.as_ref(), orig_method))
+                {
+                    return true;
+                }
             }
         }
     }
