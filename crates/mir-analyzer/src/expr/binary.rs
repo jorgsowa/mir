@@ -178,6 +178,21 @@ impl<'a> ExpressionAnalyzer<'a> {
                             Severity::Info,
                             span,
                         );
+                    } else if matches!(b.op, BinaryOp::Div | BinaryOp::Mod)
+                        && operand_is_definitely_zero(&right_ty)
+                    {
+                        // The constant-folder below (infer_int_range_arithmetic)
+                        // already detects a literal-zero divisor via its `r != 0`
+                        // guards, but only to skip folding — it never reports
+                        // this as the unconditional runtime DivisionByZeroError
+                        // that it is.
+                        self.emit(
+                            IssueKind::DivisionByZero {
+                                op: arithmetic_op_symbol(b.op).to_string(),
+                            },
+                            Severity::Error,
+                            span,
+                        );
                     }
                 }
                 infer_int_range_arithmetic(&left_ty, &right_ty, b.op).unwrap_or_else(|| {
@@ -430,6 +445,18 @@ fn operand_has_any_non_numeric_member(ty: &Type) -> bool {
 /// Whether `ty` contains `null` (potential division-by-zero when used as divisor).
 pub(super) fn operand_contains_null(ty: &Type) -> bool {
     ty.types.iter().any(|a| matches!(a, Atomic::TNull))
+}
+
+/// Whether `ty` is DEFINITELY the literal `0` (int or float) — every atomic in
+/// the union reduces to zero, not just some of them. Used to catch an
+/// unconditional division-by-zero, as opposed to `operand_contains_null`'s
+/// weaker "might be" check.
+fn operand_is_definitely_zero(ty: &Type) -> bool {
+    !ty.types.is_empty()
+        && ty
+            .types
+            .iter()
+            .all(|a| matches!(a, Atomic::TLiteralInt(0) | Atomic::TLiteralFloat(0, 0)))
 }
 
 /// Whether `ty` has any array member (arrays cannot be concatenated).

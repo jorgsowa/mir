@@ -205,6 +205,10 @@ pub enum IssueKind {
     /// Emitted when a divisor operand could be null (potential division by zero).
     /// Fixtures: `tests/fixtures/by-kind/invalid_operand/`.
     PossiblyNullOperand { op: String, ty: String },
+    /// Emitted when a divisor operand is DEFINITELY the literal `0` — an
+    /// unconditional runtime `DivisionByZeroError`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_operand/`.
+    DivisionByZero { op: String },
     /// Emitted when `yield from` is used with a non-iterable object (no Traversable).
     /// Fixtures: `tests/fixtures/by-kind/invalid_operand/`.
     RawObjectIteration { ty: String },
@@ -758,6 +762,7 @@ impl IssueKind {
             | IssueKind::ReadonlyPropertyRedeclarationMismatch { .. }
             | IssueKind::StaticPropertyRedeclarationMismatch { .. }
             | IssueKind::BackedEnumCaseTypeMismatch { .. }
+            | IssueKind::DivisionByZero { .. }
             | IssueKind::ParentNotFound => Severity::Error,
             IssueKind::Trace { .. } => Severity::Info,
 
@@ -950,6 +955,7 @@ impl IssueKind {
             IssueKind::InvalidOperand { .. } => "MIR0208",
             IssueKind::PossiblyInvalidOperand { .. } => "MIR0213",
             IssueKind::PossiblyNullOperand { .. } => "MIR0214",
+            IssueKind::DivisionByZero { .. } => "MIR0229",
             IssueKind::RawObjectIteration { .. } => "MIR0222",
             IssueKind::PossiblyRawObjectIteration { .. } => "MIR0223",
             IssueKind::MismatchingDocblockReturnType { .. } => "MIR0209",
@@ -1109,9 +1115,9 @@ impl IssueKind {
             | "MIR0205" | "MIR0212" | "MIR0215" | "MIR0216" | "MIR0217" | "MIR0224" | "MIR0600"
             | "MIR0700" | "MIR0701" | "MIR0702" | "MIR0704" | "MIR0705" | "MIR0706" | "MIR0707"
             | "MIR0708" | "MIR0709" | "MIR0711" | "MIR0712" | "MIR0713" | "MIR0714" | "MIR0715"
-            | "MIR0228" | "MIR0800" | "MIR0801" | "MIR0802" | "MIR0803" | "MIR0804" | "MIR0900"
-            | "MIR1205" | "MIR1207" | "MIR1300" | "MIR1400" | "MIR1500" | "MIR1503" | "MIR1602"
-            | "MIR1603" | "MIR1604" | "MIR1605" | "MIR1606" => Some(Severity::Error),
+            | "MIR0228" | "MIR0229" | "MIR0800" | "MIR0801" | "MIR0802" | "MIR0803" | "MIR0804"
+            | "MIR0900" | "MIR1205" | "MIR1207" | "MIR1300" | "MIR1400" | "MIR1500" | "MIR1503"
+            | "MIR1602" | "MIR1603" | "MIR1604" | "MIR1605" | "MIR1606" => Some(Severity::Error),
 
             // Warnings
             "MIR0006" | "MIR0008" | "MIR0100" | "MIR0101" | "MIR0102" | "MIR0103" | "MIR0109"
@@ -1183,6 +1189,7 @@ impl IssueKind {
             IssueKind::InvalidOperand { .. } => "InvalidOperand",
             IssueKind::PossiblyInvalidOperand { .. } => "PossiblyInvalidOperand",
             IssueKind::PossiblyNullOperand { .. } => "PossiblyNullOperand",
+            IssueKind::DivisionByZero { .. } => "DivisionByZero",
             IssueKind::RawObjectIteration { .. } => "RawObjectIteration",
             IssueKind::PossiblyRawObjectIteration { .. } => "PossiblyRawObjectIteration",
             IssueKind::MismatchingDocblockReturnType { .. } => "MismatchingDocblockReturnType",
@@ -1456,6 +1463,9 @@ impl IssueKind {
             }
             IssueKind::PossiblyNullOperand { op, ty } => {
                 format!("Operator '{op}' operand '{ty}' might be null")
+            }
+            IssueKind::DivisionByZero { op } => {
+                format!("Division by zero: right operand of '{op}' is always 0")
             }
             IssueKind::RawObjectIteration { ty } => {
                 format!("Cannot iterate over non-iterable object '{ty}'")
@@ -2167,6 +2177,7 @@ mod code_tests {
                 right: s(),
             },
             IssueKind::PossiblyNullOperand { op: s(), ty: s() },
+            IssueKind::DivisionByZero { op: s() },
             IssueKind::RawObjectIteration { ty: s() },
             IssueKind::PossiblyRawObjectIteration { ty: s() },
             IssueKind::MismatchingDocblockReturnType {
@@ -2520,6 +2531,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 146);
+        assert_eq!(one_of_each().len(), 147);
     }
 }
