@@ -1045,17 +1045,25 @@ pub(crate) fn infer_array_map_return(
     // Multi-array (zip) mode: always produces array<int, T>.
     if arg_types.len() == 2 {
         let source = &arg_types[1];
+        // A literal array (`[1, 2, 3]`) is represented as a `TKeyedArray` with
+        // `is_list: true`, not as `TList`/`TNonEmptyList` — without this arm,
+        // `array_map` over a literal list lost its list-ness/non-emptiness and
+        // fell back to a generic `array<int, T>`.
         let src_is_list = !source.types.is_empty()
-            && source
-                .types
-                .iter()
-                .all(|a| matches!(a, Atomic::TList { .. } | Atomic::TNonEmptyList { .. }));
+            && source.types.iter().all(|a| {
+                matches!(
+                    a,
+                    Atomic::TList { .. }
+                        | Atomic::TNonEmptyList { .. }
+                        | Atomic::TKeyedArray { is_list: true, .. }
+                )
+            });
         let src_is_non_empty = !source.types.is_empty()
             && source.types.iter().all(|a| {
                 matches!(
                     a,
                     Atomic::TNonEmptyArray { .. } | Atomic::TNonEmptyList { .. }
-                )
+                ) || matches!(a, Atomic::TKeyedArray { properties, .. } if !properties.is_empty())
             });
         let atom = match (src_is_list, src_is_non_empty) {
             (true, true) => Atomic::TNonEmptyList {
