@@ -74,12 +74,22 @@ fn variance_compatible_across_hierarchy(
     sup_fqcn: &str,
     sup_params: &[Type],
 ) -> bool {
-    if sub_fqcn == sup_fqcn || sub_params.is_empty() {
+    if sub_fqcn == sup_fqcn {
         return false;
     }
     let Some(sub_tps) = class_template_params(db, sub_fqcn) else {
         return false;
     };
+    // A concrete, non-generic class (`sub_tps` empty, so `sub_params` is too)
+    // has no OWN bindings to contribute, but it can still fix an ancestor's
+    // template argument via `@implements Collection<int>` —
+    // `inherited_template_bindings` below resolves that directly from the
+    // `@implements` clause, so an empty `own_bindings` is fine. Only bail
+    // when the sub class DOES declare templates but the caller supplied a
+    // mismatched arity — a malformed receiver, not "nothing to check".
+    if !sub_tps.is_empty() && sub_tps.len() != sub_params.len() {
+        return false;
+    }
     let own_bindings: FxHashMap<Name, Type> = sub_tps
         .iter()
         .zip(sub_params)
