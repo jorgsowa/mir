@@ -502,7 +502,9 @@ impl<'a> ClassAnalyzer<'a> {
                 if let (Some(own_t), Some(parent_t)) =
                     (own_prop.ty.as_deref(), parent_prop.ty.as_deref())
                 {
-                    if own_t != parent_t {
+                    let same_type = own_t.is_subtype_structural(parent_t)
+                        && parent_t.is_subtype_structural(own_t);
+                    if !same_type {
                         let loc = issue_location(
                             own_prop.location.as_ref(),
                             own_prop
