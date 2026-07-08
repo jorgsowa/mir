@@ -43,7 +43,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                 merged
             }
             None => {
-                let else_ty = self.analyze(&t.else_expr, ctx);
+                // `$cond ?: $else`: `$else` only executes when `$cond` is
+                // falsy — analyze it against a branched context so an
+                // assignment there (`$cond ?: ($y = default())`) is treated
+                // as conditional, not as always executing.
+                let pre_ctx = ctx.clone();
+                let mut else_ctx = ctx.branch();
+                let else_ty = self.analyze(&t.else_expr, &mut else_ctx);
+                *ctx = FlowState::merge_branches(&pre_ctx, pre_ctx.clone(), Some(else_ctx));
                 let truthy_ty = cond_ty.narrow_to_truthy();
                 if truthy_ty.is_empty() {
                     else_ty
@@ -62,7 +69,14 @@ impl<'a> ExpressionAnalyzer<'a> {
         ctx: &mut FlowState,
     ) -> Type {
         let left_ty = self.with_existence_check(|ea| ea.analyze(&nc.left, ctx));
-        let right_ty = self.analyze(&nc.right, ctx);
+        // The RHS of `??` only executes when the LHS is null/undefined —
+        // analyze it against a branched context so an assignment there
+        // (`$x ?? ($y = default())`) is treated as conditional, not as
+        // always executing.
+        let pre_ctx = ctx.clone();
+        let mut right_ctx = ctx.branch();
+        let right_ty = self.analyze(&nc.right, &mut right_ctx);
+        *ctx = FlowState::merge_branches(&pre_ctx, pre_ctx.clone(), Some(right_ctx));
         let non_null_left = left_ty.remove_null();
         if non_null_left.is_empty() {
             right_ty
