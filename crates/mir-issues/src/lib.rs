@@ -248,6 +248,11 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/expr/assignment.rs`.
     /// Fixtures: `tests/fixtures/by-kind/possibly_invalid_array_offset/`.
     PossiblyInvalidArrayOffset { expected: String, actual: String },
+    /// Emitted by `mir-analyzer/src/expr/arrays.rs` when an array literal repeats
+    /// the same key — the earlier entry is silently overwritten at runtime,
+    /// almost always a copy-paste mistake.
+    /// Fixtures: `tests/fixtures/by-kind/duplicate_array_key/`.
+    DuplicateArrayKey { key: String },
 
     // --- Redundancy ---------------------------------------------------------
     /// Emitted by `mir-analyzer/src/stmt/control_flow.rs`.
@@ -800,6 +805,7 @@ impl IssueKind {
             | IssueKind::InvalidStringClass { .. }
             | IssueKind::ImpossibleIdenticalComparison { .. }
             | IssueKind::ImpossibleLooseComparison { .. }
+            | IssueKind::DuplicateArrayKey { .. }
             | IssueKind::ForbiddenCode { .. } => Severity::Warning,
 
             // PossiblyUndefined: shown at default error level (same as Warning)
@@ -971,6 +977,7 @@ impl IssueKind {
             IssueKind::InvalidArrayOffset { .. } => "MIR0300",
             IssueKind::NonExistentArrayOffset { .. } => "MIR0301",
             IssueKind::PossiblyInvalidArrayOffset { .. } => "MIR0302",
+            IssueKind::DuplicateArrayKey { .. } => "MIR0303",
 
             // Redundancy (0400-0499)
             IssueKind::RedundantCondition { .. } => "MIR0400",
@@ -1122,11 +1129,10 @@ impl IssueKind {
             // Warnings
             "MIR0006" | "MIR0008" | "MIR0100" | "MIR0101" | "MIR0102" | "MIR0103" | "MIR0109"
             | "MIR0206" | "MIR0208" | "MIR0211" | "MIR0218" | "MIR0219" | "MIR0220" | "MIR0222"
-            | "MIR0300" | "MIR0301" | "MIR0302" | "MIR0404" | "MIR0405" | "MIR0408" | "MIR0500"
-            | "MIR0506" | "MIR0703" | "MIR0710" | "MIR1301" | "MIR1501" | "MIR1502" | "MIR1700"
-            | "MIR1701" | "MIR1702" | "MIR1703" | "MIR1704" | "MIR1705" | "MIR1706" | "MIR1506" => {
-                Some(Severity::Warning)
-            }
+            | "MIR0300" | "MIR0301" | "MIR0302" | "MIR0303" | "MIR0404" | "MIR0405" | "MIR0408"
+            | "MIR0500" | "MIR0506" | "MIR0703" | "MIR0710" | "MIR1301" | "MIR1501" | "MIR1502"
+            | "MIR1700" | "MIR1701" | "MIR1702" | "MIR1703" | "MIR1704" | "MIR1705" | "MIR1706"
+            | "MIR1506" => Some(Severity::Warning),
 
             // Info
             "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207" | "MIR0209"
@@ -1204,6 +1210,7 @@ impl IssueKind {
             IssueKind::InvalidArrayOffset { .. } => "InvalidArrayOffset",
             IssueKind::NonExistentArrayOffset { .. } => "NonExistentArrayOffset",
             IssueKind::PossiblyInvalidArrayOffset { .. } => "PossiblyInvalidArrayOffset",
+            IssueKind::DuplicateArrayKey { .. } => "DuplicateArrayKey",
             IssueKind::RedundantCondition { .. } => "RedundantCondition",
             IssueKind::RedundantCast { .. } => "RedundantCast",
             IssueKind::UnnecessaryVarAnnotation { .. } => "UnnecessaryVarAnnotation",
@@ -1507,6 +1514,9 @@ impl IssueKind {
             }
             IssueKind::PossiblyInvalidArrayOffset { expected, actual } => {
                 format!("Array offset might be invalid: expects '{expected}', got '{actual}'")
+            }
+            IssueKind::DuplicateArrayKey { key } => {
+                format!("Array key {key} is duplicated — the earlier entry is silently overwritten")
             }
 
             IssueKind::RedundantCondition { ty } => {
@@ -2207,6 +2217,7 @@ mod code_tests {
                 expected: s(),
                 actual: s(),
             },
+            IssueKind::DuplicateArrayKey { key: s() },
             IssueKind::RedundantCondition { ty: s() },
             IssueKind::RedundantCast { from: s(), to: s() },
             IssueKind::UnnecessaryVarAnnotation { var: s() },
@@ -2531,6 +2542,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 147);
+        assert_eq!(one_of_each().len(), 148);
     }
 }

@@ -113,6 +113,20 @@ impl<'a> ExpressionAnalyzer<'a> {
                 next_int_key += 1;
                 k
             };
+            // A repeated key silently overwrites the earlier entry at runtime
+            // (`['a' => 1, 'b' => 2, 'a' => 3]` evaluates to `['a' => 3, 'b' =>
+            // 2]`) — almost always a copy-paste mistake, not intentional.
+            if keyed_props.contains_key(&array_key) {
+                let key_str = match &array_key {
+                    ArrayKey::String(s) => format!("'{s}'"),
+                    ArrayKey::Int(i) => i.to_string(),
+                };
+                self.emit(
+                    IssueKind::DuplicateArrayKey { key: key_str },
+                    Severity::Warning,
+                    elem.key.as_ref().map_or(elem.value.span, |k| k.span),
+                );
+            }
             keyed_props.insert(
                 array_key,
                 KeyedProperty {
