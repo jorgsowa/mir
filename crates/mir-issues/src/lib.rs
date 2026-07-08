@@ -410,6 +410,16 @@ pub enum IssueKind {
         /// false when the parent's property is non-readonly and the child adds it.
         parent_readonly: bool,
     },
+    /// Emitted by `mir-analyzer/src/class/overrides.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/static_property_redeclaration_mismatch/`.
+    StaticPropertyRedeclarationMismatch {
+        parent_class: String,
+        class: String,
+        property: String,
+        /// True when the parent's property is static and the child redeclares it as
+        /// instance; false when the parent's is instance and the child redeclares it static.
+        parent_static: bool,
+    },
     /// Emitted by `mir-analyzer/src/collector/enum.rs`.
     /// Fixtures: `tests/fixtures/by-kind/backed_enum_case_type_mismatch/`.
     BackedEnumCaseTypeMismatch {
@@ -742,6 +752,7 @@ impl IssueKind {
             | IssueKind::TypeCheckMismatch { .. }
             | IssueKind::PropertyTypeRedeclarationMismatch { .. }
             | IssueKind::ReadonlyPropertyRedeclarationMismatch { .. }
+            | IssueKind::StaticPropertyRedeclarationMismatch { .. }
             | IssueKind::BackedEnumCaseTypeMismatch { .. }
             | IssueKind::ParentNotFound => Severity::Error,
             IssueKind::Trace { .. } => Severity::Info,
@@ -999,6 +1010,7 @@ impl IssueKind {
             IssueKind::PropertyTypeRedeclarationMismatch { .. } => "MIR0712",
             IssueKind::BackedEnumCaseTypeMismatch { .. } => "MIR0713",
             IssueKind::ReadonlyPropertyRedeclarationMismatch { .. } => "MIR0714",
+            IssueKind::StaticPropertyRedeclarationMismatch { .. } => "MIR0715",
             IssueKind::InvalidExtendClass { .. } => "MIR0704",
             IssueKind::FinalMethodOverridden { .. } => "MIR0705",
             IssueKind::AbstractInstantiation { .. } => "MIR0706",
@@ -1090,10 +1102,10 @@ impl IssueKind {
             | "MIR0010" | "MIR0011" | "MIR0200" | "MIR0201" | "MIR0202" | "MIR0203" | "MIR0204"
             | "MIR0205" | "MIR0212" | "MIR0215" | "MIR0216" | "MIR0217" | "MIR0224" | "MIR0600"
             | "MIR0700" | "MIR0701" | "MIR0702" | "MIR0704" | "MIR0705" | "MIR0706" | "MIR0707"
-            | "MIR0708" | "MIR0709" | "MIR0711" | "MIR0712" | "MIR0713" | "MIR0714" | "MIR0228"
-            | "MIR0800" | "MIR0801" | "MIR0802" | "MIR0803" | "MIR0804" | "MIR0900" | "MIR1205"
-            | "MIR1207" | "MIR1300" | "MIR1400" | "MIR1500" | "MIR1503" | "MIR1602" | "MIR1603"
-            | "MIR1604" | "MIR1605" | "MIR1606" => Some(Severity::Error),
+            | "MIR0708" | "MIR0709" | "MIR0711" | "MIR0712" | "MIR0713" | "MIR0714" | "MIR0715"
+            | "MIR0228" | "MIR0800" | "MIR0801" | "MIR0802" | "MIR0803" | "MIR0804" | "MIR0900"
+            | "MIR1205" | "MIR1207" | "MIR1300" | "MIR1400" | "MIR1500" | "MIR1503" | "MIR1602"
+            | "MIR1603" | "MIR1604" | "MIR1605" | "MIR1606" => Some(Severity::Error),
 
             // Warnings
             "MIR0006" | "MIR0008" | "MIR0100" | "MIR0101" | "MIR0102" | "MIR0103" | "MIR0109"
@@ -1218,6 +1230,9 @@ impl IssueKind {
             }
             IssueKind::ReadonlyPropertyRedeclarationMismatch { .. } => {
                 "ReadonlyPropertyRedeclarationMismatch"
+            }
+            IssueKind::StaticPropertyRedeclarationMismatch { .. } => {
+                "StaticPropertyRedeclarationMismatch"
             }
             IssueKind::BackedEnumCaseTypeMismatch { .. } => "BackedEnumCaseTypeMismatch",
             IssueKind::InvalidExtendClass { .. } => "InvalidExtendClass",
@@ -1621,6 +1636,22 @@ impl IssueKind {
                 } else {
                     format!(
                         "Cannot redeclare non-readonly property {parent_class}::${property} as readonly {class}::${property}"
+                    )
+                }
+            }
+            IssueKind::StaticPropertyRedeclarationMismatch {
+                parent_class,
+                class,
+                property,
+                parent_static,
+            } => {
+                if *parent_static {
+                    format!(
+                        "Cannot redeclare static property {parent_class}::${property} as non-static {class}::${property}"
+                    )
+                } else {
+                    format!(
+                        "Cannot redeclare non-static property {parent_class}::${property} as static {class}::${property}"
                     )
                 }
             }
@@ -2233,6 +2264,12 @@ mod code_tests {
                 property: s(),
                 parent_readonly: true,
             },
+            IssueKind::StaticPropertyRedeclarationMismatch {
+                parent_class: s(),
+                class: s(),
+                property: s(),
+                parent_static: true,
+            },
             IssueKind::BackedEnumCaseTypeMismatch {
                 enum_name: s(),
                 case_name: s(),
@@ -2469,6 +2506,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 144);
+        assert_eq!(one_of_each().len(), 145);
     }
 }

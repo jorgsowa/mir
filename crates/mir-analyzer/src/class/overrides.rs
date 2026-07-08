@@ -618,6 +618,36 @@ impl<'a> ClassAnalyzer<'a> {
                 }
                 issues.push(issue);
             }
+            // PHP fatal-errors when a redeclared property flips `static`-ness in either
+            // direction ("Cannot redeclare static X::$y as non static Y::$y" and vice
+            // versa). Only real PHP properties carry this contract — `@property` docblock
+            // entries are virtual (no runtime static/instance distinction), so skip
+            // docblock-only entries just like the readonly check above.
+            if !own_prop.from_docblock
+                && !parent_prop.from_docblock
+                && own_prop.is_static != parent_prop.is_static
+            {
+                let loc = issue_location(
+                    own_prop.location.as_ref(),
+                    own_prop
+                        .location
+                        .as_ref()
+                        .and_then(|l| self.sources.get(&l.file).copied()),
+                );
+                let mut issue = Issue::new(
+                    IssueKind::StaticPropertyRedeclarationMismatch {
+                        parent_class: parent_fqcn.to_string(),
+                        class: fqcn.to_string(),
+                        property: prop_name.to_string(),
+                        parent_static: parent_prop.is_static,
+                    },
+                    loc,
+                );
+                if let Some(snippet) = extract_snippet(own_prop.location.as_ref(), &self.sources) {
+                    issue = issue.with_snippet(snippet);
+                }
+                issues.push(issue);
+            }
             // PHP requires redeclared typed properties to keep the same type (invariant).
             // Only flag when both sides carry a native type hint — docblock-only types are
             // not enforced by the runtime.
