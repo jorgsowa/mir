@@ -787,8 +787,13 @@ fn resolve_method_return<'a>(
             .map(|a| expr_can_be_passed_by_reference_owned(&a.value))
             .collect();
         // Build class-level template bindings before arg-checking so we can substitute
-        // template params (e.g. T → int from Box<int>) into param types.
-        let class_tps = crate::db::class_template_params(ea.db, fqcn)
+        // template params (e.g. T → int from Box<int>) into param types. A plain
+        // subclass that doesn't redeclare `@template` (`class IntBox extends
+        // Box {}`) still carries `receiver_type_params` positioned against
+        // Box's own template list (see `infer_new_type_params`), so binding
+        // must walk up to that same ancestor instead of finding zero
+        // templates on `fqcn` itself and discarding every bound type param.
+        let class_tps = crate::db::effective_class_template_params(ea.db, fqcn)
             .map(|tps| tps.to_vec())
             .unwrap_or_default();
         let mut bindings = build_class_bindings(&class_tps, receiver_type_params);

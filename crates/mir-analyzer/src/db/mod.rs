@@ -190,9 +190,9 @@ pub use self::per_function::{infer_function, FunctionInferenceResult};
 pub use self::queries::{
     class_constant_exists_in_chain, class_exists, class_kind, class_template_params,
     collect_file_definitions, collect_file_definitions_uncached, constant_exists,
-    extends_or_implements, function_exists, has_unknown_ancestor, infer_file_return_types,
-    inherited_template_bindings, is_unchecked_exception, member_location, parse_file, resolve_name,
-    ClassKind, InferredFileTypes, TrackedParseResult,
+    effective_class_template_params, extends_or_implements, function_exists, has_unknown_ancestor,
+    infer_file_return_types, inherited_template_bindings, is_unchecked_exception, member_location,
+    parse_file, resolve_name, ClassKind, InferredFileTypes, TrackedParseResult,
 };
 pub use self::ref_index::RefIndex;
 pub use self::reference_locations::*;

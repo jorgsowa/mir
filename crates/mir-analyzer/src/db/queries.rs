@@ -99,6 +99,41 @@ pub fn class_template_params(db: &dyn MirDatabase, fqcn: &str) -> Option<Arc<[Te
     Some(Arc::from(class.template_params().to_vec()))
 }
 
+/// Like [`class_template_params`], but when `fqcn` itself declares no
+/// `@template` (or none at all), walks up its native `extends` chain to find
+/// the nearest ancestor that does. A plain subclass that doesn't redeclare
+/// `@template` (`class IntBox extends Box {}`) is still implicitly
+/// parameterized the same way its generic ancestor is — PHP/Psalm don't
+/// require re-declaring an un-narrowed inherited template — so callers that
+/// need "does this receiver have template slots to bind" (constructor-arg
+/// inference on `new`, building bindings for a method call) should use this
+/// instead of the direct, own-declarations-only query.
+pub fn effective_class_template_params(
+    db: &dyn MirDatabase,
+    fqcn: &str,
+) -> Option<Arc<[TemplateParam]>> {
+    let mut current: Arc<str> = Arc::from(fqcn);
+    let mut visited: FxHashSet<Arc<str>> = FxHashSet::default();
+    loop {
+        if !visited.insert(current.clone()) {
+            return None;
+        }
+        if let Some(tps) = class_template_params(db, current.as_ref()) {
+            if !tps.is_empty() {
+                return Some(tps);
+            }
+        }
+        let here = crate::db::Fqcn::from_str(db, current.as_ref());
+        match crate::db::find_class_like(db, here) {
+            Some(crate::db::ClassLike::Class(cls)) => match &cls.parent {
+                Some(p) => current = p.clone(),
+                None => return None,
+            },
+            _ => return None,
+        }
+    }
+}
+
 pub fn inherited_template_bindings(
     db: &dyn MirDatabase,
     fqcn: &str,

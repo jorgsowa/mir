@@ -85,7 +85,11 @@ impl<'a> ExpressionAnalyzer<'a> {
         call_span: php_ast::Span,
     ) -> Arc<[Type]> {
         let empty = mir_types::union::empty_type_params();
-        let class_tps = match crate::db::class_template_params(self.db, fqcn) {
+        // A plain subclass that doesn't redeclare `@template` (`class IntBox
+        // extends Box {}`) is still implicitly parameterized the same way
+        // `Box` is — walk up to the nearest ancestor that actually declares
+        // templates instead of bailing out just because `fqcn` itself has none.
+        let class_tps = match crate::db::effective_class_template_params(self.db, fqcn) {
             Some(tps) if !tps.is_empty() => tps,
             _ => return empty,
         };

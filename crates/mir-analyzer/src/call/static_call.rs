@@ -523,7 +523,12 @@ impl CallAnalyzer {
             // declared binding (from `@extends`/`@implements`, e.g. a
             // concretizing subclass) still takes precedence over one merely
             // inferred from this call's arguments.
-            let class_tps = crate::db::class_template_params(ea.db, &fqcn).unwrap_or_default();
+            // A plain subclass that doesn't redeclare `@template` (`class
+            // IntBox extends Box {}`) still shares Box's template slot, so
+            // `IntBox::make(42)` must infer against Box's declared params —
+            // walk up to the nearest ancestor that actually declares them.
+            let class_tps =
+                crate::db::effective_class_template_params(ea.db, &fqcn).unwrap_or_default();
             let class_arg_bindings: FxHashMap<Name, Type> = if class_tps.is_empty() {
                 FxHashMap::default()
             } else {
