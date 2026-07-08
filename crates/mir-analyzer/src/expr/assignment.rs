@@ -65,10 +65,27 @@ impl<'a> ExpressionAnalyzer<'a> {
                         }
                     }
                 }
-                if rhs_tainted {
-                    if let ExprKind::Variable(name) = &a.target.kind {
-                        ctx.taint_var(name.as_ref());
+                match &a.target.kind {
+                    ExprKind::Variable(name) => {
+                        if rhs_tainted {
+                            ctx.taint_var(name.as_ref());
+                        }
                     }
+                    ExprKind::PropertyAccess(pa) => {
+                        if let ExprKind::Variable(obj_var) = &pa.object.kind {
+                            if let Some(prop_name) = extract_string_from_expr(&pa.property) {
+                                let obj_var = obj_var.trim_start_matches('$');
+                                if rhs_tainted {
+                                    ctx.taint_prop(obj_var, &prop_name);
+                                } else {
+                                    // Overwritten with a proven-clean value —
+                                    // don't let stale taint survive.
+                                    ctx.clear_prop_taint(obj_var, &prop_name);
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
                 }
                 rhs_ty
             }

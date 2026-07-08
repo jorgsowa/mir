@@ -108,6 +108,21 @@ pub fn is_expr_tainted(expr: &Expr, ctx: &FlowState) -> bool {
             is_expr_tainted(&aa.array, ctx)
         }
 
+        // $obj->prop — tainted if this property was previously assigned a
+        // tainted value (see FlowState::taint_prop, set on property writes
+        // in expr/assignment.rs). Only a simple-variable receiver is tracked,
+        // matching prop_refined's narrowing scope.
+        ExprKind::PropertyAccess(pa) => {
+            if let ExprKind::Variable(obj_var) = &pa.object.kind {
+                if let Some(prop_name) =
+                    crate::expr::helpers::extract_string_from_expr(&pa.property)
+                {
+                    return ctx.is_prop_tainted(obj_var.trim_start_matches('$'), &prop_name);
+                }
+            }
+            false
+        }
+
         ExprKind::Assign(a) => is_expr_tainted(&a.value, ctx),
 
         ExprKind::Binary(op) => is_expr_tainted(&op.left, ctx) || is_expr_tainted(&op.right, ctx),

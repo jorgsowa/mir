@@ -105,6 +105,13 @@ pub struct FlowState {
     /// Used by taint analysis (M19).
     pub tainted_vars: FxHashSet<Name>,
 
+    /// Instance properties that carry tainted (user-controlled) values at
+    /// this point, tracked the same way `prop_refined` tracks narrowed
+    /// types. Key: `(object_var, prop_name)`. Set by a tainted property
+    /// assignment (`$obj->prop = $_GET['x']`); read by `taint::is_expr_tainted`
+    /// so a later `$obj->prop` access is recognized as tainted.
+    pub tainted_props: FxHashSet<(Name, Name)>,
+
     /// Variables that have been read at least once in this scope.
     /// Used by UnusedParam detection (M18).
     pub read_vars: FxHashSet<Name>,
@@ -275,6 +282,7 @@ impl FlowState {
             inside_static_method: false,
             strict_types: false,
             tainted_vars: FxHashSet::default(),
+            tainted_props: FxHashSet::default(),
             read_vars: FxHashSet::default(),
             param_names: Arc::new(FxHashSet::default()),
             byref_param_names: Arc::new(FxHashSet::default()),
@@ -556,6 +564,35 @@ impl FlowState {
     pub fn is_tainted(&self, name: &str) -> bool {
         let sym = Name::from(name.trim_start_matches('$'));
         self.tainted_vars.contains(&sym)
+    }
+
+    /// Mark an instance property as carrying tainted (user-controlled) data.
+    pub fn taint_prop(&mut self, obj_var: &str, prop: &str) {
+        let key = (
+            Name::from(obj_var.trim_start_matches('$')),
+            Name::from(prop),
+        );
+        self.tainted_props.insert(key);
+    }
+
+    /// Returns true if the instance property is known to carry tainted data.
+    pub fn is_prop_tainted(&self, obj_var: &str, prop: &str) -> bool {
+        let key = (
+            Name::from(obj_var.trim_start_matches('$')),
+            Name::from(prop),
+        );
+        self.tainted_props.contains(&key)
+    }
+
+    /// Clear a previously-recorded property taint — used when the property is
+    /// overwritten with a value proven not tainted, so stale taint doesn't
+    /// survive the reassignment.
+    pub fn clear_prop_taint(&mut self, obj_var: &str, prop: &str) {
+        let key = (
+            Name::from(obj_var.trim_start_matches('$')),
+            Name::from(prop),
+        );
+        self.tainted_props.remove(&key);
     }
 
     /// Record the location of the first assignment to a variable (first-write-wins)
@@ -941,6 +978,15 @@ impl FlowState {
             .chain(else_ctx.tainted_vars.iter())
         {
             result.tainted_vars.insert(*name);
+        }
+
+        // Same conservative union for tainted instance properties.
+        for key in if_ctx
+            .tainted_props
+            .iter()
+            .chain(else_ctx.tainted_props.iter())
+        {
+            result.tainted_props.insert(*key);
         }
 
         // Read vars: union — if either branch reads a var, it counts as read
