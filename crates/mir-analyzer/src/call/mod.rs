@@ -5,7 +5,10 @@ pub(crate) mod method;
 mod static_call;
 
 pub(crate) use args::substitute_static_in_return;
-pub use args::{check_constructor_args, spread_element_type, CheckArgsParams};
+pub use args::{
+    check_constructor_args, distinct_spans_for_expansion, expand_sole_spread_arg,
+    spread_element_type, CheckArgsParams,
+};
 pub(crate) use function::extract_class_docblock;
 
 pub struct CallAnalyzer;

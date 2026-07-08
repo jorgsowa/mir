@@ -18,6 +18,7 @@ pub(super) fn check_counts(
     arg_names: &[Option<String>],
     call_span: Span,
     has_spread: bool,
+    arity_unknown: bool,
     no_named_arguments: bool,
 ) -> Vec<ArgBinding> {
     let variadic_index = params.iter().position(|p| p.is_variadic);
@@ -141,7 +142,7 @@ pub(super) fn check_counts(
         .filter(|slot| slot.is_some())
         .count();
 
-    if provided_count < required_count && !has_spread && !has_shape_error {
+    if provided_count < required_count && !arity_unknown && !has_shape_error {
         ea.emit(
             IssueKind::TooFewArguments {
                 fn_name: fn_name.to_string(),
@@ -158,7 +159,7 @@ pub(super) fn check_counts(
     // extra args is not an error. Named functions/methods keep the lint.
     if variadic_index.is_none()
         && arg_types.len() > params.len()
-        && !has_spread
+        && !arity_unknown
         && !has_shape_error
         && fn_name != "{closure}"
     {

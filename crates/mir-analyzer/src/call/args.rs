@@ -4,7 +4,7 @@ use php_ast::Span;
 
 use mir_codebase::storage::{FnParam, TemplateParam, Visibility};
 use mir_issues::{IssueKind, Severity};
-use mir_types::{Atomic, Name, Type};
+use mir_types::{ArrayKey, Atomic, Name, Type};
 
 use crate::expr::ExpressionAnalyzer;
 
@@ -32,6 +32,14 @@ pub struct CheckArgsParams<'a> {
     pub arg_can_be_byref: &'a [bool],
     pub call_span: Span,
     pub has_spread: bool,
+    /// True when the total argument count can't be trusted for a
+    /// TooFew/TooManyArguments check — normally identical to `has_spread`,
+    /// but a sole spread arg that [`expand_sole_spread_arg`] resolved into
+    /// concrete per-element bindings sets `has_spread` to `false` (so
+    /// `check_counts` processes every expanded element instead of stopping
+    /// after the first) while this stays `true`, preserving the existing
+    /// "don't flag arity through a spread" behavior.
+    pub arity_unknown: bool,
     pub template_params: &'a [TemplateParam],
     /// True when the function/method is tagged `@no-named-arguments`.
     pub no_named_arguments: bool,
@@ -104,6 +112,79 @@ pub fn spread_element_type(arr_ty: &Type) -> Type {
     } else {
         result
     }
+}
+
+/// When a call's sole argument is a spread (`f(...$arr)`) and `$arr` resolves
+/// to a literal, sequentially int-keyed (0..n-1), closed shape, return one
+/// type per element instead of the single merged [`spread_element_type`].
+///
+/// Without this, `needsTwoInts(...$pair)` binds the merged union of ALL of
+/// `$pair`'s element types to just the first parameter (via the existing
+/// "stop after the first arg once a spread is seen" arity logic) and never
+/// checks the remaining parameters at all — `$pair[1]` being definitely
+/// wrong-typed for `$b` went completely undetected.
+///
+/// Returns `None` (fall back to the single-merged-type behavior) for a
+/// dynamic-length array, an open shape, or a non-shape array type.
+pub fn expand_sole_spread_arg(arr_ty: &Type) -> Option<Vec<Type>> {
+    let mut per_index: Vec<Type> = Vec::new();
+    if arr_ty.types.is_empty() {
+        return None;
+    }
+    for atomic in &arr_ty.types {
+        // `is_list` is only set for the `list{...}` docblock spelling — a
+        // shape written as `array{0: int, 1: string}` describes the exact
+        // same sequential-int-key structure but parses with `is_list:
+        // false`, so don't require it; the explicit per-index key lookup
+        // below already enforces the sequential-key structure that matters.
+        let Atomic::TKeyedArray {
+            properties,
+            is_open: false,
+            ..
+        } = atomic
+        else {
+            return None;
+        };
+        if per_index.is_empty() {
+            for i in 0..properties.len() {
+                let prop = properties.get(&ArrayKey::Int(i as i64))?;
+                per_index.push(prop.ty.clone());
+            }
+        } else {
+            if properties.len() != per_index.len() {
+                return None;
+            }
+            for (i, slot) in per_index.iter_mut().enumerate() {
+                let prop = properties.get(&ArrayKey::Int(i as i64))?;
+                slot.merge_with(&prop.ty);
+            }
+        }
+    }
+    if per_index.is_empty() {
+        None
+    } else {
+        Some(per_index)
+    }
+}
+
+/// Synthesize one span per expanded element of a sole spread argument, since
+/// the source array has no per-element location of its own. Reusing the
+/// SAME span for every element would collide in the issue de-duplication key
+/// (kind + file + line + col_start — see `mir_issues::IssueBuffer::add`) and
+/// silently drop every diagnostic after the first mismatching element.
+/// Nudges `start` forward by up to `span.len() - 1` bytes per index so each
+/// element gets a distinct (if approximate) column within the same expression.
+pub fn distinct_spans_for_expansion(span: Span, count: usize) -> Vec<Span> {
+    let max_nudge = span.len().saturating_sub(1);
+    (0..count)
+        .map(|i| {
+            let start = span.start + (i as u32).min(max_nudge);
+            Span {
+                start,
+                end: span.end.max(start),
+            }
+        })
+        .collect()
 }
 
 fn substitute_static_in_type(
@@ -246,6 +327,7 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
         arg_can_be_byref,
         call_span,
         has_spread,
+        arity_unknown,
         template_params,
         no_named_arguments,
     } = p;
@@ -259,6 +341,7 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
         arg_names,
         call_span,
         has_spread,
+        arity_unknown,
         no_named_arguments,
     );
 

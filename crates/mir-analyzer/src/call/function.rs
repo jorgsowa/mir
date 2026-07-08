@@ -15,7 +15,8 @@ use crate::symbol::ReferenceKind;
 use crate::taint::{classify_sink, is_expr_tainted, SinkKind};
 
 use super::args::{
-    check_args, expr_can_be_passed_by_reference_owned, spread_element_type, CheckArgsParams,
+    check_args, distinct_spans_for_expansion, expand_sole_spread_arg,
+    expr_can_be_passed_by_reference_owned, spread_element_type, CheckArgsParams,
 };
 use super::callable::extract_callable_params;
 use super::CallAnalyzer;
@@ -88,27 +89,47 @@ impl CallAnalyzer {
 
                 // Collect arg types, spans, names and byref flags for type checking.
                 let mut inner_arg_types: Vec<Type> = Vec::with_capacity(call.args.len());
+                let mut sole_spread_ty: Option<Type> = None;
                 for arg in call.args.iter() {
                     let ty = ea.analyze(&arg.value, ctx);
                     super::consume_arg_assignment(&arg.value, ctx);
-                    inner_arg_types.push(if arg.unpack {
-                        spread_element_type(&ty)
+                    if arg.unpack {
+                        if call.args.len() == 1 {
+                            sole_spread_ty = Some(ty.clone());
+                        }
+                        inner_arg_types.push(spread_element_type(&ty));
                     } else {
-                        ty
-                    });
+                        inner_arg_types.push(ty);
+                    }
                 }
-                let inner_arg_spans: Vec<Span> = call.args.iter().map(|a| a.span).collect();
-                let inner_arg_names: Vec<Option<String>> = call
+                let mut inner_arg_spans: Vec<Span> = call.args.iter().map(|a| a.span).collect();
+                let mut inner_arg_names: Vec<Option<String>> = call
                     .args
                     .iter()
                     .map(|a| a.name.as_ref().map(crate::parser::name_to_string_owned))
                     .collect();
-                let inner_arg_byref: Vec<bool> = call
+                let mut inner_arg_byref: Vec<bool> = call
                     .args
                     .iter()
                     .map(|a| expr_can_be_passed_by_reference_owned(&a.value))
                     .collect();
-                let has_spread = call.args.iter().any(|a| a.unpack);
+                let mut has_spread = call.args.iter().any(|a| a.unpack);
+                let mut arity_unknown = has_spread;
+                // A sole spread arg over a literal, sequentially-keyed shape can be
+                // expanded into one binding per element so each parameter is checked
+                // individually instead of only the first (see expand_sole_spread_arg).
+                // `arity_unknown` stays true even after expansion — PHP allows
+                // extra/spread positional args, so a concretely-known count still
+                // shouldn't trigger TooFew/TooManyArguments.
+                if let Some(expanded) = sole_spread_ty.and_then(|t| expand_sole_spread_arg(&t)) {
+                    inner_arg_spans =
+                        distinct_spans_for_expansion(inner_arg_spans[0], expanded.len());
+                    inner_arg_names = vec![None; expanded.len()];
+                    inner_arg_byref = vec![false; expanded.len()];
+                    inner_arg_types = expanded;
+                    has_spread = false;
+                    arity_unknown = true;
+                }
 
                 if let Some((ref callee_fn_name, ref params)) = callee_params {
                     // Full type + arity checking via check_args.
@@ -123,6 +144,7 @@ impl CallAnalyzer {
                             arg_can_be_byref: &inner_arg_byref,
                             call_span: span,
                             has_spread,
+                            arity_unknown,
                             template_params: &[],
                             no_named_arguments: false,
                         },
@@ -285,17 +307,48 @@ impl CallAnalyzer {
             .with(|b| b.borrow_mut().take())
             .unwrap_or_default();
         arg_types.clear();
+        let mut sole_spread_ty: Option<Type> = None;
         for arg in call.args.iter() {
             let ty = ea.analyze(&arg.value, ctx);
             super::consume_arg_assignment(&arg.value, ctx);
-            arg_types.push(if arg.unpack {
-                spread_element_type(&ty)
+            if arg.unpack {
+                if call.args.len() == 1 {
+                    sole_spread_ty = Some(ty.clone());
+                }
+                arg_types.push(spread_element_type(&ty));
             } else {
-                ty
-            });
+                arg_types.push(ty);
+            }
         }
 
-        let arg_spans: Vec<Span> = call.args.iter().map(|a| a.span).collect();
+        let mut arg_spans: Vec<Span> = call.args.iter().map(|a| a.span).collect();
+        let mut arg_names: Vec<Option<String>> = call
+            .args
+            .iter()
+            .map(|a| a.name.as_ref().map(crate::parser::name_to_string_owned))
+            .collect();
+        let mut arg_can_be_byref: Vec<bool> = call
+            .args
+            .iter()
+            .map(|a| expr_can_be_passed_by_reference_owned(&a.value))
+            .collect();
+        let mut has_spread = call.args.iter().any(|a| a.unpack);
+        let mut arity_unknown = has_spread;
+        // A sole spread arg over a literal, sequentially-keyed shape can be
+        // expanded into one binding per element so each parameter (and
+        // template-binding inference below) is checked individually instead
+        // of only the first (see expand_sole_spread_arg). `arity_unknown`
+        // stays true even after expansion — PHP allows extra/spread
+        // positional args, so a concretely-known count still shouldn't
+        // trigger TooFew/TooManyArguments.
+        if let Some(expanded) = sole_spread_ty.and_then(|t| expand_sole_spread_arg(&t)) {
+            arg_spans = distinct_spans_for_expansion(arg_spans[0], expanded.len());
+            arg_names = vec![None; expanded.len()];
+            arg_can_be_byref = vec![false; expanded.len()];
+            arg_types = expanded;
+            has_spread = false;
+            arity_unknown = true;
+        }
 
         // When call_user_func / call_user_func_array is called with a bare string
         // literal as the callable argument, treat that string as a direct FQN
@@ -394,18 +447,11 @@ impl CallAnalyzer {
                     params: &params,
                     arg_types: &arg_types,
                     arg_spans: &arg_spans,
-                    arg_names: &call
-                        .args
-                        .iter()
-                        .map(|a| a.name.as_ref().map(crate::parser::name_to_string_owned))
-                        .collect::<Vec<_>>(),
-                    arg_can_be_byref: &call
-                        .args
-                        .iter()
-                        .map(|a| expr_can_be_passed_by_reference_owned(&a.value))
-                        .collect::<Vec<_>>(),
+                    arg_names: &arg_names,
+                    arg_can_be_byref: &arg_can_be_byref,
                     call_span: span,
-                    has_spread: call.args.iter().any(|a| a.unpack),
+                    has_spread,
+                    arity_unknown,
                     template_params: &template_params,
                     no_named_arguments,
                 },

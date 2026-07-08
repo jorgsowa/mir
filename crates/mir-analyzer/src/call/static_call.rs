@@ -15,8 +15,9 @@ use crate::flow_state::{self_is_trait, FlowState};
 use crate::symbol::ReferenceKind;
 
 use super::args::{
-    check_args, expr_can_be_passed_by_reference_owned, spread_element_type,
-    substitute_static_in_return, CheckArgsParams,
+    check_args, distinct_spans_for_expansion, expand_sole_spread_arg,
+    expr_can_be_passed_by_reference_owned, spread_element_type, substitute_static_in_return,
+    CheckArgsParams,
 };
 use super::method::resolve_method_from_db;
 use super::CallAnalyzer;
@@ -236,20 +237,24 @@ impl CallAnalyzer {
             super::premark_byref_arg_vars(&pre_resolved.params, &call.args, ctx);
         }
 
-        let arg_types: Vec<Type> = call
+        let mut sole_spread_ty: Option<Type> = None;
+        let mut arg_types: Vec<Type> = call
             .args
             .iter()
             .map(|arg| {
                 let ty = ea.analyze(&arg.value, ctx);
                 super::consume_arg_assignment(&arg.value, ctx);
                 if arg.unpack {
+                    if call.args.len() == 1 {
+                        sole_spread_ty = Some(ty.clone());
+                    }
                     spread_element_type(&ty)
                 } else {
                     ty
                 }
             })
             .collect();
-        let arg_spans: Vec<Span> = call.args.iter().map(|a| a.span).collect();
+        let mut arg_spans: Vec<Span> = call.args.iter().map(|a| a.span).collect();
 
         // Check if trying to call static method on an interface (not allowed)
         if crate::db::class_exists(ea.db, &fqcn) {
@@ -428,16 +433,36 @@ impl CallAnalyzer {
                     );
                 }
             }
-            let arg_names: Vec<Option<String>> = call
+            let mut arg_names: Vec<Option<String>> = call
                 .args
                 .iter()
                 .map(|a| a.name.as_ref().map(crate::parser::name_to_string_owned))
                 .collect();
-            let arg_can_be_byref: Vec<bool> = call
+            let mut arg_can_be_byref: Vec<bool> = call
                 .args
                 .iter()
                 .map(|a| expr_can_be_passed_by_reference_owned(&a.value))
                 .collect();
+            let mut has_spread = call.args.iter().any(|a| a.unpack);
+            let mut arity_unknown = has_spread;
+            // A sole spread arg over a literal, sequentially-keyed shape can be
+            // expanded into one binding per element so each parameter (and
+            // template-binding inference below) is checked individually instead
+            // of only the first (see expand_sole_spread_arg). `arity_unknown`
+            // stays true even after expansion — PHP allows extra/spread
+            // positional args, so a concretely-known count still shouldn't
+            // trigger TooFew/TooManyArguments.
+            if let Some(expanded) = sole_spread_ty
+                .take()
+                .and_then(|t| expand_sole_spread_arg(&t))
+            {
+                arg_spans = distinct_spans_for_expansion(arg_spans[0], expanded.len());
+                arg_names = vec![None; expanded.len()];
+                arg_can_be_byref = vec![false; expanded.len()];
+                arg_types = expanded;
+                has_spread = false;
+                arity_unknown = true;
+            }
             // `Foo::bar()` has no receiver value to carry type params, so the
             // seed is empty — class-level bindings come solely from `fqcn`'s
             // own `@extends`/`@implements` chain.
@@ -474,7 +499,8 @@ impl CallAnalyzer {
                     arg_names: &arg_names,
                     arg_can_be_byref: &arg_can_be_byref,
                     call_span: span,
-                    has_spread: call.args.iter().any(|a| a.unpack),
+                    has_spread,
+                    arity_unknown,
                     template_params: &resolved.template_params,
                     no_named_arguments: resolved.no_named_arguments,
                 },

@@ -186,26 +186,48 @@ impl<'a> ExpressionAnalyzer<'a> {
             .with(|b| b.borrow_mut().take())
             .unwrap_or_default();
         arg_types.clear();
+        let mut sole_spread_ty: Option<Type> = None;
         for a in n.args.iter() {
             let ty = self.analyze(&a.value, ctx);
             crate::call::consume_arg_assignment(&a.value, ctx);
-            arg_types.push(if a.unpack {
-                crate::call::spread_element_type(&ty)
+            if a.unpack {
+                if n.args.len() == 1 {
+                    sole_spread_ty = Some(ty.clone());
+                }
+                arg_types.push(crate::call::spread_element_type(&ty));
             } else {
-                ty
-            });
+                arg_types.push(ty);
+            }
         }
-        let arg_spans: Vec<php_ast::Span> = n.args.iter().map(|a| a.span).collect();
-        let arg_names: Vec<Option<String>> = n
+        let mut arg_spans: Vec<php_ast::Span> = n.args.iter().map(|a| a.span).collect();
+        let mut arg_names: Vec<Option<String>> = n
             .args
             .iter()
             .map(|a| a.name.as_ref().map(crate::parser::name_to_string_owned))
             .collect();
-        let arg_can_be_byref: Vec<bool> = n
+        let mut arg_can_be_byref: Vec<bool> = n
             .args
             .iter()
             .map(|a| expr_can_be_passed_by_reference_owned(&a.value))
             .collect();
+        let mut ctor_has_spread = n.args.iter().any(|a| a.unpack);
+        let mut ctor_arity_unknown = ctor_has_spread;
+        // A sole spread arg over a literal, sequentially-keyed shape can be
+        // expanded into one binding per element so each constructor
+        // parameter is checked individually instead of only the first (see
+        // expand_sole_spread_arg). `ctor_arity_unknown` stays true even
+        // after expansion — PHP allows extra/spread positional args, so a
+        // concretely-known count still shouldn't trigger
+        // TooFew/TooManyArguments.
+        if let Some(expanded) = sole_spread_ty.and_then(|t| crate::call::expand_sole_spread_arg(&t))
+        {
+            arg_spans = crate::call::distinct_spans_for_expansion(arg_spans[0], expanded.len());
+            arg_names = vec![None; expanded.len()];
+            arg_can_be_byref = vec![false; expanded.len()];
+            arg_types = expanded;
+            ctor_has_spread = false;
+            ctor_arity_unknown = true;
+        }
 
         // Generic type params inferred from constructor arguments, attached to
         // the resulting `TNamedObject` so member-access substitution works.
@@ -322,7 +344,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     arg_names: &arg_names,
                                     arg_can_be_byref: &arg_can_be_byref,
                                     call_span,
-                                    has_spread: n.args.iter().any(|a| a.unpack),
+                                    has_spread: ctor_has_spread,
+                                    arity_unknown: ctor_arity_unknown,
                                     template_params: ctor_templates,
                                     no_named_arguments: *ctor_no_named_args,
                                 },
