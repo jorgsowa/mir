@@ -586,6 +586,11 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/stmt/control_flow.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_catch/`.
     InvalidCatch { ty: String },
+    /// Emitted by `mir-analyzer/src/stmt/control_flow.rs` when a `catch` type is a
+    /// subtype of (or identical to) a type already caught by an earlier `catch`
+    /// clause on the same `try` — the later block can never run.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_catch/`.
+    UnreachableCatch { ty: String, shadowed_by: String },
     /// Emitted by `mir-analyzer/src/stmt/flow.rs`.
     /// Fixtures: `tests/fixtures/by-kind/missing_throws_docblock/`.
     MissingThrowsDocblock { class: String },
@@ -835,6 +840,7 @@ impl IssueKind {
             | IssueKind::IfThisIsMismatch { .. }
             | IssueKind::UnusedParam { .. }
             | IssueKind::UnreachableCode
+            | IssueKind::UnreachableCatch { .. }
             | IssueKind::UnusedMethod { .. }
             | IssueKind::UnusedProperty { .. }
             | IssueKind::UnusedFunction { .. }
@@ -1104,6 +1110,7 @@ impl IssueKind {
             // Other (1500-1599)
             IssueKind::InvalidThrow { .. } => "MIR1500",
             IssueKind::InvalidCatch { .. } => "MIR1503",
+            IssueKind::UnreachableCatch { .. } => "MIR1508",
             IssueKind::ImplicitToStringCast { .. } => "MIR1501",
             IssueKind::ImplicitFloatToIntCast { .. } => "MIR1502",
         }
@@ -1143,8 +1150,8 @@ impl IssueKind {
             | "MIR1011" | "MIR1100" | "MIR1101" | "MIR1102" | "MIR1103" | "MIR1104" | "MIR1105"
             | "MIR1200" | "MIR1201" | "MIR1202" | "MIR1203" | "MIR1204" | "MIR1206" | "MIR1208"
             | "MIR1209" | "MIR1210" | "MIR1211" | "MIR1212" | "MIR1504" | "MIR1505" | "MIR1507"
-            | "MIR1600" | "MIR1601" | "MIR0225" | "MIR0226" | "MIR0227" | "MIR0406" | "MIR0407"
-            | "MIR0902" => Some(Severity::Info),
+            | "MIR1508" | "MIR1600" | "MIR1601" | "MIR0225" | "MIR0226" | "MIR0227" | "MIR0406"
+            | "MIR0407" | "MIR0902" => Some(Severity::Info),
 
             _ => None,
         }
@@ -1285,6 +1292,7 @@ impl IssueKind {
             IssueKind::MissingPropertyType { .. } => "MissingPropertyType",
             IssueKind::InvalidThrow { .. } => "InvalidThrow",
             IssueKind::InvalidCatch { .. } => "InvalidCatch",
+            IssueKind::UnreachableCatch { .. } => "UnreachableCatch",
             IssueKind::MissingThrowsDocblock { .. } => "MissingThrowsDocblock",
             IssueKind::ImplicitToStringCast { .. } => "ImplicitToStringCast",
             IssueKind::ImplicitFloatToIntCast { .. } => "ImplicitFloatToIntCast",
@@ -1819,6 +1827,9 @@ impl IssueKind {
             }
             IssueKind::InvalidCatch { ty } => {
                 format!("Caught type '{ty}' does not extend Throwable")
+            }
+            IssueKind::UnreachableCatch { ty, shadowed_by } => {
+                format!("Catch block for '{ty}' is unreachable — already caught by '{shadowed_by}'")
             }
             IssueKind::MissingThrowsDocblock { class } => {
                 format!("Exception {class} is thrown but not declared in @throws")
@@ -2423,6 +2434,10 @@ mod code_tests {
             IssueKind::ParseError { message: s() },
             IssueKind::InvalidThrow { ty: s() },
             IssueKind::InvalidCatch { ty: s() },
+            IssueKind::UnreachableCatch {
+                ty: s(),
+                shadowed_by: s(),
+            },
             IssueKind::ImplicitToStringCast { class: s() },
             IssueKind::ImplicitFloatToIntCast { from: s() },
             IssueKind::WrongCaseFunction {
@@ -2542,6 +2557,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 148);
+        assert_eq!(one_of_each().len(), 149);
     }
 }

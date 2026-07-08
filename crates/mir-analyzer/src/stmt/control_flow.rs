@@ -705,6 +705,12 @@ impl<'a> StatementsAnalyzer<'a> {
         let catch_base = FlowState::merge_branches(&pre_ctx, try_ctx.clone(), None);
 
         let mut non_diverging_catches: Vec<FlowState> = vec![];
+        // Resolved types caught by any EARLIER catch clause on this try — used to
+        // detect a later clause that can never run because an earlier one already
+        // catches the same (or a broader) type. Accumulated after each clause
+        // finishes, not during, so a union catch type (`catch (A|B $e)`) doesn't
+        // shadow itself.
+        let mut seen_catch_types: Vec<Arc<str>> = Vec::new();
         for catch in tc.catches.iter() {
             let mut catch_ctx = catch_base.clone();
             // For dead-write tracking, the catch block starts from the pre-try state:
@@ -713,6 +719,7 @@ impl<'a> StatementsAnalyzer<'a> {
             // Inheriting try-body last_write_locs would cause false "dead write" reports
             // when a catch block re-assigns variables also written in the try body.
             catch_ctx.last_write_locs = pre_ctx.last_write_locs.clone();
+            let mut this_clause_types: Vec<Arc<str>> = Vec::new();
             for catch_ty in catch.types.iter() {
                 self.check_name_undefined_class(catch_ty);
                 if self.mode == crate::body_analysis::AnalysisMode::Full {
@@ -780,10 +787,36 @@ impl<'a> StatementsAnalyzer<'a> {
                                     },
                                 ));
                             }
+                            // A type identical to (or a subtype of) one already
+                            // caught by an earlier clause on this try can never
+                            // reach this clause — the earlier one always wins.
+                            if let Some(shadow) = seen_catch_types.iter().find(|prev| {
+                                resolved.eq_ignore_ascii_case(prev)
+                                    || crate::db::extends_or_implements(self.db, &resolved, prev)
+                            }) {
+                                let (line_end, col_end2) = self.offset_to_line_col(span.end);
+                                self.issues.add(Issue::new(
+                                    IssueKind::UnreachableCatch {
+                                        ty: resolved.clone(),
+                                        shadowed_by: shadow.to_string(),
+                                    },
+                                    Location {
+                                        file: self.file.clone(),
+                                        line,
+                                        line_end,
+                                        col_start,
+                                        col_end: crate::diagnostics::clamp_col_end(
+                                            line, line_end, col_start, col_end2,
+                                        ),
+                                    },
+                                ));
+                            }
+                            this_clause_types.push(Arc::from(resolved.as_str()));
                         }
                     }
                 }
             }
+            seen_catch_types.extend(this_clause_types);
             if let Some(var) = &catch.var {
                 let exc_ty = if catch.types.is_empty() {
                     Type::single(Atomic::TObject)
