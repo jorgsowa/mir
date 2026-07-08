@@ -1044,8 +1044,100 @@ pub(crate) fn narrow_instanceof_disjuncts(
     Some(vn)
 }
 
+/// Recognized single-argument type-check functions whose truthy narrowing
+/// `narrow_from_type_fn` implements. Matches its match arms (excluding
+/// `method_exists`/`property_exists`, which take two arguments and are
+/// unrelated to the single-variable-disjunct shape this supports).
+const NARROWING_TYPE_FNS: &[&str] = &[
+    "is_string",
+    "is_int",
+    "is_integer",
+    "is_long",
+    "is_float",
+    "is_double",
+    "is_real",
+    "is_bool",
+    "is_null",
+    "is_array",
+    "array_is_list",
+    "is_object",
+    "is_callable",
+    "is_scalar",
+    "is_iterable",
+    "is_countable",
+    "is_resource",
+    "is_numeric",
+];
+
+/// Extract `(fn_name, var_name)` from a single-argument type-check call
+/// (`is_int($x)`) recognized by [`NARROWING_TYPE_FNS`]. Returns `None` for
+/// anything else — a different function, more than one argument, or an
+/// argument that isn't a plain variable.
+fn extract_type_fn_check(expr: &php_ast::owned::Expr) -> Option<(&str, String)> {
+    let ExprKind::FunctionCall(call) = &expr.kind else {
+        return None;
+    };
+    let ExprKind::Identifier(name) = &call.name.kind else {
+        return None;
+    };
+    let bare = name.as_ref().trim_start_matches('\\');
+    let canonical = NARROWING_TYPE_FNS
+        .iter()
+        .find(|f| f.eq_ignore_ascii_case(bare))?;
+    if call.args.len() != 1 {
+        return None;
+    }
+    let var_name = extract_var_name(&call.args[0].value)?;
+    Some((canonical, var_name))
+}
+
+/// Narrow `$x` to the union of every `is_TYPE($x)` truthy-narrowing
+/// collected from `conditions`, when EVERY condition is a recognized
+/// single-argument type-check call on the SAME variable — the scalar-type
+/// counterpart to [`narrow_instanceof_disjuncts`], used for the same
+/// `match(true)`/`switch(true)` fallthrough shape (`is_int($x)`,
+/// `is_string($x)`, …) that instanceof-only narrowing doesn't cover.
+///
+/// Returns the narrowed variable name on success; `None` when the shape
+/// doesn't apply (mixed condition kinds, or checks on different variables) —
+/// the caller should fall back to narrowing each condition individually.
+pub(crate) fn narrow_type_fn_disjuncts(
+    conditions: &[&php_ast::owned::Expr],
+    ctx: &mut FlowState,
+) -> Option<String> {
+    if conditions.len() < 2 {
+        return None;
+    }
+    let mut var_name: Option<String> = None;
+    let mut fn_names: Vec<&str> = Vec::with_capacity(conditions.len());
+    for cond in conditions {
+        let (fn_name, vn) = extract_type_fn_check(cond)?;
+        match &var_name {
+            None => var_name = Some(vn),
+            Some(existing) if *existing == vn => {}
+            _ => return None, // different variable — bail out
+        }
+        fn_names.push(fn_name);
+    }
+    let vn = var_name?;
+    let original = ctx.get_var(&vn);
+    let mut union_ty = Type::empty();
+    for fn_name in &fn_names {
+        let mut scratch = ctx.branch();
+        scratch.set_var(&vn, original.clone());
+        narrow_from_type_fn(&mut scratch, fn_name, &vn, true);
+        union_ty.merge_with(&scratch.get_var(&vn));
+    }
+    if !union_ty.is_empty() {
+        ctx.set_var(&vn, union_ty);
+    }
+    Some(vn)
+}
+
 /// For `$x instanceof A || $x instanceof B` (true branch): narrow $x to A|B.
 /// Handles OR chains recursively, e.g. `$x instanceof A || $x instanceof B || $x instanceof C`.
+/// Also handles the scalar-type-check counterpart (`is_int($x) || is_string($x)`)
+/// via [`narrow_type_fn_disjuncts`] when the instanceof shape doesn't apply.
 fn narrow_or_instanceof_true(
     left: &php_ast::owned::Expr,
     right: &php_ast::owned::Expr,
@@ -1053,7 +1145,9 @@ fn narrow_or_instanceof_true(
     db: &dyn MirDatabase,
     file: &str,
 ) {
-    narrow_instanceof_disjuncts(&[left, right], ctx, db, file);
+    if narrow_instanceof_disjuncts(&[left, right], ctx, db, file).is_none() {
+        narrow_type_fn_disjuncts(&[left, right], ctx);
+    }
 }
 
 /// Apply short-circuit narrowing for isset() in || expressions (true branch).

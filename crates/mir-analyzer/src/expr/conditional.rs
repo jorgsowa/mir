@@ -204,14 +204,15 @@ impl<'a> ExpressionAnalyzer<'a> {
             // would AND-compose them and collapse to the last disjunct).
             if let Some(conditions) = &arm.conditions {
                 let refs: Vec<&php_ast::owned::Expr> = conditions.iter().collect();
-                if crate::narrowing::narrow_instanceof_disjuncts(
+                let narrowed = crate::narrowing::narrow_instanceof_disjuncts(
                     &refs,
                     &mut arm_ctx,
                     self.db,
                     &self.file,
                 )
-                .is_none()
-                {
+                .is_some()
+                    || crate::narrowing::narrow_type_fn_disjuncts(&refs, &mut arm_ctx).is_some();
+                if !narrowed {
                     for cond in conditions.iter() {
                         crate::narrowing::narrow_from_condition(
                             cond,
