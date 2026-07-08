@@ -2480,26 +2480,41 @@ fn narrow_isset_shape_key(var_expr: &php_ast::owned::Expr, ctx: &mut FlowState) 
                 properties,
                 is_open,
                 is_list,
-            } if properties.contains_key(&key) => {
-                let mut new_props = properties.clone();
-                if let Some(prop) = new_props.get_mut(&key) {
-                    let narrowed_ty = prop.ty.remove_null();
-                    if !narrowed_ty.is_empty() {
-                        prop.ty = narrowed_ty;
+            } => {
+                if properties.contains_key(&key) {
+                    let mut new_props = properties.clone();
+                    if let Some(prop) = new_props.get_mut(&key) {
+                        let narrowed_ty = prop.ty.remove_null();
+                        if !narrowed_ty.is_empty() {
+                            prop.ty = narrowed_ty;
+                        }
+                        prop.optional = false;
                     }
-                    prop.optional = false;
+                    changed = true;
+                    result.add_type(Atomic::TKeyedArray {
+                        properties: new_props,
+                        is_open: *is_open,
+                        is_list: *is_list,
+                    });
+                } else if *is_open {
+                    // An open shape might still carry the key at runtime —
+                    // keep it (unnarrowed) rather than dropping it.
+                    result.add_type(atomic.clone());
+                } else {
+                    // A closed shape without this key can never satisfy
+                    // isset() — this union member is impossible in the true
+                    // branch, so exclude it instead of leaving it to be
+                    // treated as if the key existed.
+                    changed = true;
                 }
-                changed = true;
-                result.add_type(Atomic::TKeyedArray {
-                    properties: new_props,
-                    is_open: *is_open,
-                    is_list: *is_list,
-                });
             }
             _ => result.add_type(atomic.clone()),
         }
     }
-    if changed {
+    // If every union member turned out to be an impossible closed shape, keep
+    // the original type rather than narrowing to an empty union — proving
+    // the branch itself unreachable is a separate concern from key narrowing.
+    if changed && !result.types.is_empty() {
         ctx.set_var(&base, result);
     }
 }
