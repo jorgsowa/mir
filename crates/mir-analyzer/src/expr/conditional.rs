@@ -440,6 +440,73 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
         }
 
+        // Case 3: Subject is entirely bool (TBool/TTrue/TFalse) — exhaustive
+        // only when both `true` and `false` arms are present, since bool has
+        // exactly two values. Excludes the `match(true)`/`match(false)`
+        // chained-condition idiom, where the subject is a single literal
+        // TTrue/TFalse constant and arms are arbitrary boolean expressions
+        // (not literal true/false values) — exhaustiveness there depends on
+        // the arms' condition coverage, which this function doesn't attempt
+        // to prove.
+        let is_match_true_idiom = subject_ty.types.len() == 1
+            && matches!(subject_ty.types[0], Atomic::TTrue | Atomic::TFalse);
+        if !is_match_true_idiom
+            && !subject_ty.types.is_empty()
+            && subject_ty
+                .types
+                .iter()
+                .all(|a| matches!(a, Atomic::TBool | Atomic::TTrue | Atomic::TFalse))
+        {
+            let conds: Vec<&Expr> = arms
+                .iter()
+                .filter_map(|a| a.conditions.as_deref())
+                .flatten()
+                .collect();
+            let has_true = conds.iter().any(|c| matches!(c.kind, ExprKind::Bool(true)));
+            let has_false = conds
+                .iter()
+                .any(|c| matches!(c.kind, ExprKind::Bool(false)));
+            if has_true && has_false {
+                return None;
+            }
+            let mut missing = Vec::new();
+            if !has_true {
+                missing.push("true");
+            }
+            if !has_false {
+                missing.push("false");
+            }
+            return Some(missing.join(", "));
+        }
+
+        // Case 4: Subject is an unconstrained scalar (plain int/string/float,
+        // not a finite literal union or enum) with no default arm. No finite
+        // set of literal arms can ever prove exhaustiveness here — PHP throws
+        // UnhandledMatchError for any value the arms don't happen to list.
+        // Cases 1/1b above already return early for a subject that IS a
+        // finite literal union, so reaching here with a scalar atom means at
+        // least one atom is genuinely unbounded.
+        if !subject_ty.types.is_empty()
+            && subject_ty.types.iter().all(|a| {
+                matches!(
+                    a,
+                    Atomic::TInt
+                        | Atomic::TPositiveInt
+                        | Atomic::TNonNegativeInt
+                        | Atomic::TNegativeInt
+                        | Atomic::TIntRange { .. }
+                        | Atomic::TString
+                        | Atomic::TNonEmptyString
+                        | Atomic::TNumericString
+                        | Atomic::TFloat
+                        | Atomic::TIntegralFloat
+                        | Atomic::TNumeric
+                )
+            })
+        {
+            return Some(format!("possibly-unmatched value of type '{subject_ty}'"));
+        }
+
         None
     }
 }

@@ -9,4 +9,5 @@ function foo(int $i) : void {
     };
 };
 ===expect===
+UnhandledMatchCondition@3:9-6:5: Unhandled match condition: possibly-unmatched value of type 'int'
 ParadoxicalCondition@5:8-5:9: Value 1 is duplicated; this branch can never be reached
