@@ -128,7 +128,16 @@ pub fn is_expr_tainted(expr: &Expr, ctx: &FlowState) -> bool {
                 || is_expr_tainted(&t.else_expr, ctx)
         }
 
-        ExprKind::Cast(_kind, inner) => is_expr_tainted(inner, ctx),
+        // Numeric/boolean casts sanitize: PHP coerces the value to that scalar
+        // type, so a subsequent SQL/shell/HTML sink can no longer receive
+        // arbitrary attacker-controlled text through it. String/array/object
+        // casts don't remove the payload, so taint still propagates.
+        ExprKind::Cast(kind, inner) => match kind {
+            php_ast::ast::CastKind::Int
+            | php_ast::ast::CastKind::Float
+            | php_ast::ast::CastKind::Bool => false,
+            _ => is_expr_tainted(inner, ctx),
+        },
 
         // Conservative: function call results are not tracked as tainted
         // unless it's a known pass-through built-in (htmlspecialchars sanitizes)
