@@ -47,7 +47,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                     );
                 }
                 match key_ty.types.as_slice() {
-                    [Atomic::TLiteralString(s)] => ArrayKey::String(s.clone()),
+                    // PHP canonicalizes a numeric string key ("0", "42", ...)
+                    // to an int key at runtime — without this, `['0' => 'x']`
+                    // and `$arr[0]` would be treated as different slots.
+                    [Atomic::TLiteralString(s)] => match super::helpers::canonical_int_array_key(s)
+                    {
+                        Some(i) => {
+                            next_int_key = i + 1;
+                            ArrayKey::Int(i)
+                        }
+                        None => ArrayKey::String(s.clone()),
+                    },
                     [Atomic::TLiteralInt(i)] => {
                         next_int_key = *i + 1;
                         ArrayKey::Int(*i)
@@ -249,9 +259,10 @@ impl<'a> ExpressionAnalyzer<'a> {
 
         let literal_key: Option<mir_types::atomic::ArrayKey> =
             aa.index.as_ref().and_then(|idx| match &idx.kind {
-                ExprKind::String(s) => {
-                    Some(mir_types::atomic::ArrayKey::String(Arc::from(s.as_ref())))
-                }
+                ExprKind::String(s) => Some(match super::helpers::canonical_int_array_key(s) {
+                    Some(i) => mir_types::atomic::ArrayKey::Int(i),
+                    None => mir_types::atomic::ArrayKey::String(Arc::from(s.as_ref())),
+                }),
                 ExprKind::Int(i) => Some(mir_types::atomic::ArrayKey::Int(*i)),
                 _ => None,
             });

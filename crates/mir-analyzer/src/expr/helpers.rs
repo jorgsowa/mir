@@ -5,6 +5,38 @@ use rustc_hash::FxHashSet;
 
 use crate::subtype::is_subtype;
 
+/// PHP canonicalizes a numeric string array key (e.g. `"0"`, `"42"`, `"-5"`)
+/// to an int key at runtime — `$arr['0']` and `$arr[0]` are the same slot.
+/// Returns the canonical int when `s` is such a string; `None` means `s`
+/// stays a string key (e.g. `"01"`, `"+1"`, `"-0"`, `"1.0"`, `""`).
+pub fn canonical_int_array_key(s: &str) -> Option<i64> {
+    let bytes = s.as_bytes();
+    if bytes.is_empty() {
+        return None;
+    }
+    let (neg, digits) = if bytes[0] == b'-' {
+        (true, &bytes[1..])
+    } else {
+        (false, bytes)
+    };
+    if digits.is_empty() || !digits.iter().all(u8::is_ascii_digit) {
+        return None;
+    }
+    // No leading zero unless the value is exactly "0"; PHP also treats "-0"
+    // as a non-canonical string key.
+    if digits.len() > 1 && digits[0] == b'0' {
+        return None;
+    }
+    if neg && digits == b"0" {
+        return None;
+    }
+    std::str::from_utf8(digits)
+        .ok()?
+        .parse::<i64>()
+        .ok()
+        .map(|v| if neg { -v } else { v })
+}
+
 pub fn widen_array_with_value_and_key(
     current: &Type,
     new_value: &Type,

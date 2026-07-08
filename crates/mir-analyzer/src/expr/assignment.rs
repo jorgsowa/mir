@@ -631,9 +631,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                             // in place instead of widening the whole shape.
                             let literal_key: Option<mir_types::ArrayKey> = if key_chain.len() == 1 {
                                 aa.index.as_ref().and_then(|idx| match &idx.kind {
-                                    ExprKind::String(s) => Some(mir_types::ArrayKey::String(
-                                        std::sync::Arc::from(s.as_ref()),
-                                    )),
+                                    ExprKind::String(s) => {
+                                        Some(match super::helpers::canonical_int_array_key(s) {
+                                            Some(i) => mir_types::ArrayKey::Int(i),
+                                            None => mir_types::ArrayKey::String(
+                                                std::sync::Arc::from(s.as_ref()),
+                                            ),
+                                        })
+                                    }
                                     ExprKind::Int(i) => Some(mir_types::ArrayKey::Int(*i)),
                                     _ => None,
                                 })
