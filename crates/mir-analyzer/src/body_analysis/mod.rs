@@ -663,6 +663,16 @@ mod docblock_hint_compat {
     }
 }
 
+/// Coarse PHP type family bits present in `ty` (see [`docblock_hint_compat`]).
+/// `0` means "nothing closed enough to reason about" (mixed/template/
+/// conditional/etc.) — callers must treat that as "unknown", not as
+/// "disjoint from everything".
+pub(crate) fn type_family_mask(ty: &mir_types::Type) -> u32 {
+    ty.types
+        .iter()
+        .fold(0, |acc, a| acc | docblock_hint_compat::fam(a))
+}
+
 /// When the stored return type came from a docblock that conflicts with the
 /// native return-type hint, resolve it against the hint for BODY STATEMENT
 /// CHECKING (e.g. `InvalidReturnType` on a `return` statement) instead of

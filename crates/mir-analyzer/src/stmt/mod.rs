@@ -179,6 +179,34 @@ impl<'a> StatementsAnalyzer<'a> {
         // Pre-narrow: `@var Type $varname` before any statement narrows that variable.
         if let Some(ref ann) = var_annotation {
             if let Some(ref name) = ann.name {
+                let current = ctx.get_var(name.as_str());
+                // `@var` is normally a legitimate widening/narrowing assertion
+                // (e.g. `Animal` -> `Dog`) that must stay silent — only flag it
+                // when the two types share NO possible overlap at all (e.g.
+                // `string` vs `int`), using coarse PHP type families so this
+                // never fires on object narrowing (both sides just map to the
+                // same OBJECT family bit) or on mixed/template/unknown types
+                // (family mask 0, treated as "nothing to compare").
+                let current_mask = crate::body_analysis::type_family_mask(&current);
+                let ann_mask = crate::body_analysis::type_family_mask(&ann.ty);
+                if current_mask != 0 && ann_mask != 0 && current_mask & ann_mask == 0 {
+                    let (line, line_end, col_start, col_end) = self.span_to_location(stmt.span);
+                    self.issues.add(Issue::new(
+                        IssueKind::DocblockTypeContradiction {
+                            expr: format!("@var {} ${name}", ann.ty),
+                            declared: current.to_string(),
+                        },
+                        Location {
+                            file: self.file.clone(),
+                            line,
+                            line_end,
+                            col_start,
+                            col_end: crate::diagnostics::clamp_col_end(
+                                line, line_end, col_start, col_end,
+                            ),
+                        },
+                    ));
+                }
                 ctx.set_var(name.as_str(), ann.ty.clone());
             }
         }
