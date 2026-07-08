@@ -814,7 +814,17 @@ impl<'a> StatementsAnalyzer<'a> {
         };
 
         if let Some(finally_stmts) = &tc.finally {
-            let mut finally_ctx = result.clone();
+            // `finally` runs no matter how control reaches it: the try body may
+            // have completed successfully (`result`), or an exception may have
+            // been thrown at ANY point in the try body and not yet reached a
+            // catch (`catch_base`, the same conservative state catch blocks
+            // themselves start from). Seed finally's view from the merge of
+            // both, not just the optimistic success path, so a variable
+            // reassigned only partway through the try body is correctly seen
+            // as still possibly holding its earlier value inside finally.
+            let finally_start =
+                FlowState::merge_branches(&pre_ctx, result.clone(), Some(catch_base.clone()));
+            let mut finally_ctx = finally_start;
             finally_ctx.inside_finally = true;
             // finally always executes regardless of whether try/catch diverged
             finally_ctx.diverges = false;
@@ -822,6 +832,16 @@ impl<'a> StatementsAnalyzer<'a> {
             if finally_ctx.diverges {
                 result.diverges = true;
             }
+            // finally executes last, so its own variable assignments are
+            // authoritative for code after the try statement — propagate them
+            // back onto `result`, which otherwise only reflects the pre-finally
+            // state.
+            result.vars = finally_ctx.vars.clone();
+            result.assigned_vars = finally_ctx.assigned_vars.clone();
+            result.possibly_assigned_vars = finally_ctx.possibly_assigned_vars.clone();
+            result.var_locations = finally_ctx.var_locations.clone();
+            result.has_dynamic_var_def =
+                result.has_dynamic_var_def || finally_ctx.has_dynamic_var_def;
             // Variables read in the finally block count as used — propagate reads back
             // so that the save-restore pattern (assign before try, restore in finally)
             // is not falsely flagged as UnusedVariable.
