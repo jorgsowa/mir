@@ -724,6 +724,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // intermediate indices are used to wrap the value type.
                 let outer_key: Option<Type> = aa.index.as_ref().map(|idx| self.analyze(idx, ctx));
                 let mut key_chain: Vec<Option<Type>> = vec![outer_key];
+                // Parallel chain of literal array keys (same order as key_chain),
+                // used to route a fully-literal nested write (`$arr['a']['b'] = $v`)
+                // through a precise per-property update instead of widening the
+                // whole outer shape.
+                let mut literal_key_chain: Vec<Option<mir_types::ArrayKey>> = vec![aa
+                    .index
+                    .as_ref()
+                    .and_then(|idx| super::helpers::literal_array_key_of_kind(&idx.kind))];
                 let mut base: &Expr = &aa.array;
                 loop {
                     match &base.kind {
@@ -817,14 +825,37 @@ impl<'a> ExpressionAnalyzer<'a> {
                                         span,
                                     );
                                 }
-                                let updated = match &key_chain.last().unwrap() {
-                                    None => widen_array_as_list(&current, &wrapped_value),
-                                    Some(_) => widen_array_with_value_and_key(
-                                        &current,
-                                        &wrapped_value,
-                                        &base_key,
-                                        literal_key.as_ref(),
-                                    ),
+                                // A fully-literal nested write (`$arr['a']['b'] = $v`)
+                                // can be routed through a precise per-property update
+                                // at every level instead of widening the whole outer
+                                // shape — try that first (innermost key first, i.e.
+                                // the reverse of the outermost-first chain), falling
+                                // back to the existing generic accumulator when the
+                                // path isn't fully literal or doesn't cleanly resolve.
+                                let nested_path: Option<Vec<mir_types::ArrayKey>> =
+                                    if key_chain.len() > 1 {
+                                        literal_key_chain
+                                            .iter()
+                                            .rev()
+                                            .cloned()
+                                            .collect::<Option<Vec<_>>>()
+                                    } else {
+                                        None
+                                    };
+                                let nested_update = nested_path.and_then(|path| {
+                                    super::helpers::set_nested_keyed_value(&current, &path, &ty)
+                                });
+                                let updated = match nested_update {
+                                    Some(updated) => updated,
+                                    None => match &key_chain.last().unwrap() {
+                                        None => widen_array_as_list(&current, &wrapped_value),
+                                        Some(_) => widen_array_with_value_and_key(
+                                            &current,
+                                            &wrapped_value,
+                                            &base_key,
+                                            literal_key.as_ref(),
+                                        ),
+                                    },
                                 };
                                 ctx.set_var(name_str, updated);
                             }
@@ -833,6 +864,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                         ExprKind::ArrayAccess(inner) => {
                             let inner_key: Option<Type> =
                                 inner.index.as_ref().map(|idx| self.analyze(idx, ctx));
+                            literal_key_chain.push(inner.index.as_ref().and_then(|idx| {
+                                super::helpers::literal_array_key_of_kind(&idx.kind)
+                            }));
                             key_chain.push(inner_key);
                             base = &inner.array;
                         }

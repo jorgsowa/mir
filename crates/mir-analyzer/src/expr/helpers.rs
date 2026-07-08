@@ -1,4 +1,4 @@
-use mir_types::{Atomic, Name, Type};
+use mir_types::{ArrayKey, Atomic, Name, Type};
 use php_ast::ast::BinaryOp;
 use php_ast::owned::{Expr, ExprKind};
 use rustc_hash::FxHashSet;
@@ -35,6 +35,79 @@ pub fn canonical_int_array_key(s: &str) -> Option<i64> {
         .parse::<i64>()
         .ok()
         .map(|v| if neg { -v } else { v })
+}
+
+/// Resolve an index expression to a literal array key, canonicalizing numeric
+/// string keys (`"0"` → `0`) the same way [`canonical_int_array_key`] does.
+/// Returns `None` for a dynamic (non-literal) index.
+pub fn literal_array_key_of_kind(kind: &ExprKind) -> Option<ArrayKey> {
+    match kind {
+        ExprKind::String(s) => Some(match canonical_int_array_key(s) {
+            Some(i) => ArrayKey::Int(i),
+            None => ArrayKey::String(std::sync::Arc::from(s.as_ref())),
+        }),
+        ExprKind::Int(i) => Some(ArrayKey::Int(*i)),
+        _ => None,
+    }
+}
+
+/// Update a nested shape write (`$arr['a']['b'] = $v`) by walking into the
+/// matching per-key property at each level instead of widening the whole
+/// outer shape into a generic array. `path` is ordered innermost-first (the
+/// key directly on `current`, then progressively outer keys) and `leaf_value`
+/// is the value being assigned at the final (outermost) key.
+///
+/// Returns `None` when the shape at any level doesn't cleanly resolve (an
+/// unknown key, a non-uniform union, a non-shape atom, …) so the caller can
+/// fall back to the existing generic accumulator.
+pub fn set_nested_keyed_value(
+    current: &Type,
+    path: &[ArrayKey],
+    leaf_value: &Type,
+) -> Option<Type> {
+    let (key, rest) = path.split_first()?;
+    if current.types.is_empty() {
+        return None;
+    }
+    let all_shapes_have_key = current.types.iter().all(
+        |a| matches!(a, Atomic::TKeyedArray { properties, .. } if properties.contains_key(key)),
+    );
+    if !all_shapes_have_key {
+        return None;
+    }
+    let mut result = Type::empty();
+    result.possibly_undefined = current.possibly_undefined;
+    result.from_docblock = current.from_docblock;
+    for atomic in &current.types {
+        let Atomic::TKeyedArray {
+            properties,
+            is_open,
+            is_list,
+        } = atomic
+        else {
+            unreachable!("filtered to TKeyedArray above")
+        };
+        let mut new_properties = properties.clone();
+        let existing = properties.get(key).expect("checked by all_shapes_have_key");
+        let new_inner = if rest.is_empty() {
+            leaf_value.clone()
+        } else {
+            set_nested_keyed_value(&existing.ty, rest, leaf_value)?
+        };
+        new_properties.insert(
+            key.clone(),
+            mir_types::atomic::KeyedProperty {
+                ty: new_inner,
+                optional: false,
+            },
+        );
+        result.add_type(Atomic::TKeyedArray {
+            properties: new_properties,
+            is_open: *is_open,
+            is_list: *is_list,
+        });
+    }
+    Some(result)
 }
 
 pub fn widen_array_with_value_and_key(
