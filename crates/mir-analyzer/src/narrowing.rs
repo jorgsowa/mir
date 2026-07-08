@@ -715,6 +715,12 @@ pub fn narrow_from_condition(
                         let current = ctx.get_var(&base);
                         ctx.set_var(&base, current.remove_null().remove_false());
                     }
+                    // For a single-level `isset($arr['key'])` on a shape-typed
+                    // base, also narrow that key's OWN value type: remove null
+                    // and mark it no longer optional, so a later `$arr['key']`
+                    // read inside the guard isn't reported as possibly-null (the
+                    // isset check just proved the key is present and non-null).
+                    narrow_isset_shape_key(var_expr, ctx);
                 }
             }
         }
@@ -2392,6 +2398,61 @@ fn array_access_base_var(expr: &php_ast::owned::Expr) -> Option<String> {
         ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),
         ExprKind::Parenthesized(inner) => array_access_base_var(inner),
         _ => None,
+    }
+}
+
+/// For a single-level `isset($base['key'])` where `$base` is (partly) a known
+/// shape, narrow that key's own property: remove `null` from its value type
+/// and mark it no longer optional. Multi-level access (`isset($a['b']['c'])`)
+/// and non-literal keys are left alone — not worth the added complexity here.
+fn narrow_isset_shape_key(var_expr: &php_ast::owned::Expr, ctx: &mut FlowState) {
+    let ExprKind::ArrayAccess(aa) = &var_expr.kind else {
+        return;
+    };
+    let Some(base) = extract_var_name(&aa.array) else {
+        return;
+    };
+    let Some(idx) = &aa.index else {
+        return;
+    };
+    let key = match &idx.kind {
+        ExprKind::String(s) => {
+            mir_types::atomic::ArrayKey::String(std::sync::Arc::from(s.as_ref()))
+        }
+        ExprKind::Int(i) => mir_types::atomic::ArrayKey::Int(*i),
+        _ => return,
+    };
+
+    let current = ctx.get_var(&base);
+    let mut changed = false;
+    let mut result = Type::empty();
+    for atomic in &current.types {
+        match atomic {
+            Atomic::TKeyedArray {
+                properties,
+                is_open,
+                is_list,
+            } if properties.contains_key(&key) => {
+                let mut new_props = properties.clone();
+                if let Some(prop) = new_props.get_mut(&key) {
+                    let narrowed_ty = prop.ty.remove_null();
+                    if !narrowed_ty.is_empty() {
+                        prop.ty = narrowed_ty;
+                    }
+                    prop.optional = false;
+                }
+                changed = true;
+                result.add_type(Atomic::TKeyedArray {
+                    properties: new_props,
+                    is_open: *is_open,
+                    is_list: *is_list,
+                });
+            }
+            _ => result.add_type(atomic.clone()),
+        }
+    }
+    if changed {
+        ctx.set_var(&base, result);
     }
 }
 
