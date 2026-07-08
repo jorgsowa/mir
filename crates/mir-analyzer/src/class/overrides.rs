@@ -347,72 +347,40 @@ impl<'a> ClassAnalyzer<'a> {
                 }
             }
 
-            // ---- d. Required param count must not increase -----------------
-            let parent_params = parent.params.clone();
+            // ---- d/d2/d3/e. Param-side checks against EVERY ancestor --------
+            // Like section c (return type), a param-side LSP violation must be
+            // caught against ANY ancestor that defines this method, not just
+            // the "primary" one — otherwise a class implementing two
+            // interfaces with conflicting param contracts is only checked
+            // against whichever interface happens to be listed first.
             let own_params = own.params.clone();
-            let parent_required = parent_params
-                .iter()
-                .filter(|p| !p.is_optional && !p.is_variadic)
-                .count();
-            let child_required = own_params
-                .iter()
-                .filter(|p| !p.is_optional && !p.is_variadic)
-                .count();
+            // Two ancestors (e.g. a trait and an interface implemented by the
+            // same class, both declaring that trait's method) commonly share
+            // byte-identical signatures — dedup by the STRUCTURAL shape of
+            // the violation (excluding which ancestor triggered it) so that
+            // case still reports once, using the first ancestor's wording
+            // (matching pre-existing fixtures), while genuinely differing
+            // per-ancestor contracts (the diamond this loop exists to catch)
+            // still each get their own diagnostic.
+            let mut seen_count_violation: HashSet<(usize, usize)> = HashSet::default();
+            let mut seen_fewer_params: HashSet<(usize, usize)> = HashSet::default();
+            let mut seen_byref_violation: HashSet<(usize, bool)> = HashSet::default();
+            let mut seen_narrowing: HashSet<(usize, String, String)> = HashSet::default();
+            for (anc_fqcn, anc_parent) in all_parent_methods.iter() {
+                let parent_params = anc_parent.params.clone();
 
-            if child_required > parent_required {
-                issues.push(
-                    Issue::new(
-                        IssueKind::MethodSignatureMismatch {
-                            class: fqcn.to_string(),
-                            method: method_name_lower.to_string(),
-                            detail: format!(
-                                "overriding method requires {child_required} argument(s) but parent requires {parent_required}"
-                            ),
-                        },
-                        loc.clone(),
-                    )
-                    .with_snippet(method_name_lower.to_string()),
-                );
-            }
+                // ---- d. Required param count must not increase -------------
+                let parent_required = parent_params
+                    .iter()
+                    .filter(|p| !p.is_optional && !p.is_variadic)
+                    .count();
+                let child_required = own_params
+                    .iter()
+                    .filter(|p| !p.is_optional && !p.is_variadic)
+                    .count();
 
-            // ---- d2. Child must not declare fewer parameters than parent -----
-            // A child accepting fewer positional params cannot handle every call
-            // the parent could (an LSP violation PHP rejects). A trailing
-            // variadic absorbs the extras, so it is exempt. Constructors are
-            // exempt from signature compatibility in PHP, and private parent
-            // methods are not real overrides.
-            if method_name_lower.as_ref() != "__construct"
-                && parent.visibility != Visibility::Private
-                && own_params.len() < parent_params.len()
-                && !own_params.iter().any(|p| p.is_variadic)
-            {
-                issues.push(
-                    Issue::new(
-                        IssueKind::MethodSignatureMismatch {
-                            class: fqcn.to_string(),
-                            method: method_name_lower.to_string(),
-                            detail: format!(
-                                "method has fewer parameters ({}) than parent {}::{}() ({})",
-                                own_params.len(),
-                                parent_fqcn,
-                                method_name_lower,
-                                parent_params.len()
-                            ),
-                        },
-                        loc.clone(),
-                    )
-                    .with_snippet(method_name_lower.to_string()),
-                );
-            }
-
-            // ---- d3. by-reference-ness of shared params must match -----------
-            // A parameter that is by-value in the parent but by-reference in the
-            // child (or vice versa) changes the calling contract — PHP rejects
-            // the override. Constructors are exempt.
-            if method_name_lower.as_ref() != "__construct" {
-                let shared = parent_params.len().min(own_params.len());
-                if let Some(i) =
-                    (0..shared).find(|&i| parent_params[i].is_byref != own_params[i].is_byref)
+                if child_required > parent_required
+                    && seen_count_violation.insert((child_required, parent_required))
                 {
                     issues.push(
                         Issue::new(
@@ -420,11 +388,7 @@ impl<'a> ClassAnalyzer<'a> {
                                 class: fqcn.to_string(),
                                 method: method_name_lower.to_string(),
                                 detail: format!(
-                                    "parameter ${} must {}be passed by reference to match parent {}::{}()",
-                                    own_params[i].name.as_ref().trim_start_matches('$'),
-                                    if parent_params[i].is_byref { "" } else { "not " },
-                                    parent_fqcn,
-                                    method_name_lower
+                                    "overriding method requires {child_required} argument(s) but parent requires {parent_required}"
                                 ),
                             },
                             loc.clone(),
@@ -432,88 +396,152 @@ impl<'a> ClassAnalyzer<'a> {
                         .with_snippet(method_name_lower.to_string()),
                     );
                 }
-            }
 
-            // ---- e. Param types must not be narrowed (contravariance) --------
-            // For each positional param present in both parent and child:
-            //   parent_param_type must be a subtype of child_param_type.
-            //   (Child may widen; it must not narrow.)
-            // Skip when:
-            //   - Either side has no type hint
-            //   - Either type is mixed
-            //   - Either type contains TSelf/TStaticObject (late-static semantics)
-            //   - Either type contains a template param
-            let shared_len = parent_params.len().min(own_params.len());
-            for i in 0..shared_len {
-                let parent_param = &parent_params[i];
-                let child_param = &own_params[i];
-
-                let (parent_ty_raw, child_ty_raw) = match (&parent_param.ty, &child_param.ty) {
-                    (Some(p), Some(c)) => (p, c),
-                    _ => continue,
-                };
-
-                // As with return types: substitute this class's own inherited bindings
-                // before giving up on a still-templated param type, so a concretely
-                // bound generic contract (`@extends Box<int>`) is still checked.
-                let parent_ty = parent_ty_raw.substitute_templates(&inherited_bindings);
-                let child_ty = child_ty_raw.substitute_templates(&inherited_bindings);
-                let parent_ty = &parent_ty;
-                let child_ty = &child_ty;
-
-                if parent_ty.is_mixed()
-                    || child_ty.is_mixed()
-                    || self.type_has_self_or_static(parent_ty)
-                    || self.type_has_self_or_static(child_ty)
-                    || self.return_type_has_template(parent_ty)
-                    || self.return_type_has_template(child_ty)
+                // ---- d2. Child must not declare fewer parameters than parent -
+                // A child accepting fewer positional params cannot handle every
+                // call the parent could (an LSP violation PHP rejects). A
+                // trailing variadic absorbs the extras, so it is exempt.
+                // Constructors are exempt from signature compatibility in PHP,
+                // and private parent methods are not real overrides.
+                if method_name_lower.as_ref() != "__construct"
+                    && anc_parent.visibility != Visibility::Private
+                    && own_params.len() < parent_params.len()
+                    && !own_params.iter().any(|p| p.is_variadic)
+                    && seen_fewer_params.insert((own_params.len(), parent_params.len()))
                 {
-                    continue;
+                    issues.push(
+                        Issue::new(
+                            IssueKind::MethodSignatureMismatch {
+                                class: fqcn.to_string(),
+                                method: method_name_lower.to_string(),
+                                detail: format!(
+                                    "method has fewer parameters ({}) than parent {}::{}() ({})",
+                                    own_params.len(),
+                                    anc_fqcn,
+                                    method_name_lower,
+                                    parent_params.len()
+                                ),
+                            },
+                            loc.clone(),
+                        )
+                        .with_snippet(method_name_lower.to_string()),
+                    );
                 }
 
-                // Object (or mixed object+scalar) params resolve narrowing through
-                // the codebase inheritance graph: a contravariance violation is when
-                // the parent type is NOT a subtype of the child type (the child
-                // accepts strictly fewer values than the parent contract). We only
-                // decide this when every named class involved is known to the
-                // codebase — an unknown class would make `is_subtype` falsely report
-                // narrowing. Pure-scalar params keep the structural check. (G4)
-                let involves_objects = Self::type_has_named_objects(parent_ty)
-                    || Self::type_has_named_objects(child_ty);
-                let narrowed = if involves_objects {
-                    // Parameter contravariance is a native-signature concept: PHP only
-                    // enforces it on declared type hints. A docblock `@param` that
-                    // narrows to subclasses (native hint unchanged) is an intentional
-                    // refinement, not an LSP violation — so only compare native hints.
-                    if !parent_ty.from_docblock
-                        && !child_ty.from_docblock
-                        && self.all_object_classes_known(parent_ty)
-                        && self.all_object_classes_known(child_ty)
+                // ---- d3. by-reference-ness of shared params must match ------
+                // A parameter that is by-value in the parent but by-reference
+                // in the child (or vice versa) changes the calling contract —
+                // PHP rejects the override. Constructors are exempt.
+                if method_name_lower.as_ref() != "__construct" {
+                    let shared = parent_params.len().min(own_params.len());
+                    if let Some(i) =
+                        (0..shared).find(|&i| parent_params[i].is_byref != own_params[i].is_byref)
                     {
-                        !crate::subtype::is_subtype(self.db, parent_ty, child_ty)
-                    } else {
-                        false
+                        if seen_byref_violation.insert((i, parent_params[i].is_byref)) {
+                            issues.push(
+                                Issue::new(
+                                    IssueKind::MethodSignatureMismatch {
+                                        class: fqcn.to_string(),
+                                        method: method_name_lower.to_string(),
+                                        detail: format!(
+                                            "parameter ${} must {}be passed by reference to match parent {}::{}()",
+                                            own_params[i].name.as_ref().trim_start_matches('$'),
+                                            if parent_params[i].is_byref { "" } else { "not " },
+                                            anc_fqcn,
+                                            method_name_lower
+                                        ),
+                                    },
+                                    loc.clone(),
+                                )
+                                .with_snippet(method_name_lower.to_string()),
+                            );
+                        }
                     }
-                } else {
-                    Self::scalar_param_type_narrowed(parent_ty, child_ty)
-                };
+                }
 
-                if narrowed {
-                    issues.push(
-                        Issue::new(
-                            IssueKind::MethodSignatureMismatch {
-                                class: fqcn.to_string(),
-                                method: method_name_lower.to_string(),
-                                detail: format!(
-                                    "parameter ${} type '{}' is narrower than parent type '{}'",
-                                    child_param.name, child_ty, parent_ty
-                                ),
-                            },
-                            loc.clone(),
-                        )
-                        .with_snippet(method_name_lower.to_string()),
-                    );
-                    break; // one issue per method is enough
+                // ---- e. Param types must not be narrowed (contravariance) ---
+                // For each positional param present in both parent and child:
+                //   parent_param_type must be a subtype of child_param_type.
+                //   (Child may widen; it must not narrow.)
+                // Skip when:
+                //   - Either side has no type hint
+                //   - Either type is mixed
+                //   - Either type contains TSelf/TStaticObject (late-static semantics)
+                //   - Either type contains a template param
+                let shared_len = parent_params.len().min(own_params.len());
+                for i in 0..shared_len {
+                    let parent_param = &parent_params[i];
+                    let child_param = &own_params[i];
+
+                    let (parent_ty_raw, child_ty_raw) = match (&parent_param.ty, &child_param.ty) {
+                        (Some(p), Some(c)) => (p, c),
+                        _ => continue,
+                    };
+
+                    // As with return types: substitute this class's own inherited bindings
+                    // before giving up on a still-templated param type, so a concretely
+                    // bound generic contract (`@extends Box<int>`) is still checked.
+                    let parent_ty = parent_ty_raw.substitute_templates(&inherited_bindings);
+                    let child_ty = child_ty_raw.substitute_templates(&inherited_bindings);
+                    let parent_ty = &parent_ty;
+                    let child_ty = &child_ty;
+
+                    if parent_ty.is_mixed()
+                        || child_ty.is_mixed()
+                        || self.type_has_self_or_static(parent_ty)
+                        || self.type_has_self_or_static(child_ty)
+                        || self.return_type_has_template(parent_ty)
+                        || self.return_type_has_template(child_ty)
+                    {
+                        continue;
+                    }
+
+                    // Object (or mixed object+scalar) params resolve narrowing through
+                    // the codebase inheritance graph: a contravariance violation is when
+                    // the parent type is NOT a subtype of the child type (the child
+                    // accepts strictly fewer values than the parent contract). We only
+                    // decide this when every named class involved is known to the
+                    // codebase — an unknown class would make `is_subtype` falsely report
+                    // narrowing. Pure-scalar params keep the structural check. (G4)
+                    let involves_objects = Self::type_has_named_objects(parent_ty)
+                        || Self::type_has_named_objects(child_ty);
+                    let narrowed = if involves_objects {
+                        // Parameter contravariance is a native-signature concept: PHP only
+                        // enforces it on declared type hints. A docblock `@param` that
+                        // narrows to subclasses (native hint unchanged) is an intentional
+                        // refinement, not an LSP violation — so only compare native hints.
+                        if !parent_ty.from_docblock
+                            && !child_ty.from_docblock
+                            && self.all_object_classes_known(parent_ty)
+                            && self.all_object_classes_known(child_ty)
+                        {
+                            !crate::subtype::is_subtype(self.db, parent_ty, child_ty)
+                        } else {
+                            false
+                        }
+                    } else {
+                        Self::scalar_param_type_narrowed(parent_ty, child_ty)
+                    };
+
+                    if narrowed {
+                        if seen_narrowing.insert((i, child_ty.to_string(), parent_ty.to_string())) {
+                            issues.push(
+                                Issue::new(
+                                    IssueKind::MethodSignatureMismatch {
+                                        class: fqcn.to_string(),
+                                        method: method_name_lower.to_string(),
+                                        detail: format!(
+                                            "parameter ${} type '{}' is narrower than parent type '{}'",
+                                            child_param.name, child_ty, parent_ty
+                                        ),
+                                    },
+                                    loc.clone(),
+                                )
+                                .with_snippet(method_name_lower.to_string()),
+                            );
+                        }
+                        break; // one issue per (method, ancestor) is enough
+                    }
                 }
             }
         }
