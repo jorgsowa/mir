@@ -11,7 +11,7 @@ use mir_types::{Atomic, Type};
 use php_ast::ast::{AssignOp, BinaryOp};
 use php_ast::owned::{AssignExpr, Expr, ExprKind};
 use php_ast::Span;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_assign(
@@ -331,7 +331,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                 } else if let Some(prop_name) = prop_name_opt {
                     for atomic in &obj_ty.types {
-                        if let Atomic::TNamedObject { fqcn, .. } = atomic {
+                        if let Atomic::TNamedObject { fqcn, type_params } = atomic {
                             // Check NoInterfaceProperties for sealed interfaces.
                             if let Some(crate::db::ClassLike::Interface(iface)) =
                                 crate::db::find_class_like(
@@ -418,7 +418,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     );
                                 }
                                 if let Some(prop_ty) = &prop_ty {
-                                    if !prop_ty.is_mixed() && !ty.is_mixed() {
+                                    // `is_mixed_not_template` (not `is_mixed`): a bare
+                                    // `@template T` property type reports `is_mixed() ==
+                                    // true` (unconstrained templates default to a `mixed`
+                                    // bound), which would skip this check for every generic
+                                    // property before its template arg is even considered.
+                                    if !prop_ty.is_mixed_not_template()
+                                        && !ty.is_mixed_not_template()
+                                    {
                                         // Collect all template param names in scope: class-level
                                         // (from the receiver's class) and method-level.
                                         let class_tp_names: FxHashSet<mir_types::Name> =
@@ -434,38 +441,74 @@ impl<'a> ExpressionAnalyzer<'a> {
                                                     .collect()
                                             })
                                             .unwrap_or_default();
-                                        // Skip the check if prop_ty or ty references any
-                                        // unresolvable template param (class-level or
-                                        // method-level). Inside a generic class, $this carries
-                                        // no concrete type args, so class templates in prop_ty
-                                        // can't be resolved, and method templates in ty are
-                                        // likewise unknown.
-                                        let skip = type_refs_any_template(prop_ty, &class_tp_names)
-                                            || type_refs_any_template(&ty, &class_tp_names)
-                                            || type_refs_any_template(
-                                                &ty,
-                                                &ctx.template_param_names,
-                                            );
+                                        // Resolve the property's declared type against the
+                                        // receiver's own concrete type args (e.g. `Box<int>`
+                                        // binds `T -> int`) before deciding whether to skip:
+                                        // a write through a receiver whose template args are
+                                        // statically known should still be checked, not
+                                        // unconditionally waved through just because the
+                                        // docblock type mentions a template name.
+                                        let class_tps = crate::db::effective_class_template_params(
+                                            self.db,
+                                            fqcn.as_ref(),
+                                        )
+                                        .map(|tps| tps.to_vec())
+                                        .unwrap_or_default();
+                                        let mut bindings = crate::generic::build_class_bindings(
+                                            &class_tps,
+                                            type_params,
+                                        );
+                                        for (k, v) in crate::db::inherited_template_bindings(
+                                            self.db,
+                                            fqcn.as_ref(),
+                                            &bindings,
+                                        ) {
+                                            bindings.entry(k).or_insert(v);
+                                        }
+                                        let resolved_prop_ty = if bindings.is_empty() {
+                                            prop_ty.clone()
+                                        } else {
+                                            prop_ty.substitute_templates(&bindings)
+                                        };
+                                        // Skip the check if the resolved prop_ty or ty still
+                                        // references any unresolvable template param
+                                        // (class-level or method-level). Inside a generic
+                                        // class, $this carries no concrete type args, so class
+                                        // templates in prop_ty can't be resolved there, and
+                                        // method templates in ty are likewise unknown.
+                                        let skip =
+                                            type_refs_any_template(
+                                                &resolved_prop_ty,
+                                                &class_tp_names,
+                                            ) || type_refs_any_template(&ty, &class_tp_names)
+                                                || type_refs_any_template(
+                                                    &ty,
+                                                    &ctx.template_param_names,
+                                                );
                                         // A docblock-only (`@var`) property
                                         // accepts null (implicit null default);
                                         // widen for the compatibility decision
                                         // only, keeping the declared type in the
                                         // emitted message.
                                         let compat_ty = if prop_has_native_type {
-                                            prop_ty.clone()
+                                            resolved_prop_ty.clone()
                                         } else {
-                                            let mut t = prop_ty.clone();
+                                            let mut t = resolved_prop_ty.clone();
                                             t.add_type(Atomic::TNull);
                                             t
                                         };
                                         if !skip
                                             && !property_assign_compatible(&ty, &compat_ty, self.db)
                                         {
-                                            if is_property_type_coercion(&ty, prop_ty, self.db) {
+                                            if is_property_type_coercion(
+                                                &ty,
+                                                &resolved_prop_ty,
+                                                self.db,
+                                            ) {
                                                 self.emit(
                                                     IssueKind::PropertyTypeCoercion {
                                                         property: prop_name.clone(),
-                                                        expected: format!("{prop_ty}"),
+                                                        expected: format!("{resolved_prop_ty}"),
                                                         actual: format!("{ty}"),
                                                     },
                                                     Severity::Info,
@@ -475,7 +518,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                                 self.emit(
                                                     IssueKind::InvalidPropertyAssignment {
                                                         property: prop_name.clone(),
-                                                        expected: format!("{prop_ty}"),
+                                                        expected: format!("{resolved_prop_ty}"),
                                                         actual: format!("{ty}"),
                                                     },
                                                     Severity::Warning,
@@ -545,7 +588,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                             {
                                 let prop_has_native_type = prop_def.has_native_type;
                                 if let Some(prop_ty) = prop_def.ty.as_deref() {
-                                    if !prop_ty.is_mixed() && !ty.is_mixed() {
+                                    if !prop_ty.is_mixed_not_template()
+                                        && !ty.is_mixed_not_template()
+                                    {
                                         let class_tp_names: FxHashSet<mir_types::Name> =
                                             crate::db::class_template_params(
                                                 self.db,
@@ -559,32 +604,54 @@ impl<'a> ExpressionAnalyzer<'a> {
                                                     .collect()
                                             })
                                             .unwrap_or_default();
-                                        let skip = type_refs_any_template(prop_ty, &class_tp_names)
-                                            || type_refs_any_template(&ty, &class_tp_names)
-                                            || type_refs_any_template(
-                                                &ty,
-                                                &ctx.template_param_names,
-                                            );
+                                        // A static access has no receiver instance to carry
+                                        // type args, but an `@extends Box<int>` clause on the
+                                        // accessed class itself still statically binds the
+                                        // declaring class's template param — resolve that
+                                        // before deciding whether to skip.
+                                        let bindings = crate::db::inherited_template_bindings(
+                                            self.db,
+                                            fqcn.as_ref(),
+                                            &FxHashMap::default(),
+                                        );
+                                        let resolved_prop_ty = if bindings.is_empty() {
+                                            prop_ty.clone()
+                                        } else {
+                                            prop_ty.substitute_templates(&bindings)
+                                        };
+                                        let skip =
+                                            type_refs_any_template(
+                                                &resolved_prop_ty,
+                                                &class_tp_names,
+                                            ) || type_refs_any_template(&ty, &class_tp_names)
+                                                || type_refs_any_template(
+                                                    &ty,
+                                                    &ctx.template_param_names,
+                                                );
                                         // A docblock-only (`@var`) property
                                         // accepts null (implicit null default);
                                         // widen for the compatibility decision
                                         // only, keeping the declared type in the
                                         // emitted message.
                                         let compat_ty = if prop_has_native_type {
-                                            prop_ty.clone()
+                                            resolved_prop_ty.clone()
                                         } else {
-                                            let mut t = prop_ty.clone();
+                                            let mut t = resolved_prop_ty.clone();
                                             t.add_type(Atomic::TNull);
                                             t
                                         };
                                         if !skip
                                             && !property_assign_compatible(&ty, &compat_ty, self.db)
                                         {
-                                            if is_property_type_coercion(&ty, prop_ty, self.db) {
+                                            if is_property_type_coercion(
+                                                &ty,
+                                                &resolved_prop_ty,
+                                                self.db,
+                                            ) {
                                                 self.emit(
                                                     IssueKind::PropertyTypeCoercion {
                                                         property: prop_name.clone(),
-                                                        expected: format!("{prop_ty}"),
+                                                        expected: format!("{resolved_prop_ty}"),
                                                         actual: format!("{ty}"),
                                                     },
                                                     Severity::Info,
@@ -594,7 +661,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                                 self.emit(
                                                     IssueKind::InvalidPropertyAssignment {
                                                         property: prop_name.clone(),
-                                                        expected: format!("{prop_ty}"),
+                                                        expected: format!("{resolved_prop_ty}"),
                                                         actual: format!("{ty}"),
                                                     },
                                                     Severity::Warning,
