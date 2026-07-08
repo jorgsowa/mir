@@ -240,7 +240,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         span,
                     );
                 }
-                let value_ty: Type = ty
+                let fallback_value_ty: Type = ty
                     .types
                     .iter()
                     .find_map(|a| match a {
@@ -251,8 +251,48 @@ impl<'a> ExpressionAnalyzer<'a> {
                         _ => None,
                     })
                     .unwrap_or_else(Type::mixed);
+                // Destructuring a shape-typed source (`['a' => $a] = $arr` or
+                // `[$a, $b] = $arr` against `array{0: int, 1: string}`) should
+                // resolve each target's type from the matching per-key
+                // property instead of always falling back to `mixed` — the
+                // fallback above only covers the plain `TArray`/`TList` shapes.
+                let mut next_int_key: i64 = 0;
                 for elem in elements.iter() {
-                    self.assign_to_target(&elem.value, value_ty.clone(), ctx, span);
+                    let key: Option<mir_types::atomic::ArrayKey> = match &elem.key {
+                        Some(k) => match &k.kind {
+                            ExprKind::String(s) => {
+                                Some(match super::helpers::canonical_int_array_key(s) {
+                                    Some(i) => mir_types::atomic::ArrayKey::Int(i),
+                                    None => mir_types::atomic::ArrayKey::String(
+                                        std::sync::Arc::from(s.as_ref()),
+                                    ),
+                                })
+                            }
+                            ExprKind::Int(i) => Some(mir_types::atomic::ArrayKey::Int(*i)),
+                            _ => None,
+                        },
+                        None => Some(mir_types::atomic::ArrayKey::Int(next_int_key)),
+                    };
+                    if elem.key.is_none() {
+                        next_int_key += 1;
+                    }
+                    let elem_ty = key
+                        .as_ref()
+                        .and_then(|k| {
+                            let mut result = Type::empty();
+                            let mut found_any = false;
+                            for atomic in &ty.types {
+                                if let Atomic::TKeyedArray { properties, .. } = atomic {
+                                    if let Some(prop) = properties.get(k) {
+                                        result.merge_with(&prop.ty);
+                                        found_any = true;
+                                    }
+                                }
+                            }
+                            found_any.then_some(result)
+                        })
+                        .unwrap_or_else(|| fallback_value_ty.clone());
+                    self.assign_to_target(&elem.value, elem_ty, ctx, span);
                 }
             }
             ExprKind::PropertyAccess(pa) => {

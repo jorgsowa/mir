@@ -19,4 +19,5 @@ class A {
     }
 }
 ===expect===
+InvalidPropertyAssignment@11:8-11:45: Property $a expects 'int', cannot assign '"a"'
 InvalidReturnType@13:8-13:24: Return type 'int' is not compatible with declared 'string'
