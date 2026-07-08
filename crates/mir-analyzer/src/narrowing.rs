@@ -1331,15 +1331,27 @@ fn narrow_instanceof_preserving_subtypes(
                     ]),
                 });
             }
+            // A `Closure(...): R`-typed atom (its own dedicated atomic, not a
+            // TNamedObject) genuinely IS an instance of `Closure` at runtime —
+            // keep it as-is rather than falling through to the catch-all drop,
+            // which would make `$x instanceof Closure` on a `Closure(): T`-typed
+            // value look provably impossible.
+            Atomic::TClosure { .. } if class_name.eq_ignore_ascii_case("Closure") => {
+                result.add_type(atomic.clone());
+            }
             _ => {}
         }
     }
 
-    if result.is_empty() {
-        Type::single(narrowed_ty)
-    } else {
-        result
-    }
+    // Unlike the early-return above (truly unconstrained `mixed`/empty `current`),
+    // reaching here with an empty `result` means `current` had at least one real
+    // atom and NONE of them survived narrowing — every atom was proven
+    // incompatible with `class_name` (e.g. two unrelated `final` classes).
+    // Propagate the emptiness instead of resetting to a bare `narrowed_ty`, so
+    // the caller's `mark_diverges` can correctly flag the branch as unreachable
+    // instead of silently treating a provably-impossible instanceof as if
+    // nothing were known about the value.
+    result
 }
 
 /// Like [`narrow_instanceof_preserving_subtypes`], but for an OR-chain of
