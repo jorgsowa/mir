@@ -161,6 +161,7 @@ pub fn narrow_from_condition(
                         file,
                     ) {
                         narrow_var_to_literal_enum_case(
+                            db,
                             ctx,
                             &var_name,
                             &enum_fqcn,
@@ -179,6 +180,7 @@ pub fn narrow_from_condition(
                         file,
                     ) {
                         narrow_var_to_literal_enum_case(
+                            db,
                             ctx,
                             &var_name,
                             &enum_fqcn,
@@ -201,6 +203,7 @@ pub fn narrow_from_condition(
                         file,
                     ) {
                         narrow_var_to_literal_enum_case(
+                            db,
                             ctx,
                             &var_name,
                             &enum_fqcn,
@@ -229,6 +232,7 @@ pub fn narrow_from_condition(
                         file,
                     ) {
                         narrow_var_to_literal_enum_case(
+                            db,
                             ctx,
                             &var_name,
                             &enum_fqcn,
@@ -2252,7 +2256,47 @@ fn narrow_var_literal_int(ctx: &mut FlowState, name: &str, value: i64, is_value:
     set_narrowed(ctx, name, &current, narrowed, mark_diverges);
 }
 
+/// If `ty` contains an atomic referring to the WHOLE enum `enum_fqcn` (a
+/// plain `TNamedObject` — e.g. a `Status $s` parameter that was never
+/// narrowed to individual cases), replace that atomic with a union of
+/// `TLiteralEnumCase` for every case the enum declares. Atoms that already
+/// are per-case literals, or refer to something else entirely, pass through
+/// unchanged. Falls back to `ty` unchanged if the enum can't be resolved or
+/// nothing needed expanding.
+fn expand_enum_to_cases(db: &dyn MirDatabase, ty: &Type, enum_fqcn: &str) -> Type {
+    if !ty
+        .types
+        .iter()
+        .any(|a| matches!(a, Atomic::TNamedObject { fqcn, .. } if fqcn.as_ref() == enum_fqcn))
+    {
+        return ty.clone();
+    }
+    let Some(crate::db::ClassLike::Enum(e)) =
+        crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, enum_fqcn))
+    else {
+        return ty.clone();
+    };
+    let mut result = Type::empty();
+    result.possibly_undefined = ty.possibly_undefined;
+    result.from_docblock = ty.from_docblock;
+    for atomic in &ty.types {
+        match atomic {
+            Atomic::TNamedObject { fqcn, .. } if fqcn.as_ref() == enum_fqcn => {
+                for case_name in e.cases.keys() {
+                    result.add_type(Atomic::TLiteralEnumCase {
+                        enum_fqcn: enum_fqcn.into(),
+                        case_name: case_name.as_ref().into(),
+                    });
+                }
+            }
+            other => result.add_type(other.clone()),
+        }
+    }
+    result
+}
+
 fn narrow_var_to_literal_enum_case(
+    db: &dyn MirDatabase,
     ctx: &mut FlowState,
     name: &str,
     enum_fqcn: &str,
@@ -2266,8 +2310,12 @@ fn narrow_var_to_literal_enum_case(
             case_name: case_name.into(),
         })
     } else {
-        // For !== comparison with enum case, remove that specific case from the union.
-        current.filter(|t| {
+        // For !== comparison with enum case, remove that specific case from
+        // the union. `current` may not already be decomposed into per-case
+        // TLiteralEnumCase atoms (e.g. a plain `Status $s` parameter typed
+        // as the whole enum) — expand it first, or the filter below matches
+        // nothing and the exclusion silently does nothing.
+        expand_enum_to_cases(db, &current, enum_fqcn).filter(|t| {
             !matches!(t, Atomic::TLiteralEnumCase { enum_fqcn: fqcn, case_name: c }
                 if fqcn.as_ref() == enum_fqcn && c.as_ref() == case_name)
         })
