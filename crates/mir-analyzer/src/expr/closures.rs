@@ -308,6 +308,17 @@ impl<'a> ExpressionAnalyzer<'a> {
         // See analyze_closure: propagate the enclosing scope's template params
         // so captured template-typed variables aren't misjudged as concrete.
         arrow_ctx.template_param_names = Arc::clone(&ctx.template_param_names);
+        // See analyze_closure: an arrow function invoked from inside a
+        // @pure/@psalm-immutable/@psalm-external-mutation-free body can still
+        // smuggle out a side effect through an implicitly-captured variable —
+        // `fn() => impure_fn()` or a tainted value flowing into a sink must be
+        // checked the same way the equivalent `function(){...}` closure is.
+        arrow_ctx.is_in_pure_fn = ctx.is_in_pure_fn;
+        arrow_ctx.is_in_immutable_method = ctx.is_in_immutable_method;
+        arrow_ctx.is_in_external_mutation_free_method = ctx.is_in_external_mutation_free_method;
+        // Arrow functions auto-capture every outer variable by value (no
+        // explicit `use()` list), so taint on any of them must carry over too.
+        arrow_ctx.tainted_vars = ctx.tainted_vars.clone();
         let this_sym = mir_types::Name::from("this");
         for (name, ty) in ctx.vars.iter() {
             // Static arrow functions don't capture $this from the outer scope.
@@ -318,6 +329,21 @@ impl<'a> ExpressionAnalyzer<'a> {
                 std::sync::Arc::make_mut(&mut arrow_ctx.vars).insert(*name, ty.clone());
                 std::sync::Arc::make_mut(&mut arrow_ctx.assigned_vars).insert(*name);
             }
+        }
+        // See analyze_closure: a captured (by-value) outer parameter is still
+        // externally owned by the caller, so mutating it via method call
+        // inside the arrow body is an observable side effect just like a real
+        // parameter — extend param_names so the existing pure/immutable/
+        // external-mutation-free checks (which key off that set) catch it.
+        // Every outer var is auto-captured, so union the whole set rather
+        // than filtering by an explicit use() list.
+        if arrow_ctx.is_in_pure_fn
+            || arrow_ctx.is_in_immutable_method
+            || arrow_ctx.is_in_external_mutation_free_method
+        {
+            let mut extended_param_names = (*arrow_ctx.param_names).clone();
+            extended_param_names.extend(ctx.param_names.iter().copied());
+            arrow_ctx.param_names = Arc::new(extended_param_names);
         }
 
         for p in af.params.iter() {
