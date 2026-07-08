@@ -562,7 +562,10 @@ impl<'a> StatementsAnalyzer<'a> {
         ctx: &mut crate::flow_state::FlowState,
     ) {
         for sv in vars.iter() {
-            let ty = Type::mixed(); // static vars are indeterminate on entry
+            let ty = match &sv.default {
+                Some(default) => self.expr_analyzer(ctx).analyze(default, ctx),
+                None => Type::mixed(), // static vars are indeterminate on entry
+            };
             let name_str = sv.name.as_deref().unwrap_or("").to_string();
             let name = name_str.trim_start_matches('$');
             // Purity check: using a static variable in a @pure function.
