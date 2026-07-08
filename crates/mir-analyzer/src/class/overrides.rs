@@ -467,7 +467,7 @@ impl<'a> ClassAnalyzer<'a> {
                     crate::db::find_property_in_class(self.db, anc_here, prop_name.as_ref())
                         .map(|p| (anc.clone(), p))
                 });
-            let Some((_parent_fqcn, parent_prop)) = parent_prop else {
+            let Some((parent_fqcn, parent_prop)) = parent_prop else {
                 continue;
             };
             // Only enforce visibility rules against real PHP properties.
@@ -487,6 +487,34 @@ impl<'a> ClassAnalyzer<'a> {
                     IssueKind::OverriddenPropertyAccess {
                         class: fqcn.to_string(),
                         property: prop_name.to_string(),
+                    },
+                    loc,
+                );
+                if let Some(snippet) = extract_snippet(own_prop.location.as_ref(), &self.sources) {
+                    issue = issue.with_snippet(snippet);
+                }
+                issues.push(issue);
+            }
+            // PHP fatal-errors when a redeclared property flips native `readonly`-ness in
+            // either direction. Only real PHP properties carry this contract — `@readonly`
+            // is advisory and not runtime-enforced, so skip docblock-only entries.
+            if !own_prop.from_docblock
+                && !parent_prop.from_docblock
+                && own_prop.has_native_readonly != parent_prop.has_native_readonly
+            {
+                let loc = issue_location(
+                    own_prop.location.as_ref(),
+                    own_prop
+                        .location
+                        .as_ref()
+                        .and_then(|l| self.sources.get(&l.file).copied()),
+                );
+                let mut issue = Issue::new(
+                    IssueKind::ReadonlyPropertyRedeclarationMismatch {
+                        parent_class: parent_fqcn.to_string(),
+                        class: fqcn.to_string(),
+                        property: prop_name.to_string(),
+                        parent_readonly: parent_prop.has_native_readonly,
                     },
                     loc,
                 );
