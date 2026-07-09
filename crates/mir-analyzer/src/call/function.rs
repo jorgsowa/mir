@@ -644,7 +644,23 @@ impl CallAnalyzer {
                         return_ty
                     }
                 }
-                "intdiv" => super::callable::intdiv_return_type(&arg_types).unwrap_or(return_ty),
+                "intdiv" => {
+                    // intdiv() throws the exact same DivisionByZeroError as `$a / 0` for
+                    // a literal-zero divisor — report it the same way BinaryOp::Div does,
+                    // rather than only narrowing the return type.
+                    if let Some(divisor_ty) = arg_types.get(1) {
+                        if crate::expr::operand_is_definitely_zero(divisor_ty) {
+                            ea.emit(
+                                IssueKind::DivisionByZero {
+                                    op: "intdiv".to_string(),
+                                },
+                                Severity::Error,
+                                arg_spans.get(1).copied().unwrap_or(span),
+                            );
+                        }
+                    }
+                    super::callable::intdiv_return_type(&arg_types).unwrap_or(return_ty)
+                }
                 "min" => super::callable::min_return_type(&arg_types).unwrap_or(return_ty),
                 "max" => super::callable::max_return_type(&arg_types).unwrap_or(return_ty),
                 "rand" | "mt_rand" | "random_int" => {

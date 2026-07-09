@@ -451,7 +451,7 @@ pub(super) fn operand_contains_null(ty: &Type) -> bool {
 /// the union reduces to zero, not just some of them. Used to catch an
 /// unconditional division-by-zero, as opposed to `operand_contains_null`'s
 /// weaker "might be" check.
-fn operand_is_definitely_zero(ty: &Type) -> bool {
+pub(crate) fn operand_is_definitely_zero(ty: &Type) -> bool {
     !ty.types.is_empty()
         && ty
             .types
