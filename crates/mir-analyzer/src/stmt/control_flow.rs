@@ -8,7 +8,7 @@ use mir_issues::{Issue, IssueKind, Location};
 use mir_types::{Atomic, Name, Type};
 
 use crate::db;
-use crate::expr::{extract_destructure_vars, extract_simple_var};
+use crate::expr::extract_simple_var;
 use crate::flow_state::FlowState;
 use crate::narrowing::narrow_from_condition;
 use crate::parser;
@@ -351,7 +351,6 @@ impl<'a> StatementsAnalyzer<'a> {
             }
         }
         let value_var = extract_simple_var(&fe.value);
-        let value_destructure_vars = extract_destructure_vars(&fe.value);
         // The PHP parser silently discards the `&` in `foreach ($arr as &$val)`.
         // Detect it by checking whether the source character immediately preceding
         // the value span (skipping whitespace) is `&`. Reference iteration writes
@@ -400,9 +399,12 @@ impl<'a> StatementsAnalyzer<'a> {
                 );
             }
         } else {
-            for vname in &value_destructure_vars {
-                entry.set_var(vname, Type::mixed());
-            }
+            self.expr_analyzer(&entry).assign_to_target(
+                &fe.value,
+                value_ty.clone(),
+                &mut entry,
+                fe.value.span,
+            );
         }
 
         let loop_guaranteed = super::loops::loop_guaranteed_to_execute(&arr_ty);
@@ -418,9 +420,12 @@ impl<'a> StatementsAnalyzer<'a> {
                 if let Some(ref vname) = value_var {
                     iter.set_var(vname.as_str(), value_ty.clone());
                 } else {
-                    for vname in &value_destructure_vars {
-                        iter.set_var(vname, Type::mixed());
-                    }
+                    sa.expr_analyzer(iter).assign_to_target(
+                        &fe.value,
+                        value_ty.clone(),
+                        iter,
+                        fe.value.span,
+                    );
                 }
                 sa.analyze_stmt(&fe.body, iter);
             },

@@ -27,10 +27,7 @@ mod variables;
 
 pub(crate) use binary::operand_is_definitely_zero;
 #[allow(unused_imports)]
-pub use helpers::{
-    duplicate_literal_conditions, extract_destructure_vars, extract_simple_var, infer_arithmetic,
-    infer_div,
-};
+pub use helpers::{duplicate_literal_conditions, extract_simple_var, infer_arithmetic, infer_div};
 
 // ---------------------------------------------------------------------------
 // ExpressionAnalyzer

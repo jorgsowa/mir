@@ -590,26 +590,6 @@ pub fn extract_simple_var(expr: &Expr) -> Option<String> {
     }
 }
 
-pub fn extract_destructure_vars(expr: &Expr) -> Vec<String> {
-    match &expr.kind {
-        ExprKind::Array(elements) => {
-            let mut vars = vec![];
-            for elem in elements.iter() {
-                let sub = extract_destructure_vars(&elem.value);
-                if sub.is_empty() {
-                    if let Some(v) = extract_simple_var(&elem.value) {
-                        vars.push(v);
-                    }
-                } else {
-                    vars.extend(sub);
-                }
-            }
-            vars
-        }
-        _ => vec![],
-    }
-}
-
 pub(crate) fn ast_params_to_fn_params_resolved(
     params: &[php_ast::owned::Param],
     self_fqcn: Option<&str>,

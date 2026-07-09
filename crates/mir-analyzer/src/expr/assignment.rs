@@ -193,7 +193,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
     }
 
-    pub(super) fn assign_to_target(
+    pub(crate) fn assign_to_target(
         &mut self,
         target: &Expr,
         ty: Type,
