@@ -227,6 +227,7 @@ impl<'a> StatementsAnalyzer<'a> {
             },
             is_infinite,
             is_infinite,
+            Some(&w.condition),
         );
         *ctx = post;
     }
@@ -245,6 +246,7 @@ impl<'a> StatementsAnalyzer<'a> {
             },
             true,
             false,
+            Some(&dw.condition),
         );
         // Since the body always executes at least once, variables introduced
         // inside the body are definitely defined after the loop. Strip any
@@ -318,6 +320,7 @@ impl<'a> StatementsAnalyzer<'a> {
             },
             is_infinite,
             is_infinite,
+            f.condition.last(),
         );
         *ctx = post;
     }
@@ -431,6 +434,7 @@ impl<'a> StatementsAnalyzer<'a> {
             },
             loop_guaranteed,
             false,
+            None,
         );
         *ctx = post;
     }

@@ -594,6 +594,7 @@ impl<'a> StatementsAnalyzer<'a> {
         mut body: F,
         loop_guaranteed: bool,
         is_infinite: bool,
+        exit_condition: Option<&Expr>,
     ) -> FlowState
     where
         F: FnMut(&mut Self, &mut FlowState),
@@ -653,6 +654,14 @@ impl<'a> StatementsAnalyzer<'a> {
         // before every break are treated as definitely-assigned after the loop.
         if is_infinite {
             current.diverges = true;
+        } else if let Some(cond) = exit_condition {
+            // A non-break exit from a finite loop can only happen when the loop's
+            // own condition evaluates false — apply that negated narrowing to
+            // `current` (the "ran zero-or-more times, then condition failed" path)
+            // BEFORE merging in the break contexts below, since a `break` exits
+            // while the condition was still true (or mid-body) and must not be
+            // narrowed by it.
+            crate::narrowing::narrow_from_condition(cond, &mut current, false, self.db, &self.file);
         }
 
         // Pop break contexts and merge them into the post-loop result
