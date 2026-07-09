@@ -230,6 +230,23 @@ pub fn narrow_from_condition(
                         }
                     }
                 }
+                // `get_class($x) === Foo::class` — the far more idiomatic
+                // counterpart of the `get_class($x) === 'Foo'` string-literal
+                // case above; only reached once extract_var_name on the left
+                // fails (i.e. the left side is the get_class(...) call itself).
+                else if let Some(obj_var_name) = extract_get_class_arg(&b.left) {
+                    if let ExprKind::ClassConstAccess(cca) = &b.right.kind {
+                        if let Some(fqcn) = extract_class_const_fqcn(
+                            cca,
+                            ctx.self_fqcn.as_deref(),
+                            ctx.parent_fqcn.as_deref(),
+                            db,
+                            file,
+                        ) {
+                            narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true);
+                        }
+                    }
+                }
             } else if let ExprKind::ClassConstAccess(_) = &b.left.kind {
                 if let Some(var_name) = extract_var_name(&b.right) {
                     if let Some((enum_fqcn, case_name)) = extract_enum_case(
@@ -256,6 +273,20 @@ pub fn narrow_from_condition(
                             file,
                         ) {
                             narrow_var_to_class_string(ctx, &var_name, &fqcn, effective_true);
+                        }
+                    }
+                }
+                // `Foo::class === get_class($x)` — symmetric counterpart.
+                else if let Some(obj_var_name) = extract_get_class_arg(&b.right) {
+                    if let ExprKind::ClassConstAccess(cca) = &b.left.kind {
+                        if let Some(fqcn) = extract_class_const_fqcn(
+                            cca,
+                            ctx.self_fqcn.as_deref(),
+                            ctx.parent_fqcn.as_deref(),
+                            db,
+                            file,
+                        ) {
+                            narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true);
                         }
                     }
                 }
