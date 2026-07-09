@@ -52,6 +52,8 @@ impl DefinitionCollector<'_> {
         let mut cases = indexmap::IndexMap::new();
         let mut own_methods = indexmap::IndexMap::new();
         let mut own_constants = indexmap::IndexMap::new();
+        let mut traits: Vec<Arc<str>> = Vec::new();
+        let mut trait_use_locations: Vec<(Arc<str>, mir_types::Location)> = Vec::new();
 
         // See `class.rs` for why this runs before the loop: it lets
         // `int-mask-of<self::*>` in a method docblock below resolve against
@@ -184,7 +186,15 @@ impl DefinitionCollector<'_> {
                         },
                     );
                 }
-                EnumMemberKind::TraitUse(_) => {}
+                EnumMemberKind::TraitUse(tu) => {
+                    for t in tu.traits.iter() {
+                        let trait_fqcn: Arc<str> =
+                            self.resolve_name(&name_to_string_owned(t)).into();
+                        trait_use_locations
+                            .push((trait_fqcn.clone(), self.location(t.span.start, t.span.end)));
+                        traits.push(trait_fqcn);
+                    }
+                }
             }
         }
 
@@ -209,6 +219,8 @@ impl DefinitionCollector<'_> {
                 cases,
                 own_methods,
                 own_constants,
+                traits,
+                trait_use_locations,
                 location: Some(self.location(stmt_span.start, stmt_span.end)),
             }));
     }

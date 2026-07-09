@@ -159,6 +159,8 @@ impl<'a> BodyAnalyzer<'a> {
                 None,
             );
         }
+
+        self.check_trait_constraints(fqcn, file, all_issues);
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -218,6 +220,8 @@ impl<'a> BodyAnalyzer<'a> {
                 Some(&mut *type_envs),
             );
         }
+
+        self.check_trait_constraints(fqcn, file, all_issues);
     }
 
     pub(crate) fn analyze_interface_decl(

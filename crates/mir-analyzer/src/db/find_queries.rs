@@ -79,7 +79,11 @@ impl ClassLike {
             }
             ClassLike::Interface(i) => i.extends.clone(),
             ClassLike::Trait(t) => t.traits.clone(),
-            ClassLike::Enum(e) => e.interfaces.clone(),
+            ClassLike::Enum(e) => {
+                let mut out = e.traits.clone();
+                out.extend(e.interfaces.iter().cloned());
+                out
+            }
         }
     }
 
@@ -146,13 +150,14 @@ impl ClassLike {
         matches!(self, ClassLike::Class(_))
     }
 
-    /// `use SomeTrait;` declarations on a class or trait body. Interfaces
-    /// and enums never have trait uses; they return an empty slice.
+    /// `use SomeTrait;` declarations on a class, trait, or enum body.
+    /// Interfaces never have trait uses; they return an empty slice.
     pub fn class_traits(&self) -> &[Arc<str>] {
         match self {
             ClassLike::Class(c) => &c.traits,
             ClassLike::Trait(t) => &t.traits,
-            _ => &[],
+            ClassLike::Enum(e) => &e.traits,
+            ClassLike::Interface(_) => &[],
         }
     }
 
@@ -254,10 +259,11 @@ impl ClassLike {
         }
     }
 
-    /// Per-`use SomeTrait;` declaration locations (class + trait).
+    /// Per-`use SomeTrait;` declaration locations (class + enum).
     pub fn trait_use_locations(&self) -> &[(Arc<str>, mir_types::Location)] {
         match self {
             ClassLike::Class(c) => &c.trait_use_locations,
+            ClassLike::Enum(e) => &e.trait_use_locations,
             _ => &[],
         }
     }

@@ -473,9 +473,17 @@ impl<'a> BodyAnalyzer<'a> {
         self.check_trait_constraints(fqcn, file, all_issues);
     }
 
-    /// Emit `InvalidTraitUse` issues if this class violates any `@psalm-require-extends` /
-    /// `@psalm-require-implements` constraint declared on the traits it uses.
-    fn check_trait_constraints(&self, fqcn: &str, file: &Arc<str>, all_issues: &mut Vec<Issue>) {
+    /// Emit `InvalidTraitUse` issues if this class/enum violates any
+    /// `@psalm-require-extends` / `@psalm-require-implements` constraint declared
+    /// on the traits it uses, or (for an enum) consumes a trait that declares an
+    /// instance property — enums may use traits but cannot carry extra state
+    /// beyond their cases, so a trait instance property is a hard PHP fatal.
+    pub(super) fn check_trait_constraints(
+        &self,
+        fqcn: &str,
+        file: &Arc<str>,
+        all_issues: &mut Vec<Issue>,
+    ) {
         let here = crate::db::Fqcn::from_str(self.db, fqcn);
         let Some(class) = crate::db::find_class_like(self.db, here) else {
             return;
@@ -541,6 +549,26 @@ impl<'a> BodyAnalyzer<'a> {
                     make_loc(),
                 ));
                 continue;
+            }
+
+            if class.is_enum() {
+                if let Some(props) = trait_class.own_properties() {
+                    for (prop_name, prop_def) in props.iter() {
+                        if !prop_def.is_static {
+                            all_issues.push(mir_issues::Issue::new(
+                                mir_issues::IssueKind::InvalidTraitUse {
+                                    trait_name: tr_short.to_string(),
+                                    reason: format!(
+                                        "Enum {fqcn} cannot use trait {tr_short}: it declares \
+                                         a non-static property ${prop_name}, and enums cannot \
+                                         carry state beyond their cases"
+                                    ),
+                                },
+                                make_loc(),
+                            ));
+                        }
+                    }
+                }
             }
 
             let (req_ext, req_impl): (Vec<Arc<str>>, Vec<Arc<str>>) = match &trait_class {

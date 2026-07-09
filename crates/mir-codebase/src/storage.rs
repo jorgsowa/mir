@@ -698,6 +698,12 @@ pub struct EnumDef {
     pub cases: IndexMap<Arc<str>, EnumCaseDef>,
     pub own_methods: IndexMap<Arc<str>, Arc<MethodDef>>,
     pub own_constants: IndexMap<Arc<str>, ConstantDef>,
+    /// `use SomeTrait;` declarations. PHP enums may use traits (for methods),
+    /// just never carry instance properties from them.
+    #[serde(default)]
+    pub traits: Vec<Arc<str>>,
+    #[serde(default)]
+    pub trait_use_locations: Vec<(Arc<str>, Location)>,
     pub location: Option<Location>,
 }
 
