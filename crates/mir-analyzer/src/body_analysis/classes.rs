@@ -571,6 +571,32 @@ impl<'a> BodyAnalyzer<'a> {
                 }
             }
 
+            // A `readonly class` requires EVERY property it carries — including
+            // ones pulled in from a used trait — to be readonly. A trait property
+            // declared without `readonly` (and not just an advisory `@readonly`
+            // docblock tag) is a hard PHP fatal once consumed by a readonly class.
+            if class.is_readonly() {
+                if let Some(props) = trait_class.own_properties() {
+                    for (prop_name, prop_def) in props.iter() {
+                        if !prop_def.is_static
+                            && !prop_def.from_docblock
+                            && !prop_def.has_native_readonly
+                        {
+                            all_issues.push(mir_issues::Issue::new(
+                                mir_issues::IssueKind::InvalidTraitUse {
+                                    trait_name: tr_short.to_string(),
+                                    reason: format!(
+                                        "Readonly class {fqcn} cannot use trait {tr_short}: it \
+                                         declares a non-readonly property ${prop_name}"
+                                    ),
+                                },
+                                make_loc(),
+                            ));
+                        }
+                    }
+                }
+            }
+
             let (req_ext, req_impl): (Vec<Arc<str>>, Vec<Arc<str>>) = match &trait_class {
                 crate::db::ClassLike::Trait(t) => {
                     (t.require_extends.to_vec(), t.require_implements.to_vec())
