@@ -125,10 +125,9 @@ pub fn effective_class_template_params(
         }
         let here = crate::db::Fqcn::from_str(db, current.as_ref());
         match crate::db::find_class_like(db, here) {
-            Some(crate::db::ClassLike::Class(cls)) => match &cls.parent {
-                Some(p) => current = p.clone(),
-                None => return None,
-            },
+            Some(crate::db::ClassLike::Class(cls)) => {
+                current = cls.parent.clone()?;
+            }
             _ => return None,
         }
     }
