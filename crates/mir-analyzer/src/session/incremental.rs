@@ -42,8 +42,6 @@ impl AnalysisSession {
         file: &str,
         cancel: &crate::IndexCancel,
     ) -> Vec<(Arc<str>, crate::FileAnalysis)> {
-        use rayon::prelude::*;
-
         if cancel.is_cancelled() {
             return Vec::new();
         }
@@ -57,6 +55,44 @@ impl AnalysisSession {
             .into_iter()
             .map(|path| Arc::from(path.as_str()))
             .collect();
+        self.reanalyze_file_set(dependents, cancel)
+    }
+
+    /// Re-analyze an explicit file set — typically the editor's currently
+    /// open files — after an edit elsewhere in the workspace.
+    ///
+    /// This is the rust-analyzer diagnostics model: instead of computing the
+    /// edited file's transitive dependents (an O(all-ingested-files) graph
+    /// rebuild on every keystroke), the caller passes the handful of files it
+    /// actually publishes diagnostics for, and salsa memoization makes the
+    /// unaffected ones ~free — `analyze_file` re-validates each file's memo
+    /// against what actually changed and only re-executes bodies the edit
+    /// reaches. Per-edit cost is O(open files), independent of workspace size.
+    ///
+    /// Files the session has no source for are silently skipped. Cancellation
+    /// semantics match [`Self::reanalyze_dependents_cancellable`].
+    pub fn reanalyze_files_cancellable(
+        &self,
+        files: &[Arc<str>],
+        cancel: &crate::IndexCancel,
+    ) -> Vec<(Arc<str>, crate::FileAnalysis)> {
+        if cancel.is_cancelled() || files.is_empty() {
+            return Vec::new();
+        }
+        self.reanalyze_file_set(files.to_vec(), cancel)
+    }
+
+    /// Shared body of [`Self::reanalyze_dependents_cancellable`] and
+    /// [`Self::reanalyze_files_cancellable`]: warm up, analyze in parallel,
+    /// commit reference locations.
+    fn reanalyze_file_set(
+        &self,
+        files: Vec<Arc<str>>,
+        cancel: &crate::IndexCancel,
+    ) -> Vec<(Arc<str>, crate::FileAnalysis)> {
+        use rayon::prelude::*;
+
+        let dependents = files;
 
         // Phase 2a: fault in each dependent's direct class references if the
         // background indexer hasn't reached them yet (mirrors the FileAnalyzer

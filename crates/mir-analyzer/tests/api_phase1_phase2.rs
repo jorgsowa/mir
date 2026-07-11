@@ -650,6 +650,70 @@ fn reanalyze_dependents_runs_in_parallel() {
 }
 
 #[test]
+fn reanalyze_files_recomputes_the_given_set_only() {
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_all_stubs();
+
+    let base: Arc<str> = Arc::from("rf_base.php");
+    let dependent: Arc<str> = Arc::from("rf_dep.php");
+    let unrelated: Arc<str> = Arc::from("rf_other.php");
+
+    session.ingest_file(base.clone(), Arc::from("<?php\nclass RfBase {}\n"));
+    session.ingest_file(
+        dependent.clone(),
+        Arc::from("<?php\nclass RfDep extends RfBase {}\n"),
+    );
+    session.ingest_file(
+        unrelated.clone(),
+        Arc::from("<?php\nfunction rf_free(): void {}\n"),
+    );
+
+    // Edit the base: RfBase disappears. Re-analyzing the caller-supplied
+    // "open" set must surface the dependent's broken extends without any
+    // dependency-graph computation, and must not touch files outside the set.
+    session.ingest_file(base.clone(), Arc::from("<?php\nclass RfRenamed {}\n"));
+
+    let open_set = [dependent.clone(), unrelated.clone()];
+    let analyses =
+        session.reanalyze_files_cancellable(&open_set, &mir_analyzer::IndexCancel::new());
+
+    let files: Vec<&str> = analyses.iter().map(|(f, _)| f.as_ref()).collect();
+    assert_eq!(files, vec![dependent.as_ref(), unrelated.as_ref()]);
+
+    let dep_analysis = &analyses[0].1;
+    assert!(
+        dep_analysis
+            .issues
+            .iter()
+            .any(|i| i.location.file.as_ref() == dependent.as_ref()
+                && format!("{:?}", i.kind).contains("RfBase")),
+        "dependent must report the missing RfBase after the base edit; got {:?}",
+        dep_analysis.issues
+    );
+    assert!(
+        analyses[1].1.issues.is_empty(),
+        "unrelated file must stay clean"
+    );
+
+    // Files the session doesn't know are skipped, not errored.
+    let ghost: [Arc<str>; 1] = [Arc::from("rf_ghost.php")];
+    assert!(
+        session
+            .reanalyze_files_cancellable(&ghost, &mir_analyzer::IndexCancel::new())
+            .is_empty()
+    );
+
+    // A pre-cancelled token short-circuits.
+    let cancelled = mir_analyzer::IndexCancel::new();
+    cancelled.cancel();
+    assert!(
+        session
+            .reanalyze_files_cancellable(&open_set, &cancelled)
+            .is_empty()
+    );
+}
+
+#[test]
 fn load_class_not_resolvable_without_resolver() {
     use mir_analyzer::LoadOutcome;
 
