@@ -234,6 +234,29 @@ pub fn narrow_from_condition(
                         }
                     }
                 }
+                // `$this->prop === EnumName::CaseName` / `$obj->prop === ...`
+                // — property-access counterpart of the plain-variable case
+                // above, only reached once extract_var_name on the left fails.
+                else if let Some((obj_var, prop)) = extract_prop_access(&b.left) {
+                    if let Some((enum_fqcn, case_name)) = extract_enum_case(
+                        &b.right,
+                        ctx.self_fqcn.as_deref(),
+                        ctx.parent_fqcn.as_deref(),
+                        db,
+                        file,
+                    ) {
+                        narrow_prop_to_literal_enum_case(
+                            db,
+                            ctx,
+                            &obj_var,
+                            &prop,
+                            file,
+                            &enum_fqcn,
+                            &case_name,
+                            effective_true,
+                        );
+                    }
+                }
                 // `get_class($x) === Foo::class` — the far more idiomatic
                 // counterpart of the `get_class($x) === 'Foo'` string-literal
                 // case above; only reached once extract_var_name on the left
@@ -278,6 +301,28 @@ pub fn narrow_from_condition(
                         ) {
                             narrow_var_to_class_string(ctx, &var_name, &fqcn, effective_true);
                         }
+                    }
+                }
+                // `EnumName::CaseName === $this->prop` — property-access
+                // counterpart, symmetric with the left-side case above.
+                else if let Some((obj_var, prop)) = extract_prop_access(&b.right) {
+                    if let Some((enum_fqcn, case_name)) = extract_enum_case(
+                        &b.left,
+                        ctx.self_fqcn.as_deref(),
+                        ctx.parent_fqcn.as_deref(),
+                        db,
+                        file,
+                    ) {
+                        narrow_prop_to_literal_enum_case(
+                            db,
+                            ctx,
+                            &obj_var,
+                            &prop,
+                            file,
+                            &enum_fqcn,
+                            &case_name,
+                            effective_true,
+                        );
                     }
                 }
                 // `Foo::class === get_class($x)` — symmetric counterpart.
@@ -1741,6 +1786,60 @@ fn set_narrowed(
     }
 }
 
+/// Resolve the current type of `$obj_var->prop`: an existing flow-state
+/// refinement if one is already tracked, else the declared type looked up
+/// through the object variable's own type (including `self`/`static`, and
+/// falling back to `self_fqcn` for `$this`).
+fn resolve_prop_current_type(
+    ctx: &FlowState,
+    obj_var: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Type {
+    if let Some(refined) = ctx.get_prop_refined(obj_var, prop) {
+        return refined.clone();
+    }
+    // Resolve through the object variable's type
+    let obj_ty = ctx.get_var(obj_var);
+    let mut prop_ty = mir_types::Type::mixed();
+    'outer: for atomic in &obj_ty.types {
+        if let mir_types::Atomic::TNamedObject { fqcn, .. } = atomic {
+            let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
+            // Try to find the property in the class chain
+            if let Some((_, p_def)) = crate::db::find_property_in_chain(db, here, prop) {
+                if let Some(ty) = p_def.ty.as_deref() {
+                    prop_ty = ty.clone();
+                    break 'outer;
+                }
+            }
+        } else if let mir_types::Atomic::TSelf { fqcn }
+        | mir_types::Atomic::TStaticObject { fqcn } = atomic
+        {
+            let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
+            if let Some((_, p_def)) = crate::db::find_property_in_chain(db, here, prop) {
+                if let Some(ty) = p_def.ty.as_deref() {
+                    prop_ty = ty.clone();
+                    break 'outer;
+                }
+            }
+        }
+    }
+    // Also try self_fqcn if obj_var is "this"
+    if prop_ty.is_mixed() && obj_var == "this" {
+        if let Some(fqcn) = ctx.self_fqcn.as_ref() {
+            let resolved = crate::db::resolve_name(db, file, fqcn.as_ref());
+            let here = crate::db::Fqcn::from_str(db, &resolved);
+            if let Some((_, p_def)) = crate::db::find_property_in_chain(db, here, prop) {
+                if let Some(ty) = p_def.ty.as_deref() {
+                    prop_ty = ty.clone();
+                }
+            }
+        }
+    }
+    prop_ty
+}
+
 /// Narrow a property access `$obj->prop` by a null check.
 /// Looks up the declared property type through the database and stores the
 /// narrowed result in `ctx.prop_refined`.
@@ -1752,50 +1851,7 @@ fn narrow_prop_null(
     file: &str,
     is_null: bool,
 ) {
-    // Get the current type: use an existing refinement if present, else look up
-    // the declared type through the object variable's type.
-    let current = if let Some(refined) = ctx.get_prop_refined(obj_var, prop) {
-        refined.clone()
-    } else {
-        // Resolve through the object variable's type
-        let obj_ty = ctx.get_var(obj_var);
-        let mut prop_ty = mir_types::Type::mixed();
-        'outer: for atomic in &obj_ty.types {
-            if let mir_types::Atomic::TNamedObject { fqcn, .. } = atomic {
-                let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
-                // Try to find the property in the class chain
-                if let Some((_, p_def)) = crate::db::find_property_in_chain(db, here, prop) {
-                    if let Some(ty) = p_def.ty.as_deref() {
-                        prop_ty = ty.clone();
-                        break 'outer;
-                    }
-                }
-            } else if let mir_types::Atomic::TSelf { fqcn }
-            | mir_types::Atomic::TStaticObject { fqcn } = atomic
-            {
-                let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
-                if let Some((_, p_def)) = crate::db::find_property_in_chain(db, here, prop) {
-                    if let Some(ty) = p_def.ty.as_deref() {
-                        prop_ty = ty.clone();
-                        break 'outer;
-                    }
-                }
-            }
-        }
-        // Also try self_fqcn if obj_var is "this"
-        if prop_ty.is_mixed() && obj_var == "this" {
-            if let Some(fqcn) = ctx.self_fqcn.as_ref() {
-                let resolved = crate::db::resolve_name(db, file, fqcn.as_ref());
-                let here = crate::db::Fqcn::from_str(db, &resolved);
-                if let Some((_, p_def)) = crate::db::find_property_in_chain(db, here, prop) {
-                    if let Some(ty) = p_def.ty.as_deref() {
-                        prop_ty = ty.clone();
-                    }
-                }
-            }
-        }
-        prop_ty
-    };
+    let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
 
     if current.is_mixed() {
         return;
@@ -2610,6 +2666,38 @@ fn narrow_var_to_literal_enum_case(
         })
     };
     set_narrowed(ctx, name, &current, narrowed, true);
+}
+
+/// Property-access counterpart of `narrow_var_to_literal_enum_case`, for
+/// `$this->prop === EnumName::CaseName` (or any `$obj->prop` receiver).
+fn narrow_prop_to_literal_enum_case(
+    db: &dyn MirDatabase,
+    ctx: &mut FlowState,
+    obj_var: &str,
+    prop: &str,
+    file: &str,
+    enum_fqcn: &str,
+    case_name: &str,
+    is_case: bool,
+) {
+    let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
+    if current.is_mixed() {
+        return;
+    }
+    let narrowed = if is_case {
+        Type::single(Atomic::TLiteralEnumCase {
+            enum_fqcn: enum_fqcn.into(),
+            case_name: case_name.into(),
+        })
+    } else {
+        expand_enum_to_cases(db, &current, enum_fqcn).filter(|t| {
+            !matches!(t, Atomic::TLiteralEnumCase { enum_fqcn: fqcn, case_name: c }
+                if fqcn.as_ref() == enum_fqcn && c.as_ref() == case_name)
+        })
+    };
+    if !narrowed.is_empty() && narrowed != current {
+        ctx.set_prop_refined(obj_var, prop, narrowed);
+    }
 }
 
 fn narrow_var_to_class_string(ctx: &mut FlowState, name: &str, fqcn: &str, is_class: bool) {
