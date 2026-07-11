@@ -153,8 +153,12 @@ pub fn run_output(
     match cli.format {
         OutputFormat::Text => {
             if !cli.quiet {
+                // Single locked, block-buffered writer: one flush at drop
+                // instead of a lock + line-flush per issue.
+                use std::io::Write;
+                let mut out = std::io::BufWriter::new(std::io::stdout().lock());
                 for issue in &display_issues {
-                    println!("{}", format_issue(issue));
+                    let _ = writeln!(out, "{}", format_issue(issue));
                 }
             }
         }
@@ -165,13 +169,16 @@ pub fn run_output(
         },
 
         OutputFormat::GithubActions => {
+            use std::io::Write;
+            let mut out = std::io::BufWriter::new(std::io::stdout().lock());
             for issue in &display_issues {
                 let level = match issue.severity {
                     Severity::Error => "error",
                     Severity::Warning => "warning",
                     Severity::Info => "notice",
                 };
-                println!(
+                let _ = writeln!(
+                    out,
                     "::{} file={},line={},col={}::{}",
                     level,
                     issue.location.file,
