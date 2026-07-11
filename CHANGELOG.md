@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.52.0] - 2026-07-11
+
+### Added
+
+- **`reanalyze_files_cancellable`:** re-analyzes a caller-supplied set of files instead of the edited file's transitive dependents. Matches the rust-analyzer LSP model — the host passes the files it publishes diagnostics for (its open editors), so per-edit cost is O(open files) instead of O(all-ingested-files), independent of workspace size. `reanalyze_dependents_cancellable` keeps its existing behavior; both now share the same warm-up / parallel-analyze / ref-loc-commit implementation.
+
+### Fixed
+
+- **Unbounded memory growth in long editing sessions:** the FQN-keyed `infer_scope`/`infer_function` memo tables now carry an LRU bound (4096, matching `collect_file_definitions`) instead of growing forever as renames mint new memo keys. The process-global lowercase-`Name` cache now clears itself past 65,536 entries instead of growing unbounded across a rename storm.
+
 ## [0.51.0] - 2026-07-10
 
 ### Added
