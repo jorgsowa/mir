@@ -79,6 +79,7 @@ impl<'a> BodyAnalyzer<'a> {
             self.php_version,
             self.mode,
         );
+        sa.collect_symbols = self.collect_symbols;
         for stmt in program.stmts.iter() {
             match &stmt.kind {
                 StmtKind::Function(_)
@@ -140,6 +141,7 @@ impl<'a> BodyAnalyzer<'a> {
                 self.php_version,
                 self.mode,
             );
+            sa.collect_symbols = self.collect_symbols;
             for stmt in program.stmts.iter() {
                 match &stmt.kind {
                     StmtKind::Function(_)

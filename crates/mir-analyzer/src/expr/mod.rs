@@ -46,6 +46,9 @@ pub struct ExpressionAnalyzer<'a> {
     /// When true, coercive PHP typing (e.g. Stringable → string) must not be
     /// silently allowed — the runtime would throw a TypeError.
     pub strict_types: bool,
+    /// When false, `record_symbol*` calls are no-ops — see
+    /// `StatementsAnalyzer::collect_symbols`.
+    pub collect_symbols: bool,
     /// When true, we are inside an existence-check context (isset/empty/??) where missing
     /// variables and missing array offsets are not errors — they are what is being tested.
     in_existence_check: bool,
@@ -82,6 +85,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             php_version,
             mode,
             strict_types: false,
+            collect_symbols: true,
             in_existence_check: false,
             yielded_types,
         }
@@ -102,6 +106,9 @@ impl<'a> ExpressionAnalyzer<'a> {
 
     /// Record a resolved symbol.
     pub fn record_symbol(&mut self, span: php_ast::Span, kind: ReferenceKind, resolved_type: Type) {
+        if !self.collect_symbols {
+            return;
+        }
         self.symbols.push(ResolvedSymbol {
             file: self.file.clone(),
             span,
@@ -118,6 +125,9 @@ impl<'a> ExpressionAnalyzer<'a> {
         kind: ReferenceKind,
         resolved_type: Type,
     ) {
+        if !self.collect_symbols {
+            return;
+        }
         self.symbols.push(ResolvedSymbol {
             file: self.file.clone(),
             span,
@@ -242,6 +252,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     self.php_version,
                     self.mode,
                 );
+                sa.collect_symbols = self.collect_symbols;
                 sa.analyze_class_decl_stmt(anon, ctx);
                 Type::single(Atomic::TObject)
             }

@@ -117,6 +117,7 @@ impl<'a> StatementsAnalyzer<'a> {
             self.php_version,
             self.mode,
         );
+        sa.collect_symbols = self.collect_symbols;
         sa.analyze_stmts(&decl.body.stmts, &mut fn_ctx);
     }
 
@@ -223,6 +224,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 self.php_version,
                 self.mode,
             );
+            sa.collect_symbols = self.collect_symbols;
             sa.analyze_stmts(&body.stmts, &mut method_ctx);
         }
     }

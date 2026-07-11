@@ -457,6 +457,10 @@ pub(crate) struct BodyAnalyzer<'a> {
     db: &'a dyn MirDatabase,
     php_version: PhpVersion,
     mode: AnalysisMode,
+    /// When false, walks skip `ResolvedSymbol` recording entirely — set for
+    /// diagnostics-only consumers (`BatchOptions::skip_symbols`) so per-
+    /// reference Type clones aren't built just to be discarded.
+    pub(crate) collect_symbols: bool,
     inferred_types: Arc<Mutex<InferredTypes>>,
 }
 
@@ -466,6 +470,7 @@ impl<'a> BodyAnalyzer<'a> {
             db,
             php_version,
             mode: AnalysisMode::Full,
+            collect_symbols: true,
             inferred_types: Arc::new(Mutex::new(InferredTypes {
                 functions: Vec::new(),
                 methods: Vec::new(),
@@ -478,6 +483,7 @@ impl<'a> BodyAnalyzer<'a> {
             db,
             php_version,
             mode: AnalysisMode::InferenceOnly,
+            collect_symbols: true,
             inferred_types: Arc::new(Mutex::new(InferredTypes {
                 functions: Vec::new(),
                 methods: Vec::new(),

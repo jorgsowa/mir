@@ -98,6 +98,10 @@ pub struct StatementsAnalyzer<'a> {
     pub symbols: &'a mut Vec<ResolvedSymbol>,
     pub php_version: PhpVersion,
     pub mode: AnalysisMode,
+    /// When false, `ResolvedSymbol` recording is skipped entirely. Set by
+    /// pure inference walks whose caller discards the symbol buffer, so the
+    /// walk doesn't clone a Type per reference just to drop it.
+    pub collect_symbols: bool,
     /// Accumulated inferred return types for the current function.
     pub return_types: Vec<Type>,
     /// `(key type, value type)` for every `yield`/`yield from` seen so far in
@@ -129,6 +133,7 @@ impl<'a> StatementsAnalyzer<'a> {
             symbols,
             php_version,
             mode,
+            collect_symbols: true,
             return_types: Vec::new(),
             yielded_types: Vec::new(),
             break_ctx_stack: Vec::new(),
@@ -472,11 +477,15 @@ impl<'a> StatementsAnalyzer<'a> {
             &mut self.yielded_types,
         );
         ea.strict_types = ctx.strict_types;
+        ea.collect_symbols = self.collect_symbols;
         ea
     }
 
     fn record_symbol_for_var(&mut self, span: php_ast::Span, var_name: &str, ty: Type) {
         use crate::symbol::ReferenceKind;
+        if !self.collect_symbols {
+            return;
+        }
         self.symbols.push(ResolvedSymbol {
             file: self.file.clone(),
             span,

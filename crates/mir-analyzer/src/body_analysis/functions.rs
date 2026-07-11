@@ -129,6 +129,7 @@ impl<'a> BodyAnalyzer<'a> {
             self.php_version,
             self.mode,
         );
+        sa.collect_symbols = self.collect_symbols;
         ctx.is_generator = body_has_yield(&decl.body.stmts);
         sa.analyze_stmts(&decl.body.stmts, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
@@ -564,6 +565,9 @@ impl<'a> BodyAnalyzer<'a> {
             self.php_version,
             self.mode,
         );
+        sa.collect_symbols = self.collect_symbols;
+        // The symbol buffer above is dropped at return — skip building it.
+        sa.collect_symbols = false;
         ctx.is_generator = body_has_yield(&decl.body.stmts);
         sa.analyze_stmts(&decl.body.stmts, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);
@@ -682,6 +686,7 @@ impl<'a> BodyAnalyzer<'a> {
             self.php_version,
             self.mode,
         );
+        sa.collect_symbols = self.collect_symbols;
         ctx.is_generator = body_has_yield(&decl.body.stmts);
         sa.analyze_stmts(&decl.body.stmts, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);

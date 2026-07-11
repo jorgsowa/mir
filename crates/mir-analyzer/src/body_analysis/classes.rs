@@ -88,6 +88,7 @@ impl<'a> BodyAnalyzer<'a> {
                 self.php_version,
                 self.mode,
             );
+            sa.collect_symbols = self.collect_symbols;
             let mut default_ctx = FlowState::new();
             default_ctx.self_fqcn = Some(cx.fqcn.clone());
             default_ctx.parent_fqcn = cx.parent_fqcn.clone();
@@ -213,6 +214,7 @@ impl<'a> BodyAnalyzer<'a> {
             self.php_version,
             self.mode,
         );
+        sa.collect_symbols = self.collect_symbols;
         ctx.is_generator = body_has_yield(&body.stmts);
         sa.analyze_stmts(&body.stmts, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);

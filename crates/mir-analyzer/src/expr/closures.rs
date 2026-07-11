@@ -228,6 +228,8 @@ impl<'a> ExpressionAnalyzer<'a> {
             self.php_version,
             self.mode,
         );
+
+        sa.collect_symbols = self.collect_symbols;
         sa.analyze_stmts(&c.body.stmts, &mut closure_ctx);
         let inferred_return = crate::body_analysis::merge_return_types(&sa.return_types);
         // A closure containing `yield` always returns a Generator, regardless

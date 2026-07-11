@@ -61,11 +61,13 @@ impl<'a> ExpressionAnalyzer<'a> {
         } else {
             ctx.get_var_sym(sym)
         };
-        self.record_symbol(
-            expr.span,
-            ReferenceKind::Variable(Arc::from(name_str)),
-            ty.clone(),
-        );
+        if self.collect_symbols {
+            self.record_symbol(
+                expr.span,
+                ReferenceKind::Variable(Arc::from(name_str)),
+                ty.clone(),
+            );
+        }
         ty
     }
 

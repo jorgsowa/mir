@@ -283,7 +283,10 @@ impl AnalysisSession {
             .par_iter()
             .filter(|parsed| !files_with_parse_errors.contains(&parsed.file))
             .map_with(db_main, |db, parsed| {
-                let driver = BodyAnalyzer::new(&*db as &dyn MirDatabase, php_version);
+                let mut driver = BodyAnalyzer::new(&*db as &dyn MirDatabase, php_version);
+                // Diagnostics-only consumers never read the symbol vecs —
+                // don't build them (a Type clone per reference) at all.
+                driver.collect_symbols = !opts.skip_symbols;
                 let (issues, symbols) = if let Some(cache) = &self.cache {
                     let h = content_hexes
                         .get(parsed.file.as_ref())
