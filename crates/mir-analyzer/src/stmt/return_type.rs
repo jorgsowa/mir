@@ -102,7 +102,7 @@ pub(crate) fn named_object_return_compatible(
             // per-atom lets unions that mix objects and scalars (e.g.
             // `string|MyClass`) validate correctly — object atoms take the
             // inheritance path below, scalar atoms are decided here. (G5)
-            other => return Type::single(other.clone()).is_subtype_structural(declared),
+            other => return declared.accepts_atomic_structural(other),
         };
 
         declared.types.iter().any(|declared_atom| {
@@ -413,7 +413,7 @@ fn resolve_atomic_for_file(atomic: Atomic, db: &dyn MirDatabase, file: &str) -> 
 /// compatible with the declared value type.  Only called after the named-object and
 /// class-string branches of the match have already been handled above.
 fn scalar_array_element_compatible(av: &Atomic, dec_val: &Type) -> bool {
-    Type::single(av.clone()).is_subtype_structural(dec_val)
+    dec_val.accepts_atomic_structural(av)
 }
 
 /// Returns true if both actual and declared are array/list types whose value types are

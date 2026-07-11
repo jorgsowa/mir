@@ -1171,6 +1171,16 @@ impl Type {
             .all(|a| other.types.iter().any(|b| atomic_subtype(a, b)))
     }
 
+    /// `sub <: self`, structurally, for a single atomic — equivalent to
+    /// `Type::single(sub.clone()).is_subtype_structural(self)` without the
+    /// clone and the temporary single-atomic union.
+    pub fn accepts_atomic_structural(&self, sub: &Atomic) -> bool {
+        if self.is_mixed() {
+            return true;
+        }
+        matches!(sub, Atomic::TNever) || self.types.iter().any(|b| atomic_subtype(sub, b))
+    }
+
     // --- Utilities ----------------------------------------------------------
 
     fn filter<F: Fn(&Atomic) -> bool>(&self, f: F) -> Type {
@@ -1341,7 +1351,8 @@ fn substitute_in_fn_param(
 // Atomic subtype (no codebase — structural check only)
 // ---------------------------------------------------------------------------
 
-fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
+/// Structural `sub <: sup` for a single atomic pair, without hierarchy resolution.
+pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
     if sub == sup {
         return true;
     }

@@ -140,7 +140,7 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
             // Per-pair structural check: handles scalars (string, int, etc.) when
             // sub is a union — is_subtype_structural above failed because another
             // arm didn't match structurally, but this pair may still match.
-            if Type::single(a.clone()).is_subtype_structural(&Type::single(b.clone())) {
+            if mir_types::union::atomic_subtype(a, b) {
                 return true;
             }
             match (a, b) {
