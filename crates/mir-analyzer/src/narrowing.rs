@@ -465,6 +465,15 @@ pub fn narrow_from_condition(
                     let class_name = crate::db::resolve_name(db, file, &raw_name);
                     narrow_prop_instanceof(ctx, &obj, &prop, &class_name, db, file, is_true);
                 }
+            } else if let Some((fqcn, prop)) = extract_static_prop_access(&b.left, ctx, db, file) {
+                if let Some(raw_name) = extract_class_name(
+                    &b.right,
+                    ctx.self_fqcn.as_deref(),
+                    ctx.parent_fqcn.as_deref(),
+                ) {
+                    let class_name = crate::db::resolve_name(db, file, &raw_name);
+                    narrow_static_prop_instanceof(ctx, &fqcn, &prop, &class_name, db, is_true);
+                }
             }
         }
 
@@ -1974,6 +1983,38 @@ fn narrow_static_prop_null(
         current.narrow_to_null()
     } else {
         current.remove_null()
+    };
+    if narrowed != current {
+        ctx.set_prop_refined(fqcn, prop, narrowed);
+    }
+}
+
+/// Narrow a static property's type when `self::$prop instanceof ClassName` /
+/// `static::$prop instanceof ClassName` is proven true or false.
+fn narrow_static_prop_instanceof(
+    ctx: &mut FlowState,
+    fqcn: &str,
+    prop: &str,
+    class_name: &str,
+    db: &dyn MirDatabase,
+    is_true: bool,
+) {
+    let current = if let Some(refined) = ctx.get_prop_refined(fqcn, prop) {
+        refined.clone()
+    } else {
+        let here = crate::db::Fqcn::from_str(db, fqcn);
+        crate::db::find_property_in_chain(db, here, prop)
+            .and_then(|(_, p)| p.ty.as_deref().cloned())
+            .unwrap_or_else(mir_types::Type::mixed)
+    };
+
+    if current.is_mixed_not_template() {
+        return;
+    }
+    let narrowed = if is_true {
+        narrow_instanceof_preserving_subtypes(&current, class_name, db, &ctx.template_param_names)
+    } else {
+        filter_out_instanceof_match(&current, class_name, db)
     };
     if narrowed != current {
         ctx.set_prop_refined(fqcn, prop, narrowed);
