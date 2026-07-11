@@ -13,9 +13,9 @@
 
 use std::sync::Arc;
 
-use mir_codebase::storage::{
-    ClassDef, ConstantDef, EnumDef, FnParam, FunctionDef, InterfaceDef, MethodDef, PropertyDef,
-    TraitDef,
+use mir_codebase::definitions::{
+    ClassDef, ConstantDef, DeclaredParam, EnumDef, FunctionDef, InterfaceDef, MethodDef,
+    PropertyDef, TraitDef,
 };
 use mir_types::{Atomic, Name};
 
@@ -180,7 +180,7 @@ impl ClassLike {
     }
 
     /// Declared `@template` parameters.
-    pub fn template_params(&self) -> &[mir_codebase::storage::TemplateParam] {
+    pub fn template_params(&self) -> &[mir_codebase::definitions::TemplateParam] {
         match self {
             ClassLike::Class(c) => &c.template_params,
             ClassLike::Interface(i) => &i.template_params,
@@ -397,16 +397,6 @@ pub fn global_constant_in_file<'db>(
         .map(|(_, ty)| Arc::new(ty.clone()))
 }
 
-/// Composite: resolve `fqcn` to its defining file, then locate any
-/// class-like definition (class / interface / trait / enum) within it.
-///
-/// **The headline pull-based lookup.** Demands `collect_file_definitions`
-/// on the resolved file as a salsa tracked dependency — callers reading
-/// this from a tracked context are correctly invalidated when either the
-/// resolver or the defining file's text changes. No prior `ingest_file`
-/// call is required: the file's text must be registered (via
-/// `set_file_text` or `set_workspace_files`), but definition-collection collection
-/// happens on demand inside salsa.
 /// Salsa-tracked per-(file, idx) class storage. One memo entry per distinct
 /// class ever queried; subsequent calls return the same Arc cheaply.
 #[salsa::tracked]
@@ -458,7 +448,7 @@ pub fn analyzed_class_defs(
 pub fn analyzed_interface_defs(
     db: &dyn MirDatabase,
     analyzed_files: &rustc_hash::FxHashSet<Arc<str>>,
-) -> Vec<(Arc<str>, Arc<mir_codebase::storage::InterfaceDef>)> {
+) -> Vec<(Arc<str>, Arc<mir_codebase::definitions::InterfaceDef>)> {
     let mut files: Vec<SourceFile> = if analyzed_files.is_empty() {
         db.all_source_files()
     } else {
@@ -483,7 +473,7 @@ pub fn analyzed_interface_defs(
 pub fn analyzed_enum_defs(
     db: &dyn MirDatabase,
     analyzed_files: &rustc_hash::FxHashSet<Arc<str>>,
-) -> Vec<(Arc<str>, Arc<mir_codebase::storage::EnumDef>)> {
+) -> Vec<(Arc<str>, Arc<mir_codebase::definitions::EnumDef>)> {
     let mut files: Vec<SourceFile> = if analyzed_files.is_empty() {
         db.all_source_files()
     } else {
@@ -507,7 +497,7 @@ pub fn analyzed_enum_defs(
 pub fn analyzed_trait_defs(
     db: &dyn MirDatabase,
     analyzed_files: &rustc_hash::FxHashSet<Arc<str>>,
-) -> Vec<(Arc<str>, Arc<mir_codebase::storage::TraitDef>)> {
+) -> Vec<(Arc<str>, Arc<mir_codebase::definitions::TraitDef>)> {
     let mut files: Vec<SourceFile> = if analyzed_files.is_empty() {
         db.all_source_files()
     } else {
@@ -560,6 +550,16 @@ pub fn function_def_at(
     defs.slice.functions.get(idx as usize).cloned()
 }
 
+/// Composite: resolve `fqcn` to its defining file, then locate any
+/// class-like definition (class / interface / trait / enum) within it.
+///
+/// **The headline pull-based lookup.** Demands `collect_file_definitions`
+/// on the resolved file as a salsa tracked dependency — callers reading
+/// this from a tracked context are correctly invalidated when either the
+/// resolver or the defining file's text changes. No prior `ingest_file`
+/// call is required: the file's text must be registered (via
+/// `set_file_text` or `set_workspace_files`), but definition collection
+/// happens on demand inside salsa.
 pub fn find_class_like<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option<ClassLike> {
     use crate::db::SymbolLoc;
     // O(1) HashMap lookup in the workspace symbol index, then a per-(file, idx)
@@ -671,13 +671,13 @@ pub fn find_method_in_class<'db>(
             let cases_return = mir_types::Type::single(Atomic::TList {
                 value: Box::new(enum_ty),
             });
-            return Some(Arc::new(mir_codebase::storage::MethodDef {
+            return Some(Arc::new(mir_codebase::definitions::MethodDef {
                 fqcn: e.fqcn.clone(),
                 name: Arc::from("cases"),
                 params: Arc::from([].as_ref()),
                 return_type: Some(Arc::new(cases_return)),
                 inferred_return_type: None,
-                visibility: mir_codebase::storage::Visibility::Public,
+                visibility: mir_codebase::definitions::Visibility::Public,
                 is_static: true,
                 is_abstract: false,
                 is_constructor: false,
@@ -702,7 +702,7 @@ pub fn find_method_in_class<'db>(
             }));
         }
         if is_backed && (lower == "from" || lower == "tryfrom") {
-            let value_param = FnParam {
+            let value_param = DeclaredParam {
                 name: Name::from("value"),
                 ty: e.scalar_type.as_ref().map(|t| Arc::new(t.clone())),
                 out_ty: None,
@@ -729,13 +729,13 @@ pub fn find_method_in_class<'db>(
             } else {
                 enum_ty
             };
-            return Some(Arc::new(mir_codebase::storage::MethodDef {
+            return Some(Arc::new(mir_codebase::definitions::MethodDef {
                 fqcn: e.fqcn.clone(),
                 name: Arc::from(canonical_name),
                 params: Arc::from(vec![value_param]),
                 return_type: Some(Arc::new(return_ty)),
                 inferred_return_type: None,
-                visibility: mir_codebase::storage::Visibility::Public,
+                visibility: mir_codebase::definitions::Visibility::Public,
                 is_static: true,
                 is_abstract: false,
                 is_constructor: false,
@@ -790,7 +790,7 @@ pub fn find_class_constant_in_class<'db>(
     // Enum cases live in EnumDef.cases, not own_constants.
     if let ClassLike::Enum(e) = &class {
         if let Some(case) = e.cases.get(name) {
-            return Some(mir_codebase::storage::ConstantDef {
+            return Some(mir_codebase::definitions::ConstantDef {
                 name: case.name.clone(),
                 ty: mir_types::Type::single(Atomic::TNamedObject {
                     fqcn: Name::new(e.fqcn.as_ref()),
