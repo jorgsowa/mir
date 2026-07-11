@@ -920,6 +920,8 @@ impl IssueKind {
     /// | 1300 – 1399   | Trait                           |
     /// | 1400 – 1499   | Parse                           |
     /// | 1500 – 1599   | Other                           |
+    /// | 1600 – 1699   | Attribute / duplicate declarations |
+    /// | 1700 – 1799   | Purity                          |
     pub fn code(&self) -> &'static str {
         match self {
             // Undefined (0001-0099)
