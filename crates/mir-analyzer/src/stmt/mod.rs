@@ -607,8 +607,20 @@ impl<'a> StatementsAnalyzer<'a> {
         let mut current = entry;
         current.inside_loop = true;
 
-        for _ in 0..MAX_ITERS {
+        for iter_idx in 0..MAX_ITERS {
             let prev_vars = current.vars.clone();
+
+            // `body` runs the real statement analyzer, which emits diagnostics
+            // directly into the shared issue buffer — not a scratch copy. Only
+            // the FINAL, stabilized pass reflects a realistic "any iteration"
+            // type state; earlier passes see overly-narrow entry
+            // approximations (e.g. a loop counter still at 0 or 1, a toggled
+            // bool still `true`) and can flag things that are only true on
+            // that unstabilized pass — an `if ($first)` toggle read as always
+            // true, or a comparison against a value the loop variable hasn't
+            // widened to yet read as always false. Mark the buffer here and
+            // roll back below if this pass turns out not to be the last one.
+            let issues_mark = self.issues.issue_count();
 
             let mut iter = current.clone();
             body(self, &mut iter);
@@ -637,6 +649,14 @@ impl<'a> StatementsAnalyzer<'a> {
             if vars_stabilized(&prev_vars, &next.vars) {
                 current = next;
                 break;
+            }
+            // Not the fixed point yet, and (since the loop keeps going) not
+            // the last pass either — this pass's diagnostics were computed
+            // against a type state later passes will refine, so they're
+            // provisional. Roll them back; a real issue at the same
+            // condition will re-emit on a later pass if it's still real.
+            if iter_idx + 1 < MAX_ITERS {
+                self.issues.truncate_to(issues_mark);
             }
             current = next;
         }

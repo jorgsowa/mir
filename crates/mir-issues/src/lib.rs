@@ -2058,6 +2058,23 @@ impl IssueBuffer {
         self.issues.len()
     }
 
+    /// Discard every issue added since index `mark`, un-marking their
+    /// locations as `seen` so a later `add()` at the same spot isn't silently
+    /// deduplicated away. Used to roll back a speculative analysis pass (e.g.
+    /// an unstabilized loop fixed-point iteration) whose diagnostics were
+    /// provisional and must not leak into the final result.
+    pub fn truncate_to(&mut self, mark: usize) {
+        for issue in self.issues.drain(mark..) {
+            let key = (
+                issue.kind.name(),
+                issue.location.file.clone(),
+                issue.location.line,
+                issue.location.col_start,
+            );
+            self.seen.remove(&key);
+        }
+    }
+
     pub fn is_empty(&self) -> bool {
         self.issues.is_empty()
     }
