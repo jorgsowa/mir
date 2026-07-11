@@ -771,9 +771,7 @@ name = "mir-issues"
 version = "0.52.0"
 dependencies = [
  "mir-types",
- "owo-colors",
  "serde",
- "thiserror",
 ]
 
 [[package]]
