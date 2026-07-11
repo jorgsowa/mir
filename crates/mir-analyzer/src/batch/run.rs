@@ -124,6 +124,20 @@ impl AnalysisSession {
             .map(|(parsed, (_defs, _h, _e, surface))| (parsed.file.clone(), surface.clone()))
             .collect();
 
+        // Hex content hashes derived from the pass-1 digests, so the
+        // content-changed pass and the body pass below don't re-hash every
+        // source file (BLAKE3 over all bytes, twice).
+        let content_hexes: HashMap<Arc<str>, String> = parsed_files
+            .iter()
+            .zip(file_defs.iter())
+            .map(|(parsed, (_defs, hash, _e, _surface))| {
+                (
+                    parsed.file.clone(),
+                    blake3::Hash::from(*hash).to_hex().to_string(),
+                )
+            })
+            .collect();
+
         // ---- Cross-file invalidation: evict dependents whose surface changed --
         // A file whose content changed re-analyzes itself regardless (its body
         // pass misses the cache below). It cascades to dependents only when its
@@ -132,13 +146,15 @@ impl AnalysisSession {
         // pre-firewall (empty) stored surface is treated as unknown and cascades.
         if let Some(cache) = &self.cache {
             let content_changed: Vec<String> = file_data
-                .par_iter()
-                .filter_map(|(f, src)| {
-                    let h = hash_content(src.as_ref());
-                    if cache.get(f, &h).is_none() {
-                        Some(f.to_string())
-                    } else {
+                .iter()
+                .filter_map(|(f, _src)| {
+                    let valid = content_hexes
+                        .get(f)
+                        .is_some_and(|h| cache.is_valid(f, h));
+                    if valid {
                         None
+                    } else {
+                        Some(f.to_string())
                     }
                 })
                 .collect();
@@ -269,7 +285,10 @@ impl AnalysisSession {
             .map_with(db_main, |db, parsed| {
                 let driver = BodyAnalyzer::new(&*db as &dyn MirDatabase, php_version);
                 let (issues, symbols) = if let Some(cache) = &self.cache {
-                    let h = hash_content(parsed.source());
+                    let h = content_hexes
+                        .get(parsed.file.as_ref())
+                        .cloned()
+                        .unwrap_or_else(|| hash_content(parsed.source()));
                     if let Some((cached_issues, ref_locs)) = cache.get(&parsed.file, &h) {
                         // Cache replay: rebuild the file's complete reference
                         // set straight from the cached tuples — no pending-

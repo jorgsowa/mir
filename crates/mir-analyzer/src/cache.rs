@@ -221,12 +221,14 @@ struct CacheFile {
     reverse_deps: HashMap<String, HashSet<String>>,
 }
 
-/// View for serializing cache data without cloning.
+/// View for serializing cache data without cloning. Generic so `flush` can
+/// pass maps of borrowed keys/entries — bincode encodes `&str`/`&CacheEntry`
+/// identically to their owned counterparts in [`CacheFile`].
 #[derive(Serialize)]
-struct CacheFileView<'a> {
+struct CacheFileView<E: Serialize, R: Serialize> {
     version: u64,
-    entries: &'a HashMap<String, CacheEntry>,
-    reverse_deps: &'a HashMap<String, HashSet<String>>,
+    entries: E,
+    reverse_deps: R,
 }
 
 /// Thread-safe, disk-backed cache for per-file analysis results.
@@ -312,6 +314,18 @@ impl AnalysisCache {
         })
     }
 
+    /// True if `file_path` has an entry stored for exactly `content_hash`.
+    /// Presence-only variant of [`Self::get`] that skips cloning the entry.
+    pub fn is_valid(&self, file_path: &str, content_hash: &str) -> bool {
+        let Some(id) = self.file_id_map.lock().get(file_path) else {
+            return false;
+        };
+        let entries = self.entries.lock();
+        entries
+            .get(&id)
+            .is_some_and(|e| e.content_hash == content_hash)
+    }
+
     /// Return the paths of every file that currently has a cache entry.
     /// Used to detect files that were analyzed in a previous run but have since
     /// been deleted, so their dependents can be invalidated.
@@ -370,21 +384,21 @@ impl AnalysisCache {
         let entries_guard = self.entries.lock();
         let deps_guard = self.reverse_deps.lock();
 
-        // Resolve FileIds back to path strings for the on-disk format.
-        let entries: HashMap<String, CacheEntry> = entries_guard
+        // Resolve FileIds back to path strings for the on-disk format,
+        // borrowing paths and entries rather than cloning them.
+        let entries: HashMap<&str, &CacheEntry> = entries_guard
             .iter()
-            .filter_map(|(&id, entry)| id_map.path(id).map(|p| (p.to_string(), entry.clone())))
+            .filter_map(|(&id, entry)| id_map.path(id).map(|p| (p, entry)))
             .collect();
-        let reverse_deps: HashMap<String, HashSet<String>> = deps_guard
+        let reverse_deps: HashMap<&str, HashSet<&str>> = deps_guard
             .iter()
             .filter_map(|(&id, dep_ids)| {
                 let path = id_map.path(id)?;
-                let dep_paths: HashSet<String> = dep_ids
+                let dep_paths: HashSet<&str> = dep_ids
                     .iter()
                     .filter_map(|&dep_id| id_map.path(dep_id))
-                    .map(|s| s.to_string())
                     .collect();
-                Some((path.to_string(), dep_paths))
+                Some((path, dep_paths))
             })
             .collect();
 
