@@ -173,8 +173,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // were null) and afterwards `$x` is exactly the RHS type — not a union
                 // with the `mixed` that an undefined-variable read would otherwise
                 // produce.
-                let is_undefined_var = extract_simple_var(&a.target)
-                    .is_some_and(|name| !ctx.var_is_defined(&name));
+                let is_undefined_var =
+                    extract_simple_var(&a.target).is_some_and(|name| !ctx.var_is_defined(&name));
                 let lhs_ty = self.with_existence_check(|ea| ea.analyze(&a.target, ctx));
                 let merged = if is_undefined_var {
                     rhs_ty.clone()

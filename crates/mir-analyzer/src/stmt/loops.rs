@@ -128,7 +128,11 @@ pub(crate) fn infer_foreach_types_with_db(db: &dyn MirDatabase, arr_ty: &Type) -
     infer_foreach_types_with_db_depth(db, arr_ty, 4)
 }
 
-fn infer_foreach_types_with_db_depth(db: &dyn MirDatabase, arr_ty: &Type, depth: u8) -> (Type, Type) {
+fn infer_foreach_types_with_db_depth(
+    db: &dyn MirDatabase,
+    arr_ty: &Type,
+    depth: u8,
+) -> (Type, Type) {
     if depth == 0 || arr_ty.is_mixed() {
         return (Type::mixed(), Type::mixed());
     }
@@ -188,12 +192,15 @@ fn resolve_iterator_item_types(
     // Prefer an explicit `@implements Iterator<TKey, TValue>` (or
     // `IteratorAggregate<TKey, TValue>`) annotation: it directly states the
     // item types without needing to chase `current()`/`getIterator()`.
-    let annotated = class.implements_type_args().iter().find_map(|(iface, args)| {
-        let iface_bare = iface.trim_start_matches('\\');
-        (iface_bare.eq_ignore_ascii_case("Iterator")
-            || iface_bare.eq_ignore_ascii_case("IteratorAggregate"))
-        .then_some(args)
-    });
+    let annotated = class
+        .implements_type_args()
+        .iter()
+        .find_map(|(iface, args)| {
+            let iface_bare = iface.trim_start_matches('\\');
+            (iface_bare.eq_ignore_ascii_case("Iterator")
+                || iface_bare.eq_ignore_ascii_case("IteratorAggregate"))
+            .then_some(args)
+        });
     if let Some(args) = annotated {
         if args.len() >= 2 {
             let key = args[0].substitute_templates(&bindings);

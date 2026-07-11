@@ -54,7 +54,10 @@ fn implements_array_access(db: &dyn crate::db::MirDatabase, fqcn: &mir_types::Na
     let bare = fqcn.as_ref().trim_start_matches('\\');
     crate::db::class_ancestors_by_fqcn(db, crate::db::Fqcn::from_str(db, bare))
         .iter()
-        .any(|a| a.trim_start_matches('\\').eq_ignore_ascii_case("ArrayAccess"))
+        .any(|a| {
+            a.trim_start_matches('\\')
+                .eq_ignore_ascii_case("ArrayAccess")
+        })
 }
 
 /// Resolve the value type `$obj[$idx]` yields for an `ArrayAccess`-implementing
@@ -75,9 +78,15 @@ fn resolve_array_access_value_type(
     let class_tps = crate::db::class_template_params(db, bare).unwrap_or_default();
     let bindings = crate::generic::build_class_bindings(&class_tps, type_params);
 
-    let annotated = class.implements_type_args().iter().find_map(|(iface, args)| {
-        (iface.trim_start_matches('\\').eq_ignore_ascii_case("ArrayAccess")).then_some(args)
-    });
+    let annotated = class
+        .implements_type_args()
+        .iter()
+        .find_map(|(iface, args)| {
+            (iface
+                .trim_start_matches('\\')
+                .eq_ignore_ascii_case("ArrayAccess"))
+            .then_some(args)
+        });
     if let Some(args) = annotated {
         if args.len() >= 2 {
             return Some(args[1].substitute_templates(&bindings));
@@ -86,7 +95,11 @@ fn resolve_array_access_value_type(
 
     let (_, def) =
         crate::db::find_method_in_chain(db, crate::db::Fqcn::from_str(db, bare), "offsetget")?;
-    let ty = def.return_type.as_deref().cloned().unwrap_or_else(Type::mixed);
+    let ty = def
+        .return_type
+        .as_deref()
+        .cloned()
+        .unwrap_or_else(Type::mixed);
     Some(ty.substitute_templates(&bindings))
 }
 

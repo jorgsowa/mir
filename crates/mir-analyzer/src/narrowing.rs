@@ -1517,7 +1517,10 @@ fn project_type_params_onto_subclass(
             let Some(bare_name) = bare_named_type(arg_expr) else {
                 continue;
             };
-            if let Some(pos) = class_own_tps.iter().position(|tp| tp.name.as_str() == bare_name) {
+            if let Some(pos) = class_own_tps
+                .iter()
+                .position(|tp| tp.name.as_str() == bare_name)
+            {
                 result[pos] = given_ty.clone();
                 any_bound = true;
             }
@@ -3189,7 +3192,9 @@ fn collect_array_access_path(
     };
     let idx = aa.index.as_ref()?;
     let key = match &idx.kind {
-        ExprKind::String(s) => mir_types::atomic::ArrayKey::String(std::sync::Arc::from(s.as_ref())),
+        ExprKind::String(s) => {
+            mir_types::atomic::ArrayKey::String(std::sync::Arc::from(s.as_ref()))
+        }
         ExprKind::Int(i) => mir_types::atomic::ArrayKey::Int(*i),
         _ => return None,
     };

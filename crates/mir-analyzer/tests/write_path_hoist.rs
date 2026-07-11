@@ -107,8 +107,8 @@ fn no_ref_index_locks_on_edit_or_read_paths_when_opted_out() {
         );
         assert!(!refs.is_empty(), "pure references path must still work");
         // Edit sweep (the per-keystroke republish path).
-        let _ = session
-            .reanalyze_files_cancellable(std::slice::from_ref(&file_b), &IndexCancel::new());
+        let _ =
+            session.reanalyze_files_cancellable(std::slice::from_ref(&file_b), &IndexCancel::new());
         // Close path.
         session.invalidate_file(file_b.as_ref());
     };

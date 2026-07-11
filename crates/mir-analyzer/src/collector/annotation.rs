@@ -8,16 +8,12 @@ pub(super) fn build_assertions(
     resolve_union_doc_fn: impl Fn(Type) -> Type,
 ) -> Vec<Assertion> {
     let mut assertions = Vec::new();
-    assertions.extend(
-        doc.assertions
-            .iter()
-            .map(|(param, ty, negated)| Assertion {
-                kind: AssertionKind::Assert,
-                param: Arc::from(param.as_str()),
-                ty: resolve_union_doc_fn(ty.clone()),
-                negated: *negated,
-            }),
-    );
+    assertions.extend(doc.assertions.iter().map(|(param, ty, negated)| Assertion {
+        kind: AssertionKind::Assert,
+        param: Arc::from(param.as_str()),
+        ty: resolve_union_doc_fn(ty.clone()),
+        negated: *negated,
+    }));
     assertions.extend(
         doc.assertions_if_true
             .iter()
