@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Structural subtype checks compare atomics directly instead of allocating temporary single-atomic unions in the `O(n×m)` union pair loops; generic inference uses `FxHashSet` for template-name lookups.
 - Flow-state assignment tracking and diverging-branch merges no longer clone write-location collections to satisfy the borrow checker.
 - Type display renders straight into the formatter (no per-element `String` allocations); text and GitHub Actions issue output is batched through one buffered writer instead of a syscall per line.
+- `Atomic` shrunk further from 40 to 32 bytes (`Type` 96 → 80) by boxing the `TClosure`/`TConditional` payloads; a size regression test now guards both bounds.
+- Class member lookup no longer scans every method with `eq_ignore_ascii_case` — keys are lowercase-normalized at collection time, so `find_method_in_class` is a single hashed get. Member maps, the global `Type` interner, and the lowercase-name cache all moved from SipHash to FxHash.
+- Cache hits Arc-share the stored issues and reference locations instead of deep-cloning them under the global cache lock, which serialized the parallel body pass on warm runs; reference replay reuses interned `Arc<str>` symbol keys instead of allocating each symbol string twice per run.
+- Variable reads (the hottest expression kind) intern their name once instead of four times per read, and no longer allocate a normalized copy of the file path per read for the view-template check.
+- `ResolvedSymbol` recording — a deep `Type` clone per reference — is skipped entirely in walks whose symbol buffer is discarded: the CLI batch pass and pure inference walks.
+- Keyed-array (shape) hashing combines per-entry hashes commutatively instead of allocating and sorting a `Vec` on every hash; `substitute_templates` returns a plain clone when no atomic can reference a template.
+- The unused-suppression pass buckets issues by file once instead of scanning (and cloning) the whole issue list per file with named suppressions.
 
 ## [0.52.0] - 2026-07-11
 
