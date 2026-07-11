@@ -1456,6 +1456,104 @@ fn narrow_or_isset_true(
     }
 }
 
+/// When `class_name` is a (possibly indirect) subclass/subinterface of
+/// `atom_fqcn` and the atom being narrowed carries concrete `type_params`
+/// (e.g. `Box<int>`), project those onto `class_name`'s own template params
+/// instead of discarding them: `$b instanceof IntBox` on a `Box<int>`
+/// receiver should narrow to `IntBox<int>`, not a bare unparameterized
+/// `IntBox` that leaves a later `IntBox` method's own `@return T` unresolved
+/// and unrelated to `Box`'s binding.
+///
+/// Handles the two shapes real code uses to relate a subclass's own template
+/// params to its ancestor's: an explicit `@extends`/`@implements
+/// Ancestor<...>` clause whose args are bare references to the subclass's
+/// own template param names (identity or renamed passthrough), and the
+/// simpler case where the subclass declares no such clause at all but has
+/// the same template arity as the ancestor, which real-world code (and this
+/// analyzer's own `effective_class_template_params`) treats as an implicit,
+/// unchanged passthrough. Anything else (arity mismatch, no relationship
+/// found) falls back to no type params, same as before this projection
+/// existed.
+fn project_type_params_onto_subclass(
+    db: &dyn MirDatabase,
+    atom_fqcn: &str,
+    atom_type_params: &[Type],
+    class_name: &str,
+) -> std::sync::Arc<[Type]> {
+    let Some(class_own_tps) = crate::db::class_template_params(db, class_name) else {
+        return mir_types::union::empty_type_params();
+    };
+    if class_own_tps.is_empty() {
+        return mir_types::union::empty_type_params();
+    }
+    let Some(atom_own_tps) = crate::db::class_template_params(db, atom_fqcn) else {
+        return mir_types::union::empty_type_params();
+    };
+    let here = crate::db::Fqcn::from_str(db, class_name);
+    let Some(class) = crate::db::find_class_like(db, here) else {
+        return mir_types::union::empty_type_params();
+    };
+
+    let explicit_args: Option<&[Type]> = if class
+        .parent()
+        .is_some_and(|p| p.as_ref().eq_ignore_ascii_case(atom_fqcn))
+    {
+        Some(class.extends_type_args())
+    } else {
+        class
+            .implements_type_args()
+            .iter()
+            .chain(class.interface_extends_type_args())
+            .find(|(iface, _)| iface.as_ref().eq_ignore_ascii_case(atom_fqcn))
+            .map(|(_, args)| args.as_slice())
+    };
+
+    let mut result = vec![Type::mixed(); class_own_tps.len()];
+    let mut any_bound = false;
+
+    if let Some(args) = explicit_args.filter(|a| !a.is_empty()) {
+        for (idx, given_ty) in atom_type_params.iter().enumerate() {
+            let Some(arg_expr) = args.get(idx) else {
+                continue;
+            };
+            let Some(bare_name) = bare_named_type(arg_expr) else {
+                continue;
+            };
+            if let Some(pos) = class_own_tps.iter().position(|tp| tp.name.as_str() == bare_name) {
+                result[pos] = given_ty.clone();
+                any_bound = true;
+            }
+        }
+    } else if class_own_tps.len() == atom_own_tps.len() {
+        result = atom_type_params.to_vec();
+        any_bound = !result.is_empty();
+    }
+
+    if any_bound {
+        mir_types::union::vec_to_type_params(result)
+    } else {
+        mir_types::union::empty_type_params()
+    }
+}
+
+/// A `Type` consisting of exactly one bare, unqualified named-type atom
+/// (e.g. a docblock's `@extends Box<U>` argument referencing a template
+/// param by name) — as opposed to a real, concrete class reference or a
+/// compound type. Returns that name, if so.
+fn bare_named_type(ty: &Type) -> Option<&str> {
+    if ty.types.len() != 1 {
+        return None;
+    }
+    match &ty.types[0] {
+        Atomic::TNamedObject { fqcn, type_params }
+            if type_params.is_empty() && !fqcn.contains('\\') =>
+        {
+            Some(fqcn.as_ref())
+        }
+        _ => None,
+    }
+}
+
 fn narrow_instanceof_preserving_subtypes(
     current: &Type,
     class_name: &str,
@@ -1532,6 +1630,21 @@ fn narrow_instanceof_preserving_subtypes(
                         parts: std::sync::Arc::from(new_parts),
                     });
                 }
+            }
+            // `class_name` is a (possibly indirect) subtype of the atom's own class
+            // AND the atom carries concrete type params (e.g. `Box<int>`
+            // narrowed by `instanceof IntBox`) — project them onto
+            // `class_name`'s own template params rather than discarding them.
+            Atomic::TNamedObject { fqcn, type_params }
+                if !type_params.is_empty()
+                    && named_object_matches_instanceof(class_name, fqcn, db) =>
+            {
+                let projected =
+                    project_type_params_onto_subclass(db, fqcn, type_params, class_name);
+                result.add_type(Atomic::TNamedObject {
+                    fqcn: class_name.into(),
+                    type_params: projected,
+                });
             }
             // `class_name` is a (possibly indirect) subtype of the atom's own class
             // — e.g. atom is the `Foo` interface and class_name is `A implements
@@ -1685,6 +1798,27 @@ fn narrow_or_instanceof_union(
                     result.add_type(Atomic::TIntersection {
                         parts: std::sync::Arc::from(new_parts),
                     });
+                }
+            }
+            // Some disjunct(s) are a (possibly indirect) subtype of the atom's own
+            // class AND the atom carries concrete type params — project them
+            // onto each subsuming disjunct's own template params rather than
+            // discarding them, mirroring narrow_instanceof_preserving_subtypes.
+            Atomic::TNamedObject { fqcn, type_params }
+                if !type_params.is_empty()
+                    && class_names
+                        .iter()
+                        .any(|cn| named_object_matches_instanceof(cn, fqcn, db)) =>
+            {
+                for cn in class_names {
+                    if named_object_matches_instanceof(cn, fqcn, db) {
+                        let projected =
+                            project_type_params_onto_subclass(db, fqcn, type_params, cn);
+                        result.add_type(Atomic::TNamedObject {
+                            fqcn: cn.as_str().into(),
+                            type_params: projected,
+                        });
+                    }
                 }
             }
             // Some disjunct(s) are a (possibly indirect) subtype of the atom's own
