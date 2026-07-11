@@ -1,10 +1,11 @@
+//! Definition collector.
+//!
+//! Visits every top-level declaration in the AST and produces a `StubSlice`
+//! containing class, function, and constant signatures. No type inference
+//! happens here.
+
 use rustc_hash::FxHashMap;
 use std::sync::atomic::{AtomicUsize, Ordering::Relaxed};
-/// definition collection — Definition collector.
-///
-/// Visits every top-level declaration in the AST and produces a `StubSlice`
-/// containing class, function, and constant signatures. No type inference
-/// happens here.
 use std::sync::Arc;
 
 use std::ops::ControlFlow;
@@ -15,9 +16,9 @@ use php_ast::owned::{Program, StmtKind};
 
 use crate::parser::{name_to_string_owned, type_from_hint_owned};
 use crate::php_version::PhpVersion;
-use mir_codebase::storage::{
-    wrap_return_type, wrap_template_bound, Assertion, FnParam, MethodDef, PropertyDef, StubSlice,
-    TemplateParam, Visibility,
+use mir_codebase::definitions::{
+    wrap_return_type, wrap_template_bound, Assertion, DeclaredParam, MethodDef, PropertyDef,
+    StubSlice, TemplateParam, Visibility,
 };
 use mir_issues::{Issue, IssueBuffer};
 use mir_types::{Atomic, Location, Name, Type};
@@ -1043,7 +1044,7 @@ impl<'a> DefinitionCollector<'a> {
                 Arc::from(prop.name.as_str()),
                 PropertyDef {
                     name: Arc::from(prop.name.as_str()),
-                    ty: mir_codebase::storage::wrap_property_type(ty),
+                    ty: mir_codebase::definitions::wrap_property_type(ty),
                     native_ty: None,
                     inferred_ty: None,
                     visibility: Visibility::Public,
@@ -1089,7 +1090,7 @@ impl<'a> DefinitionCollector<'a> {
                         parsed.from_docblock = true;
                         Some(self.resolve_union_doc_with_aliases(parsed, aliases))
                     };
-                    FnParam {
+                    DeclaredParam {
                         name: Name::new(p.name.as_str()),
                         ty: mir_codebase::wrap_param_type(ty),
                         out_ty: None,
@@ -1542,7 +1543,7 @@ impl<'a> DefinitionCollector<'a> {
                 resolved.from_docblock = true;
                 resolved
             });
-            params.push(FnParam {
+            params.push(DeclaredParam {
                 name: Name::new(param_name),
                 ty: mir_codebase::wrap_param_type(ty),
                 out_ty: mir_codebase::wrap_param_type(out_ty),
@@ -1571,7 +1572,7 @@ impl<'a> DefinitionCollector<'a> {
                 .map(|b| b.stmts.as_ref())
                 .unwrap_or_default();
             if crate::collector::function::stmts_use_func_get_args(body_stmts) {
-                params.push(FnParam {
+                params.push(DeclaredParam {
                     name: mir_types::Name::new("..."),
                     ty: None,
                     out_ty: None,
