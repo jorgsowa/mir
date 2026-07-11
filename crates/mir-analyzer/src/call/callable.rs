@@ -1895,7 +1895,7 @@ fn preg_match_leaf(flags: i64) -> Type {
             },
         );
         Type::single(Atomic::TKeyedArray {
-            properties: props,
+            properties: Box::new(props),
             is_open: false,
             is_list: true,
         })

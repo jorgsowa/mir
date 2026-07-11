@@ -539,7 +539,7 @@ fn infer_from_pair(
                         Atomic::TKeyedArray { properties, .. } => {
                             let mut key_union = Type::empty();
                             let mut val_union = Type::empty();
-                            for (k, prop) in properties {
+                            for (k, prop) in properties.iter() {
                                 let key_atomic = match k {
                                     ArrayKey::String(_) => Atomic::TString,
                                     ArrayKey::Int(_) => Atomic::TInt,
@@ -595,7 +595,7 @@ fn infer_from_pair(
                         Atomic::TKeyedArray { properties, .. } => {
                             let mut key_union = Type::empty();
                             let mut val_union = Type::empty();
-                            for (k, prop) in properties {
+                            for (k, prop) in properties.iter() {
                                 let key_atomic = match k {
                                     ArrayKey::String(_) => Atomic::TString,
                                     ArrayKey::Int(_) => Atomic::TInt,

@@ -93,7 +93,7 @@ pub(crate) fn infer_foreach_types(arr_ty: &Type) -> (Type, Type) {
             Atomic::TKeyedArray { properties, .. } => {
                 let mut keys = Type::empty();
                 let mut values = Type::empty();
-                for (k, prop) in properties {
+                for (k, prop) in properties.iter() {
                     let key_atomic = match k {
                         ArrayKey::String(s) => Atomic::TLiteralString(s.clone()),
                         ArrayKey::Int(i) => Atomic::TLiteralInt(*i),

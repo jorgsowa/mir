@@ -109,7 +109,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
         if elements.is_empty() {
             return Type::single(Atomic::TKeyedArray {
-                properties: indexmap::IndexMap::new(),
+                properties: Box::default(),
                 is_open: false,
                 is_list: true,
             });
@@ -195,7 +195,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
         if can_be_keyed {
             return Type::single(Atomic::TKeyedArray {
-                properties: keyed_props,
+                properties: Box::new(keyed_props),
                 is_open: false,
                 is_list,
             });

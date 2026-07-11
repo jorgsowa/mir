@@ -197,20 +197,22 @@ pub(super) fn resolve_atomic_inner(
             is_open,
             is_list,
         } => Atomic::TKeyedArray {
-            properties: properties
-                .into_iter()
-                .map(|(key, prop)| {
-                    let resolved_ty =
-                        resolve_union_inner(prop.ty, full_qualify, namespace, use_aliases);
-                    (
-                        key,
-                        KeyedProperty {
-                            ty: resolved_ty,
-                            optional: prop.optional,
-                        },
-                    )
-                })
-                .collect(),
+            properties: Box::new(
+                properties
+                    .into_iter()
+                    .map(|(key, prop)| {
+                        let resolved_ty =
+                            resolve_union_inner(prop.ty, full_qualify, namespace, use_aliases);
+                        (
+                            key,
+                            KeyedProperty {
+                                ty: resolved_ty,
+                                optional: prop.optional,
+                            },
+                        )
+                    })
+                    .collect(),
+            ),
             is_open,
             is_list,
         },

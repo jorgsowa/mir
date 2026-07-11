@@ -192,7 +192,7 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
             u.add_type(Atomic::TLiteralString(Arc::from("")));
             u.add_type(Atomic::TLiteralString(Arc::from("0")));
             u.add_type(Atomic::TKeyedArray {
-                properties: IndexMap::new(),
+                properties: Box::default(),
                 is_open: false,
                 is_list: true,
             });
@@ -665,7 +665,7 @@ pub(super) fn parse_keyed_array(inner: &str, is_list: bool) -> Type {
     }
 
     Type::single(Atomic::TKeyedArray {
-        properties,
+        properties: Box::new(properties),
         is_open,
         is_list,
     })

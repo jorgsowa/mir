@@ -931,7 +931,7 @@ impl Type {
                         })
                         .collect();
                     result.add_type(Atomic::TKeyedArray {
-                        properties: new_props,
+                        properties: Box::new(new_props),
                         is_open: *is_open,
                         is_list: *is_list,
                     });
@@ -2010,7 +2010,7 @@ mod tests {
             },
         );
         let ty = Type::single(Atomic::TKeyedArray {
-            properties: props,
+            properties: Box::new(props),
             is_open: true,
             is_list: false,
         });

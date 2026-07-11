@@ -194,7 +194,9 @@ pub enum Atomic {
     TNonEmptyList { value: Box<Type> },
     /// `array{key: T, ...}` — shape / keyed array
     TKeyedArray {
-        properties: IndexMap<ArrayKey, KeyedProperty>,
+        /// Boxed: an inline `IndexMap` (~72 B) would otherwise set the size of
+        /// every `Atomic` — and `Type` inlines two — for this rare variant.
+        properties: Box<IndexMap<ArrayKey, KeyedProperty>>,
         /// If true, additional keys beyond the declared ones may exist
         is_open: bool,
         /// If true, the shape represents a list (integer keys only)
