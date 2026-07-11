@@ -32,7 +32,7 @@ use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use mir_codebase::storage::{deduplicate_params_in_slice, StubSlice};
+use mir_codebase::definitions::{deduplicate_params_in_slice, StubSlice};
 use serde::{Deserialize, Serialize};
 
 /// Magic bytes at the start of every cache entry. "MIR\x01" little-endian.
@@ -118,8 +118,20 @@ impl StubSliceCache {
         }
         let entry_path = self.shard_path(path);
         let bytes = std::fs::read(&entry_path).ok()?;
+        // A stale or bit-flipped entry can desync bincode's length-prefixed
+        // decoding, making it read a bogus multi-gigabyte collection length
+        // from garbage bytes and try to allocate it before returning an
+        // error. Bounding every read to the entry's own size makes that
+        // impossible: the real data can never need more bytes than the file
+        // contains, so a desync now fails fast as a miss instead of paging
+        // the machine to death. `config()` (not the newer `options()`) is
+        // required here: it's the fixint encoding `put()` writes with, while
+        // `options()`'s `DefaultOptions` defaults to varint and silently
+        // misreads every field.
+        #[allow(deprecated)]
+        let cfg = bincode::config().limit(bytes.len() as u64).clone();
         let mut cursor = Cursor::new(&bytes);
-        let header: Header = bincode::deserialize_from(&mut cursor).ok()?;
+        let header: Header = cfg.deserialize_from(&mut cursor).ok()?;
         if header.magic != MAGIC
             || header.format_version != FORMAT_VERSION
             || header.mir_version != mir_version_hash()
@@ -129,7 +141,7 @@ impl StubSliceCache {
             self.misses.fetch_add(1, Ordering::Relaxed);
             return None;
         }
-        match bincode::deserialize_from::<_, StubSlice>(&mut cursor) {
+        match cfg.deserialize_from::<_, StubSlice>(&mut cursor) {
             Ok(mut slice) => {
                 // Restore the caller's path; cached paths are not trusted.
                 slice.file = Some(std::sync::Arc::from(path));
@@ -225,7 +237,7 @@ pub fn prepare_for_ingest(slice: &mut StubSlice) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mir_codebase::storage::StubSlice;
+    use mir_codebase::definitions::StubSlice;
     use tempfile::TempDir;
 
     fn make_cache() -> (TempDir, StubSliceCache) {
@@ -309,6 +321,41 @@ mod tests {
             .join(&s[..2])
             .join(format!("{}.bin", s));
         std::fs::write(&bad, b"not a header").unwrap();
+
+        assert!(cache.get("/x/a.php", &hash, 8).is_none());
+    }
+
+    /// A desynced body (valid header, incompatible payload) can make bincode
+    /// read a garbage multi-exabyte collection length instead of erroring
+    /// immediately. Without a size limit this tries to allocate that much
+    /// before ever returning `Err`; regression test for that failure mode.
+    #[test]
+    fn oversized_length_prefix_is_treated_as_miss_not_a_huge_allocation() {
+        let (dir, cache) = make_cache();
+        let hash = hash_source("a");
+        cache.put("/x/a.php", &hash, 8, &StubSlice::default());
+
+        let digest = blake3::hash("/x/a.php".as_bytes()).to_hex();
+        let s = digest.as_str();
+        let entry_path = dir
+            .path()
+            .join("stubs")
+            .join(&s[..2])
+            .join(format!("{}.bin", s));
+        let mut bytes = std::fs::read(&entry_path).unwrap();
+
+        // Find where the header ends, same as `get` does.
+        let mut cursor = Cursor::new(&bytes);
+        #[allow(deprecated)]
+        let cfg = bincode::config().limit(bytes.len() as u64).clone();
+        let _: Header = cfg.deserialize_from(&mut cursor).unwrap();
+        let header_len = cursor.position() as usize;
+
+        // Replace the body with a claimed length far larger than the file
+        // could possibly contain.
+        bytes.truncate(header_len);
+        bytes.extend_from_slice(&bincode::serialize(&u64::MAX).unwrap());
+        std::fs::write(&entry_path, &bytes).unwrap();
 
         assert!(cache.get("/x/a.php", &hash, 8).is_none());
     }

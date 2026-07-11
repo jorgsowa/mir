@@ -520,7 +520,17 @@ impl AnalysisCache {
         };
         // Primary: bincode format
         if let Ok(bytes) = std::fs::read(cache_dir.join("cache.bin")) {
-            if let Ok(file) = bincode::deserialize::<CacheFile>(&bytes) {
+            // Bound the read to the file's own size: an incompatible or
+            // bit-flipped cache.bin can desync bincode's length-prefixed
+            // decoding into reading a bogus multi-gigabyte collection length
+            // from garbage bytes, which otherwise tries to allocate that much
+            // before deserialize() gets a chance to return an error. `config()`
+            // (not the newer `options()`) is required here: it's the fixint
+            // encoding this file is written with, while `options()`'s
+            // `DefaultOptions` defaults to varint and silently misreads it.
+            #[allow(deprecated)]
+            let cfg = bincode::config().limit(bytes.len() as u64).clone();
+            if let Ok(file) = cfg.deserialize::<CacheFile>(&bytes) {
                 return fresh(file);
             }
         }
