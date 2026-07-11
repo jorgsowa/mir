@@ -13,7 +13,7 @@ use crate::flow_state::FlowState;
 use crate::narrowing::narrow_from_condition;
 use crate::parser;
 
-use super::loops::infer_foreach_types;
+use super::loops::infer_foreach_types_with_db;
 use super::StatementsAnalyzer;
 
 impl<'a> StatementsAnalyzer<'a> {
@@ -332,7 +332,7 @@ impl<'a> StatementsAnalyzer<'a> {
         ctx: &mut FlowState,
     ) {
         let arr_ty = self.expr_analyzer(ctx).analyze(&fe.expr, ctx);
-        let (key_ty, mut value_ty) = infer_foreach_types(&arr_ty);
+        let (key_ty, mut value_ty) = infer_foreach_types_with_db(self.db, &arr_ty);
 
         if let Some(vname) = extract_simple_var(&fe.value) {
             let doc = crate::parser::find_preceding_docblock(self.source, stmt.span.start);
