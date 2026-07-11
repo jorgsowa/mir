@@ -132,6 +132,9 @@ pub struct MirDbStorage {
     /// symbol→files views behind one lock with a single writer path, so the
     /// views cannot drift apart. See [`crate::db::ref_index::RefIndex`].
     ref_index: Arc<Mutex<crate::db::ref_index::RefIndex>>,
+    /// Times `ref_index` was locked, shared across clones. Hosts that opt out
+    /// of index maintenance assert this stays flat across edit/read paths.
+    ref_index_locks: Arc<std::sync::atomic::AtomicU64>,
     /// Per-clone staging area for reference locations.  Workers push here
     /// during parallel analysis; the orchestrator drains and commits serially.
     pending_ref_locs: PendingRefLocs,
@@ -256,6 +259,7 @@ impl Default for MirDbStorage {
         let mut db = Self {
             storage: salsa::Storage::default(),
             ref_index: Arc::default(),
+            ref_index_locks: Arc::default(),
             pending_ref_locs: PendingRefLocs::default(),
             source_files: Arc::default(),
             deleted_files: Arc::default(),
@@ -349,7 +353,7 @@ impl MirDatabase for MirDbStorage {
     }
 
     fn symbol_referencers_of(&self, symbol_key: &str) -> Vec<Arc<str>> {
-        self.ref_index.lock().referencers_of(symbol_key)
+        self.locked_ref_index().referencers_of(symbol_key)
     }
 
     fn record_reference_location(&self, loc: RefLoc) {
@@ -389,27 +393,27 @@ impl MirDatabase for MirDbStorage {
     }
 
     fn extract_file_reference_locations(&self, file: &str) -> Vec<(Arc<str>, u32, u16, u16)> {
-        self.ref_index.lock().file_locations(file)
+        self.locked_ref_index().file_locations(file)
     }
 
     fn reference_locations(&self, symbol: &str) -> Vec<(Arc<str>, u32, u16, u16)> {
-        self.ref_index.lock().locations_of(symbol)
+        self.locked_ref_index().locations_of(symbol)
     }
 
     fn has_reference(&self, symbol: &str) -> bool {
-        self.ref_index.lock().has_reference(symbol)
+        self.locked_ref_index().has_reference(symbol)
     }
 
     fn clear_file_references(&self, file: &str) {
-        self.ref_index.lock().clear_file(file);
+        self.locked_ref_index().clear_file(file);
     }
 
     fn all_reference_location_pairs(&self) -> Vec<(Arc<str>, Arc<str>)> {
-        self.ref_index.lock().all_pairs()
+        self.locked_ref_index().all_pairs()
     }
 
     fn file_referenced_symbols(&self, file: &str) -> Vec<Arc<str>> {
-        self.ref_index.lock().symbols_referenced_by(file)
+        self.locked_ref_index().symbols_referenced_by(file)
     }
 
     fn lookup_source_file(&self, path: &str) -> Option<SourceFile> {
@@ -485,6 +489,20 @@ impl MirDatabase for MirDbStorage {
 }
 
 impl MirDbStorage {
+    /// The single gateway to the reference index: every lock is counted so
+    /// hosts can assert the index stays untouched on their hot paths.
+    fn locked_ref_index(&self) -> parking_lot::MutexGuard<'_, crate::db::ref_index::RefIndex> {
+        self.ref_index_locks
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.ref_index.lock()
+    }
+
+    /// Times the reference index has been locked (all clones combined).
+    pub fn ref_index_lock_count(&self) -> u64 {
+        self.ref_index_locks
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
     /// Wire a disk-backed stub cache into this db so `collect_file_definitions`
     /// can skip reparsing on cache hits. Called by `AnalyzerDb::with_cache_dir`.
     pub fn set_stub_cache(&self, cache: Arc<crate::stub_cache::StubSliceCache>) {
@@ -956,7 +974,7 @@ impl MirDbStorage {
         if locs.is_empty() {
             return;
         }
-        self.ref_index.lock().append_batch(locs);
+        self.locked_ref_index().append_batch(locs);
     }
 
     /// Replace `file`'s reference locations wholesale (clear + append) in
@@ -966,7 +984,7 @@ impl MirDbStorage {
     /// recorded by nested on-demand inference) are appended without
     /// clearing those files.
     pub fn set_file_reference_locations(&self, file: &str, locs: Vec<RefLoc>) {
-        self.ref_index.lock().set_file_refs(file, locs);
+        self.locked_ref_index().set_file_refs(file, locs);
     }
 
     /// Install or replace the active class resolver.

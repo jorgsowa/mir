@@ -183,6 +183,36 @@ impl AnalysisSession {
         self.priority_index_for_ast(program, file);
     }
 
+    /// Run `file`'s Phase-1 warm-up — resolve its direct class references and
+    /// lazy-load any not yet indexed — and record it as prepared against its
+    /// current text. No-op when the file is unknown or already prepared.
+    ///
+    /// This is the write-path home of the warm-up: hosts call it (via
+    /// [`Self::ingest_file_prepared`]) when text lands, so read paths
+    /// (`references_to_in_files`, `reanalyze_files_cancellable`) find every
+    /// candidate prepared and stay pure. Loading mutates salsa inputs, so the
+    /// parse snapshot is scoped and dropped before the warm-up runs — callers
+    /// must not hold a live snapshot across this call.
+    pub fn prepare_file_for_analysis(&self, path: &std::sync::Arc<str>) {
+        let generation = self.prepare_generation_snapshot();
+        let (parsed, text) = {
+            let db = self.snapshot_db();
+            let Some(sf) = db.lookup_source_file(path.as_ref()) else {
+                return;
+            };
+            let text = sf.text(&db as &dyn crate::db::MirDatabase);
+            if self.is_prepared_for_analysis(path.as_ref(), &text, generation) {
+                return;
+            }
+            (
+                crate::db::parse_file(&db as &dyn crate::db::MirDatabase, sf).0,
+                text,
+            )
+        };
+        self.prepare_ast_for_analysis(&parsed.program, path.as_ref());
+        self.mark_prepared_for_analysis(path, text, generation);
+    }
+
     /// Current warm-up generation; capture before a prepare + mark pair so a
     /// concurrent [`Self::bump_prepare_generation`] invalidates the mark.
     pub(crate) fn prepare_generation_snapshot(&self) -> u64 {

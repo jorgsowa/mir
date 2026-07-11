@@ -98,6 +98,12 @@ pub struct AnalysisSession {
     /// warm-up re-run to lazy-load a replacement (e.g. a vendor class shadowed
     /// by a since-deleted project class).
     prepare_generation: Arc<std::sync::atomic::AtomicU64>,
+    /// Whether analysis maintains the legacy imperative reference index
+    /// ([`crate::db::RefIndex`]). On by default. Hosts that read references
+    /// exclusively through the memoized [`Self::references_to_in_files`] path
+    /// opt out via [`Self::without_reference_index`], removing every
+    /// `RefIndex` lock from their edit and read paths.
+    pub(crate) maintain_ref_index: bool,
 }
 
 /// FQCN → optional resolver-mapped path. See the field doc on
@@ -136,7 +142,30 @@ impl AnalysisSession {
             pending_eager_function_files: Arc::new(parking_lot::Mutex::new(Some(Vec::new()))),
             prepared_files: Arc::new(RwLock::new(HashMap::default())),
             prepare_generation: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            maintain_ref_index: true,
         }
+    }
+
+    /// Stop maintaining the legacy imperative reference index on the
+    /// incremental (LSP-style) paths: `ingest_file`, `invalidate_file`,
+    /// [`crate::FileAnalyzer`] commits, and the `reanalyze_*` sweeps.
+    ///
+    /// After this, [`Self::references_to`] / [`Self::reference_locations`]
+    /// return empty for files analyzed through those paths and
+    /// [`Self::dependency_graph`] loses body-level bare-FQN edges — callers
+    /// must use the memoized [`Self::references_to_in_files`] /
+    /// [`Self::reanalyze_files_cancellable`] paths instead. In exchange, no
+    /// edit or read ever takes the `RefIndex` lock (assert via
+    /// [`Self::ref_index_lock_count`]) and the index holds no memory.
+    /// The batch entry points (`analyze_paths`) still maintain the index.
+    pub fn without_reference_index(mut self) -> Self {
+        self.maintain_ref_index = false;
+        self
+    }
+
+    /// Times the reference index has been locked on this session's db.
+    pub fn ref_index_lock_count(&self) -> u64 {
+        self.db.salsa.read().ref_index_lock_count()
     }
 
     /// Swap in a custom [`crate::SourceProvider`]. LSPs install a VFS-backed

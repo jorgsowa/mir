@@ -80,7 +80,7 @@ impl AnalysisSession {
     /// [`crate::BatchFileAnalyzer`] after parallel body analysis to flush the pending
     /// buffers that accumulate in worker db clones.
     pub(crate) fn commit_ref_locs_batch(&self, locs: Vec<RefLoc>) {
-        if locs.is_empty() {
+        if locs.is_empty() || !self.maintain_ref_index {
             return;
         }
         let guard = self.db.salsa.read();
@@ -123,7 +123,7 @@ impl AnalysisSession {
             .cloned()
             .unwrap_or_default();
 
-        {
+        if self.maintain_ref_index {
             let mut guard = self.db.salsa.write();
             guard.remove_file_definitions(file.as_ref());
         }
@@ -199,6 +199,21 @@ impl AnalysisSession {
                 }
             }
         }
+    }
+
+    /// [`Self::ingest_file`] followed by the file's Phase-1 warm-up
+    /// ([`Self::prepare_file_for_analysis`]): its direct class references are
+    /// resolved and lazy-loaded *now*, at write time, instead of serially at
+    /// the front of the next references / re-analysis read.
+    ///
+    /// This is the host edit-path entry point (rust-analyzer's discipline:
+    /// mutation happens only when text changes; requests are pure reads).
+    /// Lazy loads triggered by the warm-up go through plain
+    /// [`Self::ingest_file`], so faulting in a dependency never cascades into
+    /// preparing *its* dependencies — the load frontier stays one file wide.
+    pub fn ingest_file_prepared(&self, file: Arc<str>, source: Arc<str>) {
+        self.ingest_file(file.clone(), source);
+        self.prepare_file_for_analysis(&file);
     }
 
     /// Register `source` as the text of `file` in the salsa input layer **without**
@@ -459,7 +474,9 @@ impl AnalysisSession {
     pub fn invalidate_file(&self, file: &str) {
         {
             let mut guard = self.db.salsa.write();
-            guard.remove_file_definitions(file);
+            if self.maintain_ref_index {
+                guard.remove_file_definitions(file);
+            }
             guard.remove_source_file(file);
         }
         // Outgoing structural edges disappear from the derived graph

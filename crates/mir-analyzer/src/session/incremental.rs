@@ -113,32 +113,17 @@ impl AnalysisSession {
         //  - even serially, a snapshot held across the loop (e.g. one taken to
         //    parse the dependents) blocks the very first write.
         //
-        // So each iteration takes a *scoped* snapshot to fetch the parsed AST,
-        // drops it (the `Arc<ParseResult>` is owned), and only then warms up.
+        // `prepare_file_for_analysis` takes a *scoped* snapshot to fetch the
+        // parsed AST, drops it (the `Arc<ParseResult>` is owned), and only
+        // then warms up. Files already prepared against their current text
+        // skip the parse + AST walk entirely — hosts on the
+        // `ingest_file_prepared` write path pre-pay this per edit, making the
+        // whole loop a map-lookup sweep.
         for file in &dependents {
             if cancel.is_cancelled() {
                 return Vec::new();
             }
-            // Same warm-up skip as `references_to_in_files`: a dependent
-            // already prepared against its current text can't discover new
-            // lazy-load targets — skip the parse + AST walk.
-            let generation = self.prepare_generation_snapshot();
-            let (parsed, text) = {
-                let db = self.snapshot_db();
-                let Some(sf) = db.lookup_source_file(file.as_ref()) else {
-                    continue;
-                };
-                let text = sf.text(&db as &dyn crate::db::MirDatabase);
-                if self.is_prepared_for_analysis(file.as_ref(), &text, generation) {
-                    continue;
-                }
-                (
-                    crate::db::parse_file(&db as &dyn crate::db::MirDatabase, sf).0,
-                    text,
-                )
-            };
-            self.prepare_ast_for_analysis(&parsed.program, file.as_ref());
-            self.mark_prepared_for_analysis(file, text, generation);
+            self.prepare_file_for_analysis(file);
         }
 
         // Phase 2b: drive each dependent through the `analyze_file` tracked
@@ -175,7 +160,7 @@ impl AnalysisSession {
 
         // Serial commit: each dependent's output is its complete reference
         // set, so replace rather than append.
-        {
+        if self.maintain_ref_index {
             let guard = self.db.salsa.read();
             for (file, out) in &results {
                 guard.set_file_reference_locations(file.as_ref(), out.ref_locs.to_vec());

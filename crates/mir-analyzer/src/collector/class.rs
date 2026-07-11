@@ -155,15 +155,18 @@ impl<'a> DefinitionCollector<'a> {
                                         )
                                     })
                                 };
-                                // When the native hint is a plain unspecialized `array`, prefer
-                                // the @param docblock if it provides a more specific generic array.
+                                // When the native hint is a plain unspecialized `array` or
+                                // `mixed` — the two hints PHP generics idioms fall back to
+                                // when there's no way to natively express a template param —
+                                // prefer the @param docblock if it provides a more specific
+                                // type, e.g. `@param T $value` alongside `public mixed $value`.
                                 let ty = if native_ty.as_ref().is_some_and(|t| {
                                     t.types.len() == 1
-                                        && matches!(
+                                        && (matches!(
                                             &t.types[0],
                                             Atomic::TArray { key, value }
                                                 if key.is_mixed() && value.is_mixed()
-                                        )
+                                        ) || matches!(&t.types[0], Atomic::TMixed))
                                 }) {
                                     resolve_doc().or(native_ty)
                                 } else {

@@ -292,20 +292,7 @@ impl AnalysisSession {
             if should_cancel() {
                 return None;
             }
-            let generation = self.prepare_generation_snapshot();
-            let (parsed, text) = {
-                let db = self.snapshot_db();
-                let Some(sf) = db.lookup_source_file(path.as_ref()) else {
-                    continue;
-                };
-                let text = sf.text(&db as &dyn MirDatabase);
-                if self.is_prepared_for_analysis(path.as_ref(), &text, generation) {
-                    continue;
-                }
-                (crate::db::parse_file(&db as &dyn MirDatabase, sf).0, text)
-            };
-            self.prepare_ast_for_analysis(&parsed.program, path.as_ref());
-            self.mark_prepared_for_analysis(path, text, generation);
+            self.prepare_file_for_analysis(path);
         }
 
         // Phase 2 (parallel, pure) under a `salsa::Cancelled` retry loop: every
