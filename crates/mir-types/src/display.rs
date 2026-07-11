@@ -3,13 +3,43 @@ use std::fmt;
 use crate::atomic::Atomic;
 use crate::union::Type;
 
+/// Write `items` separated by `sep` straight into the formatter, avoiding the
+/// intermediate `Vec<String>` + `join` allocations.
+fn write_joined<T: fmt::Display>(
+    f: &mut fmt::Formatter<'_>,
+    items: impl IntoIterator<Item = T>,
+    sep: &str,
+) -> fmt::Result {
+    for (i, item) in items.into_iter().enumerate() {
+        if i > 0 {
+            f.write_str(sep)?;
+        }
+        write!(f, "{item}")?;
+    }
+    Ok(())
+}
+
+/// Write a comma-separated callable/closure parameter type list, printing
+/// `mixed` for untyped params.
+fn write_param_types(f: &mut fmt::Formatter<'_>, params: &[crate::atomic::FnParam]) -> fmt::Result {
+    for (i, p) in params.iter().enumerate() {
+        if i > 0 {
+            f.write_str(", ")?;
+        }
+        match &p.ty {
+            Some(ty) => write!(f, "{ty}")?,
+            None => f.write_str("mixed")?,
+        }
+    }
+    Ok(())
+}
+
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.types.is_empty() {
             return write!(f, "never");
         }
-        let strs: Vec<String> = self.types.iter().map(|a| format!("{a}")).collect();
-        write!(f, "{}", strs.join("|"))
+        write_joined(f, self.types.iter(), "|")
     }
 }
 
@@ -61,8 +91,9 @@ impl fmt::Display for Atomic {
                 if type_params.is_empty() {
                     write!(f, "{fqcn}")
                 } else {
-                    let params: Vec<String> = type_params.iter().map(|p| format!("{p}")).collect();
-                    write!(f, "{}<{}>", fqcn, params.join(", "))
+                    write!(f, "{fqcn}<")?;
+                    write_joined(f, type_params.iter(), ", ")?;
+                    f.write_str(">")
                 }
             }
             Atomic::TStaticObject { fqcn } => write!(f, "static({fqcn})"),
@@ -77,20 +108,12 @@ impl fmt::Display for Atomic {
                 params: Some(params),
                 return_type,
             } => {
-                let ps: Vec<String> = params
-                    .iter()
-                    .map(|p| {
-                        if let Some(ty) = &p.ty {
-                            format!("{ty}")
-                        } else {
-                            "mixed".to_string()
-                        }
-                    })
-                    .collect();
-                let ret = return_type
-                    .as_ref()
-                    .map_or_else(|| "mixed".to_string(), |r| format!("{r}"));
-                write!(f, "callable({}): {}", ps.join(", "), ret)
+                f.write_str("callable(")?;
+                write_param_types(f, params)?;
+                match return_type {
+                    Some(r) => write!(f, "): {r}"),
+                    None => f.write_str("): mixed"),
+                }
             }
             Atomic::TCallable {
                 params: None,
@@ -103,17 +126,9 @@ impl fmt::Display for Atomic {
                 return_type,
                 ..
             } => {
-                let ps: Vec<String> = params
-                    .iter()
-                    .map(|p| {
-                        if let Some(ty) = &p.ty {
-                            format!("{ty}")
-                        } else {
-                            "mixed".to_string()
-                        }
-                    })
-                    .collect();
-                write!(f, "Closure({}): {}", ps.join(", "), return_type)
+                f.write_str("Closure(")?;
+                write_param_types(f, params)?;
+                write!(f, "): {return_type}")
             }
 
             Atomic::TArray { key, value } => {
@@ -125,18 +140,21 @@ impl fmt::Display for Atomic {
             }
             Atomic::TNonEmptyList { value } => write!(f, "non-empty-list<{value}>"),
             Atomic::TKeyedArray { properties, .. } => {
-                let entries: Vec<String> = properties
-                    .iter()
-                    .map(|(k, v)| {
-                        let key_str = match k {
-                            crate::atomic::ArrayKey::String(s) => format!("'{s}'"),
-                            crate::atomic::ArrayKey::Int(n) => n.to_string(),
-                        };
-                        let opt = if v.optional { "?" } else { "" };
-                        format!("{}{}: {}", key_str, opt, v.ty)
-                    })
-                    .collect();
-                write!(f, "array{{{}}}", entries.join(", "))
+                f.write_str("array{")?;
+                for (i, (k, v)) in properties.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(", ")?;
+                    }
+                    match k {
+                        crate::atomic::ArrayKey::String(s) => write!(f, "'{s}'")?,
+                        crate::atomic::ArrayKey::Int(n) => write!(f, "{n}")?,
+                    }
+                    if v.optional {
+                        f.write_str("?")?;
+                    }
+                    write!(f, ": {}", v.ty)?;
+                }
+                f.write_str("}")
             }
 
             Atomic::TTemplateParam { name, .. } => write!(f, "{name}"),
