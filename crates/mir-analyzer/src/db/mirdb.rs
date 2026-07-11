@@ -987,13 +987,6 @@ impl MirDbStorage {
         self.locked_ref_index().set_file_refs(file, locs);
     }
 
-    /// Install or replace the active class resolver.
-    ///
-    /// First call lazily creates the singleton [`ResolverConfig`] salsa
-    /// input (revision = 0); subsequent calls bump the revision so
-    /// downstream tracked queries (notably
-    /// [`crate::db::resolve_fqcn_to_path`]) are invalidated.
-    ///
     /// Mark a file path as a user-provided stub so `workspace_symbol_index`
     /// gives it priority over native stubs for the same symbol.
     pub fn register_user_stub_path(&self, path: Arc<str>) {
@@ -1020,6 +1013,13 @@ impl MirDbStorage {
         }
     }
 
+    /// Install or replace the active class resolver.
+    ///
+    /// First call lazily creates the singleton [`ResolverConfig`] salsa
+    /// input (revision = 0); subsequent calls bump the revision so
+    /// downstream tracked queries (notably
+    /// [`crate::db::resolve_fqcn_to_path`]) are invalidated.
+    ///
     /// `None` clears the resolver. The `ResolverConfig` input is *not*
     /// removed — it remains as a versioned anchor, with revision bumped to
     /// signal the change.
