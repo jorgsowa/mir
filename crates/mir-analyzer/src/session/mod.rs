@@ -301,13 +301,21 @@ mod stubs;
 /// bare-FQN references recorded during body analysis (which live in the
 /// reference index and are not visible to salsa). Self-edges are excluded.
 /// Used to persist the disk cache's reverse-dep graph.
-fn file_outgoing_dependencies(db: &dyn MirDatabase, file: &str) -> HashSet<String> {
+fn file_outgoing_dependencies(
+    db: &dyn MirDatabase,
+    file: &str,
+    include_body_ref_edges: bool,
+) -> HashSet<String> {
     let mut targets: HashSet<String> = HashSet::default();
 
     if let Some(sf) = db.lookup_source_file(file) {
         for target in crate::db::file_structural_deps(db, sf).iter() {
             targets.insert(target.as_ref().to_string());
         }
+    }
+
+    if !include_body_ref_edges {
+        return targets;
     }
 
     // Bare-FQN references recorded during body analysis (new \Foo(),

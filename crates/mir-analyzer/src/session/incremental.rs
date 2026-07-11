@@ -304,7 +304,10 @@ impl AnalysisSession {
     pub(super) fn update_reverse_deps_for(&self, file: &str) {
         if let Some(cache) = self.cache.as_deref() {
             let db = self.snapshot_db();
-            let targets = file_outgoing_dependencies(&db, file);
+            // Body-level bare-FQN edges live in the RefIndex; a session that
+            // opted out of index maintenance never commits them, so reading
+            // the (empty) index would only take the lock it promised not to.
+            let targets = file_outgoing_dependencies(&db, file, self.maintain_ref_index);
             cache.update_reverse_deps_for_file(file, &targets);
         }
     }

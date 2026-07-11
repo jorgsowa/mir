@@ -76,8 +76,24 @@ impl<'a> FileAnalyzer<'a> {
         // reached by the background indexer resolve in this single pass (no
         // transient false UndefinedClass during warm-up). Once indexing
         // completes this is a no-op.
+        // Capture (text, generation) BEFORE the warm-up: if a concurrent edit
+        // swaps the input text mid-flight, the stored Arc no longer matches
+        // and the mark is dead on arrival — the safe direction.
+        let prepare_generation = self.session.prepare_generation_snapshot();
+        let ingested_text = {
+            let db = self.session.snapshot_db();
+            db.lookup_source_file(file.as_ref())
+                .map(|sf| sf.text(&db as &dyn crate::db::MirDatabase))
+        };
         self.session
             .prepare_ast_for_analysis(program, file.as_ref());
+        // Record the warm-up so later Phase-1 sweeps (references, dependent
+        // re-analysis) skip this file's parse + AST walk while its salsa
+        // input text is unchanged.
+        if let Some(text) = ingested_text {
+            self.session
+                .mark_prepared_for_analysis(&file, text, prepare_generation);
+        }
 
         let _scope = crate::metrics::BodyAnalysisScope::new();
 

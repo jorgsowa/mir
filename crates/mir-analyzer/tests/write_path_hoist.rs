@@ -113,8 +113,13 @@ fn no_ref_index_locks_on_edit_or_read_paths_when_opted_out() {
         session.invalidate_file(file_b.as_ref());
     };
 
-    // Opted-out session: zero RefIndex locks across every flow above.
-    let session = AnalysisSession::new(PhpVersion::LATEST).without_reference_index();
+    // Opted-out session: zero RefIndex locks across every flow above. The
+    // cache dir matters: it attaches an AnalysisCache, whose reverse-dep
+    // upkeep inside ingest_file read the index's forward view until gated.
+    let cache_dir = create_temp_dir("hoist_locks");
+    let session = AnalysisSession::new(PhpVersion::LATEST)
+        .with_cache_dir(cache_dir.path())
+        .without_reference_index();
     run_flows(&session);
     assert_eq!(
         session.ref_index_lock_count(),
