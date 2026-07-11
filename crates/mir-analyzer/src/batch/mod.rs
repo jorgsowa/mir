@@ -528,18 +528,14 @@ pub(crate) fn collect_fqcns_in_atomic(a: &Atomic, out: &mut Vec<String>) {
                 collect_fqcns_in_union(&kp.ty, out);
             }
         }
-        Atomic::TClosure {
-            params,
-            return_type,
-            this_type,
-        } => {
-            for p in params {
+        Atomic::TClosure { data } => {
+            for p in data.params.iter() {
                 if let Some(t) = &p.ty {
                     collect_fqcns_in_simple(t, out);
                 }
             }
-            collect_fqcns_in_union(return_type, out);
-            if let Some(t) = this_type {
+            collect_fqcns_in_union(&data.return_type, out);
+            if let Some(t) = &data.this_type {
                 collect_fqcns_in_union(t, out);
             }
         }
@@ -563,15 +559,10 @@ pub(crate) fn collect_fqcns_in_atomic(a: &Atomic, out: &mut Vec<String>) {
                 collect_fqcns_in_union(p, out);
             }
         }
-        Atomic::TConditional {
-            param_name: _,
-            subject,
-            if_true,
-            if_false,
-        } => {
-            collect_fqcns_in_union(subject, out);
-            collect_fqcns_in_union(if_true, out);
-            collect_fqcns_in_union(if_false, out);
+        Atomic::TConditional { data } => {
+            collect_fqcns_in_union(&data.subject, out);
+            collect_fqcns_in_union(&data.if_true, out);
+            collect_fqcns_in_union(&data.if_false, out);
         }
         Atomic::TTemplateParam { as_type, .. } => {
             collect_fqcns_in_union(as_type, out);

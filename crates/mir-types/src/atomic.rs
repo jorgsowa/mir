@@ -91,6 +91,29 @@ pub struct KeyedProperty {
 }
 
 // ---------------------------------------------------------------------------
+// Boxed variant payloads — keep `Atomic` (and `Type`, which inlines two) small
+// ---------------------------------------------------------------------------
+
+/// Payload of [`Atomic::TClosure`].
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ClosureData {
+    pub params: Box<[FnParam]>,
+    pub return_type: Type,
+    pub this_type: Option<Type>,
+}
+
+/// Payload of [`Atomic::TConditional`].
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ConditionalData {
+    /// The parameter name being tested (without `$`), e.g. `"classOrInterface"`.
+    /// `None` for conditionals that were not parsed from a `$param is` form.
+    pub param_name: Option<Name>,
+    pub subject: Type,
+    pub if_true: Type,
+    pub if_false: Type,
+}
+
+// ---------------------------------------------------------------------------
 // Atomic — every distinct PHP type variant
 // ---------------------------------------------------------------------------
 
@@ -173,15 +196,14 @@ pub enum Atomic {
     // --- Callables ---
     /// `callable` or `callable(T): R`
     TCallable {
-        params: Option<Vec<FnParam>>,
+        /// Boxed slice: a `Vec` here would make this the largest variant and
+        /// grow every `Atomic` (and `Type` inlines two of them).
+        params: Option<Box<[FnParam]>>,
         return_type: Option<Box<Type>>,
     },
-    /// `Closure` or `Closure(T): R` — more specific than TCallable
-    TClosure {
-        params: Vec<FnParam>,
-        return_type: Box<Type>,
-        this_type: Option<Box<Type>>,
-    },
+    /// `Closure` or `Closure(T): R` — more specific than TCallable.
+    /// Payload boxed to keep `Atomic` at 32 bytes (see [`ClosureData`]).
+    TClosure { data: Box<ClosureData> },
 
     // --- Arrays ---
     /// `array` or `array<K, V>`
@@ -211,15 +233,9 @@ pub enum Atomic {
         /// The entity (class or function FQN) that declared this template
         defining_entity: Name,
     },
-    /// `($param is TypeName ? A : B)` — conditional type
-    TConditional {
-        /// The parameter name being tested (without `$`), e.g. `"classOrInterface"`.
-        /// `None` for conditionals that were not parsed from a `$param is` form.
-        param_name: Option<Name>,
-        subject: Box<Type>,
-        if_true: Box<Type>,
-        if_false: Box<Type>,
-    },
+    /// `($param is TypeName ? A : B)` — conditional type.
+    /// Payload boxed to keep `Atomic` at 32 bytes (see [`ConditionalData`]).
+    TConditional { data: Box<ConditionalData> },
 
     // --- Special object strings ---
     /// `interface-string` or `interface-string<T>`
@@ -626,15 +642,9 @@ impl Hash for Atomic {
                 params.hash(state);
                 return_type.hash(state);
             }
-            Atomic::TClosure {
-                params,
-                return_type,
-                this_type,
-            } => {
+            Atomic::TClosure { data } => {
                 (T::TClosure as u8).hash(state);
-                params.hash(state);
-                return_type.hash(state);
-                this_type.hash(state);
+                data.hash(state);
             }
             Atomic::TArray { key, value } => {
                 (T::TArray as u8).hash(state);
@@ -681,17 +691,9 @@ impl Hash for Atomic {
                 as_type.hash(state);
                 defining_entity.hash(state);
             }
-            Atomic::TConditional {
-                param_name,
-                subject,
-                if_true,
-                if_false,
-            } => {
+            Atomic::TConditional { data } => {
                 (T::TConditional as u8).hash(state);
-                param_name.hash(state);
-                subject.hash(state);
-                if_true.hash(state);
-                if_false.hash(state);
+                data.hash(state);
             }
             Atomic::TLiteralEnumCase {
                 enum_fqcn,

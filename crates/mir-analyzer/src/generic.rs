@@ -719,18 +719,12 @@ fn infer_from_pair(
             }
 
             // Closure(T1, T2): R matched against Closure(t1, t2): r
-            Atomic::TClosure {
-                params: p_params,
-                return_type: p_ret,
-                ..
-            } => {
+            Atomic::TClosure { data: p_data } => {
+                let (p_params, p_ret) = (&p_data.params, &p_data.return_type);
                 for a_atomic in &arg_ty.types {
                     match a_atomic {
-                        Atomic::TClosure {
-                            params: a_params,
-                            return_type: a_ret,
-                            ..
-                        } => {
+                        Atomic::TClosure { data: a_data } => {
+                            let (a_params, a_ret) = (&a_data.params, &a_data.return_type);
                             for (pp, ap) in p_params.iter().zip(a_params.iter()) {
                                 if let (Some(pt), Some(at)) = (pp.ty.as_ref(), ap.ty.as_ref()) {
                                     infer_from_pair(
@@ -793,11 +787,8 @@ fn infer_from_pair(
                             }
                             infer_from_pair(db, p_ret, a_ret, template_names, bindings, risky);
                         }
-                        Atomic::TClosure {
-                            params: a_params,
-                            return_type: a_ret,
-                            ..
-                        } => {
+                        Atomic::TClosure { data: a_data } => {
+                            let (a_params, a_ret) = (&a_data.params, &a_data.return_type);
                             for (pp, ap) in p_params.iter().zip(a_params.iter()) {
                                 if let (Some(pt), Some(at)) = (pp.ty.as_ref(), ap.ty.as_ref()) {
                                     infer_from_pair(

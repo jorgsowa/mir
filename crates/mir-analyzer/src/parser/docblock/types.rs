@@ -702,7 +702,7 @@ pub(super) fn parse_callable_syntax(s: &str) -> Option<Type> {
     let return_type = after
         .strip_prefix(':')
         .map(|ret_str| Box::new(parse_type_string(ret_str.trim())));
-    let params: Vec<mir_types::atomic::FnParam> = split_generics(params_str)
+    let params: Box<[mir_types::atomic::FnParam]> = split_generics(params_str)
         .into_iter()
         .enumerate()
         .filter(|(_, p)| !p.trim().is_empty())
@@ -726,9 +726,12 @@ pub(super) fn parse_callable_syntax(s: &str) -> Option<Type> {
         .collect();
     if is_closure {
         Some(Type::single(Atomic::TClosure {
-            params,
-            return_type: return_type.unwrap_or_else(|| Box::new(Type::single(Atomic::TVoid))),
-            this_type: None,
+            data: Box::new(mir_types::atomic::ClosureData {
+                params,
+                return_type: return_type
+                    .map_or_else(|| Type::single(Atomic::TVoid), |boxed| *boxed),
+                this_type: None,
+            }),
         }))
     } else {
         Some(Type::single(Atomic::TCallable {
@@ -1141,10 +1144,12 @@ pub(super) fn parse_conditional_type(s: &str) -> Option<Type> {
         (true_str, false_str)
     };
     Some(Type::single(Atomic::TConditional {
-        param_name,
-        subject: Box::new(parse_type_string(subject_str)),
-        if_true: Box::new(parse_type_string(if_true_str)),
-        if_false: Box::new(parse_type_string(if_false_str)),
+        data: Box::new(mir_types::atomic::ConditionalData {
+            param_name,
+            subject: parse_type_string(subject_str),
+            if_true: parse_type_string(if_true_str),
+            if_false: parse_type_string(if_false_str),
+        }),
     }))
 }
 

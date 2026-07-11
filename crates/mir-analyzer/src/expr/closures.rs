@@ -251,7 +251,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
 
         let return_ty = return_ty_hint.unwrap_or(inferred_return);
-        let closure_params: Vec<mir_types::atomic::FnParam> = params
+        let closure_params: Box<[mir_types::atomic::FnParam]> = params
             .iter()
             .map(|p| mir_types::atomic::FnParam {
                 name: Name::from(p.name.as_ref()),
@@ -272,13 +272,15 @@ impl<'a> ExpressionAnalyzer<'a> {
             .collect();
 
         Type::single(Atomic::TClosure {
-            params: closure_params,
-            return_type: Box::new(return_ty),
-            this_type: ctx.self_fqcn.clone().map(|f| {
-                Box::new(Type::single(Atomic::TNamedObject {
-                    fqcn: Name::from(f.as_ref()),
-                    type_params: mir_types::union::empty_type_params(),
-                }))
+            data: Box::new(mir_types::atomic::ClosureData {
+                params: closure_params,
+                return_type: return_ty,
+                this_type: ctx.self_fqcn.clone().map(|f| {
+                    Type::single(Atomic::TNamedObject {
+                        fqcn: Name::from(f.as_ref()),
+                        type_params: mir_types::union::empty_type_params(),
+                    })
+                }),
             }),
         })
     }
@@ -426,7 +428,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
 
         let return_ty = return_ty_hint.unwrap_or(inferred_return);
-        let closure_params: Vec<mir_types::atomic::FnParam> = params
+        let closure_params: Box<[mir_types::atomic::FnParam]> = params
             .iter()
             .map(|p| mir_types::atomic::FnParam {
                 name: Name::from(p.name.as_ref()),
@@ -447,18 +449,20 @@ impl<'a> ExpressionAnalyzer<'a> {
             .collect();
 
         Type::single(Atomic::TClosure {
-            params: closure_params,
-            return_type: Box::new(return_ty),
-            this_type: if af.is_static {
-                None
-            } else {
-                ctx.self_fqcn.clone().map(|f| {
-                    Box::new(Type::single(Atomic::TNamedObject {
-                        fqcn: Name::from(f.as_ref()),
-                        type_params: mir_types::union::empty_type_params(),
-                    }))
-                })
-            },
+            data: Box::new(mir_types::atomic::ClosureData {
+                params: closure_params,
+                return_type: return_ty,
+                this_type: if af.is_static {
+                    None
+                } else {
+                    ctx.self_fqcn.clone().map(|f| {
+                        Type::single(Atomic::TNamedObject {
+                            fqcn: Name::from(f.as_ref()),
+                            type_params: mir_types::union::empty_type_params(),
+                        })
+                    })
+                },
+            }),
         })
     }
 }

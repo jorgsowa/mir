@@ -240,13 +240,8 @@ impl Type {
 
         // Simplify trivial conditional types: (X is ? T : T) → T
         // Recursively simplify branches first so nested trivial conditionals collapse.
-        let atomic = if let Atomic::TConditional {
-            param_name: _,
-            subject: _,
-            if_true,
-            if_false,
-        } = &atomic
-        {
+        let atomic = if let Atomic::TConditional { data } = &atomic {
+            let (if_true, if_false) = (&data.if_true, &data.if_false);
             let mut simplified_true = Type::empty();
             for t in &if_true.types {
                 simplified_true.add_type(t.clone());
@@ -951,31 +946,27 @@ impl Type {
                             .map(|r| Box::new(r.substitute_templates(bindings))),
                     });
                 }
-                Atomic::TClosure {
-                    params,
-                    return_type,
-                    this_type,
-                } => {
+                Atomic::TClosure { data } => {
                     result.add_type(Atomic::TClosure {
-                        params: params
-                            .iter()
-                            .map(|p| substitute_in_fn_param(p, bindings))
-                            .collect(),
-                        return_type: Box::new(return_type.substitute_templates(bindings)),
-                        this_type: this_type
-                            .as_ref()
-                            .map(|t| Box::new(t.substitute_templates(bindings))),
+                        data: Box::new(crate::atomic::ClosureData {
+                            params: data
+                                .params
+                                .iter()
+                                .map(|p| substitute_in_fn_param(p, bindings))
+                                .collect(),
+                            return_type: data.return_type.substitute_templates(bindings),
+                            this_type: data
+                                .this_type
+                                .as_ref()
+                                .map(|t| t.substitute_templates(bindings)),
+                        }),
                     });
                 }
-                Atomic::TConditional {
-                    param_name,
-                    subject,
-                    if_true,
-                    if_false,
-                } => {
-                    let new_subject = subject.substitute_templates(bindings);
-                    let new_if_true = if_true.substitute_templates(bindings);
-                    let new_if_false = if_false.substitute_templates(bindings);
+                Atomic::TConditional { data } => {
+                    let param_name = &data.param_name;
+                    let new_subject = data.subject.substitute_templates(bindings);
+                    let new_if_true = data.if_true.substitute_templates(bindings);
+                    let new_if_false = data.if_false.substitute_templates(bindings);
 
                     // If param_name names a template that is bound in this substitution,
                     // resolve the conditional immediately using the same predicate logic as
@@ -1005,10 +996,12 @@ impl Type {
                         }
                     } else {
                         result.add_type(Atomic::TConditional {
-                            param_name: *param_name,
-                            subject: Box::new(new_subject),
-                            if_true: Box::new(new_if_true),
-                            if_false: Box::new(new_if_false),
+                            data: Box::new(crate::atomic::ConditionalData {
+                                param_name: *param_name,
+                                subject: new_subject,
+                                if_true: new_if_true,
+                                if_false: new_if_false,
+                            }),
                         });
                     }
                 }
@@ -1103,12 +1096,9 @@ impl Type {
         let mut result = Type::empty();
         for atomic in self.types {
             match atomic {
-                Atomic::TConditional {
-                    ref param_name,
-                    ref subject,
-                    ref if_true,
-                    ref if_false,
-                } => {
+                Atomic::TConditional { ref data } => {
+                    let (param_name, subject, if_true, if_false) =
+                        (&data.param_name, &data.subject, &data.if_true, &data.if_false);
                     let resolved = if subject.types.len() == 1 {
                         if let Some(name) = param_name {
                             if let Some(arg_ty) = lookup(name.as_ref()) {
@@ -1740,6 +1730,17 @@ mod tests {
 
     use super::*;
 
+    fn conditional(param_name: Option<Name>, subject: Type, if_true: Type, if_false: Type) -> Atomic {
+        Atomic::TConditional {
+            data: Box::new(crate::atomic::ConditionalData {
+                param_name,
+                subject,
+                if_true,
+                if_false,
+            }),
+        }
+    }
+
     #[test]
     fn single_is_single() {
         let u = Type::single(Atomic::TString);
@@ -2040,7 +2041,7 @@ mod tests {
     fn substitute_callable_params_and_return() {
         use crate::atomic::FnParam;
         let ty = Type::single(Atomic::TCallable {
-            params: Some(vec![FnParam {
+            params: Some(Box::new([FnParam {
                 name: Name::new("x"),
                 ty: Some(crate::compact::SimpleType::from_union(t_param("T"))),
                 out_ty: None,
@@ -2048,7 +2049,7 @@ mod tests {
                 is_variadic: false,
                 is_byref: false,
                 is_optional: false,
-            }]),
+            }])),
             return_type: Some(Box::new(t_param("T"))),
         });
         let result = ty.substitute_templates(&bindings_t_string());
@@ -2087,27 +2088,25 @@ mod tests {
     fn substitute_closure_params_return_and_this() {
         use crate::atomic::FnParam;
         let ty = Type::single(Atomic::TClosure {
-            params: vec![FnParam {
-                name: Name::new("a"),
-                ty: Some(crate::compact::SimpleType::from_union(t_param("T"))),
-                out_ty: None,
-                default: Some(crate::compact::SimpleType::from_union(t_param("T"))),
-                is_variadic: true,
-                is_byref: true,
-                is_optional: true,
-            }],
-            return_type: Box::new(t_param("T")),
-            this_type: Some(Box::new(t_param("T"))),
+            data: Box::new(crate::atomic::ClosureData {
+                params: Box::new([FnParam {
+                    name: Name::new("a"),
+                    ty: Some(crate::compact::SimpleType::from_union(t_param("T"))),
+                    out_ty: None,
+                    default: Some(crate::compact::SimpleType::from_union(t_param("T"))),
+                    is_variadic: true,
+                    is_byref: true,
+                    is_optional: true,
+                }]),
+                return_type: t_param("T"),
+                this_type: Some(t_param("T")),
+            }),
         });
         let result = ty.substitute_templates(&bindings_t_string());
-        let Atomic::TClosure {
-            params,
-            return_type,
-            this_type,
-        } = &result.types[0]
-        else {
+        let Atomic::TClosure { data } = &result.types[0] else {
             panic!("expected TClosure");
         };
+        let (params, return_type, this_type) = (&data.params, &data.return_type, &data.this_type);
         let p = &params[0];
         let ty_union = p.ty.as_ref().unwrap().to_union();
         let default_union = p.default.as_ref().unwrap().to_union();
@@ -2126,22 +2125,17 @@ mod tests {
 
     #[test]
     fn substitute_conditional_all_branches() {
-        let ty = Type::single(Atomic::TConditional {
-            param_name: None,
-            subject: Box::new(t_param("T")),
-            if_true: Box::new(t_param("T")),
-            if_false: Box::new(Type::single(Atomic::TInt)),
-        });
+        let ty = Type::single(conditional(
+            None,
+            t_param("T"),
+            t_param("T"),
+            Type::single(Atomic::TInt),
+        ));
         let result = ty.substitute_templates(&bindings_t_string());
-        let Atomic::TConditional {
-            param_name: _,
-            subject,
-            if_true,
-            if_false,
-        } = &result.types[0]
-        else {
+        let Atomic::TConditional { data } = &result.types[0] else {
             panic!("expected TConditional");
         };
+        let (subject, if_true, if_false) = (&data.subject, &data.if_true, &data.if_false);
         assert!(matches!(subject.types[0], Atomic::TString));
         assert!(matches!(if_true.types[0], Atomic::TString));
         assert!(matches!(if_false.types[0], Atomic::TInt));
@@ -2149,12 +2143,12 @@ mod tests {
 
     #[test]
     fn resolve_conditional_is_null_non_null_arg() {
-        let ty = Type::single(Atomic::TConditional {
-            param_name: Some(Name::new("x")),
-            subject: Box::new(Type::single(Atomic::TNull)),
-            if_true: Box::new(Type::single(Atomic::TInt)),
-            if_false: Box::new(Type::single(Atomic::TString)),
-        });
+        let ty = Type::single(conditional(
+            Some(Name::new("x")),
+            Type::single(Atomic::TNull),
+            Type::single(Atomic::TInt),
+            Type::single(Atomic::TString),
+        ));
         let result = ty.resolve_conditional_returns(|name| {
             if name == "x" {
                 Some(Type::single(Atomic::TString)) // definitely not null
@@ -2168,12 +2162,12 @@ mod tests {
 
     #[test]
     fn resolve_conditional_is_null_null_arg() {
-        let ty = Type::single(Atomic::TConditional {
-            param_name: Some(Name::new("x")),
-            subject: Box::new(Type::single(Atomic::TNull)),
-            if_true: Box::new(Type::single(Atomic::TInt)),
-            if_false: Box::new(Type::single(Atomic::TString)),
-        });
+        let ty = Type::single(conditional(
+            Some(Name::new("x")),
+            Type::single(Atomic::TNull),
+            Type::single(Atomic::TInt),
+            Type::single(Atomic::TString),
+        ));
         let result = ty.resolve_conditional_returns(|name| {
             if name == "x" {
                 Some(Type::single(Atomic::TNull)) // definitely null
@@ -2189,12 +2183,12 @@ mod tests {
     fn resolve_conditional_is_null_nullable_arg_widens_to_branch_union() {
         let mut nullable_str = Type::single(Atomic::TString);
         nullable_str.add_type(Atomic::TNull);
-        let ty = Type::single(Atomic::TConditional {
-            param_name: Some(Name::new("x")),
-            subject: Box::new(Type::single(Atomic::TNull)),
-            if_true: Box::new(Type::single(Atomic::TInt)),
-            if_false: Box::new(Type::single(Atomic::TString)),
-        });
+        let ty = Type::single(conditional(
+            Some(Name::new("x")),
+            Type::single(Atomic::TNull),
+            Type::single(Atomic::TInt),
+            Type::single(Atomic::TString),
+        ));
         let result = ty.resolve_conditional_returns(|name| {
             if name == "x" {
                 Some(nullable_str.clone())
@@ -2212,18 +2206,18 @@ mod tests {
     fn resolve_conditional_nested_widens_inner_branch() {
         // ($x is null ? int : ($x is string ? string : float))
         // When $x is unknown, should widen to int|string|float (no TConditional remaining).
-        let inner = Type::single(Atomic::TConditional {
-            param_name: Some(Name::new("x")),
-            subject: Box::new(Type::single(Atomic::TString)),
-            if_true: Box::new(Type::single(Atomic::TString)),
-            if_false: Box::new(Type::single(Atomic::TFloat)),
-        });
-        let ty = Type::single(Atomic::TConditional {
-            param_name: Some(Name::new("x")),
-            subject: Box::new(Type::single(Atomic::TNull)),
-            if_true: Box::new(Type::single(Atomic::TInt)),
-            if_false: Box::new(inner),
-        });
+        let inner = Type::single(conditional(
+            Some(Name::new("x")),
+            Type::single(Atomic::TString),
+            Type::single(Atomic::TString),
+            Type::single(Atomic::TFloat),
+        ));
+        let ty = Type::single(conditional(
+            Some(Name::new("x")),
+            Type::single(Atomic::TNull),
+            Type::single(Atomic::TInt),
+            inner,
+        ));
         // unknown arg → widen both outer branches, inner conditional must also be widened
         let result = ty.resolve_conditional_returns(|_| None);
         assert!(
@@ -2244,18 +2238,18 @@ mod tests {
         // ($x is null ? int : ($x is string ? string : float))
         // When $x is definitely not null but unknown string-or-not → resolves outer to inner,
         // then inner must also be resolved.
-        let inner = Type::single(Atomic::TConditional {
-            param_name: Some(Name::new("x")),
-            subject: Box::new(Type::single(Atomic::TString)),
-            if_true: Box::new(Type::single(Atomic::TString)),
-            if_false: Box::new(Type::single(Atomic::TFloat)),
-        });
-        let ty = Type::single(Atomic::TConditional {
-            param_name: Some(Name::new("x")),
-            subject: Box::new(Type::single(Atomic::TNull)),
-            if_true: Box::new(Type::single(Atomic::TInt)),
-            if_false: Box::new(inner),
-        });
+        let inner = Type::single(conditional(
+            Some(Name::new("x")),
+            Type::single(Atomic::TString),
+            Type::single(Atomic::TString),
+            Type::single(Atomic::TFloat),
+        ));
+        let ty = Type::single(conditional(
+            Some(Name::new("x")),
+            Type::single(Atomic::TNull),
+            Type::single(Atomic::TInt),
+            inner,
+        ));
         // $x = string → outer: not null → if_false (inner); inner: is string → if_true = string
         let result = ty.resolve_conditional_returns(|name| {
             if name == "x" {

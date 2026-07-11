@@ -624,7 +624,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             crate::call::substitute_static_in_return(t, receiver_fqcn, receiver_type_params)
                 .substitute_templates(&bindings)
         };
-        let fn_params: Vec<mir_types::atomic::FnParam> = params
+        let fn_params: Box<[mir_types::atomic::FnParam]> = params
             .iter()
             .map(|p| mir_types::atomic::FnParam {
                 name: mir_types::Name::from(p.name.as_ref()),
@@ -651,9 +651,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             })
             .collect();
         Atomic::TClosure {
-            params: fn_params,
-            return_type: Box::new(resolve(return_ty)),
-            this_type: None,
+            data: Box::new(mir_types::atomic::ClosureData {
+                params: fn_params,
+                return_type: resolve(return_ty),
+                this_type: None,
+            }),
         }
     }
 

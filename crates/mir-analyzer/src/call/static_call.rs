@@ -277,25 +277,22 @@ impl CallAnalyzer {
         if fqcn_arc.as_ref() == "Closure" && method_name_lower == "bind" {
             if let Some(closure_arg) = arg_types.first() {
                 for atomic in &closure_arg.types {
-                    if let mir_types::Atomic::TClosure {
-                        params,
-                        return_type,
-                        ..
-                    } = atomic
-                    {
+                    if let mir_types::Atomic::TClosure { data } = atomic {
                         let new_this = arg_types.get(1).cloned().unwrap_or_else(Type::null);
                         let this_type = {
                             let non_null = new_this.remove_null();
                             if non_null.is_empty() {
                                 None
                             } else {
-                                Some(Box::new(non_null))
+                                Some(non_null)
                             }
                         };
                         let mut result = Type::single(mir_types::Atomic::TClosure {
-                            params: params.clone(),
-                            return_type: return_type.clone(),
-                            this_type,
+                            data: Box::new(mir_types::atomic::ClosureData {
+                                params: data.params.clone(),
+                                return_type: data.return_type.clone(),
+                                this_type,
+                            }),
                         });
                         result.add_type(mir_types::Atomic::TNull);
                         return result;

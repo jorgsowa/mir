@@ -58,8 +58,8 @@ pub(crate) fn check_one(
             Atomic::TCallable {
                 params: Some(expected_params),
                 ..
-            } => expected_params,
-            Atomic::TClosure { params, .. } => params,
+            } => &expected_params[..],
+            Atomic::TClosure { data } => &data.params[..],
             _ => continue,
         };
         super::super::callable::check_typed_callable_arg(

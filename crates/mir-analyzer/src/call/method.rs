@@ -477,11 +477,7 @@ impl CallAnalyzer {
                     result.add_type(mir_types::Atomic::TMixed);
                     self_out_union.merge_with(&Type::single(atomic.clone()));
                 }
-                mir_types::Atomic::TClosure {
-                    params,
-                    return_type,
-                    ..
-                } => {
+                mir_types::Atomic::TClosure { data } => {
                     let method_name_lower = crate::util::php_ident_lowercase(method_name);
                     match method_name_lower.as_str() {
                         "bindto" => {
@@ -493,13 +489,15 @@ impl CallAnalyzer {
                                 if non_null.is_empty() {
                                     None
                                 } else {
-                                    Some(Box::new(non_null))
+                                    Some(non_null)
                                 }
                             };
                             let mut bound = Type::single(mir_types::Atomic::TClosure {
-                                params: params.clone(),
-                                return_type: return_type.clone(),
-                                this_type,
+                                data: Box::new(mir_types::atomic::ClosureData {
+                                    params: data.params.clone(),
+                                    return_type: data.return_type.clone(),
+                                    this_type,
+                                }),
                             });
                             bound.add_type(mir_types::Atomic::TNull);
                             result.merge_with(&bound);
@@ -507,7 +505,7 @@ impl CallAnalyzer {
                         "call" => {
                             // call($newThis, ...$args): mixed
                             // Immediately invokes the closure, returns its return_type (not nullable)
-                            result.merge_with(return_type);
+                            result.merge_with(&data.return_type);
                         }
                         _ => {
                             // Other methods (e.g. __invoke) dispatch through the Closure stub

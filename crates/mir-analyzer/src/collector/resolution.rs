@@ -1,4 +1,8 @@
-use mir_types::{atomic::KeyedProperty, union::vec_to_type_params, Atomic, Name, Type};
+use mir_types::{
+    atomic::{ConditionalData, KeyedProperty},
+    union::vec_to_type_params,
+    Atomic, Name, Type,
+};
 use rustc_hash::FxHashMap;
 
 pub(super) fn resolve_name(
@@ -158,32 +162,22 @@ pub(super) fn resolve_atomic_inner(
                 use_aliases,
             )),
         },
-        Atomic::TConditional {
-            param_name,
-            subject,
-            if_true,
-            if_false,
-        } => Atomic::TConditional {
-            param_name,
-            subject: Box::new(resolve_union_inner(
-                *subject,
-                full_qualify,
-                namespace,
-                use_aliases,
-            )),
-            if_true: Box::new(resolve_union_inner(
-                *if_true,
-                full_qualify,
-                namespace,
-                use_aliases,
-            )),
-            if_false: Box::new(resolve_union_inner(
-                *if_false,
-                full_qualify,
-                namespace,
-                use_aliases,
-            )),
-        },
+        Atomic::TConditional { data } => {
+            let ConditionalData {
+                param_name,
+                subject,
+                if_true,
+                if_false,
+            } = *data;
+            Atomic::TConditional {
+                data: Box::new(ConditionalData {
+                    param_name,
+                    subject: resolve_union_inner(subject, full_qualify, namespace, use_aliases),
+                    if_true: resolve_union_inner(if_true, full_qualify, namespace, use_aliases),
+                    if_false: resolve_union_inner(if_false, full_qualify, namespace, use_aliases),
+                }),
+            }
+        }
         Atomic::TIntersection { parts } => Atomic::TIntersection {
             parts: vec_to_type_params(
                 parts

@@ -121,14 +121,10 @@ impl fmt::Display for Atomic {
             } => {
                 write!(f, "callable(): {ret}")
             }
-            Atomic::TClosure {
-                params,
-                return_type,
-                ..
-            } => {
+            Atomic::TClosure { data } => {
                 f.write_str("Closure(")?;
-                write_param_types(f, params)?;
-                write!(f, "): {return_type}")
+                write_param_types(f, &data.params)?;
+                write!(f, "): {}", data.return_type)
             }
 
             Atomic::TArray { key, value } => {
@@ -158,15 +154,13 @@ impl fmt::Display for Atomic {
             }
 
             Atomic::TTemplateParam { name, .. } => write!(f, "{name}"),
-            Atomic::TConditional {
-                param_name,
-                subject,
-                if_true,
-                if_false,
-            } => match param_name {
-                Some(name) => write!(f, "(${name} is {subject} ? {if_true} : {if_false})"),
-                None => write!(f, "({subject} is ? {if_true} : {if_false})"),
-            },
+            Atomic::TConditional { data } => {
+                let (subject, if_true, if_false) = (&data.subject, &data.if_true, &data.if_false);
+                match &data.param_name {
+                    Some(name) => write!(f, "(${name} is {subject} ? {if_true} : {if_false})"),
+                    None => write!(f, "({subject} is ? {if_true} : {if_false})"),
+                }
+            }
 
             Atomic::TInterfaceString(None) => write!(f, "interface-string"),
             Atomic::TInterfaceString(Some(iface)) => write!(f, "interface-string<{iface}>"),

@@ -617,32 +617,29 @@ impl<'a> DefinitionCollector<'a> {
                 // Conditional return type: recurse into subject and both branches with the
                 // same template context so class names and template references inside them
                 // are resolved correctly.
-                mir_types::Atomic::TConditional {
-                    param_name,
-                    subject,
-                    if_true,
-                    if_false,
-                } => {
+                mir_types::Atomic::TConditional { data } => {
                     result.add_type(mir_types::Atomic::TConditional {
-                        param_name: *param_name,
-                        subject: Box::new(self.resolve_union_doc_with_templates(
-                            *subject.clone(),
-                            template_names,
-                            defining_entity,
-                            template_params,
-                        )),
-                        if_true: Box::new(self.resolve_union_doc_with_templates(
-                            *if_true.clone(),
-                            template_names,
-                            defining_entity,
-                            template_params,
-                        )),
-                        if_false: Box::new(self.resolve_union_doc_with_templates(
-                            *if_false.clone(),
-                            template_names,
-                            defining_entity,
-                            template_params,
-                        )),
+                        data: Box::new(mir_types::atomic::ConditionalData {
+                            param_name: data.param_name,
+                            subject: self.resolve_union_doc_with_templates(
+                                data.subject.clone(),
+                                template_names,
+                                defining_entity,
+                                template_params,
+                            ),
+                            if_true: self.resolve_union_doc_with_templates(
+                                data.if_true.clone(),
+                                template_names,
+                                defining_entity,
+                                template_params,
+                            ),
+                            if_false: self.resolve_union_doc_with_templates(
+                                data.if_false.clone(),
+                                template_names,
+                                defining_entity,
+                                template_params,
+                            ),
+                        }),
                     });
                 }
                 // Closure/callable param & return types: recurse with template awareness so
@@ -650,12 +647,9 @@ impl<'a> DefinitionCollector<'a> {
                 // function's predicate/mapper param) is converted to TTemplateParam instead
                 // of falling through to resolve_union_doc, which has no template context and
                 // would leave it as an unresolved bare class-like reference to "T".
-                mir_types::Atomic::TClosure {
-                    params,
-                    return_type,
-                    this_type,
-                } => {
-                    let new_params = params
+                mir_types::Atomic::TClosure { data } => {
+                    let new_params = data
+                        .params
                         .iter()
                         .map(|p| {
                             let mut p = p.clone();
@@ -673,14 +667,16 @@ impl<'a> DefinitionCollector<'a> {
                         })
                         .collect();
                     result.add_type(mir_types::Atomic::TClosure {
-                        params: new_params,
-                        return_type: Box::new(self.resolve_union_doc_with_templates(
-                            *return_type.clone(),
-                            template_names,
-                            defining_entity,
-                            template_params,
-                        )),
-                        this_type: this_type.clone(),
+                        data: Box::new(mir_types::atomic::ClosureData {
+                            params: new_params,
+                            return_type: self.resolve_union_doc_with_templates(
+                                data.return_type.clone(),
+                                template_names,
+                                defining_entity,
+                                template_params,
+                            ),
+                            this_type: data.this_type.clone(),
+                        }),
                     });
                 }
                 mir_types::Atomic::TCallable {
@@ -839,12 +835,9 @@ impl<'a> DefinitionCollector<'a> {
                         )),
                     });
                 }
-                mir_types::Atomic::TClosure {
-                    params,
-                    return_type,
-                    this_type,
-                } => {
-                    let new_params = params
+                mir_types::Atomic::TClosure { data } => {
+                    let new_params = data
+                        .params
                         .iter()
                         .map(|p| {
                             let mut p = p.clone();
@@ -862,14 +855,16 @@ impl<'a> DefinitionCollector<'a> {
                         })
                         .collect();
                     result.add_type(mir_types::Atomic::TClosure {
-                        params: new_params,
-                        return_type: Box::new(self.substitute_template_params(
-                            *return_type.clone(),
-                            template_names,
-                            template_params,
-                            defining_entity,
-                        )),
-                        this_type: this_type.clone(),
+                        data: Box::new(mir_types::atomic::ClosureData {
+                            params: new_params,
+                            return_type: self.substitute_template_params(
+                                data.return_type.clone(),
+                                template_names,
+                                template_params,
+                                defining_entity,
+                            ),
+                            this_type: data.this_type.clone(),
+                        }),
                     });
                 }
                 mir_types::Atomic::TCallable {

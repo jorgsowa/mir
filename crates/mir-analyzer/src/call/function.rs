@@ -212,7 +212,7 @@ impl CallAnalyzer {
 
                 for atomic in &callee_ty.types {
                     match atomic {
-                        Atomic::TClosure { return_type, .. } => return *return_type.clone(),
+                        Atomic::TClosure { data } => return data.return_type.clone(),
                         Atomic::TCallable {
                             return_type: Some(rt),
                             ..
@@ -1020,8 +1020,8 @@ fn typed_params_from_callee(
 
     for atomic in &union.types {
         match atomic {
-            Atomic::TClosure { params, .. } => {
-                let storage_params = params.iter().map(type_param_to_storage_param).collect();
+            Atomic::TClosure { data } => {
+                let storage_params = data.params.iter().map(type_param_to_storage_param).collect();
                 return Some(("{closure}".to_string(), storage_params));
             }
             Atomic::TNamedObject { fqcn, .. } => {

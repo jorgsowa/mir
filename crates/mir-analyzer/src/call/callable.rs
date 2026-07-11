@@ -29,9 +29,9 @@ fn extract_all_callable_candidates(
     let mut out = Vec::new();
     for atomic in &union.types {
         match atomic {
-            Atomic::TClosure { params, .. } => {
+            Atomic::TClosure { data } => {
                 out.push(
-                    params
+                    data.params
                         .iter()
                         .map(|p| ParamInfo {
                             is_optional: p.is_optional,
@@ -357,7 +357,7 @@ pub(crate) fn check_array_filter_callback(
 fn callable_return_type(union: &Type, ea: &ExpressionAnalyzer<'_>) -> Option<Type> {
     for atomic in &union.types {
         match atomic {
-            Atomic::TClosure { return_type, .. } => return Some((**return_type).clone()),
+            Atomic::TClosure { data } => return Some(data.return_type.clone()),
             Atomic::TCallable {
                 return_type: Some(rt),
                 ..
@@ -1507,16 +1507,12 @@ fn atomic_contains_unresolvable_named_type(
                 .as_ref()
                 .is_some_and(|r| contains_unresolvable_named_type(r, ea, template_names))
         }
-        Atomic::TClosure {
-            params,
-            return_type,
-            ..
-        } => {
-            params.iter().any(|p| {
+        Atomic::TClosure { data } => {
+            data.params.iter().any(|p| {
                 p.ty.as_ref().is_some_and(|t| {
                     contains_unresolvable_named_type(&t.to_union(), ea, template_names)
                 })
-            }) || contains_unresolvable_named_type(return_type, ea, template_names)
+            }) || contains_unresolvable_named_type(&data.return_type, ea, template_names)
         }
         _ => false,
     }
