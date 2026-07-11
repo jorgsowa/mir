@@ -375,7 +375,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             self.emit(IssueKind::NullArrayAccess, Severity::Error, expr.span);
             return Type::mixed();
         }
-        if arr_ty.is_nullable() {
+        if arr_ty.is_nullable() && !self.in_existence_check {
             self.emit(
                 IssueKind::PossiblyNullArrayAccess,
                 Severity::Info,

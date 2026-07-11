@@ -3031,42 +3031,70 @@ fn array_access_base_var(expr: &php_ast::owned::Expr) -> Option<String> {
     }
 }
 
-/// For a single-level `isset($base['key'])` where `$base` is (partly) a known
-/// shape, narrow that key's own property: remove `null` from its value type
-/// and mark it no longer optional. Multi-level access (`isset($a['b']['c'])`)
-/// and non-literal keys are left alone — not worth the added complexity here.
+/// For `isset($base['a']['b']...)` where `$base` is (partly) a known shape,
+/// narrow every level of the access path: remove `null` from each key's
+/// value type and mark it no longer optional, recursing into the key's own
+/// value type for the next path segment. `isset($a['b']['c'])` proves both
+/// `$a['b']` and `$a['b']['c']` present, not just the outermost key.
 fn narrow_isset_shape_key(var_expr: &php_ast::owned::Expr, ctx: &mut FlowState) {
-    let ExprKind::ArrayAccess(aa) = &var_expr.kind else {
+    let Some((base, path)) = collect_array_access_path(var_expr) else {
         return;
     };
-    let Some(base) = extract_var_name(&aa.array) else {
-        return;
-    };
-    let Some(idx) = &aa.index else {
-        return;
-    };
-    let key = match &idx.kind {
-        ExprKind::String(s) => {
-            mir_types::atomic::ArrayKey::String(std::sync::Arc::from(s.as_ref()))
-        }
-        ExprKind::Int(i) => mir_types::atomic::ArrayKey::Int(*i),
-        _ => return,
-    };
-
     let current = ctx.get_var(&base);
+    if let Some(narrowed) = narrow_shape_path(&current, &path) {
+        ctx.set_var(&base, narrowed);
+    }
+}
+
+/// Collect `(base_var, [key1, key2, ...])` from a chain of literal-keyed
+/// `ArrayAccess` nodes, outermost-to-innermost (`$a['x']['y']` -> `("a",
+/// [x, y])`). Returns `None` as soon as a non-literal key or non-variable
+/// root is found — those cases are left unnarrowed.
+fn collect_array_access_path(
+    expr: &php_ast::owned::Expr,
+) -> Option<(String, Vec<mir_types::atomic::ArrayKey>)> {
+    let ExprKind::ArrayAccess(aa) = &expr.kind else {
+        return None;
+    };
+    let idx = aa.index.as_ref()?;
+    let key = match &idx.kind {
+        ExprKind::String(s) => mir_types::atomic::ArrayKey::String(std::sync::Arc::from(s.as_ref())),
+        ExprKind::Int(i) => mir_types::atomic::ArrayKey::Int(*i),
+        _ => return None,
+    };
+    if let Some(base) = extract_var_name(&aa.array) {
+        Some((base, vec![key]))
+    } else {
+        let (base, mut path) = collect_array_access_path(&aa.array)?;
+        path.push(key);
+        Some((base, path))
+    }
+}
+
+/// Narrow `ty` along a shape-key access path proven present by `isset()`:
+/// clears `optional`/`null` at `path[0]`, then recurses into that key's own
+/// value type for `path[1..]`. Returns `None` when nothing changed (e.g. no
+/// union member is a `TKeyedArray` carrying the key at all).
+fn narrow_shape_path(ty: &Type, path: &[mir_types::atomic::ArrayKey]) -> Option<Type> {
+    let (key, rest) = path.split_first()?;
     let mut changed = false;
     let mut result = Type::empty();
-    for atomic in &current.types {
+    for atomic in &ty.types {
         match atomic {
             Atomic::TKeyedArray {
                 properties,
                 is_open,
                 is_list,
             } => {
-                if properties.contains_key(&key) {
+                if properties.contains_key(key) {
                     let mut new_props = properties.clone();
-                    if let Some(prop) = new_props.get_mut(&key) {
-                        let narrowed_ty = prop.ty.remove_null();
+                    if let Some(prop) = new_props.get_mut(key) {
+                        let mut narrowed_ty = prop.ty.remove_null();
+                        if !rest.is_empty() {
+                            if let Some(deeper) = narrow_shape_path(&narrowed_ty, rest) {
+                                narrowed_ty = deeper;
+                            }
+                        }
                         if !narrowed_ty.is_empty() {
                             prop.ty = narrowed_ty;
                         }
@@ -3097,7 +3125,9 @@ fn narrow_isset_shape_key(var_expr: &php_ast::owned::Expr, ctx: &mut FlowState) 
     // the original type rather than narrowing to an empty union — proving
     // the branch itself unreachable is a separate concern from key narrowing.
     if changed && !result.types.is_empty() {
-        ctx.set_var(&base, result);
+        Some(result)
+    } else {
+        None
     }
 }
 
