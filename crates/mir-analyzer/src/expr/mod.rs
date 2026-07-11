@@ -411,36 +411,23 @@ impl<'a> ExpressionAnalyzer<'a> {
                             .as_deref()
                             .cloned()
                             .unwrap_or_else(Type::mixed);
-                        let params: Vec<mir_types::atomic::FnParam> = f
-                            .params
-                            .iter()
-                            .map(|p| mir_types::atomic::FnParam {
-                                name: mir_types::Name::from(p.name.as_ref()),
-                                ty: p
-                                    .ty
-                                    .as_deref()
-                                    .cloned()
-                                    .map(mir_types::compact::SimpleType::from_union),
-                                out_ty: p
-                                    .out_ty
-                                    .as_deref()
-                                    .cloned()
-                                    .map(mir_types::compact::SimpleType::from_union),
-                                default: if p.has_default {
-                                    Some(mir_types::compact::SimpleType::from_union(Type::mixed()))
-                                } else {
-                                    None
-                                },
-                                is_variadic: p.is_variadic,
-                                is_byref: p.is_byref,
-                                is_optional: p.is_optional,
-                            })
-                            .collect();
-                        return Type::single(Atomic::TClosure {
-                            params,
-                            return_type: Box::new(return_ty),
-                            this_type: None,
-                        });
+                        // No receiver for a plain function — self/static/parent can't
+                        // legally appear in its signature, so an empty fqcn/type-param
+                        // list is a safe no-op for build_closure_from_resolved_params's
+                        // static-substitution step. Routed through the same helper as
+                        // the method FCC cases below so the function's own @template
+                        // params get bound to their declared bound (see the helper's
+                        // doc comment) instead of leaking as bare, unchecked
+                        // TTemplateParam atoms into every call through the closure.
+                        let empty_fqcn: Arc<str> = Arc::from("");
+                        return Type::single(Self::build_closure_from_resolved_params(
+                            &f.params,
+                            return_ty,
+                            &rustc_hash::FxHashMap::default(),
+                            &f.template_params,
+                            &empty_fqcn,
+                            &[],
+                        ));
                     }
                 }
                 Type::single(Atomic::TCallable {
@@ -496,16 +483,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                         {
                             bindings.entry(k).or_insert(v);
                         }
-                        let own_template_names: Vec<mir_types::Name> = resolved
-                            .template_params
-                            .iter()
-                            .map(|tp| mir_types::Name::from(tp.name.as_ref()))
-                            .collect();
                         let closure = Self::build_closure_from_resolved_params(
                             &resolved.params,
                             resolved.return_ty_raw,
                             &bindings,
-                            &own_template_names,
+                            &resolved.template_params,
                             &fqcn_arc,
                             &receiver_type_params,
                         );
@@ -591,16 +573,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                     {
                         bindings.entry(k).or_insert(v);
                     }
-                    let own_template_names: Vec<mir_types::Name> = resolved
-                        .template_params
-                        .iter()
-                        .map(|tp| mir_types::Name::from(tp.name.as_ref()))
-                        .collect();
                     return Type::single(Self::build_closure_from_resolved_params(
                         &resolved.params,
                         resolved.return_ty_raw,
                         &bindings,
-                        &own_template_names,
+                        &resolved.template_params,
                         &fqcn_arc,
                         &receiver_type_params,
                     ));
@@ -617,17 +594,27 @@ impl<'a> ExpressionAnalyzer<'a> {
         params: &[mir_codebase::storage::FnParam],
         return_ty: Type,
         bindings: &rustc_hash::FxHashMap<mir_types::Name, Type>,
-        own_template_names: &[mir_types::Name],
+        own_template_params: &[mir_codebase::storage::TemplateParam],
         receiver_fqcn: &Arc<str>,
         receiver_type_params: &[Type],
     ) -> Atomic {
-        // A method-level `@template` SHADOWS a same-named class template — its
-        // occurrences must stay unbound here rather than getting the class-level
-        // binding baked in, the same way method.rs's direct-call path keeps them
-        // unbound for `check_args` to infer (see `param_bindings.remove` there).
+        // A method-level `@template` SHADOWS a same-named class template, so it
+        // must not get the class-level binding baked in here. Unlike a direct
+        // call (where `check_args` sees the real arguments and infers+bound-checks
+        // the method's own templates per call), a first-class-callable value is
+        // built once and may be called anywhere later with no template_params in
+        // scope to infer against (see the `template_params: &[]` call to
+        // `check_args` for a closure-typed callee) — so a bare, still-templated
+        // param would silently accept any argument. Substituting each of the
+        // method's own templates with its declared bound (or `mixed` if
+        // unbounded, the same fallback `infer_template_bindings` uses) instead
+        // keeps every call through the closure checked against at least that
+        // bound, which is always sound: an argument to the real method must
+        // satisfy the bound regardless of what the template later infers to.
         let mut bindings = bindings.clone();
-        for name in own_template_names {
-            bindings.remove(name);
+        for tp in own_template_params {
+            let bound_ty = tp.bound.as_deref().cloned().unwrap_or_else(Type::mixed);
+            bindings.insert(mir_types::Name::from(tp.name.as_ref()), bound_ty);
         }
         let resolve = |t: Type| -> Type {
             // `self`/`static` must resolve to the receiver's concrete class, the
