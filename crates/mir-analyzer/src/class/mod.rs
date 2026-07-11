@@ -481,6 +481,7 @@ impl<'a> ClassAnalyzer<'a> {
             &bindings,
             &target_tps,
             &HashSet::default(),
+            None,
         ) {
             let loc = issue_location(
                 location,

@@ -129,7 +129,11 @@ impl<'a> ExpressionAnalyzer<'a> {
         // *different, now-invisible* overload would be a false positive that
         // this approximation can't distinguish from a real violation.
         let violations = crate::generic::check_template_bounds_with_inheritance(
-            self.db, &bindings, &class_tps, &unchecked,
+            self.db,
+            &bindings,
+            &class_tps,
+            &unchecked,
+            Some(fqcn.as_ref()),
         );
         let is_stub_class = !violations.is_empty()
             && crate::db::class_like_decl_file(self.db, crate::db::Fqcn::from_str(self.db, fqcn))

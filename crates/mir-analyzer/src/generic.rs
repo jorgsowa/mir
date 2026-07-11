@@ -159,11 +159,24 @@ fn variadic_element_type(ty: &Type) -> &Type {
 /// (e.g. `@template U of T`) substituted in, so it names the concrete type
 /// the violation was actually checked against rather than the bound's raw,
 /// possibly-still-templated docblock spelling.
+///
+/// `receiver_fqcn` is the call site's late-static-bound class (the actual
+/// receiver for an instance/static method call; `None` when there is no
+/// receiver, e.g. a free function call or a class-declaration-time check
+/// like `@implements`'s own type-arg bound check). A `@template T of static`
+/// bound was collected once, at the class's own declaration site, as
+/// `static(DeclaringClass)` — the only class known then — so without this it
+/// always checks against the declaring class instead of the real receiver,
+/// missing violations where a call through a subclass narrows what `static`
+/// must mean. `@template T of self` is intentionally left untouched: unlike
+/// `static`, `self` always means the exact declaring class regardless of
+/// the receiver.
 pub fn check_template_bounds_with_inheritance<'a>(
     db: &dyn MirDatabase,
     bindings: &'a FxHashMap<Name, Type>,
     template_params: &'a [TemplateParam],
     unchecked: &FxHashSet<Name>,
+    receiver_fqcn: Option<&str>,
 ) -> Vec<(&'a Name, &'a Type, Type)> {
     // An inferred type that still contains unresolved template placeholders or
     // self/static cannot be meaningfully checked against the bound here — it
@@ -217,7 +230,8 @@ pub fn check_template_bounds_with_inheritance<'a>(
                 // Substitute already-bound template params into the bound before
                 // comparing — handles `@template B of A` where A itself is a
                 // template that was just bound from another argument.
-                let resolved_bound = bound.substitute_templates(bindings);
+                let resolved_bound =
+                    resolve_static_in_bound(bound.substitute_templates(bindings), receiver_fqcn);
                 if !resolved_bound.is_mixed()
                     && !inferred.is_mixed()
                     && !is_unresolved(inferred, template_params)
@@ -229,6 +243,36 @@ pub fn check_template_bounds_with_inheritance<'a>(
         }
     }
     violations
+}
+
+/// Replace a `static` atom in a (already template-substituted) bound with
+/// the call site's actual receiver class, when known. `static` was filled in
+/// at collection time with the class that DECLARES the template — the only
+/// class known at that point — so without this, `@template T of static` can
+/// only ever be checked against the declaring class, missing violations
+/// where a call through a subclass narrows what `static` actually means at
+/// this call site (`self` is left alone; it never late-binds).
+fn resolve_static_in_bound(bound: Type, receiver_fqcn: Option<&str>) -> Type {
+    let Some(fqcn) = receiver_fqcn else {
+        return bound;
+    };
+    let from_docblock = bound.from_docblock;
+    let possibly_undefined = bound.possibly_undefined;
+    let types: Vec<Atomic> = bound
+        .types
+        .into_iter()
+        .map(|a| match a {
+            Atomic::TStaticObject { .. } => Atomic::TNamedObject {
+                fqcn: Name::from(fqcn),
+                type_params: empty_type_params(),
+            },
+            other => other,
+        })
+        .collect();
+    let mut result = Type::from_vec(types);
+    result.from_docblock = from_docblock;
+    result.possibly_undefined = possibly_undefined;
+    result
 }
 
 /// Shallow variant of the unresolved-placeholder check for nested type params

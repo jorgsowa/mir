@@ -922,6 +922,7 @@ fn resolve_method_return<'a>(
                 &bindings,
                 &resolved.template_params,
                 &unchecked,
+                Some(fqcn.as_ref()),
             ) {
                 ea.emit(
                     IssueKind::InvalidTemplateParam {

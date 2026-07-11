@@ -524,6 +524,7 @@ impl CallAnalyzer {
                     &bindings,
                     &resolved.template_params,
                     &unchecked,
+                    Some(fqcn_arc.as_ref()),
                 ) {
                     ea.emit(
                         IssueKind::InvalidTemplateParam {

@@ -491,6 +491,7 @@ impl CallAnalyzer {
                     &bindings,
                     &template_params,
                     &unchecked,
+                    None,
                 ) {
                     ea.emit(
                         IssueKind::InvalidTemplateParam {
