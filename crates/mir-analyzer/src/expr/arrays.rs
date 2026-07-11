@@ -46,6 +46,50 @@ fn spread_key_type(arr_ty: &Type) -> Type {
     }
 }
 
+/// Whether `fqcn` implements `ArrayAccess`, directly or via an ancestor
+/// class/interface — `$obj[$idx]` on such a receiver is governed by the
+/// class's own `offsetGet`/`offsetSet`/`offsetExists` signatures, not the
+/// plain-PHP-array "offset must be an array-key" rule.
+fn implements_array_access(db: &dyn crate::db::MirDatabase, fqcn: &mir_types::Name) -> bool {
+    let bare = fqcn.as_ref().trim_start_matches('\\');
+    crate::db::class_ancestors_by_fqcn(db, crate::db::Fqcn::from_str(db, bare))
+        .iter()
+        .any(|a| a.trim_start_matches('\\').eq_ignore_ascii_case("ArrayAccess"))
+}
+
+/// Resolve the value type `$obj[$idx]` yields for an `ArrayAccess`-implementing
+/// receiver: prefer an explicit `@implements ArrayAccess<TKey, TValue>`
+/// annotation (substituting the receiver's own concrete type args), falling
+/// back to `offsetGet()`'s resolved return type. `None` means `fqcn` doesn't
+/// implement `ArrayAccess` at all.
+fn resolve_array_access_value_type(
+    db: &dyn crate::db::MirDatabase,
+    fqcn: &mir_types::Name,
+    type_params: &[Type],
+) -> Option<Type> {
+    if !implements_array_access(db, fqcn) {
+        return None;
+    }
+    let bare = fqcn.as_ref().trim_start_matches('\\');
+    let class = crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, bare))?;
+    let class_tps = crate::db::class_template_params(db, bare).unwrap_or_default();
+    let bindings = crate::generic::build_class_bindings(&class_tps, type_params);
+
+    let annotated = class.implements_type_args().iter().find_map(|(iface, args)| {
+        (iface.trim_start_matches('\\').eq_ignore_ascii_case("ArrayAccess")).then_some(args)
+    });
+    if let Some(args) = annotated {
+        if args.len() >= 2 {
+            return Some(args[1].substitute_templates(&bindings));
+        }
+    }
+
+    let (_, def) =
+        crate::db::find_method_in_chain(db, crate::db::Fqcn::from_str(db, bare), "offsetget")?;
+    let ty = def.return_type.as_deref().cloned().unwrap_or_else(Type::mixed);
+    Some(ty.substitute_templates(&bindings))
+}
+
 impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_array(&mut self, elements: &[ArrayElement], ctx: &mut FlowState) -> Type {
         use mir_types::atomic::{ArrayKey, KeyedProperty};
@@ -215,10 +259,19 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
         }
         let arr_ty = self.analyze(&aa.array, ctx);
+        // `ArrayAccess` receivers (WeakMap, SplObjectStorage, user collections)
+        // define their own offset type via offsetGet/offsetSet/offsetExists —
+        // the plain-PHP-array "offset must be an array-key" rule below doesn't
+        // apply to them (e.g. WeakMap is keyed by `object`).
+        let receiver_is_array_access = arr_ty.types.iter().any(
+            |a| matches!(a, Atomic::TNamedObject { fqcn, .. } if implements_array_access(self.db, fqcn)),
+        );
         if let Some(idx) = &aa.index {
             let idx_ty = self.analyze(idx, ctx);
-            // Float keys are silently truncated to int in PHP
-            if idx_ty.contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..))) {
+            if receiver_is_array_access {
+                // The array-key rule below is plain-PHP-array-only; skip it.
+            } else if idx_ty.contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..))) {
+                // Float keys are silently truncated to int in PHP
                 self.emit(
                     IssueKind::ImplicitFloatToIntCast {
                         from: idx_ty.to_string(),
@@ -448,6 +501,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
                 Atomic::TString | Atomic::TLiteralString(_) => {
                     return Type::single(Atomic::TString);
+                }
+                Atomic::TNamedObject { fqcn, type_params } => {
+                    if let Some(value_ty) =
+                        resolve_array_access_value_type(self.db, fqcn, type_params)
+                    {
+                        return value_ty;
+                    }
                 }
                 _ => {}
             }
