@@ -670,14 +670,18 @@ impl Hash for Atomic {
                 is_list,
             } => {
                 (T::TKeyedArray as u8).hash(state);
-                // Sort by key before hashing so the hash is order-independent,
-                // consistent with PartialEq which uses IndexMap value equality.
-                let mut pairs: Vec<_> = properties.iter().collect();
-                pairs.sort_by_key(|(a, _)| *a);
-                for (k, v) in pairs {
-                    k.hash(state);
-                    v.hash(state);
+                // Combine per-entry hashes commutatively (wrapping add) so the
+                // result is order-independent, consistent with PartialEq which
+                // uses IndexMap value equality — without allocating and sorting.
+                let mut combined: u64 = 0;
+                for (k, v) in properties.iter() {
+                    let mut entry_hasher = rustc_hash::FxHasher::default();
+                    k.hash(&mut entry_hasher);
+                    v.hash(&mut entry_hasher);
+                    combined = combined.wrapping_add(std::hash::Hasher::finish(&entry_hasher));
                 }
+                combined.hash(state);
+                properties.len().hash(state);
                 is_open.hash(state);
                 is_list.hash(state);
             }

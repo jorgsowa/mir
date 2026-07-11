@@ -871,6 +871,11 @@ impl Type {
         if bindings.is_empty() {
             return self.clone();
         }
+        // Most argument/return types are plain scalars or resolved objects
+        // with nothing to substitute — skip the rebuild entirely.
+        if !self.types.iter().any(atomic_may_contain_templates) {
+            return self.clone();
+        }
         let mut result = Type::empty();
         result.possibly_undefined = self.possibly_undefined;
         result.from_docblock = self.from_docblock;
@@ -1309,6 +1314,33 @@ fn resolve_conditional_branch(
 // ---------------------------------------------------------------------------
 // Template substitution helpers
 // ---------------------------------------------------------------------------
+
+/// Whether `substitute_templates` could change this atomic: it is either a
+/// template reference itself or a container/callable that may hold one.
+/// Mirrors the substituting arms of that function's match — keep in sync.
+fn atomic_may_contain_templates(atomic: &Atomic) -> bool {
+    match atomic {
+        // Bare unqualified names double as template refs (docblock parser
+        // workaround, see substitute_templates); qualified names only matter
+        // when they carry generic params.
+        Atomic::TNamedObject { fqcn, type_params } => {
+            !type_params.is_empty() || !fqcn.contains('\\')
+        }
+        Atomic::TTemplateParam { .. }
+        | Atomic::TArray { .. }
+        | Atomic::TList { .. }
+        | Atomic::TNonEmptyArray { .. }
+        | Atomic::TNonEmptyList { .. }
+        | Atomic::TKeyedArray { .. }
+        | Atomic::TCallable { .. }
+        | Atomic::TClosure { .. }
+        | Atomic::TConditional { .. }
+        | Atomic::TIntersection { .. }
+        | Atomic::TClassString(Some(_))
+        | Atomic::TInterfaceString(Some(_)) => true,
+        _ => false,
+    }
+}
 
 fn substitute_in_fn_param(
     p: &crate::atomic::FnParam,
