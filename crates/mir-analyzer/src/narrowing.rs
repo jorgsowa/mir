@@ -1282,10 +1282,71 @@ pub(crate) fn narrow_type_fn_disjuncts(
     Some(vn)
 }
 
+/// Extract the single variable a leaf disjunct condition narrows — either a
+/// direct `$x instanceof A` or a recognized `is_TYPE($x)` call — without
+/// applying any narrowing. Used to check every condition in a disjunct list
+/// targets the same variable before [`narrow_mixed_disjuncts`] mixes the two
+/// kinds together; does not recurse into nested `||`/parens the way
+/// [`collect_instanceof`] does; a nested chain is left for the pure
+/// instanceof/type-fn paths (tried first) to handle instead.
+fn single_leaf_disjunct_var(expr: &php_ast::owned::Expr) -> Option<String> {
+    let expr = peel_parens(expr);
+    match &expr.kind {
+        ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => extract_var_name(&b.left),
+        _ => extract_type_fn_check(expr).map(|(_, vn)| vn),
+    }
+}
+
+/// Narrow `$x` to the union of every disjunct's narrowing when `conditions`
+/// mixes `instanceof` and `is_TYPE()` checks on the SAME variable (e.g. `$x
+/// instanceof A || is_string($x)`) — the case neither
+/// [`narrow_instanceof_disjuncts`] (which requires every disjunct to be an
+/// `instanceof`) nor [`narrow_type_fn_disjuncts`] (which requires every
+/// disjunct to be a type-check call) can handle alone. Each disjunct is
+/// narrowed independently from the original type in a scratch branch, then
+/// the results are unioned — the same technique `narrow_type_fn_disjuncts`
+/// already uses, generalized to a mix of condition kinds via the top-level
+/// [`narrow_from_condition`] dispatcher instead of a single specialized
+/// narrowing function.
+pub(crate) fn narrow_mixed_disjuncts(
+    conditions: &[&php_ast::owned::Expr],
+    ctx: &mut FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<String> {
+    if conditions.len() < 2 {
+        return None;
+    }
+    let mut var_name: Option<String> = None;
+    for cond in conditions {
+        let vn = single_leaf_disjunct_var(cond)?;
+        match &var_name {
+            None => var_name = Some(vn),
+            Some(existing) if *existing == vn => {}
+            _ => return None, // different variable — bail out
+        }
+    }
+    let vn = var_name?;
+    let original = ctx.get_var(&vn);
+    let mut union_ty = Type::empty();
+    for cond in conditions {
+        let mut scratch = ctx.branch();
+        scratch.set_var(&vn, original.clone());
+        narrow_from_condition(cond, &mut scratch, true, db, file);
+        union_ty.merge_with(&scratch.get_var(&vn));
+    }
+    if !union_ty.is_empty() {
+        ctx.set_var(&vn, union_ty);
+    }
+    Some(vn)
+}
+
 /// For `$x instanceof A || $x instanceof B` (true branch): narrow $x to A|B.
 /// Handles OR chains recursively, e.g. `$x instanceof A || $x instanceof B || $x instanceof C`.
 /// Also handles the scalar-type-check counterpart (`is_int($x) || is_string($x)`)
-/// via [`narrow_type_fn_disjuncts`] when the instanceof shape doesn't apply.
+/// via [`narrow_type_fn_disjuncts`], and a mix of the two (`$x instanceof A ||
+/// is_string($x)`) via [`narrow_mixed_disjuncts`], when the pure-instanceof
+/// shape doesn't apply.
 fn narrow_or_instanceof_true(
     left: &php_ast::owned::Expr,
     right: &php_ast::owned::Expr,
@@ -1293,8 +1354,10 @@ fn narrow_or_instanceof_true(
     db: &dyn MirDatabase,
     file: &str,
 ) {
-    if narrow_instanceof_disjuncts(&[left, right], ctx, db, file).is_none() {
-        narrow_type_fn_disjuncts(&[left, right], ctx);
+    if narrow_instanceof_disjuncts(&[left, right], ctx, db, file).is_none()
+        && narrow_type_fn_disjuncts(&[left, right], ctx).is_none()
+    {
+        narrow_mixed_disjuncts(&[left, right], ctx, db, file);
     }
 }
 

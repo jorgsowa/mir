@@ -606,6 +606,16 @@ impl<'a> StatementsAnalyzer<'a> {
                             &mut union_ctx,
                         ) {
                             case_ctx.set_var(&vn, union_ctx.get_var(&vn));
+                        } else {
+                            let mut union_ctx = pre_ctx.branch();
+                            if let Some(vn) = crate::narrowing::narrow_mixed_disjuncts(
+                                &pending_conditions,
+                                &mut union_ctx,
+                                self.db,
+                                &self.file,
+                            ) {
+                                case_ctx.set_var(&vn, union_ctx.get_var(&vn));
+                            }
                         }
                     }
                 } else if let Some(ref var_name) = subject_var {
