@@ -169,14 +169,22 @@ impl<'a> ExpressionAnalyzer<'a> {
                 result_ty
             }
             AssignOp::Coalesce => {
+                // `$x ??= 'y'` on an undefined `$x` is valid PHP (treated as if `$x`
+                // were null) and afterwards `$x` is exactly the RHS type — not a union
+                // with the `mixed` that an undefined-variable read would otherwise
+                // produce.
+                let is_undefined_var = extract_simple_var(&a.target)
+                    .is_some_and(|name| !ctx.var_is_defined(&name));
                 let lhs_ty = self.with_existence_check(|ea| ea.analyze(&a.target, ctx));
-                let merged = Type::merge(&lhs_ty.remove_null(), &rhs_ty);
-                if let Some(var_name) = extract_simple_var(&a.target) {
-                    ctx.set_var(&var_name, merged.clone());
-                    let (line, col_start) = self.offset_to_line_col(a.target.span.start);
-                    let (line_end, col_end) = self.offset_to_line_col(a.target.span.end);
-                    ctx.record_var_location(&var_name, line, col_start, line_end, col_end);
-                }
+                let merged = if is_undefined_var {
+                    rhs_ty.clone()
+                } else {
+                    Type::merge(&lhs_ty.remove_null(), &rhs_ty)
+                };
+                // Route through assign_to_target (not just the simple-variable case) so
+                // property/array targets are also narrowed — e.g. `$this->x ??= 'y'`
+                // should leave $this->x non-null afterwards, not just plain `$x ??= 'y'`.
+                self.assign_to_target(&a.target, merged.clone(), ctx, expr_span);
                 merged
             }
             _ => {
