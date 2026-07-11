@@ -438,8 +438,18 @@ fn infer_from_pair(
 
     for p_atomic in &param_ty.types {
         match p_atomic {
-            // Direct template placeholder: T → bind T = residual(arg_ty)
-            Atomic::TTemplateParam { name, .. } => {
+            // Direct template placeholder: T → bind T = residual(arg_ty).
+            // Only when `name` belongs to the template set actually being
+            // inferred right now (`template_names`) — a nested signature
+            // (e.g. a `callable(T): R` parameter, where T is the class's own
+            // template and R is this method's) can carry an ALREADY-BOUND
+            // template from a different declaring entity as a bare
+            // `TTemplateParam` atom too. Rebinding that from the argument's
+            // structure here would silently overwrite the correct binding
+            // computed elsewhere (e.g. from the receiver) once the two
+            // binding maps are merged. Mirrors the `template_names.contains`
+            // gate the `TNamedObject` arm below already has.
+            Atomic::TTemplateParam { name, .. } if template_names.contains(name) => {
                 let bind = template_residual.bind_value(arg_ty);
                 if bind.types.is_empty() {
                     // Empty residual: every arg atomic was consumed by another
