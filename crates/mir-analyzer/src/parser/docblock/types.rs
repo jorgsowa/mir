@@ -2,6 +2,16 @@ use super::*;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 
+/// Parse an assertion annotation's type, recognizing the leading `!` negation
+/// marker (`@psalm-assert !null $x` — asserts `$x` is NOT this type) that only
+/// assertion tags use, never ordinary `@param`/`@return` type positions.
+pub(crate) fn parse_assertion_type(s: &str) -> (Type, bool) {
+    match s.trim().strip_prefix('!') {
+        Some(rest) => (parse_type_string(rest), true),
+        None => (parse_type_string(s), false),
+    }
+}
+
 pub(crate) fn parse_type_string(s: &str) -> Type {
     let s = s.trim();
 

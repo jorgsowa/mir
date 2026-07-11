@@ -183,7 +183,8 @@ impl DocblockParser {
                 "assert" | "psalm-assert" | "phpstan-assert" => {
                     if let Some(body_str) = body_text(&tag.body) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
-                            result.assertions.push((name, parse_type_string(&ty_str)));
+                            let (ty, negated) = parse_assertion_type(&ty_str);
+                            result.assertions.push((name, ty, negated));
                         }
                     }
                 }
@@ -323,18 +324,16 @@ impl DocblockParser {
                 "psalm-assert-if-true" | "phpstan-assert-if-true" => {
                     if let Some(body_str) = body_text(&tag.body) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
-                            result
-                                .assertions_if_true
-                                .push((name, parse_type_string(&ty_str)));
+                            let (ty, negated) = parse_assertion_type(&ty_str);
+                            result.assertions_if_true.push((name, ty, negated));
                         }
                     }
                 }
                 "psalm-assert-if-false" | "phpstan-assert-if-false" => {
                     if let Some(body_str) = body_text(&tag.body) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
-                            result
-                                .assertions_if_false
-                                .push((name, parse_type_string(&ty_str)));
+                            let (ty, negated) = parse_assertion_type(&ty_str);
+                            result.assertions_if_false.push((name, ty, negated));
                         }
                     }
                 }
@@ -521,12 +520,12 @@ pub struct ParsedDocblock {
     pub implements: Vec<Type>,
     /// `@throws ClassName`
     pub throws: Vec<String>,
-    /// `@psalm-assert Type $var`
-    pub assertions: Vec<(String, Type)>,
+    /// `@psalm-assert Type $var` — the `bool` is true for the `!Type` negated form.
+    pub assertions: Vec<(String, Type, bool)>,
     /// `@psalm-assert-if-true Type $var`
-    pub assertions_if_true: Vec<(String, Type)>,
+    pub assertions_if_true: Vec<(String, Type, bool)>,
     /// `@psalm-assert-if-false Type $var`
-    pub assertions_if_false: Vec<(String, Type)>,
+    pub assertions_if_false: Vec<(String, Type, bool)>,
     /// `@psalm-suppress IssueName`
     pub suppressed_issues: Vec<String>,
     pub is_deprecated: bool,

@@ -368,6 +368,10 @@ pub struct Assertion {
     pub kind: AssertionKind,
     pub param: Arc<str>,
     pub ty: Type,
+    /// True for the `!Type` negated form (`@psalm-assert !null $x`): the
+    /// parameter is asserted to NOT be `ty`, rather than to BE it.
+    #[serde(default)]
+    pub negated: bool,
 }
 
 // ---------------------------------------------------------------------------

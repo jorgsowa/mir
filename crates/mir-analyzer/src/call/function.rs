@@ -548,11 +548,21 @@ impl CallAnalyzer {
                 if let Some(index) = params.iter().position(|p| p.name == assertion.param) {
                     if let Some(arg) = call.args.get(index) {
                         if let ExprKind::Variable(name) = &arg.value.kind {
+                            let var_name = name.as_ref().trim_start_matches('$');
                             let asserted_ty = match &template_bindings {
                                 Some(b) => assertion.ty.substitute_templates(b),
                                 None => assertion.ty.clone(),
                             };
-                            ctx.set_var(name.as_ref().trim_start_matches('$'), asserted_ty);
+                            let asserted_ty = if assertion.negated {
+                                crate::narrowing::negate_assertion_type(
+                                    &ctx.get_var(var_name),
+                                    &asserted_ty,
+                                    ea.db,
+                                )
+                            } else {
+                                asserted_ty
+                            };
+                            ctx.set_var(var_name, asserted_ty);
                         }
                     }
                 }
