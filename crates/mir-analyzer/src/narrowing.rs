@@ -2182,6 +2182,28 @@ fn add_key_to_sealed_shapes(
                 }
                 continue;
             }
+            // The key is already declared but optional (or nullable) —
+            // array_key_exists() proves it's actually present, so clear the
+            // optional flag and strip null the same way isset() narrowing does.
+            if let Some(prop) = properties.get(key) {
+                if prop.optional || prop.ty.is_nullable() {
+                    changed = true;
+                    let mut new_props = properties.clone();
+                    if let Some(new_prop) = new_props.get_mut(key) {
+                        let narrowed_ty = new_prop.ty.remove_null();
+                        if !narrowed_ty.is_empty() {
+                            new_prop.ty = narrowed_ty;
+                        }
+                        new_prop.optional = false;
+                    }
+                    result.add_type(Atomic::TKeyedArray {
+                        properties: new_props,
+                        is_open: *is_open,
+                        is_list: *is_list,
+                    });
+                    continue;
+                }
+            }
         }
         result.add_type(a.clone());
     }
