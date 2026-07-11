@@ -696,11 +696,8 @@ fn build_reverse_deps(db: &dyn crate::db::MirDatabase) -> HashMap<String, HashSe
 fn extract_reference_locations(
     db: &dyn crate::db::MirDatabase,
     file: &Arc<str>,
-) -> Vec<(String, u32, u16, u16)> {
-    db.extract_file_reference_locations(file.as_ref())
-        .into_iter()
-        .map(|(sym, line, col_start, col_end)| (sym.to_string(), line, col_start, col_end))
-        .collect()
+) -> Arc<[crate::cache::CachedRefLoc]> {
+    db.extract_file_reference_locations(file.as_ref()).into()
 }
 
 pub struct AnalysisResult {

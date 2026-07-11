@@ -292,18 +292,19 @@ impl AnalysisSession {
                     if let Some((cached_issues, ref_locs)) = cache.get(&parsed.file, &h) {
                         // Cache replay: rebuild the file's complete reference
                         // set straight from the cached tuples — no pending-
-                        // buffer detour.
+                        // buffer detour. Symbol keys are Arc-shared with the
+                        // cache entry, so this allocates no strings.
                         let locs: Vec<RefLoc> = ref_locs
                             .iter()
                             .map(|(symbol, line, col_start, col_end)| RefLoc {
-                                symbol_key: Arc::from(symbol.as_str()),
+                                symbol_key: Arc::clone(symbol),
                                 file: parsed.file.clone(),
                                 line: *line,
                                 col_start: *col_start,
                                 col_end: *col_end,
                             })
                             .collect();
-                        return (parsed.file.clone(), cached_issues, Vec::new(), locs);
+                        return (parsed.file.clone(), cached_issues.to_vec(), Vec::new(), locs);
                     }
                     let (issues, symbols) = driver.analyze_bodies(
                         parsed.owned(),
@@ -312,15 +313,15 @@ impl AnalysisSession {
                         parsed.source_map(),
                     );
                     let pending = db.take_pending_ref_locs();
-                    let cache_locs = pending
+                    let cache_locs: Arc<[crate::cache::CachedRefLoc]> = pending
                         .iter()
-                        .map(|r| (r.symbol_key.to_string(), r.line, r.col_start, r.col_end))
+                        .map(|r| (Arc::clone(&r.symbol_key), r.line, r.col_start, r.col_end))
                         .collect();
                     let surface = surface_hashes
                         .get(parsed.file.as_ref())
                         .cloned()
                         .unwrap_or_default();
-                    cache.put(&parsed.file, h, surface, issues.clone(), cache_locs);
+                    cache.put(&parsed.file, h, surface, issues.as_slice().into(), cache_locs);
                     if let Some(cb) = &opts.on_file_done {
                         cb();
                     }
@@ -469,7 +470,8 @@ impl AnalysisSession {
         // Fast path: content unchanged and cache has a valid entry.
         if let Some(cache) = &self.cache {
             let h = hash_content(new_content);
-            if let Some((mut issues, ref_locs)) = cache.get(file_path, &h) {
+            if let Some((cached_issues, ref_locs)) = cache.get(file_path, &h) {
+                let mut issues = cached_issues.to_vec();
                 let file: Arc<str> = Arc::from(file_path);
                 // Replace semantics: the cached set is the file's complete
                 // reference set, so stale entries from a prior version are
@@ -477,7 +479,7 @@ impl AnalysisSession {
                 let locs: Vec<RefLoc> = ref_locs
                     .iter()
                     .map(|(symbol, line, col_start, col_end)| RefLoc {
-                        symbol_key: Arc::from(symbol.as_str()),
+                        symbol_key: Arc::clone(symbol),
                         file: file.clone(),
                         line: *line,
                         col_start: *col_start,
@@ -571,7 +573,7 @@ impl AnalysisSession {
             }
             let db = self.snapshot_db();
             let ref_locs = extract_reference_locations(&db, &file);
-            cache.put(file_path, h, surface_hash, all_issues.clone(), ref_locs);
+            cache.put(file_path, h, surface_hash, all_issues.as_slice().into(), ref_locs);
         }
 
         opts.apply(&mut all_issues);

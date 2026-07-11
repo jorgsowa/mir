@@ -683,15 +683,15 @@ fn invalidate_file_releases_all_per_file_state() {
         base.as_ref(),
         "h1".to_string(),
         String::new(),
-        Vec::new(),
-        Vec::new(),
+        [].into(),
+        [].into(),
     );
     cache.put(
         child.as_ref(),
         "h2".to_string(),
         String::new(),
-        Vec::new(),
-        Vec::new(),
+        [].into(),
+        [].into(),
     );
     assert_eq!(session.tracked_file_count(), stub_count + 2);
 
@@ -713,8 +713,8 @@ fn invalidate_file_releases_all_per_file_state() {
         child.as_ref(),
         "h3".to_string(),
         String::new(),
-        Vec::new(),
-        Vec::new(),
+        [].into(),
+        [].into(),
     );
     let evicted = cache.evict_with_dependents(&[base.as_ref().to_string()]);
     assert_eq!(
@@ -803,15 +803,15 @@ fn ingest_file_maintains_reverse_dep_graph_for_session_callers() {
         base_path.as_ref(),
         "h1".to_string(),
         String::new(),
-        Vec::new(),
-        Vec::new(),
+        [].into(),
+        [].into(),
     );
     cache.put(
         child_path.as_ref(),
         "h2".to_string(),
         String::new(),
-        Vec::new(),
-        Vec::new(),
+        [].into(),
+        [].into(),
     );
     assert!(cache.get(base_path.as_ref(), "h1").is_some());
     assert!(cache.get(child_path.as_ref(), "h2").is_some());

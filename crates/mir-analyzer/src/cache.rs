@@ -18,9 +18,13 @@ use serde::{Deserialize, Serialize};
 
 use mir_issues::Issue;
 
-/// Cached analysis result returned on a cache hit: issues and reference location
-/// tuples `(symbol_key, line, col_start, col_end)`.
-pub type CacheHit = (Vec<Issue>, Vec<(String, u32, u16, u16)>);
+/// Reference location tuple recorded during body analysis:
+/// `(symbol_key, line, col_start, col_end)`.
+pub type CachedRefLoc = (std::sync::Arc<str>, u32, u16, u16);
+
+/// Cached analysis result returned on a cache hit. Arc-shared with the stored
+/// entry so a hit is two refcount bumps, not a deep clone under the cache lock.
+pub type CacheHit = (std::sync::Arc<[Issue]>, std::sync::Arc<[CachedRefLoc]>);
 
 // ---------------------------------------------------------------------------
 // Hash helper
@@ -183,12 +187,14 @@ fn cache_epoch(php_version: u8, user_stub_fp: u64) -> u64 {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct CacheEntry {
     content_hash: String,
-    issues: Vec<Issue>,
-    /// Reference locations recorded during body analysis: (symbol_key, line, col_start, col_end).
-    /// Stored so that cache hits can replay symbol_reference_locations without re-running
-    /// analyze_bodies.
+    /// Arc-shared so `get` hands out the stored slice without deep-cloning
+    /// every Issue while holding the cache lock.
+    issues: std::sync::Arc<[Issue]>,
+    /// Reference locations recorded during body analysis. Stored so that cache
+    /// hits can replay symbol_reference_locations without re-running
+    /// analyze_bodies. Arc-shared for the same reason as `issues`.
     #[serde(default)]
-    reference_locations: Vec<(String, u32, u16, u16)>,
+    reference_locations: std::sync::Arc<[CachedRefLoc]>,
     /// Digest of this file's cross-file surface (see [`surface_fingerprint`]).
     /// Dependents are evicted only when this changes between runs — a body-only
     /// edit to a declared-return callable leaves it untouched. Empty for entries
@@ -307,6 +313,7 @@ impl AnalysisCache {
         let entries = self.entries.lock();
         entries.get(&id).and_then(|e| {
             if e.content_hash == content_hash {
+                // Arc clones: O(1) while holding the lock.
                 Some((e.issues.clone(), e.reference_locations.clone()))
             } else {
                 None
@@ -346,8 +353,8 @@ impl AnalysisCache {
         file_path: &str,
         content_hash: String,
         surface_hash: String,
-        issues: Vec<Issue>,
-        reference_locations: Vec<(String, u32, u16, u16)>,
+        issues: std::sync::Arc<[Issue]>,
+        reference_locations: std::sync::Arc<[CachedRefLoc]>,
     ) {
         let id = self.file_id_map.lock().assign_or_get(file_path);
         let mut entries = self.entries.lock();
@@ -576,7 +583,7 @@ mod tests {
     }
 
     fn seed(cache: &AnalysisCache, file: &str) {
-        cache.put(file, "hash".to_string(), String::new(), vec![], vec![]);
+        cache.put(file, "hash".to_string(), String::new(), [].into(), [].into());
     }
 
     fn surface(src: &str) -> String {
@@ -761,7 +768,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         {
             let cache = make_cache(&dir);
-            cache.put("a.php", "h1".to_string(), String::new(), vec![], vec![]);
+            cache.put("a.php", "h1".to_string(), String::new(), [].into(), [].into());
             cache.flush();
         }
         let cache = AnalysisCache::open(dir.path(), TEST_PHP_V, 0);
@@ -784,8 +791,8 @@ mod tests {
             "a.php".to_string(),
             CacheEntry {
                 content_hash: "h1".to_string(),
-                issues: vec![],
-                reference_locations: vec![],
+                issues: [].into(),
+                reference_locations: [].into(),
                 surface_hash: String::new(),
             },
         );
@@ -817,7 +824,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         {
             let cache = AnalysisCache::open(dir.path(), 74, 0); // analyzed as PHP 7.4
-            cache.put("a.php", "h1".to_string(), String::new(), vec![], vec![]);
+            cache.put("a.php", "h1".to_string(), String::new(), [].into(), [].into());
             cache.flush();
         }
         let same = AnalysisCache::open(dir.path(), 74, 0);
@@ -840,7 +847,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         {
             let cache = AnalysisCache::open(dir.path(), TEST_PHP_V, 0xAAAA);
-            cache.put("a.php", "h1".to_string(), String::new(), vec![], vec![]);
+            cache.put("a.php", "h1".to_string(), String::new(), [].into(), [].into());
             cache.flush();
         }
         let same = AnalysisCache::open(dir.path(), TEST_PHP_V, 0xAAAA);
@@ -869,8 +876,8 @@ mod tests {
             "a.php".to_string(),
             CacheEntry {
                 content_hash: "h1".to_string(),
-                issues: vec![],
-                reference_locations: vec![],
+                issues: [].into(),
+                reference_locations: [].into(),
                 surface_hash: String::new(),
             },
         );
