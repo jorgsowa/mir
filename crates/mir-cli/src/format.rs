@@ -1,4 +1,24 @@
+use owo_colors::OwoColorize;
+
 use mir_issues::{Issue, Severity};
+
+/// Renders an issue the way `mir`'s default text output prints it, e.g.
+/// `src/foo.php:3:1 error[MIR0002] UndefinedVariable: ...`.
+pub fn format_issue(issue: &Issue) -> String {
+    let sev = match issue.severity {
+        Severity::Error => "error".red().to_string(),
+        Severity::Warning => "warning".yellow().to_string(),
+        Severity::Info => "info".blue().to_string(),
+    };
+    format!(
+        "{} {}[{}] {}: {}",
+        issue.location.bright_black(),
+        sev,
+        issue.kind.code().bright_black(),
+        issue.kind.name().bold(),
+        issue.kind.message()
+    )
+}
 
 pub fn format_junit(issues: &[&Issue]) -> String {
     use std::collections::HashMap;
@@ -191,4 +211,52 @@ pub fn format_sarif(issues: &[&Issue]) -> String {
     });
 
     serde_json::to_string_pretty(&sarif).unwrap_or_else(|_| "{}".to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use mir_issues::{Issue, IssueKind, Location};
+
+    use super::*;
+
+    #[test]
+    fn format_issue_includes_code() {
+        let issue = Issue::new(
+            IssueKind::UndefinedClass {
+                name: "Foo".to_string(),
+            },
+            Location {
+                file: Arc::from("src/x.php"),
+                line: 1,
+                line_end: 1,
+                col_start: 0,
+                col_end: 3,
+            },
+        );
+        // Strip ANSI escape sequences so the assertion isn't dependent on
+        // owo-colors' tty detection.
+        let raw = format_issue(&issue);
+        let stripped: String = {
+            let mut out = String::new();
+            let mut chars = raw.chars();
+            while let Some(c) = chars.next() {
+                if c == '\u{1b}' {
+                    for c2 in chars.by_ref() {
+                        if c2 == 'm' {
+                            break;
+                        }
+                    }
+                } else {
+                    out.push(c);
+                }
+            }
+            out
+        };
+        assert!(
+            stripped.contains("error[MIR0005] UndefinedClass:"),
+            "format_issue output missing code/name segment: {stripped:?}",
+        );
+    }
 }

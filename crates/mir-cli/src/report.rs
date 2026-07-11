@@ -6,7 +6,7 @@ use owo_colors::OwoColorize;
 use mir_issues::{Issue, Severity};
 
 use crate::config::{Baseline, Config, ErrorLevel};
-use crate::format::{format_junit, format_sarif};
+use crate::format::{format_issue, format_junit, format_sarif};
 use crate::{Cli, OutputFormat};
 
 /// Load baseline from `--baseline` flag or auto-discover `psalm-baseline.xml`.
@@ -154,7 +154,7 @@ pub fn run_output(
         OutputFormat::Text => {
             if !cli.quiet {
                 for issue in &display_issues {
-                    println!("{issue}");
+                    println!("{}", format_issue(issue));
                 }
             }
         }

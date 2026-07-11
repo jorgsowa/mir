@@ -2,7 +2,6 @@ use std::collections::HashSet;
 use std::fmt;
 use std::sync::Arc;
 
-use owo_colors::OwoColorize;
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
@@ -1964,25 +1963,6 @@ impl Issue {
     }
 }
 
-impl fmt::Display for Issue {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let sev = match self.severity {
-            Severity::Error => "error".red().to_string(),
-            Severity::Warning => "warning".yellow().to_string(),
-            Severity::Info => "info".blue().to_string(),
-        };
-        write!(
-            f,
-            "{} {}[{}] {}: {}",
-            self.location.bright_black(),
-            sev,
-            self.kind.code().bright_black(),
-            self.kind.name().bold(),
-            self.kind.message()
-        )
-    }
-}
-
 // ---------------------------------------------------------------------------
 // IssueBuffer — collects issues for a single file pass
 // ---------------------------------------------------------------------------
@@ -2509,45 +2489,6 @@ mod code_tests {
                 kind.name(),
             );
         }
-    }
-
-    #[test]
-    fn display_includes_code() {
-        let issue = Issue::new(
-            IssueKind::UndefinedClass {
-                name: "Foo".to_string(),
-            },
-            Location {
-                file: Arc::from("src/x.php"),
-                line: 1,
-                line_end: 1,
-                col_start: 0,
-                col_end: 3,
-            },
-        );
-        // Strip ANSI escape sequences so the assertion isn't dependent on
-        // owo-colors' tty detection.
-        let raw = format!("{issue}");
-        let stripped: String = {
-            let mut out = String::new();
-            let mut chars = raw.chars();
-            while let Some(c) = chars.next() {
-                if c == '\u{1b}' {
-                    for c2 in chars.by_ref() {
-                        if c2 == 'm' {
-                            break;
-                        }
-                    }
-                } else {
-                    out.push(c);
-                }
-            }
-            out
-        };
-        assert!(
-            stripped.contains("error[MIR0005] UndefinedClass:"),
-            "Display output missing code/name segment: {stripped:?}",
-        );
     }
 
     #[test]

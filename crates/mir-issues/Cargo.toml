@@ -11,4 +11,3 @@ homepage.workspace   = true
 [dependencies]
 mir-types = { workspace = true }
 serde     = { workspace = true }
-owo-colors = { workspace = true }
