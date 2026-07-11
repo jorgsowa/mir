@@ -2269,8 +2269,14 @@ fn narrow_from_type_fn(ctx: &mut FlowState, fn_name: &str, var_name: &str, is_tr
                         Atomic::TLiteralString(s) if is_numeric_string(s) => {
                             narrowed_parts.add_type(t.clone());
                         }
+                        // mixed/scalar could be anything; a truthy is_numeric()
+                        // proves it's specifically int|float|numeric-string, so
+                        // replace it rather than leaving it as mixed/scalar (matching
+                        // how is_string/is_int/etc. narrow these two atoms).
                         Atomic::TScalar | Atomic::TMixed => {
-                            narrowed_parts.add_type(t.clone());
+                            narrowed_parts.add_type(Atomic::TInt);
+                            narrowed_parts.add_type(Atomic::TFloat);
+                            narrowed_parts.add_type(Atomic::TNumericString);
                         }
                         _ => {} // non-numeric types are excluded
                     }
