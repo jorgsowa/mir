@@ -893,6 +893,7 @@ fn resolve_method_return<'a>(
                 &resolved.template_params,
                 &resolved.params,
                 arg_types,
+                &arg_names,
             );
             // Only warn about template shadowing when the declaring class lives
             // in the file under analysis — a shadow inside a stub or vendor

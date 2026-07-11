@@ -12,14 +12,19 @@ use crate::subtype::is_subtype;
 // Public API
 // ---------------------------------------------------------------------------
 
+/// `arg_names[i]` is the name the call used for `arg_types[i]` (`None` for a
+/// positional argument), so an argument doesn't have to sit at its declared
+/// parameter's index to bind that parameter's template correctly. Pass `&[]`
+/// when the call site has no named arguments to track.
 pub fn infer_template_bindings(
     db: &dyn MirDatabase,
     template_params: &[TemplateParam],
     params: &[FnParam],
     arg_types: &[Type],
+    arg_names: &[Option<String>],
 ) -> (FxHashMap<Name, Type>, FxHashSet<Name>) {
     let (mut bindings, unchecked) =
-        infer_arg_template_bindings(db, template_params, params, arg_types);
+        infer_arg_template_bindings(db, template_params, params, arg_types, arg_names);
 
     // For any template not bound through arguments, fall back to its bound
     // (or mixed if no bound is declared).
@@ -32,11 +37,14 @@ pub fn infer_template_bindings(
     (bindings, unchecked)
 }
 
+/// Same named-argument handling as [`infer_template_bindings`], but skips its
+/// bound/mixed fallback for templates no argument bound.
 pub fn infer_arg_template_bindings(
     db: &dyn MirDatabase,
     template_params: &[TemplateParam],
     params: &[FnParam],
     arg_types: &[Type],
+    arg_names: &[Option<String>],
 ) -> (FxHashMap<Name, Type>, FxHashSet<Name>) {
     let mut bindings: FxHashMap<Name, Type> = FxHashMap::default();
     let mut unchecked: FxHashSet<Name> = FxHashSet::default();
@@ -45,17 +53,7 @@ pub fn infer_arg_template_bindings(
         .map(|tp| Name::from(tp.name.as_ref()))
         .collect();
 
-    for (idx, arg_ty) in arg_types.iter().enumerate() {
-        // A trailing variadic param collects every remaining argument: match
-        // each one against it instead of stopping at params.len().
-        let param = if idx < params.len() {
-            &params[idx]
-        } else {
-            match params.last() {
-                Some(p) if p.is_variadic => p,
-                _ => break,
-            }
-        };
+    for (param, arg_ty) in bind_args_to_params(params, arg_types, arg_names) {
         if let Some(param_ty) = &param.ty {
             if param.is_variadic {
                 // Variadic docblock types are written aggregate-style
@@ -84,6 +82,57 @@ pub fn infer_arg_template_bindings(
     }
 
     (bindings, unchecked)
+}
+
+/// Pair each argument with the parameter it actually binds to, honoring
+/// named-argument reordering the same way `call::args::counts::check_counts`
+/// does (a diagnostics-emitting superset of this same resolution) — a named
+/// argument can appear at any textual position, so template inference can't
+/// assume `arg_types[i]` feeds `params[i]`. `arg_names` shorter than
+/// `arg_types` (or empty) is treated as if every remaining argument were
+/// positional, so callers that never track argument names can pass `&[]`.
+fn bind_args_to_params<'p, 'a>(
+    params: &'p [FnParam],
+    arg_types: &'a [Type],
+    arg_names: &[Option<String>],
+) -> Vec<(&'p FnParam, &'a Type)> {
+    let variadic_index = params.iter().position(|p| p.is_variadic);
+    let max_positional = variadic_index.unwrap_or(params.len());
+    let mut used = vec![false; params.len()];
+    let mut out = Vec::with_capacity(arg_types.len());
+    let mut positional = 0usize;
+
+    for (i, arg_ty) in arg_types.iter().enumerate() {
+        if let Some(Some(name)) = arg_names.get(i) {
+            if let Some(pi) = params.iter().position(|p| p.name.as_ref() == name.as_str()) {
+                if !used[pi] {
+                    used[pi] = true;
+                    out.push((&params[pi], arg_ty));
+                }
+            } else if let Some(vi) = variadic_index {
+                out.push((&params[vi], arg_ty));
+            }
+            continue;
+        }
+
+        while positional < max_positional && used[positional] {
+            positional += 1;
+        }
+        let pi = if positional < max_positional {
+            Some(positional)
+        } else {
+            variadic_index
+        };
+        if let Some(pi) = pi {
+            if pi < max_positional {
+                used[pi] = true;
+                positional += 1;
+            }
+            out.push((&params[pi], arg_ty));
+        }
+    }
+
+    out
 }
 
 /// For a variadic parameter declared aggregate-style (`@param array<X> $args`

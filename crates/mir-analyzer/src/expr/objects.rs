@@ -82,6 +82,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         fqcn: &Arc<str>,
         ctor_params: Option<&[mir_codebase::storage::FnParam]>,
         arg_types: &[Type],
+        arg_names: &[Option<String>],
         call_span: php_ast::Span,
     ) -> Arc<[Type]> {
         let empty = mir_types::union::empty_type_params();
@@ -109,6 +110,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             &class_tps,
             ctor_params,
             arg_types,
+            arg_names,
         );
 
         // A class-level `@template T of Bound` was previously enforced only at
@@ -384,6 +386,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             .as_ref()
                             .map(|(p, _, _)| p.as_slice()),
                         &arg_types,
+                        &arg_names,
                         call_span,
                     );
                 }

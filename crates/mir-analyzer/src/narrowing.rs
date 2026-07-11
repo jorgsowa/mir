@@ -888,17 +888,26 @@ fn apply_docblock_assertions(
     let template_bindings = if f.template_params.is_empty() {
         None
     } else {
-        let arg_types: Vec<Type> = params
+        let arg_types: Vec<Type> = call
+            .args
             .iter()
-            .enumerate()
-            .map(|(i, _)| {
-                call.args
-                    .get(i)
-                    .map(|arg| assertion_arg_type(&arg.value, ctx, db, file))
-                    .unwrap_or_else(Type::mixed)
-            })
+            .map(|arg| assertion_arg_type(&arg.value, ctx, db, file))
             .collect();
-        Some(crate::generic::infer_template_bindings(db, &f.template_params, params, &arg_types).0)
+        let arg_names: Vec<Option<String>> = call
+            .args
+            .iter()
+            .map(|arg| arg.name.as_ref().map(crate::parser::name_to_string_owned))
+            .collect();
+        Some(
+            crate::generic::infer_template_bindings(
+                db,
+                &f.template_params,
+                params,
+                &arg_types,
+                &arg_names,
+            )
+            .0,
+        )
     };
 
     let mut applied = false;
@@ -907,7 +916,7 @@ fn apply_docblock_assertions(
         .filter(|a| a.kind == expected_kind || (is_true && a.kind == AssertionKind::Assert))
     {
         if let Some(index) = params.iter().position(|p| p.name == assertion.param) {
-            if let Some(arg) = call.args.get(index) {
+            if let Some(arg) = arg_for_param_index(params, &call.args, index) {
                 if let Some(var_name) = extract_var_name(&arg.value) {
                     let ty = match &template_bindings {
                         Some(b) => assertion.ty.substitute_templates(b),
@@ -921,6 +930,29 @@ fn apply_docblock_assertions(
     }
 
     applied
+}
+
+/// Resolve the call argument that actually feeds `params[param_index]`,
+/// honoring named-argument reordering: a named argument binds by name
+/// wherever it sits textually, so `call_args[param_index]` is only correct
+/// when every argument is positional.
+fn arg_for_param_index<'a>(
+    params: &[mir_codebase::storage::FnParam],
+    call_args: &'a [php_ast::owned::Arg],
+    param_index: usize,
+) -> Option<&'a php_ast::owned::Arg> {
+    let param_name = params.get(param_index)?.name.as_ref();
+    if let Some(arg) = call_args.iter().find(|a| {
+        a.name
+            .as_ref()
+            .is_some_and(|n| crate::parser::name_to_string_owned(n) == param_name)
+    }) {
+        return Some(arg);
+    }
+    call_args
+        .iter()
+        .filter(|a| a.name.is_none())
+        .nth(param_index)
 }
 
 /// Best-effort type of a call argument for inferring `@template` bindings on

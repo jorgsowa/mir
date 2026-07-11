@@ -514,6 +514,7 @@ impl CallAnalyzer {
                     &resolved.template_params,
                     effective_params,
                     &arg_types,
+                    &arg_names,
                 );
                 // Static calls (`Foo::bar()`, `self::bar()`, `parent::bar()`)
                 // previously never checked the method's own `@template ... of
@@ -558,11 +559,17 @@ impl CallAnalyzer {
             let class_arg_bindings: FxHashMap<Name, Type> = if class_tps.is_empty() {
                 FxHashMap::default()
             } else {
-                infer_arg_template_bindings(ea.db, &class_tps, &resolved.params, &arg_types)
-                    .0
-                    .into_iter()
-                    .map(|(name, ty)| (name, widen_own_type_param(&ty)))
-                    .collect()
+                infer_arg_template_bindings(
+                    ea.db,
+                    &class_tps,
+                    &resolved.params,
+                    &arg_types,
+                    &arg_names,
+                )
+                .0
+                .into_iter()
+                .map(|(name, ty)| (name, widen_own_type_param(&ty)))
+                .collect()
             };
             let return_class_bindings: FxHashMap<Name, Type> = if class_arg_bindings.is_empty() {
                 class_bindings.clone()
@@ -663,6 +670,7 @@ impl CallAnalyzer {
                             &resolved.template_params,
                             effective_params,
                             &arg_types,
+                            &arg_names,
                         );
                         for v in method_bindings.values_mut() {
                             *v = crate::stmt::widen_for_check(v.clone());
