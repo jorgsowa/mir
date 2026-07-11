@@ -54,7 +54,7 @@ pub fn infer_arg_template_bindings(
 ) -> (FxHashMap<Name, Type>, FxHashSet<Name>) {
     let mut bindings: FxHashMap<Name, Type> = FxHashMap::default();
     let mut unchecked: FxHashSet<Name> = FxHashSet::default();
-    let template_names: std::collections::HashSet<Name> = template_params
+    let template_names: FxHashSet<Name> = template_params
         .iter()
         .map(|tp| Name::from(tp.name.as_ref()))
         .collect();
@@ -366,7 +366,7 @@ impl TemplateResidual {
 fn compute_template_residual(
     param_ty: &Type,
     arg_ty: &Type,
-    template_names: &std::collections::HashSet<Name>,
+    template_names: &FxHashSet<Name>,
 ) -> TemplateResidual {
     let mut has_template = false;
     let mut has_template_class_string = false;
@@ -440,7 +440,7 @@ fn literal_is_class_like(s: &str) -> bool {
     shape_ok && (s.contains('\\') || t.chars().next().is_some_and(|c| c.is_ascii_uppercase()))
 }
 
-fn is_template_atomic(a: &Atomic, template_names: &std::collections::HashSet<Name>) -> bool {
+fn is_template_atomic(a: &Atomic, template_names: &FxHashSet<Name>) -> bool {
     match a {
         Atomic::TTemplateParam { .. } => true,
         Atomic::TNamedObject { fqcn, type_params } => {
@@ -476,7 +476,7 @@ fn infer_from_pair(
     db: &dyn MirDatabase,
     param_ty: &Type,
     arg_ty: &Type,
-    template_names: &std::collections::HashSet<Name>,
+    template_names: &FxHashSet<Name>,
     bindings: &mut FxHashMap<Name, Type>,
     risky: &mut FxHashSet<Name>,
 ) {
@@ -912,7 +912,7 @@ fn infer_from_generic_ancestor(
     pp: &[Type],
     afqcn: &str,
     ap: &[Type],
-    template_names: &std::collections::HashSet<Name>,
+    template_names: &FxHashSet<Name>,
     bindings: &mut FxHashMap<Name, Type>,
     risky: &mut FxHashSet<Name>,
 ) {
