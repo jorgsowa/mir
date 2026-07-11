@@ -8,6 +8,7 @@ as mixed, even when the class fully typed its iteration:
   - a class with `@template T` + `@implements Iterator<int, T>`
   - a class with `@template T` + `@implements IteratorAggregate<int, T>`
   - a plain (non-generic) class whose `current()`/`key()` are natively typed
+
 Now the key/value types are resolved from the class's generic `@implements`
 annotation (substituting the receiver's own type args), or — absent that
 annotation — from `current()`/`key()`'s resolved return types, recursing

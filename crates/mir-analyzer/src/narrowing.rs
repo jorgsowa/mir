@@ -251,8 +251,7 @@ pub fn narrow_from_condition(
                             &obj_var,
                             &prop,
                             file,
-                            &enum_fqcn,
-                            &case_name,
+                            (&enum_fqcn, &case_name),
                             effective_true,
                         );
                     }
@@ -319,8 +318,7 @@ pub fn narrow_from_condition(
                             &obj_var,
                             &prop,
                             file,
-                            &enum_fqcn,
-                            &case_name,
+                            (&enum_fqcn, &case_name),
                             effective_true,
                         );
                     }
@@ -2962,8 +2960,7 @@ fn narrow_prop_to_literal_enum_case(
     obj_var: &str,
     prop: &str,
     file: &str,
-    enum_fqcn: &str,
-    case_name: &str,
+    (enum_fqcn, case_name): (&str, &str),
     is_case: bool,
 ) {
     let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
@@ -3760,7 +3757,7 @@ fn narrow_to_haystack_values(current: &Type, haystack: &Type) -> Type {
 /// would incorrectly rule out.
 fn in_array_loose_narrowing_is_safe(current: &Type, haystack: &Type) -> bool {
     fn all(ty: &Type, pred: fn(&Atomic) -> bool) -> bool {
-        !ty.types.is_empty() && ty.types.iter().all(|a| pred(a))
+        !ty.types.is_empty() && ty.types.iter().all(pred)
     }
     (all(current, Atomic::is_int) && all(haystack, Atomic::is_int))
         || (all(current, Atomic::is_string) && all(haystack, Atomic::is_string))
