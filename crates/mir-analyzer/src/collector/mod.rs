@@ -1020,8 +1020,8 @@ impl<'a> DefinitionCollector<'a> {
         doc: &crate::parser::ParsedDocblock,
         aliases: &FxHashMap<String, Type>,
         class_fqcn: &str,
-        own_methods: &mut indexmap::IndexMap<Arc<str>, Arc<MethodDef>>,
-        own_properties: &mut indexmap::IndexMap<Arc<str>, PropertyDef>,
+        own_methods: &mut mir_codebase::definitions::MemberMap<Arc<MethodDef>>,
+        own_properties: &mut mir_codebase::definitions::MemberMap<PropertyDef>,
         location: Option<Location>,
     ) {
         for prop in &doc.properties {

@@ -100,8 +100,8 @@ impl<'a> DefinitionCollector<'a> {
             })
             .collect();
 
-        let mut own_methods = indexmap::IndexMap::new();
-        let mut own_constants = indexmap::IndexMap::new();
+        let mut own_methods = mir_codebase::definitions::MemberMap::default();
+        let mut own_constants = mir_codebase::definitions::MemberMap::default();
 
         // See `collector/class.rs` for why this runs before the loop: it lets
         // `int-mask-of<self::*>` in a method docblock below resolve against
@@ -194,7 +194,7 @@ impl<'a> DefinitionCollector<'a> {
         }
 
         let type_aliases = self.build_type_aliases(&iface_doc);
-        let mut own_properties = indexmap::IndexMap::new();
+        let mut own_properties = mir_codebase::definitions::MemberMap::default();
         self.add_docblock_members(
             &iface_doc,
             &type_aliases,

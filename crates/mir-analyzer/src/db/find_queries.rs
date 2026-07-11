@@ -89,7 +89,7 @@ impl ClassLike {
 
     /// Own methods (does not include inherited). Class / interface / trait
     /// / enum all carry these (interfaces hold abstract method signatures).
-    pub fn own_methods(&self) -> &indexmap::IndexMap<Arc<str>, Arc<MethodDef>> {
+    pub fn own_methods(&self) -> &mir_codebase::definitions::MemberMap<Arc<MethodDef>> {
         match self {
             ClassLike::Class(c) => &c.own_methods,
             ClassLike::Interface(i) => &i.own_methods,
@@ -100,7 +100,7 @@ impl ClassLike {
 
     /// Own properties. Interfaces don't have properties, so we return an
     /// empty map for them (avoids match callers having to special-case).
-    pub fn own_properties(&self) -> Option<&indexmap::IndexMap<Arc<str>, PropertyDef>> {
+    pub fn own_properties(&self) -> Option<&mir_codebase::definitions::MemberMap<PropertyDef>> {
         match self {
             ClassLike::Class(c) => Some(&c.own_properties),
             ClassLike::Trait(t) => Some(&t.own_properties),
@@ -109,7 +109,7 @@ impl ClassLike {
     }
 
     /// Own constants.
-    pub fn own_constants(&self) -> &indexmap::IndexMap<Arc<str>, ConstantDef> {
+    pub fn own_constants(&self) -> &mir_codebase::definitions::MemberMap<ConstantDef> {
         match self {
             ClassLike::Class(c) => &c.own_constants,
             ClassLike::Interface(i) => &i.own_constants,
@@ -650,18 +650,18 @@ pub fn find_method_in_class<'db>(
     name: &str,
 ) -> Option<Arc<MethodDef>> {
     let class = find_class_like(db, fqcn)?;
-    if let Some(m) = class.own_methods().iter().find_map(|(k, v)| {
-        if k.as_ref().eq_ignore_ascii_case(name) {
-            Some(v.clone())
-        } else {
-            None
-        }
-    }) {
-        return Some(m);
+    // Keys are lowercase-normalized at collection time, so one lowercase of
+    // the query gives an O(1) hashed lookup instead of a scan of all methods.
+    let lower: std::borrow::Cow<str> = if name.bytes().any(|b| b.is_ascii_uppercase()) {
+        std::borrow::Cow::Owned(name.to_ascii_lowercase())
+    } else {
+        std::borrow::Cow::Borrowed(name)
+    };
+    if let Some(m) = class.own_methods().get(lower.as_ref()) {
+        return Some(m.clone());
     }
     // Synthesize PHP built-in enum static methods.
     if let ClassLike::Enum(e) = &class {
-        let lower = name.to_ascii_lowercase();
         let is_backed = e.scalar_type.is_some();
         if lower == "cases" {
             let enum_ty = mir_types::Type::single(Atomic::TNamedObject {
@@ -1180,8 +1180,8 @@ pub fn is_method_concretely_implemented(
         if class.is_interface() {
             continue;
         }
-        for (k, m) in class.own_methods().iter() {
-            if k.as_ref().eq_ignore_ascii_case(&lower) && !m.is_abstract {
+        if let Some(m) = class.own_methods().get(lower.as_str()) {
+            if !m.is_abstract {
                 return true;
             }
         }

@@ -32,13 +32,12 @@ impl<'a> DefinitionCollector<'a> {
             .map(|n| self.resolve_name(&name_to_string_owned(n)).into())
             .collect();
 
-        let mut own_methods = indexmap::IndexMap::new();
-        let mut own_properties = indexmap::IndexMap::new();
-        let mut own_constants = indexmap::IndexMap::new();
+        let mut own_methods = mir_codebase::definitions::MemberMap::default();
+        let mut own_properties = mir_codebase::definitions::MemberMap::default();
+        let mut own_constants = mir_codebase::definitions::MemberMap::default();
         let mut trait_uses: Vec<Arc<str>> = vec![];
         let mut trait_use_locations: Vec<(Arc<str>, mir_types::Location)> = vec![];
-        let mut trait_insteadof: indexmap::IndexMap<Arc<str>, Vec<Arc<str>>> =
-            indexmap::IndexMap::new();
+        let mut trait_insteadof = mir_codebase::definitions::MemberMap::<Vec<Arc<str>>>::default();
         #[allow(clippy::type_complexity)]
         let mut trait_aliases: rustc_hash::FxHashMap<
             Arc<str>,

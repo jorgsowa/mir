@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use indexmap::IndexMap;
+/// Insertion-ordered member map keyed by lowercased member name.
+/// FxHash instead of SipHash: member lookup is one of the hottest analyzer
+/// operations and the keys are short trusted identifiers.
+pub type MemberMap<V> = indexmap::IndexMap<std::sync::Arc<str>, V, rustc_hash::FxBuildHasher>;
 use mir_types::{Location, Name, Type};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
@@ -91,11 +94,12 @@ mod interned_types {
     /// Trade-off: every `intern_or_wrap` call hashes + does one DashMap lookup.
     /// Hashing a `Type` is cheap (SmallVec, small atomics) — measured cost is
     /// well below the alloc-savings benefit on real workloads.
-    static GLOBAL_UNION_INTERN: std::sync::OnceLock<dashmap::DashMap<Type, Arc<Type>>> =
-        std::sync::OnceLock::new();
+    type InternTable = dashmap::DashMap<Type, Arc<Type>, rustc_hash::FxBuildHasher>;
 
-    fn global_intern_table() -> &'static dashmap::DashMap<Type, Arc<Type>> {
-        GLOBAL_UNION_INTERN.get_or_init(dashmap::DashMap::default)
+    static GLOBAL_UNION_INTERN: std::sync::OnceLock<InternTable> = std::sync::OnceLock::new();
+
+    fn global_intern_table() -> &'static InternTable {
+        GLOBAL_UNION_INTERN.get_or_init(|| dashmap::DashMap::with_hasher(Default::default()))
     }
 
     /// Try to intern a Type if it matches a common type, otherwise wrap in Arc.
@@ -570,9 +574,9 @@ pub struct ClassDef {
     pub parent: Option<Arc<str>>,
     pub interfaces: Vec<Arc<str>>,
     pub traits: Vec<Arc<str>>,
-    pub own_methods: IndexMap<Arc<str>, Arc<MethodDef>>,
-    pub own_properties: IndexMap<Arc<str>, PropertyDef>,
-    pub own_constants: IndexMap<Arc<str>, ConstantDef>,
+    pub own_methods: MemberMap<Arc<MethodDef>>,
+    pub own_properties: MemberMap<PropertyDef>,
+    pub own_constants: MemberMap<ConstantDef>,
     #[serde(default)]
     pub mixins: Vec<Arc<str>>,
     pub template_params: Vec<TemplateParam>,
@@ -611,7 +615,7 @@ pub struct ClassDef {
     /// Maps method_name_lowercase → list of trait FQCNs whose version of the method is excluded.
     /// E.g. `use A, B { B::hello insteadof A; }` stores `"hello" → ["A"]`.
     #[serde(default)]
-    pub trait_insteadof: IndexMap<Arc<str>, Vec<Arc<str>>>,
+    pub trait_insteadof: MemberMap<Vec<Arc<str>>>,
     /// Trait method aliases from `as` declarations in this class's `use` blocks.
     /// Maps new_name_lowercase → (optional_trait_fqcn, original_method_name_lowercase, visibility_override, alias_cased).
     /// `alias_cased` is the alias name preserving the original PHP casing (for error messages / case checks).
@@ -653,8 +657,8 @@ pub struct InterfaceDef {
     pub fqcn: Arc<str>,
     pub short_name: Arc<str>,
     pub extends: Vec<Arc<str>>,
-    pub own_methods: IndexMap<Arc<str>, Arc<MethodDef>>,
-    pub own_constants: IndexMap<Arc<str>, ConstantDef>,
+    pub own_methods: MemberMap<Arc<MethodDef>>,
+    pub own_constants: MemberMap<ConstantDef>,
     pub template_params: Vec<TemplateParam>,
     pub location: Option<Location>,
     /// `@deprecated` docblock annotation, if present.
@@ -662,7 +666,7 @@ pub struct InterfaceDef {
     pub deprecated: Option<Arc<str>>,
     /// Properties declared via `@property*` docblock annotations on the interface.
     #[serde(default)]
-    pub own_properties: IndexMap<Arc<str>, PropertyDef>,
+    pub own_properties: MemberMap<PropertyDef>,
     /// `@seal-properties` / `@psalm-seal-properties` — disallows undeclared property access.
     #[serde(default)]
     pub seal_properties: bool,
@@ -681,9 +685,9 @@ pub struct InterfaceDef {
 pub struct TraitDef {
     pub fqcn: Arc<str>,
     pub short_name: Arc<str>,
-    pub own_methods: IndexMap<Arc<str>, Arc<MethodDef>>,
-    pub own_properties: IndexMap<Arc<str>, PropertyDef>,
-    pub own_constants: IndexMap<Arc<str>, ConstantDef>,
+    pub own_methods: MemberMap<Arc<MethodDef>>,
+    pub own_properties: MemberMap<PropertyDef>,
+    pub own_constants: MemberMap<ConstantDef>,
     pub template_params: Vec<TemplateParam>,
     /// Traits used by this trait (`use OtherTrait;` inside a trait body).
     pub traits: Vec<Arc<str>>,
@@ -719,9 +723,9 @@ pub struct EnumDef {
     pub short_name: Arc<str>,
     pub scalar_type: Option<Type>,
     pub interfaces: Vec<Arc<str>>,
-    pub cases: IndexMap<Arc<str>, EnumCaseDef>,
-    pub own_methods: IndexMap<Arc<str>, Arc<MethodDef>>,
-    pub own_constants: IndexMap<Arc<str>, ConstantDef>,
+    pub cases: MemberMap<EnumCaseDef>,
+    pub own_methods: MemberMap<Arc<MethodDef>>,
+    pub own_constants: MemberMap<ConstantDef>,
     /// `use SomeTrait;` declarations. PHP enums may use traits (for methods),
     /// just never carry instance properties from them.
     #[serde(default)]

@@ -46,9 +46,10 @@ impl Name {
         if self.as_str().bytes().all(|b| !b.is_ascii_uppercase()) {
             return self;
         }
-        static CACHE: std::sync::OnceLock<dashmap::DashMap<ustr::Ustr, ustr::Ustr>> =
-            std::sync::OnceLock::new();
-        let cache = CACHE.get_or_init(dashmap::DashMap::default);
+        static CACHE: std::sync::OnceLock<
+            dashmap::DashMap<ustr::Ustr, ustr::Ustr, rustc_hash::FxBuildHasher>,
+        > = std::sync::OnceLock::new();
+        let cache = CACHE.get_or_init(|| dashmap::DashMap::with_hasher(Default::default()));
         if let Some(v) = cache.get(&self.0) {
             return Name(*v);
         }

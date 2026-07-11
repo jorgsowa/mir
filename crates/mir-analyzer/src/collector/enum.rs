@@ -49,9 +49,9 @@ impl DefinitionCollector<'_> {
             interfaces.push(implicit_iface);
         }
 
-        let mut cases = indexmap::IndexMap::new();
-        let mut own_methods = indexmap::IndexMap::new();
-        let mut own_constants = indexmap::IndexMap::new();
+        let mut cases = mir_codebase::definitions::MemberMap::default();
+        let mut own_methods = mir_codebase::definitions::MemberMap::default();
+        let mut own_constants = mir_codebase::definitions::MemberMap::default();
         let mut traits: Vec<Arc<str>> = Vec::new();
         let mut trait_use_locations: Vec<(Arc<str>, mir_types::Location)> = Vec::new();
 
@@ -199,7 +199,7 @@ impl DefinitionCollector<'_> {
         }
 
         let type_aliases = self.build_type_aliases(&enum_doc);
-        let mut dummy_properties = indexmap::IndexMap::new();
+        let mut dummy_properties = mir_codebase::definitions::MemberMap::default();
         self.add_docblock_members(
             &enum_doc,
             &type_aliases,

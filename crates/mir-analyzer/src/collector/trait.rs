@@ -71,9 +71,9 @@ impl<'a> DefinitionCollector<'a> {
             })
             .collect();
 
-        let mut own_methods = indexmap::IndexMap::new();
-        let mut own_properties = indexmap::IndexMap::new();
-        let mut own_constants = indexmap::IndexMap::new();
+        let mut own_methods = mir_codebase::definitions::MemberMap::default();
+        let mut own_properties = mir_codebase::definitions::MemberMap::default();
+        let mut own_constants = mir_codebase::definitions::MemberMap::default();
         let mut trait_uses: Vec<Arc<str>> = vec![];
 
         // See `class.rs` for why this runs before the loop and only covers
