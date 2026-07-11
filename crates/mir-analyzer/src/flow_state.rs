@@ -630,9 +630,9 @@ impl FlowState {
         col_end: u16,
     ) {
         let sym = Name::from(name.trim_start_matches('$'));
-        if let Some(old_locs) = self.last_write_locs.get(&sym) {
+        if let Some(old_locs) = self.last_write_locs.remove(&sym) {
             // Previous write(s) overwritten without being read → dead writes.
-            for old_loc in old_locs.clone() {
+            for old_loc in old_locs {
                 self.dead_writes
                     .push((sym, old_loc.0, old_loc.1, old_loc.2, old_loc.3));
             }
@@ -728,7 +728,7 @@ impl FlowState {
             // removing writes that appear in read_vars only due to loop-iteration
             // accumulation (not because they were actually consumed this iteration).
             {
-                let consumed = result.consumed_write_locs.clone();
+                let consumed = &result.consumed_write_locs;
                 result.last_write_locs.retain(|name, locs| {
                     locs.retain(|loc| !consumed.contains(&(*name, *loc)));
                     !locs.is_empty()
@@ -762,7 +762,7 @@ impl FlowState {
                 .extend(else_ctx.consumed_write_locs.iter().copied());
             // Remove pending writes consumed in the diverging branch.
             {
-                let consumed = result.consumed_write_locs.clone();
+                let consumed = &result.consumed_write_locs;
                 result.last_write_locs.retain(|name, locs| {
                     locs.retain(|loc| !consumed.contains(&(*name, *loc)));
                     !locs.is_empty()
