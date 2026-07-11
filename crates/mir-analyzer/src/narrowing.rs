@@ -1211,18 +1211,21 @@ fn narrow_or_isset_true(
     if let ExprKind::UnaryPrefix(u) = &left.kind {
         if u.op == UnaryPrefixOp::BooleanNot {
             if let ExprKind::Isset(vars) = &u.operand.kind {
-                // Save original variable states so narrowing only affects RHS analysis
-                let original_vars: Vec<_> = vars
-                    .iter()
-                    .filter_map(|var_expr| {
-                        extract_var_name(var_expr).map(|name| {
-                            let was_assigned = ctx.var_is_defined(&name);
-                            (name.clone(), ctx.get_var(&name), was_assigned)
-                        })
-                    })
-                    .collect();
+                // `!isset($x) || RHS` is true either because `$x` isn't set (RHS never
+                // runs, nothing is narrowed) or because `$x` is set AND RHS is true.
+                // The merged true-branch state is the union of those two paths, and a
+                // union with the "nothing narrowed" path always collapses back to the
+                // pre-condition state — so *every* narrowing effect of evaluating RHS
+                // (not just to the isset()-checked vars) must be undone afterward, or
+                // an unrelated variable RHS happens to narrow (e.g. `$y instanceof Foo`
+                // in `!isset($x) || $y instanceof Foo`) would incorrectly leak into the
+                // if-body on the path where `$x` was simply never set.
+                let saved_vars = ctx.vars.clone();
+                let saved_assigned = ctx.assigned_vars.clone();
+                let saved_possibly_assigned = ctx.possibly_assigned_vars.clone();
 
-                // Apply isset narrowing: remove null and mark as definitely assigned
+                // Apply isset narrowing: remove null and mark as definitely assigned,
+                // so RHS's own narrowing logic can see $x as set while it's analyzed.
                 for var_expr in vars.iter() {
                     if let Some(var_name) = extract_var_name(var_expr) {
                         let current = ctx.get_var(&var_name);
@@ -1235,15 +1238,12 @@ fn narrow_or_isset_true(
                 // Evaluate RHS with narrowed context
                 narrow_from_condition(right, ctx, true, db, file);
 
-                // Restore original variable states for if-body context
-                for (var_name, original_type, was_assigned) in original_vars {
-                    let sym = mir_types::Name::from(var_name.as_str());
-                    std::sync::Arc::make_mut(&mut ctx.vars)
-                        .insert(sym, mir_codebase::storage::wrap_var_type(original_type));
-                    if !was_assigned {
-                        std::sync::Arc::make_mut(&mut ctx.assigned_vars).remove(&sym);
-                    }
-                }
+                // Discard every narrowing effect of the above — RHS's narrowing (of $x
+                // or any other variable) only holds on the path where $x was set, not
+                // on the merged true-branch as a whole.
+                ctx.vars = saved_vars;
+                ctx.assigned_vars = saved_assigned;
+                ctx.possibly_assigned_vars = saved_possibly_assigned;
             }
         }
     }
