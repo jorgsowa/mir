@@ -10,7 +10,7 @@
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::sync::Arc;
 
-use mir_codebase::storage::Visibility;
+use mir_codebase::definitions::Visibility;
 use mir_issues::{Issue, IssueKind, Location};
 
 use crate::db::{class_ancestors, MirDatabase};
@@ -50,6 +50,24 @@ impl<'a> ClassAnalyzer<'a> {
         class_ancestors(self.db, crate::db::Fqcn::from_str(self.db, fqcn)).0
     }
 
+    /// Build an `Issue` of `kind` at `location` (with a source snippet when
+    /// available) and push it. Centralizes the location/snippet boilerplate
+    /// repeated by every check in `analyze_all`.
+    fn push_located_issue(
+        &self,
+        issues: &mut Vec<Issue>,
+        kind: IssueKind,
+        location: Option<&mir_types::Location>,
+    ) {
+        let source = location.and_then(|l| self.sources.get(&l.file).copied());
+        let loc = issue_location(location, source);
+        let mut issue = Issue::new(kind, loc);
+        if let Some(snippet) = extract_snippet(location, &self.sources) {
+            issue = issue.with_snippet(snippet);
+        }
+        issues.push(issue);
+    }
+
     /// Run all class-level checks and return every discovered issue.
     pub fn analyze_all(&self) -> Vec<Issue> {
         let mut issues = Vec::new();
@@ -78,63 +96,36 @@ impl<'a> ClassAnalyzer<'a> {
                     if let Some((used, canonical_str)) =
                         crate::fqcn_case_mismatch(parent_fqcn.as_ref(), canonical.fqcn().as_ref())
                     {
-                        let loc = issue_location(
-                            location.as_ref(),
-                            location
-                                .as_ref()
-                                .and_then(|l| self.sources.get(&l.file).copied()),
-                        );
-                        let mut issue = Issue::new(
+                        self.push_located_issue(
+                            &mut issues,
                             IssueKind::WrongCaseClass {
                                 used,
                                 canonical: canonical_str,
                             },
-                            loc,
+                            location.as_ref(),
                         );
-                        if let Some(snippet) = extract_snippet(location.as_ref(), &self.sources) {
-                            issue = issue.with_snippet(snippet);
-                        }
-                        issues.push(issue);
                     }
                 }
                 if parent_pulled.is_some() {
                     if parent_is_final {
-                        let loc = issue_location(
-                            location.as_ref(),
-                            location
-                                .as_ref()
-                                .and_then(|l| self.sources.get(&l.file).copied()),
-                        );
-                        let mut issue = Issue::new(
+                        self.push_located_issue(
+                            &mut issues,
                             IssueKind::InvalidExtendClass {
                                 parent: parent_fqcn.to_string(),
                                 child: fqcn.to_string(),
                             },
-                            loc,
+                            location.as_ref(),
                         );
-                        if let Some(snippet) = extract_snippet(location.as_ref(), &self.sources) {
-                            issue = issue.with_snippet(snippet);
-                        }
-                        issues.push(issue);
                     }
                     if let Some(msg) = parent_deprecated {
-                        let loc = issue_location(
-                            location.as_ref(),
-                            location
-                                .as_ref()
-                                .and_then(|l| self.sources.get(&l.file).copied()),
-                        );
-                        let mut issue = Issue::new(
+                        self.push_located_issue(
+                            &mut issues,
                             IssueKind::DeprecatedClass {
                                 name: parent_fqcn.to_string(),
                                 message: Some(msg).filter(|m| !m.is_empty()),
                             },
-                            loc,
+                            location.as_ref(),
                         );
-                        if let Some(snippet) = extract_snippet(location.as_ref(), &self.sources) {
-                            issue = issue.with_snippet(snippet);
-                        }
-                        issues.push(issue);
                     }
                 }
             }
@@ -150,46 +141,24 @@ impl<'a> ClassAnalyzer<'a> {
                                 iface_fqcn.as_ref(),
                                 iface.fqcn().as_ref(),
                             ) {
-                                let loc = issue_location(
-                                    location.as_ref(),
-                                    location
-                                        .as_ref()
-                                        .and_then(|l| self.sources.get(&l.file).copied()),
-                                );
-                                let mut issue = Issue::new(
+                                self.push_located_issue(
+                                    &mut issues,
                                     IssueKind::WrongCaseClass {
                                         used,
                                         canonical: canonical_str,
                                     },
-                                    loc,
+                                    location.as_ref(),
                                 );
-                                if let Some(snippet) =
-                                    extract_snippet(location.as_ref(), &self.sources)
-                                {
-                                    issue = issue.with_snippet(snippet);
-                                }
-                                issues.push(issue);
                             }
                             if let Some(msg) = iface.deprecated() {
-                                let loc = issue_location(
-                                    location.as_ref(),
-                                    location
-                                        .as_ref()
-                                        .and_then(|l| self.sources.get(&l.file).copied()),
-                                );
-                                let mut issue = Issue::new(
+                                self.push_located_issue(
+                                    &mut issues,
                                     IssueKind::DeprecatedInterface {
                                         name: iface_fqcn.to_string(),
                                         message: Some(msg.clone()).filter(|m| !m.is_empty()),
                                     },
-                                    loc,
+                                    location.as_ref(),
                                 );
-                                if let Some(snippet) =
-                                    extract_snippet(location.as_ref(), &self.sources)
-                                {
-                                    issue = issue.with_snippet(snippet);
-                                }
-                                issues.push(issue);
                             }
                         }
                     }
@@ -199,46 +168,24 @@ impl<'a> ClassAnalyzer<'a> {
                             if let Some((used, canonical_str)) =
                                 crate::fqcn_case_mismatch(trait_fqcn.as_ref(), t.fqcn().as_ref())
                             {
-                                let loc = issue_location(
-                                    location.as_ref(),
-                                    location
-                                        .as_ref()
-                                        .and_then(|l| self.sources.get(&l.file).copied()),
-                                );
-                                let mut issue = Issue::new(
+                                self.push_located_issue(
+                                    &mut issues,
                                     IssueKind::WrongCaseClass {
                                         used,
                                         canonical: canonical_str,
                                     },
-                                    loc,
+                                    location.as_ref(),
                                 );
-                                if let Some(snippet) =
-                                    extract_snippet(location.as_ref(), &self.sources)
-                                {
-                                    issue = issue.with_snippet(snippet);
-                                }
-                                issues.push(issue);
                             }
                             if let Some(msg) = t.deprecated() {
-                                let loc = issue_location(
-                                    location.as_ref(),
-                                    location
-                                        .as_ref()
-                                        .and_then(|l| self.sources.get(&l.file).copied()),
-                                );
-                                let mut issue = Issue::new(
+                                self.push_located_issue(
+                                    &mut issues,
                                     IssueKind::DeprecatedTrait {
                                         name: trait_fqcn.to_string(),
                                         message: Some(msg.clone()).filter(|m| !m.is_empty()),
                                     },
-                                    loc,
+                                    location.as_ref(),
                                 );
-                                if let Some(snippet) =
-                                    extract_snippet(location.as_ref(), &self.sources)
-                                {
-                                    issue = issue.with_snippet(snippet);
-                                }
-                                issues.push(issue);
                             }
                         }
                     }
@@ -304,42 +251,24 @@ impl<'a> ClassAnalyzer<'a> {
                         parent_iface_fqcn.as_ref(),
                         canonical.fqcn().as_ref(),
                     ) {
-                        let loc = issue_location(
-                            location.as_ref(),
-                            location
-                                .as_ref()
-                                .and_then(|l| self.sources.get(&l.file).copied()),
-                        );
-                        let mut issue = Issue::new(
+                        self.push_located_issue(
+                            &mut issues,
                             IssueKind::WrongCaseClass {
                                 used,
                                 canonical: canonical_str,
                             },
-                            loc,
+                            location.as_ref(),
                         );
-                        if let Some(snippet) = extract_snippet(location.as_ref(), &self.sources) {
-                            issue = issue.with_snippet(snippet);
-                        }
-                        issues.push(issue);
                     }
                     if let Some(msg) = canonical.deprecated() {
-                        let loc = issue_location(
-                            location.as_ref(),
-                            location
-                                .as_ref()
-                                .and_then(|l| self.sources.get(&l.file).copied()),
-                        );
-                        let mut issue = Issue::new(
+                        self.push_located_issue(
+                            &mut issues,
                             IssueKind::DeprecatedInterface {
                                 name: parent_iface_fqcn.to_string(),
                                 message: Some(msg.clone()).filter(|m| !m.is_empty()),
                             },
-                            loc,
+                            location.as_ref(),
                         );
-                        if let Some(snippet) = extract_snippet(location.as_ref(), &self.sources) {
-                            issue = issue.with_snippet(snippet);
-                        }
-                        issues.push(issue);
                     }
                 }
             }
@@ -355,42 +284,24 @@ impl<'a> ClassAnalyzer<'a> {
                     if let Some((used, canonical_str)) =
                         crate::fqcn_case_mismatch(iface_fqcn.as_ref(), canonical.fqcn().as_ref())
                     {
-                        let loc = issue_location(
-                            location.as_ref(),
-                            location
-                                .as_ref()
-                                .and_then(|l| self.sources.get(&l.file).copied()),
-                        );
-                        let mut issue = Issue::new(
+                        self.push_located_issue(
+                            &mut issues,
                             IssueKind::WrongCaseClass {
                                 used,
                                 canonical: canonical_str,
                             },
-                            loc,
+                            location.as_ref(),
                         );
-                        if let Some(snippet) = extract_snippet(location.as_ref(), &self.sources) {
-                            issue = issue.with_snippet(snippet);
-                        }
-                        issues.push(issue);
                     }
                     if let Some(msg) = canonical.deprecated() {
-                        let loc = issue_location(
-                            location.as_ref(),
-                            location
-                                .as_ref()
-                                .and_then(|l| self.sources.get(&l.file).copied()),
-                        );
-                        let mut issue = Issue::new(
+                        self.push_located_issue(
+                            &mut issues,
                             IssueKind::DeprecatedInterface {
                                 name: iface_fqcn.to_string(),
                                 message: Some(msg.clone()).filter(|m| !m.is_empty()),
                             },
-                            loc,
+                            location.as_ref(),
                         );
-                        if let Some(snippet) = extract_snippet(location.as_ref(), &self.sources) {
-                            issue = issue.with_snippet(snippet);
-                        }
-                        issues.push(issue);
                     }
                 }
             }
@@ -425,23 +336,14 @@ impl<'a> ClassAnalyzer<'a> {
                     continue;
                 };
                 if let Some(msg) = canonical.deprecated() {
-                    let loc = issue_location(
-                        location.as_ref(),
-                        location
-                            .as_ref()
-                            .and_then(|l| self.sources.get(&l.file).copied()),
-                    );
-                    let mut issue = Issue::new(
+                    self.push_located_issue(
+                        &mut issues,
                         IssueKind::DeprecatedTrait {
                             name: used_trait_fqcn.to_string(),
                             message: Some(msg.clone()).filter(|m| !m.is_empty()),
                         },
-                        loc,
+                        location.as_ref(),
                     );
-                    if let Some(snippet) = extract_snippet(location.as_ref(), &self.sources) {
-                        issue = issue.with_snippet(snippet);
-                    }
-                    issues.push(issue);
                 }
             }
         }
@@ -483,22 +385,15 @@ impl<'a> ClassAnalyzer<'a> {
             &HashSet::default(),
             None,
         ) {
-            let loc = issue_location(
-                location,
-                location.and_then(|l| self.sources.get(&l.file).copied()),
-            );
-            let mut issue = Issue::new(
+            self.push_located_issue(
+                issues,
                 IssueKind::InvalidTemplateParam {
                     name: name.to_string(),
                     expected_bound: format!("{bound}"),
                     actual: format!("{inferred}"),
                 },
-                loc,
+                location,
             );
-            if let Some(snippet) = extract_snippet(location, &self.sources) {
-                issue = issue.with_snippet(snippet);
-            }
-            issues.push(issue);
         }
     }
 
