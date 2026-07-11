@@ -16,16 +16,19 @@ impl<'a> ExpressionAnalyzer<'a> {
         ctx: &mut FlowState,
     ) -> Type {
         let name_str = name.trim_start_matches('$');
+        // Interned once: this runs for every `$var` read, and each string-keyed
+        // FlowState call would re-hash + lock the global interner.
+        let sym = mir_types::Name::from(name_str);
         // View template files (blade templates and files under resources/views/) have
         // variables injected from the calling scope, so undefined-variable diagnostics
         // are false positives there.
         let is_view_template = crate::diagnostics::is_view_template_path(&self.file);
-        if !ctx.var_is_defined(name_str)
+        if !ctx.var_is_defined_sym(sym)
             && !self.in_existence_check
             && !is_view_template
             && !ctx.has_dynamic_var_def
         {
-            if ctx.var_possibly_defined(name_str) {
+            if ctx.var_possibly_defined_sym(sym) {
                 self.emit(
                     IssueKind::PossiblyUndefinedVariable {
                         name: name_str.to_string(),
@@ -51,12 +54,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                 );
             }
         }
-        ctx.read_vars.insert(mir_types::Name::from(name_str));
-        ctx.mark_consumed(name_str);
-        let ty = if name_str == "this" && !ctx.var_is_defined("this") {
+        ctx.read_vars.insert(sym);
+        ctx.mark_consumed_sym(sym);
+        let ty = if name_str == "this" && !ctx.var_is_defined_sym(sym) {
             Type::never()
         } else {
-            ctx.get_var(name_str)
+            ctx.get_var_sym(sym)
         };
         self.record_symbol(
             expr.span,

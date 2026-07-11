@@ -497,7 +497,12 @@ impl FlowState {
 
     /// Get the type of a variable. Returns `mixed` if not found.
     pub fn get_var(&self, name: &str) -> Type {
-        let sym = Name::from(name.trim_start_matches('$'));
+        self.get_var_sym(Name::from(name.trim_start_matches('$')))
+    }
+
+    /// [`Self::get_var`] for an already-interned name — lets per-expression
+    /// callers intern once instead of re-hashing the string per call.
+    pub fn get_var_sym(&self, sym: Name) -> Type {
         self.vars
             .get(&sym)
             .map(|a| (**a).clone())
@@ -513,13 +518,21 @@ impl FlowState {
 
     /// Check if a variable is definitely in scope.
     pub fn var_is_defined(&self, name: &str) -> bool {
-        let sym = Name::from(name.trim_start_matches('$'));
+        self.var_is_defined_sym(Name::from(name.trim_start_matches('$')))
+    }
+
+    /// [`Self::var_is_defined`] for an already-interned name.
+    pub fn var_is_defined_sym(&self, sym: Name) -> bool {
         self.assigned_vars.contains(&sym)
     }
 
     /// Check if a variable might be defined (but not certainly).
     pub fn var_possibly_defined(&self, name: &str) -> bool {
-        let sym = Name::from(name.trim_start_matches('$'));
+        self.var_possibly_defined_sym(Name::from(name.trim_start_matches('$')))
+    }
+
+    /// [`Self::var_possibly_defined`] for an already-interned name.
+    pub fn var_possibly_defined_sym(&self, sym: Name) -> bool {
         self.assigned_vars.contains(&sym) || self.possibly_assigned_vars.contains(&sym)
     }
 
@@ -646,7 +659,11 @@ impl FlowState {
     /// This clears the pending write entry so the write is no longer considered
     /// dead. Call this whenever a variable is used as an expression value.
     pub fn mark_consumed(&mut self, name: &str) {
-        let sym = Name::from(name.trim_start_matches('$'));
+        self.mark_consumed_sym(Name::from(name.trim_start_matches('$')));
+    }
+
+    /// [`Self::mark_consumed`] for an already-interned name.
+    pub fn mark_consumed_sym(&mut self, sym: Name) {
         if let Some(locs) = self.last_write_locs.remove(&sym) {
             // Consumption is permanent across branch merges: see
             // `consumed_write_locs`.
