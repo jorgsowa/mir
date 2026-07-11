@@ -650,11 +650,13 @@ impl<'a> ClassAnalyzer<'a> {
             }
             // PHP requires redeclared typed properties to keep the same type (invariant).
             // Only flag when both sides carry a native type hint — docblock-only types are
-            // not enforced by the runtime.
+            // not enforced by the runtime. Compare `native_ty`, not `ty`: `ty` folds in any
+            // `@var` docblock refinement, which PHP's redeclaration rule never checks.
             if own_prop.has_native_type && parent_prop.has_native_type {
-                if let (Some(own_t), Some(parent_t)) =
-                    (own_prop.ty.as_deref(), parent_prop.ty.as_deref())
-                {
+                if let (Some(own_t), Some(parent_t)) = (
+                    own_prop.native_ty.as_deref(),
+                    parent_prop.native_ty.as_deref(),
+                ) {
                     let same_type = own_t.is_subtype_structural(parent_t)
                         && parent_t.is_subtype_structural(own_t);
                     if !same_type {

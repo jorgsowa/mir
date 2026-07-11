@@ -516,6 +516,17 @@ pub struct PropertyDef {
     /// Distinguishes PHP-enforced read-only from advisory documentation.
     #[serde(default)]
     pub has_native_readonly: bool,
+    /// The PHP native type hint alone, with any `@var` docblock refinement stripped —
+    /// `None` when `has_native_type` is false. `ty` mixes in the docblock type when
+    /// present, which makes it unsuitable for checking PHP's redeclared-property
+    /// type invariance rule: that rule is enforced by the runtime purely on the
+    /// native hint, never on the (unenforced) docblock annotation.
+    #[serde(default)]
+    #[serde(
+        deserialize_with = "deserialize_param_type",
+        serialize_with = "serialize_param_type"
+    )]
+    pub native_ty: Option<Arc<Type>>,
 }
 
 // ---------------------------------------------------------------------------

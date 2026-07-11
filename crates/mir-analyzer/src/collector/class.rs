@@ -160,6 +160,7 @@ impl<'a> DefinitionCollector<'a> {
                                 // when there's no way to natively express a template param —
                                 // prefer the @param docblock if it provides a more specific
                                 // type, e.g. `@param T $value` alongside `public mixed $value`.
+                                let native_ty_only = native_ty.clone();
                                 let ty = if native_ty.as_ref().is_some_and(|t| {
                                     t.types.len() == 1
                                         && (matches!(
@@ -176,6 +177,9 @@ impl<'a> DefinitionCollector<'a> {
                                     name: Arc::from(param_name),
                                     ty: mir_codebase::storage::wrap_property_type(ty),
                                     inferred_ty: None,
+                                    native_ty: mir_codebase::storage::wrap_property_type(
+                                        native_ty_only,
+                                    ),
                                     visibility: Self::convert_visibility(p.visibility),
                                     is_static: false,
                                     is_readonly: decl.modifiers.is_readonly || p.is_readonly,
@@ -243,11 +247,12 @@ impl<'a> DefinitionCollector<'a> {
                                 &class_template_params,
                             )
                         })
-                        .or(hint_ty);
+                        .or_else(|| hint_ty.clone());
                     let prop = PropertyDef {
                         name: Arc::from(prop_name),
                         ty: mir_codebase::storage::wrap_property_type(ty),
                         inferred_ty: None,
+                        native_ty: mir_codebase::storage::wrap_property_type(hint_ty),
                         visibility: Self::convert_visibility(p.visibility),
                         is_static: p.is_static,
                         is_readonly: p.is_readonly
