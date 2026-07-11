@@ -138,7 +138,10 @@ fn for_each_top_level_decl<'a>(
 /// Returns an empty result for hard parse errors (parse-error issues are
 /// emitted by `analyze_file`, not per scope) and for scope keys that don't
 /// resolve to a declaration in this file.
-#[salsa::tracked]
+///
+/// `lru = 4096` bounds the memo table: keys embed the resolved FQN, so a
+/// rename storm would otherwise mint a permanent memo per historical name.
+#[salsa::tracked(lru = 4096)]
 pub fn infer_scope(
     db: &dyn MirDatabase,
     file: SourceFile,

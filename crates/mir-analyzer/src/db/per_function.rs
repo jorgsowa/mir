@@ -93,7 +93,10 @@ fn find_function_decl<'a>(
 /// Returns memoized issues + reference-locations + inferred return type.
 /// Returns `None` only when the function declaration can't be located in the
 /// file's AST (e.g. fn_fqn does not refer to a function declared in this file).
-#[salsa::tracked]
+///
+/// `lru = 4096` bounds the memo table: keys embed the resolved FQN, so a
+/// rename storm would otherwise mint a permanent memo per historical name.
+#[salsa::tracked(lru = 4096)]
 pub fn infer_function(
     db: &dyn MirDatabase,
     file: SourceFile,

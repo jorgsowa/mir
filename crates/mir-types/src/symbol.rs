@@ -55,6 +55,14 @@ impl Name {
         // `to_ascii_lowercase` allocates but only on first sight of this
         // name; subsequent calls return from the cache.
         let lowered = ustr::ustr(&self.as_str().to_ascii_lowercase());
+        // Normally bounded by the workspace's mixed-case identifier
+        // vocabulary, but a long session of renames mints new names forever;
+        // dropping the whole memo is cheap (entries are re-lowered on demand)
+        // and keeps the map from growing without bound.
+        const CACHE_CAP: usize = 1 << 16;
+        if cache.len() >= CACHE_CAP {
+            cache.clear();
+        }
         cache.insert(self.0, lowered);
         Name(lowered)
     }
@@ -193,5 +201,26 @@ impl<'de> Deserialize<'de> for Name {
         // string`, silently turning every cache hit into a miss.
         let s = std::borrow::Cow::<str>::deserialize(deserializer)?;
         Ok(Self::new(&s))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Overflowing the lowercase memo must clear-and-continue, never return
+    /// a wrong lowering for names cached before the clear.
+    #[test]
+    fn ascii_lowercase_correct_across_cache_overflow() {
+        let early = Name::new("App\\EarlyService");
+        assert_eq!(early.ascii_lowercase().as_str(), "app\\earlyservice");
+        for i in 0..70_000 {
+            let n = Name::new(&format!("App\\Storm{i}"));
+            assert_eq!(
+                n.ascii_lowercase().as_str(),
+                format!("app\\storm{i}").as_str()
+            );
+        }
+        assert_eq!(early.ascii_lowercase().as_str(), "app\\earlyservice");
     }
 }
