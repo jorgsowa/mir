@@ -39,7 +39,7 @@ impl<'a> StatementsAnalyzer<'a> {
         // Look up the function in the database to get resolved parameter types
         let fn_name = decl.name.as_deref().unwrap_or("").to_string();
         let resolve_fn =
-            |fqn: &str| -> Option<(Vec<mir_codebase::FnParam>, Option<mir_types::Type>)> {
+            |fqn: &str| -> Option<(Vec<mir_codebase::DeclaredParam>, Option<mir_types::Type>)> {
                 let db = self.db;
                 let here = crate::db::Fqcn::from_str(db, fqn);
                 crate::db::find_function(db, here).map(|f| {
@@ -54,10 +54,10 @@ impl<'a> StatementsAnalyzer<'a> {
             if let Some(found) = resolve_fn(&fqn).or_else(|| resolve_fn(&fn_name)) {
                 found
             } else {
-                let ast_params: Vec<mir_codebase::FnParam> = decl
+                let ast_params: Vec<mir_codebase::DeclaredParam> = decl
                     .params
                     .iter()
-                    .map(|p| mir_codebase::FnParam {
+                    .map(|p| mir_codebase::DeclaredParam {
                         name: Name::new(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
                         ty: None,
                         out_ty: None,
@@ -73,10 +73,10 @@ impl<'a> StatementsAnalyzer<'a> {
             if let Some(found) = resolve_fn(&fn_name) {
                 found
             } else {
-                let ast_params: Vec<mir_codebase::FnParam> = decl
+                let ast_params: Vec<mir_codebase::DeclaredParam> = decl
                     .params
                     .iter()
-                    .map(|p| mir_codebase::FnParam {
+                    .map(|p| mir_codebase::DeclaredParam {
                         name: Name::new(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
                         ty: None,
                         out_ty: None,
@@ -173,7 +173,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 let ast_params = method
                     .params
                     .iter()
-                    .map(|p| mir_codebase::FnParam {
+                    .map(|p| mir_codebase::DeclaredParam {
                         name: Name::new(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
                         ty: None,
                         out_ty: None,

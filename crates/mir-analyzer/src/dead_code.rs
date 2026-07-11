@@ -11,7 +11,7 @@
 /// constructors are excluded because they are called implicitly.
 use std::sync::Arc;
 
-use mir_codebase::storage::Visibility;
+use mir_codebase::definitions::Visibility;
 use mir_issues::{Issue, IssueKind, Severity};
 
 use crate::db::MirDatabase;

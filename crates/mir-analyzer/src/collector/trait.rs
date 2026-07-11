@@ -1,6 +1,6 @@
 use super::DefinitionCollector;
 use crate::parser::{name_to_string_owned, type_from_hint_owned};
-use mir_codebase::storage::{
+use mir_codebase::definitions::{
     wrap_template_bound, ConstantDef, PropertyDef, TemplateParam, TraitDef,
 };
 use mir_types::Type;
@@ -114,14 +114,14 @@ impl<'a> DefinitionCollector<'a> {
                                 );
                                 let prop = PropertyDef {
                                     name: Arc::from(param_name),
-                                    ty: mir_codebase::storage::wrap_property_type(ty.clone()),
+                                    ty: mir_codebase::definitions::wrap_property_type(ty.clone()),
                                     inferred_ty: None,
-                                    native_ty: mir_codebase::storage::wrap_property_type(ty),
+                                    native_ty: mir_codebase::definitions::wrap_property_type(ty),
                                     visibility: Self::convert_visibility(p.visibility),
                                     is_static: false,
                                     is_readonly: p.is_readonly,
                                     has_native_readonly: p.is_readonly,
-                                    default: mir_codebase::storage::wrap_property_type(
+                                    default: mir_codebase::definitions::wrap_property_type(
                                         p.default.as_ref().map(|_| Type::mixed()),
                                     ),
                                     location: Some(
@@ -169,8 +169,8 @@ impl<'a> DefinitionCollector<'a> {
                         Arc::from(prop_name),
                         PropertyDef {
                             name: Arc::from(prop_name),
-                            ty: mir_codebase::storage::wrap_property_type(ty.clone()),
-                            native_ty: mir_codebase::storage::wrap_property_type(ty),
+                            ty: mir_codebase::definitions::wrap_property_type(ty.clone()),
+                            native_ty: mir_codebase::definitions::wrap_property_type(ty),
                             inferred_ty: None,
                             visibility: Self::convert_visibility(p.visibility),
                             is_static: p.is_static,

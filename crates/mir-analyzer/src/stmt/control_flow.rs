@@ -264,7 +264,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     if ty.possibly_undefined {
                         let mut stripped = (**ty).clone();
                         stripped.possibly_undefined = false;
-                        *ty = mir_codebase::storage::wrap_var_type(stripped);
+                        *ty = mir_codebase::definitions::wrap_var_type(stripped);
                     }
                 }
             }

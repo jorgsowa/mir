@@ -11,7 +11,7 @@ impl<'a> ClassAnalyzer<'a> {
         let Some(class) = crate::db::find_class_like(self.db, here) else {
             return;
         };
-        let own_methods: Vec<(Arc<str>, Arc<mir_codebase::storage::MethodDef>)> = class
+        let own_methods: Vec<(Arc<str>, Arc<mir_codebase::definitions::MethodDef>)> = class
             .own_methods()
             .iter()
             .map(|(k, m)| (k.clone(), m.clone()))
@@ -61,7 +61,7 @@ impl<'a> ClassAnalyzer<'a> {
             // visibility, static, abstract). All are checked for signature
             // compatibility (return type, param types) so that conflicts across
             // multiple interfaces are caught.
-            let all_parent_methods: Vec<(Arc<str>, Arc<mir_codebase::storage::MethodDef>)> =
+            let all_parent_methods: Vec<(Arc<str>, Arc<mir_codebase::definitions::MethodDef>)> =
                 crate::db::class_ancestors_by_fqcn(self.db, here)
                     .iter()
                     .skip(1)
@@ -547,7 +547,7 @@ impl<'a> ClassAnalyzer<'a> {
         }
 
         // ---- Property visibility must not be reduced -------------------------
-        let own_properties: Vec<(Arc<str>, mir_codebase::storage::PropertyDef)> = class
+        let own_properties: Vec<(Arc<str>, mir_codebase::definitions::PropertyDef)> = class
             .own_properties()
             .map(|props| props.iter().map(|(k, p)| (k.clone(), p.clone())).collect())
             .unwrap_or_default();

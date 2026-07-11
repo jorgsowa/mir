@@ -1,6 +1,6 @@
 use super::DefinitionCollector;
 use crate::parser::{name_to_string_owned, type_from_hint_owned};
-use mir_codebase::storage::{wrap_template_bound, ConstantDef, InterfaceDef, TemplateParam};
+use mir_codebase::definitions::{wrap_template_bound, ConstantDef, InterfaceDef, TemplateParam};
 use mir_types::{Atomic, Type};
 use php_ast::owned::{ClassMemberKind, InterfaceDecl};
 use std::ops::ControlFlow;

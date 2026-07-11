@@ -2,7 +2,7 @@
 /// substitute them into return types.
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use mir_codebase::storage::{FnParam, TemplateParam};
+use mir_codebase::definitions::{DeclaredParam, TemplateParam};
 use mir_types::{atomic::ArrayKey, union::empty_type_params, Atomic, Name, Type};
 
 use crate::db::MirDatabase;
@@ -19,7 +19,7 @@ use crate::subtype::is_subtype;
 pub fn infer_template_bindings(
     db: &dyn MirDatabase,
     template_params: &[TemplateParam],
-    params: &[FnParam],
+    params: &[DeclaredParam],
     arg_types: &[Type],
     arg_names: &[Option<String>],
 ) -> (FxHashMap<Name, Type>, FxHashSet<Name>) {
@@ -48,7 +48,7 @@ pub fn infer_template_bindings(
 pub fn infer_arg_template_bindings(
     db: &dyn MirDatabase,
     template_params: &[TemplateParam],
-    params: &[FnParam],
+    params: &[DeclaredParam],
     arg_types: &[Type],
     arg_names: &[Option<String>],
 ) -> (FxHashMap<Name, Type>, FxHashSet<Name>) {
@@ -98,10 +98,10 @@ pub fn infer_arg_template_bindings(
 /// `arg_types` (or empty) is treated as if every remaining argument were
 /// positional, so callers that never track argument names can pass `&[]`.
 fn bind_args_to_params<'p, 'a>(
-    params: &'p [FnParam],
+    params: &'p [DeclaredParam],
     arg_types: &'a [Type],
     arg_names: &[Option<String>],
-) -> Vec<(&'p FnParam, &'a Type)> {
+) -> Vec<(&'p DeclaredParam, &'a Type)> {
     let variadic_index = params.iter().position(|p| p.is_variadic);
     let max_positional = variadic_index.unwrap_or(params.len());
     let mut used = vec![false; params.len()];

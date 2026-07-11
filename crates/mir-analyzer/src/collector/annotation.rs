@@ -1,4 +1,4 @@
-use mir_codebase::storage::{Assertion, AssertionKind};
+use mir_codebase::definitions::{Assertion, AssertionKind};
 use mir_issues::{Issue, IssueKind};
 use mir_types::Type;
 use std::sync::Arc;

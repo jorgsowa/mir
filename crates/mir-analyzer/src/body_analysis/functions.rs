@@ -42,7 +42,7 @@ impl<'a> BodyAnalyzer<'a> {
         let fqn = resolved.as_ref().map(|(f, _)| f.clone());
         #[allow(clippy::type_complexity)]
         let (params, return_ty, template_params, declared_throws): (
-            Arc<[mir_codebase::FnParam]>,
+            Arc<[mir_codebase::DeclaredParam]>,
             _,
             Vec<_>,
             Arc<[Arc<str>]>,
@@ -167,7 +167,7 @@ impl<'a> BodyAnalyzer<'a> {
     fn emit_missing_fn_types(
         &self,
         decl: &php_ast::owned::FunctionDecl,
-        stored: Option<&Arc<mir_codebase::storage::FunctionDef>>,
+        stored: Option<&Arc<mir_codebase::definitions::FunctionDef>>,
         file: &Arc<str>,
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
@@ -511,7 +511,7 @@ impl<'a> BodyAnalyzer<'a> {
         }
         #[allow(clippy::type_complexity)]
         let (params, return_ty, template_params, declared_throws): (
-            Arc<[mir_codebase::FnParam]>,
+            Arc<[mir_codebase::DeclaredParam]>,
             _,
             Vec<_>,
             Arc<[Arc<str>]>,
@@ -626,7 +626,7 @@ impl<'a> BodyAnalyzer<'a> {
         }
         let fqn = resolved.as_ref().map(|(f, _)| f.clone());
         let (params, return_ty, declared_throws): (
-            Arc<[mir_codebase::FnParam]>,
+            Arc<[mir_codebase::DeclaredParam]>,
             _,
             Arc<[Arc<str>]>,
         ) = match &resolved {

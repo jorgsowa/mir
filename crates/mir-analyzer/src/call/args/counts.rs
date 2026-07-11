@@ -1,6 +1,6 @@
 use php_ast::Span;
 
-use mir_codebase::storage::FnParam;
+use mir_codebase::definitions::DeclaredParam;
 use mir_issues::{IssueKind, Severity};
 use mir_types::Type;
 
@@ -12,7 +12,7 @@ use super::ArgBinding;
 pub(super) fn check_counts(
     ea: &mut ExpressionAnalyzer<'_>,
     fn_name: &str,
-    params: &[FnParam],
+    params: &[DeclaredParam],
     arg_types: &[Type],
     arg_spans: &[Span],
     arg_names: &[Option<String>],

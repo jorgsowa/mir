@@ -6,7 +6,7 @@ use mir_types::{Atomic, Type};
 
 use crate::expr::ExpressionAnalyzer;
 
-/// Simple param info for arity checking (works with both codebase and types FnParam)
+/// Simple param info for arity checking (works with both mir_codebase::DeclaredParam and mir_types::atomic::FnParam)
 #[derive(Clone)]
 pub(crate) struct ParamInfo {
     pub(crate) is_optional: bool,
@@ -1575,7 +1575,7 @@ pub(crate) fn check_typed_callable_arg(
     arg_ty: &Type,
     expected_params: &[FnParam],
     arg_span: Span,
-    template_params: &[mir_codebase::storage::TemplateParam],
+    template_params: &[mir_codebase::definitions::TemplateParam],
 ) {
     let template_names: rustc_hash::FxHashSet<&str> =
         template_params.iter().map(|tp| tp.name.as_ref()).collect();

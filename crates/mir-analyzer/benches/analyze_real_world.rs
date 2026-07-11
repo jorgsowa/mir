@@ -513,7 +513,7 @@ fn bench_full_analysis_detailed(_c: &mut Criterion) {
     eprintln!("\n=== FULL ANALYSIS DETAILED PROFILING ===\n");
 
     // Print struct sizes for optimization profiling
-    use mir_codebase::storage::FnParam as CodebaseFnParam;
+    use mir_codebase::definitions::DeclaredParam as CodebaseFnParam;
     use mir_types::atomic::Atomic;
     use mir_types::union::Type;
     eprintln!("  [struct sizes]");

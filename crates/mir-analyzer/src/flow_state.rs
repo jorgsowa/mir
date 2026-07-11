@@ -316,7 +316,7 @@ impl FlowState {
     /// Create a context seeded with the given parameters.
     #[allow(clippy::too_many_arguments)]
     pub fn for_function(
-        params: &[mir_codebase::FnParam],
+        params: &[mir_codebase::DeclaredParam],
         return_type: Option<Type>,
         declared_throws: Arc<[Arc<str>]>,
         self_fqcn: Option<Arc<str>>,
@@ -341,7 +341,7 @@ impl FlowState {
     /// Like `for_function` but also sets `inside_constructor`.
     #[allow(clippy::too_many_arguments)]
     pub fn for_method(
-        params: &[mir_codebase::FnParam],
+        params: &[mir_codebase::DeclaredParam],
         return_type: Option<Type>,
         declared_throws: Arc<[Arc<str>]>,
         self_fqcn: Option<Arc<str>>,
@@ -368,7 +368,7 @@ impl FlowState {
     /// Like `for_method` but also accepts template parameters.
     #[allow(clippy::too_many_arguments)]
     pub fn for_method_with_templates(
-        params: &[mir_codebase::FnParam],
+        params: &[mir_codebase::DeclaredParam],
         return_type: Option<Type>,
         declared_throws: Arc<[Arc<str>]>,
         self_fqcn: Option<Arc<str>>,
@@ -459,7 +459,7 @@ impl FlowState {
                 elem_ty
             };
             let name = Name::from(p.name.as_ref().trim_start_matches('$'));
-            Arc::make_mut(&mut ctx.vars).insert(name, mir_codebase::storage::wrap_var_type(ty));
+            Arc::make_mut(&mut ctx.vars).insert(name, mir_codebase::definitions::wrap_var_type(ty));
             Arc::make_mut(&mut ctx.assigned_vars).insert(name);
             param_names.insert(name);
             if is_template_typed {
@@ -482,7 +482,7 @@ impl FlowState {
                 });
                 let this_sym = Name::from("this");
                 Arc::make_mut(&mut ctx.vars)
-                    .insert(this_sym, mir_codebase::storage::wrap_var_type(this_ty));
+                    .insert(this_sym, mir_codebase::definitions::wrap_var_type(this_ty));
                 Arc::make_mut(&mut ctx.assigned_vars).insert(this_sym);
             }
         }
@@ -507,7 +507,7 @@ impl FlowState {
     /// Set the type of a variable and mark it as assigned.
     pub fn set_var(&mut self, name: &str, ty: Type) {
         let name = Name::from(name.trim_start_matches('$'));
-        Arc::make_mut(&mut self.vars).insert(name, mir_codebase::storage::wrap_var_type(ty));
+        Arc::make_mut(&mut self.vars).insert(name, mir_codebase::definitions::wrap_var_type(ty));
         Arc::make_mut(&mut self.assigned_vars).insert(name);
     }
 
@@ -539,7 +539,8 @@ impl FlowState {
             Name::from(obj_var.trim_start_matches('$')),
             Name::from(prop),
         );
-        Arc::make_mut(&mut self.prop_refined).insert(key, mir_codebase::storage::wrap_var_type(ty));
+        Arc::make_mut(&mut self.prop_refined)
+            .insert(key, mir_codebase::definitions::wrap_var_type(ty));
     }
 
     /// Discard any narrowed type for an instance property (call on write to
@@ -854,7 +855,7 @@ impl FlowState {
                         } else {
                             let mut m = (**a).clone();
                             m.merge_with(b);
-                            mir_codebase::storage::wrap_var_type(m)
+                            mir_codebase::definitions::wrap_var_type(m)
                         };
                         result_vars.insert(name, merged);
                         if in_if && in_else {
@@ -871,18 +872,18 @@ impl FlowState {
                                 Some(pt) => {
                                     let mut m = (**a).clone();
                                     m.merge_with(pt);
-                                    mir_codebase::storage::wrap_var_type(m)
+                                    mir_codebase::definitions::wrap_var_type(m)
                                 }
                                 None => {
                                     let mut m = (**a).clone();
                                     m.merge_with(&Type::mixed());
-                                    mir_codebase::storage::wrap_var_type(m)
+                                    mir_codebase::definitions::wrap_var_type(m)
                                 }
                             };
                             result_vars.insert(name, merged);
                             result_assigned.insert(name);
                         } else {
-                            let ty = mir_codebase::storage::wrap_var_type(
+                            let ty = mir_codebase::definitions::wrap_var_type(
                                 (**a).clone().possibly_undefined(),
                             );
                             result_vars.insert(name, ty);
@@ -897,18 +898,18 @@ impl FlowState {
                                 Some(pt) => {
                                     let mut m = (**pt).clone();
                                     m.merge_with(b);
-                                    mir_codebase::storage::wrap_var_type(m)
+                                    mir_codebase::definitions::wrap_var_type(m)
                                 }
                                 None => {
                                     let mut m = Type::mixed();
                                     m.merge_with(b);
-                                    mir_codebase::storage::wrap_var_type(m)
+                                    mir_codebase::definitions::wrap_var_type(m)
                                 }
                             };
                             result_vars.insert(name, merged);
                             result_assigned.insert(name);
                         } else {
-                            let ty = mir_codebase::storage::wrap_var_type(
+                            let ty = mir_codebase::definitions::wrap_var_type(
                                 (**b).clone().possibly_undefined(),
                             );
                             result_vars.insert(name, ty);
@@ -963,7 +964,7 @@ impl FlowState {
                     } else {
                         let mut m = (**if_ty).clone();
                         m.merge_with(else_ty);
-                        mir_codebase::storage::wrap_var_type(m)
+                        mir_codebase::definitions::wrap_var_type(m)
                     };
                     merged_props.insert(*key, merged);
                 }

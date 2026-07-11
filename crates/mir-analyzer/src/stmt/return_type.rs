@@ -183,7 +183,7 @@ pub(crate) fn named_object_return_compatible(
 fn return_type_params_compatible(
     actual_params: &[Type],
     declared_params: &[Type],
-    template_params: &[mir_codebase::storage::TemplateParam],
+    template_params: &[mir_codebase::definitions::TemplateParam],
     db: &dyn MirDatabase,
 ) -> bool {
     if actual_params.len() != declared_params.len() {

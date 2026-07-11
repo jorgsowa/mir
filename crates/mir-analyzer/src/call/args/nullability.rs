@@ -1,6 +1,6 @@
 use php_ast::Span;
 
-use mir_codebase::storage::TemplateParam;
+use mir_codebase::definitions::TemplateParam;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Type};
 

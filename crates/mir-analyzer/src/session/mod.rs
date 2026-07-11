@@ -183,7 +183,7 @@ impl AnalysisSession {
     /// Rebuilds the shared database to attach the definition cache — call
     /// **before** any file is ingested. A debug assertion catches misuse.
     ///
-    /// [`StubSlice`]: mir_codebase::storage::StubSlice
+    /// [`StubSlice`]: mir_codebase::definitions::StubSlice
     pub fn with_cache(mut self, cache: Arc<AnalysisCache>) -> Self {
         debug_assert_eq!(
             self.db.source_file_count(),
@@ -207,7 +207,7 @@ impl AnalysisSession {
     /// [`AnalyzerDb`] internally — call **before** any file is ingested. A
     /// debug assertion catches misuse.
     ///
-    /// [`StubSlice`]: mir_codebase::storage::StubSlice
+    /// [`StubSlice`]: mir_codebase::definitions::StubSlice
     pub fn with_cache_dir(mut self, cache_dir: &std::path::Path) -> Self {
         debug_assert_eq!(
             self.db.source_file_count(),

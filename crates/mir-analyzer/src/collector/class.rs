@@ -1,6 +1,8 @@
 use super::DefinitionCollector;
 use crate::parser::{name_to_string_owned, type_from_hint_owned};
-use mir_codebase::storage::{ConstantDef, FnParam, MethodDef, PropertyDef, TemplateParam};
+use mir_codebase::definitions::{
+    ConstantDef, DeclaredParam, MethodDef, PropertyDef, TemplateParam,
+};
 use mir_codebase::ClassDef;
 use mir_types::Atomic;
 use php_ast::owned::{ClassDecl, ClassMemberKind};
@@ -72,13 +74,13 @@ impl<'a> DefinitionCollector<'a> {
             .iter()
             .map(|(n, _, _, _)| n.to_string())
             .collect();
-        let class_template_params: Vec<mir_codebase::storage::TemplateParam> = class_doc
+        let class_template_params: Vec<mir_codebase::definitions::TemplateParam> = class_doc
             .templates
             .iter()
             .map(
-                |(name, bound, variance, default)| mir_codebase::storage::TemplateParam {
+                |(name, bound, variance, default)| mir_codebase::definitions::TemplateParam {
                     name: name.as_str().into(),
-                    bound: mir_codebase::storage::wrap_template_bound(bound.clone().map(|b| {
+                    bound: mir_codebase::definitions::wrap_template_bound(bound.clone().map(|b| {
                         Self::fill_self_static_parent(
                             self.resolve_union_doc_with_templates(
                                 b,
@@ -89,17 +91,19 @@ impl<'a> DefinitionCollector<'a> {
                             fqcn.as_str(),
                         )
                     })),
-                    default: mir_codebase::storage::wrap_template_bound(default.clone().map(|d| {
-                        Self::fill_self_static_parent(
-                            self.resolve_union_doc_with_templates(
-                                d,
-                                &class_template_names,
+                    default: mir_codebase::definitions::wrap_template_bound(default.clone().map(
+                        |d| {
+                            Self::fill_self_static_parent(
+                                self.resolve_union_doc_with_templates(
+                                    d,
+                                    &class_template_names,
+                                    fqcn.as_str(),
+                                    &[],
+                                ),
                                 fqcn.as_str(),
-                                &[],
-                            ),
-                            fqcn.as_str(),
-                        )
-                    })),
+                            )
+                        },
+                    )),
                     defining_entity: fqcn.as_str().into(),
                     variance: *variance,
                 },
@@ -186,9 +190,9 @@ impl<'a> DefinitionCollector<'a> {
                                 };
                                 let prop = PropertyDef {
                                     name: Arc::from(param_name),
-                                    ty: mir_codebase::storage::wrap_property_type(ty),
+                                    ty: mir_codebase::definitions::wrap_property_type(ty),
                                     inferred_ty: None,
-                                    native_ty: mir_codebase::storage::wrap_property_type(
+                                    native_ty: mir_codebase::definitions::wrap_property_type(
                                         native_ty_only,
                                     ),
                                     visibility: Self::convert_visibility(p.visibility),
@@ -196,7 +200,7 @@ impl<'a> DefinitionCollector<'a> {
                                     is_readonly: decl.modifiers.is_readonly || p.is_readonly,
                                     has_native_readonly: decl.modifiers.is_readonly
                                         || p.is_readonly,
-                                    default: mir_codebase::storage::wrap_property_type(
+                                    default: mir_codebase::definitions::wrap_property_type(
                                         p.default.as_ref().map(|_| mir_types::Type::mixed()),
                                     ),
                                     location: Some(
@@ -261,16 +265,16 @@ impl<'a> DefinitionCollector<'a> {
                         .or_else(|| hint_ty.clone());
                     let prop = PropertyDef {
                         name: Arc::from(prop_name),
-                        ty: mir_codebase::storage::wrap_property_type(ty),
+                        ty: mir_codebase::definitions::wrap_property_type(ty),
                         inferred_ty: None,
-                        native_ty: mir_codebase::storage::wrap_property_type(hint_ty),
+                        native_ty: mir_codebase::definitions::wrap_property_type(hint_ty),
                         visibility: Self::convert_visibility(p.visibility),
                         is_static: p.is_static,
                         is_readonly: p.is_readonly
                             || decl.modifiers.is_readonly
                             || prop_doc.is_readonly,
                         has_native_readonly: p.is_readonly || decl.modifiers.is_readonly,
-                        default: mir_codebase::storage::wrap_property_type(
+                        default: mir_codebase::definitions::wrap_property_type(
                             p.default.as_ref().map(|_| mir_types::Type::mixed()),
                         ),
                         location: Some(self.location(member.span.start, member.span.end)),
@@ -594,7 +598,7 @@ fn resolve_attribute_constant(name: &str) -> Option<i64> {
 /// We keep the longest param list and mark any param at index ≥ min_required
 /// (the minimum required count across both overloads) as optional.
 fn merge_method_overloads(existing: &Arc<MethodDef>, new_def: &MethodDef) -> Arc<MethodDef> {
-    let count_required = |params: &[FnParam]| {
+    let count_required = |params: &[DeclaredParam]| {
         params
             .iter()
             .take_while(|p| !p.is_optional && !p.has_default && !p.is_variadic)
@@ -608,13 +612,13 @@ fn merge_method_overloads(existing: &Arc<MethodDef>, new_def: &MethodDef) -> Arc
         existing.as_ref()
     };
 
-    let merged_params: Arc<[FnParam]> = longer
+    let merged_params: Arc<[DeclaredParam]> = longer
         .params
         .iter()
         .enumerate()
         .map(|(i, p)| {
             if i >= min_required {
-                FnParam {
+                DeclaredParam {
                     has_default: true,
                     is_optional: true,
                     ..p.clone()

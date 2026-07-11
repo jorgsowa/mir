@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use php_ast::Span;
 
-use mir_codebase::storage::{FnParam, TemplateParam, Visibility};
+use mir_codebase::definitions::{DeclaredParam, TemplateParam, Visibility};
 use mir_issues::{IssueKind, Severity};
 use mir_types::{ArrayKey, Atomic, Name, Type};
 
@@ -25,7 +25,7 @@ pub(crate) struct ArgBinding {
 
 pub struct CheckArgsParams<'a> {
     pub fn_name: &'a str,
-    pub params: &'a [FnParam],
+    pub params: &'a [DeclaredParam],
     pub arg_types: &'a [Type],
     pub arg_spans: &'a [Span],
     pub arg_names: &'a [Option<String>],

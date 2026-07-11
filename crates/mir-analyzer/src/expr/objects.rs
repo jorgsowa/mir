@@ -80,7 +80,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     fn infer_new_type_params(
         &mut self,
         fqcn: &Arc<str>,
-        ctor_params: Option<&[mir_codebase::storage::FnParam]>,
+        ctor_params: Option<&[mir_codebase::definitions::DeclaredParam]>,
         arg_types: &[Type],
         arg_names: &[Option<String>],
         call_span: php_ast::Span,
@@ -907,7 +907,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             // Visibility check: private constants are only accessible from the
             // declaring class; protected constants only from the declaring class
             // or its subclasses.
-            use mir_codebase::storage::Visibility;
+            use mir_codebase::definitions::Visibility;
             let inaccessible = match c.visibility {
                 Some(Visibility::Private) => {
                     // Accessible only from the exact declaring class

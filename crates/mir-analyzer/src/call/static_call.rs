@@ -6,7 +6,7 @@ use php_ast::Span;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Type};
 
-use mir_codebase::storage::FnParam;
+use mir_codebase::definitions::DeclaredParam;
 use mir_types::Name;
 use rustc_hash::FxHashMap;
 
@@ -472,14 +472,14 @@ impl CallAnalyzer {
             for tp in resolved.template_params.iter() {
                 param_bindings.remove(&Name::from(tp.name.as_ref()));
             }
-            let substituted_params: Vec<FnParam>;
-            let effective_params: &[FnParam] = if param_bindings.is_empty() {
+            let substituted_params: Vec<DeclaredParam>;
+            let effective_params: &[DeclaredParam] = if param_bindings.is_empty() {
                 &resolved.params
             } else {
                 substituted_params = resolved
                     .params
                     .iter()
-                    .map(|p| FnParam {
+                    .map(|p| DeclaredParam {
                         ty: mir_codebase::wrap_param_type(
                             p.ty.as_ref()
                                 .map(|t| t.substitute_templates(&param_bindings)),

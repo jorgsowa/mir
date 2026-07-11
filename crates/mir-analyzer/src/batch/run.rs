@@ -105,7 +105,7 @@ impl AnalysisSession {
                 );
                 let (mut slice, collector_issues) = collector.collect_slice(parsed.owned());
                 all_issues.extend(collector_issues);
-                mir_codebase::storage::deduplicate_params_in_slice(&mut slice);
+                mir_codebase::definitions::deduplicate_params_in_slice(&mut slice);
                 let defs = FileDefinitions {
                     slice: Arc::new(slice),
                     issues: Arc::new(all_issues),
@@ -577,7 +577,7 @@ impl AnalysisSession {
             file: Arc<str>,
             src: Arc<str>,
             hash: [u8; 32],
-            cached: Option<mir_codebase::storage::StubSlice>,
+            cached: Option<mir_codebase::definitions::StubSlice>,
         }
         let entries: Vec<FileEntry> = paths
             .par_iter()
@@ -621,7 +621,7 @@ impl AnalysisSession {
             (**guard).clone()
         };
         let stub_cache = self.db.stub_cache.clone();
-        let prepared: Vec<mir_codebase::storage::StubSlice> = entries
+        let prepared: Vec<mir_codebase::definitions::StubSlice> = entries
             .into_par_iter()
             .zip(source_files.into_par_iter())
             .map_with(db_pass1, |db, (mut entry, salsa_file)| {

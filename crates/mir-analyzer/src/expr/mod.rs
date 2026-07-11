@@ -591,10 +591,10 @@ impl<'a> ExpressionAnalyzer<'a> {
     }
 
     fn build_closure_from_resolved_params(
-        params: &[mir_codebase::storage::FnParam],
+        params: &[mir_codebase::definitions::DeclaredParam],
         return_ty: Type,
         bindings: &rustc_hash::FxHashMap<mir_types::Name, Type>,
-        own_template_params: &[mir_codebase::storage::TemplateParam],
+        own_template_params: &[mir_codebase::definitions::TemplateParam],
         receiver_fqcn: &Arc<str>,
         receiver_type_params: &[Type],
     ) -> Atomic {
@@ -818,7 +818,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         span: php_ast::Span,
         caller_fqcn: Option<&str>,
     ) {
-        use mir_codebase::storage::Visibility;
+        use mir_codebase::definitions::Visibility;
         use mir_types::CloneValidity;
         // Skip if the type already has structural clone issues (non-object components)
         match ty.clone_validity() {

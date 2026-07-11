@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use mir_codebase::storage::{
-    wrap_return_type, wrap_template_bound, FnParam, FunctionDef, TemplateParam,
+use mir_codebase::definitions::{
+    wrap_return_type, wrap_template_bound, DeclaredParam, FunctionDef, TemplateParam,
 };
 use mir_types::Name;
 
@@ -286,7 +286,7 @@ impl DefinitionCollector<'_> {
                 doc_ty.from_docblock = true;
                 doc_ty
             });
-            params.push(FnParam {
+            params.push(DeclaredParam {
                 name: Name::new(param_name),
                 ty: mir_codebase::wrap_param_type(ty),
                 out_ty: mir_codebase::wrap_param_type(out_ty),
@@ -314,7 +314,7 @@ impl DefinitionCollector<'_> {
         // emitted for such functions.
         let last_is_variadic = params.last().is_some_and(|p| p.is_variadic);
         if !last_is_variadic && stmts_use_func_get_args(&decl.body.stmts) {
-            params.push(FnParam {
+            params.push(DeclaredParam {
                 name: Name::new("..."),
                 ty: None,
                 out_ty: None,

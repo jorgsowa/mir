@@ -311,7 +311,7 @@ impl<'a> ClassAnalyzer<'a> {
         let Some(class) = crate::db::find_class_like(self.db, here) else {
             return;
         };
-        let own_methods: Vec<Arc<mir_codebase::storage::MethodDef>> =
+        let own_methods: Vec<Arc<mir_codebase::definitions::MethodDef>> =
             class.own_methods().iter().map(|(_, m)| m.clone()).collect();
         for own in own_methods {
             let method_name = own.name.as_ref();

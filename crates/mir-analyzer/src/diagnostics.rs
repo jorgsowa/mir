@@ -436,7 +436,7 @@ const MAGIC_METHODS_WITH_RUNTIME_PARAMS: &[&str] = &[
 ];
 
 pub(crate) fn emit_unused_params(
-    params: &[mir_codebase::FnParam],
+    params: &[mir_codebase::DeclaredParam],
     ctx: &crate::flow_state::FlowState,
     method_name: &str,
     file: &Arc<str>,

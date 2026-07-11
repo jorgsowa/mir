@@ -858,7 +858,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 };
                                 std::sync::Arc::make_mut(&mut ctx.vars).insert(
                                     name_sym,
-                                    mir_codebase::storage::wrap_var_type(init_ty),
+                                    mir_codebase::definitions::wrap_var_type(init_ty),
                                 );
                                 std::sync::Arc::make_mut(&mut ctx.assigned_vars).insert(name_sym);
                                 let (line, col_start) = self.offset_to_line_col(base.span.start);

@@ -152,7 +152,7 @@ impl<'a> BodyAnalyzer<'a> {
         );
         let declared_return = return_ty.clone();
         let is_ctor = cx.detect_ctor && method_name == "__construct";
-        let templates: Option<&[mir_codebase::storage::TemplateParam]> = if cx.with_templates {
+        let templates: Option<&[mir_codebase::definitions::TemplateParam]> = if cx.with_templates {
             Some(&template_params)
         } else {
             None

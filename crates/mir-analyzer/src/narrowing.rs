@@ -5,7 +5,7 @@
 use php_ast::ast::{AssignOp, BinaryOp, UnaryPrefixOp};
 use php_ast::owned::ExprKind;
 
-use mir_codebase::storage::AssertionKind;
+use mir_codebase::definitions::AssertionKind;
 use mir_types::{Atomic, Type};
 
 use crate::db::MirDatabase;
@@ -1047,7 +1047,7 @@ pub(crate) fn negate_assertion_type(current: &Type, asserted: &Type, db: &dyn Mi
 /// wherever it sits textually, so `call_args[param_index]` is only correct
 /// when every argument is positional.
 fn arg_for_param_index<'a>(
-    params: &[mir_codebase::storage::FnParam],
+    params: &[mir_codebase::definitions::DeclaredParam],
     call_args: &'a [php_ast::owned::Arg],
     param_index: usize,
 ) -> Option<&'a php_ast::owned::Arg> {

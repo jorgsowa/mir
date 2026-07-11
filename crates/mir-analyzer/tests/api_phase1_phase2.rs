@@ -200,8 +200,8 @@ fn symbol_kind_variable_uses_arc_str() {
 fn re_exports_available_at_crate_root() {
     // Should not require depending on mir_codebase
     let _: mir_analyzer::Visibility = mir_analyzer::Visibility::Public;
-    // FnParam and TemplateParam should also be reachable as types
-    let _name: &'static str = std::any::type_name::<mir_analyzer::FnParam>();
+    // DeclaredParam and TemplateParam should also be reachable as types
+    let _name: &'static str = std::any::type_name::<mir_analyzer::DeclaredParam>();
     let _name: &'static str = std::any::type_name::<mir_analyzer::TemplateParam>();
 }
 

@@ -44,14 +44,14 @@ pub(crate) fn consume_arg_assignment(
 /// type, which isn't available yet (premarking must run before args are
 /// analyzed).
 pub(crate) fn premark_byref_arg_vars(
-    params: &[mir_codebase::storage::FnParam],
+    params: &[mir_codebase::definitions::DeclaredParam],
     args: &[php_ast::owned::Arg],
     ctx: &mut crate::flow_state::FlowState,
 ) {
     use php_ast::owned::ExprKind;
 
     fn premark_one(
-        param: &mir_codebase::storage::FnParam,
+        param: &mir_codebase::definitions::DeclaredParam,
         arg: &php_ast::owned::Arg,
         ctx: &mut crate::flow_state::FlowState,
     ) {

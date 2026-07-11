@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use mir_codebase::storage::{ConstantDef, EnumCaseDef};
+use mir_codebase::definitions::{ConstantDef, EnumCaseDef};
 use mir_issues::{Issue, IssueKind};
 use mir_types::Type;
 use php_ast::owned::EnumMemberKind;

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use mir_codebase::storage::TemplateParam;
+use mir_codebase::definitions::TemplateParam;
 use mir_issues::Issue;
 use mir_types::{Location, Name, Type};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -453,7 +453,7 @@ pub fn collect_file_definitions_uncached(
     .with_php_version(php_version);
     let (mut slice, collector_issues) = collector.collect_slice(&parsed.program);
     all_issues.extend(collector_issues);
-    mir_codebase::storage::deduplicate_params_in_slice(&mut slice);
+    mir_codebase::definitions::deduplicate_params_in_slice(&mut slice);
 
     let slice_arc = Arc::new(slice);
 
@@ -600,7 +600,7 @@ pub fn infer_file_return_types(db: &dyn MirDatabase, file: SourceFile) -> Inferr
     let mut functions: FxHashMap<Arc<str>, Arc<Type>> =
         FxHashMap::with_capacity_and_hasher(inferred.functions.len(), Default::default());
     for (fqn, ty) in inferred.functions {
-        functions.insert(fqn, mir_codebase::storage::wrap_var_type(ty));
+        functions.insert(fqn, mir_codebase::definitions::wrap_var_type(ty));
     }
 
     let mut methods: FxHashMap<(Arc<str>, Arc<str>), Arc<Type>> =
@@ -611,7 +611,10 @@ pub fn infer_file_return_types(db: &dyn MirDatabase, file: SourceFile) -> Inferr
         } else {
             name
         };
-        methods.insert((fqcn, name_lower), mir_codebase::storage::wrap_var_type(ty));
+        methods.insert(
+            (fqcn, name_lower),
+            mir_codebase::definitions::wrap_var_type(ty),
+        );
     }
 
     InferredFileTypes {

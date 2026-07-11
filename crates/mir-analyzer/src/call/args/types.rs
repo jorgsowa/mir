@@ -2,7 +2,7 @@ use rustc_hash::FxHashMap;
 
 use php_ast::Span;
 
-use mir_codebase::storage::TemplateParam;
+use mir_codebase::definitions::TemplateParam;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Name, Type};
 
@@ -19,7 +19,7 @@ fn is_interface(ea: &ExpressionAnalyzer<'_>, fqcn: &str) -> bool {
 fn class_template_params(
     ea: &ExpressionAnalyzer<'_>,
     fqcn: &str,
-) -> Vec<mir_codebase::storage::TemplateParam> {
+) -> Vec<mir_codebase::definitions::TemplateParam> {
     crate::db::class_template_params(ea.db, fqcn)
         .map(|tps| tps.to_vec())
         .unwrap_or_default()
@@ -826,7 +826,7 @@ fn strict_named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer
 fn generic_type_params_compatible(
     arg_params: &[Type],
     param_params: &[Type],
-    template_params: &[mir_codebase::storage::TemplateParam],
+    template_params: &[mir_codebase::definitions::TemplateParam],
     ea: &ExpressionAnalyzer<'_>,
 ) -> bool {
     if arg_params.len() != param_params.len() {

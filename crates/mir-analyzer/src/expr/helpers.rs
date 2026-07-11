@@ -595,7 +595,7 @@ pub(crate) fn ast_params_to_fn_params_resolved(
     self_fqcn: Option<&str>,
     db: &dyn crate::db::MirDatabase,
     file: &str,
-) -> Vec<mir_codebase::FnParam> {
+) -> Vec<mir_codebase::DeclaredParam> {
     params
         .iter()
         .map(|p| {
@@ -605,7 +605,7 @@ pub(crate) fn ast_params_to_fn_params_resolved(
                 .as_ref()
                 .map(|h| crate::parser::type_from_hint_owned(h, self_fqcn))
                 .map(|u| resolve_named_objects_in_union(u, db, file));
-            mir_codebase::FnParam {
+            mir_codebase::DeclaredParam {
                 name: Name::new(name_str),
                 ty: mir_codebase::wrap_param_type(ty),
                 out_ty: None,
@@ -626,7 +626,7 @@ pub(crate) fn ast_params_to_fn_params_resolved(
 /// whose family is entirely absent from the docblock type (e.g. `@param int $x` on a
 /// `bool $x` hint), in which case the native hint is the runtime truth and wins.
 pub(crate) fn apply_doc_param_types(
-    params: &mut [mir_codebase::FnParam],
+    params: &mut [mir_codebase::DeclaredParam],
     ast_params: &[php_ast::owned::Param],
     doc_params: &[(String, Type)],
     db: &dyn crate::db::MirDatabase,

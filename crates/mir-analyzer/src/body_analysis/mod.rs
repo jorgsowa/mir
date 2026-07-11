@@ -131,9 +131,9 @@ fn method_chain_signature(
     fqcn: &str,
     method_name: &str,
 ) -> (
-    Arc<[mir_codebase::storage::FnParam]>,
+    Arc<[mir_codebase::definitions::DeclaredParam]>,
     Option<Type>,
-    Vec<mir_codebase::storage::TemplateParam>,
+    Vec<mir_codebase::definitions::TemplateParam>,
     Arc<[Arc<str>]>,
 ) {
     let method_name_lower = if method_name.bytes().any(|b| b.is_ascii_uppercase()) {
@@ -169,7 +169,7 @@ fn method_chain_signature(
                 .or_else(|| storage.return_type.as_deref().cloned())
         };
 
-        let params: Arc<[mir_codebase::storage::FnParam]> = if let Some(ref p) = parent {
+        let params: Arc<[mir_codebase::definitions::DeclaredParam]> = if let Some(ref p) = parent {
             storage
                 .params
                 .iter()
@@ -182,7 +182,7 @@ fn method_chain_signature(
                     if !own_ty_is_docblock && own_is_mixed_or_absent {
                         if let Some(parent_param) = p.params.get(i) {
                             if parent_param.ty.is_some() {
-                                return mir_codebase::storage::FnParam {
+                                return mir_codebase::definitions::DeclaredParam {
                                     ty: parent_param.ty.clone(),
                                     ..own.clone()
                                 };
@@ -226,9 +226,9 @@ fn lookup_function_node_for_decl(
     db: &dyn MirDatabase,
     file: &str,
     fn_name: &str,
-) -> Option<(Arc<str>, Arc<mir_codebase::storage::FunctionDef>)> {
+) -> Option<(Arc<str>, Arc<mir_codebase::definitions::FunctionDef>)> {
     let qualified = resolve_name(db, file, fn_name);
-    let try_lookup = |fqn: &str| -> Option<Arc<mir_codebase::storage::FunctionDef>> {
+    let try_lookup = |fqn: &str| -> Option<Arc<mir_codebase::definitions::FunctionDef>> {
         crate::db::find_function(db, crate::db::Fqcn::from_str(db, fqn))
     };
     if let Some(f) = try_lookup(qualified.as_str()) {
@@ -249,12 +249,12 @@ fn lookup_function_node_for_decl(
     None
 }
 
-/// Build `FnParam`s directly from the declaration AST when no storage match is
+/// Build `DeclaredParam`s directly from the declaration AST when no storage match is
 /// available.  Defaults are typed as `mixed` since their value type isn't tracked.
-fn ast_derived_fn_params(params: &[php_ast::owned::Param]) -> Vec<mir_codebase::FnParam> {
+fn ast_derived_fn_params(params: &[php_ast::owned::Param]) -> Vec<mir_codebase::DeclaredParam> {
     params
         .iter()
-        .map(|p| mir_codebase::FnParam {
+        .map(|p| mir_codebase::DeclaredParam {
             name: Name::new(p.name.as_deref().unwrap_or("")),
             ty: None,
             out_ty: None,

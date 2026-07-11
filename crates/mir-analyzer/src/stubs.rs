@@ -19,7 +19,7 @@ use std::ops::ControlFlow;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock};
 
-use mir_codebase::storage::StubSlice;
+use mir_codebase::definitions::StubSlice;
 use php_ast::owned::visitor::{walk_owned_expr, walk_owned_program, OwnedVisitor};
 use php_ast::owned::ExprKind;
 use php_lexer::TokenKind;
@@ -269,7 +269,7 @@ pub(crate) fn stub_slice_from_source(
         None => collector,
     };
     let (mut slice, _) = collector.collect_slice(&result.program);
-    mir_codebase::storage::deduplicate_params_in_slice(&mut slice);
+    mir_codebase::definitions::deduplicate_params_in_slice(&mut slice);
     slice
 }
 

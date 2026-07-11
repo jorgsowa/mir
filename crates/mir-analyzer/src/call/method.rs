@@ -5,7 +5,7 @@ use php_ast::Span;
 
 use crate::narrowing::extract_expr_guard_key;
 use crate::taint::is_expr_tainted;
-use mir_codebase::storage::{FnParam, TemplateParam, Visibility};
+use mir_codebase::definitions::{DeclaredParam, TemplateParam, Visibility};
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Name, Type};
 
@@ -49,7 +49,7 @@ pub(crate) struct ResolvedMethod {
     pub(crate) is_abstract: bool,
     pub(crate) is_pure: bool,
     pub(crate) is_mutation_free: bool,
-    pub(crate) params: Vec<FnParam>,
+    pub(crate) params: Vec<DeclaredParam>,
     pub(crate) template_params: Vec<TemplateParam>,
     pub(crate) return_ty_raw: Type,
     pub(crate) throws: Arc<[Arc<str>]>,
@@ -110,7 +110,7 @@ pub(crate) fn resolve_method_from_db(
         .map(|t| (*t).clone())
         .unwrap_or_else(Type::mixed);
 
-        let params: Vec<FnParam> = if let Some(ref p) = parent {
+        let params: Vec<DeclaredParam> = if let Some(ref p) = parent {
             storage
                 .params
                 .iter()
@@ -127,7 +127,7 @@ pub(crate) fn resolve_method_from_db(
                     if !own_ty_is_docblock && own_is_mixed_or_absent {
                         if let Some(parent_param) = p.params.get(i) {
                             if parent_param.ty.is_some() {
-                                return FnParam {
+                                return DeclaredParam {
                                     ty: parent_param.ty.clone(),
                                     ..own.clone()
                                 };
@@ -810,14 +810,14 @@ fn resolve_method_return<'a>(
         for tp in resolved.template_params.iter() {
             param_bindings.remove(&Name::from(tp.name.as_ref()));
         }
-        let substituted_params: Vec<FnParam>;
-        let effective_params: &[FnParam] = if param_bindings.is_empty() {
+        let substituted_params: Vec<DeclaredParam>;
+        let effective_params: &[DeclaredParam] = if param_bindings.is_empty() {
             &resolved.params
         } else {
             substituted_params = resolved
                 .params
                 .iter()
-                .map(|p| FnParam {
+                .map(|p| DeclaredParam {
                     ty: mir_codebase::wrap_param_type(
                         p.ty.as_ref()
                             .map(|t| t.substitute_templates(&param_bindings)),

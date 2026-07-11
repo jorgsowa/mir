@@ -402,9 +402,11 @@ impl AnalysisSession {
         let mut out: Vec<DocumentSymbol> = Vec::new();
 
         let class_children =
-            |methods: &indexmap::IndexMap<Arc<str>, Arc<mir_codebase::storage::MethodDef>>,
-             props: Option<&indexmap::IndexMap<Arc<str>, mir_codebase::storage::PropertyDef>>,
-             consts: &indexmap::IndexMap<Arc<str>, mir_codebase::storage::ConstantDef>,
+            |methods: &indexmap::IndexMap<Arc<str>, Arc<mir_codebase::definitions::MethodDef>>,
+             props: Option<
+                &indexmap::IndexMap<Arc<str>, mir_codebase::definitions::PropertyDef>,
+            >,
+             consts: &indexmap::IndexMap<Arc<str>, mir_codebase::definitions::ConstantDef>,
              is_enum: bool|
              -> Vec<DocumentSymbol> {
                 let mut out: Vec<DocumentSymbol> = Vec::new();

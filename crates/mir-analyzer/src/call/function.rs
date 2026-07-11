@@ -3,7 +3,7 @@ use php_ast::Span;
 
 use std::sync::Arc;
 
-use mir_codebase::storage::{Assertion, AssertionKind, FnParam, TemplateParam};
+use mir_codebase::definitions::{Assertion, AssertionKind, DeclaredParam, TemplateParam};
 use mir_issues::{IssueKind, Severity};
 use mir_types::atomic::FnParam as TypeFnParam;
 use mir_types::{Atomic, Name, Type};
@@ -24,7 +24,7 @@ use super::CallAnalyzer;
 struct ResolvedFn {
     fqn: std::sync::Arc<str>,
     deprecated: Option<std::sync::Arc<str>>,
-    params: Vec<FnParam>,
+    params: Vec<DeclaredParam>,
     template_params: Vec<TemplateParam>,
     assertions: Vec<Assertion>,
     return_ty_raw: Type,
@@ -984,10 +984,10 @@ fn extract_docblock_case_insensitive<'a>(src: &'a str, pattern: &str) -> Option<
     }
 }
 
-/// Convert `mir_types::atomic::FnParam` (from TClosure) to `mir_codebase::storage::FnParam`
+/// Convert `mir_types::atomic::FnParam` (from TClosure) to `mir_codebase::definitions::DeclaredParam`
 /// so they can be passed to `check_args`.
-fn type_param_to_storage_param(p: &TypeFnParam) -> FnParam {
-    FnParam {
+fn type_param_to_storage_param(p: &TypeFnParam) -> DeclaredParam {
+    DeclaredParam {
         name: p.name,
         ty: p.ty.as_ref().map(|t| Arc::new(t.to_union())),
         out_ty: p.out_ty.as_ref().map(|t| Arc::new(t.to_union())),
@@ -1008,7 +1008,7 @@ fn type_param_to_storage_param(p: &TypeFnParam) -> FnParam {
 fn typed_params_from_callee(
     union: &Type,
     ea: &ExpressionAnalyzer<'_>,
-) -> Option<(String, Vec<FnParam>)> {
+) -> Option<(String, Vec<DeclaredParam>)> {
     // Bare callable with unknown arity — we cannot determine params statically.
     if union
         .types

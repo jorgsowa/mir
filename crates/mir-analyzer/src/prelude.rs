@@ -9,7 +9,7 @@
 //!
 //! This pulls in types from all four context crates:
 //! - `mir-types`: [`Type`], [`Name`] (the interned identifier)
-//! - `mir-codebase`: [`FnParam`], [`TemplateParam`], [`Visibility`]
+//! - `mir-codebase`: [`DeclaredParam`], [`TemplateParam`], [`Visibility`]
 //! - `mir-issues`: [`Issue`], [`IssueKind`], [`Severity`]
 //! - `mir-analyzer` itself: [`AnalysisSession`], [`FileAnalyzer`], …
 
@@ -18,6 +18,6 @@ pub use crate::{
     LoadOutcome, Name, ParsedFile, Position, Range, ReferenceKind, ResolvedSymbol,
     SymbolLookupError,
 };
-pub use mir_codebase::storage::{FnParam, TemplateParam, Visibility};
+pub use mir_codebase::definitions::{DeclaredParam, TemplateParam, Visibility};
 pub use mir_issues::{Issue, IssueKind, Severity};
 pub use mir_types::Type;
