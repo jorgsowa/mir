@@ -31,6 +31,34 @@ fn param_name_span(source: &str, p: &Param) -> Span {
     }
 }
 
+/// Carry a `$this->prop` narrowing proven before a closure/arrow function
+/// literal into the closure's own scope, but only for `readonly` properties.
+/// An ordinary mutable property could still change between the guard and
+/// whenever the closure actually runs, so resetting it is correct; a
+/// `readonly` property can never change after construction, so the guard's
+/// proof stays valid no matter when the closure is invoked.
+fn propagate_readonly_prop_refinements(
+    db: &dyn crate::db::MirDatabase,
+    ctx: &FlowState,
+    inner_ctx: &mut FlowState,
+) {
+    let Some(self_fqcn) = ctx.self_fqcn.clone() else {
+        return;
+    };
+    let this_sym = mir_types::Name::from("this");
+    let here = crate::db::Fqcn::from_str(db, self_fqcn.as_ref());
+    for ((obj_var, prop), ty) in ctx.prop_refined.iter() {
+        if *obj_var != this_sym {
+            continue;
+        }
+        if let Some((_, p_def)) = crate::db::find_property_in_chain(db, here, prop.as_str()) {
+            if p_def.is_readonly {
+                inner_ctx.set_prop_refined("this", prop.as_str(), (**ty).clone());
+            }
+        }
+    }
+}
+
 impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_closure(
         &mut self,
@@ -104,6 +132,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         closure_ctx.is_in_pure_fn = ctx.is_in_pure_fn;
         closure_ctx.is_in_immutable_method = ctx.is_in_immutable_method;
         closure_ctx.is_in_external_mutation_free_method = ctx.is_in_external_mutation_free_method;
+        propagate_readonly_prop_refinements(self.db, ctx, &mut closure_ctx);
         for p in c.params.iter() {
             if let Some(raw) = p.name.as_deref() {
                 let trimmed = raw.trim_start_matches('$');
@@ -316,6 +345,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         arrow_ctx.is_in_pure_fn = ctx.is_in_pure_fn;
         arrow_ctx.is_in_immutable_method = ctx.is_in_immutable_method;
         arrow_ctx.is_in_external_mutation_free_method = ctx.is_in_external_mutation_free_method;
+        propagate_readonly_prop_refinements(self.db, ctx, &mut arrow_ctx);
         // Arrow functions auto-capture every outer variable by value (no
         // explicit `use()` list), so taint on any of them must carry over too.
         arrow_ctx.tainted_vars = ctx.tainted_vars.clone();
