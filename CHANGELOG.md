@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Performance
+
+- `Type` shrunk from 176 to 96 bytes (`Atomic` 80 → 40) by boxing the `TKeyedArray` property map — the rare shape variant no longer sets the size every scalar type pays for, nearly halving the copy volume of type clones across the analyzer.
+- Warm runs no longer deep-clone cache entries to test freshness, hash each source file three times, or clone the whole entry map when persisting the cache; the content-changed pass reuses the pass-1 digest.
+- Structural subtype checks compare atomics directly instead of allocating temporary single-atomic unions in the `O(n×m)` union pair loops; generic inference uses `FxHashSet` for template-name lookups.
+- Flow-state assignment tracking and diverging-branch merges no longer clone write-location collections to satisfy the borrow checker.
+- Type display renders straight into the formatter (no per-element `String` allocations); text and GitHub Actions issue output is batched through one buffered writer instead of a syscall per line.
+
 ## [0.52.0] - 2026-07-11
 
 ### Added
