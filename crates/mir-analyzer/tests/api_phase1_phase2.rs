@@ -697,20 +697,16 @@ fn reanalyze_files_recomputes_the_given_set_only() {
 
     // Files the session doesn't know are skipped, not errored.
     let ghost: [Arc<str>; 1] = [Arc::from("rf_ghost.php")];
-    assert!(
-        session
-            .reanalyze_files_cancellable(&ghost, &mir_analyzer::IndexCancel::new())
-            .is_empty()
-    );
+    assert!(session
+        .reanalyze_files_cancellable(&ghost, &mir_analyzer::IndexCancel::new())
+        .is_empty());
 
     // A pre-cancelled token short-circuits.
     let cancelled = mir_analyzer::IndexCancel::new();
     cancelled.cancel();
-    assert!(
-        session
-            .reanalyze_files_cancellable(&open_set, &cancelled)
-            .is_empty()
-    );
+    assert!(session
+        .reanalyze_files_cancellable(&open_set, &cancelled)
+        .is_empty());
 }
 
 #[test]

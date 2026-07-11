@@ -22,7 +22,9 @@ const STORM: usize = LRU_CAP + 300;
 fn storm_source(n: usize) -> String {
     let mut s = String::from("<?php\n");
     for i in 0..n {
-        s.push_str(&format!("function f{i}(int $x): int {{ return $x + 1; }}\n"));
+        s.push_str(&format!(
+            "function f{i}(int $x): int {{ return $x + 1; }}\n"
+        ));
     }
     s
 }
@@ -81,7 +83,11 @@ fn infer_scope_memos_bounded_under_rename_storm() {
             .map(|key| Arc::downgrade(&infer_scope(&db, file, key.clone())))
             .collect()
     };
-    assert_eq!(alive_count(&weaks), weaks.len(), "memos live before eviction");
+    assert_eq!(
+        alive_count(&weaks),
+        weaks.len(),
+        "memos live before eviction"
+    );
 
     session.set_file_text(Arc::from("/memo_bounds/other.php"), Arc::from("<?php\n"));
 
