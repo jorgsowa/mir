@@ -138,10 +138,12 @@ fn main() {
     }
 
     if let Some(n) = cli.threads {
-        rayon::ThreadPoolBuilder::new()
+        if let Err(e) = rayon::ThreadPoolBuilder::new()
             .num_threads(n)
             .build_global()
-            .ok();
+        {
+            eprintln!("mir: failed to set thread pool size: {e}");
+        }
     }
 
     let composer_root = resolve_composer_root(&cli, &cwd);
