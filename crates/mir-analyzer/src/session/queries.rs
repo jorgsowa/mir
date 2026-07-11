@@ -371,9 +371,17 @@ impl AnalysisSession {
     pub fn class_issues(&self, files: &[Arc<str>]) -> Vec<crate::Issue> {
         let db = self.snapshot_db();
         let file_set: HashSet<Arc<str>> = files.iter().cloned().collect();
+        // Read source texts through the snapshot already in hand — calling
+        // `source_of` here would re-enter the session RwLock while this
+        // snapshot is live, and a concurrent salsa write (which blocks new
+        // readers behind the fair write lock while waiting for existing
+        // snapshots to drop) turns that into a deadlock.
         let file_data: Vec<(Arc<str>, Arc<str>)> = files
             .iter()
-            .filter_map(|f| Some((f.clone(), self.source_of(f)?)))
+            .filter_map(|f| {
+                let sf = db.lookup_source_file(f)?;
+                Some((f.clone(), sf.text(&db as &dyn crate::db::MirDatabase)))
+            })
             .collect();
         crate::class::ClassAnalyzer::with_files(&db, file_set, &file_data).analyze_all()
     }
