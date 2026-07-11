@@ -464,7 +464,7 @@ impl<'a> DefinitionCollector<'a> {
     fn resolve_union_doc_with_templates(
         &self,
         union: Type,
-        template_names: &std::collections::HashSet<String>,
+        template_names: &rustc_hash::FxHashSet<String>,
         defining_entity: &str,
         template_params: &[TemplateParam],
     ) -> Type {
@@ -735,7 +735,7 @@ impl<'a> DefinitionCollector<'a> {
     fn substitute_template_params(
         &self,
         ty: Type,
-        template_names: &std::collections::HashSet<String>,
+        template_names: &rustc_hash::FxHashSet<String>,
         template_params: &[TemplateParam],
         defining_entity: &str,
     ) -> Type {
@@ -1389,7 +1389,7 @@ impl<'a> DefinitionCollector<'a> {
         // that reference class-level template params (e.g. `TRelatedModel`) are stored as
         // TTemplateParam instead of being wrongly namespace-qualified.
         // Includes both method-level and class-level template names.
-        let template_names: std::collections::HashSet<String> = doc
+        let template_names: rustc_hash::FxHashSet<String> = doc
             .templates
             .iter()
             .map(|(n, _, _, _)| n.to_string())

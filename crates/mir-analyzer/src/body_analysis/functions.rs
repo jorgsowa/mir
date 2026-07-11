@@ -383,7 +383,7 @@ impl<'a> BodyAnalyzer<'a> {
                 crate::diagnostics::offset_to_line_col(source, fn_span.end, source_map);
             // Type alias names defined on this function (@psalm-type / @psalm-import-type).
             // These are not class names and must not be flagged as UndefinedDocblockClass.
-            let type_alias_names: std::collections::HashSet<&str> = doc
+            let type_alias_names: rustc_hash::FxHashSet<&str> = doc
                 .type_aliases
                 .iter()
                 .map(|a| a.name.as_str())

@@ -171,7 +171,7 @@ impl DefinitionCollector<'_> {
 
         // Build template names first so bound resolution below can recognise template-param
         // names and avoid FQN-qualifying them (e.g. `@template T of K` where K is another param).
-        let template_names: std::collections::HashSet<String> = doc
+        let template_names: rustc_hash::FxHashSet<String> = doc
             .templates
             .iter()
             .map(|(n, _, _, _)| n.to_string())

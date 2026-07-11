@@ -32,7 +32,7 @@ impl<'a> DefinitionCollector<'a> {
             return ControlFlow::Continue(());
         }
 
-        let iface_template_names: std::collections::HashSet<String> = iface_doc
+        let iface_template_names: rustc_hash::FxHashSet<String> = iface_doc
             .templates
             .iter()
             .map(|(n, _, _, _)| n.to_string())

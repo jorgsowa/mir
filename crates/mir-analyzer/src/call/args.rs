@@ -409,10 +409,10 @@ fn param_contains_template_or_unknown(
     ea: &ExpressionAnalyzer<'_>,
     template_params: &[TemplateParam],
 ) -> bool {
-    let template_names: std::collections::HashSet<&str> =
+    let template_names: rustc_hash::FxHashSet<&str> =
         template_params.iter().map(|tp| tp.name.as_ref()).collect();
 
-    fn has_template_param(union: &Type, template_names: &std::collections::HashSet<&str>) -> bool {
+    fn has_template_param(union: &Type, template_names: &rustc_hash::FxHashSet<&str>) -> bool {
         union.types.iter().any(|atomic| match atomic {
             Atomic::TTemplateParam { .. } => true,
             Atomic::TNamedObject { fqcn, type_params } => {

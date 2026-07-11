@@ -68,7 +68,7 @@ impl<'a> DefinitionCollector<'a> {
         // to build_method_storage, allowing method return types to reference class templates
         // (e.g. TKey) without those names being wrongly namespace-qualified.
         // Collect names first so bounds referencing sibling template params are not FQN-qualified.
-        let class_template_names: std::collections::HashSet<String> = class_doc
+        let class_template_names: rustc_hash::FxHashSet<String> = class_doc
             .templates
             .iter()
             .map(|(n, _, _, _)| n.to_string())
@@ -145,7 +145,7 @@ impl<'a> DefinitionCollector<'a> {
                         // on the class) types the promoted `$value` property as the
                         // template param `T`, enabling generic member inference.
                         let ctor_doc = self.parse_docblock_from_node(m.doc_comment.as_ref());
-                        let ctor_template_names: std::collections::HashSet<String> = ctor_doc
+                        let ctor_template_names: rustc_hash::FxHashSet<String> = ctor_doc
                             .templates
                             .iter()
                             .map(|(n, _, _, _)| n.to_string())

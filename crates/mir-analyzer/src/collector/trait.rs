@@ -34,7 +34,7 @@ impl<'a> DefinitionCollector<'a> {
             return ControlFlow::Continue(());
         }
 
-        let trait_template_names: std::collections::HashSet<String> = trait_doc
+        let trait_template_names: rustc_hash::FxHashSet<String> = trait_doc
             .templates
             .iter()
             .map(|(n, _, _, _)| n.to_string())

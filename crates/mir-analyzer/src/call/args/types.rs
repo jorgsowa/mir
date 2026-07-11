@@ -878,7 +878,7 @@ fn generic_ancestor_type_args(
     ancestor: &str,
     ea: &ExpressionAnalyzer<'_>,
 ) -> Option<Vec<Type>> {
-    let mut seen = std::collections::HashSet::new();
+    let mut seen = rustc_hash::FxHashSet::default();
     let raw = generic_ancestor_type_args_inner(child, ancestor, ea, &mut seen)?;
     if raw.is_empty() {
         return Some(raw);
@@ -919,7 +919,7 @@ fn generic_ancestor_type_args_inner(
     child: &str,
     ancestor: &str,
     ea: &ExpressionAnalyzer<'_>,
-    seen: &mut std::collections::HashSet<String>,
+    seen: &mut rustc_hash::FxHashSet<String>,
 ) -> Option<Vec<Type>> {
     if child == ancestor {
         return Some(vec![]);
@@ -941,7 +941,7 @@ fn generic_ancestor_type_args_inner(
     // `TypedList implements Collection<T>` — is not silently missed.
     let resolve_through = |edge: &str,
                            edge_args: &[Type],
-                           seen: &mut std::collections::HashSet<String>|
+                           seen: &mut rustc_hash::FxHashSet<String>|
      -> Option<Vec<Type>> {
         if edge == ancestor {
             return Some(edge_args.to_vec());

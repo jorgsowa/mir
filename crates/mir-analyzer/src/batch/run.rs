@@ -51,7 +51,7 @@ impl AnalysisSession {
         let mut topology_changed = false;
         let mut removed_files: Vec<String> = Vec::new();
         if let Some(cache) = &self.cache {
-            let current: std::collections::HashSet<&str> =
+            let current: rustc_hash::FxHashSet<&str> =
                 file_data.iter().map(|(f, _)| f.as_ref()).collect();
             removed_files = cache
                 .cached_files()
