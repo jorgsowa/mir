@@ -586,7 +586,20 @@ pub fn narrow_from_condition(
                     }
                 } else if bare.eq_ignore_ascii_case("in_array") {
                     // in_array($needle, ['a', 'b', 'c']) true →
-                    // narrow $needle to 'a'|'b'|'c'.
+                    // narrow $needle to 'a'|'b'|'c'. Only safe when either the
+                    // 3rd (strict) argument is truthy, or $needle's current
+                    // type and the haystack are both exclusively string atoms
+                    // or both exclusively int atoms — for same-category
+                    // scalars, loose (==) comparison agrees with strict
+                    // (===). A mixed-category needle (e.g. int|string) can't
+                    // be narrowed under loose comparison: the string "1"
+                    // loosely equals the int 1, so a haystack of `[1, 2]`
+                    // doesn't rule out $needle being the string "1".
+                    let strict = call
+                        .args
+                        .get(2)
+                        .map(|a| is_truthy_bool_literal(&a.value))
+                        .unwrap_or(false);
                     if let (Some(needle_arg), Some(haystack_arg)) =
                         (call.args.first(), call.args.get(1))
                     {
@@ -595,14 +608,16 @@ pub fn narrow_from_condition(
                                 extract_haystack_type(&haystack_arg.value, ctx)
                             {
                                 let current = ctx.get_var(&var_name);
-                                if !current.is_mixed() && is_true {
+                                let loose_safe = strict
+                                    || in_array_loose_narrowing_is_safe(&current, &haystack_ty);
+                                if !current.is_mixed() && is_true && loose_safe {
                                     // intersect: keep only types that could match a haystack value
                                     let narrowed =
                                         narrow_to_haystack_values(&current, &haystack_ty);
                                     if !narrowed.is_empty() && narrowed != current {
                                         ctx.set_var(&var_name, narrowed);
                                     }
-                                } else if !current.is_mixed() && !is_true {
+                                } else if !current.is_mixed() && !is_true && loose_safe {
                                     // False branch: safe only when the current type is a
                                     // finite literal union — remove the matched haystack values.
                                     let all_literals = !current.types.is_empty()
@@ -3330,4 +3345,19 @@ fn narrow_to_haystack_values(current: &Type, haystack: &Type) -> Type {
         }
     }
     out
+}
+
+/// Whether narrowing `current` by an `in_array()`/`!in_array()` check against
+/// `haystack` is sound without a strict (third-argument) comparison. Loose
+/// (`==`) comparison agrees with strict (`===`) comparison whenever both
+/// sides are exclusively strings, or exclusively ints — cross-category
+/// comparisons (e.g. a string needle against an int haystack) can match via
+/// PHP's loose-equality coercion rules in ways a same-category narrowing
+/// would incorrectly rule out.
+fn in_array_loose_narrowing_is_safe(current: &Type, haystack: &Type) -> bool {
+    fn all(ty: &Type, pred: fn(&Atomic) -> bool) -> bool {
+        !ty.types.is_empty() && ty.types.iter().all(|a| pred(a))
+    }
+    (all(current, Atomic::is_int) && all(haystack, Atomic::is_int))
+        || (all(current, Atomic::is_string) && all(haystack, Atomic::is_string))
 }
