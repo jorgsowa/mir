@@ -91,6 +91,8 @@ pub fn narrow_from_condition(
             else if matches!(b.right.kind, ExprKind::Null) {
                 if let Some(name) = extract_var_name(&b.left) {
                     narrow_var_null(ctx, &name, effective_true);
+                } else if let Some((obj, prop)) = extract_nullsafe_prop_access(&b.left) {
+                    narrow_nullsafe_prop_null(ctx, &obj, &prop, db, file, effective_true);
                 } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
                     narrow_prop_null(ctx, &obj, &prop, db, file, effective_true);
                 } else if let Some((fqcn, prop)) =
@@ -101,6 +103,8 @@ pub fn narrow_from_condition(
             } else if matches!(b.left.kind, ExprKind::Null) {
                 if let Some(name) = extract_var_name(&b.right) {
                     narrow_var_null(ctx, &name, effective_true);
+                } else if let Some((obj, prop)) = extract_nullsafe_prop_access(&b.right) {
+                    narrow_nullsafe_prop_null(ctx, &obj, &prop, db, file, effective_true);
                 } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
                     narrow_prop_null(ctx, &obj, &prop, db, file, effective_true);
                 } else if let Some((fqcn, prop)) =
@@ -1778,6 +1782,25 @@ fn narrow_prop_null(
     }
 }
 
+/// Narrow a nullsafe property access (`$obj?->prop`) by a null check.
+/// Beyond narrowing the property itself, a proven-non-null result also
+/// proves the receiver is non-null — `$obj?->prop` only evaluates to `null`
+/// without reading `prop` when `$obj` is null, so the negative case can't
+/// tell us anything about `$obj`, but the non-null case can.
+fn narrow_nullsafe_prop_null(
+    ctx: &mut FlowState,
+    obj_var: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    file: &str,
+    is_null: bool,
+) {
+    narrow_prop_null(ctx, obj_var, prop, db, file, is_null);
+    if !is_null {
+        narrow_var_null(ctx, obj_var, false);
+    }
+}
+
 /// Narrow a static property access `self::$prop`/`Class::$prop` by a null
 /// check. `prop_refined` is keyed by FQCN here instead of a receiver
 /// variable name — a FQCN string can never collide with a real PHP variable.
@@ -2641,6 +2664,25 @@ fn extract_prop_access(expr: &php_ast::owned::Expr) -> Option<(String, String)> 
             Some((obj, prop))
         }
         ExprKind::Parenthesized(inner) => extract_prop_access(inner),
+        _ => None,
+    }
+}
+
+/// Like `extract_prop_access`, but only matches the nullsafe (`?->`) form.
+/// Kept separate because a nullsafe access being non-null also proves the
+/// receiver itself is non-null (a null receiver short-circuits the whole
+/// chain to `null`), which a plain `->` access can't imply.
+fn extract_nullsafe_prop_access(expr: &php_ast::owned::Expr) -> Option<(String, String)> {
+    match &expr.kind {
+        ExprKind::NullsafePropertyAccess(pa) => {
+            let obj = extract_var_name(&pa.object)?;
+            let prop = match &pa.property.kind {
+                ExprKind::Identifier(s) => s.as_ref().to_string(),
+                _ => return None,
+            };
+            Some((obj, prop))
+        }
+        ExprKind::Parenthesized(inner) => extract_nullsafe_prop_access(inner),
         _ => None,
     }
 }
