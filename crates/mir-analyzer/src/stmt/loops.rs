@@ -168,6 +168,18 @@ fn resolve_iterator_item_types(
     if bare.eq_ignore_ascii_case("Generator") {
         return Some(generator_item_types(type_params));
     }
+    // The receiver's static type may itself be one of the built-in iteration
+    // interfaces used generically — e.g. `@param Iterator<int, string> $x` —
+    // rather than a concrete class implementing it. There's no `current()`/
+    // `getIterator()` to chase in that case; the annotation's own type args
+    // (if supplied) directly are the key/value types.
+    if (bare.eq_ignore_ascii_case("Iterator")
+        || bare.eq_ignore_ascii_case("IteratorAggregate")
+        || bare.eq_ignore_ascii_case("Traversable"))
+        && !type_params.is_empty()
+    {
+        return Some(generator_item_types(type_params));
+    }
 
     let class = crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, bare))?;
     let class_tps = crate::db::class_template_params(db, bare).unwrap_or_default();
