@@ -154,13 +154,17 @@ fn variadic_element_type(ty: &Type) -> &Type {
 /// Check that each binding satisfies the template's declared bound, using
 /// the codebase to resolve class inheritance chains. This is inheritance-aware
 /// and will accept subclasses that satisfy their parent's bound.
-/// Returns a list of `(template_name, inferred_type, bound)` for violations.
+/// Returns a list of `(template_name, inferred_type, resolved_bound)` for
+/// violations. `resolved_bound` has any other already-bound template params
+/// (e.g. `@template U of T`) substituted in, so it names the concrete type
+/// the violation was actually checked against rather than the bound's raw,
+/// possibly-still-templated docblock spelling.
 pub fn check_template_bounds_with_inheritance<'a>(
     db: &dyn MirDatabase,
     bindings: &'a FxHashMap<Name, Type>,
     template_params: &'a [TemplateParam],
     unchecked: &FxHashSet<Name>,
-) -> Vec<(&'a Name, &'a Type, &'a Type)> {
+) -> Vec<(&'a Name, &'a Type, Type)> {
     // An inferred type that still contains unresolved template placeholders or
     // self/static cannot be meaningfully checked against the bound here — it
     // resolves only at a concrete call site (e.g. Eloquent's TRelatedModel
@@ -219,7 +223,7 @@ pub fn check_template_bounds_with_inheritance<'a>(
                     && !is_unresolved(inferred, template_params)
                     && !is_subtype(db, inferred, &resolved_bound)
                 {
-                    violations.push((&tp.name, inferred, bound.as_ref()));
+                    violations.push((&tp.name, inferred, resolved_bound));
                 }
             }
         }
