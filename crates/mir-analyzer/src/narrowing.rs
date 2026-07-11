@@ -786,6 +786,19 @@ pub fn narrow_from_condition(
                 if !narrowed.is_empty() {
                     ctx.set_var(&var_name, narrowed);
                 }
+            } else {
+                if !is_true {
+                    // `!empty($base[$k])` implies `$base` is a non-null, indexable
+                    // value, same as the `isset($base[$k])` case above.
+                    if let Some(base) = array_access_base_var(var_expr) {
+                        let current = ctx.get_var(&base);
+                        ctx.set_var(&base, current.remove_null().remove_false());
+                    }
+                }
+                // For a single-level `empty($arr['key'])` on a shape-typed base,
+                // also narrow that key's OWN value type by truthiness, mirroring
+                // narrow_isset_shape_key.
+                narrow_empty_shape_key(var_expr, ctx, is_true);
             }
         }
 
@@ -2828,6 +2841,84 @@ fn narrow_isset_shape_key(var_expr: &php_ast::owned::Expr, ctx: &mut FlowState) 
     // If every union member turned out to be an impossible closed shape, keep
     // the original type rather than narrowing to an empty union — proving
     // the branch itself unreachable is a separate concern from key narrowing.
+    if changed && !result.types.is_empty() {
+        ctx.set_var(&base, result);
+    }
+}
+
+/// For a single-level `empty($base['key'])` where `$base` is (partly) a known
+/// shape, narrow that key's own property by truthiness — mirroring
+/// `narrow_isset_shape_key`, but with `empty()`'s truthy/falsy semantics
+/// instead of `isset()`'s presence/null semantics.
+fn narrow_empty_shape_key(var_expr: &php_ast::owned::Expr, ctx: &mut FlowState, is_true: bool) {
+    let ExprKind::ArrayAccess(aa) = &var_expr.kind else {
+        return;
+    };
+    let Some(base) = extract_var_name(&aa.array) else {
+        return;
+    };
+    let Some(idx) = &aa.index else {
+        return;
+    };
+    let key = match &idx.kind {
+        ExprKind::String(s) => {
+            mir_types::atomic::ArrayKey::String(std::sync::Arc::from(s.as_ref()))
+        }
+        ExprKind::Int(i) => mir_types::atomic::ArrayKey::Int(*i),
+        _ => return,
+    };
+
+    let current = ctx.get_var(&base);
+    let mut changed = false;
+    let mut result = Type::empty();
+    for atomic in &current.types {
+        match atomic {
+            Atomic::TKeyedArray {
+                properties,
+                is_open,
+                is_list,
+            } => {
+                if properties.contains_key(&key) {
+                    let mut new_props = properties.clone();
+                    if let Some(prop) = new_props.get_mut(&key) {
+                        if is_true {
+                            // empty($base['key']) true: the key's value (if any) is
+                            // falsy. The key may also be entirely absent (also
+                            // falsy), so `optional` is left untouched.
+                            let narrowed_ty = prop.ty.narrow_to_falsy();
+                            if !narrowed_ty.is_empty() {
+                                prop.ty = narrowed_ty;
+                            }
+                        } else {
+                            // !empty($base['key']): the key is present and truthy.
+                            let narrowed_ty = prop.ty.narrow_to_truthy();
+                            if !narrowed_ty.is_empty() {
+                                prop.ty = narrowed_ty;
+                            }
+                            prop.optional = false;
+                        }
+                    }
+                    changed = true;
+                    result.add_type(Atomic::TKeyedArray {
+                        properties: new_props,
+                        is_open: *is_open,
+                        is_list: *is_list,
+                    });
+                } else if *is_open || is_true {
+                    // An open shape might still carry the key at runtime; and a
+                    // closed shape genuinely missing the key is exactly the
+                    // (falsy, offset-doesn't-exist) case `empty() === true`
+                    // covers — either way, keep this arm unnarrowed.
+                    result.add_type(atomic.clone());
+                } else {
+                    // A closed shape without this key can never satisfy
+                    // `!empty(...)` — exclude this union member.
+                    changed = true;
+                }
+            }
+            _ => result.add_type(atomic.clone()),
+        }
+    }
     if changed && !result.types.is_empty() {
         ctx.set_var(&base, result);
     }
