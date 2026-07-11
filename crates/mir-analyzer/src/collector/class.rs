@@ -70,18 +70,29 @@ impl<'a> DefinitionCollector<'a> {
         let class_template_names: std::collections::HashSet<String> = class_doc
             .templates
             .iter()
-            .map(|(n, _, _)| n.to_string())
+            .map(|(n, _, _, _)| n.to_string())
             .collect();
         let class_template_params: Vec<mir_codebase::storage::TemplateParam> = class_doc
             .templates
             .iter()
             .map(
-                |(name, bound, variance)| mir_codebase::storage::TemplateParam {
+                |(name, bound, variance, default)| mir_codebase::storage::TemplateParam {
                     name: name.as_str().into(),
                     bound: mir_codebase::storage::wrap_template_bound(bound.clone().map(|b| {
                         Self::fill_self_static_parent(
                             self.resolve_union_doc_with_templates(
                                 b,
+                                &class_template_names,
+                                fqcn.as_str(),
+                                &[],
+                            ),
+                            fqcn.as_str(),
+                        )
+                    })),
+                    default: mir_codebase::storage::wrap_template_bound(default.clone().map(|d| {
+                        Self::fill_self_static_parent(
+                            self.resolve_union_doc_with_templates(
+                                d,
                                 &class_template_names,
                                 fqcn.as_str(),
                                 &[],
@@ -134,7 +145,7 @@ impl<'a> DefinitionCollector<'a> {
                         let ctor_template_names: std::collections::HashSet<String> = ctor_doc
                             .templates
                             .iter()
-                            .map(|(n, _, _)| n.to_string())
+                            .map(|(n, _, _, _)| n.to_string())
                             .chain(class_template_names.iter().cloned())
                             .collect();
                         for p in m.params.iter() {

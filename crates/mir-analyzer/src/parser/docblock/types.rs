@@ -772,7 +772,7 @@ pub(super) fn find_matching_paren(s: &str) -> Option<usize> {
 pub(super) fn parse_template_line(
     _tag_name: &str,
     body: Option<String>,
-) -> Option<(String, Option<String>)> {
+) -> Option<(String, Option<String>, Option<String>)> {
     let body = body?;
     let body = body.trim();
     // The body may also carry FOLLOWING PROSE LINES (a description written
@@ -794,13 +794,32 @@ pub(super) fn parse_template_line(
     // bound too, not silently fall through to the no-bound case.
     let mut tokens = body.split_whitespace().peekable();
     let name = tokens.next()?;
-    if matches!(tokens.peek(), Some(&"of") | Some(&"as")) {
+    let bound = if matches!(tokens.peek(), Some(&"of") | Some(&"as")) {
         tokens.next();
-        let bound: String = tokens.collect::<Vec<_>>().join(" ");
-        Some((name.to_string(), (!bound.is_empty()).then_some(bound)))
+        let mut bound_tokens = Vec::new();
+        while let Some(&t) = tokens.peek() {
+            // A trailing `= Default` (e.g. `@template T of Bound = Default`)
+            // belongs to the default value, not the bound.
+            if t == "=" {
+                break;
+            }
+            bound_tokens.push(t);
+            tokens.next();
+        }
+        let bound = bound_tokens.join(" ");
+        (!bound.is_empty()).then_some(bound)
     } else {
-        Some((name.to_string(), None))
-    }
+        None
+    };
+    // `@template T = Default` — the value used when nothing binds T.
+    let default = if matches!(tokens.peek(), Some(&"=")) {
+        tokens.next();
+        let default: String = tokens.collect::<Vec<_>>().join(" ");
+        (!default.is_empty()).then_some(default)
+    } else {
+        None
+    };
+    Some((name.to_string(), bound, default))
 }
 
 /// Extract the description text (all prose before the first `@` tag) from a raw docblock.

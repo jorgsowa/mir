@@ -889,18 +889,22 @@ fn generic_ancestor_type_args(
     }
     // A `child` template param not supplied by `child_own_args` (e.g. a bare,
     // unparameterized `Generator` return with no `@return Generator<...>`
-    // annotation) is effectively unbound — default it to its declared bound
-    // (or `mixed`), the same fallback `infer_template_bindings` uses, so a
-    // bare ancestor placeholder doesn't leak through unresolved and then read
-    // as a concrete mismatch against the expected type.
+    // annotation) is effectively unbound — default it to its declared
+    // `@template T = Default`, then its bound, then `mixed`, the same
+    // fallback `infer_template_bindings` uses, so a bare ancestor placeholder
+    // doesn't leak through unresolved and then read as a concrete mismatch
+    // against the expected type.
     let own_bindings: FxHashMap<Name, Type> = own_tps
         .iter()
         .enumerate()
         .map(|(i, tp)| {
-            let ty = child_own_args
-                .get(i)
-                .cloned()
-                .unwrap_or_else(|| tp.bound.as_deref().cloned().unwrap_or_else(Type::mixed));
+            let ty = child_own_args.get(i).cloned().unwrap_or_else(|| {
+                tp.default
+                    .as_deref()
+                    .or(tp.bound.as_deref())
+                    .cloned()
+                    .unwrap_or_else(Type::mixed)
+            });
             (Name::from(tp.name.as_ref()), ty)
         })
         .collect();

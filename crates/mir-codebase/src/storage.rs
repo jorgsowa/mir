@@ -190,6 +190,15 @@ pub struct TemplateParam {
         deserialize_with = "deserialize_template_bound"
     )]
     pub bound: Option<Arc<Type>>,
+    /// Default type used when nothing binds this template param, e.g.
+    /// `@template T = string`. Falls back to `mixed` when absent, same as
+    /// before this field existed.
+    #[serde(
+        default,
+        serialize_with = "serialize_template_bound",
+        deserialize_with = "deserialize_template_bound"
+    )]
+    pub default: Option<Arc<Type>>,
     /// The entity (class or function FQN) that declared this template param.
     pub defining_entity: Name,
     pub variance: mir_types::Variance,

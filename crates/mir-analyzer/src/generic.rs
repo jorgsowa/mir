@@ -26,12 +26,16 @@ pub fn infer_template_bindings(
     let (mut bindings, unchecked) =
         infer_arg_template_bindings(db, template_params, params, arg_types, arg_names);
 
-    // For any template not bound through arguments, fall back to its bound
-    // (or mixed if no bound is declared).
+    // For any template not bound through arguments, fall back to its declared
+    // default (`@template T = Default`), then its bound, then mixed.
     for tp in template_params {
-        bindings
-            .entry(Name::from(tp.name.as_ref()))
-            .or_insert_with(|| tp.bound.as_deref().cloned().unwrap_or_else(Type::mixed));
+        bindings.entry(Name::from(tp.name.as_ref())).or_insert_with(|| {
+            tp.default
+                .as_deref()
+                .or(tp.bound.as_deref())
+                .cloned()
+                .unwrap_or_else(Type::mixed)
+        });
     }
 
     (bindings, unchecked)

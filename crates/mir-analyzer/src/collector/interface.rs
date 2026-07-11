@@ -35,17 +35,28 @@ impl<'a> DefinitionCollector<'a> {
         let iface_template_names: std::collections::HashSet<String> = iface_doc
             .templates
             .iter()
-            .map(|(n, _, _)| n.to_string())
+            .map(|(n, _, _, _)| n.to_string())
             .collect();
         let template_params: Vec<TemplateParam> = iface_doc
             .templates
             .iter()
-            .map(|(name, bound, variance)| TemplateParam {
+            .map(|(name, bound, variance, default)| TemplateParam {
                 name: name.as_str().into(),
                 bound: wrap_template_bound(bound.clone().map(|b| {
                     Self::fill_self_static_parent(
                         self.resolve_union_doc_with_templates(
                             b,
+                            &iface_template_names,
+                            fqcn.as_str(),
+                            &[],
+                        ),
+                        fqcn.as_str(),
+                    )
+                })),
+                default: wrap_template_bound(default.clone().map(|d| {
+                    Self::fill_self_static_parent(
+                        self.resolve_union_doc_with_templates(
+                            d,
                             &iface_template_names,
                             fqcn.as_str(),
                             &[],

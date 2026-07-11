@@ -102,7 +102,7 @@ impl DocblockParser {
                     result.deprecated = Some(body_text(&tag.body).unwrap_or_default().to_string());
                 }
                 "template" | "psalm-template" | "phpstan-template" => {
-                    if let Some((name, bound)) =
+                    if let Some((name, bound, default)) =
                         parse_template_line(tag.name.as_str(), body_text(&tag.body))
                     {
                         if let Some(msg) = validate_type_str(&name, "template") {
@@ -117,13 +117,14 @@ impl DocblockParser {
                             name,
                             bound.map(|b| parse_type_string(&b)),
                             Variance::Invariant,
+                            default.map(|d| parse_type_string(&d)),
                         ));
                     }
                 }
                 "template-covariant"
                 | "psalm-template-covariant"
                 | "phpstan-template-covariant" => {
-                    if let Some((name, bound)) =
+                    if let Some((name, bound, default)) =
                         parse_template_line(tag.name.as_str(), body_text(&tag.body))
                     {
                         if let Some(msg) = validate_type_str(&name, "template-covariant") {
@@ -138,13 +139,14 @@ impl DocblockParser {
                             name,
                             bound.map(|b| parse_type_string(&b)),
                             Variance::Covariant,
+                            default.map(|d| parse_type_string(&d)),
                         ));
                     }
                 }
                 "template-contravariant"
                 | "psalm-template-contravariant"
                 | "phpstan-template-contravariant" => {
-                    if let Some((name, bound)) =
+                    if let Some((name, bound, default)) =
                         parse_template_line(tag.name.as_str(), body_text(&tag.body))
                     {
                         if let Some(msg) = validate_type_str(&name, "template-contravariant") {
@@ -159,6 +161,7 @@ impl DocblockParser {
                             name,
                             bound.map(|b| parse_type_string(&b)),
                             Variance::Contravariant,
+                            default.map(|d| parse_type_string(&d)),
                         ));
                     }
                 }
@@ -511,7 +514,8 @@ pub struct ParsedDocblock {
     /// Optional variable name from `@var Type $name`
     pub var_name: Option<String>,
     /// `@template T` / `@template T of Bound` / `@template-covariant T` / `@template-contravariant T`
-    pub templates: Vec<(String, Option<Type>, Variance)>,
+    /// The last element is the optional `@template T = Default` default type.
+    pub templates: Vec<(String, Option<Type>, Variance, Option<Type>)>,
     /// `@extends ClassName<T>` — a class has at most one entry (its single
     /// parent); an interface may have several, one per base interface named
     /// in its native `extends A, B` clause.
