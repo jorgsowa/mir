@@ -171,7 +171,7 @@ impl SuppressionMap {
     /// the target.
     pub fn unused_named(
         &self,
-        all_issues: &[mir_issues::Issue],
+        all_issues: &[&mir_issues::Issue],
         pre_suppressed: &[&mir_issues::Issue],
     ) -> Vec<(u32, String)> {
         self.named_suppressions
@@ -183,7 +183,7 @@ impl SuppressionMap {
                 // Normal case: SuppressionMap-suppressed issue at the exact target line.
                 let at_target = all_issues
                     .iter()
-                    .any(|issue| issue.location.line == *target_line && kind_matches(&issue));
+                    .any(|issue| issue.location.line == *target_line && kind_matches(issue));
                 if at_target {
                     return false; // suppression IS used
                 }
@@ -204,19 +204,6 @@ impl SuppressionMap {
             .collect()
     }
 
-    /// Like `unused_named` but takes a slice of `Issue` references.
-    pub fn unused_named_ref(&self, issues: &[&mir_issues::Issue]) -> Vec<(u32, String)> {
-        self.named_suppressions
-            .iter()
-            .filter(|(line, kind)| {
-                !issues.iter().any(|issue| {
-                    issue.location.line == *line
-                        && (issue.kind.name() == kind || issue.kind.code() == kind)
-                })
-            })
-            .cloned()
-            .collect()
-    }
 }
 
 fn insert_line(lines: &mut FxHashMap<u32, KindSet>, line: u32, kinds: KindSet) {

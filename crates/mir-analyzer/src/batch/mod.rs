@@ -221,28 +221,39 @@ impl AnalysisSession {
             .iter()
             .filter_map(|(f, m)| m.as_ref().map(|_| f.clone()))
             .collect();
+        // Bucket issue refs by file once — a per-file scan of the global
+        // issue list would be O(files × issues), with clones on top.
+        let mut issues_by_file: HashMap<&str, Vec<&Issue>> = HashMap::default();
+        for issue in issues.iter() {
+            issues_by_file
+                .entry(issue.location.file.as_ref())
+                .or_default()
+                .push(issue);
+        }
         let mut new_issues: Vec<Issue> = Vec::new();
         for file in files {
             if let Some(Some(map)) = cache.get(&file) {
                 if map.named_suppressions.is_empty() {
                     continue;
                 }
-                let file_issues: Vec<Issue> = issues
-                    .iter()
-                    .filter(|i| i.location.file == file)
-                    .cloned()
-                    .collect();
+                let file_issues: &[&Issue] = issues_by_file
+                    .get(file.as_ref())
+                    .map(Vec::as_slice)
+                    .unwrap_or(&[]);
                 // Pre-suppressed issues arrived with suppressed=true from the
                 // IssueBuffer mechanism (collector / body analysis). They may be
                 // at a different line than the SuppressionMap target and need
                 // special handling in unused_named.
-                let pre_suppressed: Vec<&Issue> =
-                    file_issues.iter().filter(|i| i.suppressed).collect();
+                let pre_suppressed: Vec<&Issue> = file_issues
+                    .iter()
+                    .filter(|i| i.suppressed)
+                    .copied()
+                    .collect();
                 // Issues newly suppressed by the SuppressionMap in this pass
                 // arrived with suppressed=false; after the marking loop they
                 // also have suppressed=true. Pass all file issues for exact-line
                 // matching; pre_suppressed enables the docblock-range fallback.
-                let unused = map.unused_named(&file_issues, &pre_suppressed);
+                let unused = map.unused_named(file_issues, &pre_suppressed);
                 for (line, kind) in unused {
                     let loc = mir_types::Location::new(file.clone(), line, line, 0, 0);
                     let mut issue = Issue::new(mir_issues::IssueKind::UnusedSuppress { kind }, loc);
@@ -381,13 +392,9 @@ fn emit_unused_suppressions(
     suppressions: &crate::suppression::SuppressionMap,
     file: &std::sync::Arc<str>,
 ) {
-    let pre_suppressed_cloned: Vec<Issue> = all_issues
-        .iter()
-        .filter(|i| i.suppressed)
-        .cloned()
-        .collect();
-    let pre_suppressed: Vec<&Issue> = pre_suppressed_cloned.iter().collect();
-    let unused = suppressions.unused_named(all_issues, &pre_suppressed);
+    let all_refs: Vec<&Issue> = all_issues.iter().collect();
+    let pre_suppressed: Vec<&Issue> = all_refs.iter().filter(|i| i.suppressed).copied().collect();
+    let unused = suppressions.unused_named(&all_refs, &pre_suppressed);
     for (line, kind) in unused {
         let loc = mir_types::Location::new(file.clone(), line, line, 0, 0);
         let mut issue = Issue::new(mir_issues::IssueKind::UnusedSuppress { kind }, loc);
