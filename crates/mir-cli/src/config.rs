@@ -330,16 +330,6 @@ impl Baseline {
         false
     }
 
-    /// Return true if the (file, issue_kind) pair exists in the baseline
-    /// regardless of snippet.  Used as a fallback when no snippet is available.
-    #[allow(dead_code)]
-    pub fn contains_kind(&self, file: &str, issue_kind: &str) -> bool {
-        self.entries
-            .get(file)
-            .and_then(|m| m.get(issue_kind))
-            .is_some_and(|v| !v.is_empty())
-    }
-
     /// Serialize this baseline to a Psalm-compatible XML file.
     pub fn write(&self, path: &std::path::Path) -> Result<(), ConfigError> {
         let mut out = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<files>\n");
