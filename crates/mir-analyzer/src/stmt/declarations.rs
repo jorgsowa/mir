@@ -161,6 +161,7 @@ impl<'a> StatementsAnalyzer<'a> {
             if !ctx.is_class_guarded(parent_resolved.as_str()) {
                 self.check_name_undefined_class(parent);
             }
+            self.record_class_like_ref(&parent_resolved, parent.span);
         }
         for iface in decl.implements.iter() {
             let iface_str = crate::parser::name_to_string_owned(iface);
@@ -168,6 +169,7 @@ impl<'a> StatementsAnalyzer<'a> {
             if !ctx.is_class_guarded(iface_resolved.as_str()) {
                 self.check_name_undefined_class(iface);
             }
+            self.record_class_like_ref(&iface_resolved, iface.span);
         }
         for member in decl.body.members.iter() {
             if let ClassMemberKind::TraitUse(tu) = &member.kind {
@@ -177,6 +179,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     if !ctx.is_class_guarded(trait_resolved.as_str()) {
                         self.check_name_undefined_trait(trait_name);
                     }
+                    self.record_class_like_ref(&trait_resolved, trait_name.span);
                 }
             }
         }

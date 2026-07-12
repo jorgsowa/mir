@@ -884,3 +884,78 @@ fn arrow_function_param_type_hint_records_class_reference() {
         "arrow function param type hint Formatter should record a reference to Formatter"
     );
 }
+
+#[test]
+fn anonymous_class_extends_records_class_reference() {
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "anon_extends.php",
+        "<?php\nclass Base {}\nfunction make(): object { return new class extends Base {}; }\n",
+    );
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let locs: Vec<_> = analyzer
+        .reference_locations("cls:Base")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert!(
+        !locs.is_empty(),
+        "anonymous class `extends Base` should record a reference to Base"
+    );
+}
+
+#[test]
+fn anonymous_class_implements_records_class_reference() {
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "anon_implements.php",
+        "<?php\ninterface Greets {}\nfunction make(): object { return new class implements Greets {}; }\n",
+    );
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let locs: Vec<_> = analyzer
+        .reference_locations("cls:Greets")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert!(
+        !locs.is_empty(),
+        "anonymous class `implements Greets` should record a reference to Greets"
+    );
+}
+
+#[test]
+fn anonymous_class_use_trait_records_class_reference() {
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "anon_use_trait.php",
+        "<?php\ntrait Helper {}\nfunction make(): object { return new class { use Helper; }; }\n",
+    );
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let locs: Vec<_> = analyzer
+        .reference_locations("cls:Helper")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert!(
+        !locs.is_empty(),
+        "anonymous class `use Helper;` should record a reference to Helper"
+    );
+}

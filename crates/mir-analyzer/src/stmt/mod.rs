@@ -572,6 +572,28 @@ impl<'a> StatementsAnalyzer<'a> {
         ));
     }
 
+    /// Record `resolved` as referenced, if it names a real class/interface/
+    /// trait/enum. Used for an anonymous class's `extends`/`implements`/
+    /// `use` targets, which — unlike a top-level class (checked via
+    /// `check_name_class`/`check_trait_constraints`, both of which record
+    /// refs) — are never collected into the codebase, so nothing else ever
+    /// marks these names as used. Without this, a class/trait reachable only
+    /// through an anonymous class's clause is falsely treated as unreferenced.
+    pub(crate) fn record_class_like_ref(&mut self, resolved: &str, span: php_ast::Span) {
+        if self.mode != AnalysisMode::Full || !crate::db::class_exists(self.db, resolved) {
+            return;
+        }
+        let (line, col_start) = self.offset_to_line_col(span.start);
+        let (line_end, col_end) = self.offset_to_line_col(span.end);
+        self.db.record_reference_location(crate::db::RefLoc {
+            symbol_key: Arc::from(format!("cls:{resolved}")),
+            file: self.file.clone(),
+            line,
+            col_start,
+            col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
+        });
+    }
+
     /// Emit `UndefinedTrait` for a `use` clause's trait name if it does not
     /// resolve to a real trait. Used by anonymous (and nested named) class
     /// declarations, which — unlike a top-level class — are never collected
