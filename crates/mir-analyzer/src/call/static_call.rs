@@ -302,6 +302,18 @@ impl CallAnalyzer {
             // If we can't determine the closure type from the first arg, fall through to stub resolution
         }
 
+        // Closure::fromCallable('helper') / Closure::fromCallable('Foo::bar'):
+        // a bare string callable argument is a real runtime reference, same as
+        // call_user_func('name') — record it, or a function/method reachable
+        // only this way is falsely flagged dead code.
+        if fqcn_arc.as_ref() == "Closure" && method_name_lower == "fromcallable" {
+            if let (Some(callback_ty), Some(&callback_span)) =
+                (arg_types.first(), arg_spans.first())
+            {
+                super::callable::record_callable_string_ref(ea, callback_ty, callback_span);
+            }
+        }
+
         let resolved = resolve_method_from_db(ea, &fqcn_arc, &method_name_lower);
 
         if let Some(resolved) = resolved {
