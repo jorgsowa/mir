@@ -418,6 +418,7 @@ impl CallAnalyzer {
             "is_a" | "is_subclass_of" => Some(1),
             "method_exists" => Some(0),
             "class_alias" => Some(0),
+            "class_implements" | "class_parents" | "class_uses" | "get_class_methods" => Some(0),
             _ => None,
         };
         if let Some(idx) = class_name_arg_index {
