@@ -54,11 +54,19 @@ pub fn resolve_name(db: &dyn MirDatabase, file: &str, name: &str) -> String {
     }
 
     if name.contains('\\') {
-        if let Some(imports) = (!name.starts_with('\\')).then(|| db.file_imports(file)) {
-            if let Some((first, rest)) = name.split_once('\\') {
-                if let Some(base) = imports.get(&Name::new(first)) {
-                    return format!("{}\\{rest}", base.as_str());
-                }
+        if let Some((first, rest)) = name.split_once('\\') {
+            let imports = db.file_imports(file);
+            if let Some(base) = imports.get(&Name::new(first)) {
+                return format!("{}\\{rest}", base.as_str());
+            }
+            // Case-insensitive fallback: PHP resolves the leading segment of a
+            // qualified name against `use` imports case-insensitively, same as
+            // unqualified names below.
+            if let Some((_, base)) = imports
+                .iter()
+                .find(|(alias, _)| alias.as_str().eq_ignore_ascii_case(first))
+            {
+                return format!("{}\\{rest}", base.as_str());
             }
         }
         // If the name is already a known FQCN (e.g. stored in TNamedObject by a prior
