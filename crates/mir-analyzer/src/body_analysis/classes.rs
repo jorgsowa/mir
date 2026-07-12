@@ -1,5 +1,19 @@
 use super::*;
 
+/// Recursively collects every `TNamedObject` FQCN in `ty`, including ones
+/// nested inside its own type-argument list (e.g. `Box<Wrapper<Foo>>` yields
+/// `Box`, `Wrapper`, and `Foo`).
+fn collect_named_object_fqcns(ty: &mir_types::Type, out: &mut Vec<mir_types::Name>) {
+    for atomic in &ty.types {
+        if let mir_types::Atomic::TNamedObject { fqcn, type_params } = atomic {
+            out.push(fqcn.clone());
+            for tp in type_params.iter() {
+                collect_named_object_fqcns(tp, out);
+            }
+        }
+    }
+}
+
 impl<'a> BodyAnalyzer<'a> {
     #[allow(clippy::too_many_arguments)]
     /// Property-member checks shared by the class and trait paths: type-hint
@@ -251,27 +265,10 @@ impl<'a> BodyAnalyzer<'a> {
             col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
         };
 
-        let check_class_name = |cls_fqcn: &str, all_issues: &mut Vec<Issue>| {
-            if crate::diagnostics::is_pseudo_type(cls_fqcn) {
-                return;
-            }
-            if !crate::db::class_exists(self.db, cls_fqcn) {
-                all_issues.push(mir_issues::Issue::new(
-                    mir_issues::IssueKind::UndefinedDocblockClass {
-                        name: cls_fqcn.to_string(),
-                    },
-                    location.clone(),
-                ));
-            } else {
-                self.db.record_reference_location(crate::db::RefLoc {
-                    symbol_key: Arc::from(format!("cls:{cls_fqcn}")),
-                    file: location.file.clone(),
-                    line: location.line,
-                    col_start: location.col_start,
-                    col_end: location.col_end,
-                });
-            }
-        };
+        let check_class_name =
+            |cls_fqcn: &str, all_issues: &mut Vec<Issue>| {
+                self.check_and_record_docblock_class_at(cls_fqcn, &location, all_issues)
+            };
 
         let type_class_names = |ty: &mir_types::Type| -> Vec<mir_types::Name> {
             ty.types
@@ -321,6 +318,115 @@ impl<'a> BodyAnalyzer<'a> {
                     check_class_name(cls_fqcn.as_ref(), all_issues);
                 }
             }
+        }
+    }
+
+    /// Shared `UndefinedDocblockClass`/`cls:` usage for a single docblock-only
+    /// class name: emit the issue if it doesn't resolve to a real class/
+    /// interface/trait/enum, otherwise record a reference at `location`.
+    fn check_and_record_docblock_class_at(
+        &self,
+        cls_fqcn: &str,
+        location: &mir_issues::Location,
+        all_issues: &mut Vec<Issue>,
+    ) {
+        if crate::diagnostics::is_pseudo_type(cls_fqcn) {
+            return;
+        }
+        if !crate::db::class_exists(self.db, cls_fqcn) {
+            all_issues.push(mir_issues::Issue::new(
+                mir_issues::IssueKind::UndefinedDocblockClass {
+                    name: cls_fqcn.to_string(),
+                },
+                location.clone(),
+            ));
+        } else {
+            self.db.record_reference_location(crate::db::RefLoc {
+                symbol_key: Arc::from(format!("cls:{cls_fqcn}")),
+                file: location.file.clone(),
+                line: location.line,
+                col_start: location.col_start,
+                col_end: location.col_end,
+            });
+        }
+    }
+
+    /// `UndefinedDocblockClass`/`cls:` usage for class names nested inside a
+    /// generic type-argument list — `@extends Base<Arg>`, `@implements
+    /// Iface<Arg>`, and a class's own `@template T of Bound` — none of which
+    /// are walked by the plain extends/implements existence checks (those
+    /// only look at the outer class/interface name itself, via
+    /// `extends_type_args`/`implements_type_args`/`TemplateParam::bound`,
+    /// which are already namespace/template-resolved at collection time —
+    /// see `resolve_union`/`resolve_union_doc_with_templates` — so no
+    /// qualification concern here, only the missing validation).
+    fn check_class_generic_type_args(
+        &self,
+        decl: &php_ast::owned::ClassDecl,
+        fqcn: &str,
+        file: &Arc<str>,
+        source: &str,
+        source_map: &php_rs_parser::source_map::SourceMap,
+        all_issues: &mut Vec<Issue>,
+    ) {
+        if self.mode != AnalysisMode::Full {
+            return;
+        }
+        let Some(doc_comment) = &decl.doc_comment else {
+            return;
+        };
+        let (line, col_start) =
+            crate::diagnostics::offset_to_line_col(source, doc_comment.span.start, source_map);
+        let (line_end, col_end) =
+            crate::diagnostics::offset_to_line_col(source, doc_comment.span.end, source_map);
+        let location = mir_issues::Location {
+            file: file.clone(),
+            line,
+            line_end,
+            col_start,
+            col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
+        };
+
+        let here = crate::db::Fqcn::from_str(self.db, fqcn);
+        let Some(crate::db::ClassLike::Class(class)) = crate::db::find_class_like(self.db, here)
+        else {
+            return;
+        };
+
+        // `extends_type_args`/`implements_type_args` are the concrete type
+        // arguments THIS class passes to its parent/interfaces — e.g. `class
+        // TypedList<T> implements Collection<T>` forwards its own template
+        // param `T` positionally. Collected via plain `resolve_union` (no
+        // template awareness — see the field docs), a forwarded template
+        // name stays a bare `TNamedObject` instead of becoming
+        // `TTemplateParam`, so it must be filtered out here or every generic
+        // class forwarding its own template param would misreport it as an
+        // undefined class.
+        let own_template_names: rustc_hash::FxHashSet<&str> = class
+            .template_params
+            .iter()
+            .map(|tp| tp.name.as_ref())
+            .collect();
+
+        let mut names = Vec::new();
+        for ty in class.extends_type_args.iter() {
+            collect_named_object_fqcns(ty, &mut names);
+        }
+        for (_iface, args) in class.implements_type_args.iter() {
+            for ty in args {
+                collect_named_object_fqcns(ty, &mut names);
+            }
+        }
+        for tp in class.template_params.iter() {
+            if let Some(bound) = tp.bound.as_deref() {
+                collect_named_object_fqcns(bound, &mut names);
+            }
+        }
+        for cls_fqcn in names {
+            if own_template_names.contains(cls_fqcn.as_ref()) {
+                continue;
+            }
+            self.check_and_record_docblock_class_at(cls_fqcn.as_ref(), &location, all_issues);
         }
     }
 
@@ -642,6 +748,7 @@ impl<'a> BodyAnalyzer<'a> {
         }
 
         self.check_class_docblock_magic_members(decl, fqcn, file, source, source_map, all_issues);
+        self.check_class_generic_type_args(decl, fqcn, file, source, source_map, all_issues);
 
         let scope_cx = MethodScopeCx {
             fqcn: Arc::from(fqcn),
@@ -742,6 +849,7 @@ impl<'a> BodyAnalyzer<'a> {
         }
 
         self.check_class_docblock_magic_members(decl, fqcn, file, source, source_map, all_issues);
+        self.check_class_generic_type_args(decl, fqcn, file, source, source_map, all_issues);
 
         let scope_cx = MethodScopeCx {
             fqcn: Arc::from(fqcn),
