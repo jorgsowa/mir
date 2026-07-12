@@ -115,7 +115,29 @@ impl<'a> ExpressionAnalyzer<'a> {
                     ctx.record_var_location(&var_name, line, col_start, line_end, col_end);
                     result_ty
                 } else {
-                    Type::single(Atomic::TString)
+                    // A non-variable target (`$this->log .= 'x'`, `$arr[$k] .= 'x'`)
+                    // must still be analyzed like the arithmetic compound ops below —
+                    // otherwise the target's own reference recording/existence checks
+                    // never run, and the concatenated type is never written back,
+                    // leaving the tracked type stale.
+                    let lhs_ty = self.analyze(&a.target, ctx);
+                    let result_ty = if let (Some(l), Some(r)) =
+                        (as_concat_str(&lhs_ty), as_concat_str(&rhs_ty))
+                    {
+                        let combined = format!("{l}{r}");
+                        if combined.len() <= 1000 {
+                            Type::single(Atomic::TLiteralString(combined.into()))
+                        } else {
+                            Type::single(Atomic::TNonEmptyString)
+                        }
+                    } else if is_non_empty_when_concat(&lhs_ty) || is_non_empty_when_concat(&rhs_ty)
+                    {
+                        Type::single(Atomic::TNonEmptyString)
+                    } else {
+                        Type::single(Atomic::TString)
+                    };
+                    self.assign_to_target(&a.target, result_ty.clone(), ctx, expr_span);
+                    result_ty
                 }
             }
             AssignOp::Plus
