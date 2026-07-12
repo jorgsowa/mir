@@ -5,6 +5,19 @@ use mir_types::{
 };
 use rustc_hash::FxHashMap;
 
+/// Look up `alias` in `use_aliases`, falling back to a case-insensitive scan
+/// if the exact-case lookup misses. PHP resolves `use` imports
+/// case-insensitively; the exact-case hit above covers the common path, the
+/// scan is a last resort for a differently-cased reference.
+fn find_alias<'a>(alias: &str, use_aliases: &'a FxHashMap<String, String>) -> Option<&'a String> {
+    use_aliases.get(alias).or_else(|| {
+        use_aliases
+            .iter()
+            .find(|(a, _)| a.eq_ignore_ascii_case(alias))
+            .map(|(_, fqcn)| fqcn)
+    })
+}
+
 pub(super) fn resolve_name(
     name: &str,
     namespace: &Option<String>,
@@ -14,7 +27,7 @@ pub(super) fn resolve_name(
         return name.trim_start_matches('\\').to_string();
     }
     let first_part = name.split('\\').next().unwrap_or(name);
-    if let Some(resolved) = use_aliases.get(first_part) {
+    if let Some(resolved) = find_alias(first_part, use_aliases) {
         if name.contains('\\') {
             let rest = &name[first_part.len()..];
             return format!("{resolved}{rest}");
@@ -30,7 +43,7 @@ pub(super) fn resolve_name(
 pub(super) fn resolve_alias_only(name: &str, use_aliases: &FxHashMap<String, String>) -> String {
     let name = name.trim_start_matches('\\');
     let first_part = name.split('\\').next().unwrap_or(name);
-    if let Some(resolved) = use_aliases.get(first_part) {
+    if let Some(resolved) = find_alias(first_part, use_aliases) {
         if name.contains('\\') {
             let rest = &name[first_part.len()..];
             return format!("{resolved}{rest}");
@@ -53,7 +66,7 @@ pub(super) fn resolve_type_name(
     }
     let stripped = name.trim_start_matches('\\');
     let first_part = stripped.split('\\').next().unwrap_or(stripped);
-    if use_aliases.contains_key(first_part) {
+    if find_alias(first_part, use_aliases).is_some() {
         return resolve_alias_only(stripped, use_aliases).as_str().into();
     }
     if stripped.contains('\\') {
@@ -294,4 +307,47 @@ pub(super) fn resolve_union_opt(
     use_aliases: &FxHashMap<String, String>,
 ) -> Option<Type> {
     opt.map(|u| resolve_union(u, namespace, use_aliases))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn aliases(pairs: &[(&str, &str)]) -> FxHashMap<String, String> {
+        pairs
+            .iter()
+            .map(|(a, b)| (a.to_string(), b.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn resolve_name_matches_qualified_alias_case_insensitively() {
+        let use_aliases = aliases(&[("Deep", "MyApp\\Deep")]);
+        let ns = Some("Client".to_string());
+        assert_eq!(
+            resolve_name("deep\\Service", &ns, &use_aliases),
+            "MyApp\\Deep\\Service",
+            "a differently-cased qualified reference must still resolve via the import"
+        );
+    }
+
+    #[test]
+    fn resolve_name_matches_unqualified_alias_case_insensitively() {
+        let use_aliases = aliases(&[("Service", "MyApp\\Deep\\Service")]);
+        let ns = Some("Client".to_string());
+        assert_eq!(
+            resolve_name("service", &ns, &use_aliases),
+            "MyApp\\Deep\\Service"
+        );
+    }
+
+    #[test]
+    fn resolve_type_name_matches_qualified_alias_case_insensitively() {
+        let use_aliases = aliases(&[("Deep", "MyApp\\Deep")]);
+        let ns = Some("Client".to_string());
+        assert_eq!(
+            resolve_type_name("deep\\Service", true, &ns, &use_aliases).as_str(),
+            "MyApp\\Deep\\Service"
+        );
+    }
 }
