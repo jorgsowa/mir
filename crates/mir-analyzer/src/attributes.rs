@@ -18,8 +18,8 @@ use std::sync::Arc;
 
 use mir_issues::{Issue, IssueKind, Location};
 use php_ast::owned::{
-    Attribute, ClassDecl, ClassMemberKind, EnumDecl, EnumMemberKind, FunctionDecl, InterfaceDecl,
-    TraitDecl,
+    Attribute, ClassDecl, ClassMemberKind, EnumDecl, EnumMemberKind, Expr, ExprKind, FunctionDecl,
+    InterfaceDecl, TraitDecl,
 };
 use php_rs_parser::source_map::SourceMap;
 
@@ -68,6 +68,83 @@ fn invalid_attr(message: impl Into<String>, loc: Location) -> Issue {
         },
         loc,
     )
+}
+
+// ---------------------------------------------------------------------------
+// Class references inside attribute constructor arguments
+// ---------------------------------------------------------------------------
+
+/// Recursively walk a constant-expression tree (the only kind of expression
+/// PHP allows inside an attribute argument) recording a usage reference for
+/// every class name reached via `Foo::class`, `Foo::CONST`, or an enum case
+/// `Foo::Case` — all three share the same `ClassConstAccess` AST shape.
+/// `self`/`static`/`parent` are skipped: attribute arguments have no
+/// surrounding method scope to resolve them against.
+fn record_class_refs_in_expr(
+    expr: &Expr,
+    db: &dyn MirDatabase,
+    file: &Arc<str>,
+    source: &str,
+    source_map: &SourceMap,
+) {
+    let record = |name: &str, span: php_ast::Span| {
+        let resolved = resolve_name(db, file.as_ref(), name);
+        if matches!(resolved.as_str(), "self" | "static" | "parent") {
+            return;
+        }
+        let (line, col_start) = offset_to_line_col(source, span.start, source_map);
+        let (line_end, col_end) = offset_to_line_col(source, span.end, source_map);
+        db.record_reference_location(crate::db::RefLoc {
+            symbol_key: Arc::from(format!("cls:{resolved}")),
+            file: file.clone(),
+            line,
+            col_start,
+            col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
+        });
+    };
+
+    match &expr.kind {
+        ExprKind::ClassConstAccess(cca) => {
+            if let ExprKind::Identifier(id) = &cca.class.kind {
+                record(id.as_ref(), cca.class.span);
+            } else {
+                record_class_refs_in_expr(&cca.class, db, file, source, source_map);
+            }
+        }
+        ExprKind::New(n) => {
+            if let ExprKind::Identifier(id) = &n.class.kind {
+                record(id.as_ref(), n.class.span);
+            } else {
+                record_class_refs_in_expr(&n.class, db, file, source, source_map);
+            }
+            for arg in n.args.iter() {
+                record_class_refs_in_expr(&arg.value, db, file, source, source_map);
+            }
+        }
+        ExprKind::Array(elements) => {
+            for el in elements.iter() {
+                if let Some(key) = &el.key {
+                    record_class_refs_in_expr(key, db, file, source, source_map);
+                }
+                record_class_refs_in_expr(&el.value, db, file, source, source_map);
+            }
+        }
+        ExprKind::Binary(b) => {
+            record_class_refs_in_expr(&b.left, db, file, source, source_map);
+            record_class_refs_in_expr(&b.right, db, file, source, source_map);
+        }
+        ExprKind::Ternary(t) => {
+            record_class_refs_in_expr(&t.condition, db, file, source, source_map);
+            if let Some(then_expr) = &t.then_expr {
+                record_class_refs_in_expr(then_expr, db, file, source, source_map);
+            }
+            record_class_refs_in_expr(&t.else_expr, db, file, source, source_map);
+        }
+        ExprKind::UnaryPrefix(u) => {
+            record_class_refs_in_expr(&u.operand, db, file, source, source_map);
+        }
+        _ => {}
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -554,6 +631,16 @@ fn check_attribute_list(
 
         let fqcn = resolve_attr_name(db, file.as_ref(), attr);
         let loc = span_to_location(file, source, source_map, attr.span.start, attr.span.end);
+
+        // A class named only inside an attribute constructor argument (e.g.
+        // `#[Route(Target::class)]`) is a real reference to that class — record it,
+        // or a class reachable only through an attribute argument is falsely
+        // flagged UnusedClass.
+        if record_refs {
+            for arg in attr.args.iter() {
+                record_class_refs_in_expr(&arg.value, db, file, source, source_map);
+            }
+        }
 
         let class_like = find_class_like(db, Fqcn::from_str(db, &fqcn));
         match class_like {
