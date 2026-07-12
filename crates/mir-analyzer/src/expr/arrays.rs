@@ -194,6 +194,23 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
 
         if can_be_keyed {
+            // `[$obj, 'method']` / `['ClassName', 'method']`: PHP's array-callable
+            // shape. Record the method as referenced here, at the literal itself,
+            // regardless of how the array is later used (call_user_func(...),
+            // Closure::fromCallable(...), or invoked directly) — otherwise a
+            // private method reachable only this way is falsely flagged unused.
+            if is_list && elements.len() == 2 {
+                if let ExprKind::String(method_name) = &elements[1].value.kind {
+                    if let Some(receiver_ty) = keyed_props.get(&ArrayKey::Int(0)).map(|p| &p.ty) {
+                        self.record_array_callable_method_ref(
+                            &elements[0].value,
+                            receiver_ty,
+                            method_name,
+                            elements[1].value.span,
+                        );
+                    }
+                }
+            }
             return Type::single(Atomic::TKeyedArray {
                 properties: Box::new(keyed_props),
                 is_open: false,
@@ -243,6 +260,46 @@ impl<'a> ExpressionAnalyzer<'a> {
             key: Box::new(key_union),
             value: Box::new(all_value_types),
         })
+    }
+
+    /// Resolve and record a method reference for the `[receiver, 'method']`
+    /// array-callable shape. `receiver_expr`/`receiver_ty` are the array's
+    /// first element (already analyzed by the caller); `method_name` is the
+    /// literal string of the second. No-op if the receiver isn't a resolvable
+    /// object type or class-string literal, or the method doesn't exist.
+    fn record_array_callable_method_ref(
+        &mut self,
+        receiver_expr: &Expr,
+        receiver_ty: &Type,
+        method_name: &str,
+        method_span: php_ast::Span,
+    ) {
+        let fqcn: Option<Arc<str>> = if let ExprKind::String(class_name) = &receiver_expr.kind {
+            Some(Arc::from(
+                crate::db::resolve_name(self.db, self.file.as_ref(), class_name.as_ref())
+                    .as_str(),
+            ))
+        } else {
+            // An object-typed receiver's `TNamedObject` fqcn is already the
+            // canonical resolved name (set at inference time), unlike a raw
+            // source-text class-string literal — no `resolve_name` needed.
+            receiver_ty
+                .remove_null()
+                .types
+                .iter()
+                .find_map(|a| a.named_object_fqcn())
+                .map(Arc::from)
+        };
+        let Some(fqcn) = fqcn else { return };
+        let method_name_lower = crate::util::php_ident_lowercase(method_name);
+        if let Some(resolved) =
+            crate::call::method::resolve_method_from_db(self, &fqcn, &method_name_lower)
+        {
+            self.record_ref(
+                Arc::from(format!("meth:{}::{}", resolved.owner_fqcn, method_name_lower)),
+                method_span,
+            );
+        }
     }
 
     pub(super) fn analyze_array_access(
