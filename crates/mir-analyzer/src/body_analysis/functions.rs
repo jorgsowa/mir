@@ -19,6 +19,7 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
             all_issues,
             self.mode == AnalysisMode::Full,
+            Some(&mut *all_symbols),
         );
         let fn_name = decl.name.as_deref().unwrap_or("").to_string();
         for param in decl.params.iter() {

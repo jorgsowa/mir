@@ -760,6 +760,7 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
             all_issues,
             self.mode == AnalysisMode::Full,
+            Some(&mut *all_symbols),
         );
 
         let class_name_owned = decl

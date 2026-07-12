@@ -19,6 +19,7 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
             all_issues,
             self.mode == AnalysisMode::Full,
+            Some(&mut *all_symbols),
         );
 
         let resolved = resolve_name(self.db, file.as_ref(), decl.name.as_deref().unwrap_or(""));
@@ -207,6 +208,7 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
             all_issues,
             self.mode == AnalysisMode::Full,
+            Some(&mut *all_symbols),
         );
 
         for iface in decl.implements.iter() {
@@ -284,6 +286,7 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
             all_issues,
             self.mode == AnalysisMode::Full,
+            Some(&mut *all_symbols),
         );
 
         // Single pass: same analysis as the untyped path, additionally
@@ -361,6 +364,7 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
             all_issues,
             self.mode == AnalysisMode::Full,
+            None,
         );
         let iface_name = decl.name.as_deref().unwrap_or("<anonymous>");
         let iface_fqcn = resolve_name(self.db, file.as_ref(), iface_name);

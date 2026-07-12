@@ -183,6 +183,7 @@ fn resolve_attr_name(db: &dyn MirDatabase, file: &str, attr: &Attribute) -> Stri
 // ---------------------------------------------------------------------------
 
 /// Check that `#[Attribute]` (the PHP built-in) is not placed on a function or its parameters.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn check_function_attributes(
     decl: &FunctionDecl,
     db: &dyn MirDatabase,
@@ -191,6 +192,7 @@ pub(crate) fn check_function_attributes(
     source_map: &SourceMap,
     issues: &mut Vec<Issue>,
     record_refs: bool,
+    mut all_symbols: Option<&mut Vec<crate::symbol::ResolvedSymbol>>,
 ) {
     for attr in decl.attributes.iter() {
         if !is_attribute_class_annotation(attr) {
@@ -211,6 +213,7 @@ pub(crate) fn check_function_attributes(
         source_map,
         issues,
         record_refs,
+        all_symbols.as_deref_mut(),
     );
     for param in decl.params.iter() {
         // `#[Attribute]` on a function parameter is invalid
@@ -233,6 +236,7 @@ pub(crate) fn check_function_attributes(
             source_map,
             issues,
             record_refs,
+            all_symbols.as_deref_mut(),
         );
     }
 }
@@ -242,6 +246,7 @@ pub(crate) fn check_function_attributes(
 /// - `#[Attribute]` on abstract class → invalid
 /// - `#[Attribute]` class with private constructor → invalid
 /// - All `#[...]` attributes: validate against database if possible
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn check_class_attributes(
     decl: &ClassDecl,
     db: &dyn MirDatabase,
@@ -250,6 +255,7 @@ pub(crate) fn check_class_attributes(
     source_map: &SourceMap,
     issues: &mut Vec<Issue>,
     record_refs: bool,
+    mut all_symbols: Option<&mut Vec<crate::symbol::ResolvedSymbol>>,
 ) {
     // Check 1: `#[Attribute]` on abstract class
     if decl.modifiers.is_abstract {
@@ -298,6 +304,7 @@ pub(crate) fn check_class_attributes(
         source_map,
         issues,
         record_refs,
+        all_symbols.as_deref_mut(),
     );
 
     for member in decl.body.members.iter() {
@@ -312,6 +319,7 @@ pub(crate) fn check_class_attributes(
                     source_map,
                     issues,
                     record_refs,
+                    all_symbols.as_deref_mut(),
                 );
                 for param in method.params.iter() {
                     check_attribute_list(
@@ -323,6 +331,7 @@ pub(crate) fn check_class_attributes(
                         source_map,
                         issues,
                         record_refs,
+                        all_symbols.as_deref_mut(),
                     );
                     // `#[Attribute]` on a method parameter is invalid
                     for attr in param.attributes.iter() {
@@ -368,6 +377,7 @@ pub(crate) fn check_class_attributes(
                     source_map,
                     issues,
                     record_refs,
+                    all_symbols.as_deref_mut(),
                 );
                 // `#[Attribute]` on a property is invalid
                 for attr in prop.attributes.iter() {
@@ -396,6 +406,7 @@ pub(crate) fn check_class_attributes(
                     source_map,
                     issues,
                     record_refs,
+                    all_symbols.as_deref_mut(),
                 );
                 // `#[Attribute]` on a class constant is invalid
                 for attr in c.attributes.iter() {
@@ -420,6 +431,7 @@ pub(crate) fn check_class_attributes(
 }
 
 /// Check attribute placement on an interface (interfaces can't be attribute classes).
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn check_interface_attributes(
     decl: &InterfaceDecl,
     db: &dyn MirDatabase,
@@ -428,6 +440,7 @@ pub(crate) fn check_interface_attributes(
     source_map: &SourceMap,
     issues: &mut Vec<Issue>,
     record_refs: bool,
+    mut all_symbols: Option<&mut Vec<crate::symbol::ResolvedSymbol>>,
 ) {
     for attr in decl.attributes.iter() {
         if !is_attribute_class_annotation(attr) {
@@ -450,11 +463,13 @@ pub(crate) fn check_interface_attributes(
             source_map,
             issues,
             record_refs,
+            all_symbols.as_deref_mut(),
         );
     }
 }
 
 /// Check attribute placement on a trait (traits can't be attribute classes).
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn check_trait_attributes(
     decl: &TraitDecl,
     db: &dyn MirDatabase,
@@ -463,6 +478,7 @@ pub(crate) fn check_trait_attributes(
     source_map: &SourceMap,
     issues: &mut Vec<Issue>,
     record_refs: bool,
+    mut all_symbols: Option<&mut Vec<crate::symbol::ResolvedSymbol>>,
 ) {
     for attr in decl.attributes.iter() {
         if !is_attribute_class_annotation(attr) {
@@ -484,6 +500,7 @@ pub(crate) fn check_trait_attributes(
                     source_map,
                     issues,
                     record_refs,
+                    all_symbols.as_deref_mut(),
                 );
             }
             ClassMemberKind::Property(prop) => {
@@ -496,6 +513,7 @@ pub(crate) fn check_trait_attributes(
                     source_map,
                     issues,
                     record_refs,
+                    all_symbols.as_deref_mut(),
                 );
             }
             _ => {}
@@ -507,6 +525,7 @@ pub(crate) fn check_trait_attributes(
 /// Also validates attributes on enum methods and cases — `#[SomeAttr]` on a
 /// `case` is validated against `Attribute::TARGET_CLASS_CONSTANT`, matching
 /// how PHP itself treats enum cases as class-constant-like targets.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn check_enum_attributes(
     decl: &EnumDecl,
     db: &dyn MirDatabase,
@@ -515,6 +534,7 @@ pub(crate) fn check_enum_attributes(
     source_map: &SourceMap,
     issues: &mut Vec<Issue>,
     record_refs: bool,
+    mut all_symbols: Option<&mut Vec<crate::symbol::ResolvedSymbol>>,
 ) {
     for attr in decl.attributes.iter() {
         if !is_attribute_class_annotation(attr) {
@@ -532,6 +552,7 @@ pub(crate) fn check_enum_attributes(
         source_map,
         issues,
         record_refs,
+        all_symbols.as_deref_mut(),
     );
     for member in decl.body.members.iter() {
         match &member.kind {
@@ -545,6 +566,7 @@ pub(crate) fn check_enum_attributes(
                     source_map,
                     issues,
                     record_refs,
+                    all_symbols.as_deref_mut(),
                 );
             }
             EnumMemberKind::Case(case) => {
@@ -557,6 +579,7 @@ pub(crate) fn check_enum_attributes(
                     source_map,
                     issues,
                     record_refs,
+                    all_symbols.as_deref_mut(),
                 );
             }
             _ => {}
@@ -611,6 +634,7 @@ pub(crate) fn check_parent_in_class_attrs(
 /// 2. If found and has a target mask, checks that `target_flag` is set.
 /// 3. Checks for duplicate non-repeatable attributes.
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 fn check_attribute_list(
     attrs: &[Attribute],
     target_flag: i64,
@@ -620,6 +644,7 @@ fn check_attribute_list(
     source_map: &SourceMap,
     issues: &mut Vec<Issue>,
     record_refs: bool,
+    mut all_symbols: Option<&mut Vec<crate::symbol::ResolvedSymbol>>,
 ) {
     let mut seen_fqcns: Vec<(String, u32)> = Vec::new(); // (fqcn, span.start)
 
@@ -667,6 +692,22 @@ fn check_attribute_list(
                             line, line_end, col_start, col_end,
                         ),
                     });
+                    // Without this, hover/go-to-definition on the attribute class name
+                    // in `#[MyAttr]` resolved nothing, unlike every other class-name
+                    // position — the same gap already fixed for `Foo::class`.
+                    if let Some(symbols) = all_symbols.as_deref_mut() {
+                        symbols.push(crate::symbol::ResolvedSymbol {
+                            file: file.clone(),
+                            span: attr.span,
+                            expr_span: None,
+                            kind: crate::symbol::ReferenceKind::ClassReference(Arc::from(
+                                fqcn.as_str(),
+                            )),
+                            resolved_type: mir_types::Type::single(mir_types::Atomic::TClassString(
+                                None,
+                            )),
+                        });
+                    }
                 }
                 // Check for case mismatch between the written attribute name and canonical.
                 if let Some((used, canonical)) =

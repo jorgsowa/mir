@@ -1169,6 +1169,32 @@ fn symbol_at_method_param_type_hint_resolves_to_class_reference() {
     );
 }
 
+#[test]
+fn symbol_at_attribute_class_name_resolves_to_class_reference() {
+    // Hovering the attribute class name in `#[MyAttr]` must resolve, matching
+    // every other class-name position (the same gap already fixed for
+    // `Foo::class`). Class-decl attribute checking only runs on the batch
+    // (untyped) analysis path, so this uses AnalysisSession rather than the
+    // single-source analyze_source() helper (which drives the typed/pure path).
+    let dir = create_temp_dir("symbol_at_attribute_class_name_resolves_to_class_reference");
+    let src = "<?php\n#[Attribute]\nclass MyAttr {}\n#[MyAttr]\nclass Target {}\n";
+    let file = write_file(&dir, "a.php", src);
+    let file_str = path_to_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let offset = src.rfind("MyAttr").unwrap() as u32;
+    let sym = result
+        .symbol_at(file_str, offset)
+        .expect("symbol_at must find ClassReference on an attribute class name");
+    assert!(
+        matches!(&sym.kind, ReferenceKind::ClassReference(n) if n.as_ref() == "MyAttr"),
+        "expected ClassReference(MyAttr), got {:?}",
+        sym.kind
+    );
+}
+
 // ---------------------------------------------------------------------------
 // symbol_at — negated instanceof guard narrows receiver type (issue #6)
 // ---------------------------------------------------------------------------
