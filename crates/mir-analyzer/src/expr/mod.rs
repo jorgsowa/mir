@@ -467,10 +467,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let method_name = match &method.kind {
                     ExprKind::Identifier(name) => name.clone(),
                     _ => {
+                        self.analyze(method, ctx);
+                        // Method name isn't statically known — same coarse
+                        // exemption the ordinary `$obj->$name(...)` dynamic call
+                        // gets, or a private method reachable only via
+                        // `$obj->$name(...)` (first-class-callable form) is
+                        // falsely flagged unused.
+                        self.record_dynamic_member_access(&obj_ty, method.span);
                         return Type::single(Atomic::TCallable {
                             params: None,
                             return_type: None,
-                        })
+                        });
                     }
                 };
                 let method_name_lower = crate::util::php_ident_lowercase(method_name.as_ref());
@@ -539,10 +546,39 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let method_name = match &method.kind {
                     ExprKind::Identifier(name) => name.clone(),
                     _ => {
+                        // Method name isn't statically known — same coarse
+                        // exemption the ordinary `Foo::$name(...)` dynamic call
+                        // gets, or a private static method reachable only via
+                        // `Foo::$name(...)` (first-class-callable form) is
+                        // falsely flagged unused.
+                        if let ExprKind::Identifier(name) = &class.kind {
+                            let resolved =
+                                crate::db::resolve_name(self.db, self.file.as_ref(), name.as_ref());
+                            let fqcn = match crate::util::php_ident_lowercase(&resolved).as_str() {
+                                "self" => ctx.self_fqcn.as_deref().unwrap_or(&resolved).to_string(),
+                                "parent" => {
+                                    ctx.parent_fqcn.as_deref().unwrap_or(&resolved).to_string()
+                                }
+                                "static" => ctx
+                                    .static_fqcn
+                                    .as_deref()
+                                    .or(ctx.self_fqcn.as_deref())
+                                    .unwrap_or(&resolved)
+                                    .to_string(),
+                                _ => resolved,
+                            };
+                            if !matches!(fqcn.as_str(), "self" | "static" | "parent") {
+                                self.record_ref(Arc::from(format!("dyn:{fqcn}")), method.span);
+                            }
+                        } else {
+                            let class_ty = self.analyze(class, ctx);
+                            self.record_dynamic_member_access(&class_ty, method.span);
+                        }
+                        self.analyze(method, ctx);
                         return Type::single(Atomic::TCallable {
                             params: None,
                             return_type: None,
-                        })
+                        });
                     }
                 };
                 let method_name_lower = crate::util::php_ident_lowercase(method_name.as_ref());
