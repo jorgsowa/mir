@@ -1234,6 +1234,54 @@ fn catch_clause_records_class_reference_symbol() {
 }
 
 #[test]
+fn static_property_access_records_symbols() {
+    // `Foo::$bar` recorded the dead-code prop:/cls: references but never a
+    // ResolvedSymbol, so hover/go-to-definition silently did nothing on a
+    // static property access (unlike instance `$obj->prop`, which does).
+    use mir_analyzer::symbol::ReferenceKind;
+    use mir_analyzer::FileAnalyzer;
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_all_stubs();
+
+    let file: Arc<str> = Arc::from("static_prop.php");
+    let source: Arc<str> = Arc::from(
+        "<?php\n\
+         class Counter {\n\
+             public static $count = 0;\n\
+         }\n\
+         function bump(): void {\n\
+             Counter::$count = Counter::$count + 1;\n\
+         }\n",
+    );
+
+    session.ingest_file(file.clone(), source.clone());
+    let parsed = php_rs_parser::parse(&source);
+    let analysis = FileAnalyzer::new(&session).analyze(
+        file.clone(),
+        &source,
+        &parsed.program,
+        &parsed.source_map,
+    );
+
+    assert!(
+        analysis.symbols.iter().any(|s| matches!(
+            &s.kind,
+            ReferenceKind::ClassReference(name) if name.as_ref() == "Counter"
+        )),
+        "Counter::$count should record a ClassReference symbol for Counter"
+    );
+    assert!(
+        analysis.symbols.iter().any(|s| matches!(
+            &s.kind,
+            ReferenceKind::PropertyAccess { class, property }
+                if class.as_ref() == "Counter" && property.as_ref() == "count"
+        )),
+        "Counter::$count should record a PropertyAccess symbol for Counter::$count"
+    );
+}
+
+#[test]
 fn references_to_finds_extends_implements_and_trait_use() {
     // `extends`, `implements`, and trait `use` name a class/interface/trait
     // just as much as `new Foo()` does — references_to() must find those

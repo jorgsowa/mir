@@ -615,6 +615,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                     _ => None,
                 };
                 if let Some(fqcn) = fqcn_opt {
+                    self.record_symbol(
+                        spa.class.span,
+                        ReferenceKind::ClassReference(fqcn.clone()),
+                        Type::single(Atomic::TClassString(None)),
+                    );
                     if let Some(prop_name) = expr_name_str(&spa.member) {
                         let prop_name = prop_name.trim_start_matches('$');
                         self.record_ref(
@@ -631,6 +636,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 result_ty = p.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
                             }
                         }
+                        self.record_symbol(
+                            spa.member.span,
+                            ReferenceKind::PropertyAccess {
+                                class: fqcn,
+                                property: Arc::from(prop_name),
+                            },
+                            result_ty.clone(),
+                        );
                     }
                 }
             } else if !crate::db::class_exists(self.db, &resolved)
@@ -643,22 +656,28 @@ impl<'a> ExpressionAnalyzer<'a> {
                 );
             } else {
                 self.record_ref(Arc::from(format!("cls:{resolved}")), spa.class.span);
+                let resolved: Arc<str> = Arc::from(resolved.as_str());
+                self.record_symbol(
+                    spa.class.span,
+                    ReferenceKind::ClassReference(resolved.clone()),
+                    Type::single(Atomic::TClassString(None)),
+                );
                 if let Some(prop_name) = expr_name_str(&spa.member) {
                     self.record_ref(
                         Arc::from(format!("prop:{}::{}", resolved, prop_name)),
                         spa.member.span,
                     );
-                    if let Some(refined) = ctx.get_prop_refined(resolved.as_str(), prop_name) {
+                    if let Some(refined) = ctx.get_prop_refined(resolved.as_ref(), prop_name) {
                         result_ty = refined.clone();
                     } else {
                         // Check if the static property is deprecated
-                        let here = crate::db::Fqcn::from_str(self.db, resolved.as_str());
+                        let here = crate::db::Fqcn::from_str(self.db, resolved.as_ref());
                         if let Some(p) = crate::db::find_property_in_chain(self.db, here, prop_name)
                         {
                             if let Some(msg) = &p.1.deprecated {
                                 self.emit(
                                     IssueKind::DeprecatedProperty {
-                                        class: resolved.clone(),
+                                        class: resolved.to_string(),
                                         property: prop_name.to_string(),
                                         message: Some(msg.clone()).filter(|m| !m.is_empty()),
                                     },
@@ -669,6 +688,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                             result_ty = p.1.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
                         }
                     }
+                    self.record_symbol(
+                        spa.member.span,
+                        ReferenceKind::PropertyAccess {
+                            class: resolved,
+                            property: Arc::from(prop_name),
+                        },
+                        result_ty.clone(),
+                    );
                 }
             }
         }
