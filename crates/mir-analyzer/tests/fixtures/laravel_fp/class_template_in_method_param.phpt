@@ -24,3 +24,4 @@ class HasOneOrMany {
 
 class Model {}
 ===expect===
+UndefinedDocblockClass@11:20-11:34: Docblock type 'Illuminate\Database\Eloquent\Collection' does not exist

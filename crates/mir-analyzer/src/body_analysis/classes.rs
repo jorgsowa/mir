@@ -147,12 +147,7 @@ impl<'a> BodyAnalyzer<'a> {
     /// references substituted to `TTemplateParam` and `@psalm-type`/
     /// `@phpstan-type` aliases expanded by the collector, so any
     /// `TNamedObject` still present genuinely names a class — no need to
-    /// re-derive template/alias awareness here. `@param` docblock types are
-    /// NOT checked here for the same reason function.rs gives for re-parsing
-    /// them separately: unlike the return type, storage doesn't reliably
-    /// flag which param types came from a docblock, and reusing the
-    /// resolved type unconditionally would double-report a native-hint
-    /// class already caught by `check_and_record_type_hint_classes`.
+    /// re-derive template/alias awareness here.
     fn check_method_docblock_classes(
         &self,
         method: &php_ast::owned::MethodDecl,
@@ -169,58 +164,104 @@ impl<'a> BodyAnalyzer<'a> {
         if method_name.is_empty() {
             return;
         }
-        let (_, return_ty, _, _) = method_chain_signature(self.db, fqcn, method_name);
-        let Some(doc_ty) = return_ty.filter(|t| t.from_docblock) else {
-            return;
-        };
-        if !doc_ty
-            .types
-            .iter()
-            .any(|a| matches!(a, mir_types::Atomic::TNamedObject { .. }))
-        {
-            return;
+        let (params, return_ty, _, _) = method_chain_signature(self.db, fqcn, method_name);
+        if let Some(doc_ty) = return_ty.filter(|t| t.from_docblock) {
+            if doc_ty
+                .types
+                .iter()
+                .any(|a| matches!(a, mir_types::Atomic::TNamedObject { .. }))
+            {
+                let header_span = method_header_name_span(source, method);
+                let (line, col_start) =
+                    crate::diagnostics::offset_to_line_col(source, header_span.start, source_map);
+                let (line_end, col_end) =
+                    crate::diagnostics::offset_to_line_col(source, header_span.end, source_map);
+                let header_location = mir_issues::Location {
+                    file: file.clone(),
+                    line,
+                    line_end,
+                    col_start,
+                    col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
+                };
+                for atomic in &doc_ty.types {
+                    if let mir_types::Atomic::TNamedObject { fqcn: cls_fqcn, .. } = atomic {
+                        // `static<T, ...>` (a templated late-static-binding return) can
+                        // surface as a literal `TNamedObject("static")` rather than
+                        // `TStaticObject` — a method-only shape a free function's
+                        // return type can never produce, so this pseudo-name was
+                        // never filtered before. `self`/`parent` guarded the same way
+                        // for consistency, though only reachable via `@return` here.
+                        if matches!(
+                            crate::util::php_ident_lowercase(cls_fqcn.as_ref()).as_str(),
+                            "self" | "static" | "parent"
+                        ) {
+                            continue;
+                        }
+                        if !crate::db::class_exists(self.db, cls_fqcn.as_ref()) {
+                            all_issues.push(mir_issues::Issue::new(
+                                mir_issues::IssueKind::UndefinedDocblockClass {
+                                    name: cls_fqcn.to_string(),
+                                },
+                                header_location.clone(),
+                            ));
+                        } else {
+                            self.db.record_reference_location(crate::db::RefLoc {
+                                symbol_key: Arc::from(format!("cls:{cls_fqcn}")),
+                                file: file.clone(),
+                                line: header_location.line,
+                                col_start: header_location.col_start,
+                                col_end: header_location.col_end,
+                            });
+                        }
+                    }
+                }
+            }
         }
-        let header_span = method_header_name_span(source, method);
-        let (line, col_start) =
-            crate::diagnostics::offset_to_line_col(source, header_span.start, source_map);
-        let (line_end, col_end) =
-            crate::diagnostics::offset_to_line_col(source, header_span.end, source_map);
-        let header_location = mir_issues::Location {
-            file: file.clone(),
-            line,
-            line_end,
-            col_start,
-            col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
-        };
-        for atomic in &doc_ty.types {
-            if let mir_types::Atomic::TNamedObject { fqcn: cls_fqcn, .. } = atomic {
-                // `static<T, ...>` (a templated late-static-binding return) can
-                // surface as a literal `TNamedObject("static")` rather than
-                // `TStaticObject` — a method-only shape a free function's
-                // return type can never produce, so this pseudo-name was
-                // never filtered before. `self`/`parent` guarded the same way
-                // for consistency, though only reachable via `@return` here.
-                if matches!(
-                    crate::util::php_ident_lowercase(cls_fqcn.as_ref()).as_str(),
-                    "self" | "static" | "parent"
-                ) {
+
+        // `UndefinedDocblockClass`/`cls:` usage for a method's `@param` docblock
+        // types — free functions get this via the identical block in
+        // `emit_missing_fn_types`, methods never did. A param with no native
+        // hint whose stored type is nonetheless present can only have gotten
+        // that type from `@param`; reusing storage (rather than re-parsing the
+        // raw docblock, as functions.rs does) means `@template`/`@psalm-type`
+        // are already resolved exactly like the `@return` check above, with no
+        // need to re-derive alias/template awareness by hand.
+        if method.params.len() == params.len() {
+            let header_span = method_header_name_span(source, method);
+            let (header_line, header_col_start) =
+                crate::diagnostics::offset_to_line_col(source, header_span.start, source_map);
+            let (header_line_end, header_col_end) =
+                crate::diagnostics::offset_to_line_col(source, header_span.end, source_map);
+            let header_location = mir_issues::Location {
+                file: file.clone(),
+                line: header_line,
+                line_end: header_line_end,
+                col_start: header_col_start,
+                col_end: crate::diagnostics::clamp_col_end(
+                    header_line,
+                    header_line_end,
+                    header_col_start,
+                    header_col_end,
+                ),
+            };
+            for (ast_param, stored_param) in method.params.iter().zip(params.iter()) {
+                if ast_param.type_hint.is_some() {
                     continue;
                 }
-                if !crate::db::class_exists(self.db, cls_fqcn.as_ref()) {
-                    all_issues.push(mir_issues::Issue::new(
-                        mir_issues::IssueKind::UndefinedDocblockClass {
-                            name: cls_fqcn.to_string(),
-                        },
-                        header_location.clone(),
-                    ));
-                } else {
-                    self.db.record_reference_location(crate::db::RefLoc {
-                        symbol_key: Arc::from(format!("cls:{cls_fqcn}")),
-                        file: file.clone(),
-                        line: header_location.line,
-                        col_start: header_location.col_start,
-                        col_end: header_location.col_end,
-                    });
+                let Some(doc_ty) = stored_param.ty.as_deref() else {
+                    continue;
+                };
+                for atomic in &doc_ty.types {
+                    if let mir_types::Atomic::TNamedObject { fqcn: cls_fqcn, .. } = atomic {
+                        if crate::diagnostics::is_pseudo_type(cls_fqcn.as_ref()) {
+                            continue;
+                        }
+                        self.check_and_record_docblock_class_at(
+                            cls_fqcn.as_ref(),
+                            &header_location,
+                            all_issues,
+                        );
+                    }
                 }
             }
         }

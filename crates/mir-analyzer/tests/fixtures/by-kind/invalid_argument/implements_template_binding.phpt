@@ -17,5 +17,6 @@ class IntProcessor implements Processor {
 $p = new IntProcessor();
 $p->process("this should be an int, not a string");
 ===expect===
+UndefinedDocblockClass@11:20-11:27: Docblock type 'V' does not exist
 UnusedParam@11:28-11:30: Parameter $v is never used
 InvalidArgument@15:12-15:49: Argument $v of process() expects 'int', got '"this should be an int, not a string"'

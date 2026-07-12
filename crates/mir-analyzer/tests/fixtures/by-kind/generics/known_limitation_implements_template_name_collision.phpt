@@ -55,4 +55,5 @@ $result = $t->get();
 /** @mir-check $result is Foo */
 echo "ok";
 ===expect===
+UndefinedDocblockClass@22:20-22:29: Docblock type 'T' does not exist
 UndefinedDocblockClass@26:20-26:23: Docblock type 'T' does not exist
