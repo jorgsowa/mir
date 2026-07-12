@@ -108,6 +108,61 @@ impl<'a> BodyAnalyzer<'a> {
         }
     }
 
+    /// Analyze each enum case's value expression against a minimal FlowState
+    /// scoped to the enum itself. Case values are constant expressions that
+    /// may reference class constants (`case Active = Config::VALUE;`) or
+    /// other classes — the enum-analysis loop previously matched only
+    /// `EnumMemberKind::Method`, so `Case` values were never walked and an
+    /// undefined reference there (a genuine PHP fatal on first touch of the
+    /// enum) went completely unflagged.
+    fn analyze_enum_case_values(
+        &self,
+        decl: &php_ast::owned::EnumDecl,
+        fqcn: &str,
+        file: &Arc<str>,
+        source: &str,
+        source_map: &php_rs_parser::source_map::SourceMap,
+        all_issues: &mut Vec<Issue>,
+        all_symbols: &mut Vec<ResolvedSymbol>,
+    ) {
+        use crate::flow_state::FlowState;
+        use crate::stmt::StatementsAnalyzer;
+        use mir_issues::IssueBuffer;
+        use php_ast::owned::EnumMemberKind;
+
+        let has_case_value = decl.body.members.iter().any(|m| {
+            matches!(&m.kind, EnumMemberKind::Case(c) if c.value.is_some())
+        });
+        if !has_case_value {
+            return;
+        }
+        let mut buf = IssueBuffer::new();
+        let mut sa = StatementsAnalyzer::new(
+            self.db,
+            file.clone(),
+            source,
+            source_map,
+            &mut buf,
+            all_symbols,
+            self.php_version,
+            self.mode,
+        );
+        sa.collect_symbols = self.collect_symbols;
+        let mut ctx = FlowState::new();
+        ctx.self_fqcn = Some(Arc::from(fqcn));
+        ctx.static_fqcn = Some(Arc::from(fqcn));
+        for member in decl.body.members.iter() {
+            if let EnumMemberKind::Case(case) = &member.kind {
+                if let Some(value) = &case.value {
+                    let mut ea = sa.expr_analyzer(&ctx);
+                    let _ = ea.analyze(value, &mut ctx);
+                }
+            }
+        }
+        drop(sa);
+        all_issues.extend(buf.into_all_issues());
+    }
+
     pub(crate) fn analyze_enum_decl(
         &self,
         decl: &php_ast::owned::EnumDecl,
@@ -160,6 +215,7 @@ impl<'a> BodyAnalyzer<'a> {
             );
         }
 
+        self.analyze_enum_case_values(decl, fqcn, file, source, source_map, all_issues, all_symbols);
         self.check_trait_constraints(fqcn, file, all_issues);
     }
 
@@ -221,6 +277,7 @@ impl<'a> BodyAnalyzer<'a> {
             );
         }
 
+        self.analyze_enum_case_values(decl, fqcn, file, source, source_map, all_issues, all_symbols);
         self.check_trait_constraints(fqcn, file, all_issues);
     }
 
