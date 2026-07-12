@@ -55,7 +55,7 @@ pub fn resolve_name(db: &dyn MirDatabase, file: &str, name: &str) -> String {
 
     if name.contains('\\') {
         if let Some((first, rest)) = name.split_once('\\') {
-            let imports = db.file_imports(file);
+            let imports = db.file_class_imports(file);
             if let Some(base) = imports.get(&Name::new(first)) {
                 return format!("{}\\{rest}", base.as_str());
             }
@@ -82,7 +82,7 @@ pub fn resolve_name(db: &dyn MirDatabase, file: &str, name: &str) -> String {
         return name.to_string();
     }
 
-    let imports = db.file_imports(file);
+    let imports = db.file_class_imports(file);
     if let Some(fqcn) = imports.get(&Name::new(name)) {
         return fqcn.as_str().to_string();
     }

@@ -15,7 +15,7 @@ impl<'a> DefinitionCollector<'a> {
         stmt_span: php_ast::Span,
     ) -> ControlFlow<()> {
         let trait_name = decl.name.as_deref().unwrap_or_default().to_string();
-        let fqcn = self.resolve_name(&trait_name);
+        let fqcn = self.declared_fqn(&trait_name);
 
         let trait_doc = decl
             .doc_comment

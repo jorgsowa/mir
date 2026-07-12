@@ -19,7 +19,7 @@ impl<'a> DefinitionCollector<'a> {
             Some(n) => n.to_string(),
             None => return ControlFlow::Continue(()), // anonymous class — handled at expression level
         };
-        let fqcn = self.resolve_name(&name);
+        let fqcn = self.declared_fqn(&name);
         let short_name = name;
 
         let parent = decl

@@ -13,7 +13,7 @@ impl<'a> DefinitionCollector<'a> {
         stmt_span: php_ast::Span,
     ) -> ControlFlow<()> {
         let interface_name = decl.name.as_deref().unwrap_or_default().to_string();
-        let fqcn = self.resolve_name(&interface_name);
+        let fqcn = self.declared_fqn(&interface_name);
 
         let iface_doc = decl
             .doc_comment

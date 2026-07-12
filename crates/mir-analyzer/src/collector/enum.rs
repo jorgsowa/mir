@@ -15,7 +15,7 @@ impl DefinitionCollector<'_> {
         stmt_span: php_ast::Span,
     ) {
         let enum_name = decl.name.as_deref().unwrap_or_default().to_string();
-        let fqcn = self.resolve_name(&enum_name);
+        let fqcn = self.declared_fqn(&enum_name);
 
         let enum_doc = decl
             .doc_comment

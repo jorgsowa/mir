@@ -35,6 +35,14 @@ pub trait MirDatabase: salsa::Database {
     /// `resolve_name` calls this on every symbol reference.
     fn file_imports(&self, file: &str) -> Arc<FxHashMap<Name, Name>>;
 
+    /// Return this file's `use` alias map restricted to class/interface/trait/enum
+    /// imports (`UseKind::Normal`), excluding `use function`/`use const` aliases.
+    ///
+    /// Class-name resolution (`resolve_name`) must consult this instead of
+    /// `file_imports` so a `use function Foo\bar;` can't make an unrelated `bar`
+    /// class/type-hint reference resolve to `Foo\bar`.
+    fn file_class_imports(&self, file: &str) -> Arc<FxHashMap<Name, Name>>;
+
     /// Return the known type for a PHP global variable.
     fn global_var_type(&self, name: &str) -> Option<Type>;
 

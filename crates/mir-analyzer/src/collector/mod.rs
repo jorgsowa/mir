@@ -305,7 +305,9 @@ pub struct DefinitionCollector<'a> {
     source: &'a str,
     source_map: &'a php_rs_parser::source_map::SourceMap,
     namespace: Option<String>,
-    /// `use` aliases: alias → FQCN
+    /// `use` aliases: alias → FQCN. `UseKind::Normal` only — every consumer
+    /// resolves a class/type/attribute/exception name, so a `use function`/
+    /// `use const` alias must never appear here.
     use_aliases: FxHashMap<String, String>,
     issues: IssueBuffer,
     /// When `Some`, stub symbols annotated with `@since`/`@removed` are filtered
@@ -314,10 +316,17 @@ pub struct DefinitionCollector<'a> {
     /// The first namespace declaration seen in this file. Matches the semantics
     /// of `project.rs` which only records the first namespace per file.
     first_namespace: Option<String>,
-    /// All `use` imports ever encountered in this file, accumulated across all
-    /// namespace blocks. Unlike `use_aliases`, this is never cleared or restored,
-    /// so braced-namespace imports are not lost.
+    /// All `use` imports ever encountered in this file — every `UseKind`,
+    /// unlike `use_aliases` — accumulated across all namespace blocks. Unlike
+    /// `use_aliases`, this is never cleared or restored, so braced-namespace
+    /// imports are not lost. Feeds `slice.imports` / `file_imports()`, which
+    /// Pass-2 function-call resolution relies on for `use function` aliases.
     accumulated_imports: FxHashMap<String, String>,
+    /// Subset of `accumulated_imports` containing only `UseKind::Normal`
+    /// (class/interface/trait/enum) aliases — excludes `use function`/`use const`.
+    /// Feeds `slice.class_imports`, consulted by class-name resolution so a
+    /// function/constant import can't shadow a same-named class reference.
+    accumulated_class_imports: FxHashMap<String, String>,
 }
 
 impl<'a> DefinitionCollector<'a> {
@@ -341,6 +350,7 @@ impl<'a> DefinitionCollector<'a> {
             php_version: None,
             first_namespace: None,
             accumulated_imports: FxHashMap::default(),
+            accumulated_class_imports: FxHashMap::default(),
         }
     }
 
@@ -410,6 +420,15 @@ impl<'a> DefinitionCollector<'a> {
             }
             self.slice.imports = Arc::new(interned);
         }
+        if !self.accumulated_class_imports.is_empty() {
+            let raw = std::mem::take(&mut self.accumulated_class_imports);
+            let mut interned: FxHashMap<mir_types::Name, mir_types::Name> =
+                FxHashMap::with_capacity_and_hasher(raw.len(), Default::default());
+            for (alias, fqcn) in raw {
+                interned.insert(mir_types::Name::new(&alias), mir_types::Name::new(&fqcn));
+            }
+            self.slice.class_imports = Arc::new(interned);
+        }
     }
 
     pub fn collect_slice(mut self, program: &Program) -> (StubSlice, Vec<Issue>) {
@@ -426,6 +445,24 @@ impl<'a> DefinitionCollector<'a> {
 
     fn resolve_name(&self, name: &str) -> String {
         resolution::resolve_name(name, &self.namespace, &self.use_aliases)
+    }
+
+    /// Compute the FQCN a class/interface/trait/enum *declaration* establishes
+    /// for its own short name: `current_namespace \ short_name`, never run
+    /// through `use`-alias substitution. A declaration names a new symbol, it
+    /// doesn't reference an existing one — unlike `resolve_name`, which must
+    /// consult `use_aliases` because callers pass it names being *referenced*
+    /// (`extends`, `implements`, type hints, ...). Using `resolve_name` here
+    /// misfires when the short name collides with a `use function`/`use
+    /// const` alias of the same spelling (legal in PHP, since functions and
+    /// constants live in a separate symbol table from classes): the
+    /// declaration would be silently registered under the alias's target
+    /// FQCN instead of its own namespace.
+    fn declared_fqn(&self, short_name: &str) -> String {
+        match &self.namespace {
+            Some(ns) => format!("{ns}\\{short_name}"),
+            None => short_name.to_string(),
+        }
     }
 
     fn resolve_type_name(&self, name: &str, full_qualify: bool) -> mir_types::Name {
@@ -1216,6 +1253,7 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
             }
 
             StmtKind::Use(use_decl) => {
+                use php_ast::ast::UseKind;
                 for item in use_decl.uses.iter() {
                     let full_name = name_to_string_owned(&item.name)
                         .trim_start_matches('\\')
@@ -1224,10 +1262,24 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
                         .alias
                         .as_deref()
                         .unwrap_or_else(|| full_name.rsplit('\\').next().unwrap_or(&full_name));
-                    self.use_aliases
-                        .insert(alias.to_string(), full_name.clone());
+                    // `accumulated_imports` (→ `file_imports()`) keeps every kind: Pass 2
+                    // function-call resolution (`call/function.rs`) relies on `use
+                    // function` aliases showing up there. `use_aliases` and
+                    // `accumulated_class_imports` (→ `file_class_imports()`) are
+                    // Normal-only: every Pass-1 consumer of `use_aliases` resolves a
+                    // class/type/attribute/exception name, so a `use function`/`use
+                    // const` alias (including per-item overrides inside a grouped `use
+                    // Foo\{Bar, function baz, const QUX}`) must never populate them —
+                    // otherwise a type hint/`new`/`extends` reference sharing that short
+                    // name would incorrectly resolve to the function/constant's FQN.
                     self.accumulated_imports
-                        .insert(alias.to_string(), full_name);
+                        .insert(alias.to_string(), full_name.clone());
+                    if item.kind.unwrap_or(use_decl.kind) == UseKind::Normal {
+                        self.use_aliases
+                            .insert(alias.to_string(), full_name.clone());
+                        self.accumulated_class_imports
+                            .insert(alias.to_string(), full_name);
+                    }
                 }
             }
 
@@ -1779,6 +1831,64 @@ mod tests {
             Some("App\\Repository\\EntityRepo"),
             "collect_slice must capture aliased use import"
         );
+    }
+
+    #[test]
+    fn collect_slice_class_imports_excludes_use_function_and_const() {
+        // `use function`/`use const` (plain or grouped) must still land in
+        // slice.imports (Pass-2 function-call resolution needs them), but never
+        // in slice.class_imports — otherwise a same-named class/type-hint
+        // reference would incorrectly resolve to the function/constant's FQN.
+        let slice = parse_and_collect_slice(
+            "src/Handler.php",
+            concat!(
+                "<?php\n",
+                "namespace App\\Service;\n",
+                "use App\\Model\\Entity;\n",
+                "use function App\\Helpers\\foo;\n",
+                "use const App\\Helpers\\BAR;\n",
+                "use App\\Helpers\\{Baz, function qux, const QUUX};\n",
+                "class Handler {}\n",
+            ),
+        );
+
+        for (alias, fqcn) in [
+            ("Entity", "App\\Model\\Entity"),
+            ("foo", "App\\Helpers\\foo"),
+            ("BAR", "App\\Helpers\\BAR"),
+            ("Baz", "App\\Helpers\\Baz"),
+            ("qux", "App\\Helpers\\qux"),
+            ("QUUX", "App\\Helpers\\QUUX"),
+        ] {
+            assert_eq!(
+                slice.imports.get(&mir_types::Name::new(alias)).map(|s| s.as_str()),
+                Some(fqcn),
+                "slice.imports must capture every UseKind for alias {alias}"
+            );
+        }
+
+        assert_eq!(
+            slice
+                .class_imports
+                .get(&mir_types::Name::new("Entity"))
+                .map(|s| s.as_str()),
+            Some("App\\Model\\Entity"),
+            "slice.class_imports must capture a Normal-kind alias"
+        );
+        assert_eq!(
+            slice
+                .class_imports
+                .get(&mir_types::Name::new("Baz"))
+                .map(|s| s.as_str()),
+            Some("App\\Helpers\\Baz"),
+            "slice.class_imports must capture a Normal-kind alias from a grouped use"
+        );
+        for alias in ["foo", "BAR", "qux", "QUUX"] {
+            assert!(
+                slice.class_imports.get(&mir_types::Name::new(alias)).is_none(),
+                "slice.class_imports must not contain function/const alias {alias}"
+            );
+        }
     }
 
     #[test]

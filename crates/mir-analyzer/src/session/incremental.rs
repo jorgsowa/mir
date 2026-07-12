@@ -198,7 +198,7 @@ impl AnalysisSession {
     /// imports.
     pub fn class_imports(&self, file: &str) -> Vec<(Arc<str>, Arc<str>)> {
         let db = self.snapshot_db();
-        let imports = db.file_imports(file);
+        let imports = db.file_class_imports(file);
         imports
             .iter()
             .map(|(alias, fqcn)| (Arc::from(alias.as_str()), Arc::from(fqcn.as_str())))

@@ -836,6 +836,18 @@ pub struct StubSlice {
     )]
     #[serde(default = "default_imports")]
     pub imports: Arc<FxHashMap<Name, Name>>,
+    /// Subset of `imports` containing only `use` items that import a
+    /// class/interface/trait/enum (`UseKind::Normal`) — excludes `use
+    /// function`/`use const` aliases. Class-name resolution consults this
+    /// instead of `imports` so a function/constant import can't shadow a
+    /// same-named class reference (`use function Foo\bar;` must not make an
+    /// unrelated `bar` type hint resolve to `Foo\bar`).
+    #[serde(
+        deserialize_with = "deserialize_imports",
+        serialize_with = "serialize_imports"
+    )]
+    #[serde(default = "default_imports")]
+    pub class_imports: Arc<FxHashMap<Name, Name>>,
     /// Set to `true` after `deduplicate_params_in_slice` has run on this slice.
     /// `ingest_stub_slice` skips the clone+re-dedup when this flag is set.
     #[serde(skip)]
