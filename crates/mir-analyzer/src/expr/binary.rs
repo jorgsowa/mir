@@ -114,7 +114,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             }
                         }
                     }
-                    self.record_ref(fqcn.clone(), b.right.span);
+                    self.record_ref(Arc::from(format!("cls:{fqcn}")), b.right.span);
                     self.record_symbol(
                         b.right.span,
                         crate::symbol::ReferenceKind::ClassReference(fqcn),

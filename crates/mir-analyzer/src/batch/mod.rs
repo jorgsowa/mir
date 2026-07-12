@@ -690,10 +690,7 @@ fn build_reverse_deps(db: &dyn crate::db::MirDatabase) -> HashMap<String, HashSe
 
     for (ref_file, symbol_key) in db.all_reference_location_pairs() {
         let file_str = ref_file.as_ref().to_string();
-        let lookup: &str = match symbol_key.split_once("::") {
-            Some((class, _)) => class,
-            None => &symbol_key,
-        };
+        let lookup = crate::defining_file_lookup_key(&symbol_key);
         add_edge(lookup, &file_str);
     }
 

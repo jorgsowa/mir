@@ -181,7 +181,7 @@ impl CallAnalyzer {
         let fqcn = resolve_static_class(&fqcn, ctx);
 
         if matches!(&call.class.kind, ExprKind::Identifier(_)) {
-            ea.record_ref(Arc::from(fqcn.as_str()), call.class.span);
+            ea.record_ref(Arc::from(format!("cls:{fqcn}")), call.class.span);
             // Record a symbol on the class token itself so hover / go-to-definition
             // works when the cursor sits on the class name — including the
             // `self`/`parent`/`static` keywords, which `resolve_static_class`
@@ -307,7 +307,7 @@ impl CallAnalyzer {
         if let Some(resolved) = resolved {
             ea.record_ref(
                 Arc::from(format!(
-                    "{}::{}",
+                    "meth:{}::{}",
                     resolved.owner_fqcn,
                     crate::util::php_ident_lowercase(method_name)
                 )),

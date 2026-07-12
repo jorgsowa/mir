@@ -412,7 +412,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     ReferenceKind::ClassReference(fqcn.clone()),
                     ty.clone(),
                 );
-                self.record_ref(fqcn.clone(), n.class.span);
+                self.record_ref(Arc::from(format!("cls:{fqcn}")), n.class.span);
                 ty
             }
             _ => {
@@ -616,7 +616,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     if let Some(prop_name) = expr_name_str(&spa.member) {
                         let prop_name = prop_name.trim_start_matches('$');
                         self.record_ref(
-                            Arc::from(format!("{}::{}", fqcn, prop_name)),
+                            Arc::from(format!("prop:{}::{}", fqcn, prop_name)),
                             spa.member.span,
                         );
                         if let Some(refined) = ctx.get_prop_refined(fqcn.as_ref(), prop_name) {
@@ -640,10 +640,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                     spa.class.span,
                 );
             } else {
-                self.record_ref(Arc::from(resolved.as_str()), spa.class.span);
+                self.record_ref(Arc::from(format!("cls:{resolved}")), spa.class.span);
                 if let Some(prop_name) = expr_name_str(&spa.member) {
                     self.record_ref(
-                        Arc::from(format!("{}::{}", resolved, prop_name)),
+                        Arc::from(format!("prop:{}::{}", resolved, prop_name)),
                         spa.member.span,
                     );
                     if let Some(refined) = ctx.get_prop_refined(resolved.as_str(), prop_name) {
@@ -708,7 +708,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             }
                         }
                     }
-                    self.record_ref(Arc::from(resolved.as_str()), cca.class.span);
+                    self.record_ref(Arc::from(format!("cls:{resolved}")), cca.class.span);
                 }
                 return Type::single(Atomic::TClassString(Some(mir_types::Name::from(
                     resolved.as_str(),
@@ -786,7 +786,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             .map(|(_, c)| c.ty.clone())
                             .unwrap_or_else(Type::mixed);
                         self.record_ref(
-                            Arc::from(format!("{}::{}", self_fqcn, const_name)),
+                            Arc::from(format!("cnst:{}::{}", self_fqcn, const_name)),
                             cca.member.span,
                         );
                         self.record_symbol(
@@ -841,7 +841,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             .map(|(_, c)| c.ty.clone())
                             .unwrap_or_else(Type::mixed);
                         self.record_ref(
-                            Arc::from(format!("{}::{}", parent_fqcn, const_name)),
+                            Arc::from(format!("cnst:{}::{}", parent_fqcn, const_name)),
                             cca.member.span,
                         );
                         self.record_symbol(
@@ -869,9 +869,9 @@ impl<'a> ExpressionAnalyzer<'a> {
             return Type::mixed();
         }
 
-        self.record_ref(Arc::from(fqcn.as_str()), cca.class.span);
+        self.record_ref(Arc::from(format!("cls:{fqcn}")), cca.class.span);
         self.record_ref(
-            Arc::from(format!("{}::{}", fqcn, const_name)),
+            Arc::from(format!("cnst:{}::{}", fqcn, const_name)),
             cca.member.span,
         );
 
@@ -1026,7 +1026,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         } else {
                             ty
                         };
-                        self.record_ref(Arc::from(format!("{}::{}", owner, prop_name)), span);
+                        self.record_ref(Arc::from(format!("prop:{}::{}", owner, prop_name)), span);
                         *declaring_class = Some(owner);
                         return ty;
                     }
@@ -1072,7 +1072,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     );
                     if let Some((owner, p)) = prop_result {
                         let ty = p.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
-                        self.record_ref(Arc::from(format!("{}::{}", owner, prop_name)), span);
+                        self.record_ref(Arc::from(format!("prop:{}::{}", owner, prop_name)), span);
                         *declaring_class = Some(owner);
                         return ty;
                     }

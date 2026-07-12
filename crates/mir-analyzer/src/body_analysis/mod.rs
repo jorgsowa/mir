@@ -538,7 +538,7 @@ impl<'a> BodyAnalyzer<'a> {
                 let (line_end, col_end) =
                     crate::diagnostics::offset_to_line_col(source, span.end, source_map);
                 self.db.record_reference_location(crate::db::RefLoc {
-                    symbol_key: fqcn,
+                    symbol_key: Arc::from(format!("cls:{fqcn}")),
                     file: file.clone(),
                     line,
                     col_start,

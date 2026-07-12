@@ -71,7 +71,7 @@ fn symbol_method_normalizes_case() {
 
     assert_eq!(s1, s2);
     assert_eq!(s1, s3);
-    assert_eq!(s1.codebase_key(), "Foo::bar");
+    assert_eq!(s1.codebase_key(), "meth:Foo::bar");
 }
 
 #[test]

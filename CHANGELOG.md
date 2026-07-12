@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Loop analysis:** the fixed-point widening pass used to converge on loop variable types no longer leaks diagnostics from its earlier, unstabilized passes — only the final, converged pass's diagnostics are kept, fixing false `ImpossibleIdenticalComparison`/`RedundantCondition` reports on loop counters and toggle flags that only reach their real value on a later iteration.
 - **`PropertyTypeRedeclarationMismatch`:** a redeclared typed property is now compared by its native type hint alone, matching the PHP runtime rule; a differing `@var` docblock refinement (e.g. a narrower array value type) on an otherwise-identical native hint is no longer falsely flagged.
 - **Reference-index bookkeeping:** sessions built with `without_reference_index()` no longer read from the (intentionally empty) `RefIndex` during reverse-dependency cache upkeep on every edit.
+- **Reference-index key collisions between a method, property, and class constant of the same name:** `Foo::bar` as both a property and a method shared one reference-index entry, so `references_to` merged their locations together and a truly-dead property could hide behind a same-named method's usage — a false negative in `UnusedProperty`. Reference-index keys are now kind-prefixed (`cls:`/`fn:`/`meth:`/`prop:`/`cnst:`/`gcnst:`).
 
 ## [0.51.0] - 2026-07-10
 

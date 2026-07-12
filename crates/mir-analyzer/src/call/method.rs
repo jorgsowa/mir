@@ -627,7 +627,7 @@ fn resolve_method_return<'a>(
         }
         ea.record_ref(
             Arc::from(format!(
-                "{}::{}",
+                "meth:{}::{}",
                 resolved.owner_fqcn,
                 crate::util::php_ident_lowercase(&resolved.name)
             )),

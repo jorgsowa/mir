@@ -749,7 +749,7 @@ impl<'a> StatementsAnalyzer<'a> {
                         let (line, col_start) = self.offset_to_line_col(span.start);
                         let (line_end, col_end) = self.offset_to_line_col(span.end);
                         self.db.record_reference_location(crate::db::RefLoc {
-                            symbol_key: Arc::from(resolved.as_str()),
+                            symbol_key: Arc::from(format!("cls:{resolved}")),
                             file: self.file.clone(),
                             line,
                             col_start,

@@ -321,10 +321,7 @@ fn file_outgoing_dependencies(
     // Bare-FQN references recorded during body analysis (new \Foo(),
     // \Foo::method(), \foo()) that do not appear in use-import statements.
     for symbol_key in db.file_referenced_symbols(file) {
-        let lookup: &str = match symbol_key.split_once("::") {
-            Some((class, _)) => class,
-            None => &symbol_key,
-        };
+        let lookup = crate::defining_file_lookup_key(&symbol_key);
         if let Some(defining_file) = db.symbol_defining_file(lookup) {
             if defining_file.as_ref() != file {
                 targets.insert(defining_file.as_ref().to_string());

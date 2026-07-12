@@ -718,7 +718,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     );
                 } else {
                     let fqcn: Arc<str> = Arc::from(resolved.as_str());
-                    self.record_ref(fqcn.clone(), hint.span);
+                    self.record_ref(Arc::from(format!("cls:{fqcn}")), hint.span);
                     self.record_symbol(
                         hint.span,
                         ReferenceKind::ClassReference(fqcn),

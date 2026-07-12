@@ -265,7 +265,7 @@ fn symbol_at_finds_this_property_access() {
     let key = sym
         .codebase_key()
         .expect("PropertyAccess must have a codebase key");
-    assert_eq!(key, "Counter::count");
+    assert_eq!(key, "prop:Counter::count");
 }
 
 #[test]
@@ -375,7 +375,7 @@ fn codebase_key_for_function_call_matches_reference_index() {
     let key = sym
         .codebase_key()
         .expect("FunctionCall should have a codebase key");
-    assert_eq!(key, "greet");
+    assert_eq!(key, "fn:greet");
 
     assert!(
         !analyzer.reference_locations(key.as_str()).is_empty(),
@@ -427,7 +427,7 @@ fn codebase_key_for_static_call_matches_reference_index() {
         .expect("StaticCall(square) must be recorded");
 
     let key = sym.codebase_key().unwrap();
-    assert_eq!(key, "Math::square");
+    assert_eq!(key, "meth:Math::square");
     assert!(
         !analyzer.reference_locations(key.as_str()).is_empty(),
         "codebase_key should match an entry in symbol_reference_locations"
@@ -452,7 +452,7 @@ fn codebase_key_for_property_access_matches_reference_index() {
         .expect("PropertyAccess(count) must be recorded");
 
     let key = sym.codebase_key().unwrap();
-    assert_eq!(key, "Counter::count");
+    assert_eq!(key, "prop:Counter::count");
     assert!(
         !analyzer.reference_locations(key.as_str()).is_empty(),
         "codebase_key for PropertyAccess should match an entry in symbol_reference_locations"
@@ -475,7 +475,7 @@ fn codebase_key_for_class_reference_matches_reference_index() {
         .expect("ClassReference(Widget) must be recorded");
 
     let key = sym.codebase_key().unwrap();
-    assert_eq!(key, "Widget");
+    assert_eq!(key, "cls:Widget");
     assert!(
         !analyzer.reference_locations(key.as_str()).is_empty(),
         "codebase_key should match an entry in symbol_reference_locations"
@@ -521,7 +521,7 @@ fn full_flow_cursor_to_reference_locations() {
         .expect("symbol_at should find a symbol at the first ping() call");
 
     let key = sym.codebase_key().expect("FunctionCall must have a key");
-    assert_eq!(key, "ping");
+    assert_eq!(key, "fn:ping");
 
     let locs = analyzer.reference_locations(&key);
     assert_eq!(
@@ -677,7 +677,7 @@ fn symbol_at_finds_property_access() {
 
     // Verify the full LSP flow: cursor → key → reference locations
     let key = sym.codebase_key().expect("PropertyAccess must have a key");
-    assert_eq!(key, "Counter::count");
+    assert_eq!(key, "prop:Counter::count");
     let locs = analyzer.reference_locations(&key);
     assert_eq!(
         locs.len(),
@@ -711,7 +711,7 @@ fn symbol_at_finds_nullsafe_property_access() {
 
     // Verify the full LSP flow: cursor → key → reference locations
     let key = sym.codebase_key().expect("PropertyAccess must have a key");
-    assert_eq!(key, "Box::val");
+    assert_eq!(key, "prop:Box::val");
     let locs = analyzer.reference_locations(&key);
     assert_eq!(
         locs.len(),
@@ -744,7 +744,7 @@ fn symbol_at_finds_nullsafe_method_call() {
 
     // Verify the full LSP flow: cursor → key → reference locations
     let key = sym.codebase_key().expect("MethodCall must have a key");
-    assert_eq!(key, "Svc::run");
+    assert_eq!(key, "meth:Svc::run");
     let locs = analyzer.reference_locations(&key);
     assert_eq!(
         locs.len(),
@@ -839,7 +839,7 @@ fn class_const_access_records_symbol() {
         .expect("ConstantAccess(VERSION) must be recorded for Config::VERSION");
 
     let key = sym.codebase_key().unwrap();
-    assert_eq!(key, "Config::VERSION");
+    assert_eq!(key, "cnst:Config::VERSION");
     assert!(
         !analyzer.reference_locations(key.as_str()).is_empty(),
         "codebase_key should match an entry in symbol_reference_locations"
@@ -865,7 +865,7 @@ fn inherited_static_call_symbol_keys_by_declaring_class() {
 
     let key = sym.codebase_key().unwrap();
     assert_eq!(
-        key, "Base::foo",
+        key, "meth:Base::foo",
         "codebase_key must be the declaring class Base, not Child"
     );
     assert!(
@@ -914,7 +914,7 @@ function caller(): void { $obj = new MyClass(); $obj->hello(); }\n";
 
     let key = sym.codebase_key().unwrap();
     assert_eq!(
-        key, "B::hello",
+        key, "meth:B::hello",
         "insteadof should route $obj->hello() to B::hello, not A::hello"
     );
 
@@ -924,7 +924,7 @@ function caller(): void { $obj = new MyClass(); $obj->hello(); }\n";
         .expect("symbol_at should resolve $obj->hello()");
     let key_at = sym_at.codebase_key().unwrap();
     assert_eq!(
-        key_at, "B::hello",
+        key_at, "meth:B::hello",
         "symbol_at codebase_key must also be B::hello after insteadof resolution"
     );
 }

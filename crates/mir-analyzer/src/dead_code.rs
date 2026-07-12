@@ -84,7 +84,7 @@ impl<'a> DeadCodeAnalyzer<'a> {
                 }
                 if !self
                     .db
-                    .has_reference(&format!("{}::{}", fqcn_str, name_lower))
+                    .has_reference(&format!("meth:{}::{}", fqcn_str, name_lower))
                 {
                     let location =
                         crate::diagnostics::storage_loc_to_location(method.location.as_ref());
@@ -106,7 +106,7 @@ impl<'a> DeadCodeAnalyzer<'a> {
                     }
                     if !self
                         .db
-                        .has_reference(&format!("{}::{}", fqcn_str, name.as_ref()))
+                        .has_reference(&format!("prop:{}::{}", fqcn_str, name.as_ref()))
                     {
                         let location =
                             crate::diagnostics::storage_loc_to_location(prop.location.as_ref());
@@ -150,7 +150,7 @@ impl<'a> DeadCodeAnalyzer<'a> {
                 }
             }
 
-            if !self.db.has_reference(fqcn_str) {
+            if !self.db.has_reference(&format!("cls:{fqcn_str}")) {
                 let loc = crate::diagnostics::storage_loc_to_location(location.as_ref());
                 issues.push(Issue::new(
                     IssueKind::UnusedClass {
@@ -188,7 +188,7 @@ impl<'a> DeadCodeAnalyzer<'a> {
                     continue;
                 }
             }
-            if !self.db.has_reference(fqn.as_ref()) {
+            if !self.db.has_reference(&format!("fn:{}", fqn.as_ref())) {
                 let location = crate::diagnostics::storage_loc_to_location(location.as_ref());
                 issues.push(Issue::new(
                     IssueKind::UnusedFunction { name: short_name },

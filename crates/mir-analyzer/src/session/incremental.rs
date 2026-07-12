@@ -339,10 +339,7 @@ impl AnalysisSession {
             let symbol_keys = db.file_referenced_symbols(file);
             let mut file_deps: HashSet<String> = HashSet::default();
             for symbol_key in &symbol_keys {
-                let lookup: &str = match symbol_key.split_once("::") {
-                    Some((class, _)) => class,
-                    None => symbol_key.as_ref(),
-                };
+                let lookup = crate::defining_file_lookup_key(symbol_key);
                 if let Some(def_file) = db.symbol_defining_file(lookup) {
                     let def = def_file.as_ref().to_string();
                     if &def != file {
@@ -404,18 +401,25 @@ impl AnalysisSession {
             if !stale.is_empty() {
                 for (file, deleted_syms) in stale.iter() {
                     for sym in deleted_syms {
-                        let lookup: &str = match sym.split_once("::") {
-                            Some((class, _)) => class,
-                            None => sym.as_ref(),
-                        };
-                        for referencing_file in db.symbol_referencers_of(lookup) {
-                            let ref_file = referencing_file.as_ref().to_string();
-                            if &ref_file != file {
-                                dependents
-                                    .entry(file.clone())
-                                    .or_default()
-                                    .push(ref_file.clone());
-                                dependencies.entry(ref_file).or_default().push(file.clone());
+                        let lookup = crate::defining_file_lookup_key(sym);
+                        // `defined_symbols()` only yields top-level FQ names
+                        // (classes/interfaces/traits/enums, functions, global
+                        // constants) — never knows here which kind `sym` was,
+                        // so probe every prefix the reference index actually
+                        // uses (see `Name::codebase_key`) rather than guessing
+                        // one and silently missing referencers of the others.
+                        for prefix in ["cls:", "fn:", "gcnst:"] {
+                            for referencing_file in
+                                db.symbol_referencers_of(&format!("{prefix}{lookup}"))
+                            {
+                                let ref_file = referencing_file.as_ref().to_string();
+                                if &ref_file != file {
+                                    dependents
+                                        .entry(file.clone())
+                                        .or_default()
+                                        .push(ref_file.clone());
+                                    dependencies.entry(ref_file).or_default().push(file.clone());
+                                }
                             }
                         }
                     }

@@ -190,15 +190,44 @@ impl Name {
 
     /// The codebase lookup key for this symbol (used internally for the
     /// reference-locations index). Stable across releases.
+    ///
+    /// Kind-prefixed (`cls:`, `fn:`, `meth:`, `prop:`, `cnst:`, `gcnst:`) so
+    /// that a method, property, and class constant sharing the same class and
+    /// name (e.g. `Foo::bar` as both a property and a method) never collide
+    /// on the same reference-index entry — an unprefixed scheme merged their
+    /// usages, which both scrambled `references_to` results and hid truly
+    /// dead members behind an unrelated same-named symbol's usage.
     pub fn codebase_key(&self) -> String {
         match self {
-            Name::Class(fqcn) => fqcn.to_string(),
-            Name::Function(fqn) => fqn.to_string(),
-            Name::Method { class, name } => format!("{class}::{name}"),
-            Name::Property { class, name } => format!("{class}::{name}"),
-            Name::ClassConstant { class, name } => format!("{class}::{name}"),
-            Name::GlobalConstant(fqn) => fqn.to_string(),
+            Name::Class(fqcn) => format!("cls:{fqcn}"),
+            Name::Function(fqn) => format!("fn:{fqn}"),
+            Name::Method { class, name } => format!("meth:{class}::{name}"),
+            Name::Property { class, name } => format!("prop:{class}::{name}"),
+            Name::ClassConstant { class, name } => format!("cnst:{class}::{name}"),
+            Name::GlobalConstant(fqn) => format!("gcnst:{fqn}"),
         }
+    }
+}
+
+/// Reduce a reference-index symbol key (as produced by [`Name::codebase_key`])
+/// to the bare class/function/global-constant name that
+/// `MirDatabase::symbol_defining_file` is keyed by.
+///
+/// Strips the kind prefix, then — for member keys (`meth:`/`prop:`/`cnst:`,
+/// shaped `Class::member`) — keeps only the class portion, since a member has
+/// no defining file of its own; only its owning class does.
+pub(crate) fn defining_file_lookup_key(symbol_key: &str) -> &str {
+    let stripped = symbol_key
+        .strip_prefix("meth:")
+        .or_else(|| symbol_key.strip_prefix("prop:"))
+        .or_else(|| symbol_key.strip_prefix("cnst:"))
+        .or_else(|| symbol_key.strip_prefix("cls:"))
+        .or_else(|| symbol_key.strip_prefix("fn:"))
+        .or_else(|| symbol_key.strip_prefix("gcnst:"))
+        .unwrap_or(symbol_key);
+    match stripped.split_once("::") {
+        Some((class, _)) => class,
+        None => stripped,
     }
 }
 

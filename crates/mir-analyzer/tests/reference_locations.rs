@@ -22,7 +22,7 @@ fn function_call_records_reference_location() {
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
-    let locs = analyzer.reference_locations("greet");
+    let locs = analyzer.reference_locations("fn:greet");
     assert!(
         locs.iter().any(|(f, ..)| f == &file_arc),
         "reference location should be recorded for the analyzed file"
@@ -46,7 +46,7 @@ fn function_call_span_covers_only_name() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let locs: Vec<_> = analyzer
-        .reference_locations("greet")
+        .reference_locations("fn:greet")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .collect();
@@ -76,7 +76,7 @@ fn method_call_span_covers_only_name() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let locs: Vec<_> = analyzer
-        .reference_locations("Svc::run")
+        .reference_locations("meth:Svc::run")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .collect();
@@ -106,7 +106,7 @@ fn property_access_span_covers_only_name() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let locs: Vec<_> = analyzer
-        .reference_locations("Counter::count")
+        .reference_locations("prop:Counter::count")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .collect();
@@ -137,7 +137,7 @@ fn nullsafe_property_access_records_reference_location() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let locs: Vec<_> = analyzer
-        .reference_locations("Box::val")
+        .reference_locations("prop:Box::val")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .collect();
@@ -165,7 +165,7 @@ fn method_call_records_reference_location() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     assert!(
-        !analyzer.reference_locations("Svc::run").is_empty(),
+        !analyzer.reference_locations("meth:Svc::run").is_empty(),
         "Svc::run should be in symbol_reference_locations"
     );
 }
@@ -184,7 +184,7 @@ fn multiple_calls_in_same_file_produce_multiple_spans() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let count = analyzer
-        .reference_locations("ping")
+        .reference_locations("fn:ping")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .count();
@@ -205,7 +205,7 @@ fn new_expression_records_class_reference() {
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
-    let locs = analyzer.reference_locations("Widget");
+    let locs = analyzer.reference_locations("cls:Widget");
     assert!(
         locs.iter().any(|(f, ..)| f == &file_arc),
         "new Widget() should record a reference to Widget"
@@ -228,7 +228,7 @@ fn re_analyze_removes_stale_reference_locations() {
 
     assert!(
         analyzer
-            .reference_locations("helper")
+            .reference_locations("fn:helper")
             .iter()
             .any(|(f, ..)| f == &file_arc),
         "initial analysis should record location"
@@ -242,7 +242,7 @@ fn re_analyze_removes_stale_reference_locations() {
     );
 
     let stale = analyzer
-        .reference_locations("helper")
+        .reference_locations("fn:helper")
         .iter()
         .any(|(f, ..)| f == &file_arc);
 
@@ -267,7 +267,7 @@ fn static_method_call_span_covers_only_name() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let locs: Vec<_> = analyzer
-        .reference_locations("Math::sq")
+        .reference_locations("meth:Math::sq")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .collect();
@@ -298,7 +298,7 @@ fn cache_hit_replays_reference_locations() {
         let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(&cache_dir);
         analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
         assert!(
-            !analyzer.reference_locations("cached_fn").is_empty(),
+            !analyzer.reference_locations("fn:cached_fn").is_empty(),
             "first run should record reference"
         );
     }
@@ -308,7 +308,7 @@ fn cache_hit_replays_reference_locations() {
         let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(&cache_dir);
         analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
-        let locs = analyzer.reference_locations("cached_fn");
+        let locs = analyzer.reference_locations("fn:cached_fn");
         assert!(
             !locs.is_empty(),
             "cache hit should replay reference locations"
@@ -334,7 +334,7 @@ fn compact_index_preserves_reference_locations() {
 
     // After analyze(), the reference index must hold both call sites.
     let locs: Vec<_> = analyzer
-        .reference_locations("ping")
+        .reference_locations("fn:ping")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .collect();
@@ -365,7 +365,7 @@ fn compact_index_survives_re_analyze() {
     // Index is now compact; verify initial state.
     assert!(
         analyzer
-            .reference_locations("helper")
+            .reference_locations("fn:helper")
             .iter()
             .any(|(f, ..)| f == &file_arc),
         "initial reference should be recorded"
@@ -379,7 +379,7 @@ fn compact_index_survives_re_analyze() {
     );
 
     let stale = analyzer
-        .reference_locations("helper")
+        .reference_locations("fn:helper")
         .iter()
         .any(|(f, ..)| f == &file_arc);
     assert!(
@@ -404,7 +404,7 @@ fn this_method_call_records_reference_location() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     assert!(
-        !analyzer.reference_locations("Svc::helper").is_empty(),
+        !analyzer.reference_locations("meth:Svc::helper").is_empty(),
         "$this->helper() should record a reference to Svc::helper"
     );
 }
@@ -422,7 +422,7 @@ fn this_method_call_span_covers_only_name() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let locs: Vec<_> = analyzer
-        .reference_locations("Svc::helper")
+        .reference_locations("meth:Svc::helper")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .collect();
@@ -452,7 +452,7 @@ fn nullsafe_method_call_records_reference_location() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let locs: Vec<_> = analyzer
-        .reference_locations("Svc::run")
+        .reference_locations("meth:Svc::run")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .collect();
@@ -480,7 +480,7 @@ fn instanceof_records_class_reference() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     assert!(
-        !analyzer.reference_locations("Widget").is_empty(),
+        !analyzer.reference_locations("cls:Widget").is_empty(),
         "instanceof Widget should record a reference to Widget"
     );
 }
@@ -498,7 +498,7 @@ fn catch_type_records_class_reference() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     assert!(
-        !analyzer.reference_locations("AppEx").is_empty(),
+        !analyzer.reference_locations("cls:AppEx").is_empty(),
         "catch (AppEx $e) should record a reference to AppEx"
     );
 }
@@ -517,12 +517,12 @@ fn multi_type_catch_records_all_class_references() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let locs_a: Vec<_> = analyzer
-        .reference_locations("ErrA")
+        .reference_locations("cls:ErrA")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .collect();
     let locs_b: Vec<_> = analyzer
-        .reference_locations("ErrB")
+        .reference_locations("cls:ErrB")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .collect();
@@ -550,7 +550,7 @@ fn class_const_syntax_records_class_reference() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     assert!(
-        !analyzer.reference_locations("Router").is_empty(),
+        !analyzer.reference_locations("cls:Router").is_empty(),
         "Router::class should record a reference to Router"
     );
 }
@@ -568,7 +568,7 @@ fn static_const_access_records_class_reference() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     assert!(
-        !analyzer.reference_locations("Config").is_empty(),
+        !analyzer.reference_locations("cls:Config").is_empty(),
         "Config::VERSION should record a reference to Config"
     );
 }
@@ -587,7 +587,7 @@ fn function_param_type_hint_records_class_reference() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let locs: Vec<_> = analyzer
-        .reference_locations("Service")
+        .reference_locations("cls:Service")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .collect();
@@ -612,7 +612,7 @@ fn return_type_hint_records_class_reference() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let locs: Vec<_> = analyzer
-        .reference_locations("Repo")
+        .reference_locations("cls:Repo")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .collect();
@@ -637,7 +637,7 @@ fn property_type_hint_records_class_reference() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let locs: Vec<_> = analyzer
-        .reference_locations("Logger")
+        .reference_locations("cls:Logger")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .collect();
@@ -663,7 +663,7 @@ fn self_const_access_records_constant_reference() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     assert!(
-        !analyzer.reference_locations("Foo::SEP").is_empty(),
+        !analyzer.reference_locations("cnst:Foo::SEP").is_empty(),
         "self::SEP should record a reference to Foo::SEP"
     );
 }
@@ -682,7 +682,7 @@ fn static_const_access_records_constant_reference() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     assert!(
-        !analyzer.reference_locations("Bar::PREFIX").is_empty(),
+        !analyzer.reference_locations("cnst:Bar::PREFIX").is_empty(),
         "static::PREFIX should record a reference to Bar::PREFIX"
     );
 }
@@ -701,7 +701,7 @@ fn parent_const_access_records_constant_reference() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     assert!(
-        !analyzer.reference_locations("Base::TAG").is_empty(),
+        !analyzer.reference_locations("cnst:Base::TAG").is_empty(),
         "parent::TAG should record a reference to Base::TAG"
     );
 }
@@ -720,7 +720,7 @@ fn explicit_class_const_access_records_constant_reference() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     assert!(
-        !analyzer.reference_locations("Config::VERSION").is_empty(),
+        !analyzer.reference_locations("cnst:Config::VERSION").is_empty(),
         "Config::VERSION should record a reference to Config::VERSION"
     );
 }
@@ -728,7 +728,7 @@ fn explicit_class_const_access_records_constant_reference() {
 #[test]
 fn inherited_static_method_call_keys_by_declaring_class() {
     // Child::foo() where foo is declared on Base must record "Base::foo",
-    // not "Child::foo", so that reference_locations("Base::foo") finds the call.
+    // not "Child::foo", so that reference_locations("meth:Base::foo") finds the call.
     let dir = create_temp_dir("test");
     let file = write_file(
         &dir,
@@ -740,11 +740,11 @@ fn inherited_static_method_call_keys_by_declaring_class() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     assert!(
-        !analyzer.reference_locations("Base::foo").is_empty(),
+        !analyzer.reference_locations("meth:Base::foo").is_empty(),
         "Child::foo() should record a reference to the declaring class Base::foo"
     );
     assert!(
-        analyzer.reference_locations("Child::foo").is_empty(),
+        analyzer.reference_locations("meth:Child::foo").is_empty(),
         "Child::foo() must not be recorded under the called subclass key Child::foo"
     );
 }
@@ -752,7 +752,7 @@ fn inherited_static_method_call_keys_by_declaring_class() {
 #[test]
 fn static_property_access_records_class_reference() {
     // Foo::$bar should record a class reference to Foo so that
-    // reference_locations("Foo") includes the static property access.
+    // reference_locations("cls:Foo") includes the static property access.
     let dir = create_temp_dir("test");
     let file = write_file(
         &dir,
@@ -765,7 +765,7 @@ fn static_property_access_records_class_reference() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let class_locs: Vec<_> = analyzer
-        .reference_locations("Config")
+        .reference_locations("cls:Config")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .collect();
@@ -779,7 +779,7 @@ fn static_property_access_records_class_reference() {
 #[test]
 fn static_property_access_records_property_reference() {
     // Foo::$bar should also record a property reference so that
-    // reference_locations("Foo::timeout") finds the static property access.
+    // reference_locations("prop:Foo::timeout") finds the static property access.
     let dir = create_temp_dir("test");
     let file = write_file(
         &dir,
@@ -792,7 +792,7 @@ fn static_property_access_records_property_reference() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let prop_locs: Vec<_> = analyzer
-        .reference_locations("Config::timeout")
+        .reference_locations("prop:Config::timeout")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .collect();
@@ -819,7 +819,7 @@ fn static_method_call_records_class_reference() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let locs: Vec<_> = analyzer
-        .reference_locations("Widget")
+        .reference_locations("cls:Widget")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .collect();
@@ -846,7 +846,7 @@ fn closure_param_type_hint_records_class_reference() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let locs: Vec<_> = analyzer
-        .reference_locations("Logger")
+        .reference_locations("cls:Logger")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .collect();
@@ -872,7 +872,7 @@ fn arrow_function_param_type_hint_records_class_reference() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let locs: Vec<_> = analyzer
-        .reference_locations("Formatter")
+        .reference_locations("cls:Formatter")
         .into_iter()
         .filter(|(f, ..)| f == &file_arc)
         .collect();
