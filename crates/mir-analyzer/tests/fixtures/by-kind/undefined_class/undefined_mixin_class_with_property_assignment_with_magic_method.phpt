@@ -12,3 +12,4 @@ class A {
 
 (new A)->foo = "bar";
 ===expect===
+UndefinedDocblockClass@2:0-5:3: Docblock type 'B' does not exist

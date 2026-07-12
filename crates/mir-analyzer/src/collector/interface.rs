@@ -202,6 +202,8 @@ impl<'a> DefinitionCollector<'a> {
             &mut own_methods,
             &mut own_properties,
             Some(self.location(stmt_span.start, stmt_span.end)),
+            &iface_template_names,
+            &template_params,
         );
         let seal_properties = iface_doc.seal_properties;
 

@@ -224,6 +224,8 @@ impl<'a> DefinitionCollector<'a> {
             &mut own_methods,
             &mut own_properties,
             Some(self.location(stmt_span.start, stmt_span.end)),
+            &trait_template_names,
+            &trait_template_params,
         );
 
         let require_extends: Vec<Arc<str>> = trait_doc

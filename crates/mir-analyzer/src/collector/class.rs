@@ -412,6 +412,8 @@ impl<'a> DefinitionCollector<'a> {
             &mut own_methods,
             &mut own_properties,
             Some(self.location(stmt_span.start, stmt_span.end)),
+            &class_template_names,
+            &class_template_params,
         );
 
         let template_params: Vec<TemplateParam> = class_template_params;

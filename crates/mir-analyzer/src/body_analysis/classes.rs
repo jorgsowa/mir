@@ -212,6 +212,114 @@ impl<'a> BodyAnalyzer<'a> {
         }
     }
 
+    /// `UndefinedDocblockClass`/`cls:` usage for class-level magic docblock
+    /// tags — `@mixin`, `@property`/`@property-read`/`@property-write`, and
+    /// `@method` — each of which names a class/interface/trait that must
+    /// exist and is a real (virtual) reference to it. None of these tags
+    /// correspond to a native AST member (`@mixin` names a class, and
+    /// `@property`/`@method` are synthesized by the collector into
+    /// `own_properties`/`own_methods` — see `add_docblock_members` — only
+    /// when no real member of that name exists), so the per-member loop in
+    /// `analyze_class_decl` over `decl.body.members` never sees them.
+    /// Distinguishes synthesized members from real ones via
+    /// `PropertyDef::from_docblock`/`MethodDef::is_virtual`, which a real
+    /// declared member never sets.
+    fn check_class_docblock_magic_members(
+        &self,
+        decl: &php_ast::owned::ClassDecl,
+        fqcn: &str,
+        file: &Arc<str>,
+        source: &str,
+        source_map: &php_rs_parser::source_map::SourceMap,
+        all_issues: &mut Vec<Issue>,
+    ) {
+        if self.mode != AnalysisMode::Full {
+            return;
+        }
+        let Some(doc_comment) = &decl.doc_comment else {
+            return;
+        };
+        let (line, col_start) =
+            crate::diagnostics::offset_to_line_col(source, doc_comment.span.start, source_map);
+        let (line_end, col_end) =
+            crate::diagnostics::offset_to_line_col(source, doc_comment.span.end, source_map);
+        let location = mir_issues::Location {
+            file: file.clone(),
+            line,
+            line_end,
+            col_start,
+            col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
+        };
+
+        let check_class_name = |cls_fqcn: &str, all_issues: &mut Vec<Issue>| {
+            if crate::diagnostics::is_pseudo_type(cls_fqcn) {
+                return;
+            }
+            if !crate::db::class_exists(self.db, cls_fqcn) {
+                all_issues.push(mir_issues::Issue::new(
+                    mir_issues::IssueKind::UndefinedDocblockClass {
+                        name: cls_fqcn.to_string(),
+                    },
+                    location.clone(),
+                ));
+            } else {
+                self.db.record_reference_location(crate::db::RefLoc {
+                    symbol_key: Arc::from(format!("cls:{cls_fqcn}")),
+                    file: location.file.clone(),
+                    line: location.line,
+                    col_start: location.col_start,
+                    col_end: location.col_end,
+                });
+            }
+        };
+
+        let type_class_names = |ty: &mir_types::Type| -> Vec<mir_types::Name> {
+            ty.types
+                .iter()
+                .filter_map(|atomic| match atomic {
+                    mir_types::Atomic::TNamedObject { fqcn, .. } => Some(fqcn.clone()),
+                    _ => None,
+                })
+                .collect()
+        };
+
+        let here = crate::db::Fqcn::from_str(self.db, fqcn);
+        let Some(class) = crate::db::find_class_like(self.db, here) else {
+            return;
+        };
+
+        for mixin_fqcn in class.mixins() {
+            check_class_name(mixin_fqcn.as_ref(), all_issues);
+        }
+
+        if let Some(props) = class.own_properties() {
+            for prop in props.values().filter(|p| p.from_docblock) {
+                let Some(ty) = prop.ty.as_deref() else {
+                    continue;
+                };
+                for cls_fqcn in type_class_names(ty) {
+                    check_class_name(cls_fqcn.as_ref(), all_issues);
+                }
+            }
+        }
+
+        for method in class.own_methods().values().filter(|m| m.is_virtual) {
+            if let Some(ret) = method.return_type.as_deref() {
+                for cls_fqcn in type_class_names(ret) {
+                    check_class_name(cls_fqcn.as_ref(), all_issues);
+                }
+            }
+            for param in method.params.iter() {
+                let Some(ty) = param.ty.as_deref() else {
+                    continue;
+                };
+                for cls_fqcn in type_class_names(ty) {
+                    check_class_name(cls_fqcn.as_ref(), all_issues);
+                }
+            }
+        }
+    }
+
     /// Analyze one class-like member method: hint checks, optional parameter
     /// default-value analysis, FlowState construction, body statement
     /// analysis, unused-param/-var emission, optional return checks, and
@@ -529,6 +637,8 @@ impl<'a> BodyAnalyzer<'a> {
             }
         }
 
+        self.check_class_docblock_magic_members(decl, fqcn, file, source, source_map, all_issues);
+
         let scope_cx = MethodScopeCx {
             fqcn: Arc::from(fqcn),
             parent_fqcn: parent_fqcn.clone(),
@@ -626,6 +736,8 @@ impl<'a> BodyAnalyzer<'a> {
                 );
             }
         }
+
+        self.check_class_docblock_magic_members(decl, fqcn, file, source, source_map, all_issues);
 
         let scope_cx = MethodScopeCx {
             fqcn: Arc::from(fqcn),

@@ -498,6 +498,58 @@ impl<'a> DefinitionCollector<'a> {
         resolution::resolve_union_opt(opt, &self.namespace, &self.use_aliases)
     }
 
+    /// Like `resolve_union_doc_with_templates`, but also expands a bare class
+    /// name matching a same-file `@psalm-type`/`@phpstan-type` alias before
+    /// falling back to template/namespace resolution. Used for magic
+    /// `@property`/`@method` docblock member types (`add_docblock_members`),
+    /// which — unlike a real member's `@var`/`@param`/`@return` — previously
+    /// went through `resolve_union_doc_with_aliases` alone: that resolver
+    /// deliberately leaves a bare, non-aliased class name namespace-unqualified
+    /// (see the comment on `substitute_template_params`), so `@property Foo $x`
+    /// inside a namespaced file stored the literal, unqualified name `Foo`
+    /// instead of `App\Foo` — silently failing every existence check and
+    /// reference recording done against it.
+    fn resolve_docblock_member_type(
+        &self,
+        union: Type,
+        aliases: &FxHashMap<String, Type>,
+        template_names: &rustc_hash::FxHashSet<String>,
+        template_params: &[TemplateParam],
+        defining_entity: &str,
+    ) -> Type {
+        if aliases.is_empty() {
+            return self.resolve_union_doc_with_templates(
+                union,
+                template_names,
+                defining_entity,
+                template_params,
+            );
+        }
+        let mut result = Type::empty();
+        result.possibly_undefined = union.possibly_undefined;
+        result.from_docblock = union.from_docblock;
+        for atomic in union.types {
+            if let Atomic::TNamedObject { fqcn, type_params } = &atomic {
+                if type_params.is_empty() {
+                    if let Some(alias_ty) = aliases.get(fqcn.as_ref()) {
+                        result.merge_with(alias_ty);
+                        continue;
+                    }
+                }
+            }
+            let resolved = self.resolve_union_doc_with_templates(
+                Type::single(atomic),
+                template_names,
+                defining_entity,
+                template_params,
+            );
+            for resolved_atomic in resolved.types {
+                result.add_type(resolved_atomic);
+            }
+        }
+        result
+    }
+
     fn resolve_union_doc_with_templates(
         &self,
         union: Type,
@@ -1052,6 +1104,7 @@ impl<'a> DefinitionCollector<'a> {
         aliases
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn add_docblock_members(
         &self,
         doc: &crate::parser::ParsedDocblock,
@@ -1060,6 +1113,8 @@ impl<'a> DefinitionCollector<'a> {
         own_methods: &mut mir_codebase::definitions::MemberMap<Arc<MethodDef>>,
         own_properties: &mut mir_codebase::definitions::MemberMap<PropertyDef>,
         location: Option<Location>,
+        template_names: &rustc_hash::FxHashSet<String>,
+        template_params: &[TemplateParam],
     ) {
         for prop in &doc.properties {
             if prop.name.is_empty() || own_properties.contains_key(prop.name.as_str()) {
@@ -1070,7 +1125,13 @@ impl<'a> DefinitionCollector<'a> {
             } else {
                 let mut parsed = crate::parser::docblock::parse_type_string(&prop.type_hint);
                 parsed.from_docblock = true;
-                Some(self.resolve_union_doc_with_aliases(parsed, aliases))
+                Some(self.resolve_docblock_member_type(
+                    parsed,
+                    aliases,
+                    template_names,
+                    template_params,
+                    class_fqcn,
+                ))
             };
             own_properties.insert(
                 Arc::from(prop.name.as_str()),
@@ -1107,7 +1168,13 @@ impl<'a> DefinitionCollector<'a> {
                 let mut parsed = crate::parser::docblock::parse_type_string(&method.return_type);
                 parsed.from_docblock = true;
                 Some(Self::fill_self_static_parent(
-                    self.resolve_union_doc_with_aliases(parsed, aliases),
+                    self.resolve_docblock_member_type(
+                        parsed,
+                        aliases,
+                        template_names,
+                        template_params,
+                        class_fqcn,
+                    ),
                     class_fqcn,
                 ))
             };
@@ -1120,7 +1187,13 @@ impl<'a> DefinitionCollector<'a> {
                     } else {
                         let mut parsed = crate::parser::docblock::parse_type_string(&p.type_hint);
                         parsed.from_docblock = true;
-                        Some(self.resolve_union_doc_with_aliases(parsed, aliases))
+                        Some(self.resolve_docblock_member_type(
+                            parsed,
+                            aliases,
+                            template_names,
+                            template_params,
+                            class_fqcn,
+                        ))
                     };
                     DeclaredParam {
                         name: Name::new(p.name.as_str()),

@@ -207,6 +207,8 @@ impl DefinitionCollector<'_> {
             &mut own_methods,
             &mut dummy_properties,
             Some(self.location(stmt_span.start, stmt_span.end)),
+            &rustc_hash::FxHashSet::default(),
+            &[],
         );
 
         self.slice

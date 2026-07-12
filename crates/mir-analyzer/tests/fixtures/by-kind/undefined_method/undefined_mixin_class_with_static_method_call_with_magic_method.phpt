@@ -12,3 +12,4 @@ class A {
 
 A::foo();
 ===expect===
+UndefinedDocblockClass@2:0-5:3: Docblock type 'B' does not exist
