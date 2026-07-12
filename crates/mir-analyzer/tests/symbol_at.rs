@@ -269,6 +269,35 @@ fn symbol_at_finds_this_property_access() {
 }
 
 #[test]
+fn symbol_at_finds_property_write_target() {
+    // $this->count = 5 (a plain-assignment write, not a read/compound-op) must
+    // resolve on the property name, matching the read side ($this->count++).
+    let dir = create_temp_dir("test");
+    let src = "<?php\nclass Counter { public int $count = 0;\npublic function reset(): void { $this->count = 0; } }\n";
+    let file = write_file(&dir, "prop_write.php", src);
+    let file_str = path_to_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let offset = src.find("->count = 0;").unwrap() as u32 + 2; // +2 skips '->'
+    let sym = result
+        .symbol_at(file_str, offset)
+        .expect("symbol_at should resolve the $this->count write target");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::PropertyAccess { property, .. } if property.as_ref() == "count"),
+        "expected PropertyAccess(count) for the write target, got {:?}",
+        sym.kind
+    );
+
+    let key = sym
+        .codebase_key()
+        .expect("PropertyAccess must have a codebase key");
+    assert_eq!(key, "prop:Counter::count");
+}
+
+#[test]
 fn symbol_at_this_method_call_full_lsp_flow() {
     // Verify the full LSP flow: cursor → codebase_key → get_reference_locations.
     // Two calls to $this->helper() from the same method must both be indexed.

@@ -448,6 +448,22 @@ impl<'a> ExpressionAnalyzer<'a> {
                             let prop_declaring_class =
                                 prop_found.as_ref().map(|(cls, _)| cls.clone());
                             let prop_def = prop_found.map(|(_, p)| p);
+                            // Without this, hover/go-to-definition on the property name
+                            // worked on the read side (analyze_property_access) but not
+                            // on a plain-assignment write target ($this->prop = ...).
+                            self.record_symbol(
+                                pa.property.span,
+                                crate::symbol::ReferenceKind::PropertyAccess {
+                                    class: prop_declaring_class
+                                        .clone()
+                                        .unwrap_or_else(|| std::sync::Arc::from(fqcn.as_ref())),
+                                    property: std::sync::Arc::from(prop_name.as_str()),
+                                },
+                                prop_def
+                                    .as_ref()
+                                    .and_then(|p| p.ty.as_deref().cloned())
+                                    .unwrap_or_else(|| ty.clone()),
+                            );
                             // Emit DeprecatedProperty if the property is deprecated
                             if let Some(ref p) = prop_def {
                                 if let Some(msg) = &p.deprecated {
