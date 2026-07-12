@@ -403,6 +403,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     let db = self.db;
                     let here = crate::db::Fqcn::from_str(db, &resolved_fqn);
                     if let Some(f) = crate::db::find_function(db, here) {
+                        self.record_ref(Arc::from(format!("fn:{}", f.fqn)), name_expr.span);
                         if let Some((used, canonical)) =
                             crate::fqcn_case_mismatch(&resolved_fqn, f.fqn.as_ref())
                         {
@@ -479,6 +480,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                         &fqcn_arc,
                         &method_name_lower,
                     ) {
+                        self.record_ref(
+                            Arc::from(format!(
+                                "meth:{}::{}",
+                                resolved.owner_fqcn, method_name_lower
+                            )),
+                            method.span,
+                        );
                         // Substitute this receiver's own bound type params (e.g.
                         // `Box<int>`'s T -> int) into the method's raw param/return
                         // types before building the callable — otherwise a
@@ -527,6 +535,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 };
                 let method_name_lower = crate::util::php_ident_lowercase(method_name.as_ref());
                 let mut receiver_type_params: Vec<Type> = Vec::new();
+                let is_named_class = matches!(&class.kind, ExprKind::Identifier(_));
                 let fqcn = match &class.kind {
                     ExprKind::Identifier(name) => {
                         let resolved =
@@ -568,10 +577,41 @@ impl<'a> ExpressionAnalyzer<'a> {
                         }
                     }
                 };
+                // A named class token (`Foo::bar(...)`) must resolve to a real
+                // class — unlike the object-derived branch above, whose fqcn
+                // already came from a resolved (thus existing) receiver type.
+                // Without this check an undefined class here silently produced
+                // a generic `TCallable` with no diagnostic at all, unlike the
+                // identical `Foo::bar()` direct-call form.
+                if is_named_class
+                    && !matches!(fqcn.as_str(), "self" | "static" | "parent")
+                    && !crate::db::class_exists(self.db, &fqcn)
+                    && !ctx.is_class_guarded(fqcn.as_str())
+                {
+                    self.emit(
+                        IssueKind::UndefinedClass { name: fqcn },
+                        Severity::Error,
+                        class.span,
+                    );
+                    return Type::single(Atomic::TCallable {
+                        params: None,
+                        return_type: None,
+                    });
+                }
                 let fqcn_arc: Arc<str> = Arc::from(fqcn.as_str());
+                if is_named_class {
+                    self.record_ref(Arc::from(format!("cls:{fqcn_arc}")), class.span);
+                }
                 if let Some(resolved) =
                     crate::call::method::resolve_method_from_db(self, &fqcn_arc, &method_name_lower)
                 {
+                    self.record_ref(
+                        Arc::from(format!(
+                            "meth:{}::{}",
+                            resolved.owner_fqcn, method_name_lower
+                        )),
+                        method.span,
+                    );
                     // Same reasoning as the instance-method FCC case above: substitute
                     // the receiver's own bound type params before building the callable.
                     let class_tps = crate::db::class_template_params(self.db, &fqcn_arc)

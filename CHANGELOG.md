@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`PropertyTypeRedeclarationMismatch`:** a redeclared typed property is now compared by its native type hint alone, matching the PHP runtime rule; a differing `@var` docblock refinement (e.g. a narrower array value type) on an otherwise-identical native hint is no longer falsely flagged.
 - **Reference-index bookkeeping:** sessions built with `without_reference_index()` no longer read from the (intentionally empty) `RefIndex` during reverse-dependency cache upkeep on every edit.
 - **Reference-index key collisions between a method, property, and class constant of the same name:** `Foo::bar` as both a property and a method shared one reference-index entry, so `references_to` merged their locations together and a truly-dead property could hide behind a same-named method's usage — a false negative in `UnusedProperty`. Reference-index keys are now kind-prefixed (`cls:`/`fn:`/`meth:`/`prop:`/`cnst:`/`gcnst:`).
+- **First-class callables (`$this->method(...)`, `self::method(...)`/`Class::method(...)`, `func(...)`) no longer record a reference:** a private method/function used only by taking it as a first-class callable was falsely reported `UnusedMethod`/`UnusedFunction`. A static-method first-class callable on an undefined class (`MissingClass::baz(...)`) also silently produced a generic callable instead of reporting `UndefinedClass`, unlike the equivalent direct-call form.
 
 ## [0.51.0] - 2026-07-10
 
