@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.53.1] - 2026-07-12
+
+### Fixed
+
+- **`$this` inside a free-standing closure/arrow function falsely flagged `InvalidScope`:** a closure declared outside any class can legitimately reference `$this` if it's later rebound to an object via `Closure::bind()`/`bindTo()`/`call()` — a common macro/PHPUnit-style idiom. `$this` was only seeded into a closure's flow-state when it was lexically inside a method; non-static closures and arrow functions now seed `$this` as a generic object instead of leaving it undefined.
+- **View-template path detection missed mixed path separators:** `is_view_template_path` matched only pure `/resources/views/` or `\resources\views\` substrings, so it missed paths mixing both separators — which `PathBuf::join` produces on Windows when the joined-in component already contains forward slashes — silently suppressing no diagnostics for such paths and failing fixture tests on `windows-latest` CI. Detection now splits on either separator instead of substring-matching.
+- **Nested `@psalm-type`/`@phpstan-type` aliases only expanded one level deep:** an alias whose body referenced another same-file alias (`@psalm-type UserId = Id` where `Id` is itself an alias) resolved to the unexpanded alias name instead of its final type. Alias expansion is now re-run to a fixpoint, bounded so a cyclic alias definition converges to a stable self-reference instead of looping.
+- **Single-file `symbol_at` missed chained-call cursor positions:** `FileAnalysis::symbol_at` — the per-file/open-document query path used by editor integrations for hover, go-to-definition, and completion — only matched a byte offset against a symbol's identifier span, so a cursor sitting in a chained call's gap (e.g. right after `->` following `$f->bar()->`) resolved to nothing. `BatchAnalysis::symbol_at` already had a fallback to the call's full expression span for exactly this case; the single-file path had fallen out of sync with it and now uses the same fallback.
+
 ## [0.53.0] - 2026-07-12
 
 ### Added
