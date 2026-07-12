@@ -1189,3 +1189,52 @@ fn reanalyze_dependents_lazy_load_warmup_does_not_deadlock() {
         Err(e) => panic!("worker channel error: {e:?}"),
     }
 }
+
+#[test]
+fn references_to_finds_extends_implements_and_trait_use() {
+    // `extends`, `implements`, and trait `use` name a class/interface/trait
+    // just as much as `new Foo()` does — references_to() must find those
+    // sites too, not just constructor/static-call/type-hint usages.
+    use mir_analyzer::FileAnalyzer;
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_all_stubs();
+
+    let file: Arc<str> = Arc::from("hierarchy.php");
+    let source: Arc<str> = Arc::from(
+        "<?php\n\
+         class Base {}\n\
+         interface Greets {}\n\
+         trait Helper {}\n\
+         class Child extends Base implements Greets {\n\
+             use Helper;\n\
+         }\n",
+    );
+
+    session.ingest_file(file.clone(), source.clone());
+    let parsed = php_rs_parser::parse(&source);
+    let _ = FileAnalyzer::new(&session).analyze(
+        file.clone(),
+        &source,
+        &parsed.program,
+        &parsed.source_map,
+    );
+
+    let base_refs = session.references_to(&Name::class("Base"));
+    assert!(
+        base_refs.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
+        "references_to(Base) must find `class Child extends Base`"
+    );
+
+    let iface_refs = session.references_to(&Name::class("Greets"));
+    assert!(
+        iface_refs.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
+        "references_to(Greets) must find `implements Greets`"
+    );
+
+    let trait_refs = session.references_to(&Name::class("Helper"));
+    assert!(
+        trait_refs.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
+        "references_to(Helper) must find `use Helper;`"
+    );
+}

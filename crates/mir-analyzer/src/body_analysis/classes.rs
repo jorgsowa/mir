@@ -499,6 +499,7 @@ impl<'a> BodyAnalyzer<'a> {
                     source_map,
                     all_issues,
                     self.php_version,
+                    self.mode == AnalysisMode::Full,
                 );
             }
         }
@@ -514,6 +515,7 @@ impl<'a> BodyAnalyzer<'a> {
                     source_map,
                     all_issues,
                     self.php_version,
+                    self.mode == AnalysisMode::Full,
                 );
             }
         }
@@ -595,6 +597,7 @@ impl<'a> BodyAnalyzer<'a> {
                     source_map,
                     all_issues,
                     self.php_version,
+                    self.mode == AnalysisMode::Full,
                 );
             }
         }
@@ -610,6 +613,7 @@ impl<'a> BodyAnalyzer<'a> {
                     source_map,
                     all_issues,
                     self.php_version,
+                    self.mode == AnalysisMode::Full,
                 );
             }
         }
@@ -713,6 +717,17 @@ impl<'a> BodyAnalyzer<'a> {
                 }
                 Some(c) => c,
             };
+
+            if self.mode == AnalysisMode::Full {
+                let loc = make_loc();
+                self.db.record_reference_location(crate::db::RefLoc {
+                    symbol_key: Arc::from(format!("cls:{trait_fqcn}")),
+                    file: loc.file.clone(),
+                    line: loc.line,
+                    col_start: loc.col_start,
+                    col_end: loc.col_end,
+                });
+            }
 
             if !trait_class.is_trait() {
                 let (article, kind) = if trait_class.is_interface() {

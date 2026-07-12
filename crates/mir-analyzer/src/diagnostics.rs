@@ -239,6 +239,7 @@ fn collect_type_hint_class_refs_inner(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn check_name_class(
     name: &php_ast::owned::Name,
     db: &dyn MirDatabase,
@@ -247,6 +248,7 @@ pub(crate) fn check_name_class(
     source_map: &php_rs_parser::source_map::SourceMap,
     issues: &mut Vec<mir_issues::Issue>,
     php_version: PhpVersion,
+    record_refs: bool,
 ) {
     check_name_class_with_context(
         name,
@@ -257,9 +259,11 @@ pub(crate) fn check_name_class(
         issues,
         php_version,
         false,
+        record_refs,
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn check_name_class_for_extends(
     name: &php_ast::owned::Name,
     db: &dyn MirDatabase,
@@ -268,6 +272,7 @@ pub(crate) fn check_name_class_for_extends(
     source_map: &php_rs_parser::source_map::SourceMap,
     issues: &mut Vec<mir_issues::Issue>,
     php_version: PhpVersion,
+    record_refs: bool,
 ) {
     check_name_class_with_context(
         name,
@@ -278,6 +283,7 @@ pub(crate) fn check_name_class_for_extends(
         issues,
         php_version,
         true,
+        record_refs,
     );
 }
 
@@ -291,6 +297,7 @@ fn check_name_class_with_context(
     issues: &mut Vec<mir_issues::Issue>,
     php_version: PhpVersion,
     is_extends: bool,
+    record_refs: bool,
 ) {
     let name_str = crate::parser::name_to_string_owned(name);
     let resolved = resolve_name(db, file.as_ref(), &name_str);
@@ -328,6 +335,19 @@ fn check_name_class_with_context(
             .with_snippet(crate::parser::span_text(source, span).unwrap_or_default()),
         );
         return;
+    }
+
+    if record_refs {
+        let span = name.span;
+        let (line, col_start) = offset_to_line_col(source, span.start, source_map);
+        let (line_end, col_end) = offset_to_line_col(source, span.end, source_map);
+        db.record_reference_location(crate::db::RefLoc {
+            symbol_key: Arc::from(format!("cls:{resolved}")),
+            file: file.clone(),
+            line,
+            col_start,
+            col_end: clamp_col_end(line, line_end, col_start, col_end),
+        });
     }
 
     // Check if extending an interface

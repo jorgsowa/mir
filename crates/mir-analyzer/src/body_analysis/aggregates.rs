@@ -199,6 +199,7 @@ impl<'a> BodyAnalyzer<'a> {
                 source_map,
                 all_issues,
                 self.php_version,
+                self.mode == AnalysisMode::Full,
             );
         }
 
@@ -271,6 +272,7 @@ impl<'a> BodyAnalyzer<'a> {
                 source_map,
                 all_issues,
                 self.php_version,
+                self.mode == AnalysisMode::Full,
             );
         }
 
@@ -343,6 +345,7 @@ impl<'a> BodyAnalyzer<'a> {
                 source_map,
                 all_issues,
                 self.php_version,
+                self.mode == AnalysisMode::Full,
             );
         }
         let iface_name = decl.name.as_deref().unwrap_or("<anonymous>");
