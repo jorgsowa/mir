@@ -402,6 +402,29 @@ impl CallAnalyzer {
             }
         }
 
+        // A string-literal class name passed to one of these reflection-like
+        // builtins is a real (runtime) reference to that class — record it,
+        // or a class checked/reflected on only this way is falsely flagged
+        // UnusedClass. `is_a`/`is_subclass_of`/`method_exists` take the class
+        // name in a different argument position than `class_exists`'s family.
+        let class_name_arg_index: Option<usize> = match resolved_fn_name.to_ascii_lowercase().as_str()
+        {
+            "class_exists" | "interface_exists" | "trait_exists" | "enum_exists" => Some(0),
+            "is_a" | "is_subclass_of" => Some(1),
+            "method_exists" => Some(0),
+            _ => None,
+        };
+        if let Some(idx) = class_name_arg_index {
+            if let Some(arg) = call.args.get(idx) {
+                if let ExprKind::String(name) = &arg.value.kind {
+                    let resolved_class = crate::db::resolve_name(ea.db, &ea.file, name.as_ref());
+                    if crate::db::class_exists(ea.db, &resolved_class) {
+                        ea.record_ref(Arc::from(format!("cls:{resolved_class}")), arg.span);
+                    }
+                }
+            }
+        }
+
         // compact() reads variables by string name at runtime; mark each string-literal arg as read
         if fn_name == "compact" {
             for arg in call.args.iter() {
