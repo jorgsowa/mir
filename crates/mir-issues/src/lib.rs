@@ -85,6 +85,17 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/expr/objects.rs`.
     /// Fixtures: `tests/fixtures/by-kind/undefined_class/trait_constant_accessed_directly*.phpt`.
     TraitConstantAccessedDirectly { trait_name: String, constant: String },
+    /// A trait `use` adaptation (`use T { T::missing as alias; }`, or an
+    /// unqualified `as` naming no method any used trait declares) aliases a
+    /// method that doesn't exist — a PHP fatal error at class-declaration
+    /// time, checked the same way a bad `insteadof`/undefined trait already
+    /// is by `check_trait_constraints`.
+    /// Emitted by `mir-analyzer/src/body_analysis/classes.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/undefined_method/trait_alias*.phpt`.
+    UndefinedTraitAliasMethod {
+        trait_name: Option<String>,
+        method: String,
+    },
     /// Emitted when `parent::` is used in a class that has no parent.
     /// Fixtures: `tests/fixtures/by-kind/undefined_class/no_parent*.phpt`.
     ParentNotFound,
@@ -772,6 +783,7 @@ impl IssueKind {
             | IssueKind::InvalidTraitUse { .. }
             | IssueKind::UndefinedTrait { .. }
             | IssueKind::TraitConstantAccessedDirectly { .. }
+            | IssueKind::UndefinedTraitAliasMethod { .. }
             | IssueKind::InvalidClone { .. }
             | IssueKind::InvalidToString { .. }
             | IssueKind::TypeCheckMismatch { .. }
@@ -943,6 +955,7 @@ impl IssueKind {
             IssueKind::UndefinedConstant { .. } => "MIR0007",
             IssueKind::InaccessibleClassConstant { .. } => "MIR0011",
             IssueKind::TraitConstantAccessedDirectly { .. } => "MIR0012",
+            IssueKind::UndefinedTraitAliasMethod { .. } => "MIR0013",
             IssueKind::PossiblyUndefinedVariable { .. } => "MIR0008",
             IssueKind::UndefinedTrait { .. } => "MIR0009",
             IssueKind::ParentNotFound => "MIR0010",
@@ -1135,7 +1148,8 @@ impl IssueKind {
         match code {
             // Errors
             "MIR0001" | "MIR0002" | "MIR0003" | "MIR0004" | "MIR0005" | "MIR0007" | "MIR0009"
-            | "MIR0010" | "MIR0011" | "MIR0012" | "MIR0200" | "MIR0201" | "MIR0202" | "MIR0203" | "MIR0204"
+            | "MIR0010" | "MIR0011" | "MIR0012" | "MIR0013" | "MIR0200" | "MIR0201" | "MIR0202"
+            | "MIR0203" | "MIR0204"
             | "MIR0205" | "MIR0212" | "MIR0215" | "MIR0216" | "MIR0217" | "MIR0224" | "MIR0600"
             | "MIR0700" | "MIR0701" | "MIR0702" | "MIR0704" | "MIR0705" | "MIR0706" | "MIR0707"
             | "MIR0708" | "MIR0709" | "MIR0711" | "MIR0712" | "MIR0713" | "MIR0714" | "MIR0715"
@@ -1181,6 +1195,7 @@ impl IssueKind {
             IssueKind::UndefinedConstant { .. } => "UndefinedConstant",
             IssueKind::InaccessibleClassConstant { .. } => "InaccessibleClassConstant",
             IssueKind::TraitConstantAccessedDirectly { .. } => "TraitConstantAccessedDirectly",
+            IssueKind::UndefinedTraitAliasMethod { .. } => "UndefinedTraitAliasMethod",
             IssueKind::PossiblyUndefinedVariable { .. } => "PossiblyUndefinedVariable",
             IssueKind::UndefinedTrait { .. } => "UndefinedTrait",
             IssueKind::ParentNotFound => "ParentNotFound",
@@ -1375,6 +1390,10 @@ impl IssueKind {
             } => {
                 format!("Cannot access trait constant {trait_name}::{constant} directly")
             }
+            IssueKind::UndefinedTraitAliasMethod { trait_name, method } => match trait_name {
+                Some(t) => format!("An alias was defined for {t}::{method} but this method does not exist"),
+                None => format!("An alias was defined for {method} but this method does not exist"),
+            },
             IssueKind::ParentNotFound => {
                 "Cannot use parent:: when current class has no parent".to_string()
             }
@@ -2138,6 +2157,10 @@ mod code_tests {
                 trait_name: s(),
                 constant: s(),
             },
+            IssueKind::UndefinedTraitAliasMethod {
+                trait_name: Some(s()),
+                method: s(),
+            },
             IssueKind::ParentNotFound,
             IssueKind::NullArgument {
                 param: s(),
@@ -2537,6 +2560,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 150);
+        assert_eq!(one_of_each().len(), 151);
     }
 }

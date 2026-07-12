@@ -53,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`UndefinedDocblockClass` never checked a method's own `@return` docblock type:** only free functions got this check, so `/** @return UndefinedClass */` on a method silently passed. Reuses the method's already-resolved (template-substituted, alias-expanded) return type rather than re-parsing the docblock, so `@template`/`@psalm-type` edge cases that already work for the native-hint path aren't reopened.
 - **Enum case value expressions were never analyzed at all:** the enum-analysis loop matched only `EnumMemberKind::Method`, so `case Active = UndefinedClass::VALUE;` (a real PHP fatal on first touch of the enum) went completely unflagged. Each case's value expression is now analyzed against the enum itself.
 - **`TraitConstantAccessedDirectly` (MIR0012):** `SomeTrait::CONST` was treated exactly like a normal class constant fetch — accessing a trait's constant directly (rather than through a class that `use`s it) is a hard PHP fatal error regardless of whether the constant exists, since a trait is never a valid constant-access target.
+- **`UndefinedTraitAliasMethod` (MIR0013):** a trait `use` alias (`use A { A::missing as alias; }`, or an unqualified `missing as alias;` naming no method any used trait declares) was never validated — a PHP fatal error at class-declaration time that previously passed silently.
 
 ## [0.51.0] - 2026-07-10
 

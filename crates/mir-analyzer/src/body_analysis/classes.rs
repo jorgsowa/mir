@@ -724,5 +724,44 @@ impl<'a> BodyAnalyzer<'a> {
                 }
             }
         }
+
+        // `use T { T::missing as alias; }` (or an unqualified `as` naming no
+        // method any used trait declares) — PHP fatals at class-declaration
+        // time. Trait aliases carry no span of their own in storage, so the
+        // diagnostic falls back to the class's own location, mirroring
+        // `make_loc`'s fallback for a trait use with no recorded location.
+        if let crate::db::ClassLike::Class(c) = &class {
+            let fallback_loc = mir_issues::Location {
+                file: file.clone(),
+                line: 1,
+                line_end: 1,
+                col_start: 0,
+                col_end: 0,
+            };
+            for (trait_name_opt, orig_lower, _vis_override, _alias_cased) in
+                c.trait_aliases.values()
+            {
+                let candidates: &[Arc<str>] = match trait_name_opt {
+                    Some(t) => std::slice::from_ref(t),
+                    None => &trait_list,
+                };
+                let found = candidates.iter().any(|t| {
+                    let here = crate::db::Fqcn::from_str(self.db, t.as_ref());
+                    crate::db::find_class_like(self.db, here)
+                        .is_some_and(|cl| cl.own_methods().contains_key(orig_lower.as_ref()))
+                });
+                if !found {
+                    all_issues.push(mir_issues::Issue::new(
+                        mir_issues::IssueKind::UndefinedTraitAliasMethod {
+                            trait_name: trait_name_opt.as_ref().map(|t| {
+                                t.rsplit('\\').next().unwrap_or(t.as_ref()).to_string()
+                            }),
+                            method: orig_lower.to_string(),
+                        },
+                        fallback_loc.clone(),
+                    ));
+                }
+            }
+        }
     }
 }
