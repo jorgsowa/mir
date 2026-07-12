@@ -380,19 +380,27 @@ impl<'a> DefinitionCollector<'a> {
                                 new_modifier,
                                 new_name,
                             } => {
-                                if let Some(new_name) = new_name {
-                                    let alias_cased: Arc<str> =
-                                        name_to_string_owned(new_name).into();
-                                    let new_lower: Arc<str> =
-                                        alias_cased.to_ascii_lowercase().into();
-                                    let orig_lower: Arc<str> =
-                                        name_to_string_owned(method).to_ascii_lowercase().into();
-                                    let trait_fqcn: Option<Arc<str>> =
-                                        trait_name.as_ref().map(|t| {
-                                            self.resolve_name(&name_to_string_owned(t)).into()
-                                        });
-                                    let vis_override =
-                                        new_modifier.map(|v| Self::convert_visibility(Some(v)));
+                                // `new_name` is `None` for a visibility-only adaptation
+                                // (`use T { foo as protected; }`) — still record it,
+                                // keyed by the original method's own name, or the
+                                // visibility override is silently dropped and the
+                                // trait's originally-declared visibility leaks through
+                                // (e.g. a demoted-to-private method stays externally
+                                // callable, and its visibility is asserted at
+                                // call/property-resolution sites via `trait_aliases`).
+                                let alias_cased: Arc<str> = new_name
+                                    .as_ref()
+                                    .map(|n| name_to_string_owned(n).into())
+                                    .unwrap_or_else(|| name_to_string_owned(method).into());
+                                let new_lower: Arc<str> = alias_cased.to_ascii_lowercase().into();
+                                let orig_lower: Arc<str> =
+                                    name_to_string_owned(method).to_ascii_lowercase().into();
+                                let trait_fqcn: Option<Arc<str>> = trait_name
+                                    .as_ref()
+                                    .map(|t| self.resolve_name(&name_to_string_owned(t)).into());
+                                let vis_override =
+                                    new_modifier.map(|v| Self::convert_visibility(Some(v)));
+                                if new_name.is_some() || vis_override.is_some() {
                                     trait_aliases.insert(
                                         new_lower,
                                         (trait_fqcn, orig_lower, vis_override, alias_cased),
