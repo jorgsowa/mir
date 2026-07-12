@@ -148,6 +148,39 @@ impl<'a> StatementsAnalyzer<'a> {
         param_default_ctx.parent_fqcn = parent_fqcn.clone();
         param_default_ctx.static_fqcn = Some(fqcn.clone());
 
+        // Anonymous classes (and named classes declared nested inside a
+        // function/if-block) are never collected into the codebase's class
+        // definitions, so unlike a top-level `class Foo extends Bar {}` —
+        // checked once from the collected definition — nothing else ever
+        // validates their `extends`/`implements`/`use` targets. Each name is
+        // resolved up front to honor `class_exists`/`interface_exists`/
+        // `trait_exists` guards, matching the top-level check's behavior.
+        if let Some(parent) = &decl.extends {
+            let parent_str = crate::parser::name_to_string_owned(parent);
+            let parent_resolved = crate::db::resolve_name(self.db, &self.file, &parent_str);
+            if !ctx.is_class_guarded(parent_resolved.as_str()) {
+                self.check_name_undefined_class(parent);
+            }
+        }
+        for iface in decl.implements.iter() {
+            let iface_str = crate::parser::name_to_string_owned(iface);
+            let iface_resolved = crate::db::resolve_name(self.db, &self.file, &iface_str);
+            if !ctx.is_class_guarded(iface_resolved.as_str()) {
+                self.check_name_undefined_class(iface);
+            }
+        }
+        for member in decl.body.members.iter() {
+            if let ClassMemberKind::TraitUse(tu) = &member.kind {
+                for trait_name in tu.traits.iter() {
+                    let trait_str = crate::parser::name_to_string_owned(trait_name);
+                    let trait_resolved = crate::db::resolve_name(self.db, &self.file, &trait_str);
+                    if !ctx.is_class_guarded(trait_resolved.as_str()) {
+                        self.check_name_undefined_trait(trait_name);
+                    }
+                }
+            }
+        }
+
         for member in decl.body.members.iter() {
             let ClassMemberKind::Method(method) = &member.kind else {
                 continue;

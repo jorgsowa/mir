@@ -535,6 +535,37 @@ impl<'a> StatementsAnalyzer<'a> {
         ));
     }
 
+    /// Emit `UndefinedTrait` for a `use` clause's trait name if it does not
+    /// resolve to a real trait. Used by anonymous (and nested named) class
+    /// declarations, which — unlike a top-level class — are never collected
+    /// into the codebase, so `check_trait_constraints`'s definition-based
+    /// walk never sees them.
+    pub(crate) fn check_name_undefined_trait(&mut self, name: &php_ast::owned::Name) {
+        let raw = crate::parser::name_to_string_owned(name);
+        let resolved = crate::db::resolve_name(self.db, &self.file, &raw);
+        if crate::db::class_exists(self.db, &resolved) {
+            return;
+        }
+        let short = resolved
+            .rsplit('\\')
+            .next()
+            .unwrap_or(resolved.as_str())
+            .to_string();
+        let span = name.span;
+        let (line, col_start) = self.offset_to_line_col(span.start);
+        let (line_end, col_end) = self.offset_to_line_col(span.end);
+        self.issues.add(Issue::new(
+            IssueKind::UndefinedTrait { name: short },
+            Location {
+                file: self.file.clone(),
+                line,
+                line_end,
+                col_start,
+                col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
+            },
+        ));
+    }
+
     // -----------------------------------------------------------------------
     // @psalm-suppress / @suppress per-statement
     // -----------------------------------------------------------------------
