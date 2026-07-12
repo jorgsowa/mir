@@ -547,6 +547,55 @@ impl<'a> BodyAnalyzer<'a> {
             }
         }
     }
+
+    /// `UndefinedDocblockClass`/`cls:` usage for a function or method's
+    /// `@throws` docblock tags, attached at `span` (the declaration header —
+    /// individual `@throws` tags carry no span of their own). `throws` is
+    /// the collector-resolved, already-namespace-resolved list.
+    fn check_and_record_throws_classes(
+        &self,
+        throws: &[Arc<str>],
+        span: php_ast::Span,
+        file: &Arc<str>,
+        source: &str,
+        source_map: &php_rs_parser::source_map::SourceMap,
+        all_issues: &mut Vec<Issue>,
+    ) {
+        if self.mode != AnalysisMode::Full || throws.is_empty() {
+            return;
+        }
+        let (line, col_start) = crate::diagnostics::offset_to_line_col(source, span.start, source_map);
+        let (line_end, col_end) = crate::diagnostics::offset_to_line_col(source, span.end, source_map);
+        for fqcn in throws {
+            if crate::diagnostics::is_pseudo_type(fqcn.as_ref()) {
+                continue;
+            }
+            if !crate::db::class_exists(self.db, fqcn.as_ref()) {
+                all_issues.push(Issue::new(
+                    mir_issues::IssueKind::UndefinedDocblockClass {
+                        name: fqcn.to_string(),
+                    },
+                    mir_issues::Location {
+                        file: file.clone(),
+                        line,
+                        line_end,
+                        col_start,
+                        col_end: crate::diagnostics::clamp_col_end(
+                            line, line_end, col_start, col_end,
+                        ),
+                    },
+                ));
+            } else {
+                self.db.record_reference_location(crate::db::RefLoc {
+                    symbol_key: Arc::from(format!("cls:{fqcn}")),
+                    file: file.clone(),
+                    line,
+                    col_start,
+                    col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
+                });
+            }
+        }
+    }
 }
 
 mod aggregates;

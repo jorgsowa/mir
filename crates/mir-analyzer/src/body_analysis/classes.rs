@@ -312,6 +312,15 @@ impl<'a> BodyAnalyzer<'a> {
         let (params, return_ty, template_params, declared_throws) =
             method_chain_signature(self.db, fqcn, method_name);
 
+        self.check_and_record_throws_classes(
+            &declared_throws,
+            method_header_name_span(source, method),
+            file,
+            source,
+            source_map,
+            all_issues,
+        );
+
         // A docblock @return that conflicts with the native hint must not
         // make the method's own valid `return` statements look invalid — the
         // native hint is runtime truth. This only affects body-statement

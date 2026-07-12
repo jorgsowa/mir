@@ -95,6 +95,15 @@ impl<'a> BodyAnalyzer<'a> {
             );
         }
 
+        self.check_and_record_throws_classes(
+            &declared_throws,
+            fn_header_name_span(source, decl),
+            file,
+            source,
+            source_map,
+            all_issues,
+        );
+
         // A docblock @return that conflicts with the native hint must not
         // make the function's own valid `return` statements look invalid —
         // the native hint is runtime truth. This only affects body-statement
@@ -569,6 +578,15 @@ impl<'a> BodyAnalyzer<'a> {
             ),
         };
 
+        self.check_and_record_throws_classes(
+            &declared_throws,
+            fn_header_name_span(source, decl),
+            file,
+            source,
+            source_map,
+            &mut issues,
+        );
+
         let mut ctx = FlowState::for_method_with_templates(
             &params,
             return_ty,
@@ -690,6 +708,15 @@ impl<'a> BodyAnalyzer<'a> {
                 Arc::from([]),
             ),
         };
+
+        self.check_and_record_throws_classes(
+            &declared_throws,
+            fn_header_name_span(source, decl),
+            file,
+            source,
+            source_map,
+            all_issues,
+        );
 
         let mut ctx = FlowState::for_function(
             &params,
