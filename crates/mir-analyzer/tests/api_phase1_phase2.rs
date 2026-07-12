@@ -1191,6 +1191,49 @@ fn reanalyze_dependents_lazy_load_warmup_does_not_deadlock() {
 }
 
 #[test]
+fn catch_clause_records_class_reference_symbol() {
+    // A caught exception type is a class reference just like `new Foo()` or
+    // `instanceof Foo` — hover/go-to-definition on it relies on a
+    // ResolvedSymbol being recorded, which the catch-clause path previously
+    // skipped (it only ever recorded the dead-code `cls:` reference).
+    use mir_analyzer::symbol::ReferenceKind;
+    use mir_analyzer::FileAnalyzer;
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_all_stubs();
+
+    let file: Arc<str> = Arc::from("catch.php");
+    let source: Arc<str> = Arc::from(
+        "<?php\n\
+         final class MyException extends \\Exception {}\n\
+         function run(): void {\n\
+             try {\n\
+                 throw new MyException();\n\
+             } catch (MyException $e) {\n\
+             }\n\
+         }\n",
+    );
+
+    session.ingest_file(file.clone(), source.clone());
+    let parsed = php_rs_parser::parse(&source);
+    let analysis = FileAnalyzer::new(&session).analyze(
+        file.clone(),
+        &source,
+        &parsed.program,
+        &parsed.source_map,
+    );
+
+    let catch_symbol = analysis.symbols.iter().find(|s| {
+        matches!(&s.kind, ReferenceKind::ClassReference(name) if name.as_ref() == "MyException")
+            && s.span.start > source.find("catch (").unwrap() as u32
+    });
+    assert!(
+        catch_symbol.is_some(),
+        "catch (MyException $e) should record a ClassReference symbol for MyException"
+    );
+}
+
+#[test]
 fn references_to_finds_extends_implements_and_trait_use() {
     // `extends`, `implements`, and trait `use` name a class/interface/trait
     // just as much as `new Foo()` does — references_to() must find those

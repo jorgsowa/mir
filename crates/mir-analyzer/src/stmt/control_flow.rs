@@ -12,6 +12,7 @@ use crate::expr::extract_simple_var;
 use crate::flow_state::FlowState;
 use crate::narrowing::narrow_from_condition;
 use crate::parser;
+use crate::symbol::ResolvedSymbol;
 
 use super::loops::infer_foreach_types_with_db;
 use super::StatementsAnalyzer;
@@ -757,6 +758,16 @@ impl<'a> StatementsAnalyzer<'a> {
                                 line, line_end, col_start, col_end,
                             ),
                         });
+                        if self.collect_symbols {
+                            let fqcn: Arc<str> = Arc::from(resolved.as_str());
+                            self.symbols.push(ResolvedSymbol {
+                                file: self.file.clone(),
+                                span,
+                                expr_span: None,
+                                kind: crate::symbol::ReferenceKind::ClassReference(fqcn),
+                                resolved_type: Type::single(Atomic::TClassString(None)),
+                            });
+                        }
                         // Check if the caught type extends Throwable
                         if crate::db::class_exists(self.db, &resolved) {
                             let here = crate::db::Fqcn::from_str(self.db, resolved.as_str());
