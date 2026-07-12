@@ -886,6 +886,31 @@ impl<'a> ExpressionAnalyzer<'a> {
                     _ => resolved,
                 }
             }
+            // `$obj::CONST` — derive the FQCN(s) from the object's inferred
+            // type, mirroring the `$obj::class` handling a few lines above.
+            // Without this, a constant read only through an object-instance
+            // variable was never checked (existence/visibility/deprecation)
+            // and never recorded as a usage.
+            ExprKind::Variable(var_name) => {
+                let obj_ty = ctx.get_var(var_name.as_ref());
+                let mut result = Type::empty();
+                let mut any = false;
+                for atomic in &obj_ty.types {
+                    if let Some(fqcn) = atomic.named_object_fqcn() {
+                        any = true;
+                        let const_ty = self.record_object_const_access(
+                            fqcn,
+                            &const_name,
+                            cca.class.span,
+                            cca.member.span,
+                            expr_span,
+                            ctx,
+                        );
+                        result.merge_with(&const_ty);
+                    }
+                }
+                return if any { result } else { Type::mixed() };
+            }
             _ => return Type::mixed(),
         };
 
@@ -1008,6 +1033,105 @@ impl<'a> ExpressionAnalyzer<'a> {
                 expr_span,
             );
         }
+        const_ty
+    }
+
+    /// Constant access through an object-typed receiver (`$obj::CONST`).
+    /// `fqcn` comes from the receiver's already-resolved type, so unlike the
+    /// class-name-token path in `analyze_class_const_access` there's no
+    /// separate `UndefinedClass` check here.
+    fn record_object_const_access(
+        &mut self,
+        fqcn: &str,
+        const_name: &str,
+        class_span: php_ast::Span,
+        member_span: php_ast::Span,
+        expr_span: php_ast::Span,
+        ctx: &FlowState,
+    ) -> Type {
+        if crate::db::class_kind(self.db, fqcn).is_some_and(|k| k.is_trait) {
+            self.emit(
+                IssueKind::TraitConstantAccessedDirectly {
+                    trait_name: fqcn.to_string(),
+                    constant: const_name.to_string(),
+                },
+                Severity::Error,
+                expr_span,
+            );
+            return Type::mixed();
+        }
+
+        self.record_ref(Arc::from(format!("cls:{fqcn}")), class_span);
+        self.record_ref(Arc::from(format!("cnst:{fqcn}::{const_name}")), member_span);
+
+        let here = crate::db::Fqcn::from_str(self.db, fqcn);
+        let found = crate::db::find_class_constant_in_chain(self.db, here, const_name);
+        if let Some((ref owner_fqcn, ref c)) = found {
+            if let Some(msg) = &c.deprecated {
+                self.emit(
+                    IssueKind::DeprecatedConstant {
+                        class: fqcn.to_string(),
+                        constant: const_name.to_string(),
+                        message: Some(msg.clone()).filter(|m| !m.is_empty()),
+                    },
+                    Severity::Info,
+                    member_span,
+                );
+            }
+            use mir_codebase::definitions::Visibility;
+            let inaccessible = match c.visibility {
+                Some(Visibility::Private) => ctx
+                    .self_fqcn
+                    .as_deref()
+                    .map(|s| !s.eq_ignore_ascii_case(owner_fqcn))
+                    .unwrap_or(true),
+                Some(Visibility::Protected) => {
+                    let caller = ctx.self_fqcn.as_deref().unwrap_or("");
+                    if caller.is_empty() {
+                        true
+                    } else {
+                        !crate::db::extends_or_implements(self.db, caller, owner_fqcn)
+                            && !caller.eq_ignore_ascii_case(owner_fqcn)
+                    }
+                }
+                _ => false,
+            };
+            if inaccessible {
+                self.emit(
+                    IssueKind::InaccessibleClassConstant {
+                        class: fqcn.to_string(),
+                        constant: const_name.to_string(),
+                    },
+                    Severity::Error,
+                    member_span,
+                );
+            }
+        }
+
+        let const_ty = found
+            .as_ref()
+            .map(|(_, c)| c.ty.clone())
+            .unwrap_or_else(Type::mixed);
+
+        self.record_symbol(
+            member_span,
+            ReferenceKind::ConstantAccess {
+                class: Arc::from(fqcn),
+                constant: Arc::from(const_name),
+            },
+            const_ty.clone(),
+        );
+
+        if found.is_none() && !crate::db::has_unknown_ancestor(self.db, fqcn) {
+            self.emit(
+                IssueKind::UndefinedConstant {
+                    name: format!("{fqcn}::{const_name}"),
+                },
+                Severity::Error,
+                expr_span,
+            );
+        }
+
         const_ty
     }
 
