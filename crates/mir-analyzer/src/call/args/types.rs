@@ -83,6 +83,20 @@ pub(crate) fn check_one(
     validate_interface_string_argument(ea, param_ty, arg_ty, arg_span);
     validate_callable_type(ea, param_ty, arg_ty, arg_span);
 
+    // A bare string literal passed where any parameter accepts `callable` is a
+    // real runtime reference to the named function/method (register_shutdown_function,
+    // set_error_handler, spl_autoload_register, or any user function with a `callable`
+    // param) — record it so the referenced symbol isn't flagged as dead code. The
+    // array_map/usort/etc-specific call sites already do this; this covers every
+    // other callable-typed parameter generically. call_user_func/call_user_func_array's
+    // first arg is excluded: it has its own stricter syntactic-literal-only recording
+    // in function.rs (a variable that merely infers to a literal string doesn't count).
+    if !skip_validation
+        && param_ty.contains(|t| matches!(t, Atomic::TCallable { .. } | Atomic::TCallableString))
+    {
+        super::super::callable::record_callable_string_ref(ea, arg_ty, arg_span);
+    }
+
     // Null checks run here to preserve the original emission order
     // (after callable validations but before type-compat checks).
     super::nullability::check_one(
