@@ -118,6 +118,20 @@ impl<'a> ExpressionAnalyzer<'a> {
             ctx.strict_types,
             c.is_static,
         );
+        // A non-static closure declared outside any class body doesn't get `$this`
+        // injected by `for_function` (no `self_fqcn`), but it's still valid PHP for
+        // it to reference `$this` if the closure is later rebound to an object via
+        // `Closure::bind()`/`bindTo()`/`call()` — a common macro/PHPUnit idiom.
+        // Model that by seeding `$this` as an object of unknown type rather than
+        // leaving it undefined, which would otherwise misfire `InvalidScope`.
+        if ctx.self_fqcn.is_none() && !c.is_static {
+            let this_sym = Name::from("this");
+            Arc::make_mut(&mut closure_ctx.vars).insert(
+                this_sym,
+                mir_codebase::definitions::wrap_var_type(Type::single(Atomic::TObject)),
+            );
+            Arc::make_mut(&mut closure_ctx.assigned_vars).insert(this_sym);
+        }
         // Closures see the enclosing function/method's template params (e.g. a
         // captured `@template T`-typed variable assigned to a typed property
         // inside the closure body) — without this, `type_refs_any_template`
@@ -363,6 +377,16 @@ impl<'a> ExpressionAnalyzer<'a> {
                 std::sync::Arc::make_mut(&mut arrow_ctx.vars).insert(*name, ty.clone());
                 std::sync::Arc::make_mut(&mut arrow_ctx.assigned_vars).insert(*name);
             }
+        }
+        // See analyze_closure: an arrow function outside any class also produces
+        // a rebindable Closure, so `$this` may be validly late-bound even though
+        // there's no enclosing `self_fqcn` to capture it from here.
+        if !af.is_static && !arrow_ctx.vars.contains_key(&this_sym) {
+            std::sync::Arc::make_mut(&mut arrow_ctx.vars).insert(
+                this_sym,
+                mir_codebase::definitions::wrap_var_type(Type::single(Atomic::TObject)),
+            );
+            std::sync::Arc::make_mut(&mut arrow_ctx.assigned_vars).insert(this_sym);
         }
         // See analyze_closure: a captured (by-value) outer parameter is still
         // externally owned by the caller, so mutating it via method call
