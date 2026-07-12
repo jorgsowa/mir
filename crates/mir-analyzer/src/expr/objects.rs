@@ -738,6 +738,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                         }
                     }
                     self.record_ref(Arc::from(format!("cls:{resolved}")), cca.class.span);
+                    // Without this, go-to-definition/hover on the class name inside
+                    // `Foo::class` resolved nothing, unlike every other class-name
+                    // position (`new Foo`, `instanceof Foo`, `Foo::method()`, …).
+                    self.record_symbol(
+                        cca.class.span,
+                        ReferenceKind::ClassReference(Arc::from(resolved.as_str())),
+                        Type::single(Atomic::TClassString(None)),
+                    );
                 }
                 return Type::single(Atomic::TClassString(Some(mir_types::Name::from(
                     resolved.as_str(),

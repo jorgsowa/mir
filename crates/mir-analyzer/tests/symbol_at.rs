@@ -1282,6 +1282,30 @@ fn symbol_at_static_call_class_name_resolves_to_class_reference() {
     );
 }
 
+// ---------------------------------------------------------------------------
+// symbol_at — class token in `Foo::class` resolves to ClassReference
+// ---------------------------------------------------------------------------
+
+#[test]
+fn symbol_at_class_const_class_name_resolves_to_class_reference() {
+    // `Widget::class` — symbol_at on "Widget" must return ClassReference("Widget"),
+    // mirroring `new Widget` / `$v instanceof Widget` / `Widget::method()`.
+    let src = "<?php\nclass Widget {}\nfunction caller(): string { return Widget::class; }\n";
+    let result = mir_analyzer::analyze_source(src);
+
+    let offset = src.find("Widget::class").unwrap() as u32;
+
+    let sym = result
+        .symbol_at("<source>", offset)
+        .expect("symbol_at must find ClassReference on the Foo::class class name");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::ClassReference(n) if n.as_ref() == "Widget"),
+        "expected ClassReference(Widget), got {:?}",
+        sym.kind
+    );
+}
+
 #[test]
 fn symbol_at_parent_keyword_in_static_call_resolves_to_parent_class() {
     // `parent::greet()` — symbol_at on the `parent` keyword must return a
