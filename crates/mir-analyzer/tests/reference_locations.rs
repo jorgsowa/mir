@@ -92,6 +92,31 @@ fn method_call_span_covers_only_name() {
 }
 
 #[test]
+fn dynamic_invoke_call_records_reference_to_invoke_method() {
+    // `$obj(...)` invoking an object's __invoke() must record a reference,
+    // matching every other call form ($obj->run(), Svc::run(), etc.).
+    let dir = create_temp_dir("test");
+    let src = "<?php\nclass Svc { public function __invoke(): void {} }\nfunction caller(Svc $s): void { $s(); }\n";
+    let file = write_file(&dir, "i.php", src);
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let locs: Vec<_> = analyzer
+        .reference_locations("meth:Svc::__invoke")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert_eq!(
+        locs.len(),
+        1,
+        "expected exactly one reference to Svc::__invoke from $s()"
+    );
+}
+
+#[test]
 fn property_access_span_covers_only_name() {
     let dir = create_temp_dir("test");
     // "<?php\n"                                          = 6 bytes

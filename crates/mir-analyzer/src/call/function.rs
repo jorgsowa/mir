@@ -79,6 +79,37 @@ impl CallAnalyzer {
                 // analysis) and output writeback (after the call).
                 let callee_params = typed_params_from_callee(&callee_ty, ea);
 
+                // `$obj(...)` invoking an object's __invoke() is a real reference to
+                // that method — record it, or find-references/go-to-definition on
+                // __invoke never sees call sites reached only this way (unlike every
+                // other call form, which always records the resolved method).
+                for atomic in &callee_ty.types {
+                    if let Atomic::TNamedObject { fqcn, .. } = atomic {
+                        if let Some((_, storage)) = crate::db::find_method_respecting_precedence(
+                            ea.db,
+                            crate::db::Fqcn::from_str(ea.db, fqcn.as_ref()),
+                            "__invoke",
+                        ) {
+                            ea.record_ref(
+                                Arc::from(format!(
+                                    "meth:{}::{}",
+                                    fqcn,
+                                    crate::util::php_ident_lowercase(&storage.name)
+                                )),
+                                call.name.span,
+                            );
+                            ea.record_symbol(
+                                call.name.span,
+                                ReferenceKind::MethodCall {
+                                    class: Arc::from(fqcn.as_ref()),
+                                    method: Arc::from("__invoke"),
+                                },
+                                callee_ty.clone(),
+                            );
+                        }
+                    }
+                }
+
                 // Pre-mark by-ref parameter variables as defined BEFORE evaluating
                 // args, so a previously-undefined variable passed to an out-param
                 // (e.g. `$fn($x, $out)` where $out is fresh) is not flagged as

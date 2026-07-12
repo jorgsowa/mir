@@ -240,6 +240,27 @@ fn symbol_at_finds_this_method_call() {
 }
 
 #[test]
+fn symbol_at_finds_dynamic_invoke_call() {
+    // `$obj(...)` invoking an object's __invoke() must record a MethodCall
+    // symbol, matching every other call form. Its span is identical to the
+    // receiver variable's own span (there's no separate method-name token to
+    // invoke implicitly), so symbol_at's smallest-span tie-break always
+    // prefers the Variable("s") reading there — check the raw symbol list
+    // instead of symbol_at for this one.
+    let dir = create_temp_dir("test");
+    let src = "<?php\nclass Svc { public function __invoke(): void {} }\nfunction caller(Svc $s): void { $s(); }\n";
+    let file = write_file(&dir, "dyn_invoke.php", src);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let found = result.symbols.iter().any(|s| {
+        matches!(&s.kind, ReferenceKind::MethodCall { class, method } if class.as_ref() == "Svc" && method.as_ref() == "__invoke")
+    });
+    assert!(found, "expected a MethodCall(Svc::__invoke) symbol for $s()");
+}
+
+#[test]
 fn symbol_at_finds_this_property_access() {
     // $this->prop was invisible for the same reason as $this->method() — $this
     // was untyped so the mixed-receiver guard fired before record_symbol.
