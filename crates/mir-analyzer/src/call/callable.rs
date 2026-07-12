@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use php_ast::Span;
 
 use mir_issues::{IssueKind, Severity};
@@ -5,6 +7,49 @@ use mir_types::atomic::FnParam;
 use mir_types::{Atomic, Type};
 
 use crate::expr::ExpressionAnalyzer;
+
+/// A bare string-literal callback (`array_map('formatRow', ...)`, `usort($a, 'my_cmp')`,
+/// `usort($a, 'MyComparator::compare')`) is a real runtime reference to the named
+/// function/method, same as `call_user_func('name')` — record it, or a function/method
+/// reachable only through one of these builtins is falsely flagged as dead code.
+pub(crate) fn record_callable_string_ref(
+    ea: &ExpressionAnalyzer<'_>,
+    callback_ty: &Type,
+    callback_span: Span,
+) {
+    for atomic in &callback_ty.types {
+        let Atomic::TLiteralString(name) = atomic else {
+            continue;
+        };
+        if name.is_empty() {
+            continue;
+        }
+        if let Some((class_name, method_name)) = name.as_ref().split_once("::") {
+            let resolved_class = crate::db::resolve_name(ea.db, &ea.file, class_name);
+            let here = crate::db::Fqcn::from_str(ea.db, &resolved_class);
+            if let Some((owner_fqcn, method)) =
+                crate::db::find_method_in_chain(ea.db, here, method_name)
+            {
+                ea.record_ref(Arc::from(format!("cls:{resolved_class}")), callback_span);
+                ea.record_ref(
+                    Arc::from(format!(
+                        "meth:{owner_fqcn}::{}",
+                        crate::util::php_ident_lowercase(&method.name)
+                    )),
+                    callback_span,
+                );
+            }
+        } else {
+            let fqn = name.as_ref().trim_start_matches('\\');
+            let here = crate::db::Fqcn::from_str(ea.db, fqn);
+            let canonical_fqn: Option<Arc<str>> =
+                crate::db::find_function(ea.db, here).map(|f| f.fqn.clone());
+            if let Some(canonical_fqn) = canonical_fqn {
+                ea.record_ref(Arc::from(format!("fn:{canonical_fqn}")), callback_span);
+            }
+        }
+    }
+}
 
 /// Simple param info for arity checking (works with both mir_codebase::DeclaredParam and mir_types::atomic::FnParam)
 #[derive(Clone)]
@@ -218,6 +263,8 @@ pub(crate) fn check_array_map_callback(
         return;
     }
 
+    record_callable_string_ref(ea, callback_ty, callback_span);
+
     if arg_types.len() > 1 {
         validate_callback_arity(ea, callback_ty, callback_span, arg_types.len() - 1);
     }
@@ -299,6 +346,8 @@ pub(crate) fn check_array_filter_callback(
         );
         return;
     }
+
+    record_callable_string_ref(ea, callback_ty, callback_span);
 
     let expected_arity = if arg_types.len() > 2 {
         match arg_types[2].types.first() {
@@ -1411,6 +1460,8 @@ pub(crate) fn check_min_arity_callback(
         );
         return;
     }
+
+    record_callable_string_ref(ea, callback_ty, callback_span);
 
     if let Some(params) = extract_callable_params(callback_ty, ea) {
         let required_count = params
