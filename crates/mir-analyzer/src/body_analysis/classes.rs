@@ -400,9 +400,9 @@ impl<'a> BodyAnalyzer<'a> {
     /// which are already namespace/template-resolved at collection time —
     /// see `resolve_union`/`resolve_union_doc_with_templates` — so no
     /// qualification concern here, only the missing validation).
-    fn check_class_generic_type_args(
+    pub(super) fn check_class_generic_type_args(
         &self,
-        decl: &php_ast::owned::ClassDecl,
+        doc_comment: &Option<php_ast::owned::Comment>,
         fqcn: &str,
         file: &Arc<str>,
         source: &str,
@@ -412,7 +412,7 @@ impl<'a> BodyAnalyzer<'a> {
         if self.mode != AnalysisMode::Full {
             return;
         }
-        let Some(doc_comment) = &decl.doc_comment else {
+        let Some(doc_comment) = doc_comment else {
             return;
         };
         let (line, col_start) =
@@ -428,36 +428,52 @@ impl<'a> BodyAnalyzer<'a> {
         };
 
         let here = crate::db::Fqcn::from_str(self.db, fqcn);
-        let Some(crate::db::ClassLike::Class(class)) = crate::db::find_class_like(self.db, here)
-        else {
+        let Some(class_like) = crate::db::find_class_like(self.db, here) else {
             return;
         };
 
         // `extends_type_args`/`implements_type_args` are the concrete type
-        // arguments THIS class passes to its parent/interfaces — e.g. `class
-        // TypedList<T> implements Collection<T>` forwards its own template
-        // param `T` positionally. Collected via plain `resolve_union` (no
-        // template awareness — see the field docs), a forwarded template
-        // name stays a bare `TNamedObject` instead of becoming
-        // `TTemplateParam`, so it must be filtered out here or every generic
-        // class forwarding its own template param would misreport it as an
-        // undefined class.
-        let own_template_names: rustc_hash::FxHashSet<&str> = class
-            .template_params
+        // arguments THIS class/interface/trait passes to its parent/interfaces
+        // — e.g. `class TypedList<T> implements Collection<T>` forwards its
+        // own template param `T` positionally. Collected via plain
+        // `resolve_union` (no template awareness — see the field docs), a
+        // forwarded template name stays a bare `TNamedObject` instead of
+        // becoming `TTemplateParam`, so it must be filtered out here or every
+        // generic class/interface forwarding its own template param would
+        // misreport it as an undefined class. Traits have no typed
+        // extends/implements edges to check (only `template_params` bounds),
+        // and enums can't declare `@template` at all in this codebase's model.
+        let (template_params, mut names): (&[mir_codebase::definitions::TemplateParam], Vec<_>) =
+            match &class_like {
+                crate::db::ClassLike::Class(class) => {
+                    let mut names = Vec::new();
+                    for ty in class.extends_type_args.iter() {
+                        collect_named_object_fqcns(ty, &mut names);
+                    }
+                    for (_iface, args) in class.implements_type_args.iter() {
+                        for ty in args {
+                            collect_named_object_fqcns(ty, &mut names);
+                        }
+                    }
+                    (&class.template_params, names)
+                }
+                crate::db::ClassLike::Interface(iface) => {
+                    let mut names = Vec::new();
+                    for (_parent, args) in iface.extends_type_args.iter() {
+                        for ty in args {
+                            collect_named_object_fqcns(ty, &mut names);
+                        }
+                    }
+                    (&iface.template_params, names)
+                }
+                crate::db::ClassLike::Trait(tr) => (&tr.template_params, Vec::new()),
+                crate::db::ClassLike::Enum(_) => return,
+            };
+        let own_template_names: rustc_hash::FxHashSet<&str> = template_params
             .iter()
             .map(|tp| tp.name.as_ref())
             .collect();
-
-        let mut names = Vec::new();
-        for ty in class.extends_type_args.iter() {
-            collect_named_object_fqcns(ty, &mut names);
-        }
-        for (_iface, args) in class.implements_type_args.iter() {
-            for ty in args {
-                collect_named_object_fqcns(ty, &mut names);
-            }
-        }
-        for tp in class.template_params.iter() {
+        for tp in template_params.iter() {
             if let Some(bound) = tp.bound.as_deref() {
                 collect_named_object_fqcns(bound, &mut names);
             }
@@ -788,7 +804,7 @@ impl<'a> BodyAnalyzer<'a> {
         }
 
         self.check_class_docblock_magic_members(decl, fqcn, file, source, source_map, all_issues);
-        self.check_class_generic_type_args(decl, fqcn, file, source, source_map, all_issues);
+        self.check_class_generic_type_args(&decl.doc_comment, fqcn, file, source, source_map, all_issues);
 
         let scope_cx = MethodScopeCx {
             fqcn: Arc::from(fqcn),
@@ -889,7 +905,7 @@ impl<'a> BodyAnalyzer<'a> {
         }
 
         self.check_class_docblock_magic_members(decl, fqcn, file, source, source_map, all_issues);
-        self.check_class_generic_type_args(decl, fqcn, file, source, source_map, all_issues);
+        self.check_class_generic_type_args(&decl.doc_comment, fqcn, file, source, source_map, all_issues);
 
         let scope_cx = MethodScopeCx {
             fqcn: Arc::from(fqcn),

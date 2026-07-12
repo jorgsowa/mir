@@ -23,6 +23,14 @@ impl<'a> BodyAnalyzer<'a> {
 
         let resolved = resolve_name(self.db, file.as_ref(), decl.name.as_deref().unwrap_or(""));
         let fqcn: &str = &resolved;
+        self.check_class_generic_type_args(
+            &decl.doc_comment,
+            fqcn,
+            file,
+            source,
+            source_map,
+            all_issues,
+        );
 
         let scope_cx = MethodScopeCx {
             fqcn: Arc::from(fqcn),
@@ -75,6 +83,14 @@ impl<'a> BodyAnalyzer<'a> {
     ) {
         let resolved = resolve_name(self.db, file.as_ref(), decl.name.as_deref().unwrap_or(""));
         let fqcn: &str = &resolved;
+        self.check_class_generic_type_args(
+            &decl.doc_comment,
+            fqcn,
+            file,
+            source,
+            source_map,
+            all_issues,
+        );
 
         let scope_cx = MethodScopeCx {
             fqcn: Arc::from(fqcn),
@@ -346,6 +362,16 @@ impl<'a> BodyAnalyzer<'a> {
             all_issues,
             self.mode == AnalysisMode::Full,
         );
+        let iface_name = decl.name.as_deref().unwrap_or("<anonymous>");
+        let iface_fqcn = resolve_name(self.db, file.as_ref(), iface_name);
+        self.check_class_generic_type_args(
+            &decl.doc_comment,
+            &iface_fqcn,
+            file,
+            source,
+            source_map,
+            all_issues,
+        );
         use php_ast::owned::ClassMemberKind;
         for parent in decl.extends.iter() {
             // Suppress UndefinedClass for a parent guarded by
@@ -367,8 +393,6 @@ impl<'a> BodyAnalyzer<'a> {
                 self.mode == AnalysisMode::Full,
             );
         }
-        let iface_name = decl.name.as_deref().unwrap_or("<anonymous>");
-        let iface_fqcn = resolve_name(self.db, file.as_ref(), iface_name);
         let iface_fqcn_ref = crate::db::Fqcn::from_str(self.db, &iface_fqcn);
 
         for member in decl.body.members.iter() {
