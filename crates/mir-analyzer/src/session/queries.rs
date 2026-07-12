@@ -401,48 +401,51 @@ impl AnalysisSession {
         let defs = crate::db::collect_file_definitions(&db, sf);
         let mut out: Vec<DocumentSymbol> = Vec::new();
 
-        let class_children =
-            |methods: &mir_codebase::definitions::MemberMap<Arc<mir_codebase::definitions::MethodDef>>,
-             props: Option<
-                &mir_codebase::definitions::MemberMap<mir_codebase::definitions::PropertyDef>,
-            >,
-             consts: &mir_codebase::definitions::MemberMap<mir_codebase::definitions::ConstantDef>,
-             is_enum: bool|
-             -> Vec<DocumentSymbol> {
-                let mut out: Vec<DocumentSymbol> = Vec::new();
-                for (_, m) in methods.iter() {
+        let class_children = |methods: &mir_codebase::definitions::MemberMap<
+            Arc<mir_codebase::definitions::MethodDef>,
+        >,
+                              props: Option<
+            &mir_codebase::definitions::MemberMap<mir_codebase::definitions::PropertyDef>,
+        >,
+                              consts: &mir_codebase::definitions::MemberMap<
+            mir_codebase::definitions::ConstantDef,
+        >,
+                              is_enum: bool|
+         -> Vec<DocumentSymbol> {
+            let mut out: Vec<DocumentSymbol> = Vec::new();
+            for (_, m) in methods.iter() {
+                out.push(DocumentSymbol {
+                    name: m.name.clone(),
+                    kind: DeclarationKind::Method,
+                    location: m.location.clone(),
+                    children: Vec::new(),
+                });
+            }
+            if let Some(props) = props {
+                for (_, p) in props.iter() {
                     out.push(DocumentSymbol {
-                        name: m.name.clone(),
-                        kind: DeclarationKind::Method,
-                        location: m.location.clone(),
+                        name: p.name.clone(),
+                        kind: DeclarationKind::Property,
+                        location: p.location.clone(),
                         children: Vec::new(),
                     });
                 }
-                if let Some(props) = props {
-                    for (_, p) in props.iter() {
-                        out.push(DocumentSymbol {
-                            name: p.name.clone(),
-                            kind: DeclarationKind::Property,
-                            location: p.location.clone(),
-                            children: Vec::new(),
-                        });
-                    }
-                }
-                let const_kind = if is_enum {
-                    DeclarationKind::EnumCase
-                } else {
-                    DeclarationKind::Constant
-                };
-                for (_, c) in consts.iter() {
-                    out.push(DocumentSymbol {
-                        name: c.name.clone(),
-                        kind: const_kind,
-                        location: c.location.clone(),
-                        children: Vec::new(),
-                    });
-                }
-                out
+            }
+            let const_kind = if is_enum {
+                DeclarationKind::EnumCase
+            } else {
+                DeclarationKind::Constant
             };
+            for (_, c) in consts.iter() {
+                out.push(DocumentSymbol {
+                    name: c.name.clone(),
+                    kind: const_kind,
+                    location: c.location.clone(),
+                    children: Vec::new(),
+                });
+            }
+            out
+        };
 
         for c in defs.slice.classes.iter() {
             out.push(DocumentSymbol {

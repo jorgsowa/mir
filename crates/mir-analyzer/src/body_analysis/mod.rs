@@ -564,8 +564,10 @@ impl<'a> BodyAnalyzer<'a> {
         if self.mode != AnalysisMode::Full || throws.is_empty() {
             return;
         }
-        let (line, col_start) = crate::diagnostics::offset_to_line_col(source, span.start, source_map);
-        let (line_end, col_end) = crate::diagnostics::offset_to_line_col(source, span.end, source_map);
+        let (line, col_start) =
+            crate::diagnostics::offset_to_line_col(source, span.start, source_map);
+        let (line_end, col_end) =
+            crate::diagnostics::offset_to_line_col(source, span.end, source_map);
         for fqcn in throws {
             if crate::diagnostics::is_pseudo_type(fqcn.as_ref()) {
                 continue;

@@ -1126,10 +1126,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     // consuming this trait — record a per-trait marker so
                     // DeadCodeAnalyzer can credit any composing class's own
                     // private property of this name as used.
-                    self.record_ref(
-                        Arc::from(format!("traituse:{fqcn}::{prop_name}")),
-                        span,
-                    );
+                    self.record_ref(Arc::from(format!("traituse:{fqcn}::{prop_name}")), span);
                     return Type::mixed();
                 }
                 Atomic::TNamedObject { fqcn, .. }

@@ -412,7 +412,9 @@ impl CallAnalyzer {
         // still just existence + reference recording here — no diagnostic is
         // raised either way, matching how the rest of this table treats a
         // string that fails to resolve to a real class.
-        let class_name_arg_index: Option<usize> = match resolved_fn_name.to_ascii_lowercase().as_str()
+        let class_name_arg_index: Option<usize> = match resolved_fn_name
+            .to_ascii_lowercase()
+            .as_str()
         {
             "class_exists" | "interface_exists" | "trait_exists" | "enum_exists" => Some(0),
             "is_a" | "is_subclass_of" => Some(1),
@@ -1074,7 +1076,11 @@ fn typed_params_from_callee(
     for atomic in &union.types {
         match atomic {
             Atomic::TClosure { data } => {
-                let storage_params = data.params.iter().map(type_param_to_storage_param).collect();
+                let storage_params = data
+                    .params
+                    .iter()
+                    .map(type_param_to_storage_param)
+                    .collect();
                 return Some(("{closure}".to_string(), storage_params));
             }
             Atomic::TNamedObject { fqcn, .. } => {

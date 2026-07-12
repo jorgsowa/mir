@@ -583,7 +583,13 @@ mod tests {
     }
 
     fn seed(cache: &AnalysisCache, file: &str) {
-        cache.put(file, "hash".to_string(), String::new(), [].into(), [].into());
+        cache.put(
+            file,
+            "hash".to_string(),
+            String::new(),
+            [].into(),
+            [].into(),
+        );
     }
 
     fn surface(src: &str) -> String {
@@ -768,7 +774,13 @@ mod tests {
         let dir = TempDir::new().unwrap();
         {
             let cache = make_cache(&dir);
-            cache.put("a.php", "h1".to_string(), String::new(), [].into(), [].into());
+            cache.put(
+                "a.php",
+                "h1".to_string(),
+                String::new(),
+                [].into(),
+                [].into(),
+            );
             cache.flush();
         }
         let cache = AnalysisCache::open(dir.path(), TEST_PHP_V, 0);
@@ -824,7 +836,13 @@ mod tests {
         let dir = TempDir::new().unwrap();
         {
             let cache = AnalysisCache::open(dir.path(), 74, 0); // analyzed as PHP 7.4
-            cache.put("a.php", "h1".to_string(), String::new(), [].into(), [].into());
+            cache.put(
+                "a.php",
+                "h1".to_string(),
+                String::new(),
+                [].into(),
+                [].into(),
+            );
             cache.flush();
         }
         let same = AnalysisCache::open(dir.path(), 74, 0);
@@ -847,7 +865,13 @@ mod tests {
         let dir = TempDir::new().unwrap();
         {
             let cache = AnalysisCache::open(dir.path(), TEST_PHP_V, 0xAAAA);
-            cache.put("a.php", "h1".to_string(), String::new(), [].into(), [].into());
+            cache.put(
+                "a.php",
+                "h1".to_string(),
+                String::new(),
+                [].into(),
+                [].into(),
+            );
             cache.flush();
         }
         let same = AnalysisCache::open(dir.path(), TEST_PHP_V, 0xAAAA);

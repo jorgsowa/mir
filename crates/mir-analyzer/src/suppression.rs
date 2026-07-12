@@ -203,7 +203,6 @@ impl SuppressionMap {
             .cloned()
             .collect()
     }
-
 }
 
 fn insert_line(lines: &mut FxHashMap<u32, KindSet>, line: u32, kinds: KindSet) {

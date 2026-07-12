@@ -569,10 +569,8 @@ fn check_attribute_list(
                 // class used only via attribute annotations elsewhere is falsely
                 // flagged UnusedClass.
                 if record_refs {
-                    let (line, col_start) =
-                        offset_to_line_col(source, attr.span.start, source_map);
-                    let (line_end, col_end) =
-                        offset_to_line_col(source, attr.span.end, source_map);
+                    let (line, col_start) = offset_to_line_col(source, attr.span.start, source_map);
+                    let (line_end, col_end) = offset_to_line_col(source, attr.span.end, source_map);
                     db.record_reference_location(crate::db::RefLoc {
                         symbol_key: Arc::from(format!("cls:{fqcn}")),
                         file: file.clone(),

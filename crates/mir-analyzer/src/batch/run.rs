@@ -148,9 +148,7 @@ impl AnalysisSession {
             let content_changed: Vec<String> = file_data
                 .iter()
                 .filter_map(|(f, _src)| {
-                    let valid = content_hexes
-                        .get(f)
-                        .is_some_and(|h| cache.is_valid(f, h));
+                    let valid = content_hexes.get(f).is_some_and(|h| cache.is_valid(f, h));
                     if valid {
                         None
                     } else {
@@ -307,7 +305,12 @@ impl AnalysisSession {
                                 col_end: *col_end,
                             })
                             .collect();
-                        return (parsed.file.clone(), cached_issues.to_vec(), Vec::new(), locs);
+                        return (
+                            parsed.file.clone(),
+                            cached_issues.to_vec(),
+                            Vec::new(),
+                            locs,
+                        );
                     }
                     let (issues, symbols) = driver.analyze_bodies(
                         parsed.owned(),
@@ -324,7 +327,13 @@ impl AnalysisSession {
                         .get(parsed.file.as_ref())
                         .cloned()
                         .unwrap_or_default();
-                    cache.put(&parsed.file, h, surface, issues.as_slice().into(), cache_locs);
+                    cache.put(
+                        &parsed.file,
+                        h,
+                        surface,
+                        issues.as_slice().into(),
+                        cache_locs,
+                    );
                     if let Some(cb) = &opts.on_file_done {
                         cb();
                     }
@@ -576,7 +585,13 @@ impl AnalysisSession {
             }
             let db = self.snapshot_db();
             let ref_locs = extract_reference_locations(&db, &file);
-            cache.put(file_path, h, surface_hash, all_issues.as_slice().into(), ref_locs);
+            cache.put(
+                file_path,
+                h,
+                surface_hash,
+                all_issues.as_slice().into(),
+                ref_locs,
+            );
         }
 
         opts.apply(&mut all_issues);

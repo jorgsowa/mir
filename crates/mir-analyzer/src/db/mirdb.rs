@@ -311,7 +311,11 @@ impl MirDatabase for MirDbStorage {
         let Some(sf) = self.source_files.get(file).copied() else {
             return Arc::new(HashMap::default());
         };
-        Arc::clone(&crate::db::collect_file_definitions(self, sf).slice.class_imports)
+        Arc::clone(
+            &crate::db::collect_file_definitions(self, sf)
+                .slice
+                .class_imports,
+        )
     }
 
     fn global_var_type(&self, name: &str) -> Option<Type> {

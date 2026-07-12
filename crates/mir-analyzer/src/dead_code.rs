@@ -118,13 +118,13 @@ impl<'a> DeadCodeAnalyzer<'a> {
                     if prop.visibility != Visibility::Private {
                         continue;
                     }
-                    let referenced = self
-                        .db
-                        .has_reference(&format!("prop:{}::{}", fqcn_str, name.as_ref()))
-                        || used_traits.iter().any(|t| {
-                            self.db
-                                .has_reference(&format!("traituse:{t}::{}", name.as_ref()))
-                        });
+                    let referenced =
+                        self.db
+                            .has_reference(&format!("prop:{}::{}", fqcn_str, name.as_ref()))
+                            || used_traits.iter().any(|t| {
+                                self.db
+                                    .has_reference(&format!("traituse:{t}::{}", name.as_ref()))
+                            });
                     if !referenced {
                         let location =
                             crate::diagnostics::storage_loc_to_location(prop.location.as_ref());

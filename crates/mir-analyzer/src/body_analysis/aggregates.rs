@@ -121,6 +121,7 @@ impl<'a> BodyAnalyzer<'a> {
     /// `EnumMemberKind::Method`, so `Case` values were never walked and an
     /// undefined reference there (a genuine PHP fatal on first touch of the
     /// enum) went completely unflagged.
+    #[allow(clippy::too_many_arguments)]
     fn analyze_enum_case_values(
         &self,
         decl: &php_ast::owned::EnumDecl,
@@ -136,9 +137,11 @@ impl<'a> BodyAnalyzer<'a> {
         use mir_issues::IssueBuffer;
         use php_ast::owned::EnumMemberKind;
 
-        let has_case_value = decl.body.members.iter().any(|m| {
-            matches!(&m.kind, EnumMemberKind::Case(c) if c.value.is_some())
-        });
+        let has_case_value = decl
+            .body
+            .members
+            .iter()
+            .any(|m| matches!(&m.kind, EnumMemberKind::Case(c) if c.value.is_some()));
         if !has_case_value {
             return;
         }
@@ -232,7 +235,15 @@ impl<'a> BodyAnalyzer<'a> {
             );
         }
 
-        self.analyze_enum_case_values(decl, fqcn, file, source, source_map, all_issues, all_symbols);
+        self.analyze_enum_case_values(
+            decl,
+            fqcn,
+            file,
+            source,
+            source_map,
+            all_issues,
+            all_symbols,
+        );
         self.check_trait_constraints(fqcn, file, all_issues);
     }
 
@@ -305,7 +316,15 @@ impl<'a> BodyAnalyzer<'a> {
             );
         }
 
-        self.analyze_enum_case_values(decl, fqcn, file, source, source_map, all_issues, all_symbols);
+        self.analyze_enum_case_values(
+            decl,
+            fqcn,
+            file,
+            source,
+            source_map,
+            all_issues,
+            all_symbols,
+        );
         self.check_trait_constraints(fqcn, file, all_issues);
     }
 

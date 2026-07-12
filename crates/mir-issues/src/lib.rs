@@ -84,7 +84,10 @@ pub enum IssueKind {
     /// constant-access target.
     /// Emitted by `mir-analyzer/src/expr/objects.rs`.
     /// Fixtures: `tests/fixtures/by-kind/undefined_class/trait_constant_accessed_directly*.phpt`.
-    TraitConstantAccessedDirectly { trait_name: String, constant: String },
+    TraitConstantAccessedDirectly {
+        trait_name: String,
+        constant: String,
+    },
     /// A trait `use` adaptation (`use T { T::missing as alias; }`, or an
     /// unqualified `as` naming no method any used trait declares) aliases a
     /// method that doesn't exist — a PHP fatal error at class-declaration
@@ -1149,13 +1152,14 @@ impl IssueKind {
             // Errors
             "MIR0001" | "MIR0002" | "MIR0003" | "MIR0004" | "MIR0005" | "MIR0007" | "MIR0009"
             | "MIR0010" | "MIR0011" | "MIR0012" | "MIR0013" | "MIR0200" | "MIR0201" | "MIR0202"
-            | "MIR0203" | "MIR0204"
-            | "MIR0205" | "MIR0212" | "MIR0215" | "MIR0216" | "MIR0217" | "MIR0224" | "MIR0600"
-            | "MIR0700" | "MIR0701" | "MIR0702" | "MIR0704" | "MIR0705" | "MIR0706" | "MIR0707"
-            | "MIR0708" | "MIR0709" | "MIR0711" | "MIR0712" | "MIR0713" | "MIR0714" | "MIR0715"
-            | "MIR0228" | "MIR0229" | "MIR0800" | "MIR0801" | "MIR0802" | "MIR0803" | "MIR0804"
-            | "MIR0900" | "MIR1205" | "MIR1207" | "MIR1300" | "MIR1400" | "MIR1500" | "MIR1503"
-            | "MIR1602" | "MIR1603" | "MIR1604" | "MIR1605" | "MIR1606" => Some(Severity::Error),
+            | "MIR0203" | "MIR0204" | "MIR0205" | "MIR0212" | "MIR0215" | "MIR0216" | "MIR0217"
+            | "MIR0224" | "MIR0600" | "MIR0700" | "MIR0701" | "MIR0702" | "MIR0704" | "MIR0705"
+            | "MIR0706" | "MIR0707" | "MIR0708" | "MIR0709" | "MIR0711" | "MIR0712" | "MIR0713"
+            | "MIR0714" | "MIR0715" | "MIR0228" | "MIR0229" | "MIR0800" | "MIR0801" | "MIR0802"
+            | "MIR0803" | "MIR0804" | "MIR0900" | "MIR1205" | "MIR1207" | "MIR1300" | "MIR1400"
+            | "MIR1500" | "MIR1503" | "MIR1602" | "MIR1603" | "MIR1604" | "MIR1605" | "MIR1606" => {
+                Some(Severity::Error)
+            }
 
             // Warnings
             "MIR0006" | "MIR0008" | "MIR0100" | "MIR0101" | "MIR0102" | "MIR0103" | "MIR0109"
@@ -1391,7 +1395,9 @@ impl IssueKind {
                 format!("Cannot access trait constant {trait_name}::{constant} directly")
             }
             IssueKind::UndefinedTraitAliasMethod { trait_name, method } => match trait_name {
-                Some(t) => format!("An alias was defined for {t}::{method} but this method does not exist"),
+                Some(t) => {
+                    format!("An alias was defined for {t}::{method} but this method does not exist")
+                }
                 None => format!("An alias was defined for {method} but this method does not exist"),
             },
             IssueKind::ParentNotFound => {

@@ -6,7 +6,7 @@ use super::*;
 fn collect_named_object_fqcns(ty: &mir_types::Type, out: &mut Vec<mir_types::Name>) {
     for atomic in &ty.types {
         if let mir_types::Atomic::TNamedObject { fqcn, type_params } = atomic {
-            out.push(fqcn.clone());
+            out.push(*fqcn);
             for tp in type_params.iter() {
                 collect_named_object_fqcns(tp, out);
             }
@@ -265,16 +265,15 @@ impl<'a> BodyAnalyzer<'a> {
             col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
         };
 
-        let check_class_name =
-            |cls_fqcn: &str, all_issues: &mut Vec<Issue>| {
-                self.check_and_record_docblock_class_at(cls_fqcn, &location, all_issues)
-            };
+        let check_class_name = |cls_fqcn: &str, all_issues: &mut Vec<Issue>| {
+            self.check_and_record_docblock_class_at(cls_fqcn, &location, all_issues)
+        };
 
         let type_class_names = |ty: &mir_types::Type| -> Vec<mir_types::Name> {
             ty.types
                 .iter()
                 .filter_map(|atomic| match atomic {
-                    mir_types::Atomic::TNamedObject { fqcn, .. } => Some(fqcn.clone()),
+                    mir_types::Atomic::TNamedObject { fqcn, .. } => Some(*fqcn),
                     _ => None,
                 })
                 .collect()
@@ -1096,9 +1095,9 @@ impl<'a> BodyAnalyzer<'a> {
                 if !found {
                     all_issues.push(mir_issues::Issue::new(
                         mir_issues::IssueKind::UndefinedTraitAliasMethod {
-                            trait_name: trait_name_opt.as_ref().map(|t| {
-                                t.rsplit('\\').next().unwrap_or(t.as_ref()).to_string()
-                            }),
+                            trait_name: trait_name_opt
+                                .as_ref()
+                                .map(|t| t.rsplit('\\').next().unwrap_or(t.as_ref()).to_string()),
                             method: orig_lower.to_string(),
                         },
                         fallback_loc.clone(),

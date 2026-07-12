@@ -1934,7 +1934,10 @@ mod tests {
             ("QUUX", "App\\Helpers\\QUUX"),
         ] {
             assert_eq!(
-                slice.imports.get(&mir_types::Name::new(alias)).map(|s| s.as_str()),
+                slice
+                    .imports
+                    .get(&mir_types::Name::new(alias))
+                    .map(|s| s.as_str()),
                 Some(fqcn),
                 "slice.imports must capture every UseKind for alias {alias}"
             );
@@ -1958,7 +1961,10 @@ mod tests {
         );
         for alias in ["foo", "BAR", "qux", "QUUX"] {
             assert!(
-                slice.class_imports.get(&mir_types::Name::new(alias)).is_none(),
+                slice
+                    .class_imports
+                    .get(&mir_types::Name::new(alias))
+                    .is_none(),
                 "slice.class_imports must not contain function/const alias {alias}"
             );
         }

@@ -1102,8 +1102,12 @@ impl Type {
         for atomic in self.types {
             match atomic {
                 Atomic::TConditional { ref data } => {
-                    let (param_name, subject, if_true, if_false) =
-                        (&data.param_name, &data.subject, &data.if_true, &data.if_false);
+                    let (param_name, subject, if_true, if_false) = (
+                        &data.param_name,
+                        &data.subject,
+                        &data.if_true,
+                        &data.if_false,
+                    );
                     let resolved = if subject.types.len() == 1 {
                         if let Some(name) = param_name {
                             if let Some(arg_ty) = lookup(name.as_ref()) {
@@ -1762,7 +1766,12 @@ mod tests {
 
     use super::*;
 
-    fn conditional(param_name: Option<Name>, subject: Type, if_true: Type, if_false: Type) -> Atomic {
+    fn conditional(
+        param_name: Option<Name>,
+        subject: Type,
+        if_true: Type,
+        if_false: Type,
+    ) -> Atomic {
         Atomic::TConditional {
             data: Box::new(crate::atomic::ConditionalData {
                 param_name,

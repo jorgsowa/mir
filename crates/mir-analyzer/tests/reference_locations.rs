@@ -720,7 +720,9 @@ fn explicit_class_const_access_records_constant_reference() {
     analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     assert!(
-        !analyzer.reference_locations("cnst:Config::VERSION").is_empty(),
+        !analyzer
+            .reference_locations("cnst:Config::VERSION")
+            .is_empty(),
         "Config::VERSION should record a reference to Config::VERSION"
     );
 }

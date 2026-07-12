@@ -317,7 +317,10 @@ impl<'a> ExpressionAnalyzer<'a> {
             crate::call::method::resolve_method_from_db(self, &fqcn, &method_name_lower)
         {
             self.record_ref(
-                Arc::from(format!("meth:{}::{}", resolved.owner_fqcn, method_name_lower)),
+                Arc::from(format!(
+                    "meth:{}::{}",
+                    resolved.owner_fqcn, method_name_lower
+                )),
                 method_span,
             );
         }
