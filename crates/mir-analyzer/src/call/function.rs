@@ -363,17 +363,40 @@ impl CallAnalyzer {
             if let Some(arg) = call.args.first() {
                 if let ExprKind::String(name) = &arg.value.kind {
                     call_user_func_string_arg = true;
-                    // Always look in global namespace (with explicit backslash prefix)
-                    let fqn = if name.as_ref().starts_with('\\') {
-                        name.as_ref().to_string()
+                    if let Some((class_name, method_name)) = name.as_ref().split_once("::") {
+                        // "Class::method" static-callable string — resolve
+                        // and record both, or a static method reachable only
+                        // this way is falsely flagged UnusedMethod (and its
+                        // class UnusedClass).
+                        let resolved_class = crate::db::resolve_name(ea.db, &ea.file, class_name);
+                        let here = crate::db::Fqcn::from_str(ea.db, &resolved_class);
+                        if let Some((owner_fqcn, method)) =
+                            crate::db::find_method_in_chain(ea.db, here, method_name)
+                        {
+                            ea.record_ref(Arc::from(format!("cls:{resolved_class}")), arg.span);
+                            ea.record_ref(
+                                Arc::from(format!(
+                                    "meth:{owner_fqcn}::{}",
+                                    crate::util::php_ident_lowercase(&method.name)
+                                )),
+                                arg.span,
+                            );
+                        }
                     } else {
-                        format!("\\{}", name.as_ref())
-                    };
-                    let here = crate::db::Fqcn::from_str(ea.db, &fqn);
-                    let canonical_fqn: Option<Arc<str>> =
-                        crate::db::find_function(ea.db, here).map(|f| f.fqn.clone());
-                    if let Some(canonical_fqn) = canonical_fqn {
-                        ea.record_ref(Arc::from(format!("fn:{canonical_fqn}")), arg.span);
+                        // Runtime callable strings always resolve in the global
+                        // namespace — no current-namespace fallback applies, unlike a
+                        // direct `helper()` call. The function index itself is never
+                        // keyed with a leading backslash (see the identical
+                        // `strip_prefix` above for `resolved_fn_name`), so a lookup
+                        // must strip one here too, not add one — a prepended `\`
+                        // makes every lookup key mismatch and silently fail.
+                        let fqn = name.as_ref().trim_start_matches('\\');
+                        let here = crate::db::Fqcn::from_str(ea.db, fqn);
+                        let canonical_fqn: Option<Arc<str>> =
+                            crate::db::find_function(ea.db, here).map(|f| f.fqn.clone());
+                        if let Some(canonical_fqn) = canonical_fqn {
+                            ea.record_ref(Arc::from(format!("fn:{canonical_fqn}")), arg.span);
+                        }
                     }
                 }
             }

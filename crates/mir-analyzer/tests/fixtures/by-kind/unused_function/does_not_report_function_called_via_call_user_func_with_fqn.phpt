@@ -1,5 +1,7 @@
 ===description===
 does not report function called via call user func with fqn
+===config===
+suppress=
 ===file===
 <?php
 namespace App;
