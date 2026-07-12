@@ -407,11 +407,17 @@ impl CallAnalyzer {
         // or a class checked/reflected on only this way is falsely flagged
         // UnusedClass. `is_a`/`is_subclass_of`/`method_exists` take the class
         // name in a different argument position than `class_exists`'s family.
+        // `class_alias`'s original-class argument is a hard requirement (PHP
+        // fatals if it doesn't exist), unlike the `*_exists` guards, but it's
+        // still just existence + reference recording here — no diagnostic is
+        // raised either way, matching how the rest of this table treats a
+        // string that fails to resolve to a real class.
         let class_name_arg_index: Option<usize> = match resolved_fn_name.to_ascii_lowercase().as_str()
         {
             "class_exists" | "interface_exists" | "trait_exists" | "enum_exists" => Some(0),
             "is_a" | "is_subclass_of" => Some(1),
             "method_exists" => Some(0),
+            "class_alias" => Some(0),
             _ => None,
         };
         if let Some(idx) = class_name_arg_index {
