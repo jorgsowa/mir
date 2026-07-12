@@ -23,7 +23,14 @@ impl<'a> BodyAnalyzer<'a> {
         let fn_name = decl.name.as_deref().unwrap_or("").to_string();
         for param in decl.params.iter() {
             if let Some(hint) = &param.type_hint {
-                self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
+                self.check_and_record_type_hint_classes(
+                    hint,
+                    file,
+                    source,
+                    source_map,
+                    all_issues,
+                    Some(&mut *all_symbols),
+                );
             }
             if let Some(default_expr) = &param.default {
                 check_expr_for_undefined_classes(
@@ -38,7 +45,14 @@ impl<'a> BodyAnalyzer<'a> {
             }
         }
         if let Some(hint) = &decl.return_type {
-            self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
+            self.check_and_record_type_hint_classes(
+                hint,
+                file,
+                source,
+                source_map,
+                all_issues,
+                Some(&mut *all_symbols),
+            );
         }
         use crate::flow_state::FlowState;
         use crate::stmt::StatementsAnalyzer;
@@ -519,6 +533,7 @@ impl<'a> BodyAnalyzer<'a> {
                     source,
                     source_map,
                     &mut issues,
+                    Some(&mut discarded_symbols),
                 );
             }
             if let Some(default_expr) = &param.default {
@@ -534,7 +549,14 @@ impl<'a> BodyAnalyzer<'a> {
             }
         }
         if let Some(hint) = &decl.return_type {
-            self.check_and_record_type_hint_classes(hint, file, source, source_map, &mut issues);
+            self.check_and_record_type_hint_classes(
+                hint,
+                file,
+                source,
+                source_map,
+                &mut issues,
+                Some(&mut discarded_symbols),
+            );
         }
 
         let resolved = lookup_function_node_for_decl(self.db, file.as_ref(), &fn_name);
@@ -657,11 +679,25 @@ impl<'a> BodyAnalyzer<'a> {
 
         for param in decl.params.iter() {
             if let Some(hint) = &param.type_hint {
-                self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
+                self.check_and_record_type_hint_classes(
+                    hint,
+                    file,
+                    source,
+                    source_map,
+                    all_issues,
+                    Some(&mut *all_symbols),
+                );
             }
         }
         if let Some(hint) = &decl.return_type {
-            self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
+            self.check_and_record_type_hint_classes(
+                hint,
+                file,
+                source,
+                source_map,
+                all_issues,
+                Some(&mut *all_symbols),
+            );
         }
 
         let resolved = lookup_function_node_for_decl(self.db, file.as_ref(), &fn_name);

@@ -31,7 +31,7 @@ impl<'a> BodyAnalyzer<'a> {
         all_issues: &mut Vec<Issue>,
     ) {
         if let Some(hint) = &prop.type_hint {
-            self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
+            self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues, None);
         } else {
             self.check_property_docblock_classes(
                 prop,
@@ -515,11 +515,25 @@ impl<'a> BodyAnalyzer<'a> {
 
         for param in method.params.iter() {
             if let Some(hint) = &param.type_hint {
-                self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
+                self.check_and_record_type_hint_classes(
+                    hint,
+                    file,
+                    source,
+                    source_map,
+                    all_issues,
+                    Some(&mut *all_symbols),
+                );
             }
         }
         if let Some(hint) = &method.return_type {
-            self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
+            self.check_and_record_type_hint_classes(
+                hint,
+                file,
+                source,
+                source_map,
+                all_issues,
+                Some(&mut *all_symbols),
+            );
         }
         self.check_method_docblock_classes(method, fqcn, file, source, source_map, all_issues);
 

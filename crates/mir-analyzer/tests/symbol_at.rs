@@ -1115,6 +1115,60 @@ fn symbol_at_param_declaration_tight_span() {
     }
 }
 
+#[test]
+fn symbol_at_function_param_type_hint_resolves_to_class_reference() {
+    // Hovering the native type-hint class name itself (not the `$var` that
+    // follows it) in a free function's param list must resolve, matching the
+    // identical closure-param case.
+    let src = "<?php\nclass User {}\nfunction greet(User $user): void {}\n";
+    let result = mir_analyzer::analyze_source(src);
+
+    let offset = src.find("User $user").unwrap() as u32;
+    let sym = result
+        .symbol_at("<source>", offset)
+        .expect("symbol_at must find ClassReference on a function param type hint");
+    assert!(
+        matches!(&sym.kind, ReferenceKind::ClassReference(n) if n.as_ref() == "User"),
+        "expected ClassReference(User), got {:?}",
+        sym.kind
+    );
+}
+
+#[test]
+fn symbol_at_function_return_type_hint_resolves_to_class_reference() {
+    // Hovering a free function's native return type-hint class name must resolve.
+    let src = "<?php\nclass User {}\nfunction current(): User { return new User(); }\n";
+    let result = mir_analyzer::analyze_source(src);
+
+    let offset = src.find("): User {").unwrap() as u32 + 3; // points at 'U' of the return type
+    let sym = result
+        .symbol_at("<source>", offset)
+        .expect("symbol_at must find ClassReference on a function return type hint");
+    assert!(
+        matches!(&sym.kind, ReferenceKind::ClassReference(n) if n.as_ref() == "User"),
+        "expected ClassReference(User), got {:?}",
+        sym.kind
+    );
+}
+
+#[test]
+fn symbol_at_method_param_type_hint_resolves_to_class_reference() {
+    // Hovering a method's native param type-hint class name must resolve,
+    // matching the free-function case.
+    let src = "<?php\nclass User {}\nclass Greeter { public function greet(User $user): void {} }\n";
+    let result = mir_analyzer::analyze_source(src);
+
+    let offset = src.find("User $user").unwrap() as u32;
+    let sym = result
+        .symbol_at("<source>", offset)
+        .expect("symbol_at must find ClassReference on a method param type hint");
+    assert!(
+        matches!(&sym.kind, ReferenceKind::ClassReference(n) if n.as_ref() == "User"),
+        "expected ClassReference(User), got {:?}",
+        sym.kind
+    );
+}
+
 // ---------------------------------------------------------------------------
 // symbol_at — negated instanceof guard narrows receiver type (issue #6)
 // ---------------------------------------------------------------------------

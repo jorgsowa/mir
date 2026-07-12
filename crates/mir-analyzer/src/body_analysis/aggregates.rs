@@ -402,12 +402,14 @@ impl<'a> BodyAnalyzer<'a> {
             for param in method.params.iter() {
                 if let Some(hint) = &param.type_hint {
                     self.check_and_record_type_hint_classes(
-                        hint, file, source, source_map, all_issues,
+                        hint, file, source, source_map, all_issues, None,
                     );
                 }
             }
             if let Some(hint) = &method.return_type {
-                self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
+                self.check_and_record_type_hint_classes(
+                    hint, file, source, source_map, all_issues, None,
+                );
             }
 
             let method_name = method.name.as_deref().unwrap_or("");

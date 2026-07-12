@@ -521,6 +521,7 @@ impl<'a> BodyAnalyzer<'a> {
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<Issue>,
+        all_symbols: Option<&mut Vec<ResolvedSymbol>>,
     ) {
         check_type_hint_classes(
             hint,
@@ -532,6 +533,7 @@ impl<'a> BodyAnalyzer<'a> {
             self.php_version,
         );
         if self.mode == AnalysisMode::Full {
+            let mut all_symbols = all_symbols;
             for (fqcn, span) in collect_type_hint_class_refs(hint, self.db, file) {
                 let (line, col_start) =
                     crate::diagnostics::offset_to_line_col(source, span.start, source_map);
@@ -544,6 +546,22 @@ impl<'a> BodyAnalyzer<'a> {
                     col_start,
                     col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
                 });
+                // Without this, hover/go-to-definition on a native type-hint class name
+                // (the single most common symbol position in the codebase) resolved
+                // nothing — the closure/arrow-fn twin (`check_type_hint` in expr/mod.rs)
+                // records both a ref and a symbol for the identical AST shape.
+                if crate::db::class_exists(self.db, fqcn.as_ref()) {
+                    if let Some(symbols) = all_symbols.as_deref_mut() {
+                        use crate::symbol::ReferenceKind;
+                        symbols.push(ResolvedSymbol {
+                            file: file.clone(),
+                            span,
+                            expr_span: None,
+                            kind: ReferenceKind::ClassReference(fqcn),
+                            resolved_type: Type::single(mir_types::Atomic::TClassString(None)),
+                        });
+                    }
+                }
             }
         }
     }
