@@ -169,6 +169,16 @@ impl ClassLike {
         }
     }
 
+    /// `@psalm-import-type`/`@phpstan-import-type` declarations not resolved
+    /// against a same-file source (class only). Each entry is `(local_name,
+    /// original_name, from_fqcn)`.
+    pub fn pending_import_types(&self) -> &[(Arc<str>, Arc<str>, Arc<str>)] {
+        match self {
+            ClassLike::Class(c) => &c.pending_import_types,
+            _ => &[],
+        }
+    }
+
     /// `@deprecated` docblock annotation, if present.
     pub fn deprecated(&self) -> Option<&Arc<str>> {
         match self {

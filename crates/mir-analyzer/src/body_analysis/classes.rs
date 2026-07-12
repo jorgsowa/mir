@@ -292,6 +292,10 @@ impl<'a> BodyAnalyzer<'a> {
             check_class_name(mixin_fqcn.as_ref(), all_issues);
         }
 
+        for (_local, _original, from_fqcn) in class.pending_import_types() {
+            check_class_name(from_fqcn.as_ref(), all_issues);
+        }
+
         if let Some(props) = class.own_properties() {
             for prop in props.values().filter(|p| p.from_docblock) {
                 let Some(ty) = prop.ty.as_deref() else {
