@@ -1,5 +1,7 @@
 ===description===
 does not report function called from another file
+===config===
+suppress=
 ===file:helpers.php===
 <?php
 function helper(): void {}

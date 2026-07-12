@@ -1,5 +1,7 @@
 ===description===
 does not report function called via use function
+===config===
+suppress=
 ===file:lib.php===
 <?php
 namespace Utils;

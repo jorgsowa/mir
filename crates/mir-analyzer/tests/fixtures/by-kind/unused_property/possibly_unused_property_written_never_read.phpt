@@ -1,12 +1,11 @@
 ===description===
 Possibly unused property written never read
 ===config===
-suppress=MissingPropertyType
+suppress=
 ===file===
 <?php
 final class A {
-    /** @var string */
-    public $foo = "hello";
+    public string $foo = "hello";
 }
 
 $a = new A();

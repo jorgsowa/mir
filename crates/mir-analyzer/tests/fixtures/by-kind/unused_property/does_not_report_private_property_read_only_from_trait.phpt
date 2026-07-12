@@ -2,6 +2,8 @@
 A private property read only from a trait's own method body ($this->secret
 inside the trait, where $secret is supplied by the composing class) must
 not be reported unused.
+===config===
+suppress=
 ===file===
 <?php
 trait T {
