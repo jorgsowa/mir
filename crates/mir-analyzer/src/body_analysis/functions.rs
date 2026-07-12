@@ -12,7 +12,13 @@ impl<'a> BodyAnalyzer<'a> {
         all_symbols: &mut Vec<ResolvedSymbol>,
     ) {
         crate::attributes::check_function_attributes(
-            decl, self.db, file, source, source_map, all_issues,
+            decl,
+            self.db,
+            file,
+            source,
+            source_map,
+            all_issues,
+            self.mode == AnalysisMode::Full,
         );
         let fn_name = decl.name.as_deref().unwrap_or("").to_string();
         for param in decl.params.iter() {

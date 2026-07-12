@@ -367,7 +367,13 @@ impl<'a> BodyAnalyzer<'a> {
         guards: &rustc_hash::FxHashSet<std::sync::Arc<str>>,
     ) {
         crate::attributes::check_class_attributes(
-            decl, self.db, file, source, source_map, all_issues,
+            decl,
+            self.db,
+            file,
+            source,
+            source_map,
+            all_issues,
+            self.mode == AnalysisMode::Full,
         );
 
         let class_name_owned = decl

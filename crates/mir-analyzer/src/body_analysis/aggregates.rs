@@ -12,7 +12,13 @@ impl<'a> BodyAnalyzer<'a> {
         all_symbols: &mut Vec<ResolvedSymbol>,
     ) {
         crate::attributes::check_trait_attributes(
-            decl, self.db, file, source, source_map, all_issues,
+            decl,
+            self.db,
+            file,
+            source,
+            source_map,
+            all_issues,
+            self.mode == AnalysisMode::Full,
         );
 
         let resolved = resolve_name(self.db, file.as_ref(), decl.name.as_deref().unwrap_or(""));
@@ -291,7 +297,13 @@ impl<'a> BodyAnalyzer<'a> {
         guards: &rustc_hash::FxHashSet<std::sync::Arc<str>>,
     ) {
         crate::attributes::check_interface_attributes(
-            decl, self.db, file, source, source_map, all_issues,
+            decl,
+            self.db,
+            file,
+            source,
+            source_map,
+            all_issues,
+            self.mode == AnalysisMode::Full,
         );
         use php_ast::owned::ClassMemberKind;
         for parent in decl.extends.iter() {

@@ -112,6 +112,7 @@ pub(crate) fn check_function_attributes(
     source: &str,
     source_map: &SourceMap,
     issues: &mut Vec<Issue>,
+    record_refs: bool,
 ) {
     for attr in decl.attributes.iter() {
         if !is_attribute_class_annotation(attr) {
@@ -131,6 +132,7 @@ pub(crate) fn check_function_attributes(
         source,
         source_map,
         issues,
+        record_refs,
     );
     for param in decl.params.iter() {
         // `#[Attribute]` on a function parameter is invalid
@@ -152,6 +154,7 @@ pub(crate) fn check_function_attributes(
             source,
             source_map,
             issues,
+            record_refs,
         );
     }
 }
@@ -168,6 +171,7 @@ pub(crate) fn check_class_attributes(
     source: &str,
     source_map: &SourceMap,
     issues: &mut Vec<Issue>,
+    record_refs: bool,
 ) {
     // Check 1: `#[Attribute]` on abstract class
     if decl.modifiers.is_abstract {
@@ -215,6 +219,7 @@ pub(crate) fn check_class_attributes(
         source,
         source_map,
         issues,
+        record_refs,
     );
 
     for member in decl.body.members.iter() {
@@ -228,6 +233,7 @@ pub(crate) fn check_class_attributes(
                     source,
                     source_map,
                     issues,
+                    record_refs,
                 );
                 for param in method.params.iter() {
                     check_attribute_list(
@@ -238,6 +244,7 @@ pub(crate) fn check_class_attributes(
                         source,
                         source_map,
                         issues,
+                        record_refs,
                     );
                     // `#[Attribute]` on a method parameter is invalid
                     for attr in param.attributes.iter() {
@@ -282,6 +289,7 @@ pub(crate) fn check_class_attributes(
                     source,
                     source_map,
                     issues,
+                    record_refs,
                 );
                 // `#[Attribute]` on a property is invalid
                 for attr in prop.attributes.iter() {
@@ -309,6 +317,7 @@ pub(crate) fn check_class_attributes(
                     source,
                     source_map,
                     issues,
+                    record_refs,
                 );
                 // `#[Attribute]` on a class constant is invalid
                 for attr in c.attributes.iter() {
@@ -340,6 +349,7 @@ pub(crate) fn check_interface_attributes(
     source: &str,
     source_map: &SourceMap,
     issues: &mut Vec<Issue>,
+    record_refs: bool,
 ) {
     for attr in decl.attributes.iter() {
         if !is_attribute_class_annotation(attr) {
@@ -361,6 +371,7 @@ pub(crate) fn check_interface_attributes(
             source,
             source_map,
             issues,
+            record_refs,
         );
     }
 }
@@ -373,6 +384,7 @@ pub(crate) fn check_trait_attributes(
     source: &str,
     source_map: &SourceMap,
     issues: &mut Vec<Issue>,
+    record_refs: bool,
 ) {
     for attr in decl.attributes.iter() {
         if !is_attribute_class_annotation(attr) {
@@ -393,6 +405,7 @@ pub(crate) fn check_trait_attributes(
                     source,
                     source_map,
                     issues,
+                    record_refs,
                 );
             }
             ClassMemberKind::Property(prop) => {
@@ -404,6 +417,7 @@ pub(crate) fn check_trait_attributes(
                     source,
                     source_map,
                     issues,
+                    record_refs,
                 );
             }
             _ => {}
@@ -457,6 +471,7 @@ pub(crate) fn check_parent_in_class_attrs(
 ///    emits `InvalidAttribute`.
 /// 2. If found and has a target mask, checks that `target_flag` is set.
 /// 3. Checks for duplicate non-repeatable attributes.
+#[allow(clippy::too_many_arguments)]
 fn check_attribute_list(
     attrs: &[Attribute],
     target_flag: i64,
@@ -465,6 +480,7 @@ fn check_attribute_list(
     source: &str,
     source_map: &SourceMap,
     issues: &mut Vec<Issue>,
+    record_refs: bool,
 ) {
     let mut seen_fqcns: Vec<(String, u32)> = Vec::new(); // (fqcn, span.start)
 
@@ -487,6 +503,24 @@ fn check_attribute_list(
                 ));
             }
             Some(cl) => {
+                // `#[MyAttr(...)]` is a real reference to MyAttr — record it, or a
+                // class used only via attribute annotations elsewhere is falsely
+                // flagged UnusedClass.
+                if record_refs {
+                    let (line, col_start) =
+                        offset_to_line_col(source, attr.span.start, source_map);
+                    let (line_end, col_end) =
+                        offset_to_line_col(source, attr.span.end, source_map);
+                    db.record_reference_location(crate::db::RefLoc {
+                        symbol_key: Arc::from(format!("cls:{fqcn}")),
+                        file: file.clone(),
+                        line,
+                        col_start,
+                        col_end: crate::diagnostics::clamp_col_end(
+                            line, line_end, col_start, col_end,
+                        ),
+                    });
+                }
                 // Check for case mismatch between the written attribute name and canonical.
                 if let Some((used, canonical)) =
                     crate::fqcn_case_mismatch(&fqcn, cl.fqcn().as_ref())
