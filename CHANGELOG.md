@@ -54,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Enum case value expressions were never analyzed at all:** the enum-analysis loop matched only `EnumMemberKind::Method`, so `case Active = UndefinedClass::VALUE;` (a real PHP fatal on first touch of the enum) went completely unflagged. Each case's value expression is now analyzed against the enum itself.
 - **`TraitConstantAccessedDirectly` (MIR0012):** `SomeTrait::CONST` was treated exactly like a normal class constant fetch — accessing a trait's constant directly (rather than through a class that `use`s it) is a hard PHP fatal error regardless of whether the constant exists, since a trait is never a valid constant-access target.
 - **`UndefinedTraitAliasMethod` (MIR0013):** a trait `use` alias (`use A { A::missing as alias; }`, or an unqualified `missing as alias;` naming no method any used trait declares) was never validated — a PHP fatal error at class-declaration time that previously passed silently.
+- **A private method/property called only from a trait's own method body was falsely reported unused:** a trait body's `$this` is typed as the trait itself, so `$this->helper()`/`$this->secret` inside the trait (satisfied by whatever class ends up `use`ing it) never recorded a reference against the composing class's own private member. Each such trait-body access now records a per-trait marker that `DeadCodeAnalyzer` credits to any class using that trait.
 
 ## [0.51.0] - 2026-07-10
 

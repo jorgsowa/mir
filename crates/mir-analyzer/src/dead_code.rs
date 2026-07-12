@@ -81,6 +81,8 @@ impl<'a> DeadCodeAnalyzer<'a> {
                 continue;
             }
 
+            let used_traits = class.class_traits();
+
             // Methods.
             for (name, method) in class.own_methods().iter() {
                 if method.visibility != Visibility::Private {
@@ -90,10 +92,14 @@ impl<'a> DeadCodeAnalyzer<'a> {
                 if MAGIC_METHODS.contains(&name_lower.as_str()) {
                     continue;
                 }
-                if !self
+                let referenced = self
                     .db
                     .has_reference(&format!("meth:{}::{}", fqcn_str, name_lower))
-                {
+                    || used_traits.iter().any(|t| {
+                        self.db
+                            .has_reference(&format!("traituse:{t}::{name_lower}"))
+                    });
+                if !referenced {
                     let location =
                         crate::diagnostics::storage_loc_to_location(method.location.as_ref());
                     issues.push(Issue::new(
@@ -112,10 +118,14 @@ impl<'a> DeadCodeAnalyzer<'a> {
                     if prop.visibility != Visibility::Private {
                         continue;
                     }
-                    if !self
+                    let referenced = self
                         .db
                         .has_reference(&format!("prop:{}::{}", fqcn_str, name.as_ref()))
-                    {
+                        || used_traits.iter().any(|t| {
+                            self.db
+                                .has_reference(&format!("traituse:{t}::{}", name.as_ref()))
+                        });
+                    if !referenced {
                         let location =
                             crate::diagnostics::storage_loc_to_location(prop.location.as_ref());
                         issues.push(Issue::new(
