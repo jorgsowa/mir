@@ -507,6 +507,46 @@ target(); function target(): void {}
     );
 }
 
+/// `FileAnalysis::symbol_at` must fall back to a call's full `expr_span` when
+/// the offset misses every identifier span — e.g. a cursor sitting on the
+/// closing `)` of `$f->bar()` in a chain `$f->bar()->bar()`, which an editor
+/// hits when resolving the receiver type for completion right after typing
+/// `->` following a call. `BatchAnalysis::symbol_at` (batch/mod.rs) already
+/// has this fallback; this is the single-file `FileAnalyzer` path exercised
+/// by `AnalysisSession`'s open-file/interactive queries.
+#[test]
+fn file_analysis_symbol_at_falls_back_to_call_expr_span_in_chain() {
+    let src = "<?php
+class Foo {
+    public function bar(): Foo { return $this; }
+}
+function test(Foo $f): void {
+    $f->bar()->bar();
+}
+";
+    let result = parse_and_analyze(src);
+
+    // Offset of the closing ')' of the *first* `bar()` call: inside that
+    // call's expr_span, but outside every recorded identifier span (the
+    // method-name span covers only `bar`).
+    let first_call = src.find("$f->bar()").expect("fixture must contain $f->bar()");
+    let close_paren_offset = (first_call + "$f->bar(".len()) as u32;
+
+    let resolved = result
+        .symbol_at(close_paren_offset)
+        .expect("expected the chained call's expr_span to cover its own closing paren");
+    assert!(
+        matches!(&resolved.kind, mir_analyzer::ReferenceKind::MethodCall { method, .. } if method.as_ref() == "bar"),
+        "expected MethodCall(bar) via expr_span fallback; got {:?}",
+        resolved.kind
+    );
+    assert!(
+        resolved.resolved_type.to_string().contains("Foo"),
+        "expected the first bar() call's return type (Foo) to be recorded; got {}",
+        resolved.resolved_type
+    );
+}
+
 /// `location_from_span` translates a parser span to a `Location` using the
 /// crate's own conventions. Round-trip sanity check: spans from a parsed
 /// program convert to lines/columns that match the source text.

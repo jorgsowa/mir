@@ -39,10 +39,32 @@ impl FileAnalysis {
     /// symbol's definition via [`crate::AnalysisSession::definition_of`] or
     /// type info via [`ResolvedSymbol::resolved_type`].
     pub fn symbol_at(&self, byte_offset: u32) -> Option<&ResolvedSymbol> {
-        self.symbols
+        // Primary: cursor is on an identifier token.
+        if let Some(sym) = self
+            .symbols
             .iter()
             .filter(|s| s.span.start <= byte_offset && byte_offset < s.span.end)
             .min_by_key(|s| s.span.end - s.span.start)
+        {
+            return Some(sym);
+        }
+
+        // Fallback: cursor is in a call-expression gap (e.g. the whitespace,
+        // argument list, or trailing `->` between two chained method calls).
+        // Match against the full expression span recorded for call-like
+        // symbols and return the innermost (smallest) enclosing call —
+        // mirrors `crate::batch::BatchAnalysis::symbol_at`, which already
+        // does this; this single-file path fell out of sync with it.
+        self.symbols
+            .iter()
+            .filter(|s| {
+                s.expr_span
+                    .is_some_and(|es| es.start <= byte_offset && byte_offset < es.end)
+            })
+            .min_by_key(|s| {
+                let es = s.expr_span.unwrap();
+                es.end - es.start
+            })
     }
 }
 
