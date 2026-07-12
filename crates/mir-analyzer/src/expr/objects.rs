@@ -871,6 +871,23 @@ impl<'a> ExpressionAnalyzer<'a> {
             return Type::mixed();
         }
 
+        // A trait can declare constants for the classes that `use` it (PHP
+        // 8.2+), but the trait itself is never a valid constant-access
+        // target — `HasFoo::FOO` is a hard fatal regardless of whether FOO
+        // exists, so this must short-circuit before the existence lookup
+        // below, which would otherwise treat the trait like any other class.
+        if crate::db::class_kind(self.db, &fqcn).is_some_and(|k| k.is_trait) {
+            self.emit(
+                IssueKind::TraitConstantAccessedDirectly {
+                    trait_name: fqcn,
+                    constant: const_name,
+                },
+                Severity::Error,
+                expr_span,
+            );
+            return Type::mixed();
+        }
+
         self.record_ref(Arc::from(format!("cls:{fqcn}")), cca.class.span);
         self.record_ref(
             Arc::from(format!("cnst:{}::{}", fqcn, const_name)),
