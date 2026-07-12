@@ -1101,7 +1101,26 @@ impl<'a> DefinitionCollector<'a> {
             }
         }
 
+        self.expand_type_aliases_fixpoint(&mut aliases);
         aliases
+    }
+
+    /// An alias body can itself reference another alias in the same map
+    /// (`@psalm-type A = B`, `@psalm-type B = int`); `resolve_union_doc`
+    /// above has no knowledge of `aliases` and leaves such a reference as a
+    /// bare `TNamedObject`, so without this pass `A` would resolve to `B`
+    /// instead of fully expanding to `int`. Re-expanding every alias against
+    /// the full map, bounded by the alias count, converges a finite chain of
+    /// any depth in one pass per link and turns a cyclic definition
+    /// (`A = B`, `B = A`) into a stable self-reference instead of looping
+    /// forever.
+    fn expand_type_aliases_fixpoint(&self, aliases: &mut FxHashMap<String, Type>) {
+        for _ in 0..aliases.len() {
+            let snapshot = aliases.clone();
+            for ty in aliases.values_mut() {
+                *ty = self.expand_aliases_only(ty.clone(), &snapshot);
+            }
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
