@@ -843,6 +843,42 @@ fn fn_header_name_span(source: &str, decl: &php_ast::owned::FunctionDecl) -> php
     }
 }
 
+/// Tight span for the method name in a `function name(...)` header, mirroring
+/// [`fn_header_name_span`] for [`php_ast::owned::MethodDecl`] (whose `name` is
+/// never absent and whose `body` is optional for abstract/interface methods).
+fn method_header_name_span(source: &str, method: &php_ast::owned::MethodDecl) -> php_ast::Span {
+    let fallback = method
+        .body
+        .as_deref()
+        .map(|b| b.span)
+        .unwrap_or(php_ast::Span { start: 0, end: 0 });
+    let anchor = method
+        .params
+        .first()
+        .map(|p| p.span.start)
+        .unwrap_or(fallback.start) as usize;
+    let anchor = anchor.min(source.len());
+    let Some(name) = method.name.as_deref() else {
+        return fallback;
+    };
+    if name.is_empty() {
+        return fallback;
+    }
+    let anchor = (anchor..=source.len())
+        .find(|&i| source.is_char_boundary(i))
+        .unwrap_or(source.len());
+    match source[..anchor].rfind(name) {
+        Some(rel) => {
+            let start = rel as u32;
+            php_ast::Span {
+                start,
+                end: start + name.len() as u32,
+            }
+        }
+        None => fallback,
+    }
+}
+
 /// Return the tight byte-offset span for only the `$name` token in a
 /// parameter declaration. Falls back to the full param span when not found.
 fn param_name_span(source: &str, p: &php_ast::owned::Param) -> php_ast::Span {

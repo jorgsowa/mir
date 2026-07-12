@@ -40,6 +40,89 @@ impl<'a> BodyAnalyzer<'a> {
         }
     }
 
+    /// `UndefinedDocblockClass` for a method's own `@return` docblock type.
+    /// Free functions already get this check (`analyze_fn_decl`) against
+    /// their collector-resolved signature; methods never did, so
+    /// `/** @return UndefinedClass */` on a method silently passed even
+    /// though the identical tag on a free function is flagged.
+    ///
+    /// Deliberately reuses `method_chain_signature`'s already-resolved
+    /// return type (the same value `FlowState` is built from) rather than
+    /// re-parsing the raw docblock: that value has already had `@template`
+    /// references substituted to `TTemplateParam` and `@psalm-type`/
+    /// `@phpstan-type` aliases expanded by the collector, so any
+    /// `TNamedObject` still present genuinely names a class — no need to
+    /// re-derive template/alias awareness here. `@param` docblock types are
+    /// NOT checked here for the same reason function.rs gives for re-parsing
+    /// them separately: unlike the return type, storage doesn't reliably
+    /// flag which param types came from a docblock, and reusing the
+    /// resolved type unconditionally would double-report a native-hint
+    /// class already caught by `check_and_record_type_hint_classes`.
+    fn check_method_docblock_classes(
+        &self,
+        method: &php_ast::owned::MethodDecl,
+        fqcn: &str,
+        file: &Arc<str>,
+        source: &str,
+        source_map: &php_rs_parser::source_map::SourceMap,
+        all_issues: &mut Vec<Issue>,
+    ) {
+        if self.mode != AnalysisMode::Full {
+            return;
+        }
+        let method_name = method.name.as_deref().unwrap_or("");
+        if method_name.is_empty() {
+            return;
+        }
+        let (_, return_ty, _, _) = method_chain_signature(self.db, fqcn, method_name);
+        let Some(doc_ty) = return_ty.filter(|t| t.from_docblock) else {
+            return;
+        };
+        if !doc_ty
+            .types
+            .iter()
+            .any(|a| matches!(a, mir_types::Atomic::TNamedObject { .. }))
+        {
+            return;
+        }
+        let header_span = method_header_name_span(source, method);
+        let (line, col_start) =
+            crate::diagnostics::offset_to_line_col(source, header_span.start, source_map);
+        let (line_end, col_end) =
+            crate::diagnostics::offset_to_line_col(source, header_span.end, source_map);
+        let header_location = mir_issues::Location {
+            file: file.clone(),
+            line,
+            line_end,
+            col_start,
+            col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
+        };
+        for atomic in &doc_ty.types {
+            if let mir_types::Atomic::TNamedObject { fqcn: cls_fqcn, .. } = atomic {
+                // `static<T, ...>` (a templated late-static-binding return) can
+                // surface as a literal `TNamedObject("static")` rather than
+                // `TStaticObject` — a method-only shape a free function's
+                // return type can never produce, so this pseudo-name was
+                // never filtered before. `self`/`parent` guarded the same way
+                // for consistency, though only reachable via `@return` here.
+                if matches!(
+                    crate::util::php_ident_lowercase(cls_fqcn.as_ref()).as_str(),
+                    "self" | "static" | "parent"
+                ) {
+                    continue;
+                }
+                if !crate::db::class_exists(self.db, cls_fqcn.as_ref()) {
+                    all_issues.push(mir_issues::Issue::new(
+                        mir_issues::IssueKind::UndefinedDocblockClass {
+                            name: cls_fqcn.to_string(),
+                        },
+                        header_location.clone(),
+                    ));
+                }
+            }
+        }
+    }
+
     /// Analyze one class-like member method: hint checks, optional parameter
     /// default-value analysis, FlowState construction, body statement
     /// analysis, unused-param/-var emission, optional return checks, and
@@ -75,6 +158,7 @@ impl<'a> BodyAnalyzer<'a> {
         if let Some(hint) = &method.return_type {
             self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
         }
+        self.check_method_docblock_classes(method, fqcn, file, source, source_map, all_issues);
 
         if cx.analyze_param_defaults && method.params.iter().any(|p| p.default.is_some()) {
             let mut buf = IssueBuffer::new();
