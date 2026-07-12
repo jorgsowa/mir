@@ -293,9 +293,10 @@ impl<'a> BodyAnalyzer<'a> {
                 crate::diagnostics::offset_to_line_col(source, span.end, source_map);
             for atomic in &doc_ty.types {
                 if let mir_types::Atomic::TNamedObject { fqcn, .. } = atomic {
-                    if !template_names.iter().any(|t| *t == fqcn.as_ref())
-                        && !crate::db::class_exists(self.db, fqcn.as_ref())
-                    {
+                    if template_names.iter().any(|t| *t == fqcn.as_ref()) {
+                        continue;
+                    }
+                    if !crate::db::class_exists(self.db, fqcn.as_ref()) {
                         issues.push(mir_issues::Issue::new(
                             mir_issues::IssueKind::UndefinedDocblockClass {
                                 name: fqcn.to_string(),
@@ -310,6 +311,16 @@ impl<'a> BodyAnalyzer<'a> {
                                 ),
                             },
                         ));
+                    } else if self.mode == AnalysisMode::Full {
+                        self.db.record_reference_location(crate::db::RefLoc {
+                            symbol_key: Arc::from(format!("cls:{fqcn}")),
+                            file: file.clone(),
+                            line,
+                            col_start,
+                            col_end: crate::diagnostics::clamp_col_end(
+                                line, line_end, col_start, col_end,
+                            ),
+                        });
                     }
                 }
             }
@@ -421,11 +432,10 @@ impl<'a> BodyAnalyzer<'a> {
                             .any(|t| *t == fqcn.as_ref() || *t == last_segment);
                         let is_alias = type_alias_names.contains(last_segment)
                             || type_alias_names.contains(fqcn.as_ref());
-                        if looks_like_class
-                            && !is_template
-                            && !is_alias
-                            && !crate::db::class_exists(self.db, fqcn.as_ref())
-                        {
+                        if !looks_like_class || is_template || is_alias {
+                            continue;
+                        }
+                        if !crate::db::class_exists(self.db, fqcn.as_ref()) {
                             issues.push(mir_issues::Issue::new(
                                 mir_issues::IssueKind::UndefinedDocblockClass {
                                     name: fqcn.to_string(),
@@ -443,6 +453,19 @@ impl<'a> BodyAnalyzer<'a> {
                                     ),
                                 },
                             ));
+                        } else if self.mode == AnalysisMode::Full {
+                            self.db.record_reference_location(crate::db::RefLoc {
+                                symbol_key: Arc::from(format!("cls:{fqcn}")),
+                                file: file.clone(),
+                                line: fn_line,
+                                col_start: fn_col_start,
+                                col_end: crate::diagnostics::clamp_col_end(
+                                    fn_line,
+                                    fn_line_end,
+                                    fn_col_start,
+                                    fn_col_end,
+                                ),
+                            });
                         }
                     }
                 }

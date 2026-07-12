@@ -118,6 +118,14 @@ impl<'a> BodyAnalyzer<'a> {
                         },
                         header_location.clone(),
                     ));
+                } else {
+                    self.db.record_reference_location(crate::db::RefLoc {
+                        symbol_key: Arc::from(format!("cls:{cls_fqcn}")),
+                        file: file.clone(),
+                        line: header_location.line,
+                        col_start: header_location.col_start,
+                        col_end: header_location.col_end,
+                    });
                 }
             }
         }
