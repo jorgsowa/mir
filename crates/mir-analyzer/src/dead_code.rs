@@ -73,6 +73,14 @@ impl<'a> DeadCodeAnalyzer<'a> {
         for (fqcn, class) in crate::db::analyzed_class_defs(self.db, &self.analyzed_files) {
             let fqcn_str = fqcn.as_ref();
 
+            // A `$obj->$name`/`$obj->$name()`/`Class::$$name` access anywhere
+            // in the codebase means some private member of this class may be
+            // reached only dynamically — the exact member is unknowable
+            // statically, so exempt the whole class rather than false-flag it.
+            if self.db.has_reference(&format!("dyn:{fqcn_str}")) {
+                continue;
+            }
+
             // Methods.
             for (name, method) in class.own_methods().iter() {
                 if method.visibility != Visibility::Private {

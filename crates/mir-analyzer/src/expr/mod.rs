@@ -286,8 +286,20 @@ impl<'a> ExpressionAnalyzer<'a> {
                 Type::mixed()
             }
             ExprKind::StaticPropertyAccessDynamic { class, member } => {
-                if matches!(&class.kind, ExprKind::Variable(_)) {
-                    let _ = self.analyze(class, ctx);
+                if let ExprKind::Identifier(name) = &class.kind {
+                    let resolved = crate::db::resolve_name(self.db, self.file.as_ref(), name);
+                    let fqcn = match ctx.self_fqcn.as_deref() {
+                        Some(self_fqcn) if resolved.eq_ignore_ascii_case("self") => {
+                            self_fqcn.to_string()
+                        }
+                        _ => resolved,
+                    };
+                    if !matches!(fqcn.as_str(), "self" | "static" | "parent") {
+                        self.record_ref(Arc::from(format!("dyn:{fqcn}")), member.span);
+                    }
+                } else {
+                    let class_ty = self.analyze(class, ctx);
+                    self.record_dynamic_member_access(&class_ty, member.span);
                 }
                 let _ = self.analyze(member, ctx);
                 Type::mixed()
@@ -724,6 +736,26 @@ impl<'a> ExpressionAnalyzer<'a> {
             col_start,
             col_end,
         });
+    }
+
+    /// Mark every named-object class in `obj_ty` as reached through a
+    /// dynamic member access (`$obj->$name`/`$obj->$name()` where `$name`
+    /// isn't a literal). The exact member touched is unknowable statically,
+    /// so instead of under- or over-recording a specific reference, this
+    /// records a coarse per-class marker (`dyn:Fqcn`) that
+    /// `DeadCodeAnalyzer` consults to blanket-exempt a class's private
+    /// members from `Unused*` once any dynamic access on it is seen —
+    /// otherwise a private member reachable only dynamically (a common
+    /// `__get`/`__set`-adjacent pattern) is falsely reported unused.
+    pub(crate) fn record_dynamic_member_access(&self, obj_ty: &Type, span: php_ast::Span) {
+        if self.mode == AnalysisMode::InferenceOnly {
+            return;
+        }
+        for atomic in obj_ty.remove_null().types.iter() {
+            if let Some(fqcn) = atomic.named_object_fqcn() {
+                self.record_ref(Arc::from(format!("dyn:{fqcn}")), span);
+            }
+        }
     }
 
     /// Walk a type hint and emit `UndefinedClass` for any named type not in the codebase.

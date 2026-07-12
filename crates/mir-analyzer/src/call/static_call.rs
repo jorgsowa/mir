@@ -732,6 +732,20 @@ impl CallAnalyzer {
         call: &StaticDynMethodCallExpr,
         ctx: &mut FlowState,
     ) -> Type {
+        // The called method's name isn't statically known — mark the target
+        // class as dynamically accessed so DeadCodeAnalyzer doesn't flag its
+        // private members as unused, mirroring the instance-call fallback.
+        if let ExprKind::Identifier(name) = &call.class.kind {
+            let resolved = crate::db::resolve_name(ea.db, &ea.file, name.as_ref());
+            let fqcn = resolve_static_class(&resolved, ctx);
+            if !matches!(fqcn.as_str(), "self" | "static" | "parent") {
+                ea.record_ref(Arc::from(format!("dyn:{fqcn}")), call.method.span);
+            }
+        } else {
+            let class_ty = ea.analyze(&call.class, ctx);
+            ea.record_dynamic_member_access(&class_ty, call.method.span);
+        }
+        ea.analyze(&call.method, ctx);
         for arg in call.args.iter() {
             ea.analyze(&arg.value, ctx);
             super::consume_arg_assignment(&arg.value, ctx);

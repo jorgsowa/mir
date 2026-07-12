@@ -210,6 +210,7 @@ impl CallAnalyzer {
             ExprKind::Identifier(name) => name.as_ref(),
             _ => {
                 ea.analyze(&call.method, ctx);
+                ea.record_dynamic_member_access(&obj_ty, call.method.span);
                 // Analyze arguments so variables used in them are marked as consumed.
                 for arg in &call.args {
                     ea.analyze(&arg.value, ctx);
