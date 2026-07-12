@@ -180,6 +180,16 @@ impl<'a> BodyAnalyzer<'a> {
     ) {
         use php_ast::owned::EnumMemberKind;
 
+        crate::attributes::check_enum_attributes(
+            decl,
+            self.db,
+            file,
+            source,
+            source_map,
+            all_issues,
+            self.mode == AnalysisMode::Full,
+        );
+
         for iface in decl.implements.iter() {
             check_name_class(
                 iface,
@@ -237,6 +247,16 @@ impl<'a> BodyAnalyzer<'a> {
         all_symbols: &mut Vec<ResolvedSymbol>,
     ) {
         use php_ast::owned::EnumMemberKind;
+
+        crate::attributes::check_enum_attributes(
+            decl,
+            self.db,
+            file,
+            source,
+            source_map,
+            all_issues,
+            self.mode == AnalysisMode::Full,
+        );
 
         // Single pass: same analysis as the untyped path, additionally
         // recording type environments for LSP hover/go-to-def. (Previously

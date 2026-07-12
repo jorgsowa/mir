@@ -18,7 +18,8 @@ use std::sync::Arc;
 
 use mir_issues::{Issue, IssueKind, Location};
 use php_ast::owned::{
-    Attribute, ClassDecl, ClassMemberKind, FunctionDecl, InterfaceDecl, TraitDecl,
+    Attribute, ClassDecl, ClassMemberKind, EnumDecl, EnumMemberKind, FunctionDecl, InterfaceDecl,
+    TraitDecl,
 };
 use php_rs_parser::source_map::SourceMap;
 
@@ -412,6 +413,67 @@ pub(crate) fn check_trait_attributes(
                 check_attribute_list(
                     &prop.attributes,
                     TARGET_PROPERTY,
+                    db,
+                    file,
+                    source,
+                    source_map,
+                    issues,
+                    record_refs,
+                );
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Check attribute placement on an enum (enums can't be attribute classes).
+/// Also validates attributes on enum methods and cases — `#[SomeAttr]` on a
+/// `case` is validated against `Attribute::TARGET_CLASS_CONSTANT`, matching
+/// how PHP itself treats enum cases as class-constant-like targets.
+pub(crate) fn check_enum_attributes(
+    decl: &EnumDecl,
+    db: &dyn MirDatabase,
+    file: &Arc<str>,
+    source: &str,
+    source_map: &SourceMap,
+    issues: &mut Vec<Issue>,
+    record_refs: bool,
+) {
+    for attr in decl.attributes.iter() {
+        if !is_attribute_class_annotation(attr) {
+            continue;
+        }
+        let loc = span_to_location(file, source, source_map, attr.span.start, attr.span.end);
+        issues.push(invalid_attr("Enums cannot be attribute classes", loc));
+    }
+    check_attribute_list(
+        &decl.attributes,
+        TARGET_CLASS,
+        db,
+        file,
+        source,
+        source_map,
+        issues,
+        record_refs,
+    );
+    for member in decl.body.members.iter() {
+        match &member.kind {
+            EnumMemberKind::Method(method) => {
+                check_attribute_list(
+                    &method.attributes,
+                    TARGET_METHOD,
+                    db,
+                    file,
+                    source,
+                    source_map,
+                    issues,
+                    record_refs,
+                );
+            }
+            EnumMemberKind::Case(case) => {
+                check_attribute_list(
+                    &case.attributes,
+                    TARGET_CLASS_CONSTANT,
                     db,
                     file,
                     source,
