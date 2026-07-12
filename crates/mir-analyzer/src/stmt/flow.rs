@@ -557,8 +557,12 @@ impl<'a> StatementsAnalyzer<'a> {
                 // `unset($arr[$key])` / `unset($obj->prop)`: analyze the target
                 // so the variables it reads (e.g. the array-access key) count as
                 // uses — otherwise a foreach value used only as an unset key is
-                // wrongly reported UnusedForeachValue.
-                self.expr_analyzer(ctx).analyze(var, ctx);
+                // wrongly reported UnusedForeachValue. Wrapped in an existence
+                // check like isset/empty: `unset()` is itself an existence-
+                // oriented operation, so unsetting a dynamic/magic property
+                // must not falsely report UndefinedProperty.
+                self.expr_analyzer(ctx)
+                    .with_existence_check(|ea| ea.analyze(var, ctx));
                 // `unset($arr['key'])` genuinely removes that key from the
                 // array's tracked shape — without this, a later `$arr['key']`
                 // read still sees the (now-stale) pre-unset type instead of
