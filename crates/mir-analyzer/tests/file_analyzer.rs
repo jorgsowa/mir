@@ -529,7 +529,9 @@ function test(Foo $f): void {
     // Offset of the closing ')' of the *first* `bar()` call: inside that
     // call's expr_span, but outside every recorded identifier span (the
     // method-name span covers only `bar`).
-    let first_call = src.find("$f->bar()").expect("fixture must contain $f->bar()");
+    let first_call = src
+        .find("$f->bar()")
+        .expect("fixture must contain $f->bar()");
     let close_paren_offset = (first_call + "$f->bar(".len()) as u32;
 
     let resolved = result
