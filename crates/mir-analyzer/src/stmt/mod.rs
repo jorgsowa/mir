@@ -183,6 +183,43 @@ impl<'a> StatementsAnalyzer<'a> {
 
         // Pre-narrow: `@var Type $varname` before any statement narrows that variable.
         if let Some(ref ann) = var_annotation {
+            // UndefinedDocblockClass: `@var` names a class that doesn't exist;
+            // otherwise record it as a `cls:` reference so a class named only
+            // via a local `@var` assertion isn't falsely flagged UnusedClass.
+            for atomic in &ann.ty.types {
+                if let Atomic::TNamedObject { fqcn, .. } = atomic {
+                    if crate::diagnostics::is_pseudo_type(fqcn.as_ref()) {
+                        continue;
+                    }
+                    let (line, line_end, col_start, col_end) = self.span_to_location(stmt.span);
+                    if !crate::db::class_exists(self.db, fqcn.as_ref()) {
+                        self.issues.add(Issue::new(
+                            IssueKind::UndefinedDocblockClass {
+                                name: fqcn.to_string(),
+                            },
+                            Location {
+                                file: self.file.clone(),
+                                line,
+                                line_end,
+                                col_start,
+                                col_end: crate::diagnostics::clamp_col_end(
+                                    line, line_end, col_start, col_end,
+                                ),
+                            },
+                        ));
+                    } else if self.mode == AnalysisMode::Full {
+                        self.db.record_reference_location(crate::db::RefLoc {
+                            symbol_key: Arc::from(format!("cls:{fqcn}")),
+                            file: self.file.clone(),
+                            line,
+                            col_start,
+                            col_end: crate::diagnostics::clamp_col_end(
+                                line, line_end, col_start, col_end,
+                            ),
+                        });
+                    }
+                }
+            }
             if let Some(ref name) = ann.name {
                 let current = ctx.get_var(name.as_str());
                 // `@var` is normally a legitimate widening/narrowing assertion

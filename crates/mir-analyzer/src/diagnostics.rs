@@ -359,7 +359,7 @@ fn check_name_class_with_context(
     }
 }
 
-fn is_pseudo_type(name: &str) -> bool {
+pub(crate) fn is_pseudo_type(name: &str) -> bool {
     matches!(
         crate::util::php_ident_lowercase(name).as_str(),
         "self"
