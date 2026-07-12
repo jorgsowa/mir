@@ -655,49 +655,97 @@ impl<'a> ExpressionAnalyzer<'a> {
                     spa.class.span,
                 );
             } else {
-                self.record_ref(Arc::from(format!("cls:{resolved}")), spa.class.span);
-                let resolved: Arc<str> = Arc::from(resolved.as_str());
-                self.record_symbol(
-                    spa.class.span,
-                    ReferenceKind::ClassReference(resolved.clone()),
-                    Type::single(Atomic::TClassString(None)),
+                result_ty = self.record_static_prop_access(
+                    Arc::from(resolved.as_str()),
+                    &spa.class,
+                    &spa.member,
+                    ctx,
                 );
-                if let Some(prop_name) = expr_name_str(&spa.member) {
-                    self.record_ref(
-                        Arc::from(format!("prop:{}::{}", resolved, prop_name)),
-                        spa.member.span,
+            }
+        } else if let ExprKind::Variable(var_name) = &spa.class.kind {
+            // `$cls::$prop` — derive the FQCN(s) from the variable's inferred
+            // type, mirroring the `$obj::CONST` handling in
+            // `analyze_class_const_access`. Covers both an object instance
+            // (`$obj::$prop`) and a class-string (`$cls = self::class;`).
+            // Without this, a property read only through a variable holding
+            // the class was never checked (existence/visibility/deprecation)
+            // and never recorded as a usage — falsely flagging the property
+            // (and, if otherwise unreferenced, the class) as unused.
+            let var_ty = ctx.get_var(var_name.as_ref());
+            let mut result = Type::empty();
+            let mut any = false;
+            for atomic in &var_ty.types {
+                let fqcn = atomic.named_object_fqcn().or_else(|| match atomic {
+                    Atomic::TClassString(Some(fqcn)) => Some(fqcn.as_ref()),
+                    _ => None,
+                });
+                if let Some(fqcn) = fqcn {
+                    any = true;
+                    let ty = self.record_static_prop_access(
+                        Arc::from(fqcn),
+                        &spa.class,
+                        &spa.member,
+                        ctx,
                     );
-                    if let Some(refined) = ctx.get_prop_refined(resolved.as_ref(), prop_name) {
-                        result_ty = refined.clone();
-                    } else {
-                        // Check if the static property is deprecated
-                        let here = crate::db::Fqcn::from_str(self.db, resolved.as_ref());
-                        if let Some(p) = crate::db::find_property_in_chain(self.db, here, prop_name)
-                        {
-                            if let Some(msg) = &p.1.deprecated {
-                                self.emit(
-                                    IssueKind::DeprecatedProperty {
-                                        class: resolved.to_string(),
-                                        property: prop_name.to_string(),
-                                        message: Some(msg.clone()).filter(|m| !m.is_empty()),
-                                    },
-                                    Severity::Info,
-                                    spa.member.span,
-                                );
-                            }
-                            result_ty = p.1.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
-                        }
-                    }
-                    self.record_symbol(
-                        spa.member.span,
-                        ReferenceKind::PropertyAccess {
-                            class: resolved,
-                            property: Arc::from(prop_name),
-                        },
-                        result_ty.clone(),
-                    );
+                    result.merge_with(&ty);
                 }
             }
+            if any {
+                result_ty = result;
+            }
+        }
+        result_ty
+    }
+
+    /// Record and resolve a static property access (`Class::$prop`) once the
+    /// concrete class FQCN is known — shared by the plain-identifier class
+    /// name path and the object-instance/class-string variable path.
+    fn record_static_prop_access(
+        &mut self,
+        resolved: Arc<str>,
+        class_expr: &Expr,
+        member_expr: &Expr,
+        ctx: &FlowState,
+    ) -> Type {
+        let mut result_ty = Type::mixed();
+        self.record_ref(Arc::from(format!("cls:{resolved}")), class_expr.span);
+        self.record_symbol(
+            class_expr.span,
+            ReferenceKind::ClassReference(resolved.clone()),
+            Type::single(Atomic::TClassString(None)),
+        );
+        if let Some(prop_name) = expr_name_str(member_expr) {
+            self.record_ref(
+                Arc::from(format!("prop:{}::{}", resolved, prop_name)),
+                member_expr.span,
+            );
+            if let Some(refined) = ctx.get_prop_refined(resolved.as_ref(), prop_name) {
+                result_ty = refined.clone();
+            } else {
+                let here = crate::db::Fqcn::from_str(self.db, resolved.as_ref());
+                if let Some(p) = crate::db::find_property_in_chain(self.db, here, prop_name) {
+                    if let Some(msg) = &p.1.deprecated {
+                        self.emit(
+                            IssueKind::DeprecatedProperty {
+                                class: resolved.to_string(),
+                                property: prop_name.to_string(),
+                                message: Some(msg.clone()).filter(|m| !m.is_empty()),
+                            },
+                            Severity::Info,
+                            member_expr.span,
+                        );
+                    }
+                    result_ty = p.1.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
+                }
+            }
+            self.record_symbol(
+                member_expr.span,
+                ReferenceKind::PropertyAccess {
+                    class: resolved,
+                    property: Arc::from(prop_name),
+                },
+                result_ty.clone(),
+            );
         }
         result_ty
     }
@@ -747,8 +795,25 @@ impl<'a> ExpressionAnalyzer<'a> {
                         Type::single(Atomic::TClassString(None)),
                     );
                 }
+                // `self`/`static`/`parent::class` must carry the actual enclosing
+                // class, not the literal pseudo-name — otherwise a variable holding
+                // `self::class` types as the unresolvable `class-string<self>`
+                // instead of e.g. `class-string<Foo>`, breaking every downstream
+                // consumer of that variable (including `$var::CONST`/`$var::$prop`).
+                let concrete = match resolved.as_str() {
+                    "self" | "static" => ctx
+                        .self_fqcn
+                        .clone()
+                        .or_else(|| ctx.static_fqcn.clone())
+                        .unwrap_or_else(|| Arc::from(resolved.as_str())),
+                    "parent" => ctx
+                        .parent_fqcn
+                        .clone()
+                        .unwrap_or_else(|| Arc::from(resolved.as_str())),
+                    _ => Arc::from(resolved.as_str()),
+                };
                 return Type::single(Atomic::TClassString(Some(mir_types::Name::from(
-                    resolved.as_str(),
+                    concrete.as_ref(),
                 ))));
             }
 
@@ -898,13 +963,21 @@ impl<'a> ExpressionAnalyzer<'a> {
             // type, mirroring the `$obj::class` handling a few lines above.
             // Without this, a constant read only through an object-instance
             // variable was never checked (existence/visibility/deprecation)
-            // and never recorded as a usage.
+            // and never recorded as a usage. Also handles `$cls::CONST` where
+            // `$cls` holds a class-string (e.g. `$cls = self::class;`) — the
+            // same access form, just via a string rather than an instance.
             ExprKind::Variable(var_name) => {
                 let obj_ty = ctx.get_var(var_name.as_ref());
                 let mut result = Type::empty();
                 let mut any = false;
                 for atomic in &obj_ty.types {
-                    if let Some(fqcn) = atomic.named_object_fqcn() {
+                    let fqcn = atomic
+                        .named_object_fqcn()
+                        .or_else(|| match atomic {
+                            Atomic::TClassString(Some(fqcn)) => Some(fqcn.as_ref()),
+                            _ => None,
+                        });
+                    if let Some(fqcn) = fqcn {
                         any = true;
                         let const_ty = self.record_object_const_access(
                             fqcn,
