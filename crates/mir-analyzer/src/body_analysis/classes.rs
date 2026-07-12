@@ -18,25 +18,106 @@ impl<'a> BodyAnalyzer<'a> {
     ) {
         if let Some(hint) = &prop.type_hint {
             self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues);
-        } else if self.mode == AnalysisMode::Full {
-            let prop_name = prop.name.as_deref().unwrap_or("").to_string();
-            let (line, col_start) =
-                crate::diagnostics::offset_to_line_col(source, member_span.start, source_map);
-            let (line_end, col_end) =
-                crate::diagnostics::offset_to_line_col(source, member_span.end, source_map);
-            all_issues.push(mir_issues::Issue::new(
-                mir_issues::IssueKind::MissingPropertyType {
-                    class: fqcn.to_string(),
-                    property: prop_name,
-                },
-                mir_issues::Location {
-                    file: file.clone(),
-                    line,
-                    line_end,
-                    col_start,
-                    col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
-                },
-            ));
+        } else {
+            self.check_property_docblock_classes(
+                prop,
+                member_span,
+                fqcn,
+                file,
+                source,
+                source_map,
+                all_issues,
+            );
+            if self.mode == AnalysisMode::Full {
+                let prop_name = prop.name.as_deref().unwrap_or("").to_string();
+                let (line, col_start) =
+                    crate::diagnostics::offset_to_line_col(source, member_span.start, source_map);
+                let (line_end, col_end) =
+                    crate::diagnostics::offset_to_line_col(source, member_span.end, source_map);
+                all_issues.push(mir_issues::Issue::new(
+                    mir_issues::IssueKind::MissingPropertyType {
+                        class: fqcn.to_string(),
+                        property: prop_name,
+                    },
+                    mir_issues::Location {
+                        file: file.clone(),
+                        line,
+                        line_end,
+                        col_start,
+                        col_end: crate::diagnostics::clamp_col_end(
+                            line, line_end, col_start, col_end,
+                        ),
+                    },
+                ));
+            }
+        }
+    }
+
+    /// `UndefinedDocblockClass`/`cls:` usage for a property's `@var` docblock
+    /// type when it has no native type hint (the native-hint path is checked
+    /// via `check_and_record_type_hint_classes` instead). Reuses the
+    /// collector-resolved `PropertyDef.ty`, which already has `@var` applied.
+    #[allow(clippy::too_many_arguments)]
+    fn check_property_docblock_classes(
+        &self,
+        prop: &php_ast::owned::PropertyDecl,
+        member_span: &php_ast::Span,
+        fqcn: &str,
+        file: &Arc<str>,
+        source: &str,
+        source_map: &php_rs_parser::source_map::SourceMap,
+        all_issues: &mut Vec<Issue>,
+    ) {
+        if self.mode != AnalysisMode::Full {
+            return;
+        }
+        let prop_name = prop.name.as_deref().unwrap_or("");
+        if prop_name.is_empty() {
+            return;
+        }
+        let key = crate::db::Fqcn::from_str(self.db, fqcn);
+        let Some(def) = crate::db::find_property_in_class(self.db, key, prop_name) else {
+            return;
+        };
+        let Some(ty) = def.ty.as_deref() else {
+            return;
+        };
+        let (line, col_start) =
+            crate::diagnostics::offset_to_line_col(source, member_span.start, source_map);
+        let (line_end, col_end) =
+            crate::diagnostics::offset_to_line_col(source, member_span.end, source_map);
+        for atomic in &ty.types {
+            if let mir_types::Atomic::TNamedObject { fqcn: cls_fqcn, .. } = atomic {
+                if crate::diagnostics::is_pseudo_type(cls_fqcn.as_ref()) {
+                    continue;
+                }
+                if !crate::db::class_exists(self.db, cls_fqcn.as_ref()) {
+                    all_issues.push(mir_issues::Issue::new(
+                        mir_issues::IssueKind::UndefinedDocblockClass {
+                            name: cls_fqcn.to_string(),
+                        },
+                        mir_issues::Location {
+                            file: file.clone(),
+                            line,
+                            line_end,
+                            col_start,
+                            col_end: crate::diagnostics::clamp_col_end(
+                                line, line_end, col_start, col_end,
+                            ),
+                        },
+                    ));
+                } else if self.mode == AnalysisMode::Full {
+                    self.db.record_reference_location(crate::db::RefLoc {
+                        symbol_key: Arc::from(format!("cls:{cls_fqcn}")),
+                        file: file.clone(),
+                        line,
+                        col_start,
+                        col_end: crate::diagnostics::clamp_col_end(
+                            line, line_end, col_start, col_end,
+                        ),
+                    });
+                }
+            }
         }
     }
 
