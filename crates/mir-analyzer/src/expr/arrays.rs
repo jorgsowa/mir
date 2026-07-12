@@ -274,23 +274,44 @@ impl<'a> ExpressionAnalyzer<'a> {
         method_name: &str,
         method_span: php_ast::Span,
     ) {
-        let fqcn: Option<Arc<str>> = if let ExprKind::String(class_name) = &receiver_expr.kind {
-            Some(Arc::from(
-                crate::db::resolve_name(self.db, self.file.as_ref(), class_name.as_ref())
-                    .as_str(),
-            ))
-        } else {
-            // An object-typed receiver's `TNamedObject` fqcn is already the
-            // canonical resolved name (set at inference time), unlike a raw
-            // source-text class-string literal — no `resolve_name` needed.
-            receiver_ty
-                .remove_null()
-                .types
-                .iter()
-                .find_map(|a| a.named_object_fqcn())
-                .map(Arc::from)
-        };
+        // `by_class_name` is true when the receiver names its class directly
+        // (a string literal or `Foo::class`) rather than being an object
+        // instance — in that case the class itself must also be recorded as
+        // referenced, or a class reachable only through an array-callable
+        // (routing tables, PSR-14 listeners, ...) is falsely flagged
+        // UnusedClass. An object-typed receiver's own construction/type hint
+        // already records that separately.
+        let (fqcn, by_class_name): (Option<Arc<str>>, bool) =
+            if let ExprKind::String(class_name) = &receiver_expr.kind {
+                (
+                    Some(Arc::from(
+                        crate::db::resolve_name(self.db, self.file.as_ref(), class_name.as_ref())
+                            .as_str(),
+                    )),
+                    true,
+                )
+            } else {
+                // An object-typed or class-string-typed receiver's
+                // `TNamedObject`/`TClassString` fqcn is already the canonical
+                // resolved name (set at inference time), unlike a raw
+                // source-text class-string literal — no `resolve_name`
+                // needed. `Foo::class` in this position evaluates to
+                // `TClassString`, not `TNamedObject`, so it must be checked
+                // in addition to `named_object_fqcn()`.
+                receiver_ty
+                    .remove_null()
+                    .types
+                    .iter()
+                    .find_map(|a| match a {
+                        Atomic::TClassString(Some(name)) => Some((Arc::from(name.as_str()), true)),
+                        _ => a.named_object_fqcn().map(|f| (Arc::from(f), false)),
+                    })
+                    .map_or((None, false), |(f, by_name)| (Some(f), by_name))
+            };
         let Some(fqcn) = fqcn else { return };
+        if by_class_name {
+            self.record_ref(Arc::from(format!("cls:{fqcn}")), receiver_expr.span);
+        }
         let method_name_lower = crate::util::php_ident_lowercase(method_name);
         if let Some(resolved) =
             crate::call::method::resolve_method_from_db(self, &fqcn, &method_name_lower)
