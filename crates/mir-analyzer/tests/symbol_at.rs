@@ -1224,6 +1224,32 @@ fn symbol_at_attribute_class_name_resolves_to_class_reference() {
     );
 }
 
+#[test]
+fn symbol_at_use_import_name_resolves_to_class_reference() {
+    // Hovering the class name in its own `use App\Models\Bar;` import
+    // statement must resolve — a developer would reasonably expect to jump
+    // straight to the class from the import line itself.
+    let dir = create_temp_dir("symbol_at_use_import_name_resolves_to_class_reference");
+    let src = "<?php\nnamespace App\\Models;\nclass Bar {}\n";
+    let base_file = write_file(&dir, "Bar.php", src);
+    let user_src = "<?php\nnamespace App;\nuse App\\Models\\Bar;\nfunction make(): void {}\n";
+    let user_file = write_file(&dir, "user.php", user_src);
+    let user_file_str = path_to_str(&user_file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(&[base_file.clone(), user_file.clone()], &BatchOptions::new());
+
+    let offset = user_src.find("Bar;").unwrap() as u32;
+    let sym = result
+        .symbol_at(user_file_str, offset)
+        .expect("symbol_at must find ClassReference on the use-import class name");
+    assert!(
+        matches!(&sym.kind, ReferenceKind::ClassReference(n) if n.as_ref() == "App\\Models\\Bar"),
+        "expected ClassReference(App\\Models\\Bar), got {:?}",
+        sym.kind
+    );
+}
+
 // ---------------------------------------------------------------------------
 // symbol_at — negated instanceof guard narrows receiver type (issue #6)
 // ---------------------------------------------------------------------------

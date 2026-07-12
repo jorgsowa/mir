@@ -223,7 +223,15 @@ impl<'a> BodyAnalyzer<'a> {
                     }
                 }
                 StmtKind::Use(use_decl) => {
-                    check_use_decl_casing(use_decl, self.db, file, source, source_map, all_issues);
+                    check_use_decl_casing(
+                        use_decl,
+                        self.db,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                        Some(&mut *all_symbols),
+                    );
                 }
                 _ => {}
             }
@@ -311,7 +319,15 @@ impl<'a> BodyAnalyzer<'a> {
                     }
                 }
                 StmtKind::Use(use_decl) => {
-                    check_use_decl_casing(use_decl, self.db, file, source, source_map, all_issues);
+                    check_use_decl_casing(
+                        use_decl,
+                        self.db,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                        Some(&mut *all_symbols),
+                    );
                 }
                 _ => {}
             }

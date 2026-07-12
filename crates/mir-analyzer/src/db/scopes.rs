@@ -306,7 +306,7 @@ fn check_use_decls(
         match &stmt.kind {
             StmtKind::Use(use_decl) => {
                 crate::body_analysis::check_use_decl_casing(
-                    use_decl, db, file, source, source_map, issues,
+                    use_decl, db, file, source, source_map, issues, None,
                 );
             }
             StmtKind::Namespace(ns) => {

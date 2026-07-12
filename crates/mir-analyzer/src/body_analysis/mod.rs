@@ -1004,6 +1004,7 @@ pub(crate) fn check_use_decl_casing(
     source: &str,
     source_map: &php_rs_parser::source_map::SourceMap,
     all_issues: &mut Vec<Issue>,
+    mut all_symbols: Option<&mut Vec<ResolvedSymbol>>,
 ) {
     use php_ast::ast::UseKind;
     for item in use_decl.uses.iter() {
@@ -1039,6 +1040,24 @@ pub(crate) fn check_use_decl_casing(
                             },
                             loc,
                         ));
+                    }
+                    // Without this, the import's own name token was a dead zone for
+                    // hover/go-to-definition — a developer would reasonably expect
+                    // to jump straight to the class from its `use` statement. Only
+                    // the symbol is recorded (not a `cls:` ref): an import alone
+                    // deliberately does not count as a usage (no UnusedImport check
+                    // exists), so this must not affect UnusedClass.
+                    if let Some(symbols) = all_symbols.as_deref_mut() {
+                        use crate::symbol::ReferenceKind;
+                        symbols.push(ResolvedSymbol {
+                            file: file.clone(),
+                            span: item.span,
+                            expr_span: None,
+                            kind: ReferenceKind::ClassReference(Arc::from(
+                                class.fqcn().as_ref(),
+                            )),
+                            resolved_type: Type::single(mir_types::Atomic::TClassString(None)),
+                        });
                     }
                 }
             }
