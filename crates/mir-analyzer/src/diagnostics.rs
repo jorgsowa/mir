@@ -622,12 +622,27 @@ pub(crate) fn check_missing_return(
 }
 
 /// Returns true for Blade templates and files under `resources/views/`.
-/// Checks both path-separator spellings so Windows paths work without
-/// allocating a normalized copy (this runs on every variable read).
+/// Splits into path components on either separator instead of matching a
+/// substring, since a path can mix `/` and `\` (e.g. `PathBuf::join` doesn't
+/// normalize separators already present in the joined-in string, so a Windows
+/// temp-dir path plus a `resources/views/x.php` fixture name yields
+/// `...\resources/views/x.php`). This runs on every variable read, so it
+/// avoids allocating a normalized copy.
 pub(crate) fn is_view_template_path(file: &str) -> bool {
-    file.ends_with(".blade.php")
-        || file.contains("/resources/views/")
-        || file.contains("\\resources\\views\\")
+    if file.ends_with(".blade.php") {
+        return true;
+    }
+    let mut components = file.split(['/', '\\']);
+    let Some(mut prev) = components.next() else {
+        return false;
+    };
+    for comp in components {
+        if prev == "resources" && comp == "views" {
+            return true;
+        }
+        prev = comp;
+    }
+    false
 }
 
 pub(crate) fn emit_unused_variables(
@@ -733,5 +748,43 @@ pub(crate) fn emit_unused_variables(
                 ctx.var_locations.get(name).copied().unwrap_or((1, 0, 1, 0));
             push(*name, line, col_start, line_end, col_end, issues);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_view_template_path;
+
+    #[test]
+    fn blade_file_is_view_template() {
+        assert!(is_view_template_path("dashboard.blade.php"));
+    }
+
+    #[test]
+    fn unix_style_path_is_view_template() {
+        assert!(is_view_template_path("/app/resources/views/dashboard.php"));
+    }
+
+    #[test]
+    fn windows_style_path_is_view_template() {
+        assert!(is_view_template_path(
+            r"C:\app\resources\views\dashboard.php"
+        ));
+    }
+
+    #[test]
+    fn mixed_separator_path_is_view_template() {
+        // PathBuf::join doesn't normalize separators already present in the
+        // joined-in string, so a Windows temp dir plus a fixture name written
+        // with forward slashes yields a path mixing both separators.
+        assert!(is_view_template_path(
+            r"C:\Users\runner\Temp\mir_fixture_0\resources/views/dashboard.php"
+        ));
+    }
+
+    #[test]
+    fn non_view_path_is_not_view_template() {
+        assert!(!is_view_template_path("/app/src/Controller.php"));
+        assert!(!is_view_template_path(r"C:\app\src\Controller.php"));
     }
 }
