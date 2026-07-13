@@ -331,7 +331,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                             for atomic in &ty.types {
                                 if let Atomic::TKeyedArray { properties, .. } = atomic {
                                     if let Some(prop) = properties.get(k) {
-                                        result.merge_with(&prop.ty);
+                                        // Same undefined-offset-then-null semantics as
+                                        // plain array access (`expr/arrays.rs`) — an
+                                        // optional key may be absent at runtime, so the
+                                        // destructured value must include null.
+                                        if prop.optional {
+                                            let mut widened = prop.ty.clone();
+                                            widened.add_type(Atomic::TNull);
+                                            result.merge_with(&widened);
+                                        } else {
+                                            result.merge_with(&prop.ty);
+                                        }
                                         found_any = true;
                                     }
                                 }
