@@ -320,7 +320,17 @@ impl<'a> ExpressionAnalyzer<'a> {
             return None;
         }
 
-        // Case 1: Subject is a finite union of string literals.
+        // Whether the subject can be `null` — used by Case 1/1b below to fold a
+        // missing `null` arm into their own uncovered-set, mirroring how Case 2
+        // (enum subjects) already tracks it.
+        let subject_is_nullable = subject_ty.contains(|t| matches!(t, Atomic::TNull));
+        let non_null_type_count = subject_ty
+            .types
+            .iter()
+            .filter(|t| !matches!(t, Atomic::TNull))
+            .count();
+
+        // Case 1: Subject is a finite union of string literals, optionally nullable.
         let string_atoms: Vec<Arc<str>> = subject_ty
             .types
             .iter()
@@ -332,12 +342,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
             })
             .collect();
-        if !string_atoms.is_empty() && string_atoms.len() == subject_ty.types.len() {
+        if !string_atoms.is_empty() && string_atoms.len() == non_null_type_count {
+            let mut null_covered = false;
             let covered: rustc_hash::FxHashSet<Box<str>> = arms
                 .iter()
                 .filter_map(|a| a.conditions.as_deref())
                 .flatten()
                 .filter_map(|cond| {
+                    if matches!(cond.kind, ExprKind::Null) {
+                        null_covered = true;
+                        return None;
+                    }
                     if let ExprKind::String(s) = &cond.kind {
                         Some(s.clone())
                     } else if let Some(Atomic::TLiteralString(s)) =
@@ -357,13 +372,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                 .collect();
             uncovered.sort();
 
-            if !uncovered.is_empty() {
-                let cases = uncovered
-                    .iter()
-                    .map(|s| format!("\"{s}\""))
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                return Some(cases);
+            if !uncovered.is_empty() || (subject_is_nullable && !null_covered) {
+                let mut cases: Vec<String> =
+                    uncovered.iter().map(|s| format!("\"{s}\"")).collect();
+                if subject_is_nullable && !null_covered {
+                    cases.push("null".to_string());
+                }
+                return Some(cases.join(", "));
             }
             return None;
         }
@@ -372,10 +387,12 @@ impl<'a> ExpressionAnalyzer<'a> {
         // bounded int ranges — `int<0, 2>` is just as enumerable as `0|1|2`,
         // so it's expanded into the same literal set rather than falling
         // through to Case 4's "unconditionally possibly-unmatched" bucket.
+        // Also optionally nullable, same as Case 1 above.
         const MAX_RANGE_EXPANSION: i64 = 4096;
         let int_atoms: Option<Vec<i64>> = subject_ty
             .types
             .iter()
+            .filter(|a| !matches!(a, Atomic::TNull))
             .map(|a| match a {
                 Atomic::TLiteralInt(n) => Some(vec![*n]),
                 Atomic::TIntRange {
@@ -392,11 +409,16 @@ impl<'a> ExpressionAnalyzer<'a> {
                 values
             });
         if let Some(int_atoms) = int_atoms.filter(|v| !v.is_empty()) {
+            let mut null_covered = false;
             let covered: rustc_hash::FxHashSet<i64> = arms
                 .iter()
                 .filter_map(|a| a.conditions.as_deref())
                 .flatten()
                 .filter_map(|cond| {
+                    if matches!(cond.kind, ExprKind::Null) {
+                        null_covered = true;
+                        return None;
+                    }
                     extract_literal_int(cond).or_else(|| {
                         if let Some(Atomic::TLiteralInt(n)) =
                             self.resolve_class_const_literal(cond, ctx)
@@ -416,13 +438,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                 .collect();
             uncovered.sort_unstable();
 
-            if !uncovered.is_empty() {
-                let cases = uncovered
-                    .iter()
-                    .map(|n| n.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                return Some(cases);
+            if !uncovered.is_empty() || (subject_is_nullable && !null_covered) {
+                let mut cases: Vec<String> = uncovered.iter().map(|n| n.to_string()).collect();
+                if subject_is_nullable && !null_covered {
+                    cases.push("null".to_string());
+                }
+                return Some(cases.join(", "));
             }
             return None;
         }
@@ -432,7 +453,6 @@ impl<'a> ExpressionAnalyzer<'a> {
         // finite and enumerable as a pure enum's — the backing scalar (its
         // value range) is irrelevant to exhaustiveness over case names, so
         // this no longer excludes backed enums.
-        let subject_is_nullable = subject_ty.contains(|t| matches!(t, Atomic::TNull));
         let non_null_atoms: Vec<&Atomic> = subject_ty
             .types
             .iter()
