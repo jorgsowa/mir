@@ -712,6 +712,28 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     span,
                                 );
                             }
+                            // Without this, a static property write (Foo::$prop = ...,
+                            // self::$prop = ..., static::$prop = ...) got no hover,
+                            // go-to-definition, or find-all-references at all — unlike
+                            // the read path (analyze_static_property_access), which
+                            // records both. Key by the declaring owner, not the
+                            // accessed-through class, matching the read path.
+                            let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
+                            let prop_owner = crate::db::find_property_in_chain(self.db, here, prop_name)
+                                .map(|(cls, _)| cls)
+                                .unwrap_or_else(|| fqcn.clone());
+                            self.record_ref(
+                                std::sync::Arc::from(format!("prop:{}::{}", prop_owner, prop_name)),
+                                spa.member.span,
+                            );
+                            self.record_symbol(
+                                spa.member.span,
+                                crate::symbol::ReferenceKind::PropertyAccess {
+                                    class: prop_owner,
+                                    property: std::sync::Arc::from(prop_name.as_str()),
+                                },
+                                ty.clone(),
+                            );
                         }
                         if let Some(prop_name) = prop_name_opt.clone() {
                             let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());

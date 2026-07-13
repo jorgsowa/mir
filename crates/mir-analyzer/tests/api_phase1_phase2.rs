@@ -564,6 +564,49 @@ fn property_write_target_appears_in_references() {
 }
 
 #[test]
+fn static_property_write_target_appears_in_references() {
+    // Foo::$prop = ..., self::$prop = ..., and static::$prop = ... writes must show up
+    // in find-all-references, same as a static property read does.
+    use mir_analyzer::Name;
+    use mir_analyzer::FileAnalyzer;
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_all_stubs();
+
+    let file: Arc<str> = Arc::from("static_prop_write.php");
+    let source: Arc<str> = Arc::from(
+        "<?php\n\
+         class Counter {\n\
+         private static int $n = 0;\n\
+         static function bump(): void { self::$n++; }\n\
+         static function reset(): void { self::$n = 0; }\n\
+         static function get(): int { return Counter::$n; }\n\
+         }\n",
+    );
+
+    session.ingest_file(file.clone(), source.clone());
+    let parsed = php_rs_parser::parse(&source);
+    let _analysis = FileAnalyzer::new(&session).analyze(
+        file.clone(),
+        &source,
+        &parsed.program,
+        &parsed.source_map,
+    );
+
+    let refs = session.references_to(&Name::property("Counter", "n"));
+    let lines: Vec<u32> = refs.iter().map(|(_, r)| r.start.line).collect();
+
+    assert!(
+        lines.contains(&5),
+        "expected the self::$n = 0; write (line 5) in references_to(Counter::n); got {lines:?}"
+    );
+    assert!(
+        lines.contains(&6),
+        "expected the Counter::$n read (line 6) in references_to(Counter::n); got {lines:?}"
+    );
+}
+
+#[test]
 fn property_references_direct_property_end_to_end() {
     // Non-inherited property: references_to(Foo::value) finds the access site.
     use mir_analyzer::FileAnalyzer;
