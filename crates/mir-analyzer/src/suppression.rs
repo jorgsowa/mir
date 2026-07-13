@@ -52,7 +52,17 @@ impl KindSet {
     fn matches(&self, name: &str, code: &str) -> bool {
         match self {
             KindSet::All => true,
-            KindSet::Named(set) => set.contains(name) || set.contains(code),
+            // Kind names/codes are matched case-insensitively — a directive
+            // author writing `@mir-ignore undefinedclass` (or any other casing
+            // that doesn't exactly match `IssueKind::name()`'s PascalCase)
+            // must still suppress the issue instead of silently doing nothing.
+            // The set is small (a handful of kinds per directive at most), and
+            // preserving each entry's original casing (rather than
+            // lowercasing at parse time) keeps `UnusedSuppress`'s message
+            // quoting the text the author actually wrote.
+            KindSet::Named(set) => set
+                .iter()
+                .any(|k| k.eq_ignore_ascii_case(name) || k.eq_ignore_ascii_case(code)),
         }
     }
 
@@ -177,8 +187,11 @@ impl SuppressionMap {
         self.named_suppressions
             .iter()
             .filter(|(target_line, kind)| {
+                // Compare case-insensitively, same as `KindSet::matches` —
+                // a directive can name a kind in any casing.
                 let kind_matches = |issue: &&mir_issues::Issue| {
-                    issue.kind.name() == kind.as_str() || issue.kind.code() == kind.as_str()
+                    issue.kind.name().eq_ignore_ascii_case(kind.as_str())
+                        || issue.kind.code().eq_ignore_ascii_case(kind.as_str())
                 };
                 // Normal case: SuppressionMap-suppressed issue at the exact target line.
                 let at_target = all_issues
