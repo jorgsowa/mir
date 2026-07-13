@@ -1,5 +1,6 @@
 use super::StatementsAnalyzer;
 use crate::flow_state::FlowState;
+use mir_issues::{Issue, IssueKind, Location};
 use mir_types::Name;
 use php_ast::owned::{ClassDecl, ClassMemberKind, FunctionDecl, Param};
 use php_ast::Span;
@@ -162,6 +163,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 self.check_name_undefined_class(parent);
             }
             self.record_class_like_ref(&parent_resolved, parent.span);
+            self.check_extends_final_class(&parent_resolved, &fqcn, parent.span);
         }
         for iface in decl.implements.iter() {
             let iface_str = crate::parser::name_to_string_owned(iface);
@@ -263,5 +265,35 @@ impl<'a> StatementsAnalyzer<'a> {
             sa.collect_symbols = self.collect_symbols;
             sa.analyze_stmts(&body.stmts, &mut method_ctx);
         }
+    }
+
+    /// Emit `InvalidExtendClass` if `parent_resolved` names a `final` class.
+    /// Only for anonymous/nested classes (see `analyze_class_decl_stmt`) — a
+    /// top-level class's `extends` is checked once via `ClassAnalyzer::analyze_all`
+    /// (`class/mod.rs`), which never sees anonymous/nested classes since the
+    /// collector skips them entirely.
+    fn check_extends_final_class(&mut self, parent_resolved: &str, child_fqcn: &str, span: Span) {
+        let here = crate::db::Fqcn::from_str(self.db, parent_resolved);
+        let Some(parent_class) = crate::db::find_class_like(self.db, here) else {
+            return;
+        };
+        if !parent_class.is_final() {
+            return;
+        }
+        let (line, col_start) = self.offset_to_line_col(span.start);
+        let (line_end, col_end) = self.offset_to_line_col(span.end);
+        self.issues.add(Issue::new(
+            IssueKind::InvalidExtendClass {
+                parent: parent_resolved.to_string(),
+                child: child_fqcn.to_string(),
+            },
+            Location {
+                file: self.file.clone(),
+                line,
+                line_end,
+                col_start,
+                col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
+            },
+        ));
     }
 }
