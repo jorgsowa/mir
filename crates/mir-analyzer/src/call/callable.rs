@@ -133,6 +133,40 @@ fn extract_all_callable_candidates(
     out
 }
 
+/// Sibling of `extract_all_callable_candidates`: collect each candidate's return
+/// type instead of its param list, for the same reason (a union of closures with
+/// different return types must have every branch checked, not just the first).
+fn extract_all_callable_return_types(union: &Type, ea: &ExpressionAnalyzer<'_>) -> Vec<Type> {
+    let mut out = Vec::new();
+    for atomic in &union.types {
+        match atomic {
+            Atomic::TClosure { data } => out.push(data.return_type.clone()),
+            Atomic::TLiteralString(fn_name) => {
+                if fn_name.is_empty() {
+                    continue;
+                }
+                let here = crate::db::Fqcn::from_str(ea.db, fn_name.as_ref());
+                if let Some(f) = crate::db::find_function(ea.db, here) {
+                    if let Some(ret) = f.return_type.as_deref() {
+                        out.push(ret.clone());
+                    }
+                }
+            }
+            Atomic::TCallable {
+                return_type: Some(ret),
+                ..
+            } => out.push((**ret).clone()),
+            Atomic::TIntersection { parts } => {
+                for part in parts.iter() {
+                    out.extend(extract_all_callable_return_types(part, ea));
+                }
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
 /// Extract callable parameter list for arity checking from a union when it can be determined statically:
 /// - TClosure: return params directly
 /// - TLiteralString: resolve to function only if from documented type annotation (issue #5)
@@ -1636,6 +1670,7 @@ pub(crate) fn check_typed_callable_arg(
     ea: &mut ExpressionAnalyzer<'_>,
     arg_ty: &Type,
     expected_params: &[FnParam],
+    expected_return: Option<&Type>,
     arg_span: Span,
     template_params: &[mir_codebase::definitions::TemplateParam],
 ) {
@@ -1734,6 +1769,40 @@ pub(crate) fn check_typed_callable_arg(
                     arg_span,
                 );
                 return;
+            }
+        }
+    }
+
+    // Return-type covariance: every candidate's return type must be assignable to
+    // the promised return type — the symmetric counterpart to the parameter
+    // contravariance loop above (`callable(int):string` is a contract on both
+    // halves of the signature, not just the params). Reuses
+    // `expected_fits_actual_param`'s subtype+leniency logic with the argument
+    // order swapped: here the *candidate's* return type plays the "expected"
+    // (must-fit-into) role.
+    if let Some(expected_ret) = expected_return {
+        if !expected_ret.is_mixed()
+            && !contains_unresolvable_named_type(expected_ret, ea, &template_names)
+        {
+            for actual_ret in extract_all_callable_return_types(arg_ty, ea) {
+                if actual_ret.is_mixed()
+                    || contains_unresolvable_named_type(&actual_ret, ea, &template_names)
+                {
+                    continue;
+                }
+                if !expected_fits_actual_param(&actual_ret, expected_ret, ea) {
+                    ea.emit(
+                        IssueKind::InvalidArgument {
+                            param: "callback".to_string(),
+                            fn_name: "typed_callable".to_string(),
+                            expected: format!("callable returning '{expected_ret}'"),
+                            actual: format!("callable returning '{actual_ret}'"),
+                        },
+                        Severity::Error,
+                        arg_span,
+                    );
+                    return;
+                }
             }
         }
     }

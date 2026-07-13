@@ -54,18 +54,19 @@ pub(crate) fn check_one(
     // `callable(T1,T2,...):R` or the equivalent `Closure(T1,T2,...):R` docblock syntax —
     // both parse to a concrete param list and must be checked the same way.
     for param_atomic in &param_ty.types {
-        let expected_params = match param_atomic {
+        let (expected_params, expected_return) = match param_atomic {
             Atomic::TCallable {
                 params: Some(expected_params),
-                ..
-            } => &expected_params[..],
-            Atomic::TClosure { data } => &data.params[..],
+                return_type,
+            } => (&expected_params[..], return_type.as_deref()),
+            Atomic::TClosure { data } => (&data.params[..], Some(&data.return_type)),
             _ => continue,
         };
         super::super::callable::check_typed_callable_arg(
             ea,
             arg_ty,
             expected_params,
+            expected_return,
             arg_span,
             template_params,
         );
