@@ -1646,6 +1646,21 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
             fqcn.as_ref().eq_ignore_ascii_case("closure")
         }
 
+        // A&B&C <: D&E iff every part of the supertype is satisfied by some
+        // part of the subtype — an intersection with MORE conjuncts is the
+        // more specific (sub)type, so `Countable&ArrayAccess&Iterator` is a
+        // subtype of `Countable&ArrayAccess`. Purely structural (each part's
+        // own `is_subtype_structural` recurses, so e.g. two differently-named
+        // interfaces only match when equal — same conservative stance as the
+        // TClosure<:TClosure arm above for named types).
+        (Atomic::TIntersection { parts: sub_parts }, Atomic::TIntersection { parts: sup_parts }) => {
+            sup_parts.iter().all(|sup_part| {
+                sub_parts
+                    .iter()
+                    .any(|sub_part| sub_part.is_subtype_structural(sup_part))
+            })
+        }
+
         // List <: array  (list key is always int; int must satisfy the array's key type)
         (Atomic::TList { value }, Atomic::TArray { key, value: av }) => {
             Type::single(Atomic::TInt).is_subtype_structural(key) && value.is_subtype_structural(av)
