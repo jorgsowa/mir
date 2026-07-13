@@ -368,19 +368,30 @@ impl<'a> ExpressionAnalyzer<'a> {
             return None;
         }
 
-        // Case 1b: Subject is a finite union of integer literals.
-        let int_atoms: Vec<i64> = subject_ty
+        // Case 1b: Subject is a finite union of integer literals and/or small
+        // bounded int ranges — `int<0, 2>` is just as enumerable as `0|1|2`,
+        // so it's expanded into the same literal set rather than falling
+        // through to Case 4's "unconditionally possibly-unmatched" bucket.
+        const MAX_RANGE_EXPANSION: i64 = 4096;
+        let int_atoms: Option<Vec<i64>> = subject_ty
             .types
             .iter()
-            .filter_map(|a| {
-                if let Atomic::TLiteralInt(n) = a {
-                    Some(*n)
-                } else {
-                    None
-                }
+            .map(|a| match a {
+                Atomic::TLiteralInt(n) => Some(vec![*n]),
+                Atomic::TIntRange {
+                    min: Some(lo),
+                    max: Some(hi),
+                } if *hi >= *lo && *hi - *lo < MAX_RANGE_EXPANSION => Some((*lo..=*hi).collect()),
+                _ => None,
             })
-            .collect();
-        if !int_atoms.is_empty() && int_atoms.len() == subject_ty.types.len() {
+            .collect::<Option<Vec<_>>>()
+            .map(|nested| {
+                let mut values: Vec<i64> = nested.into_iter().flatten().collect();
+                values.sort_unstable();
+                values.dedup();
+                values
+            });
+        if let Some(int_atoms) = int_atoms.filter(|v| !v.is_empty()) {
             let covered: rustc_hash::FxHashSet<i64> = arms
                 .iter()
                 .filter_map(|a| a.conditions.as_deref())
