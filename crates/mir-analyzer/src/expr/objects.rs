@@ -1485,6 +1485,38 @@ impl<'a> ExpressionAnalyzer<'a> {
                         }
                     }
                 }
+                Atomic::TIntersection { parts } => {
+                    for part in parts.iter() {
+                        for inner_atomic in &part.types {
+                            if let Atomic::TNamedObject { fqcn, .. } = inner_atomic {
+                                let prop_result = crate::db::find_property_in_chain(
+                                    self.db,
+                                    crate::db::Fqcn::new(self.db, *fqcn),
+                                    prop_name,
+                                );
+                                if let Some((owner, p)) = prop_result {
+                                    self.record_ref(
+                                        Arc::from(format!("prop:{}::{}", owner, prop_name)),
+                                        span,
+                                    );
+                                    *declaring_class = Some(owner);
+                                    return p.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
+                                }
+                            }
+                        }
+                    }
+                    if !self.in_existence_check {
+                        self.emit(
+                            IssueKind::UndefinedProperty {
+                                class: atomic.to_string(),
+                                property: prop_name.to_string(),
+                            },
+                            Severity::Warning,
+                            span,
+                        );
+                    }
+                    return Type::mixed();
+                }
                 Atomic::TMixed => return Type::mixed(),
                 _ => {}
             }
