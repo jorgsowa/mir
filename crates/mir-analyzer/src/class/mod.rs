@@ -351,6 +351,7 @@ impl<'a> ClassAnalyzer<'a> {
         // ---- 6. Circular inheritance detection --------------------------------
         self.check_circular_class_inheritance(&mut issues);
         self.check_circular_interface_inheritance(&mut issues);
+        self.check_circular_trait_composition(&mut issues);
 
         issues
     }

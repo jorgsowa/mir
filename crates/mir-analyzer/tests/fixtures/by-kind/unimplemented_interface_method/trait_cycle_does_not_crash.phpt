@@ -17,4 +17,5 @@ class Task implements Runnable {
     use TraitA;
 }
 ===expect===
+InvalidTraitUse@10:0-10:14: Trait TraitB used incorrectly: TraitB has a circular trait composition chain
 UnimplementedInterfaceMethod@13:0-13:32: Class Task must implement Runnable::run() from interface
