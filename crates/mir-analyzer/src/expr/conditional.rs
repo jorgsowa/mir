@@ -366,10 +366,19 @@ impl<'a> ExpressionAnalyzer<'a> {
             return None;
         }
 
-        // Case 2: Subject is a single named object (or self/static) that is a pure
-        // (non-backed) enum. Extract the FQCN from TNamedObject, TSelf, or TStaticObject.
-        let enum_fqcn_opt: Option<String> = if subject_ty.types.len() == 1 {
-            match &subject_ty.types[0] {
+        // Case 2: Subject is a single named object (or self/static, possibly
+        // nullable) that is an enum. A backed enum's case *set* is just as
+        // finite and enumerable as a pure enum's — the backing scalar (its
+        // value range) is irrelevant to exhaustiveness over case names, so
+        // this no longer excludes backed enums.
+        let subject_is_nullable = subject_ty.contains(|t| matches!(t, Atomic::TNull));
+        let non_null_atoms: Vec<&Atomic> = subject_ty
+            .types
+            .iter()
+            .filter(|t| !matches!(t, Atomic::TNull))
+            .collect();
+        let enum_fqcn_opt: Option<String> = if non_null_atoms.len() == 1 {
+            match non_null_atoms[0] {
                 Atomic::TNamedObject { fqcn, .. } => Some(fqcn.to_string()),
                 Atomic::TSelf { fqcn } | Atomic::TStaticObject { fqcn } => {
                     if fqcn.is_empty() {
@@ -388,62 +397,61 @@ impl<'a> ExpressionAnalyzer<'a> {
             if let Some(crate::db::ClassLike::Enum(enum_def)) =
                 crate::db::find_class_like(self.db, here)
             {
-                if enum_def.scalar_type.is_none() {
-                    let covered: rustc_hash::FxHashSet<String> = arms
-                        .iter()
-                        .filter_map(|a| a.conditions.as_deref())
-                        .flatten()
-                        .filter_map(|cond| {
-                            if let ExprKind::ClassConstAccess(cca) = &cond.kind {
-                                let resolved_class = match &cca.class.kind {
-                                    ExprKind::Identifier(id) => {
-                                        let r = crate::db::resolve_name(
-                                            self.db,
-                                            &self.file,
-                                            id.as_ref(),
-                                        );
-                                        if r == "self" || r == "static" {
-                                            ctx.self_fqcn.as_deref().unwrap_or("").to_string()
-                                        } else {
-                                            r
-                                        }
+                let mut null_covered = false;
+                let covered: rustc_hash::FxHashSet<String> = arms
+                    .iter()
+                    .filter_map(|a| a.conditions.as_deref())
+                    .flatten()
+                    .filter_map(|cond| {
+                        if matches!(cond.kind, ExprKind::Null) {
+                            null_covered = true;
+                            return None;
+                        }
+                        if let ExprKind::ClassConstAccess(cca) = &cond.kind {
+                            let resolved_class = match &cca.class.kind {
+                                ExprKind::Identifier(id) => {
+                                    let r = crate::db::resolve_name(
+                                        self.db,
+                                        &self.file,
+                                        id.as_ref(),
+                                    );
+                                    if r == "self" || r == "static" {
+                                        ctx.self_fqcn.as_deref().unwrap_or("").to_string()
+                                    } else {
+                                        r
                                     }
-                                    _ => return None,
-                                };
-                                if !resolved_class.eq_ignore_ascii_case(&enum_fqcn) {
-                                    return None;
                                 }
-                                let member = match &cca.member.kind {
-                                    ExprKind::Identifier(s) | ExprKind::Variable(s) => s.as_ref(),
-                                    _ => return None,
-                                };
-                                Some(crate::util::php_ident_lowercase(member))
-                            } else {
-                                None
+                                _ => return None,
+                            };
+                            if !resolved_class.eq_ignore_ascii_case(&enum_fqcn) {
+                                return None;
                             }
-                        })
-                        .collect();
+                            let member = match &cca.member.kind {
+                                ExprKind::Identifier(s) | ExprKind::Variable(s) => s.as_ref(),
+                                _ => return None,
+                            };
+                            Some(crate::util::php_ident_lowercase(member))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
 
-                    let mut uncovered: Vec<&str> = enum_def
-                        .cases
-                        .keys()
-                        .filter(|k| {
-                            !covered.contains(&crate::util::php_ident_lowercase(k.as_ref()))
-                        })
-                        .map(|k| k.as_ref())
-                        .collect();
-                    uncovered.sort();
-
-                    if !uncovered.is_empty() {
-                        let cases = uncovered
-                            .iter()
-                            .map(|c| format!("{enum_fqcn}::{c}"))
-                            .collect::<Vec<_>>()
-                            .join(", ");
-                        return Some(cases);
-                    }
-                    return None;
+                let mut uncovered: Vec<String> = enum_def
+                    .cases
+                    .keys()
+                    .filter(|k| !covered.contains(&crate::util::php_ident_lowercase(k.as_ref())))
+                    .map(|k| format!("{enum_fqcn}::{k}"))
+                    .collect();
+                uncovered.sort();
+                if subject_is_nullable && !null_covered {
+                    uncovered.push("null".to_string());
                 }
+
+                if !uncovered.is_empty() {
+                    return Some(uncovered.join(", "));
+                }
+                return None;
             }
         }
 
