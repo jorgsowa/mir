@@ -965,9 +965,21 @@ pub(super) fn extract_return_type(s: &str) -> String {
 pub(super) fn split_union(s: &str) -> Vec<String> {
     let mut parts = Vec::new();
     let mut depth = 0;
+    let mut in_quote: Option<char> = None;
     let mut current = String::new();
     for ch in s.chars() {
+        if let Some(q) = in_quote {
+            current.push(ch);
+            if ch == q {
+                in_quote = None;
+            }
+            continue;
+        }
         match ch {
+            '\'' | '"' => {
+                in_quote = Some(ch);
+                current.push(ch);
+            }
             '<' | '(' | '{' => {
                 depth += 1;
                 current.push(ch);
@@ -1090,10 +1102,40 @@ pub(super) fn extract_type_prefix(s: &str) -> &str {
     &s[..end]
 }
 
+/// Whether `target` occurs anywhere in `s` outside a single- or
+/// double-quoted literal — used to validate PHP type syntax (which never
+/// contains a bare `@`) without misreading one embedded in a literal-string
+/// type like `'admin@example.com'`.
+pub(super) fn contains_unquoted(s: &str, target: char) -> bool {
+    let mut in_quote: Option<char> = None;
+    for ch in s.chars() {
+        if let Some(q) = in_quote {
+            if ch == q {
+                in_quote = None;
+            }
+            continue;
+        }
+        match ch {
+            '\'' | '"' => in_quote = Some(ch),
+            _ if ch == target => return true,
+            _ => {}
+        }
+    }
+    false
+}
+
 pub(super) fn is_inside_generics(s: &str) -> bool {
     let mut depth = 0i32;
+    let mut in_quote: Option<char> = None;
     for ch in s.chars() {
+        if let Some(q) = in_quote {
+            if ch == q {
+                in_quote = None;
+            }
+            continue;
+        }
         match ch {
+            '\'' | '"' => in_quote = Some(ch),
             '<' | '(' | '{' => depth += 1,
             '>' | ')' | '}' => depth -= 1,
             _ => {}

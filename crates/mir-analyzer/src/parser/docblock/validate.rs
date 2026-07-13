@@ -21,10 +21,12 @@ pub(super) fn validate_type_str(s: &str, tag: &str) -> Option<String> {
     if s.is_empty() {
         return None;
     }
-    // A bare `@` inside a type expression means an adjacent tag got glued to
+    // A bare `@` outside any quoted literal means an adjacent tag got glued to
     // this one with no separating whitespace (`@template T@extends Foo`) —
-    // PHP type syntax never contains `@`.
-    if s.contains('@') {
+    // PHP type syntax never contains a bare `@`. A literal-string type MAY
+    // contain one though (`'admin@example.com'|'guest@example.com'`), so
+    // quoted content is excluded from this check.
+    if contains_unquoted(s, '@') {
         return Some(format!(
             "@{tag} has a malformed type `{s}` — a neighboring tag may be missing a space"
         ));
