@@ -2192,8 +2192,12 @@ fn narrow_static_prop_instanceof(
     } else {
         filter_out_instanceof_match(&current, class_name, db)
     };
-    if narrowed != current {
-        ctx.set_prop_refined(fqcn, prop, narrowed);
+    if !narrowed.is_empty() {
+        if narrowed != current {
+            ctx.set_prop_refined(fqcn, prop, narrowed);
+        }
+    } else if !current.is_empty() && !current.is_mixed() {
+        ctx.diverges = true;
     }
 }
 
@@ -2254,8 +2258,12 @@ fn narrow_prop_instanceof(
     } else {
         filter_out_instanceof_match(&current, class_name, db)
     };
-    if narrowed != current {
-        ctx.set_prop_refined(obj_var, prop, narrowed);
+    if !narrowed.is_empty() {
+        if narrowed != current {
+            ctx.set_prop_refined(obj_var, prop, narrowed);
+        }
+    } else if !current.is_empty() && !current.is_mixed() {
+        ctx.diverges = true;
     }
 }
 
