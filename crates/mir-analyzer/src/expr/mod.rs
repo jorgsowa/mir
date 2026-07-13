@@ -147,15 +147,34 @@ impl<'a> ExpressionAnalyzer<'a> {
             | ExprKind::Null => literals::analyze(&expr.kind),
 
             ExprKind::InterpolatedString(parts) | ExprKind::Heredoc { parts, .. } => {
+                // A heredoc (or, in principle, a double-quoted string) with no
+                // embedded expression parts is just as much a compile-time
+                // literal as an equivalent quoted string — fold it to
+                // TLiteralString so callable-string usage tracking, class-string
+                // reflection, narrowing, and match/switch dedup (all of which key
+                // off TLiteralString) don't silently stop working just because
+                // the literal happens to be spelled as a heredoc.
+                let mut literal = String::new();
+                let mut all_literal = true;
                 for part in parts.iter() {
-                    if let php_ast::owned::StringPart::Expr(e) = part {
-                        let expr_ty = self.analyze(e, ctx);
-                        self.check_interpolation_implicit_to_string_cast(&expr_ty, e.span);
+                    match part {
+                        php_ast::owned::StringPart::Literal(s) => literal.push_str(s),
+                        php_ast::owned::StringPart::Expr(e) => {
+                            all_literal = false;
+                            let expr_ty = self.analyze(e, ctx);
+                            self.check_interpolation_implicit_to_string_cast(&expr_ty, e.span);
+                        }
                     }
                 }
-                Type::single(Atomic::TString)
+                if all_literal {
+                    Type::single(Atomic::TLiteralString(literal.into()))
+                } else {
+                    Type::single(Atomic::TString)
+                }
             }
-            ExprKind::Nowdoc { .. } => Type::single(Atomic::TString),
+            ExprKind::Nowdoc { value, .. } => {
+                Type::single(Atomic::TLiteralString(value.as_ref().into()))
+            }
             ExprKind::ShellExec(_) => {
                 self.emit(
                     IssueKind::ForbiddenCode {
