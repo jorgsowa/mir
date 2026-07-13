@@ -221,7 +221,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         inner.span,
                     );
                 }
-                // Check for InvalidCast from array — same "no scalars" guard as int/float.
+                // Array-to-string always warns in PHP, so unlike int/float this has no scalar-safe guard.
                 else if inner_ty.contains(|t| {
                     matches!(
                         t,
@@ -231,8 +231,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             | Atomic::TNonEmptyList { .. }
                             | Atomic::TKeyedArray { .. }
                     )
-                }) && !inner_ty.contains(is_scalar_safe)
-                {
+                }) {
                     self.emit(
                         IssueKind::InvalidCast {
                             from: inner_ty.to_string(),
