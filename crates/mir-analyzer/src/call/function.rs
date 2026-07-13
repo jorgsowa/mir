@@ -182,6 +182,10 @@ impl CallAnalyzer {
                     );
                 } else if let Some(params) = extract_callable_params(&callee_ty, ea) {
                     // Arity-only fallback when full param types are unavailable.
+                    // A spread arg (`...$args`) makes the real argument count
+                    // unknowable from `call.args.len()` alone — same
+                    // `arity_unknown` signal `check_args` above uses to skip
+                    // TooFew/TooManyArguments for the exact same reason.
                     let required_count = params
                         .iter()
                         .filter(|p| !p.is_optional && !p.is_variadic)
@@ -190,7 +194,9 @@ impl CallAnalyzer {
                     let max_params = params.len();
                     let actual_count = call.args.len();
 
-                    if actual_count < required_count {
+                    if arity_unknown {
+                        // Skip TooFew/TooManyArguments — can't be checked precisely.
+                    } else if actual_count < required_count {
                         ea.emit(
                             IssueKind::TooFewArguments {
                                 fn_name: "callable".to_string(),
