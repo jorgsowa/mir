@@ -88,33 +88,39 @@ impl<'a> StatementsAnalyzer<'a> {
 
     fn check_echo_implicit_to_string_cast(&mut self, ty: &mir_types::Type, span: php_ast::Span) {
         for atomic in &ty.types {
-            if let mir_types::Atomic::TNamedObject { fqcn, .. } = atomic {
-                let fqcn_str = fqcn.as_ref();
-                if !crate::db::has_method_in_chain(self.db, fqcn_str, "__toString")
-                    && !crate::db::extends_or_implements(self.db, fqcn_str, "Stringable")
-                {
-                    let (line, col_start) = self.offset_to_line_col(span.start);
-                    let (line_end, col_end) = if span.start < span.end {
-                        let (end_line, end_col) = self.offset_to_line_col(span.end);
-                        (end_line, end_col)
-                    } else {
-                        (line, col_start)
-                    };
-                    self.issues.add(mir_issues::Issue::new(
-                        IssueKind::ImplicitToStringCast {
-                            class: fqcn_str.to_string(),
-                        },
-                        mir_issues::Location {
-                            file: self.file.clone(),
-                            line,
-                            line_end,
-                            col_start,
-                            col_end: crate::diagnostics::clamp_col_end(
-                                line, line_end, col_start, col_end,
-                            ),
-                        },
-                    ));
-                }
+            // Mirrors expr::binary's implicit-to-string check: a non-Stringable
+            // enum is just as fatal to `echo` as any other bare object.
+            let fqcn = match atomic {
+                mir_types::Atomic::TNamedObject { fqcn, .. } => Some(fqcn),
+                mir_types::Atomic::TLiteralEnumCase { enum_fqcn, .. } => Some(enum_fqcn),
+                _ => None,
+            };
+            let Some(fqcn) = fqcn else { continue };
+            let fqcn_str = fqcn.as_ref();
+            if !crate::db::has_method_in_chain(self.db, fqcn_str, "__toString")
+                && !crate::db::extends_or_implements(self.db, fqcn_str, "Stringable")
+            {
+                let (line, col_start) = self.offset_to_line_col(span.start);
+                let (line_end, col_end) = if span.start < span.end {
+                    let (end_line, end_col) = self.offset_to_line_col(span.end);
+                    (end_line, end_col)
+                } else {
+                    (line, col_start)
+                };
+                self.issues.add(mir_issues::Issue::new(
+                    IssueKind::ImplicitToStringCast {
+                        class: fqcn_str.to_string(),
+                    },
+                    mir_issues::Location {
+                        file: self.file.clone(),
+                        line,
+                        line_end,
+                        col_start,
+                        col_end: crate::diagnostics::clamp_col_end(
+                            line, line_end, col_start, col_end,
+                        ),
+                    },
+                ));
             }
         }
     }
