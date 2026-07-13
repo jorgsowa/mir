@@ -24,12 +24,19 @@ use parking_lot::Mutex;
 /// still bounding total resident parsed slices.
 pub const DEFAULT_CAPACITY: usize = 6144;
 
+/// `(content_hash, php_version_cache_byte)` — a version-specific stub
+/// collection (`@since`/`@removed`-filtered, `#[LanguageLevelTypeAware]`
+/// resolved) is not interchangeable with another version's for the same
+/// bytes, so the PHP version must be part of the key, same as the on-disk
+/// [`crate::stub_cache::StubSliceCache`] one entry down.
+type ParseCacheKey = ([u8; 32], u8);
+
 /// Content-hash-keyed, capacity-bounded cache of parsed [`StubSlice`]s.
 pub struct ParseCache {
-    map: DashMap<[u8; 32], Arc<StubSlice>>,
+    map: DashMap<ParseCacheKey, Arc<StubSlice>>,
     /// Insertion order of keys, for FIFO eviction. Holds keys that may already
     /// have been removed; eviction tolerates stale entries.
-    order: Mutex<VecDeque<[u8; 32]>>,
+    order: Mutex<VecDeque<ParseCacheKey>>,
     capacity: usize,
 }
 
@@ -48,20 +55,22 @@ impl ParseCache {
         }
     }
 
-    /// Look up a parsed slice by content hash.
-    pub fn get(&self, hash: &[u8; 32]) -> Option<Arc<StubSlice>> {
-        self.map.get(hash).map(|r| Arc::clone(&*r))
+    /// Look up a parsed slice by content hash and target PHP version
+    /// (`PhpVersion::cache_byte()`).
+    pub fn get(&self, hash: &[u8; 32], php_v: u8) -> Option<Arc<StubSlice>> {
+        self.map.get(&(*hash, php_v)).map(|r| Arc::clone(&*r))
     }
 
     /// Insert a parsed slice. On a genuinely new key, evicts oldest entries
     /// (FIFO) until the cache is within capacity.
-    pub fn insert(&self, hash: [u8; 32], slice: Arc<StubSlice>) {
-        let is_new = self.map.insert(hash, slice).is_none();
+    pub fn insert(&self, hash: [u8; 32], php_v: u8, slice: Arc<StubSlice>) {
+        let key = (hash, php_v);
+        let is_new = self.map.insert(key, slice).is_none();
         if !is_new {
             return;
         }
         let mut order = self.order.lock();
-        order.push_back(hash);
+        order.push_back(key);
         while self.map.len() > self.capacity {
             match order.pop_front() {
                 Some(old) => {
@@ -73,8 +82,8 @@ impl ParseCache {
     }
 
     /// Remove an entry (used when a file's content is known to have changed).
-    pub fn remove(&self, hash: &[u8; 32]) {
-        self.map.remove(hash);
+    pub fn remove(&self, hash: &[u8; 32], php_v: u8) {
+        self.map.remove(&(*hash, php_v));
     }
 
     /// Current number of cached slices.
@@ -84,5 +93,40 @@ impl ParseCache {
 
     pub fn is_empty(&self) -> bool {
         self.map.is_empty()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn get_is_isolated_per_php_version() {
+        let cache = ParseCache::with_capacity(8);
+        let hash = [1u8; 32];
+        let slice_80 = Arc::new(StubSlice::default());
+        cache.insert(hash, 80, slice_80);
+
+        assert!(
+            cache.get(&hash, 80).is_some(),
+            "same content hash + same PHP version must hit"
+        );
+        assert!(
+            cache.get(&hash, 81).is_none(),
+            "same content hash but a DIFFERENT PHP version must miss — a \
+             version-specific collected StubSlice is not interchangeable"
+        );
+    }
+
+    #[test]
+    fn two_versions_of_the_same_content_coexist() {
+        let cache = ParseCache::with_capacity(8);
+        let hash = [2u8; 32];
+        cache.insert(hash, 80, Arc::new(StubSlice::default()));
+        cache.insert(hash, 81, Arc::new(StubSlice::default()));
+
+        assert!(cache.get(&hash, 80).is_some());
+        assert!(cache.get(&hash, 81).is_some());
+        assert_eq!(cache.len(), 2, "both version-specific entries must be retained");
     }
 }

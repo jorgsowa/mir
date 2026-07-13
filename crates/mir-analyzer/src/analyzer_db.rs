@@ -276,7 +276,7 @@ impl AnalyzerDb {
         // Check in-process parse cache first (fastest path, avoids even disk I/O).
         {
             let guard = self.salsa.read();
-            let cached = guard.parse_cache().get(&content_hash);
+            let cached = guard.parse_cache().get(&content_hash, php_v);
             drop(guard);
             if let Some(cached) = cached {
                 crate::metrics::record_stub_cache_hit();
@@ -315,7 +315,7 @@ impl AnalyzerDb {
             // Prime the in-process cache so later collect_file_definitions calls hit.
             self.salsa
                 .read()
-                .prime_parse_cache(content_hash, slice_arc.clone());
+                .prime_parse_cache(content_hash, php_v, slice_arc.clone());
             let file_defs = crate::db::FileDefinitions {
                 slice: slice_arc,
                 issues: Arc::new(Vec::new()),
@@ -357,7 +357,7 @@ impl AnalyzerDb {
             // In-process cache: prevents re-parsing in the same session.
             self.salsa
                 .read()
-                .prime_parse_cache(content_hash, Arc::clone(&slice_arc));
+                .prime_parse_cache(content_hash, php_v, Arc::clone(&slice_arc));
             // Disk cache: prevents re-parsing in future sessions.
             if let Some(cache) = &self.stub_cache {
                 cache.put(&file, &content_hash, php_v, &slice_arc);

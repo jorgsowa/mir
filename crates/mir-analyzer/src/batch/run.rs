@@ -183,9 +183,10 @@ impl AnalysisSession {
         // re-parsing every project file through collect_file_definitions.
         {
             let guard = self.db.salsa.read();
+            let php_v = php_version.cache_byte();
             for (defs, hash, has_hard_parse_errors, _surface) in &file_defs {
                 if !*has_hard_parse_errors {
-                    guard.prime_parse_cache(*hash, Arc::clone(&defs.slice));
+                    guard.prime_parse_cache(*hash, php_v, Arc::clone(&defs.slice));
                 }
             }
         }
@@ -674,7 +675,7 @@ impl AnalysisSession {
             .map_with(db_pass1, |db, (mut entry, salsa_file)| {
                 if let Some(slice) = entry.cached.take() {
                     let slice_arc = Arc::new(slice);
-                    db.parse_cache().insert(entry.hash, Arc::clone(&slice_arc));
+                    db.parse_cache().insert(entry.hash, php_v, Arc::clone(&slice_arc));
                     return (*slice_arc).clone();
                 }
                 let defs = collect_file_definitions(&*db, salsa_file);
