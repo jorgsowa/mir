@@ -288,6 +288,59 @@ fn symbol_at_finds_first_class_callable_function() {
 }
 
 #[test]
+fn symbol_at_finds_use_function_import() {
+    // `use function App\greet;` must record a hover symbol on its own name
+    // token, matching the already-fixed `use App\Foo;` class-import case.
+    let dir = create_temp_dir("symbol_at_finds_use_function_import");
+    let lib_src = "<?php\nnamespace App;\nfunction greet(): void {}\n";
+    let lib = write_file(&dir, "lib.php", lib_src);
+    let main_src =
+        "<?php\nnamespace Other;\nuse function App\\greet;\nfunction caller(): void { greet(); }\n";
+    let main = write_file(&dir, "main.php", main_src);
+    let main_str = path_to_str(&main);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(&[lib, main.clone()], &BatchOptions::new());
+
+    let offset = main_src.find("greet;").unwrap() as u32 + 1;
+    let sym = result
+        .symbol_at(main_str, offset)
+        .expect("symbol_at should find a symbol on the use-function import");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::FunctionCall(n) if n.as_ref() == "App\\greet"),
+        "expected FunctionCall(App\\\\greet), got {:?}",
+        sym.kind
+    );
+}
+
+#[test]
+fn symbol_at_finds_use_const_import() {
+    // `use const App\GREETING;` must record a hover symbol on its own name
+    // token, same dead-zone fix as the function/class import cases.
+    let dir = create_temp_dir("symbol_at_finds_use_const_import");
+    let lib_src = "<?php\nnamespace App;\nconst GREETING = \"hi\";\n";
+    let lib = write_file(&dir, "lib.php", lib_src);
+    let main_src = "<?php\nnamespace Other;\nuse const App\\GREETING;\nfunction caller(): void { echo GREETING; }\n";
+    let main = write_file(&dir, "main.php", main_src);
+    let main_str = path_to_str(&main);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(&[lib, main.clone()], &BatchOptions::new());
+
+    let offset = main_src.find("GREETING;").unwrap() as u32 + 1;
+    let sym = result
+        .symbol_at(main_str, offset)
+        .expect("symbol_at should find a symbol on the use-const import");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::GlobalConstant(n) if n.as_ref() == "App\\GREETING"),
+        "expected GlobalConstant(App\\\\GREETING), got {:?}",
+        sym.kind
+    );
+}
+
+#[test]
 fn symbol_at_finds_first_class_callable_method() {
     // `$obj->method(...)` must record a hover symbol on the method name.
     let dir = create_temp_dir("symbol_at_finds_first_class_callable_method");

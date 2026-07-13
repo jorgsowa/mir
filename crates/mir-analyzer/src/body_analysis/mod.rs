@@ -1075,9 +1075,39 @@ pub(crate) fn check_use_decl_casing(
                             loc,
                         ));
                     }
+                    // Same dead-zone fix as UseKind::Normal above, for `use function`.
+                    if let Some(symbols) = all_symbols.as_deref_mut() {
+                        use crate::symbol::ReferenceKind;
+                        symbols.push(ResolvedSymbol {
+                            file: file.clone(),
+                            span: item.span,
+                            expr_span: None,
+                            kind: ReferenceKind::FunctionCall(func.fqn.clone()),
+                            resolved_type: func
+                                .return_type
+                                .as_deref()
+                                .cloned()
+                                .unwrap_or_else(Type::mixed),
+                        });
+                    }
                 }
             }
-            UseKind::Const => {}
+            UseKind::Const => {
+                let here = crate::db::Fqcn::from_str(db, &full_name);
+                if let Some(ty) = crate::db::find_global_constant(db, here) {
+                    // Same dead-zone fix as UseKind::Normal/Function above, for `use const`.
+                    if let Some(symbols) = all_symbols.as_deref_mut() {
+                        use crate::symbol::ReferenceKind;
+                        symbols.push(ResolvedSymbol {
+                            file: file.clone(),
+                            span: item.span,
+                            expr_span: None,
+                            kind: ReferenceKind::GlobalConstant(Arc::from(full_name.as_str())),
+                            resolved_type: (*ty).clone(),
+                        });
+                    }
+                }
+            }
         }
     }
 }
