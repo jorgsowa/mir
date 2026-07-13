@@ -689,6 +689,9 @@ impl CallAnalyzer {
                 "array_filter" => {
                     super::callable::infer_array_filter_return(&arg_types).unwrap_or(return_ty)
                 }
+                "array_reduce" => {
+                    super::callable::infer_array_reduce_return(ea, &arg_types).unwrap_or(return_ty)
+                }
                 "array_values" => {
                     super::callable::infer_array_values_return(&arg_types).unwrap_or(return_ty)
                 }

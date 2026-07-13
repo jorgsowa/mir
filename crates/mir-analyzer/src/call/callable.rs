@@ -1215,6 +1215,31 @@ pub(crate) fn infer_array_map_return(
     }
 }
 
+/// Infer the result type of `array_reduce($array, $callback, $initial = null)`.
+///
+/// The result is either the callback's return type (if the array is
+/// non-empty) or `$initial` as-is (if it's empty) — union both since mir
+/// doesn't track non-emptiness precisely enough here to pick one.
+pub(crate) fn infer_array_reduce_return(
+    ea: &ExpressionAnalyzer<'_>,
+    arg_types: &[Type],
+) -> Option<Type> {
+    let callback = arg_types.get(1)?;
+    let mut result = callable_return_type(callback, ea)?;
+    if result
+        .types
+        .iter()
+        .any(|a| matches!(a, Atomic::TVoid | Atomic::TNever))
+    {
+        return None;
+    }
+    match arg_types.get(2) {
+        Some(initial) => result.merge_with(initial),
+        None => result.merge_with(&Type::null()),
+    }
+    Some(result)
+}
+
 /// Infer the result type of `array_filter($array, $callback?, ...)`.
 ///
 /// Filtering never changes the element types — it only removes entries — so the
