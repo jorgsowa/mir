@@ -138,6 +138,8 @@ pub fn is_expr_tainted(expr: &Expr, ctx: &FlowState) -> bool {
             is_expr_tainted(&aa.array, ctx)
         }
 
+        ExprKind::Parenthesized(inner) => is_expr_tainted(inner, ctx),
+
         // $obj->prop — tainted if this property was previously assigned a
         // tainted value (see FlowState::taint_prop, set on property writes
         // in expr/assignment.rs). Only a simple-variable receiver is tracked,

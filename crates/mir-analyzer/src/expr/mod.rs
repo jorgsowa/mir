@@ -238,6 +238,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             ExprKind::Print(inner) => {
                 let expr_ty = self.analyze(inner, ctx);
                 self.check_interpolation_implicit_to_string_cast(&expr_ty, inner.span);
+                // `print` is an HTML sink exactly like `echo` — both write
+                // straight to the response body.
+                if crate::taint::is_expr_tainted(inner, ctx) {
+                    self.emit(IssueKind::TaintedHtml, Severity::Error, expr.span);
+                }
                 Type::single(Atomic::TLiteralInt(1))
             }
 
