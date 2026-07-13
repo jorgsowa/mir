@@ -102,6 +102,8 @@ pub enum ReferenceKind {
     ClassReference(Arc<str>),
     /// A class constant access (`Config::VERSION`, `self::CONST`, `parent::CONST`).
     ConstantAccess { class: Arc<str>, constant: Arc<str> },
+    /// A global constant reference (`FOO`, `\FOO`).
+    GlobalConstant(Arc<str>),
 }
 
 impl ReferenceKind {
@@ -121,6 +123,7 @@ impl ReferenceKind {
             ReferenceKind::ConstantAccess { class, constant } => {
                 Some(crate::Name::class_constant(class.clone(), constant.clone()))
             }
+            ReferenceKind::GlobalConstant(fqn) => Some(crate::Name::global_constant(fqn.clone())),
             ReferenceKind::Variable(_) => None,
         }
     }

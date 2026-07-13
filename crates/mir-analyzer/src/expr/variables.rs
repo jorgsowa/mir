@@ -104,12 +104,18 @@ impl<'a> ExpressionAnalyzer<'a> {
             crate::db::find_global_constant(self.db, here).map(|arc_union| (*arc_union).clone())
         };
 
-        let ty = ns_qualified
+        let resolved = ns_qualified
             .as_deref()
-            .and_then(resolve_pull)
-            .or_else(|| resolve_pull(name_str));
+            .and_then(|fqn| resolve_pull(fqn).map(|ty| (fqn.to_string(), ty)))
+            .or_else(|| resolve_pull(name_str).map(|ty| (name_str.to_string(), ty)));
 
-        if let Some(ty) = ty {
+        if let Some((fqn, ty)) = resolved {
+            self.record_ref(Arc::from(format!("gcnst:{fqn}")), expr.span);
+            self.record_symbol(
+                expr.span,
+                ReferenceKind::GlobalConstant(Arc::from(fqn.as_str())),
+                ty.clone(),
+            );
             ty
         } else if ctx.defined_guards.contains(name_str)
             || ns_qualified

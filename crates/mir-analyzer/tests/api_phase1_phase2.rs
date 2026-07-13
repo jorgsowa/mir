@@ -367,6 +367,52 @@ fn method_references_end_to_end_symbol_at_flow() {
 }
 
 #[test]
+fn global_constant_references_end_to_end_symbol_at_flow() {
+    // Global constant usages must enter the reference/symbol pipeline, same as
+    // functions/methods/properties/class constants.
+    use mir_analyzer::symbol::ReferenceKind;
+    use mir_analyzer::FileAnalyzer;
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_all_stubs();
+
+    let file: Arc<str> = Arc::from("gcnst.php");
+    let source: Arc<str> = Arc::from(
+        "<?php\n\
+         const FOO = 1;\n\
+         echo FOO;\n",
+    );
+
+    session.ingest_file(file.clone(), source.clone());
+    let parsed = php_rs_parser::parse(&source);
+    let analysis = FileAnalyzer::new(&session).analyze(
+        file.clone(),
+        &source,
+        &parsed.program,
+        &parsed.source_map,
+    );
+
+    let use_offset = source.rfind("FOO").unwrap() as u32;
+    let sym = analysis
+        .symbol_at(use_offset)
+        .expect("should resolve symbol at FOO usage site");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::GlobalConstant(fqn) if fqn.as_ref() == "FOO"),
+        "symbol_at should report global constant FOO; got {:?}",
+        sym.kind
+    );
+
+    let name = sym.to_symbol().expect("GlobalConstant should map to a Name");
+    let refs = session.references_to(&name);
+
+    assert!(
+        !refs.is_empty(),
+        "references_to via symbol_at flow must find the `echo FOO;` usage; got none"
+    );
+}
+
+#[test]
 fn method_references_inherited_method_end_to_end() {
     // When Foo inherits toString from Base, record_ref stores the reference
     // under "Base::tostring" (the declaring class). Before this fix, record_symbol
