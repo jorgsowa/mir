@@ -83,6 +83,26 @@ impl<'a> ExpressionAnalyzer<'a> {
                 Type::single(Atomic::TInt)
             }
             UnaryPrefixOp::PreIncrement | UnaryPrefixOp::PreDecrement => {
+                // Same operand check as postfix ++/-- — the same PHP warning/
+                // deprecation fires for both forms, only postfix was flagged.
+                if operand_is_definitely_bool(&operand_ty)
+                    || operand_is_non_empty_literal_string(&operand_ty)
+                {
+                    self.emit(
+                        IssueKind::InvalidOperand {
+                            op: if u.op == UnaryPrefixOp::PreIncrement {
+                                "++"
+                            } else {
+                                "--"
+                            }
+                            .to_string(),
+                            left: operand_ty.to_string(),
+                            right: String::new(),
+                        },
+                        Severity::Warning,
+                        u.operand.span,
+                    );
+                }
                 if let Some(var_name) = extract_simple_var(&u.operand) {
                     let ty = ctx.get_var(&var_name);
                     let new_ty = if ty.contains(|t| {
