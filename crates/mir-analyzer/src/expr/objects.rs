@@ -654,24 +654,30 @@ impl<'a> ExpressionAnalyzer<'a> {
                     );
                     if let Some(prop_name) = expr_name_str(&spa.member) {
                         let prop_name = prop_name.trim_start_matches('$');
-                        self.record_ref(
-                            Arc::from(format!("prop:{}::{}", fqcn, prop_name)),
-                            spa.member.span,
-                        );
+                        // Key by the declaring owner, not `self`/`static`'s own
+                        // class — a `self::$prop` access inside a subclass for a
+                        // `$prop` declared on the parent must record
+                        // `prop:Parent::prop`, matching `record_static_prop_access`.
+                        let mut owner = fqcn.clone();
                         if let Some(refined) = ctx.get_prop_refined(fqcn.as_ref(), prop_name) {
                             result_ty = refined.clone();
                         } else {
                             let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
-                            if let Some((_, p)) =
+                            if let Some((prop_owner, p)) =
                                 crate::db::find_property_in_chain(self.db, here, prop_name)
                             {
+                                owner = prop_owner;
                                 result_ty = p.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
                             }
                         }
+                        self.record_ref(
+                            Arc::from(format!("prop:{}::{}", owner, prop_name)),
+                            spa.member.span,
+                        );
                         self.record_symbol(
                             spa.member.span,
                             ReferenceKind::PropertyAccess {
-                                class: fqcn,
+                                class: owner,
                                 property: Arc::from(prop_name),
                             },
                             result_ty.clone(),
@@ -747,15 +753,19 @@ impl<'a> ExpressionAnalyzer<'a> {
             Type::single(Atomic::TClassString(None)),
         );
         if let Some(prop_name) = expr_name_str(member_expr) {
-            self.record_ref(
-                Arc::from(format!("prop:{}::{}", resolved, prop_name)),
-                member_expr.span,
-            );
+            // Key the reference/symbol by the property's declaring owner, not
+            // the accessed-through class — `Child::$prop` for a `$prop`
+            // declared on `Parent` must record `prop:Parent::prop`, or
+            // find-references from the declaring property never sees usages
+            // reached only through a subclass name (the same fix already
+            // applied to constant/instance-property access above).
+            let mut owner = resolved.clone();
             if let Some(refined) = ctx.get_prop_refined(resolved.as_ref(), prop_name) {
                 result_ty = refined.clone();
             } else {
                 let here = crate::db::Fqcn::from_str(self.db, resolved.as_ref());
                 if let Some(p) = crate::db::find_property_in_chain(self.db, here, prop_name) {
+                    owner = p.0.clone();
                     if let Some(msg) = &p.1.deprecated {
                         self.emit(
                             IssueKind::DeprecatedProperty {
@@ -770,10 +780,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                     result_ty = p.1.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
                 }
             }
+            self.record_ref(
+                Arc::from(format!("prop:{}::{}", owner, prop_name)),
+                member_expr.span,
+            );
             self.record_symbol(
                 member_expr.span,
                 ReferenceKind::PropertyAccess {
-                    class: resolved,
+                    class: owner,
                     property: Arc::from(prop_name),
                 },
                 result_ty.clone(),

@@ -1102,3 +1102,68 @@ fn interface_declared_property_access_records_reference_location() {
         "property access through an interface-typed receiver should record a reference"
     );
 }
+
+#[test]
+fn inherited_static_property_access_via_subclass_name_keys_by_declaring_class() {
+    // Child::$shared for a $shared declared on ParentC must record
+    // prop:ParentC::shared (the declaring owner), not prop:Child::shared —
+    // otherwise find-references from the declaration never sees usages
+    // reached only through a subclass name, mirroring the analogous fix
+    // already applied to constants and instance properties.
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "inherited_static_prop.php",
+        "<?php\nclass ParentC { protected static ?string $shared = null; }\nclass Child extends ParentC {}\nfunction read(): ?string { return Child::$shared; }\n",
+    );
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let owner_locs: Vec<_> = analyzer
+        .reference_locations("prop:ParentC::shared")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+    assert!(
+        !owner_locs.is_empty(),
+        "Child::$shared should record a reference keyed by the declaring class ParentC"
+    );
+
+    let subclass_locs: Vec<_> = analyzer
+        .reference_locations("prop:Child::shared")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+    assert!(
+        subclass_locs.is_empty(),
+        "Child::$shared must not also record a reference keyed by the accessed-through class"
+    );
+}
+
+#[test]
+fn inherited_static_property_access_via_self_keys_by_declaring_class() {
+    // self::$shared inside a Child method, for a $shared declared on
+    // ParentC, must also key by the declaring owner ParentC.
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "inherited_static_prop_self.php",
+        "<?php\nclass ParentC { protected static ?string $shared = null; }\nclass Child extends ParentC {\n    public static function read(): ?string { return self::$shared; }\n}\n",
+    );
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let owner_locs: Vec<_> = analyzer
+        .reference_locations("prop:ParentC::shared")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+    assert!(
+        !owner_locs.is_empty(),
+        "self::$shared inside Child should record a reference keyed by the declaring class ParentC"
+    );
+}
