@@ -587,7 +587,8 @@ pub fn narrow_from_condition(
                             narrow_from_type_fn(ctx, fn_name, &var_name, is_true);
                         }
                         if is_true {
-                            if let Some(expr_key) = extract_expr_guard_key(&arg_expr.value) {
+                            if let Some(expr_key) = extract_expr_guard_key(&arg_expr.value, db, file)
+                            {
                                 if let Some(method_arg) = call.args.get(1) {
                                     if let ExprKind::String(method_name) = &method_arg.value.kind {
                                         let method_lc = std::sync::Arc::from(
@@ -3157,13 +3158,20 @@ fn extract_var_name(expr: &php_ast::owned::Expr) -> Option<String> {
 }
 
 /// Extract a compact key for simple expressions used as the first arg of
-/// `method_exists`/`property_exists`. Supports `$var` → `"var"` and
-/// `$var->prop` → `"var->prop"` (depth-1 only). Returns `None` for anything
-/// more complex so we don't risk false-positive suppression.
-pub(crate) fn extract_expr_guard_key(expr: &php_ast::owned::Expr) -> Option<std::sync::Arc<str>> {
+/// `method_exists`/`property_exists`. Supports `$var` → `"var"`,
+/// `$var->prop` → `"var->prop"` (depth-1 only), and `Foo::class` → the
+/// resolved FQCN prefixed `"cls:"` (disjoint from the variable-key
+/// namespace, so a variable named e.g. `Foo` can never collide with a
+/// class-name guard). Returns `None` for anything more complex so we don't
+/// risk false-positive suppression.
+pub(crate) fn extract_expr_guard_key(
+    expr: &php_ast::owned::Expr,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<std::sync::Arc<str>> {
     match &expr.kind {
         ExprKind::Variable(name) => Some(std::sync::Arc::from(name.trim_start_matches('$'))),
-        ExprKind::Parenthesized(inner) => extract_expr_guard_key(inner),
+        ExprKind::Parenthesized(inner) => extract_expr_guard_key(inner, db, file),
         ExprKind::PropertyAccess(pa) => {
             let base = extract_var_name(&pa.object)?;
             let prop = match &pa.property.kind {
@@ -3172,6 +3180,19 @@ pub(crate) fn extract_expr_guard_key(expr: &php_ast::owned::Expr) -> Option<std:
                 _ => return None,
             };
             Some(std::sync::Arc::from(format!("{base}->{prop}").as_str()))
+        }
+        ExprKind::ClassConstAccess(cca) => {
+            let ExprKind::Identifier(member) = &cca.member.kind else {
+                return None;
+            };
+            if !member.eq_ignore_ascii_case("class") {
+                return None;
+            }
+            let ExprKind::Identifier(class_name) = &cca.class.kind else {
+                return None;
+            };
+            let resolved = crate::db::resolve_name(db, file, class_name.as_ref());
+            Some(std::sync::Arc::from(format!("cls:{resolved}").as_str()))
         }
         _ => None,
     }

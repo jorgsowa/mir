@@ -12,6 +12,7 @@ use rustc_hash::FxHashMap;
 
 use crate::expr::ExpressionAnalyzer;
 use crate::flow_state::{self_is_trait, FlowState};
+use crate::narrowing::extract_expr_guard_key;
 use crate::symbol::ReferenceKind;
 
 use super::args::{
@@ -730,9 +731,24 @@ impl CallAnalyzer {
                 .unwrap_or((false, false));
             // Check for __callStatic in the full inheritance chain (not just direct methods)
             let has_callstatic_magic = crate::db::has_method_in_chain(ea.db, &fqcn, "__callstatic");
+            // Suppress when caller guarded with `method_exists(Foo::class, 'method')`
+            // (literal class name — keyed by the already-resolved `fqcn`) or
+            // `method_exists($cls, 'method')` (dynamic class-string variable).
+            let guard_key: Option<Arc<str>> = match &call.class.kind {
+                ExprKind::Identifier(_) => Some(Arc::from(format!("cls:{fqcn}").as_str())),
+                _ => extract_expr_guard_key(&call.class, ea.db, &ea.file),
+            };
+            let guarded_by_method_exists = guard_key
+                .map(|key| {
+                    ctx.method_exists_guards.contains(&(
+                        key,
+                        Arc::from(crate::util::php_ident_lowercase(method_name).as_str()),
+                    ))
+                })
+                .unwrap_or(false);
             // In a trait body, self::/static:: resolve to the consuming class,
             // which may provide the method — not undefined.
-            if is_abstract || is_trait || has_callstatic_magic {
+            if is_abstract || is_trait || has_callstatic_magic || guarded_by_method_exists {
                 Type::mixed()
             } else {
                 ea.emit(
