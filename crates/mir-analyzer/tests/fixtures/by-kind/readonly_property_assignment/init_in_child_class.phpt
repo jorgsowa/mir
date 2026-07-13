@@ -14,4 +14,4 @@ class Child extends Base {
     }
 }
 ===expect===
-ReadonlyPropertyAssignment@8:8-8:27: Cannot assign to readonly property Child::$name outside of constructor
+ReadonlyPropertyAssignment@8:8-8:27: Cannot assign to readonly property Base::$name outside of constructor

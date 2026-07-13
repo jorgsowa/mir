@@ -539,7 +539,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 {
                                     self.emit(
                                         IssueKind::ReadonlyPropertyAssignment {
-                                            class: fqcn.to_string(),
+                                            class: prop_owner.to_string(),
                                             property: prop_name.clone(),
                                         },
                                         Severity::Error,
