@@ -139,6 +139,12 @@ pub struct FlowState {
     /// (matching Psalm). Monotonic: once set it propagates through clones/merges.
     pub has_dynamic_var_def: bool,
 
+    /// Set once a dynamic-name `compact()` call (`compact($names)`/`compact(...$names)`)
+    /// is seen on this path. Such a call reads an arbitrarily-named set of variables,
+    /// so a write anywhere in scope must not be reported as `UnusedVariable`/dead-write.
+    /// Monotonic like `has_dynamic_var_def`, for the same reason.
+    pub has_dynamic_var_read: bool,
+
     /// Pre-converted (line, col_start, line_end, col_end) of the first assignment
     /// to each variable. Used to emit accurate locations for UnusedVariable / UnusedParam.
     pub var_locations: FxHashMap<Name, (u32, u16, u32, u16)>,
@@ -272,6 +278,7 @@ impl FlowState {
             fn_declared_throws: Arc::from([]),
             inside_loop: false,
             has_dynamic_var_def: false,
+            has_dynamic_var_read: false,
             inside_finally: false,
             is_generator: false,
             inside_constructor: false,
@@ -727,6 +734,9 @@ impl FlowState {
         // suppressed (see `FlowState::has_dynamic_var_def`).
         let dynamic_var_def =
             pre.has_dynamic_var_def || if_ctx.has_dynamic_var_def || else_ctx.has_dynamic_var_def;
+        let dynamic_var_read = pre.has_dynamic_var_read
+            || if_ctx.has_dynamic_var_read
+            || else_ctx.has_dynamic_var_read;
 
         // If the then-branch always diverges, the code after the if runs only
         // in the else-branch — use that as the result directly.
@@ -763,6 +773,7 @@ impl FlowState {
                 result.catch_var_names.insert(*name);
             }
             result.has_dynamic_var_def = dynamic_var_def;
+            result.has_dynamic_var_read = dynamic_var_read;
             return result;
         }
         // If the else-branch always diverges, code after the if runs only
@@ -796,6 +807,7 @@ impl FlowState {
                 result.catch_var_names.insert(*name);
             }
             result.has_dynamic_var_def = dynamic_var_def;
+            result.has_dynamic_var_read = dynamic_var_read;
             return result;
         }
         // If both diverge, the code after the if is unreachable.
@@ -839,6 +851,7 @@ impl FlowState {
                 result.catch_var_names.insert(*name);
             }
             result.has_dynamic_var_def = dynamic_var_def;
+            result.has_dynamic_var_read = dynamic_var_read;
             return result;
         }
 

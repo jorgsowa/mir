@@ -465,12 +465,17 @@ impl CallAnalyzer {
             }
         }
 
-        // compact() reads variables by string name at runtime; mark each string-literal arg as read
+        // compact() reads variables by string name at runtime; mark each string-literal arg as read.
+        // A non-literal argument (`compact($names)`/`compact(...$names)`) reads an
+        // unknowable set of names — reuse the same blanket exemption extract() gets
+        // below rather than risk flagging a variable that's actually read this way.
         if fn_name == "compact" {
             for arg in call.args.iter() {
                 if let ExprKind::String(name) = &arg.value.kind {
                     ctx.read_vars.insert(mir_types::Name::from(name.as_ref()));
                     ctx.mark_consumed(name.as_ref());
+                } else {
+                    ctx.has_dynamic_var_read = true;
                 }
             }
         }

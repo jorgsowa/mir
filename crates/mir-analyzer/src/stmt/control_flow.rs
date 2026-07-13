@@ -913,6 +913,8 @@ impl<'a> StatementsAnalyzer<'a> {
             result.var_locations = finally_ctx.var_locations.clone();
             result.has_dynamic_var_def =
                 result.has_dynamic_var_def || finally_ctx.has_dynamic_var_def;
+            result.has_dynamic_var_read =
+                result.has_dynamic_var_read || finally_ctx.has_dynamic_var_read;
             // Variables read in the finally block count as used — propagate reads back
             // so that the save-restore pattern (assign before try, restore in finally)
             // is not falsely flagged as UnusedVariable.

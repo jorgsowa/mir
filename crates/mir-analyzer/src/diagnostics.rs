@@ -669,6 +669,9 @@ pub(crate) fn emit_unused_variables(
             || name.starts_with('_')
             || ctx.foreach_byref_var_names.contains(name)
             || ctx.catch_var_names.contains(name)
+            // A dynamic-name compact() call in this scope reads an unknowable set
+            // of variable names — any write in scope could be consumed by it.
+            || ctx.has_dynamic_var_read
     };
 
     // Emit at most one UnusedVariable/UnusedForeachValue per variable name to avoid
