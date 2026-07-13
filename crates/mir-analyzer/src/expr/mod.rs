@@ -435,6 +435,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                             .as_deref()
                             .cloned()
                             .unwrap_or_else(Type::mixed);
+                        // Record a hover/go-to-definition symbol, matching the plain
+                        // `foo()` call form — otherwise the direct-call path records
+                        // both record_ref and record_symbol, but this first-class-
+                        // callable form (`foo(...)`) only got the former, so
+                        // find-references/dead-code worked but hover on the name
+                        // token inside `(...)` silently resolved nothing.
+                        self.record_symbol(
+                            name_expr.span,
+                            ReferenceKind::FunctionCall(f.fqn.clone()),
+                            return_ty.clone(),
+                        );
                         // No receiver for a plain function — self/static/parent can't
                         // legally appear in its signature, so an empty fqcn/type-param
                         // list is a safe no-op for build_closure_from_resolved_params's
@@ -505,6 +516,16 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 resolved.owner_fqcn, method_name_lower
                             )),
                             method.span,
+                        );
+                        // Hover/go-to-definition symbol, matching the plain
+                        // `$obj->method()` call form — see the Function arm above.
+                        self.record_symbol(
+                            method.span,
+                            ReferenceKind::MethodCall {
+                                class: resolved.owner_fqcn.clone(),
+                                method: Arc::from(method_name.as_ref()),
+                            },
+                            resolved.return_ty_raw.clone(),
                         );
                         // Substitute this receiver's own bound type params (e.g.
                         // `Box<int>`'s T -> int) into the method's raw param/return
@@ -659,6 +680,16 @@ impl<'a> ExpressionAnalyzer<'a> {
                             resolved.owner_fqcn, method_name_lower
                         )),
                         method.span,
+                    );
+                    // Hover/go-to-definition symbol, matching the plain
+                    // `Foo::method()` call form — see the Function arm above.
+                    self.record_symbol(
+                        method.span,
+                        ReferenceKind::StaticCall {
+                            class: resolved.owner_fqcn.clone(),
+                            method: Arc::from(method_name.as_ref()),
+                        },
+                        resolved.return_ty_raw.clone(),
                     );
                     // Same reasoning as the instance-method FCC case above: substitute
                     // the receiver's own bound type params before building the callable.

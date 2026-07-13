@@ -261,6 +261,76 @@ fn symbol_at_finds_dynamic_invoke_call() {
 }
 
 #[test]
+fn symbol_at_finds_first_class_callable_function() {
+    // `foo(...)` must record a hover symbol on the function name, matching
+    // the plain `foo()` call form.
+    let dir = create_temp_dir("symbol_at_finds_first_class_callable_function");
+    let src = "<?php\nfunction greet(): void {}\nfunction caller(): void { $f = greet(...); }\n";
+    let file = write_file(&dir, "fcc_fn.php", src);
+    let file_str = path_to_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let offset = src.find("greet(...)").unwrap() as u32 + 1;
+    let sym = result
+        .symbol_at(file_str, offset)
+        .expect("symbol_at should find a symbol at greet(...)");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::FunctionCall(n) if n.as_ref() == "greet"),
+        "expected FunctionCall(greet), got {:?}",
+        sym.kind
+    );
+}
+
+#[test]
+fn symbol_at_finds_first_class_callable_method() {
+    // `$obj->method(...)` must record a hover symbol on the method name.
+    let dir = create_temp_dir("symbol_at_finds_first_class_callable_method");
+    let src = "<?php\nclass Svc { public function run(): void {} }\nfunction caller(Svc $s): void { $f = $s->run(...); }\n";
+    let file = write_file(&dir, "fcc_method.php", src);
+    let file_str = path_to_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let offset = src.find("run(...)").unwrap() as u32 + 1;
+    let sym = result
+        .symbol_at(file_str, offset)
+        .expect("symbol_at should find a symbol at $s->run(...)");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::MethodCall { class, method } if class.as_ref() == "Svc" && method.as_ref() == "run"),
+        "expected MethodCall(Svc::run), got {:?}",
+        sym.kind
+    );
+}
+
+#[test]
+fn symbol_at_finds_first_class_callable_static_method() {
+    // `Class::method(...)` must record a hover symbol on the method name.
+    let dir = create_temp_dir("symbol_at_finds_first_class_callable_static_method");
+    let src = "<?php\nclass Math { public static function sq(int $n): int { return $n * $n; } }\nfunction caller(): void { $f = Math::sq(...); }\n";
+    let file = write_file(&dir, "fcc_static.php", src);
+    let file_str = path_to_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let offset = src.find("sq(...)").unwrap() as u32 + 1;
+    let sym = result
+        .symbol_at(file_str, offset)
+        .expect("symbol_at should find a symbol at Math::sq(...)");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::StaticCall { class, method } if class.as_ref() == "Math" && method.as_ref() == "sq"),
+        "expected StaticCall(Math::sq), got {:?}",
+        sym.kind
+    );
+}
+
+#[test]
 fn symbol_at_finds_this_property_access() {
     // $this->prop was invisible for the same reason as $this->method() — $this
     // was untyped so the mixed-receiver guard fired before record_symbol.
