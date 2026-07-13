@@ -1,6 +1,6 @@
 ===description===
-P3: First-class callable on an unknown method falls back to untyped callable without
-emitting a false positive or panic.
+P3: First-class callable on an unknown method reports UndefinedMethod (like
+the ordinary call form) instead of silently falling back to untyped callable.
 ===config===
 suppress=UnusedVariable
 ===file===
@@ -11,3 +11,4 @@ class MyClass {}
 $obj = new MyClass();
 $fn = $obj->undefined(...);
 ===expect===
+UndefinedMethod@6:12-6:21: Method MyClass::undefined() does not exist

@@ -575,6 +575,19 @@ impl<'a> ExpressionAnalyzer<'a> {
                             Type::single(closure)
                         };
                     }
+                    // Unlike the ordinary `$obj->method()` call path, a
+                    // first-class-callable on an undefined method never raised
+                    // UndefinedMethod — mirror call/method.rs's suppression
+                    // rules (interface/abstract/trait receivers, __call, and
+                    // an active method_exists() guard all still apply).
+                    self.emit_undefined_method_for_callable(
+                        &fqcn_arc,
+                        &method_name,
+                        &method_name_lower,
+                        object,
+                        ctx,
+                        method.span,
+                    );
                 }
                 Type::single(Atomic::TCallable {
                     params: None,
@@ -731,12 +744,88 @@ impl<'a> ExpressionAnalyzer<'a> {
                         &receiver_type_params,
                     ));
                 }
+                self.emit_undefined_static_method_for_callable(
+                    &fqcn_arc,
+                    &method_name,
+                    method.span,
+                );
                 Type::single(Atomic::TCallable {
                     params: None,
                     return_type: None,
                 })
             }
         }
+    }
+
+    /// UndefinedMethod check for a first-class-callable (`$obj->method(...)`)
+    /// whose method didn't resolve — mirrors call/method.rs's ordinary-call
+    /// suppression rules (interface/abstract/trait receivers, `__call`, and an
+    /// active `method_exists()` guard), which the FCC path previously never ran.
+    fn emit_undefined_method_for_callable(
+        &mut self,
+        fqcn: &Arc<str>,
+        method_name: &str,
+        method_name_lower: &str,
+        object: &php_ast::owned::Expr,
+        ctx: &FlowState,
+        span: php_ast::Span,
+    ) {
+        if !crate::db::class_exists(self.db, fqcn) || crate::db::has_unknown_ancestor(self.db, fqcn)
+        {
+            return;
+        }
+        let (is_interface, is_abstract, is_trait) = crate::db::class_kind(self.db, fqcn)
+            .map(|k| (k.is_interface, k.is_abstract, k.is_trait))
+            .unwrap_or((false, false, false));
+        let has_call_magic = crate::db::has_method_in_chain(self.db, fqcn, "__call");
+        let guarded_by_method_exists = crate::narrowing::extract_expr_guard_key(object)
+            .map(|key| {
+                ctx.method_exists_guards
+                    .contains(&(key, Arc::from(method_name_lower)))
+            })
+            .unwrap_or(false);
+        if is_interface || is_abstract || is_trait || has_call_magic || guarded_by_method_exists {
+            return;
+        }
+        self.emit(
+            IssueKind::UndefinedMethod {
+                class: fqcn.to_string(),
+                method: method_name.to_string(),
+            },
+            Severity::Error,
+            span,
+        );
+    }
+
+    /// Same as `emit_undefined_method_for_callable`, for the static-call form
+    /// (`Foo::method(...)`) — mirrors call/static_call.rs's suppression rules
+    /// (abstract/trait receivers and `__callStatic`; no `method_exists()` guard,
+    /// since that pattern doesn't apply to static calls).
+    fn emit_undefined_static_method_for_callable(
+        &mut self,
+        fqcn: &Arc<str>,
+        method_name: &str,
+        span: php_ast::Span,
+    ) {
+        if !crate::db::class_exists(self.db, fqcn) || crate::db::has_unknown_ancestor(self.db, fqcn)
+        {
+            return;
+        }
+        let (is_abstract, is_trait) = crate::db::class_kind(self.db, fqcn)
+            .map(|k| (k.is_abstract, k.is_trait))
+            .unwrap_or((false, false));
+        let has_callstatic_magic = crate::db::has_method_in_chain(self.db, fqcn, "__callstatic");
+        if is_abstract || is_trait || has_callstatic_magic {
+            return;
+        }
+        self.emit(
+            IssueKind::UndefinedMethod {
+                class: fqcn.to_string(),
+                method: method_name.to_string(),
+            },
+            Severity::Error,
+            span,
+        );
     }
 
     fn build_closure_from_resolved_params(
