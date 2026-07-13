@@ -1781,6 +1781,45 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
                 && properties.values().all(|p| p.ty.is_subtype_structural(lv))
         }
 
+        // Two shapes: every sup key must be satisfied (present+compatible, or
+        // absent-but-optional/sub-open), and sub may not have keys sup doesn't
+        // declare unless sup itself is open. Named-object values are deferred
+        // to class-hierarchy checks, same as the TArray/TList sup arms above.
+        (
+            Atomic::TKeyedArray {
+                properties: sub_props,
+                is_open: sub_open,
+                ..
+            },
+            Atomic::TKeyedArray {
+                properties: sup_props,
+                is_open: sup_open,
+                ..
+            },
+        ) => {
+            let keys_satisfied = sup_props.iter().all(|(key, sup_prop)| {
+                match sub_props.get(key) {
+                    Some(sub_prop) => {
+                        let has_named_obj = sup_prop.ty.types.iter().any(|a| {
+                            matches!(
+                                a,
+                                Atomic::TNamedObject { .. }
+                                    | Atomic::TSelf { .. }
+                                    | Atomic::TStaticObject { .. }
+                                    | Atomic::TClosure { .. }
+                                    | Atomic::TTemplateParam { .. }
+                            )
+                        });
+                        has_named_obj || sub_prop.ty.is_subtype_structural(&sup_prop.ty)
+                    }
+                    None => sup_prop.optional || *sub_open,
+                }
+            });
+            let no_undeclared_extras =
+                *sup_open || sub_props.keys().all(|k| sup_props.contains_key(k));
+            keys_satisfied && no_undeclared_extras
+        }
+
         _ => false,
     }
 }
