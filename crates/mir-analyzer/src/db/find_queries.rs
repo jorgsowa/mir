@@ -1137,6 +1137,41 @@ pub fn find_property_in_chain<'db>(
     find_property_in_mixins(db, fqcn, name, &mut visited_mixins)
 }
 
+/// Whether `name` is part of `fqcn`'s own composition — declared directly on
+/// `fqcn`, or pulled in transitively through a trait `fqcn` (or one of its
+/// traits) `use`s. Never crosses an `extends` boundary, unlike
+/// [`find_property_in_chain`] — traits are PHP copy-paste semantics, so a
+/// trait-contributed property is initializable from the *consuming* class's
+/// own scope, while a genuinely inherited property (declared on a real
+/// ancestor class) is not. Used to scope readonly-property initialization.
+pub fn property_in_own_composition<'db>(
+    db: &'db dyn MirDatabase,
+    fqcn: Fqcn<'db>,
+    name: &str,
+) -> bool {
+    if find_property_in_class(db, fqcn, name).is_some() {
+        return true;
+    }
+    let mut visited = std::collections::HashSet::<Arc<str>>::new();
+    let mut stack: Vec<Arc<str>> = Vec::new();
+    if let Some(class) = find_class_like(db, fqcn) {
+        stack.extend(class.class_traits().iter().cloned());
+    }
+    while let Some(trait_fqcn) = stack.pop() {
+        if !visited.insert(trait_fqcn.clone()) {
+            continue;
+        }
+        let here = Fqcn::new(db, Name::new(trait_fqcn.as_ref()));
+        if find_property_in_class(db, here, name).is_some() {
+            return true;
+        }
+        if let Some(class) = find_class_like(db, here) {
+            stack.extend(class.class_traits().iter().cloned());
+        }
+    }
+    false
+}
+
 fn find_property_in_mixins<'db>(
     db: &'db dyn MirDatabase,
     fqcn: Fqcn<'db>,

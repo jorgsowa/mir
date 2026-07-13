@@ -518,18 +518,23 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 // PHP 8.1: native readonly (keyword) properties may be initialized
                                 // from any method of the declaring class, not just the constructor.
                                 // @readonly docblock annotations are advisory and do not get this
-                                // exemption.
-                                let in_declaring_scope = match (
-                                    ctx.self_fqcn.as_deref(),
-                                    prop_declaring_class.as_deref(),
-                                ) {
-                                    (Some(self_cls), Some(decl_cls)) => {
-                                        self_cls.eq_ignore_ascii_case(decl_cls)
-                                    }
-                                    _ => false,
-                                };
+                                // exemption. A trait-contributed property counts as part of the
+                                // *consuming* class's own scope (PHP copy-paste semantics), so this
+                                // checks own composition rather than comparing declaring-class
+                                // strings — `find_property_in_chain` reports a trait's own FQCN as
+                                // the "declaring class", which would otherwise never match self_fqcn.
+                                let in_declaring_scope = ctx.self_fqcn.as_deref().is_some_and(
+                                    |self_cls| {
+                                        self_cls.eq_ignore_ascii_case(fqcn.as_ref())
+                                            && crate::db::property_in_own_composition(
+                                                self.db,
+                                                crate::db::Fqcn::new(self.db, *fqcn),
+                                                &prop_name,
+                                            )
+                                    },
+                                );
                                 if is_readonly
-                                    && !ctx.inside_constructor
+                                    && !(ctx.inside_constructor && in_declaring_scope)
                                     && !(has_native_readonly && in_declaring_scope)
                                 {
                                     self.emit(
