@@ -218,7 +218,10 @@ impl<'a> DefinitionCollector<'a> {
                 own_constants,
                 template_params,
                 location: Some(self.location(stmt_span.start, stmt_span.end)),
-                deprecated: iface_doc.deprecated.as_deref().map(Arc::from),
+                deprecated: Self::deprecated_from_doc_or_attrs(
+                    iface_doc.deprecated.as_deref(),
+                    &decl.attributes,
+                ),
                 own_properties,
                 seal_properties,
             }));

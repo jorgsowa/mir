@@ -255,7 +255,10 @@ impl<'a> DefinitionCollector<'a> {
             trait_use_locations,
             require_extends,
             require_implements,
-            deprecated: trait_doc.deprecated.as_deref().map(Arc::from),
+            deprecated: Self::deprecated_from_doc_or_attrs(
+                trait_doc.deprecated.as_deref(),
+                &decl.attributes,
+            ),
         }));
 
         ControlFlow::Continue(())

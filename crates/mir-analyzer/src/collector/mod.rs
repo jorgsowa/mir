@@ -1031,6 +1031,30 @@ impl<'a> DefinitionCollector<'a> {
         );
     }
 
+    /// `@deprecated` docblock tag, falling back to a bare `#[Deprecated]` /
+    /// `#[\Deprecated]` attribute when there's no docblock tag. Shared by
+    /// every declaration kind that carries both a docblock and attributes
+    /// (interface/trait/enum decls, class-level already has its own inline
+    /// copy of this same fallback).
+    fn deprecated_from_doc_or_attrs(
+        doc_tag: Option<&str>,
+        attributes: &[php_ast::owned::Attribute],
+    ) -> Option<Arc<str>> {
+        doc_tag.map(Arc::from).or_else(|| {
+            if attributes.iter().any(|a| {
+                a.name
+                    .parts
+                    .last()
+                    .map(|p| p.as_ref().eq_ignore_ascii_case("Deprecated"))
+                    .unwrap_or(false)
+            }) {
+                Some(Arc::from(""))
+            } else {
+                None
+            }
+        })
+    }
+
     // -----------------------------------------------------------------------
     // Visibility conversion
     // -----------------------------------------------------------------------
