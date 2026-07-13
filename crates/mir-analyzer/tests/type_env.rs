@@ -80,3 +80,80 @@ fn issue_kind_accessible_via_mir_analyzer() {
     let _kind = mir_analyzer::IssueKind::UndefinedVariable { name: "foo".into() };
     let _sev = mir_analyzer::Severity::Error;
 }
+
+// ---------------------------------------------------------------------------
+// analyze_source's typed path (analyze_bodies_typed) had drifted out of sync
+// with the untyped batch/LSP path (analyze_bodies): several checks ran on one
+// but not the other. Each test below exercises analyze_source directly, the
+// only entry point that reaches the typed path.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn analyze_source_flags_attribute_on_function() {
+    let src = "<?php\n#[Attribute]\nfunction foo(): void {}\n";
+    let result = mir_analyzer::analyze_source(src);
+    assert!(
+        result
+            .issues
+            .iter()
+            .any(|i| i.kind.name() == "InvalidAttribute"),
+        "expected InvalidAttribute for #[Attribute] on a function, got: {:?}",
+        result.issues.iter().map(|i| i.kind.name()).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn analyze_source_flags_attribute_on_abstract_class() {
+    let src = "<?php\n#[Attribute]\nabstract class Foo {}\n";
+    let result = mir_analyzer::analyze_source(src);
+    assert!(
+        result
+            .issues
+            .iter()
+            .any(|i| i.kind.name() == "InvalidAttribute"),
+        "expected InvalidAttribute for #[Attribute] on an abstract class, got: {:?}",
+        result.issues.iter().map(|i| i.kind.name()).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn analyze_source_flags_attribute_on_trait() {
+    let src = "<?php\n#[Attribute]\ntrait Foo {}\n";
+    let result = mir_analyzer::analyze_source(src);
+    assert!(
+        result
+            .issues
+            .iter()
+            .any(|i| i.kind.name() == "InvalidAttribute"),
+        "expected InvalidAttribute for #[Attribute] on a trait, got: {:?}",
+        result.issues.iter().map(|i| i.kind.name()).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn analyze_source_flags_undefined_class_in_param_default() {
+    let src = "<?php\nfunction foo($x = NoSuchClass::VALUE): void {}\n";
+    let result = mir_analyzer::analyze_source(src);
+    assert!(
+        result
+            .issues
+            .iter()
+            .any(|i| i.kind.name() == "UndefinedClass"),
+        "expected UndefinedClass for an undefined class in a param default, got: {:?}",
+        result.issues.iter().map(|i| i.kind.name()).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn analyze_source_flags_duplicate_function_declaration() {
+    let src = "<?php\nfunction foo(): void {}\nfunction foo(): void {}\n";
+    let result = mir_analyzer::analyze_source(src);
+    assert!(
+        result
+            .issues
+            .iter()
+            .any(|i| i.kind.name() == "DuplicateFunction"),
+        "expected DuplicateFunction for a re-declared function, got: {:?}",
+        result.issues.iter().map(|i| i.kind.name()).collect::<Vec<_>>()
+    );
+}

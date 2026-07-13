@@ -684,6 +684,16 @@ impl<'a> BodyAnalyzer<'a> {
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
 
+        crate::attributes::check_function_attributes(
+            decl,
+            self.db,
+            file,
+            source,
+            source_map,
+            all_issues,
+            self.mode == AnalysisMode::Full,
+            Some(&mut *all_symbols),
+        );
         let fn_name = decl.name.as_deref().unwrap_or("").to_string();
 
         for param in decl.params.iter() {
@@ -695,6 +705,17 @@ impl<'a> BodyAnalyzer<'a> {
                     source_map,
                     all_issues,
                     Some(&mut *all_symbols),
+                );
+            }
+            if let Some(default_expr) = &param.default {
+                check_expr_for_undefined_classes(
+                    default_expr,
+                    self.db,
+                    file,
+                    source,
+                    source_map,
+                    all_issues,
+                    self.php_version,
                 );
             }
         }

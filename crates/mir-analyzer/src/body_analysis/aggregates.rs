@@ -83,6 +83,17 @@ impl<'a> BodyAnalyzer<'a> {
         type_envs: &mut FxHashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
         all_symbols: &mut Vec<ResolvedSymbol>,
     ) {
+        crate::attributes::check_trait_attributes(
+            decl,
+            self.db,
+            file,
+            source,
+            source_map,
+            all_issues,
+            self.mode == AnalysisMode::Full,
+            Some(&mut *all_symbols),
+        );
+
         let resolved = resolve_name(self.db, file.as_ref(), decl.name.as_deref().unwrap_or(""));
         let fqcn: &str = &resolved;
         self.check_class_generic_type_args(

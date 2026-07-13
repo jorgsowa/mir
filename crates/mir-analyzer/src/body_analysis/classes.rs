@@ -893,6 +893,17 @@ impl<'a> BodyAnalyzer<'a> {
         all_symbols: &mut Vec<ResolvedSymbol>,
         guards: &rustc_hash::FxHashSet<std::sync::Arc<str>>,
     ) {
+        crate::attributes::check_class_attributes(
+            decl,
+            self.db,
+            file,
+            source,
+            source_map,
+            all_issues,
+            self.mode == AnalysisMode::Full,
+            Some(&mut *all_symbols),
+        );
+
         let class_name_owned = decl
             .name
             .as_ref()
@@ -905,6 +916,15 @@ impl<'a> BodyAnalyzer<'a> {
         let here = crate::db::Fqcn::from_str(self.db, fqcn);
         let parent_fqcn =
             crate::db::find_class_like(self.db, here).and_then(|c| c.parent().cloned());
+
+        crate::attributes::check_parent_in_class_attrs(
+            &decl.attributes,
+            parent_fqcn.is_some(),
+            file,
+            source,
+            source_map,
+            all_issues,
+        );
 
         if let Some(parent) = &decl.extends {
             let parent_str = crate::parser::name_to_string_owned(parent);

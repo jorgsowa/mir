@@ -113,6 +113,9 @@ impl<'a> BodyAnalyzer<'a> {
     ) -> Vec<Issue> {
         use php_ast::owned::StmtKind;
         let mut all_issues = Vec::new();
+        if self.mode == AnalysisMode::Full {
+            check_duplicate_declarations(&program.stmts, &file, source, source_map, &mut all_issues);
+        }
         self.analyze_top_level_stmts_typed(
             &program.stmts,
             &file,
