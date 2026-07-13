@@ -161,11 +161,18 @@ impl<'a> DefinitionCollector<'a> {
                         continue;
                     }
                     let prop_name = p.name.as_deref().unwrap_or_default();
-                    let ty = self.resolve_union_opt(
-                        p.type_hint
-                            .as_ref()
-                            .map(|h| type_from_hint_owned(h, Some(&fqcn))),
-                    );
+                    // phpstorm-stubs `#[LanguageLevelTypeAware]`: a version-specific
+                    // type override wins, mirroring class.rs's property handling.
+                    let ty = self
+                        .version_attr_type_string(&p.attributes)
+                        .map(|s| crate::parser::docblock::parse_type_string(&s))
+                        .or_else(|| {
+                            self.resolve_union_opt(
+                                p.type_hint
+                                    .as_ref()
+                                    .map(|h| type_from_hint_owned(h, Some(&fqcn))),
+                            )
+                        });
                     own_properties.insert(
                         Arc::from(prop_name),
                         PropertyDef {

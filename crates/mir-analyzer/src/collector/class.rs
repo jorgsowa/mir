@@ -249,15 +249,22 @@ impl<'a> DefinitionCollector<'a> {
                     // Resolve with class template awareness so `@var array<TKey, TValue>`
                     // keeps TKey/TValue as template params instead of resolving them to
                     // namespaced classes (App\Support\TKey).
-                    let ty = prop_doc
-                        .var_type
-                        .map(|t| {
-                            self.resolve_union_doc_with_templates(
-                                t,
-                                &class_template_names,
-                                &fqcn,
-                                &class_template_params,
-                            )
+                    let ty = self
+                        // phpstorm-stubs `#[LanguageLevelTypeAware]`: a version-specific
+                        // type override wins, same precedence as params/returns —
+                        // otherwise a stub property like Exception::$file loses its
+                        // PHP-8.1+ refined type entirely.
+                        .version_attr_type_string(&p.attributes)
+                        .map(|s| crate::parser::docblock::parse_type_string(&s))
+                        .or_else(|| {
+                            prop_doc.var_type.map(|t| {
+                                self.resolve_union_doc_with_templates(
+                                    t,
+                                    &class_template_names,
+                                    &fqcn,
+                                    &class_template_params,
+                                )
+                            })
                         })
                         .or_else(|| hint_ty.clone());
                     let prop = PropertyDef {
