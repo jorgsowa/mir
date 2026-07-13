@@ -268,6 +268,42 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
     }
 
+    /// Resolves a `Class::CONST` (including `self::`/`static::`) match-arm
+    /// condition to the constant's literal scalar value, when statically known —
+    /// so `match ($x) { C::A => ..., C::B => ... }` folds into the same
+    /// covered-literal set as inline `'a'`/`1` conditions instead of leaving the
+    /// match looking non-exhaustive.
+    fn resolve_class_const_literal(&self, cond: &Expr, ctx: &FlowState) -> Option<Atomic> {
+        let ExprKind::ClassConstAccess(cca) = &cond.kind else {
+            return None;
+        };
+        let resolved_class = match &cca.class.kind {
+            ExprKind::Identifier(id) => {
+                let r = crate::db::resolve_name(self.db, &self.file, id.as_ref());
+                if r == "self" || r == "static" {
+                    ctx.self_fqcn.as_deref().unwrap_or("").to_string()
+                } else {
+                    r
+                }
+            }
+            _ => return None,
+        };
+        if resolved_class.is_empty() {
+            return None;
+        }
+        let member = match &cca.member.kind {
+            ExprKind::Identifier(s) | ExprKind::Variable(s) => s.as_ref(),
+            _ => return None,
+        };
+        let here = crate::db::Fqcn::new(self.db, mir_types::Name::new(&resolved_class));
+        let (_, cdef) = crate::db::find_class_constant_in_chain(self.db, here, member)?;
+        match cdef.ty.types.as_slice() {
+            [Atomic::TLiteralString(s)] => Some(Atomic::TLiteralString(s.clone())),
+            [Atomic::TLiteralInt(n)] => Some(Atomic::TLiteralInt(*n)),
+            _ => None,
+        }
+    }
+
     fn check_match_exhaustiveness(
         &self,
         subject_ty: &Type,
@@ -304,6 +340,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                 .filter_map(|cond| {
                     if let ExprKind::String(s) = &cond.kind {
                         Some(s.clone())
+                    } else if let Some(Atomic::TLiteralString(s)) =
+                        self.resolve_class_const_literal(cond, ctx)
+                    {
+                        Some(Box::from(s.as_ref()))
                     } else {
                         None
                     }
@@ -345,7 +385,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                 .iter()
                 .filter_map(|a| a.conditions.as_deref())
                 .flatten()
-                .filter_map(extract_literal_int)
+                .filter_map(|cond| {
+                    extract_literal_int(cond).or_else(|| {
+                        if let Some(Atomic::TLiteralInt(n)) =
+                            self.resolve_class_const_literal(cond, ctx)
+                        {
+                            Some(n)
+                        } else {
+                            None
+                        }
+                    })
+                })
                 .collect();
 
             let mut uncovered: Vec<i64> = int_atoms
@@ -410,11 +460,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                         if let ExprKind::ClassConstAccess(cca) = &cond.kind {
                             let resolved_class = match &cca.class.kind {
                                 ExprKind::Identifier(id) => {
-                                    let r = crate::db::resolve_name(
-                                        self.db,
-                                        &self.file,
-                                        id.as_ref(),
-                                    );
+                                    let r =
+                                        crate::db::resolve_name(self.db, &self.file, id.as_ref());
                                     if r == "self" || r == "static" {
                                         ctx.self_fqcn.as_deref().unwrap_or("").to_string()
                                     } else {
