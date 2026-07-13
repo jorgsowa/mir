@@ -634,7 +634,6 @@ pub(crate) fn check_parent_in_class_attrs(
 /// 2. If found and has a target mask, checks that `target_flag` is set.
 /// 3. Checks for duplicate non-repeatable attributes.
 #[allow(clippy::too_many_arguments)]
-#[allow(clippy::too_many_arguments)]
 fn check_attribute_list(
     attrs: &[Attribute],
     target_flag: i64,
