@@ -668,21 +668,53 @@ pub(crate) fn resolve_named_objects_in_union(
     let types: Vec<Atomic> = union
         .types
         .into_iter()
-        .map(|a| match a {
-            Atomic::TNamedObject { fqcn, type_params } => {
-                let resolved = crate::db::resolve_name(db, file, fqcn.as_ref());
-                Atomic::TNamedObject {
-                    fqcn: resolved.into(),
-                    type_params,
-                }
-            }
-            other => other,
-        })
+        .map(|a| resolve_named_objects_in_atomic(a, db, file))
         .collect();
     let mut result = Type::from_vec(types);
     result.from_docblock = from_docblock;
     result.possibly_undefined = possibly_undefined;
     result
+}
+
+/// Recurse into a type-argument list, array/list element+key type, or
+/// intersection member — not just a top-level `TNamedObject` — so a
+/// `use`-imported short name nested inside `Wrap<list<ShortName>>`,
+/// `array<int, ShortName>`, or `ShortName&Other` is resolved the same as one
+/// written at the top level.
+fn resolve_named_objects_in_atomic(
+    atomic: Atomic,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Atomic {
+    match atomic {
+        Atomic::TNamedObject { fqcn, type_params } => {
+            let resolved = crate::db::resolve_name(db, file, fqcn.as_ref());
+            let type_params = type_params
+                .iter()
+                .cloned()
+                .map(|tp| resolve_named_objects_in_union(tp, db, file))
+                .collect();
+            Atomic::TNamedObject {
+                fqcn: resolved.into(),
+                type_params,
+            }
+        }
+        Atomic::TArray { key, value } => Atomic::TArray {
+            key: Box::new(resolve_named_objects_in_union(*key, db, file)),
+            value: Box::new(resolve_named_objects_in_union(*value, db, file)),
+        },
+        Atomic::TList { value } => Atomic::TList {
+            value: Box::new(resolve_named_objects_in_union(*value, db, file)),
+        },
+        Atomic::TIntersection { parts } => Atomic::TIntersection {
+            parts: parts
+                .iter()
+                .cloned()
+                .map(|p| resolve_named_objects_in_union(p, db, file))
+                .collect(),
+        },
+        other => other,
+    }
 }
 
 pub(crate) fn extract_string_from_expr(expr: &Expr) -> Option<String> {

@@ -2,14 +2,32 @@ use super::*;
 
 /// Recursively collects every `TNamedObject` FQCN in `ty`, including ones
 /// nested inside its own type-argument list (e.g. `Box<Wrapper<Foo>>` yields
-/// `Box`, `Wrapper`, and `Foo`).
-fn collect_named_object_fqcns(ty: &mir_types::Type, out: &mut Vec<mir_types::Name>) {
+/// `Box`, `Wrapper`, and `Foo`), inside an array/list element or key type
+/// (`Foo[]`, `array<int, Foo>`, `list<Foo>`), or inside an intersection
+/// (`Foo&Bar`) — otherwise these common docblock shapes never get their
+/// element/member class existence-checked or reference-recorded.
+pub(super) fn collect_named_object_fqcns(ty: &mir_types::Type, out: &mut Vec<mir_types::Name>) {
     for atomic in &ty.types {
-        if let mir_types::Atomic::TNamedObject { fqcn, type_params } = atomic {
-            out.push(*fqcn);
-            for tp in type_params.iter() {
-                collect_named_object_fqcns(tp, out);
+        match atomic {
+            mir_types::Atomic::TNamedObject { fqcn, type_params } => {
+                out.push(*fqcn);
+                for tp in type_params.iter() {
+                    collect_named_object_fqcns(tp, out);
+                }
             }
+            mir_types::Atomic::TArray { key, value } => {
+                collect_named_object_fqcns(key, out);
+                collect_named_object_fqcns(value, out);
+            }
+            mir_types::Atomic::TList { value } => {
+                collect_named_object_fqcns(value, out);
+            }
+            mir_types::Atomic::TIntersection { parts } => {
+                for part in parts.iter() {
+                    collect_named_object_fqcns(part, out);
+                }
+            }
+            _ => {}
         }
     }
 }

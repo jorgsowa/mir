@@ -315,37 +315,41 @@ impl<'a> BodyAnalyzer<'a> {
                 crate::diagnostics::offset_to_line_col(source, span.start, source_map);
             let (line_end, col_end) =
                 crate::diagnostics::offset_to_line_col(source, span.end, source_map);
-            for atomic in &doc_ty.types {
-                if let mir_types::Atomic::TNamedObject { fqcn, .. } = atomic {
-                    if template_names.iter().any(|t| *t == fqcn.as_ref()) {
-                        continue;
-                    }
-                    if !crate::db::class_exists(self.db, fqcn.as_ref()) {
-                        issues.push(mir_issues::Issue::new(
-                            mir_issues::IssueKind::UndefinedDocblockClass {
-                                name: fqcn.to_string(),
-                            },
-                            mir_issues::Location {
-                                file: file.clone(),
-                                line,
-                                line_end,
-                                col_start,
-                                col_end: crate::diagnostics::clamp_col_end(
-                                    line, line_end, col_start, col_end,
-                                ),
-                            },
-                        ));
-                    } else if self.mode == AnalysisMode::Full {
-                        self.db.record_reference_location(crate::db::RefLoc {
-                            symbol_key: Arc::from(format!("cls:{fqcn}")),
+            // Recurse into type-argument lists, array/list element+key types, and
+            // intersections — not just the top-level atomic — so `Foo[]`,
+            // `array<int, Foo>`, `list<Foo>`, and `Foo&Bar` all get their
+            // member classes existence-checked and reference-recorded too.
+            let mut fqcns = Vec::new();
+            super::classes::collect_named_object_fqcns(doc_ty, &mut fqcns);
+            for fqcn in &fqcns {
+                if template_names.iter().any(|t| *t == fqcn.as_ref()) {
+                    continue;
+                }
+                if !crate::db::class_exists(self.db, fqcn.as_ref()) {
+                    issues.push(mir_issues::Issue::new(
+                        mir_issues::IssueKind::UndefinedDocblockClass {
+                            name: fqcn.to_string(),
+                        },
+                        mir_issues::Location {
                             file: file.clone(),
                             line,
+                            line_end,
                             col_start,
                             col_end: crate::diagnostics::clamp_col_end(
                                 line, line_end, col_start, col_end,
                             ),
-                        });
-                    }
+                        },
+                    ));
+                } else if self.mode == AnalysisMode::Full {
+                    self.db.record_reference_location(crate::db::RefLoc {
+                        symbol_key: Arc::from(format!("cls:{fqcn}")),
+                        file: file.clone(),
+                        line,
+                        col_start,
+                        col_end: crate::diagnostics::clamp_col_end(
+                            line, line_end, col_start, col_end,
+                        ),
+                    });
                 }
             }
         }
@@ -440,48 +444,39 @@ impl<'a> BodyAnalyzer<'a> {
                     self.db,
                     file.as_ref(),
                 );
-                for atomic in &doc_ty.types {
-                    if let mir_types::Atomic::TNamedObject { fqcn, .. } = atomic {
-                        // Skip pseudo-types (non-falsy-string), callables (pure-callable(…)),
-                        // class-constants (Ns\C::A), float-literals (0.3), and namespace-resolved
-                        // template params (App\T where T is a declared template).
-                        let looks_like_class = !fqcn.contains('-')
-                            && !fqcn.contains('(')
-                            && !fqcn.contains("::")
-                            && !fqcn.contains('.')
-                            && !fqcn.starts_with(|c: char| c.is_ascii_digit());
-                        let last_segment = fqcn.rsplit('\\').next().unwrap_or(fqcn.as_ref());
-                        let is_template = template_names
-                            .iter()
-                            .any(|t| *t == fqcn.as_ref() || *t == last_segment);
-                        let is_alias = type_alias_names.contains(last_segment)
-                            || type_alias_names.contains(fqcn.as_ref());
-                        if !looks_like_class || is_template || is_alias {
-                            continue;
-                        }
-                        if !crate::db::class_exists(self.db, fqcn.as_ref()) {
-                            issues.push(mir_issues::Issue::new(
-                                mir_issues::IssueKind::UndefinedDocblockClass {
-                                    name: fqcn.to_string(),
-                                },
-                                mir_issues::Location {
-                                    file: file.clone(),
-                                    line: fn_line,
-                                    line_end: fn_line_end,
-                                    col_start: fn_col_start,
-                                    col_end: crate::diagnostics::clamp_col_end(
-                                        fn_line,
-                                        fn_line_end,
-                                        fn_col_start,
-                                        fn_col_end,
-                                    ),
-                                },
-                            ));
-                        } else if self.mode == AnalysisMode::Full {
-                            self.db.record_reference_location(crate::db::RefLoc {
-                                symbol_key: Arc::from(format!("cls:{fqcn}")),
+                // Recurse into type-argument lists, array/list element+key types,
+                // and intersections — not just the top-level atomic — so
+                // `Foo[]`, `array<int, Foo>`, `list<Foo>`, and `Foo&Bar` all get
+                // their member classes existence-checked and reference-recorded.
+                let mut fqcns = Vec::new();
+                super::classes::collect_named_object_fqcns(&doc_ty, &mut fqcns);
+                for fqcn in &fqcns {
+                    // Skip pseudo-types (non-falsy-string), callables (pure-callable(…)),
+                    // class-constants (Ns\C::A), float-literals (0.3), and namespace-resolved
+                    // template params (App\T where T is a declared template).
+                    let looks_like_class = !fqcn.contains('-')
+                        && !fqcn.contains('(')
+                        && !fqcn.contains("::")
+                        && !fqcn.contains('.')
+                        && !fqcn.starts_with(|c: char| c.is_ascii_digit());
+                    let last_segment = fqcn.rsplit('\\').next().unwrap_or(fqcn.as_ref());
+                    let is_template = template_names
+                        .iter()
+                        .any(|t| *t == fqcn.as_ref() || *t == last_segment);
+                    let is_alias = type_alias_names.contains(last_segment)
+                        || type_alias_names.contains(fqcn.as_ref());
+                    if !looks_like_class || is_template || is_alias {
+                        continue;
+                    }
+                    if !crate::db::class_exists(self.db, fqcn.as_ref()) {
+                        issues.push(mir_issues::Issue::new(
+                            mir_issues::IssueKind::UndefinedDocblockClass {
+                                name: fqcn.to_string(),
+                            },
+                            mir_issues::Location {
                                 file: file.clone(),
                                 line: fn_line,
+                                line_end: fn_line_end,
                                 col_start: fn_col_start,
                                 col_end: crate::diagnostics::clamp_col_end(
                                     fn_line,
@@ -489,8 +484,21 @@ impl<'a> BodyAnalyzer<'a> {
                                     fn_col_start,
                                     fn_col_end,
                                 ),
-                            });
-                        }
+                            },
+                        ));
+                    } else if self.mode == AnalysisMode::Full {
+                        self.db.record_reference_location(crate::db::RefLoc {
+                            symbol_key: Arc::from(format!("cls:{fqcn}")),
+                            file: file.clone(),
+                            line: fn_line,
+                            col_start: fn_col_start,
+                            col_end: crate::diagnostics::clamp_col_end(
+                                fn_line,
+                                fn_line_end,
+                                fn_col_start,
+                                fn_col_end,
+                            ),
+                        });
                     }
                 }
             }

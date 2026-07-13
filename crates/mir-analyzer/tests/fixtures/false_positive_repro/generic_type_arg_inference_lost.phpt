@@ -4,7 +4,11 @@ list, so it must satisfy a declared `Wrap<list<AssetId>>` return type.
 ===config===
 php_version=8.4
 suppress=UnusedParam
-===file===
+===file:AssetId.php===
+<?php
+namespace Demo\Ids;
+final class AssetId {}
+===file:main.php===
 <?php
 namespace Demo;
 use Demo\Ids\AssetId;
