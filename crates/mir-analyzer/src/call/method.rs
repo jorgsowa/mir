@@ -4,7 +4,7 @@ use php_ast::owned::{ExprKind, MethodCallExpr};
 use php_ast::Span;
 
 use crate::narrowing::extract_expr_guard_key;
-use crate::taint::is_expr_tainted;
+use crate::taint::{classify_method_sink, is_expr_tainted, SinkKind};
 use mir_codebase::definitions::{DeclaredParam, TemplateParam, Visibility};
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Name, Type};
@@ -879,6 +879,21 @@ fn resolve_method_return<'a>(
                         };
                         ea.emit(issue, Severity::Error, span);
                     }
+                }
+            }
+        }
+
+        // OOP database sink check (M19 parity with call/function.rs's
+        // procedural classify_sink): $pdo->query($sql) etc.
+        if let Some(sink_kind) = classify_method_sink(ea.db, fqcn.as_ref(), method_name) {
+            for arg in call.args.iter() {
+                if is_expr_tainted(&arg.value, ctx) {
+                    let issue_kind = match sink_kind {
+                        SinkKind::Sql => IssueKind::TaintedSql,
+                        _ => unreachable!("classify_method_sink only returns SinkKind::Sql"),
+                    };
+                    ea.emit(issue_kind, Severity::Error, span);
+                    break;
                 }
             }
         }

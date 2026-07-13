@@ -84,6 +84,36 @@ pub fn classify_sink(fn_name: &str) -> Option<SinkKind> {
     }
 }
 
+/// Return the sink kind for a *method* call on a known OOP database wrapper —
+/// `$pdo->query($sql)`, `$mysqli->prepare($sql)` — the dominant modern PHP
+/// idiom over the procedural `mysqli_query()` style `classify_sink` covers.
+/// Matches the class itself or any subclass (a custom `Database extends PDO`
+/// is just as much a sink).
+pub fn classify_method_sink(
+    db: &dyn crate::db::MirDatabase,
+    fqcn: &str,
+    method_name: &str,
+) -> Option<SinkKind> {
+    let method = crate::util::php_ident_lowercase(method_name);
+    let is_a = |base: &str| fqcn.eq_ignore_ascii_case(base) || crate::db::extends_or_implements(db, fqcn, base);
+
+    if is_a("PDO") && matches!(method.as_str(), "query" | "exec" | "prepare") {
+        return Some(SinkKind::Sql);
+    }
+    if is_a("mysqli")
+        && matches!(
+            method.as_str(),
+            "query" | "prepare" | "real_query" | "multi_query"
+        )
+    {
+        return Some(SinkKind::Sql);
+    }
+    if is_a("SQLite3") && matches!(method.as_str(), "query" | "exec" | "prepare") {
+        return Some(SinkKind::Sql);
+    }
+    None
+}
+
 // ---------------------------------------------------------------------------
 // Expression taint checker
 // ---------------------------------------------------------------------------
