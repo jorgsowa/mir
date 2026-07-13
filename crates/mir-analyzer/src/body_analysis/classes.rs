@@ -1170,6 +1170,75 @@ impl<'a> BodyAnalyzer<'a> {
             }
         }
 
+        // `@psalm-require-extends`/`@psalm-require-implements` on a trait reached
+        // only transitively (`class C { use A; }` where `A` itself `use`s the
+        // constrained trait) was never validated at `C` — the loop above only
+        // walks `trait_list`, i.e. `C`'s own direct `use` clauses. Reuse the
+        // already-transitive `class_ancestors_by_fqcn` (also used for method/
+        // property resolution) to find those and re-run just the require-
+        // extends/implements satisfaction check for them; existence/kind/
+        // enum-readonly checks stay direct-only since those are the direct
+        // user's responsibility, not something a transitive re-export inherits.
+        if !class.is_trait() {
+            let direct: std::collections::HashSet<&str> =
+                trait_list.iter().map(|t| t.as_ref()).collect();
+            for ancestor in crate::db::class_ancestors_by_fqcn(self.db, here).iter() {
+                if ancestor.as_ref() == fqcn || direct.contains(ancestor.as_ref()) {
+                    continue;
+                }
+                let ancestor_here = crate::db::Fqcn::from_str(self.db, ancestor.as_ref());
+                let Some(crate::db::ClassLike::Trait(t)) =
+                    crate::db::find_class_like(self.db, ancestor_here)
+                else {
+                    continue;
+                };
+                if t.require_extends.is_empty() && t.require_implements.is_empty() {
+                    continue;
+                }
+                let tr_short: Arc<str> = ancestor
+                    .rsplit('\\')
+                    .next()
+                    .map(Arc::from)
+                    .unwrap_or_else(|| ancestor.clone());
+                let loc = class.location().cloned().unwrap_or_else(|| mir_types::Location {
+                    file: file.clone(),
+                    line: 1,
+                    line_end: 1,
+                    col_start: 0,
+                    col_end: 0,
+                });
+                for req in t.require_extends.iter() {
+                    let satisfies = fqcn == req.as_ref()
+                        || class_all_parents.iter().any(|p| p.as_ref() == req.as_ref());
+                    if !satisfies {
+                        all_issues.push(mir_issues::Issue::new(
+                            mir_issues::IssueKind::InvalidTraitUse {
+                                trait_name: tr_short.to_string(),
+                                reason: format!(
+                                    "Class {fqcn} uses trait {tr_short} but does not extend {req}"
+                                ),
+                            },
+                            loc.clone(),
+                        ));
+                    }
+                }
+                for req in t.require_implements.iter() {
+                    let satisfies = class_all_parents.iter().any(|p| p.as_ref() == req.as_ref());
+                    if !satisfies {
+                        all_issues.push(mir_issues::Issue::new(
+                            mir_issues::IssueKind::InvalidTraitUse {
+                                trait_name: tr_short.to_string(),
+                                reason: format!(
+                                    "Class {fqcn} uses trait {tr_short} but does not implement {req}"
+                                ),
+                            },
+                            loc.clone(),
+                        ));
+                    }
+                }
+            }
+        }
+
         // `use T { T::missing as alias; }` (or an unqualified `as` naming no
         // method any used trait declares) — PHP fatals at class-declaration
         // time. Trait aliases carry no span of their own in storage, so the
