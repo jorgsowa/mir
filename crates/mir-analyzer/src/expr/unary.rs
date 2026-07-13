@@ -1,4 +1,4 @@
-use super::binary::{operand_contains_null, operand_is_non_bitwise};
+use super::binary::{operand_contains_null, operand_is_non_bitwise, operand_is_non_numeric};
 use super::helpers::{extract_simple_var, infer_int_range_arithmetic};
 use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
@@ -37,8 +37,28 @@ impl<'a> ExpressionAnalyzer<'a> {
         let operand_ty = self.analyze(&u.operand, ctx);
         match u.op {
             UnaryPrefixOp::BooleanNot => Type::single(Atomic::TBool),
-            UnaryPrefixOp::Negate => negate_type(&operand_ty),
-            UnaryPrefixOp::Plus => operand_ty,
+            UnaryPrefixOp::Negate | UnaryPrefixOp::Plus => {
+                // Same operand check as binary arithmetic's `+`/`-` — an array,
+                // object, enum case, or non-numeric string throws a real PHP
+                // `TypeError`, not the "coerce to 0" fallback `negate_type`'s
+                // catch-all assumes.
+                if operand_is_non_numeric(&operand_ty) {
+                    self.emit(
+                        IssueKind::InvalidOperand {
+                            op: if u.op == UnaryPrefixOp::Negate { "-" } else { "+" }.to_string(),
+                            left: operand_ty.to_string(),
+                            right: String::new(),
+                        },
+                        Severity::Warning,
+                        u.operand.span,
+                    );
+                }
+                if u.op == UnaryPrefixOp::Negate {
+                    negate_type(&operand_ty)
+                } else {
+                    operand_ty
+                }
+            }
             UnaryPrefixOp::BitwiseNot => {
                 if operand_is_non_bitwise(&operand_ty) {
                     self.emit(

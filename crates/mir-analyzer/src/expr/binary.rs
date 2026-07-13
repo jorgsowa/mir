@@ -416,7 +416,7 @@ fn is_numeric_string(s: &str) -> bool {
 /// Whether every member of `ty` is *definitely* a non-numeric value for
 /// arithmetic. Returns `false` for empty/`mixed`/unions that include any
 /// possibly-numeric member, so only clear errors are flagged.
-fn operand_is_non_numeric(ty: &Type) -> bool {
+pub(super) fn operand_is_non_numeric(ty: &Type) -> bool {
     if ty.types.is_empty() || ty.is_mixed() {
         return false;
     }
