@@ -879,16 +879,18 @@ pub(super) fn parse_param_line(s: &str) -> Option<(String, String)> {
     // Types can contain $-named params inside callable syntax (`callable(int $a): void`),
     // so we track bracket depth and return the FIRST `$identifier` found at depth 0.
     // Using first-match (not last) prevents description text that contains $var references
-    // from being mistaken for the parameter name.
-    let first_line = s.lines().next().unwrap_or(s);
+    // from being mistaken for the parameter name. Scanning the whole body (not just its
+    // first physical line) is what lets a wrapped multi-line `array{...}`/`array<...>`
+    // shape still resolve to its `$name` — the depth tracking already keeps the shape's
+    // interior (and any newlines inside it) from being mistaken for the boundary.
     let mut depth: i32 = 0;
 
-    for (i, ch) in first_line.char_indices() {
+    for (i, ch) in s.char_indices() {
         match ch {
             '<' | '(' | '{' => depth += 1,
             '>' | ')' | '}' => depth = (depth - 1).max(0),
             _ if ch.is_whitespace() && depth == 0 => {
-                let after = first_line[i..].trim_start();
+                let after = s[i..].trim_start();
                 // Accept `$name`, `&$name` (by-reference), and `...$name` /
                 // `&...$name` (variadic) — a variadic docblock param must
                 // still resolve to a name or the whole @param line is lost.
@@ -899,7 +901,7 @@ pub(super) fn parse_param_line(s: &str) -> Option<(String, String)> {
                     {
                         let name = name_with_dollar.trim_start_matches('$').to_string();
                         if !name.is_empty() {
-                            let type_part = first_line[..i].trim().to_string();
+                            let type_part = s[..i].trim().to_string();
                             if !type_part.is_empty() {
                                 return Some((type_part, name));
                             }
