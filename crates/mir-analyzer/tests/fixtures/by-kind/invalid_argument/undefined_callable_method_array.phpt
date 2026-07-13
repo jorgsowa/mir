@@ -14,3 +14,4 @@ function foo(callable $c): void {}
 
 foo([A::class, "::barr"]);
 ===expect===
+UndefinedMethod@10:4-10:24: Method A::::barr() does not exist

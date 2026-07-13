@@ -1373,11 +1373,19 @@ fn validate_callable_type(
             if let (Some(obj_prop), Some(method_prop)) = (obj_prop, method_prop) {
                 // Check if second element is a string (method name)
                 if let Some(Atomic::TLiteralString(method_name)) = method_prop.ty.types.first() {
-                    // Get the class from the object/class reference
+                    // Get the class from the object/class reference. `[Foo::class,
+                    // 'method']` evaluates the first element to TClassString, not
+                    // TNamedObject — without this arm it silently skipped the
+                    // UndefinedMethod check that `[$obj, 'method']` already gets.
                     for obj_atomic in &obj_prop.ty.types {
-                        if let Atomic::TNamedObject { fqcn, .. } = obj_atomic {
-                            let resolved_class =
-                                crate::db::resolve_name(ea.db, &ea.file, fqcn.as_ref());
+                        let resolved_class = match obj_atomic {
+                            Atomic::TNamedObject { fqcn, .. } => {
+                                Some(crate::db::resolve_name(ea.db, &ea.file, fqcn.as_ref()))
+                            }
+                            Atomic::TClassString(Some(fqcn)) => Some(fqcn.to_string()),
+                            _ => None,
+                        };
+                        if let Some(resolved_class) = resolved_class {
                             let here =
                                 crate::db::Fqcn::new(ea.db, Name::from(resolved_class.as_str()));
                             if crate::db::find_method_in_chain(ea.db, here, method_name).is_none() {
