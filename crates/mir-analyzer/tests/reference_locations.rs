@@ -1077,3 +1077,28 @@ fn anonymous_class_use_trait_records_class_reference() {
         "anonymous class `use Helper;` should record a reference to Helper"
     );
 }
+
+#[test]
+fn interface_declared_property_access_records_reference_location() {
+    let dir = create_temp_dir("test");
+    // Accessing a `@property`-declared interface property through an
+    // interface-typed receiver must record a reference the same way a
+    // class/trait-declared property access already does.
+    let src = "<?php\n/**\n * @property string $name\n */\ninterface HasName {}\nfunction show(HasName $x): string { return $x->name; }\n";
+    let file = write_file(&dir, "k.php", src);
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let locs: Vec<_> = analyzer
+        .reference_locations("prop:HasName::name")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert!(
+        !locs.is_empty(),
+        "property access through an interface-typed receiver should record a reference"
+    );
+}

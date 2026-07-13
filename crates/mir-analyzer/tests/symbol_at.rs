@@ -257,7 +257,10 @@ fn symbol_at_finds_dynamic_invoke_call() {
     let found = result.symbols.iter().any(|s| {
         matches!(&s.kind, ReferenceKind::MethodCall { class, method } if class.as_ref() == "Svc" && method.as_ref() == "__invoke")
     });
-    assert!(found, "expected a MethodCall(Svc::__invoke) symbol for $s()");
+    assert!(
+        found,
+        "expected a MethodCall(Svc::__invoke) symbol for $s()"
+    );
 }
 
 #[test]
@@ -1275,7 +1278,8 @@ fn symbol_at_function_return_type_hint_resolves_to_class_reference() {
 fn symbol_at_method_param_type_hint_resolves_to_class_reference() {
     // Hovering a method's native param type-hint class name must resolve,
     // matching the free-function case.
-    let src = "<?php\nclass User {}\nclass Greeter { public function greet(User $user): void {} }\n";
+    let src =
+        "<?php\nclass User {}\nclass Greeter { public function greet(User $user): void {} }\n";
     let result = mir_analyzer::analyze_source(src);
 
     let offset = src.find("User $user").unwrap() as u32;
@@ -1328,7 +1332,10 @@ fn symbol_at_use_import_name_resolves_to_class_reference() {
     let user_file_str = path_to_str(&user_file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(&[base_file.clone(), user_file.clone()], &BatchOptions::new());
+    let result = analyzer.analyze_paths(
+        &[base_file.clone(), user_file.clone()],
+        &BatchOptions::new(),
+    );
 
     let offset = user_src.find("Bar;").unwrap() as u32;
     let sym = result
@@ -1659,5 +1666,36 @@ fn analyze_source_typed_param_has_no_typecheck_mismatch() {
         mismatches.is_empty(),
         "native-typed param should infer as `int`; got mismatches: {:?}",
         mismatches.iter().map(|i| &i.kind).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn symbol_at_finds_interface_declared_property_access() {
+    let dir = create_temp_dir("test");
+    let src = "<?php\n/**\n * @property string $name\n */\ninterface HasName {}\nfunction show(HasName $x): string { return $x->name; }\n";
+    let file = write_file(&dir, "o.php", src);
+    let file_str = path_to_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let offset = src.find("->name").unwrap() as u32 + 2; // +2 skips '->'
+    let sym = result
+        .symbol_at(file_str, offset)
+        .expect("symbol_at should find a symbol at $x->name through an interface-typed receiver");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::PropertyAccess { property, .. } if property.as_ref() == "name"),
+        "expected PropertyAccess(name), got {:?}",
+        sym.kind
+    );
+
+    let key = sym.codebase_key().expect("PropertyAccess must have a key");
+    assert_eq!(key, "prop:HasName::name");
+    let locs = analyzer.reference_locations(&key);
+    assert_eq!(
+        locs.len(),
+        1,
+        "interface-typed property access should produce one reference location"
     );
 }

@@ -1017,12 +1017,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let mut result = Type::empty();
                 let mut any = false;
                 for atomic in &obj_ty.types {
-                    let fqcn = atomic
-                        .named_object_fqcn()
-                        .or_else(|| match atomic {
-                            Atomic::TClassString(Some(fqcn)) => Some(fqcn.as_ref()),
-                            _ => None,
-                        });
+                    let fqcn = atomic.named_object_fqcn().or_else(|| match atomic {
+                        Atomic::TClassString(Some(fqcn)) => Some(fqcn.as_ref()),
+                        _ => None,
+                    });
                     if let Some(fqcn) = fqcn {
                         any = true;
                         let const_ty = self.record_object_const_access(
@@ -1419,6 +1417,16 @@ impl<'a> ExpressionAnalyzer<'a> {
                             );
                         }
                         if let Some(p) = iface.own_properties.get(prop_name) {
+                            // Unlike the class/trait branches above, this never ran
+                            // record_ref/set declaring_class — a `$x->prop` access
+                            // through an interface-typed `$x` was invisible to
+                            // find-references/hover and any dead-code exemption
+                            // that keys off the property reference.
+                            self.record_ref(
+                                Arc::from(format!("prop:{}::{}", fqcn, prop_name)),
+                                span,
+                            );
+                            *declaring_class = Some((*fqcn).into());
                             return p.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
                         }
                     }
