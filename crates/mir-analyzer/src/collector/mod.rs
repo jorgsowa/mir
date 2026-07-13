@@ -1255,6 +1255,7 @@ impl<'a> DefinitionCollector<'a> {
                     is_inherit_doc: false,
                     is_mutation_free: false,
                     is_external_mutation_free: false,
+                    data_provider_targets: vec![],
                 }),
             );
         }
@@ -1809,6 +1810,28 @@ impl<'a> DefinitionCollector<'a> {
                 .map(|p| p.as_ref().eq_ignore_ascii_case("Override"))
                 .unwrap_or(false)
         });
+        // PHPUnit invokes `@dataProvider`/`#[DataProvider]` targets by name via
+        // reflection, so they never get an ordinary call-site reference.
+        let mut data_provider_targets: Vec<Arc<str>> = doc
+            .data_providers
+            .iter()
+            .map(|s| Arc::from(s.as_str()))
+            .collect();
+        data_provider_targets.extend(m.attributes.iter().filter_map(|a| {
+            let is_data_provider = a
+                .name
+                .parts
+                .last()
+                .map(|p| p.as_ref().eq_ignore_ascii_case("DataProvider"))
+                .unwrap_or(false);
+            if !is_data_provider {
+                return None;
+            }
+            match a.args.first().map(|arg| &arg.value.kind) {
+                Some(php_ast::owned::ExprKind::String(s)) => Some(Arc::from(s.as_ref())),
+                _ => None,
+            }
+        }));
         Some(MethodDef {
             name: Arc::from(method_name),
             fqcn: class_fqcn.into(),
@@ -1857,6 +1880,7 @@ impl<'a> DefinitionCollector<'a> {
             is_inherit_doc: doc.is_inherit_doc,
             is_mutation_free: doc.is_mutation_free,
             is_external_mutation_free: doc.is_external_mutation_free,
+            data_provider_targets,
         })
     }
 }

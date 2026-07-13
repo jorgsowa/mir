@@ -470,6 +470,11 @@ pub struct MethodDef {
     /// passed as arguments, but is allowed to modify `$this`.
     #[serde(default)]
     pub is_external_mutation_free: bool,
+    /// Method names referenced via `@dataProvider name` / `#[DataProvider('name')]`
+    /// (PHPUnit) — treated as used by dead-code analysis, since PHPUnit invokes
+    /// them by name through reflection rather than a direct call site.
+    #[serde(default)]
+    pub data_provider_targets: Vec<Arc<str>>,
 }
 
 impl MethodDef {

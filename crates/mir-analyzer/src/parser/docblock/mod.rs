@@ -415,6 +415,20 @@ impl DocblockParser {
                         }
                     }
                 }
+                "dataProvider" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        let name = body_str
+                            .trim()
+                            .trim_end_matches("()")
+                            .rsplit("::")
+                            .next()
+                            .unwrap_or("")
+                            .trim();
+                        if !name.is_empty() {
+                            result.data_providers.push(name.to_string());
+                        }
+                    }
+                }
                 "trace" => {
                     if let Some(body_str) = body_text(&tag.body) {
                         // Support both comma-separated and space-separated variable names
@@ -590,6 +604,9 @@ pub struct ParsedDocblock {
     /// after this call returns. Stored as the raw parsed type; class names
     /// (and `self`/`static`) are resolved later by the collector.
     pub self_out: Option<Type>,
+    /// `@dataProvider methodName` (PHPUnit) — name of the method that supplies
+    /// this test's data, invoked by PHPUnit via reflection rather than a call.
+    pub data_providers: Vec<String>,
 }
 
 impl ParsedDocblock {

@@ -709,6 +709,7 @@ pub fn find_method_in_class<'db>(
                 is_inherit_doc: false,
                 is_mutation_free: false,
                 is_external_mutation_free: false,
+                data_provider_targets: vec![],
             }));
         }
         if is_backed && (lower == "from" || lower == "tryfrom") {
@@ -767,6 +768,7 @@ pub fn find_method_in_class<'db>(
                 is_inherit_doc: false,
                 is_mutation_free: false,
                 is_external_mutation_free: false,
+                data_provider_targets: vec![],
             }));
         }
     }

@@ -83,6 +83,16 @@ impl<'a> DeadCodeAnalyzer<'a> {
 
             let used_traits = class.class_traits();
 
+            // `@dataProvider name` / `#[DataProvider('name')]` methods are invoked by
+            // PHPUnit via reflection, never through an ordinary call site — collect every
+            // name any method in this class points to so the loop below can credit them.
+            let data_provider_names: rustc_hash::FxHashSet<String> = class
+                .own_methods()
+                .iter()
+                .flat_map(|(_, m)| m.data_provider_targets.iter())
+                .map(|s| s.to_ascii_lowercase())
+                .collect();
+
             // Methods.
             for (name, method) in class.own_methods().iter() {
                 if method.visibility != Visibility::Private {
@@ -98,7 +108,8 @@ impl<'a> DeadCodeAnalyzer<'a> {
                     || used_traits.iter().any(|t| {
                         self.db
                             .has_reference(&format!("traituse:{t}::{name_lower}"))
-                    });
+                    })
+                    || data_provider_names.contains(&name_lower);
                 if !referenced {
                     let location =
                         crate::diagnostics::storage_loc_to_location(method.location.as_ref());
