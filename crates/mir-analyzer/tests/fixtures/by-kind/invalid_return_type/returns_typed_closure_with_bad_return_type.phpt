@@ -14,3 +14,4 @@ function foo(Closure $f, Closure $g) : Closure {
     };
 }
 ===expect===
+InvalidReturnType@9:4-11:6: Return type 'Closure(int): int' is not compatible with declared 'Closure(int): string'

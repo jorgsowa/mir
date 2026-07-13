@@ -1571,8 +1571,65 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         (Atomic::TClosure { .. }, Atomic::TCallable { .. }) => true,
         // callable <: Closure: callable is wider but not flagged at default error level
         (Atomic::TCallable { .. }, Atomic::TClosure { .. }) => true,
-        // Any TClosure satisfies another TClosure (structural compatibility simplified)
-        (Atomic::TClosure { .. }, Atomic::TClosure { .. }) => true,
+        // TClosure <: TClosure: check arity, per-parameter contravariance, and
+        // return covariance for scalar/array-shaped types, where a purely
+        // structural check is reliable. A named-class (or nested-callable)
+        // param/return is skipped rather than checked — this checker has no
+        // database access to walk `extends`/`implements`, so it can't safely
+        // tell a real Liskov violation apart from a legitimate subclass/
+        // superclass substitution; treating it as compatible avoids false
+        // positives on that far more common case at the cost of missing the
+        // narrower nominal-variance violation.
+        (Atomic::TClosure { data: sub }, Atomic::TClosure { data: sup }) => {
+            fn has_nominal_type(t: &Type) -> bool {
+                t.types.iter().any(|a| {
+                    matches!(
+                        a,
+                        Atomic::TNamedObject { .. }
+                            | Atomic::TSelf { .. }
+                            | Atomic::TStaticObject { .. }
+                            | Atomic::TTemplateParam { .. }
+                            | Atomic::TClosure { .. }
+                            | Atomic::TCallable { .. }
+                    )
+                })
+            }
+            let sub_required = sub
+                .params
+                .iter()
+                .filter(|p| !p.is_optional && !p.is_variadic)
+                .count();
+            if sub_required > sup.params.len() {
+                false
+            } else {
+                let params_ok = sup.params.iter().enumerate().all(|(i, sup_param)| {
+                    let Some(sub_param) = sub.params.get(i) else {
+                        return true;
+                    };
+                    if sub_param.is_optional || sub_param.is_variadic {
+                        return true;
+                    }
+                    let (Some(sub_ty), Some(sup_ty)) =
+                        (sub_param.ty.as_ref(), sup_param.ty.as_ref())
+                    else {
+                        return true;
+                    };
+                    let (sub_u, sup_u) = (sub_ty.to_union(), sup_ty.to_union());
+                    if has_nominal_type(&sub_u) || has_nominal_type(&sup_u) {
+                        return true;
+                    }
+                    // Contravariance: whatever `sup` promises to pass must be
+                    // acceptable to `sub`'s declared parameter type.
+                    sup_u.is_subtype_structural(&sub_u)
+                });
+                params_ok
+                    && (sub.return_type.is_mixed()
+                        || sup.return_type.is_mixed()
+                        || has_nominal_type(&sub.return_type)
+                        || has_nominal_type(&sup.return_type)
+                        || sub.return_type.is_subtype_structural(&sup.return_type))
+            }
+        }
         // callable <: callable (trivial)
         (Atomic::TCallable { .. }, Atomic::TCallable { .. }) => true,
         // TClosure satisfies `Closure` named object or `object`
