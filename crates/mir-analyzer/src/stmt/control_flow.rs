@@ -212,7 +212,11 @@ impl<'a> StatementsAnalyzer<'a> {
             self.emit_redundant_condition(&cond_type, w.condition.span);
         }
 
-        let is_infinite = matches!(w.condition.kind, ExprKind::Bool(true));
+        // `while (1)` (and any other nonzero int literal) is just as much an
+        // idiomatic infinite loop as `while (true)` — PHP truthiness treats
+        // every nonzero int as true, only `0` is falsy.
+        let is_infinite = matches!(w.condition.kind, ExprKind::Bool(true))
+            || matches!(w.condition.kind, ExprKind::Int(n) if n != 0);
         let condition = w.condition.clone();
         let post = self.analyze_loop_widened(
             &pre,
