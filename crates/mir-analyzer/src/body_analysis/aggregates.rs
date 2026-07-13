@@ -39,7 +39,7 @@ impl<'a> BodyAnalyzer<'a> {
             detect_ctor: true,
             with_templates: false,
             check_returns: false,
-            analyze_param_defaults: false,
+            analyze_param_defaults: true,
             strict_types: crate::body_analysis::is_strict_types_file(source),
         };
         for member in decl.body.members.iter() {
@@ -111,7 +111,7 @@ impl<'a> BodyAnalyzer<'a> {
             detect_ctor: true,
             with_templates: false,
             check_returns: false,
-            analyze_param_defaults: false,
+            analyze_param_defaults: true,
             strict_types: crate::body_analysis::is_strict_types_file(source),
         };
         for member in decl.body.members.iter() {
@@ -248,7 +248,7 @@ impl<'a> BodyAnalyzer<'a> {
             detect_ctor: false,
             with_templates: false,
             check_returns: false,
-            analyze_param_defaults: false,
+            analyze_param_defaults: true,
             strict_types: crate::body_analysis::is_strict_types_file(source),
         };
         for member in decl.body.members.iter() {
@@ -331,7 +331,7 @@ impl<'a> BodyAnalyzer<'a> {
             detect_ctor: false,
             with_templates: false,
             check_returns: false,
-            analyze_param_defaults: false,
+            analyze_param_defaults: true,
             strict_types: crate::body_analysis::is_strict_types_file(source),
         };
         for member in decl.body.members.iter() {
