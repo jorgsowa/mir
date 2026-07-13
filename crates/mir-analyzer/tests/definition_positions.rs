@@ -127,6 +127,26 @@ fn definition_of_promoted_property_points_at_own_param_not_constructor() {
 }
 
 #[test]
+fn definition_of_finds_trait_constant_via_consuming_class_usage() {
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "TraitConst.php",
+        "<?php\ntrait HasVersion {\n    public const string VERSION = '1.0';\n}\nclass Config {\n    use HasVersion;\n}\nfunction ver(): string { return Config::VERSION; }\n",
+    );
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(&[file], &BatchOptions::new());
+
+    assert!(
+        analyzer
+            .definition_of(&Name::class_constant("HasVersion", "VERSION"))
+            .is_ok(),
+        "should find location for HasVersion::VERSION even though it's read via Config::VERSION"
+    );
+}
+
+#[test]
 fn definition_of_returns_not_found_for_unknown() {
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
     assert_eq!(

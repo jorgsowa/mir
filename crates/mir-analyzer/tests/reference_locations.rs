@@ -801,6 +801,30 @@ fn parent_const_access_records_constant_reference() {
 }
 
 #[test]
+fn trait_constant_accessed_via_consuming_class_records_reference_to_trait() {
+    // `ClassUsingTrait::CONST` where the constant is declared in a used trait
+    // must record a reference against the trait itself (Trait::CONST is
+    // never a legal access target, so this is the only way to ever record a
+    // usage of the trait's own constant declaration).
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "trait_const.php",
+        "<?php\ntrait HasVersion {\n    public const string VERSION = '1.0';\n}\nclass Config {\n    use HasVersion;\n}\nfunction ver(): string { return Config::VERSION; }\n",
+    );
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    assert!(
+        !analyzer
+            .reference_locations("cnst:HasVersion::VERSION")
+            .is_empty(),
+        "Config::VERSION should record a reference to HasVersion::VERSION, not Config::VERSION"
+    );
+}
+
+#[test]
 fn explicit_class_const_access_records_constant_reference() {
     // ClassName::CONST should record a reference to the constant, not just the class.
     let dir = create_temp_dir("test");

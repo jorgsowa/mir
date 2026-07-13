@@ -902,14 +902,21 @@ impl<'a> ExpressionAnalyzer<'a> {
                             .as_ref()
                             .map(|(_, c)| c.ty.clone())
                             .unwrap_or_else(Type::mixed);
+                        // Key against the resolved *declaring* class (may be a
+                        // trait providing the constant), not self_fqcn — see
+                        // record_object_const_access for why.
+                        let owner: Arc<str> = found
+                            .as_ref()
+                            .map(|(owner_fqcn, _)| owner_fqcn.clone())
+                            .unwrap_or_else(|| self_fqcn.clone());
                         self.record_ref(
-                            Arc::from(format!("cnst:{}::{}", self_fqcn, const_name)),
+                            Arc::from(format!("cnst:{owner}::{const_name}")),
                             cca.member.span,
                         );
                         self.record_symbol(
                             cca.member.span,
                             ReferenceKind::ConstantAccess {
-                                class: self_fqcn.clone(),
+                                class: owner,
                                 constant: Arc::from(const_name.as_str()),
                             },
                             const_ty.clone(),
@@ -957,14 +964,21 @@ impl<'a> ExpressionAnalyzer<'a> {
                             .as_ref()
                             .map(|(_, c)| c.ty.clone())
                             .unwrap_or_else(Type::mixed);
+                        // Key against the resolved *declaring* class (may be a
+                        // trait providing the constant), not parent_fqcn — see
+                        // record_object_const_access for why.
+                        let owner: Arc<str> = found
+                            .as_ref()
+                            .map(|(owner_fqcn, _)| owner_fqcn.clone())
+                            .unwrap_or_else(|| parent_fqcn.clone());
                         self.record_ref(
-                            Arc::from(format!("cnst:{}::{}", parent_fqcn, const_name)),
+                            Arc::from(format!("cnst:{owner}::{const_name}")),
                             cca.member.span,
                         );
                         self.record_symbol(
                             cca.member.span,
                             ReferenceKind::ConstantAccess {
-                                class: parent_fqcn.clone(),
+                                class: owner,
                                 constant: Arc::from(const_name.as_str()),
                             },
                             const_ty.clone(),
@@ -1037,10 +1051,6 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
 
         self.record_ref(Arc::from(format!("cls:{fqcn}")), cca.class.span);
-        self.record_ref(
-            Arc::from(format!("cnst:{}::{}", fqcn, const_name)),
-            cca.member.span,
-        );
 
         let here = crate::db::Fqcn::from_str(self.db, &fqcn);
         // Check if the class is deprecated
@@ -1058,6 +1068,16 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
         let here = crate::db::Fqcn::from_str(self.db, &fqcn);
         let found = crate::db::find_class_constant_in_chain(self.db, here, &const_name);
+        // Key the `cnst:` reference against the resolved *declaring* class, not
+        // the literal receiver — see record_object_const_access for why.
+        let owner: Arc<str> = found
+            .as_ref()
+            .map(|(owner_fqcn, _)| owner_fqcn.clone())
+            .unwrap_or_else(|| Arc::from(fqcn.as_str()));
+        self.record_ref(
+            Arc::from(format!("cnst:{owner}::{const_name}")),
+            cca.member.span,
+        );
         // Check if the constant is deprecated
         if let Some((ref owner_fqcn, ref c)) = found {
             if let Some(msg) = &c.deprecated {
@@ -1114,7 +1134,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         self.record_symbol(
             cca.member.span,
             ReferenceKind::ConstantAccess {
-                class: Arc::from(fqcn.as_str()),
+                class: owner,
                 constant: Arc::from(const_name.as_str()),
             },
             const_ty.clone(),
@@ -1158,10 +1178,22 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
 
         self.record_ref(Arc::from(format!("cls:{fqcn}")), class_span);
-        self.record_ref(Arc::from(format!("cnst:{fqcn}::{const_name}")), member_span);
 
         let here = crate::db::Fqcn::from_str(self.db, fqcn);
         let found = crate::db::find_class_constant_in_chain(self.db, here, const_name);
+        // Key the `cnst:` reference against the resolved *declaring* class, not
+        // the literal receiver — a `Trait::CONST` access is never legal PHP, so
+        // a constant provided by a used trait is only ever read through the
+        // consuming class. Without this, find-references from the trait's own
+        // constant declaration never sees any of its external usages.
+        let owner: Arc<str> = found
+            .as_ref()
+            .map(|(owner_fqcn, _)| owner_fqcn.clone())
+            .unwrap_or_else(|| Arc::from(fqcn));
+        self.record_ref(
+            Arc::from(format!("cnst:{owner}::{const_name}")),
+            member_span,
+        );
         if let Some((ref owner_fqcn, ref c)) = found {
             if let Some(msg) = &c.deprecated {
                 self.emit(
@@ -1212,7 +1244,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         self.record_symbol(
             member_span,
             ReferenceKind::ConstantAccess {
-                class: Arc::from(fqcn),
+                class: owner,
                 constant: Arc::from(const_name),
             },
             const_ty.clone(),
