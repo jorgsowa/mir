@@ -3282,11 +3282,30 @@ fn narrow_shape_path(ty: &Type, path: &[mir_types::atomic::ArrayKey]) -> Option<
     }
 }
 
-/// For a single-level `empty($base['key'])` where `$base` is (partly) a known
-/// shape, narrow that key's own property by truthiness — mirroring
+/// For `empty($base['a']['b']...)` where `$base` is (partly) a known shape,
+/// narrow that key's own property by truthiness — mirroring
 /// `narrow_isset_shape_key`, but with `empty()`'s truthy/falsy semantics
 /// instead of `isset()`'s presence/null semantics.
+///
+/// Nested paths (`$base['a']['b']`) are only narrowed for `!empty(...)`:
+/// that direction proves presence at every level plus truthiness of the
+/// final value, exactly like `narrow_not_empty_shape_path` computes. Plain
+/// `empty(...)` being true doesn't pin down which level was missing/falsy,
+/// so nested paths are left unnarrowed there (single-level `empty()` still
+/// narrows as before).
 fn narrow_empty_shape_key(var_expr: &php_ast::owned::Expr, ctx: &mut FlowState, is_true: bool) {
+    if let Some((base, path)) = collect_array_access_path(var_expr) {
+        if path.len() > 1 {
+            if !is_true {
+                let current = ctx.get_var(&base);
+                if let Some(narrowed) = narrow_not_empty_shape_path(&current, &path) {
+                    ctx.set_var(&base, narrowed);
+                }
+            }
+            return;
+        }
+    }
+
     let ExprKind::ArrayAccess(aa) = &var_expr.kind else {
         return;
     };
@@ -3357,6 +3376,65 @@ fn narrow_empty_shape_key(var_expr: &php_ast::owned::Expr, ctx: &mut FlowState, 
     }
     if changed && !result.types.is_empty() {
         ctx.set_var(&base, result);
+    }
+}
+
+/// For `!empty($base['a']['b']...)`, narrow every level of the access path:
+/// each level but the last is proven present (same as `narrow_shape_path`'s
+/// `isset()` semantics), and the innermost key is additionally narrowed to
+/// truthy. Mirrors `narrow_shape_path`'s recursion/exclusion structure.
+fn narrow_not_empty_shape_path(ty: &Type, path: &[mir_types::atomic::ArrayKey]) -> Option<Type> {
+    let (key, rest) = path.split_first()?;
+    let is_last = rest.is_empty();
+    let mut changed = false;
+    let mut result = Type::empty();
+    for atomic in &ty.types {
+        match atomic {
+            Atomic::TKeyedArray {
+                properties,
+                is_open,
+                is_list,
+            } => {
+                if properties.contains_key(key) {
+                    let mut new_props = properties.clone();
+                    if let Some(prop) = new_props.get_mut(key) {
+                        if is_last {
+                            let narrowed_ty = prop.ty.narrow_to_truthy();
+                            if !narrowed_ty.is_empty() {
+                                prop.ty = narrowed_ty;
+                            }
+                        } else {
+                            let mut narrowed_ty = prop.ty.remove_null();
+                            if let Some(deeper) = narrow_not_empty_shape_path(&narrowed_ty, rest) {
+                                narrowed_ty = deeper;
+                            }
+                            if !narrowed_ty.is_empty() {
+                                prop.ty = narrowed_ty;
+                            }
+                        }
+                        prop.optional = false;
+                    }
+                    changed = true;
+                    result.add_type(Atomic::TKeyedArray {
+                        properties: new_props,
+                        is_open: *is_open,
+                        is_list: *is_list,
+                    });
+                } else if *is_open {
+                    result.add_type(atomic.clone());
+                } else {
+                    // A closed shape without this key can never satisfy
+                    // `!empty(...)` at every level — exclude this union member.
+                    changed = true;
+                }
+            }
+            _ => result.add_type(atomic.clone()),
+        }
+    }
+    if changed && !result.types.is_empty() {
+        Some(result)
+    } else {
+        None
     }
 }
 
