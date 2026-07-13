@@ -595,6 +595,14 @@ impl AnalysisSession {
         }
 
         opts.apply(&mut all_issues);
+        // Emit `UnusedSuppress` for named suppressions that matched nothing —
+        // present on the cache-hit branch above and on `analyze_paths`, but
+        // missing here, so every non-cached re-analysis (the actual
+        // incremental/LSP-edit pipeline) silently dropped this diagnostic.
+        // `mark_suppressed` above already baked suppression marks into what
+        // gets cached; this only adds the (uncached, always-fresh) unused-
+        // suppression pass on top, mirroring the cache-hit branch's order.
+        self.apply_suppressions_and_emit_unused(&mut all_issues, std::slice::from_ref(&file));
         AnalysisResult::build(all_issues, HashMap::default(), symbols)
     }
 

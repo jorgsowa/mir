@@ -417,3 +417,25 @@ fn re_analyze_file_evicts_dependents_after_ingest() {
             .collect::<Vec<_>>()
     );
 }
+
+/// re_analyze_file's non-cache-hit path (definition collection + body
+/// analysis, no prior cached entry) must still emit `UnusedSuppress` for a
+/// named `@suppress` annotation that matched nothing — previously only the
+/// cache-hit branch and `analyze_paths` did this.
+#[test]
+fn re_analyze_file_flags_unused_suppress_without_cache() {
+    let source = "<?php\nclass Foo {\n    /**\n     * @suppress UndefinedClass\n     */\n    public string $bar = \"baz\";\n}\n";
+
+    let analyzer = new_session();
+    let result = analyzer.re_analyze_file("Foo.php", source, &BatchOptions::new());
+
+    assert!(
+        result.issues.iter().any(|i| i.kind.name() == "UnusedSuppress"),
+        "expected UnusedSuppress, got: {:?}",
+        result
+            .issues
+            .iter()
+            .map(|i| i.kind.name())
+            .collect::<Vec<_>>()
+    );
+}
