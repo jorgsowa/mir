@@ -204,9 +204,9 @@ impl<'a> ClassAnalyzer<'a> {
         )
     }
 
-    /// Enums cannot extend parent classes, so the only concrete implementations
-    /// come from `own_methods` (trait usage is not modeled yet). Walk all
-    /// transitively required interfaces — skipping built-in PHP enum contracts —
+    /// Enums cannot extend parent classes, but can satisfy an interface via
+    /// their own methods or a `use`d trait's methods. Walk all transitively
+    /// required interfaces — skipping built-in PHP enum contracts —
     /// and emit `UnimplementedInterfaceMethod` for each missing method.
     pub(super) fn check_enum_interface_methods_implemented(
         &self,
@@ -232,12 +232,6 @@ impl<'a> ClassAnalyzer<'a> {
             return;
         }
 
-        // Look up the enum's own methods once.
-        let Some(enum_class) = crate::db::find_class_like(self.db, here) else {
-            return;
-        };
-        let own = enum_class.own_methods();
-
         for iface_fqcn in &iface_fqcns {
             let iface_here = crate::db::Fqcn::from_str(self.db, iface_fqcn.as_ref());
             let method_names: Vec<Arc<str>> = match crate::db::find_class_like(self.db, iface_here)
@@ -253,11 +247,12 @@ impl<'a> ClassAnalyzer<'a> {
 
             for method_name in method_names {
                 let lower = crate::util::php_ident_lowercase(&method_name);
-                // Enum trait usage is not modeled yet, so only own_methods can
-                // satisfy an interface requirement. This is conservative: if an
-                // enum uses a trait to implement the method, mir may report a
-                // false positive until trait support is added.
-                let implemented = own.get(lower.as_str()).is_some_and(|m| !m.is_abstract);
+                // `class_ancestors_by_fqcn` already walks an enum's `use`d traits
+                // (via `ancestor_fqcns`'s `ClassLike::Enum` arm), so the same
+                // ancestor-walking check used for classes correctly credits a
+                // trait-provided method as satisfying the interface.
+                let implemented =
+                    crate::db::is_method_concretely_implemented(self.db, enum_fqcn.as_ref(), &lower);
 
                 if !implemented {
                     let loc = issue_location(
