@@ -15,9 +15,9 @@ use crate::flow_state::{self_is_trait, FlowState};
 use crate::symbol::ReferenceKind;
 
 use super::args::{
-    check_args, distinct_spans_for_expansion, expand_sole_spread_arg,
-    expr_can_be_passed_by_reference_owned, spread_element_type, substitute_static_in_return,
-    CheckArgsParams,
+    check_args, check_method_visibility_with_magic, distinct_spans_for_expansion,
+    expand_sole_spread_arg, expr_can_be_passed_by_reference_owned, spread_element_type,
+    substitute_static_in_return, CheckArgsParams,
 };
 use super::method::resolve_method_from_db;
 use super::CallAnalyzer;
@@ -447,6 +447,21 @@ impl CallAnalyzer {
                         span,
                     );
                 }
+            }
+            // Only checked for genuinely static methods: a non-static method
+            // called via `Foo::bar()`/self::/static:: already gets a more
+            // precise `InvalidStaticInvocation`/`NonStaticSelfCall` above —
+            // piling on a visibility error for the same call site is noise.
+            if resolved.is_static {
+                check_method_visibility_with_magic(
+                    ea,
+                    resolved.visibility,
+                    &resolved.owner_fqcn,
+                    &resolved.name,
+                    ctx,
+                    span,
+                    "__callStatic",
+                );
             }
             let mut arg_names: Vec<Option<String>> = call
                 .args

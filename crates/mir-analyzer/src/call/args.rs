@@ -269,6 +269,21 @@ pub(crate) fn check_method_visibility(
     ctx: &crate::flow_state::FlowState,
     span: Span,
 ) {
+    check_method_visibility_with_magic(ea, visibility, owner_fqcn, method_name, ctx, span, "__call")
+}
+
+/// Same as [`check_method_visibility`], but lets the caller pick which magic
+/// method intercepts an inaccessible call at runtime — instance calls fall
+/// back to `__call`, static calls to `__callStatic`.
+pub(crate) fn check_method_visibility_with_magic(
+    ea: &mut ExpressionAnalyzer<'_>,
+    visibility: Visibility,
+    owner_fqcn: &Arc<str>,
+    method_name: &Arc<str>,
+    ctx: &crate::flow_state::FlowState,
+    span: Span,
+    magic_method: &str,
+) {
     let disallowed = match visibility {
         Visibility::Private => {
             let caller_fqcn = ctx.self_fqcn.as_deref().unwrap_or("");
@@ -280,16 +295,26 @@ pub(crate) fn check_method_visibility(
         }
         Visibility::Protected => {
             let caller_fqcn = ctx.self_fqcn.as_deref().unwrap_or("");
+            // Anonymous classes are never collected into the class-hierarchy DB
+            // (the collector skips them), so `extends_or_implements` can't see
+            // their `extends` clause. `ctx.parent_fqcn` is derived straight from
+            // the AST for them (see `analyze_class_decl_stmt`), so fall back to
+            // it: if the immediate parent is or extends the owner, `self` does too.
+            let related_via_parent = ctx.parent_fqcn.as_deref().is_some_and(|parent| {
+                parent == owner_fqcn.as_ref()
+                    || crate::db::extends_or_implements(ea.db, parent, owner_fqcn.as_ref())
+            });
             caller_fqcn.is_empty()
                 || !(caller_fqcn == owner_fqcn.as_ref()
-                    || crate::db::extends_or_implements(ea.db, caller_fqcn, owner_fqcn.as_ref()))
+                    || crate::db::extends_or_implements(ea.db, caller_fqcn, owner_fqcn.as_ref())
+                    || related_via_parent)
         }
         Visibility::Public => false,
     };
     // An inaccessible method call is dispatched to `__call` at runtime when
     // the class (chain) defines one — e.g. Laravel's Router::prefix() is
     // protected and external callers go through Macroable::__call.
-    if disallowed && !crate::db::has_method_in_chain(ea.db, owner_fqcn, "__call") {
+    if disallowed && !crate::db::has_method_in_chain(ea.db, owner_fqcn, magic_method) {
         ea.emit(
             IssueKind::UndefinedMethod {
                 class: owner_fqcn.to_string(),
