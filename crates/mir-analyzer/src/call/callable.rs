@@ -27,8 +27,12 @@ pub(crate) fn record_callable_string_ref(
         if let Some((class_name, method_name)) = name.as_ref().split_once("::") {
             let resolved_class = crate::db::resolve_name(ea.db, &ea.file, class_name);
             let here = crate::db::Fqcn::from_str(ea.db, &resolved_class);
+            // Precedence-aware so a trait-conflict-resolved callable string
+            // ('Class::method' where two composed traits both declare it, or
+            // an aliased name) credits the actual winning method, not
+            // whichever trait a plain ancestor walk happens to hit first.
             if let Some((owner_fqcn, method)) =
-                crate::db::find_method_in_chain(ea.db, here, method_name)
+                crate::db::find_method_respecting_precedence(ea.db, here, method_name)
             {
                 ea.record_ref(Arc::from(format!("cls:{resolved_class}")), callback_span);
                 ea.record_ref(

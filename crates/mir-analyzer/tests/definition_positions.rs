@@ -147,6 +147,46 @@ fn definition_of_finds_trait_constant_via_consuming_class_usage() {
 }
 
 #[test]
+fn definition_of_finds_trait_aliased_method() {
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "Greeter.php",
+        "<?php\ntrait Greetable {\n    public function sayHello(): void {}\n}\nclass Greeter {\n    use Greetable { sayHello as greet; }\n}\n",
+    );
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(&[file], &BatchOptions::new());
+
+    assert!(
+        analyzer.definition_of(&Name::method("Greeter", "greet")).is_ok(),
+        "should find location for trait-aliased method Greeter::greet, \
+         even though the alias name never appears in own_methods()"
+    );
+}
+
+#[test]
+fn definition_of_trait_conflict_resolves_to_insteadof_winner() {
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "Conflict.php",
+        "<?php\ntrait A {\n    public function hello(): void {}\n}\ntrait B {\n    public function hello(): void {}\n}\nclass C {\n    use A, B {\n        B::hello insteadof A;\n    }\n}\n",
+    );
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(&[file], &BatchOptions::new());
+
+    let loc = analyzer
+        .definition_of(&Name::method("C", "hello"))
+        .expect("should find location for C::hello");
+    assert_eq!(
+        loc.line, 6,
+        "go-to-def must resolve to B::hello (the insteadof winner), not A::hello"
+    );
+}
+
+#[test]
 fn definition_of_returns_not_found_for_unknown() {
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
     assert_eq!(

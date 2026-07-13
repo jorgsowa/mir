@@ -221,7 +221,12 @@ pub fn has_unknown_ancestor(db: &dyn MirDatabase, fqcn: &str) -> bool {
 
 pub fn member_location(db: &dyn MirDatabase, fqcn: &str, member_name: &str) -> Option<Location> {
     let here = crate::db::Fqcn::from_str(db, fqcn);
-    if let Some((_, storage)) = crate::db::find_method_in_chain(db, here, member_name) {
+    // `find_method_respecting_precedence` (not the plain `find_method_in_chain`
+    // walk) so go-to-def resolves a trait-aliased method name (`use T { foo as
+    // bar; }`) and picks the `insteadof`-winning copy on a trait conflict —
+    // both invisible to a plain own-methods lookup on the using class.
+    if let Some((_, storage)) = crate::db::find_method_respecting_precedence(db, here, member_name)
+    {
         if let Some(loc) = storage.location.clone() {
             return Some(loc);
         }
