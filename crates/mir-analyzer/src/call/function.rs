@@ -1125,6 +1125,13 @@ fn typed_params_from_callee(
                     .collect();
                 return Some(("{closure}".to_string(), storage_params));
             }
+            Atomic::TCallable {
+                params: Some(params),
+                ..
+            } => {
+                let storage_params = params.iter().map(type_param_to_storage_param).collect();
+                return Some(("callable".to_string(), storage_params));
+            }
             Atomic::TNamedObject { fqcn, .. } => {
                 if let Some((_, storage)) = crate::db::find_method_respecting_precedence(
                     ea.db,

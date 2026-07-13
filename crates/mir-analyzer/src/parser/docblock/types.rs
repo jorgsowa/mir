@@ -708,6 +708,16 @@ pub(super) fn parse_callable_syntax(s: &str) -> Option<Type> {
         .filter(|(_, p)| !p.trim().is_empty())
         .map(|(i, p)| {
             let p = p.trim();
+            // `...$rest` (variadic) / trailing `=` (optional) — e.g.
+            // `callable(string, int=):void` or `callable(string, ...$args):void`.
+            let (p, is_variadic) = match p.strip_prefix("...") {
+                Some(rest) => (rest.trim_start(), true),
+                None => (p, false),
+            };
+            let (p, is_optional) = match p.strip_suffix('=') {
+                Some(rest) => (rest.trim_end(), true),
+                None => (p, false),
+            };
             let (ty_str, name) = if let Some(dollar) = p.rfind('$') {
                 (p[..dollar].trim(), p[dollar + 1..].to_string())
             } else {
@@ -718,9 +728,9 @@ pub(super) fn parse_callable_syntax(s: &str) -> Option<Type> {
                 ty: Some(mir_types::SimpleType::from_union(parse_type_string(ty_str))),
                 out_ty: None,
                 default: None,
-                is_variadic: false,
+                is_variadic,
                 is_byref: false,
-                is_optional: false,
+                is_optional: is_optional || is_variadic,
             }
         })
         .collect();

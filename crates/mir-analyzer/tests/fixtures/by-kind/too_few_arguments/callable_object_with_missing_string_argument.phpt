@@ -10,3 +10,4 @@ function takesCallableObject(object $object): void {
 }
 
 ===expect===
+TooFewArguments@6:4-6:13: Too few arguments for callable(): expected 1, got 0

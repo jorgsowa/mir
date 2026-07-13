@@ -107,6 +107,21 @@ fn extract_all_callable_candidates(
                     );
                 }
             }
+            Atomic::TCallable {
+                params: Some(params),
+                ..
+            } => {
+                out.push(
+                    params
+                        .iter()
+                        .map(|p| ParamInfo {
+                            is_optional: p.is_optional,
+                            is_variadic: p.is_variadic,
+                            ty: p.ty.as_ref().map(|t| t.to_union()),
+                        })
+                        .collect(),
+                );
+            }
             Atomic::TIntersection { parts } => {
                 for part in parts.iter() {
                     out.extend(extract_all_callable_candidates(part, ea));

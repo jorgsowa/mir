@@ -15,3 +15,4 @@ function bar(string $a, string $b, string $c): bool {}
 foo("bar");
 ===expect===
 InvalidReturnType@8:52-8:54: Return type 'void' is not compatible with declared 'bool'
+InvalidArgument@10:4-10:9: Argument $callback of typed_callable() expects 'callable with 2 required parameter(s)', got 'callable with 3 required parameter(s)'
