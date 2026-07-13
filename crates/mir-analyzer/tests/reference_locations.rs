@@ -263,6 +263,28 @@ fn new_expression_records_class_reference() {
 }
 
 #[test]
+fn new_expression_via_class_string_variable_records_class_reference() {
+    // `new $cls()` where `$cls` holds a known class-string must record a
+    // reference, matching the plain `new Widget()` form.
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "e2.php",
+        "<?php\nclass Widget {}\nfunction make(): void { $cls = Widget::class; $w = new $cls(); }\n",
+    );
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let locs = analyzer.reference_locations("cls:Widget");
+    assert!(
+        locs.iter().any(|(f, ..)| f == &file_arc),
+        "new $cls() should record a reference to Widget"
+    );
+}
+
+#[test]
 fn re_analyze_removes_stale_reference_locations() {
     let dir = create_temp_dir("test");
     let file = write_file(

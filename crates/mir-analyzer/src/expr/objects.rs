@@ -434,6 +434,21 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // class-string constraint means the held class-name IS-A AbstractClass, not
                 // that it IS AbstractClass itself. The concrete runtime class may be any
                 // non-abstract subclass, so no AbstractInstantiation check here.
+
+                // `new $class()` where `$class` holds a known class-string
+                // (`$class = Foo::class;`) is a real reference to `Foo` — record it,
+                // or a class instantiated only this way is falsely flagged unused
+                // with no go-to-definition from this call site.
+                for atomic in &ty.types {
+                    if let Atomic::TClassString(Some(fqcn)) = atomic {
+                        self.record_ref(Arc::from(format!("cls:{fqcn}")), n.class.span);
+                        self.record_symbol(
+                            n.class.span,
+                            ReferenceKind::ClassReference(Arc::from(fqcn.as_ref())),
+                            Type::single(Atomic::TClassString(None)),
+                        );
+                    }
+                }
                 Type::single(Atomic::TObject)
             }
         };
