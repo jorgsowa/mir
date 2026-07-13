@@ -591,9 +591,26 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
         let non_null_ty = obj_ty.remove_null();
         let mut declaring = None;
-        let mut prop_ty =
+        let resolved =
             self.resolve_property_type(&non_null_ty, &prop_name, pa.property.span, &mut declaring);
-        prop_ty.add_type(Atomic::TNull);
+
+        // If we have a narrowed type for this property access ($var?->prop),
+        // return it instead of the declared type — matching the plain `->`
+        // path in analyze_property_access above.
+        let mut prop_ty = if let ExprKind::Variable(obj_var) = &pa.object.kind {
+            ctx.get_prop_refined(obj_var.as_ref(), &prop_name)
+                .cloned()
+                .unwrap_or(resolved)
+        } else {
+            resolved
+        };
+        // Only the receiver's own nullability can make `$obj?->prop` evaluate to
+        // null — if `$obj` can never be null, this is exactly `$obj->prop`'s type,
+        // narrowed-or-not. Adding TNull unconditionally clobbered a narrowed
+        // non-null property type back into a nullable one.
+        if obj_ty.is_nullable() {
+            prop_ty.add_type(Atomic::TNull);
+        }
         for atomic in &non_null_ty.types {
             if let Atomic::TNamedObject { fqcn, .. } = atomic {
                 let declaring_class = declaring.take().unwrap_or_else(|| Arc::from(fqcn.as_ref()));
