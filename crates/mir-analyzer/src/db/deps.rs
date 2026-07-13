@@ -86,6 +86,13 @@ pub fn file_structural_deps(db: &dyn MirDatabase, file: SourceFile) -> Arc<[Arc<
         for ext in i.extends.iter() {
             add_target(ext);
         }
+        for prop in i.own_properties.values() {
+            if let Some(ty) = &prop.ty {
+                for named in extract_named_objects(ty) {
+                    add_target(named.as_ref());
+                }
+            }
+        }
         for method in i.own_methods.values() {
             for param in method.params.iter() {
                 if let Some(ty) = &param.ty {
@@ -104,6 +111,49 @@ pub fn file_structural_deps(db: &dyn MirDatabase, file: SourceFile) -> Arc<[Arc<
     for t in defs.slice.traits.iter() {
         for tr in t.traits.iter() {
             add_target(tr);
+        }
+        for prop in t.own_properties.values() {
+            if let Some(ty) = &prop.ty {
+                for named in extract_named_objects(ty) {
+                    add_target(named.as_ref());
+                }
+            }
+        }
+        for method in t.own_methods.values() {
+            for param in method.params.iter() {
+                if let Some(ty) = &param.ty {
+                    for named in extract_named_objects(ty.as_ref()) {
+                        add_target(named.as_ref());
+                    }
+                }
+            }
+            if let Some(rt) = method.return_type.as_deref() {
+                for named in extract_named_objects(rt) {
+                    add_target(named.as_ref());
+                }
+            }
+        }
+    }
+    for e in defs.slice.enums.iter() {
+        for iface in e.interfaces.iter() {
+            add_target(iface);
+        }
+        for tr in e.traits.iter() {
+            add_target(tr);
+        }
+        for method in e.own_methods.values() {
+            for param in method.params.iter() {
+                if let Some(ty) = &param.ty {
+                    for named in extract_named_objects(ty.as_ref()) {
+                        add_target(named.as_ref());
+                    }
+                }
+            }
+            if let Some(rt) = method.return_type.as_deref() {
+                for named in extract_named_objects(rt) {
+                    add_target(named.as_ref());
+                }
+            }
         }
     }
     for f in defs.slice.functions.iter() {
