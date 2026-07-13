@@ -680,6 +680,9 @@ pub struct InterfaceDef {
     /// class's single parent) may name several base interfaces at once.
     #[serde(default)]
     pub extends_type_args: Vec<(Arc<str>, Vec<Type>)>,
+    /// Type aliases declared on this interface via `@psalm-type` / `@phpstan-type`.
+    #[serde(default)]
+    pub type_aliases: FxHashMap<Arc<str>, Type>,
 }
 
 // ---------------------------------------------------------------------------
@@ -712,6 +715,9 @@ pub struct TraitDef {
     /// `@deprecated` docblock annotation, if present.
     #[serde(default)]
     pub deprecated: Option<Arc<str>>,
+    /// Type aliases declared on this trait via `@psalm-type` / `@phpstan-type`.
+    #[serde(default)]
+    pub type_aliases: FxHashMap<Arc<str>, Type>,
 }
 
 // ---------------------------------------------------------------------------
@@ -747,6 +753,9 @@ pub struct EnumDef {
     /// `@deprecated` docblock annotation (or `#[Deprecated]` attribute), if present.
     #[serde(default)]
     pub deprecated: Option<Arc<str>>,
+    /// Type aliases declared on this enum via `@psalm-type` / `@phpstan-type`.
+    #[serde(default)]
+    pub type_aliases: FxHashMap<Arc<str>, Type>,
 }
 
 // ---------------------------------------------------------------------------

@@ -301,6 +301,10 @@ impl<'a> DefinitionCollector<'a> {
                 trait_doc.deprecated.as_deref(),
                 &decl.attributes,
             ),
+            type_aliases: type_aliases
+                .iter()
+                .map(|(k, v)| (Arc::from(k.as_str()), v.clone()))
+                .collect(),
         }));
 
         ControlFlow::Continue(())

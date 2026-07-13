@@ -1114,12 +1114,36 @@ impl<'a> DefinitionCollector<'a> {
                 continue;
             }
             let from_resolved = self.resolve_type_name(import.from_class.as_str(), true);
+            // A `@psalm-import-type` source can be any class-like kind, not
+            // just a class — interfaces/traits/enums can declare their own
+            // `@psalm-type`/`@phpstan-type` aliases too.
             let resolved = self
                 .slice
                 .classes
                 .iter()
                 .find(|cls| cls.fqcn.as_ref() == from_resolved.as_ref())
-                .and_then(|cls| cls.type_aliases.get(import.original.as_str()).cloned());
+                .and_then(|cls| cls.type_aliases.get(import.original.as_str()).cloned())
+                .or_else(|| {
+                    self.slice
+                        .interfaces
+                        .iter()
+                        .find(|i| i.fqcn.as_ref() == from_resolved.as_ref())
+                        .and_then(|i| i.type_aliases.get(import.original.as_str()).cloned())
+                })
+                .or_else(|| {
+                    self.slice
+                        .traits
+                        .iter()
+                        .find(|t| t.fqcn.as_ref() == from_resolved.as_ref())
+                        .and_then(|t| t.type_aliases.get(import.original.as_str()).cloned())
+                })
+                .or_else(|| {
+                    self.slice
+                        .enums
+                        .iter()
+                        .find(|e| e.fqcn.as_ref() == from_resolved.as_ref())
+                        .and_then(|e| e.type_aliases.get(import.original.as_str()).cloned())
+                });
             if let Some(ty) = resolved {
                 aliases.insert(import.local.clone(), ty);
             }
