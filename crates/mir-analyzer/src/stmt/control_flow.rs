@@ -522,6 +522,7 @@ impl<'a> StatementsAnalyzer<'a> {
 
         let pre_ctx = ctx.clone();
         self.break_ctx_stack.push(Vec::new());
+        self.loop_kind_stack.push(false);
 
         let has_default = sw.body.cases.iter().any(|c| c.value.is_none());
 
@@ -680,6 +681,7 @@ impl<'a> StatementsAnalyzer<'a> {
         }
 
         let break_ctxs = self.break_ctx_stack.pop().unwrap_or_default();
+        self.loop_kind_stack.pop();
 
         // With a default arm, some arm ALWAYS runs — the "fell past every case"
         // path doesn't exist, so don't seed the merge with pre_ctx (it would

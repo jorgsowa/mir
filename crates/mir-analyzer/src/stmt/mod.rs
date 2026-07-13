@@ -107,9 +107,15 @@ pub struct StatementsAnalyzer<'a> {
     /// `(key type, value type)` for every `yield`/`yield from` seen so far in
     /// the current function body — see `ExpressionAnalyzer::yielded_types`.
     pub yielded_types: Vec<(Type, Type)>,
-    /// Break-context stack: one entry per active loop nesting level.
-    /// Each entry collects the context states at every `break` in that loop.
+    /// Break-context stack: one entry per active loop/switch nesting level
+    /// (both count towards break/continue level targeting in PHP).
+    /// Each entry collects the context states at every `break`/switch-scoped
+    /// `continue` targeting that level.
     break_ctx_stack: Vec<Vec<FlowState>>,
+    /// Parallel to `break_ctx_stack`: `true` if the corresponding level is a
+    /// real loop, `false` if it's a `switch`. `continue` behaves differently
+    /// depending on which kind its target level is — see `analyze_continue_stmt`.
+    loop_kind_stack: Vec<bool>,
 }
 
 impl<'a> StatementsAnalyzer<'a> {
@@ -137,6 +143,7 @@ impl<'a> StatementsAnalyzer<'a> {
             return_types: Vec::new(),
             yielded_types: Vec::new(),
             break_ctx_stack: Vec::new(),
+            loop_kind_stack: Vec::new(),
         }
     }
 
@@ -398,8 +405,8 @@ impl<'a> StatementsAnalyzer<'a> {
             }
 
             // ---- Continue ----------------------------------------------------
-            StmtKind::Continue(_) => {
-                self.analyze_continue_stmt(ctx);
+            StmtKind::Continue(level) => {
+                self.analyze_continue_stmt(ctx, break_continue_level(level));
             }
 
             // ---- Unset --------------------------------------------------------
@@ -702,6 +709,7 @@ impl<'a> StatementsAnalyzer<'a> {
 
         // Push a fresh break-context bucket for this loop level
         self.break_ctx_stack.push(Vec::new());
+        self.loop_kind_stack.push(true);
 
         let mut current = entry;
         current.inside_loop = true;
@@ -785,6 +793,7 @@ impl<'a> StatementsAnalyzer<'a> {
 
         // Pop break contexts and merge them into the post-loop result
         let break_ctxs = self.break_ctx_stack.pop().unwrap_or_default();
+        self.loop_kind_stack.pop();
         for bctx in break_ctxs {
             current = FlowState::merge_branches(pre, current, Some(bctx));
         }

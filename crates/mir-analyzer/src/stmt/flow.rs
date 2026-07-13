@@ -535,9 +535,29 @@ impl<'a> StatementsAnalyzer<'a> {
     // Continue
     // -----------------------------------------------------------------------
 
-    pub(super) fn analyze_continue_stmt(&mut self, ctx: &mut crate::flow_state::FlowState) {
-        // continue goes back to the loop condition — no context to save,
-        // the widening pass already re-analyses the body.
+    pub(super) fn analyze_continue_stmt(
+        &mut self,
+        ctx: &mut crate::flow_state::FlowState,
+        level: usize,
+    ) {
+        // `switch` counts as one level of loop nesting for break/continue
+        // purposes in PHP — a bare `continue;` (level 1) inside a switch with
+        // no enclosing loop, or any `continue N` whose Nth enclosing
+        // construct is a switch rather than a real loop, behaves exactly
+        // like `break`: it exits the switch, it does NOT continue an outer
+        // loop. Save the context into that level's break bucket, same as
+        // `analyze_break_stmt`, so a variable assigned only on this path
+        // still surfaces after the switch instead of vanishing entirely.
+        let stack_len = self.loop_kind_stack.len();
+        let targets_switch =
+            level >= 1 && level <= stack_len && !self.loop_kind_stack[stack_len - level];
+        if targets_switch {
+            self.break_ctx_stack[stack_len - level].push(ctx.clone());
+        }
+        // Either way, this path doesn't fall through to the code after it —
+        // continue goes back to the loop condition (the widening pass
+        // already re-analyses the body, no context to save there) or, for a
+        // switch target, exits to the break bucket saved above.
         ctx.diverges = true;
     }
 
