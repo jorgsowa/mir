@@ -7,9 +7,15 @@ impl<'a> ClassAnalyzer<'a> {
         cls_location: Option<&Location>,
         issues: &mut Vec<Issue>,
     ) {
-        // Walk every ancestor class and collect abstract methods
-        let ancestors = self.ancestors(fqcn);
-        for ancestor_fqcn in &ancestors {
+        // Walk every ancestor class and collect abstract methods. Uses the
+        // fully-recursive `class_ancestors_by_fqcn` (skipping index 0, `fqcn`
+        // itself) rather than the legacy `self.ancestors()`/`class_ancestors` —
+        // the legacy walker's trait branch doesn't recurse into a trait's own
+        // transitively-used traits, so an abstract method declared only in a
+        // trait-of-a-trait was never even considered here.
+        let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
+        let ancestors = crate::db::class_ancestors_by_fqcn(self.db, here);
+        for ancestor_fqcn in ancestors.iter().skip(1) {
             let here = crate::db::Fqcn::from_str(self.db, ancestor_fqcn.as_ref());
             let abstract_methods: Vec<Arc<str>> = crate::db::find_class_like(self.db, here)
                 .map(|c| {
