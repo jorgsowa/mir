@@ -102,6 +102,15 @@ impl DefinitionCollector<'_> {
                         .as_ref()
                         .map(|d| crate::parser::DocblockParser::parse(&d.text))
                         .unwrap_or_default();
+                    let case_doc_span = c
+                        .doc_comment
+                        .as_ref()
+                        .map(|d| d.span.start)
+                        .unwrap_or(member.span.start);
+                    self.emit_docblock_issues(&case_doc, case_doc_span);
+                    if !self.version_allows(&case_doc) {
+                        continue;
+                    }
                     let case_deprecated =
                         case_doc.deprecated.as_deref().map(Arc::from).or_else(|| {
                             if c.attributes.iter().any(|a| {
@@ -172,6 +181,15 @@ impl DefinitionCollector<'_> {
                 EnumMemberKind::ClassConst(c) => {
                     let const_name = c.name.as_deref().unwrap_or_default();
                     let const_doc = self.parse_docblock_from_node(c.doc_comment.as_ref());
+                    let const_doc_span = c
+                        .doc_comment
+                        .as_ref()
+                        .map(|d| d.span.start)
+                        .unwrap_or(member.span.start);
+                    self.emit_docblock_issues(&const_doc, const_doc_span);
+                    if !self.version_allows(&const_doc) {
+                        continue;
+                    }
                     // PHP 8.3: typed enum constants (`const int FOO = 1;`).
                     // Prefer @var docblock, then the native type hint, then the
                     // literal value, then mixed — same precedence as class.rs.
