@@ -16,6 +16,59 @@ impl<'a> ClassAnalyzer<'a> {
             .iter()
             .map(|(k, m)| (k.clone(), m.clone()))
             .collect();
+
+        // Members composed via `use Trait;` behave like "own" methods for override
+        // purposes: this class inherits the trait's *implementation*, so a conflict
+        // against the real parent/interfaces must be checked even when the class
+        // body never redeclares the method — previously only literally-declared
+        // `own_methods()` were checked, making trait-composed overrides invisible to
+        // every check below (final/static/visibility/return/param).
+        //
+        // `class_ancestors_by_fqcn` DFS-visits the FULL transitive trait subtree
+        // before ever reaching the real parent/interfaces (traits are always
+        // ordered first in `ancestor_fqcns`), so the contiguous run of Trait-kind
+        // entries immediately after `here` is exactly this class's own composed
+        // traits — a parent class's own trait-contributed methods are correctly
+        // left alone here (they're checked by that parent's own pass instead).
+        let mut seen_method_keys: HashSet<Arc<str>> =
+            own_methods.iter().map(|(k, _)| k.clone()).collect();
+        let mut trait_composed_methods: Vec<(Arc<str>, Arc<mir_codebase::definitions::MethodDef>)> =
+            Vec::new();
+        for anc in crate::db::class_ancestors_by_fqcn(self.db, here).iter().skip(1) {
+            let anc_here = crate::db::Fqcn::from_str(self.db, anc.as_ref());
+            let Some(crate::db::ClassLike::Trait(t)) = crate::db::find_class_like(self.db, anc_here)
+            else {
+                break;
+            };
+            for key in t.own_methods.iter().map(|(k, _)| k.clone()) {
+                if !seen_method_keys.insert(key.clone()) {
+                    continue;
+                }
+                // Resolve through the precedence-aware walker (not a plain lookup
+                // on this one trait) so `insteadof`/`as` conflicts between two
+                // composed traits pick the actual winning copy.
+                if let Some((owner, m)) =
+                    crate::db::find_method_respecting_precedence(self.db, here, key.as_ref())
+                {
+                    if crate::db::class_kind(self.db, owner.as_ref()).is_some_and(|k| k.is_trait) {
+                        // `self`/`static` inside a trait method are bound to the
+                        // trait's own FQCN in its declaration, but PHP resolves both
+                        // to the *composing* class at the use site — rebind before
+                        // treating this signature as the composing class's "own",
+                        // otherwise e.g. a `static` return type is compared as
+                        // `static(Trait)` against the parent's `static(Parent)` and
+                        // spuriously fails covariance.
+                        let rebound = Self::rebind_self_static_in_method(&m, fqcn);
+                        trait_composed_methods.push((key, rebound));
+                    }
+                }
+            }
+        }
+        let own_methods = own_methods
+            .into_iter()
+            .chain(trait_composed_methods)
+            .collect::<Vec<_>>();
+
         // What this class's own `@extends`/`@implements` chain binds an ancestor's
         // template params to (e.g. `@extends Box<int>` -> T => int). Lets an ancestor
         // method's still-templated param/return type be checked against a concrete
@@ -175,7 +228,12 @@ impl<'a> ClassAnalyzer<'a> {
             // ---- a0. Cannot re-declare a concrete method as abstract --------
             // PHP rejects making a concrete parent method abstract in a subclass.
             // Interface methods are implicitly abstract, so re-declaring them
-            // abstract in an abstract class is always legal.
+            // abstract in an abstract class is always legal. A trait's abstract
+            // method is exempt too — confirmed live: unlike a class body directly
+            // re-declaring a parent method abstract (always a fatal, regardless
+            // of signature), a trait's abstract requirement against an inherited
+            // concrete method is only ever rejected for a genuine signature
+            // mismatch, which the return-type/param checks below already catch.
             //
             // These structural checks (a0/a/b/c) scan ALL ancestors, not just
             // the first, for the same reason the return-type/param loops below
@@ -183,7 +241,8 @@ impl<'a> ClassAnalyzer<'a> {
             // trait's compatible copy of a method must not shadow a genuine
             // conflict against the parent (or an interface) further down the
             // chain.
-            if own.is_abstract {
+            let is_body_declared = class.own_methods().contains_key(method_name_lower.as_ref());
+            if own.is_abstract && is_body_declared {
                 if let Some((parent_fqcn, _)) = all_parent_methods.iter().find(|(pf, p)| {
                     !p.is_abstract
                         && !crate::db::class_kind(self.db, pf.as_ref())
@@ -566,16 +625,44 @@ impl<'a> ClassAnalyzer<'a> {
         }
 
         // ---- Property visibility must not be reduced -------------------------
-        let own_properties: Vec<(Arc<str>, mir_codebase::definitions::PropertyDef)> = class
+        // Same trait-composition gap as methods above: a property declared only
+        // in a `use`d trait is otherwise invisible to every check in this loop.
+        let mut own_properties: Vec<(Arc<str>, mir_codebase::definitions::PropertyDef)> = class
             .own_properties()
             .map(|props| props.iter().map(|(k, p)| (k.clone(), p.clone())).collect())
             .unwrap_or_default();
+        let mut seen_prop_keys: HashSet<Arc<str>> =
+            own_properties.iter().map(|(k, _)| k.clone()).collect();
+        for anc in crate::db::class_ancestors_by_fqcn(self.db, here).iter().skip(1) {
+            let anc_here = crate::db::Fqcn::from_str(self.db, anc.as_ref());
+            let Some(crate::db::ClassLike::Trait(t)) = crate::db::find_class_like(self.db, anc_here)
+            else {
+                break;
+            };
+            for (key, prop) in t.own_properties.iter() {
+                if seen_prop_keys.insert(key.clone()) {
+                    own_properties.push((key.clone(), prop.clone()));
+                }
+            }
+        }
         for (_, own_prop) in own_properties {
             let prop_name = own_prop.name.clone();
-            // Look up the same property name in ancestors (skip self = first entry)
+            // Look up the same property name in ancestors, skipping self (first
+            // entry) AND this class's own composed-trait prefix — a trait that
+            // contributes `own_prop` itself is not a "parent" to compare against,
+            // it's where `own_prop` came from (mirrors the method loop's parent
+            // walk, which naturally skips past a self-match by looking for a
+            // *violating* ancestor rather than just the first same-named one).
             let parent_prop = crate::db::class_ancestors_by_fqcn(self.db, here)
                 .iter()
                 .skip(1)
+                .skip_while(|anc| {
+                    let anc_here = crate::db::Fqcn::from_str(self.db, anc.as_ref());
+                    matches!(
+                        crate::db::find_class_like(self.db, anc_here),
+                        Some(crate::db::ClassLike::Trait(_))
+                    )
+                })
                 .find_map(|anc| {
                     let anc_here = crate::db::Fqcn::from_str(self.db, anc.as_ref());
                     crate::db::find_property_in_class(self.db, anc_here, prop_name.as_ref())
@@ -710,6 +797,76 @@ impl<'a> ClassAnalyzer<'a> {
     // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
+
+    /// Rebinds any `self`/`static` atomic in `ty` from wherever it was declared
+    /// to `to_fqcn` — PHP resolves both to the class actually using a trait
+    /// method, not the trait's own declaring FQCN.
+    fn rebind_self_static(ty: &mir_types::Type, to_fqcn: &Arc<str>) -> mir_types::Type {
+        use mir_types::Atomic;
+        if !ty
+            .types
+            .iter()
+            .any(|a| matches!(a, Atomic::TSelf { .. } | Atomic::TStaticObject { .. }))
+        {
+            return ty.clone();
+        }
+        let mut result = mir_types::Type::empty();
+        result.possibly_undefined = ty.possibly_undefined;
+        result.from_docblock = ty.from_docblock;
+        for atomic in &ty.types {
+            let rebound = match atomic {
+                Atomic::TSelf { .. } => Atomic::TSelf {
+                    fqcn: mir_types::Name::new(to_fqcn.as_ref()),
+                },
+                Atomic::TStaticObject { .. } => Atomic::TStaticObject {
+                    fqcn: mir_types::Name::new(to_fqcn.as_ref()),
+                },
+                other => other.clone(),
+            };
+            result.add_type(rebound);
+        }
+        result
+    }
+
+    /// Applies [`rebind_self_static`] to a trait method's params/return type
+    /// before it's checked as if it were the composing class's own method.
+    fn rebind_self_static_in_method(
+        m: &Arc<mir_codebase::definitions::MethodDef>,
+        to_fqcn: &Arc<str>,
+    ) -> Arc<mir_codebase::definitions::MethodDef> {
+        let needs_rebind = m
+            .return_type
+            .as_deref()
+            .is_some_and(|t| Self::type_has_self_or_static_atomic(t))
+            || m.params
+                .iter()
+                .any(|p| p.ty.as_deref().is_some_and(|t| Self::type_has_self_or_static_atomic(t)));
+        if !needs_rebind {
+            return m.clone();
+        }
+        let mut m_clone = (**m).clone();
+        m_clone.return_type = m_clone
+            .return_type
+            .as_deref()
+            .map(|t| Arc::new(Self::rebind_self_static(t, to_fqcn)));
+        m_clone.params = m_clone
+            .params
+            .iter()
+            .map(|p| {
+                let mut p = p.clone();
+                p.ty = p.ty.as_deref().map(|t| Arc::new(Self::rebind_self_static(t, to_fqcn)));
+                p
+            })
+            .collect();
+        Arc::new(m_clone)
+    }
+
+    fn type_has_self_or_static_atomic(ty: &mir_types::Type) -> bool {
+        use mir_types::Atomic;
+        ty.types
+            .iter()
+            .any(|a| matches!(a, Atomic::TSelf { .. } | Atomic::TStaticObject { .. }))
+    }
 
     /// Returns true if the type contains template params or class-strings with unknown types.
     /// Used to suppress MethodSignatureMismatch on generic parent return types.
