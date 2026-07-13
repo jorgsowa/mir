@@ -18,3 +18,4 @@ class A
 }
 ===expect===
 UnusedSuppress@3:0-3:0: Suppress annotation for 'UndefinedClass' is never used
+UndefinedClass@11:8-11:12: Class Foo does not exist

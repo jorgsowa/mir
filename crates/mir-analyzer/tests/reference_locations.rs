@@ -92,6 +92,31 @@ fn method_call_span_covers_only_name() {
 }
 
 #[test]
+fn static_method_call_via_class_string_variable_records_reference() {
+    // `$cls::method()` where `$cls` holds a class-string variable must record
+    // a reference, matching the plain `Math::sq()` form.
+    let dir = create_temp_dir("test");
+    let src = "<?php\nclass Math { public static function sq(int $n): int { return $n * $n; } }\nfunction caller(): void { $cls = Math::class; $cls::sq(3); }\n";
+    let file = write_file(&dir, "dyn_static.php", src);
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let locs: Vec<_> = analyzer
+        .reference_locations("meth:Math::sq")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert_eq!(
+        locs.len(),
+        1,
+        "expected exactly one reference to Math::sq from $cls::sq(3)"
+    );
+}
+
+#[test]
 fn dynamic_invoke_call_records_reference_to_invoke_method() {
     // `$obj(...)` invoking an object's __invoke() must record a reference,
     // matching every other call form ($obj->run(), Svc::run(), etc.).

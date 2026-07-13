@@ -103,6 +103,11 @@ fn is_object_atomic(t: &Atomic) -> bool {
 /// approximate here with the declared class, which is correct in the common
 /// case and never produces a false positive.  Null is skipped — null safety
 /// on `::` is a separate concern from class-string validity.
+///
+/// Also covers `$cls::method()` where `$cls` holds a known class-string
+/// (`TClassString(Some(fqcn))`, e.g. `$cls = Foo::class;`) — otherwise this
+/// call form skips method resolution/reference-recording entirely, unlike
+/// its already-handled `$cls::$prop` / `$cls::CONST` siblings.
 fn extract_object_fqcn(ty: &Type) -> Option<String> {
     let mut result: Option<String> = None;
     for atom in ty.types.iter() {
@@ -111,6 +116,7 @@ fn extract_object_fqcn(ty: &Type) -> Option<String> {
             | Atomic::TStaticObject { fqcn }
             | Atomic::TSelf { fqcn }
             | Atomic::TParent { fqcn } => fqcn.to_string(),
+            Atomic::TClassString(Some(fqcn)) => fqcn.to_string(),
             Atomic::TNull => continue, // nullable object: skip null, resolve against class
             _ => return None,
         };

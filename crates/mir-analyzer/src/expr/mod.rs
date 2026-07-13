@@ -788,7 +788,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             return;
         }
         for atomic in obj_ty.remove_null().types.iter() {
-            if let Some(fqcn) = atomic.named_object_fqcn() {
+            let fqcn = atomic.named_object_fqcn().or_else(|| match atomic {
+                Atomic::TClassString(Some(fqcn)) => Some(fqcn.as_ref()),
+                _ => None,
+            });
+            if let Some(fqcn) = fqcn {
                 self.record_ref(Arc::from(format!("dyn:{fqcn}")), span);
             }
         }
