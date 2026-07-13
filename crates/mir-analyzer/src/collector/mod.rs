@@ -1397,7 +1397,7 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
             }
 
             StmtKind::Enum(decl) => {
-                self.collect_enum(decl, stmt.span);
+                return self.collect_enum(decl, stmt.span);
             }
 
             StmtKind::Const(items) => {

@@ -1,3 +1,4 @@
+use std::ops::ControlFlow;
 use std::sync::Arc;
 
 use mir_codebase::definitions::{ConstantDef, EnumCaseDef};
@@ -13,7 +14,7 @@ impl DefinitionCollector<'_> {
         &mut self,
         decl: &php_ast::owned::EnumDecl,
         stmt_span: php_ast::Span,
-    ) {
+    ) -> ControlFlow<()> {
         let enum_name = decl.name.as_deref().unwrap_or_default().to_string();
         let fqcn = self.declared_fqn(&enum_name);
 
@@ -22,6 +23,17 @@ impl DefinitionCollector<'_> {
             .as_ref()
             .map(|c| crate::parser::DocblockParser::parse(&c.text))
             .unwrap_or_default();
+
+        let enum_doc_span = decl
+            .doc_comment
+            .as_ref()
+            .map(|c| c.span.start)
+            .unwrap_or(stmt_span.start);
+        self.emit_docblock_issues(&enum_doc, enum_doc_span);
+
+        if !self.version_allows(&enum_doc) {
+            return ControlFlow::Continue(());
+        }
 
         let scalar_type = decl
             .scalar_type
@@ -226,5 +238,6 @@ impl DefinitionCollector<'_> {
                 location: Some(self.location(stmt_span.start, stmt_span.end)),
                 deprecated: enum_doc.deprecated.as_deref().map(Arc::from),
             }));
+        ControlFlow::Continue(())
     }
 }

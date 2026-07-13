@@ -292,6 +292,35 @@ fn version_filter_removed_php80_rejects_hebrevc() {
     );
 }
 
+// ── @since filtering applies to enum stubs too ───────────────────────────────
+
+/// collect_enum never called version_allows, unlike class/trait/interface —
+/// an @since-gated enum stub (e.g. PropertyHookType, @since 8.4) was collected
+/// regardless of the configured target version.
+#[test]
+fn version_filter_since_php83_rejects_php84_enum() {
+    let session = AnalysisSession::new(PhpVersion::new(8, 3));
+    session.ensure_all_stubs();
+
+    assert!(
+        !session.contains_class("PropertyHookType"),
+        "PropertyHookType (@since 8.4) must be absent on PHP 8.3"
+    );
+}
+
+/// Sibling of version_filter_since_php83_rejects_php84_enum: the same enum
+/// must be collected once the target version reaches @since.
+#[test]
+fn version_filter_since_php84_accepts_php84_enum() {
+    let session = AnalysisSession::new(PhpVersion::new(8, 4));
+    session.ensure_all_stubs();
+
+    assert!(
+        session.contains_class("PropertyHookType"),
+        "PropertyHookType (@since 8.4) must be present on PHP 8.4"
+    );
+}
+
 // ── Secondary regression guards: with_cache_dir / with_cache paths ───────────
 
 /// `with_cache_dir` rebuilds `self.db`; the fix must re-apply `php_version`
