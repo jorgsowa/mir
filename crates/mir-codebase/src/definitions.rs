@@ -744,6 +744,9 @@ pub struct EnumDef {
     #[serde(default)]
     pub trait_use_locations: Vec<(Arc<str>, Location)>,
     pub location: Option<Location>,
+    /// `@deprecated` docblock annotation (or `#[Deprecated]` attribute), if present.
+    #[serde(default)]
+    pub deprecated: Option<Arc<str>>,
 }
 
 // ---------------------------------------------------------------------------

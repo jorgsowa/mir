@@ -185,7 +185,7 @@ impl ClassLike {
             ClassLike::Class(c) => c.deprecated.as_ref(),
             ClassLike::Interface(i) => i.deprecated.as_ref(),
             ClassLike::Trait(t) => t.deprecated.as_ref(),
-            ClassLike::Enum(_) => None,
+            ClassLike::Enum(e) => e.deprecated.as_ref(),
         }
     }
 

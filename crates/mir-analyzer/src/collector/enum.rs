@@ -224,6 +224,7 @@ impl DefinitionCollector<'_> {
                 traits,
                 trait_use_locations,
                 location: Some(self.location(stmt_span.start, stmt_span.end)),
+                deprecated: enum_doc.deprecated.as_deref().map(Arc::from),
             }));
     }
 }
