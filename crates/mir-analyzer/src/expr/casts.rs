@@ -221,7 +221,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         inner.span,
                     );
                 }
-                // Check for InvalidCast from array
+                // Check for InvalidCast from array — same "no scalars" guard as int/float.
                 else if inner_ty.contains(|t| {
                     matches!(
                         t,
@@ -231,7 +231,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                             | Atomic::TNonEmptyList { .. }
                             | Atomic::TKeyedArray { .. }
                     )
-                }) {
+                }) && !inner_ty.contains(is_scalar_safe)
+                {
                     self.emit(
                         IssueKind::InvalidCast {
                             from: inner_ty.to_string(),
