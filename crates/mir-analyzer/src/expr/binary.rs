@@ -83,7 +83,23 @@ impl<'a> ExpressionAnalyzer<'a> {
             // variable is marked as consumed — otherwise it is falsely reported
             // as unused.
             if !matches!(b.right.kind, ExprKind::Identifier(_)) {
-                let _ = self.analyze(&b.right, ctx);
+                let right_ty = self.analyze(&b.right, ctx);
+                // `instanceof $cls` where `$cls` holds a known class-string
+                // (`$cls = Foo::class;`) is a real reference to `Foo` — record it,
+                // matching the plain `instanceof Foo` form below, or a class
+                // checked only this way is falsely flagged unused with no
+                // go-to-definition from the check site.
+                for atomic in &right_ty.types {
+                    if let Atomic::TClassString(Some(fqcn)) = atomic {
+                        let fqcn: Arc<str> = Arc::from(fqcn.as_ref());
+                        self.record_ref(Arc::from(format!("cls:{fqcn}")), b.right.span);
+                        self.record_symbol(
+                            b.right.span,
+                            crate::symbol::ReferenceKind::ClassReference(fqcn),
+                            mir_types::Type::single(mir_types::Atomic::TClassString(None)),
+                        );
+                    }
+                }
             }
             if let ExprKind::Identifier(name) = &b.right.kind {
                 let resolved = crate::db::resolve_name(self.db, &self.file, name.as_ref());

@@ -285,6 +285,28 @@ fn new_expression_via_class_string_variable_records_class_reference() {
 }
 
 #[test]
+fn instanceof_via_class_string_variable_records_class_reference() {
+    // `$x instanceof $cls` where `$cls` holds a known class-string must
+    // record a reference, matching the plain `$x instanceof Widget` form.
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "e3.php",
+        "<?php\nclass Widget {}\nfunction check(object $o): bool { $cls = Widget::class; return $o instanceof $cls; }\n",
+    );
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let locs = analyzer.reference_locations("cls:Widget");
+    assert!(
+        locs.iter().any(|(f, ..)| f == &file_arc),
+        "$o instanceof $cls should record a reference to Widget"
+    );
+}
+
+#[test]
 fn re_analyze_removes_stale_reference_locations() {
     let dir = create_temp_dir("test");
     let file = write_file(
