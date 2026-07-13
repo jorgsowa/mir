@@ -176,32 +176,45 @@ impl<'a> ClassAnalyzer<'a> {
             // PHP rejects making a concrete parent method abstract in a subclass.
             // Interface methods are implicitly abstract, so re-declaring them
             // abstract in an abstract class is always legal.
-            let parent_is_interface = crate::db::class_kind(self.db, parent_fqcn.as_ref())
-                .is_some_and(|k| k.is_interface);
-            if own.is_abstract && !parent.is_abstract && !parent_is_interface {
-                issues.push(
-                    Issue::new(
-                        IssueKind::MethodSignatureMismatch {
-                            class: fqcn.to_string(),
-                            method: method_name_lower.to_string(),
-                            detail: format!(
-                                "cannot make non-abstract method {}::{}() abstract",
-                                parent_fqcn, method_name_lower
-                            ),
-                        },
-                        loc.clone(),
-                    )
-                    .with_snippet(method_name_lower.to_string()),
-                );
+            //
+            // These structural checks (a0/a/b/c) scan ALL ancestors, not just
+            // the first, for the same reason the return-type/param loops below
+            // do: traits are always ordered before the real parent class, so a
+            // trait's compatible copy of a method must not shadow a genuine
+            // conflict against the parent (or an interface) further down the
+            // chain.
+            if own.is_abstract {
+                if let Some((parent_fqcn, _)) = all_parent_methods.iter().find(|(pf, p)| {
+                    !p.is_abstract
+                        && !crate::db::class_kind(self.db, pf.as_ref())
+                            .is_some_and(|k| k.is_interface)
+                }) {
+                    issues.push(
+                        Issue::new(
+                            IssueKind::MethodSignatureMismatch {
+                                class: fqcn.to_string(),
+                                method: method_name_lower.to_string(),
+                                detail: format!(
+                                    "cannot make non-abstract method {}::{}() abstract",
+                                    parent_fqcn, method_name_lower
+                                ),
+                            },
+                            loc.clone(),
+                        )
+                        .with_snippet(method_name_lower.to_string()),
+                    );
+                }
             }
 
             // ---- a. Cannot override a final method -------------------------
-            if parent.is_final {
+            if let Some((final_parent_fqcn, _)) =
+                all_parent_methods.iter().find(|(_, p)| p.is_final)
+            {
                 let mut issue = Issue::new(
                     IssueKind::FinalMethodOverridden {
                         class: fqcn.to_string(),
                         method: method_name_lower.to_string(),
-                        parent: parent_fqcn.to_string(),
+                        parent: final_parent_fqcn.to_string(),
                     },
                     loc.clone(),
                 );
@@ -215,16 +228,19 @@ impl<'a> ClassAnalyzer<'a> {
             // A non-static child method cannot override a static parent method
             // and vice versa — PHP treats these as different methods in practice
             // but the static contract is part of the signature.
-            if parent.is_static != own.is_static {
-                let detail = if parent.is_static {
+            if let Some((static_parent_fqcn, static_parent)) = all_parent_methods
+                .iter()
+                .find(|(_, p)| p.is_static != own.is_static)
+            {
+                let detail = if static_parent.is_static {
                     format!(
                         "cannot override static method {}::{}() with a non-static method",
-                        parent_fqcn, method_name_lower
+                        static_parent_fqcn, method_name_lower
                     )
                 } else {
                     format!(
                         "cannot override non-static method {}::{}() with a static method",
-                        parent_fqcn, method_name_lower
+                        static_parent_fqcn, method_name_lower
                     )
                 };
                 let mut issue = Issue::new(
@@ -242,7 +258,10 @@ impl<'a> ClassAnalyzer<'a> {
             }
 
             // ---- c. Visibility must not be reduced -------------------------
-            if visibility_reduced(own.visibility, parent.visibility) {
+            if all_parent_methods
+                .iter()
+                .any(|(_, p)| visibility_reduced(own.visibility, p.visibility))
+            {
                 let mut issue = Issue::new(
                     IssueKind::OverriddenMethodAccess {
                         class: fqcn.to_string(),
