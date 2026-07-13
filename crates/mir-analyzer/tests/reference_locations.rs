@@ -1232,3 +1232,34 @@ fn attribute_argument_enum_case_records_constant_reference() {
         "Status::Inactive was never referenced and must not show up"
     );
 }
+
+#[test]
+fn trait_composing_trait_records_reference_at_use_site() {
+    // A trait consuming another trait (`trait A { use B; }`) previously had no
+    // location storage for its own `use` tokens, so the reference fell back to
+    // a dummy line-1/col-0 location instead of the real `use B;` line.
+    let dir = create_temp_dir("test");
+    let src = "<?php\ntrait Greets {\n    public function greet(): void {}\n}\ntrait Person {\n    use Greets;\n}\n";
+    let file = write_file(&dir, "a.php", src);
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let locs: Vec<_> = analyzer
+        .reference_locations("cls:Greets")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert!(
+        !locs.is_empty(),
+        "use Greets; inside trait Person should record a reference to Greets"
+    );
+    let (_, line, col_start, _) = locs[0];
+    assert_eq!(
+        (line, col_start),
+        (6, 8),
+        "reference should point at the real `use Greets;` line/column, not the line-1/col-0 fallback"
+    );
+}

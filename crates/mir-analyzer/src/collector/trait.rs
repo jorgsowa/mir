@@ -75,6 +75,7 @@ impl<'a> DefinitionCollector<'a> {
         let mut own_properties = mir_codebase::definitions::MemberMap::default();
         let mut own_constants = mir_codebase::definitions::MemberMap::default();
         let mut trait_uses: Vec<Arc<str>> = vec![];
+        let mut trait_use_locations: Vec<(Arc<str>, mir_types::Location)> = vec![];
 
         // See `class.rs` for why this runs before the loop and only covers
         // self/static references to this same trait's constants.
@@ -210,7 +211,10 @@ impl<'a> DefinitionCollector<'a> {
                 }
                 ClassMemberKind::TraitUse(tu) => {
                     for t in tu.traits.iter() {
-                        trait_uses.push(self.resolve_name(&name_to_string_owned(t)).into());
+                        let fqcn: Arc<str> = self.resolve_name(&name_to_string_owned(t)).into();
+                        let loc = self.location(t.span.start, t.span.end);
+                        trait_use_locations.push((fqcn.clone(), loc));
+                        trait_uses.push(fqcn);
                     }
                 }
             }
@@ -248,6 +252,7 @@ impl<'a> DefinitionCollector<'a> {
             template_params: trait_template_params,
             traits: trait_uses,
             location: Some(self.location(stmt_span.start, stmt_span.end)),
+            trait_use_locations,
             require_extends,
             require_implements,
             deprecated: trait_doc.deprecated.as_deref().map(Arc::from),

@@ -1119,6 +1119,15 @@ impl<'a> BodyAnalyzer<'a> {
                 }
             }
 
+            // `@psalm-require-extends`/`@psalm-require-implements` constrain
+            // whatever CLASS eventually consumes this trait chain — a trait
+            // that merely re-composes another constrained trait (`trait A {
+            // use B; }`) isn't itself required to satisfy it, since traits
+            // can't extend/implement anything; the check re-applies once a
+            // real class further up the chain uses A.
+            if class.is_trait() {
+                continue;
+            }
             let (req_ext, req_impl): (Vec<Arc<str>>, Vec<Arc<str>>) = match &trait_class {
                 crate::db::ClassLike::Trait(t) => {
                     (t.require_extends.to_vec(), t.require_implements.to_vec())

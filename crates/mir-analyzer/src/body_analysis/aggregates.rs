@@ -69,6 +69,7 @@ impl<'a> BodyAnalyzer<'a> {
                 None,
             );
         }
+        self.check_trait_constraints(fqcn, file, all_issues);
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -129,6 +130,7 @@ impl<'a> BodyAnalyzer<'a> {
                 Some(&mut *type_envs),
             );
         }
+        self.check_trait_constraints(fqcn, file, all_issues);
     }
 
     /// Analyze each enum case's value expression against a minimal FlowState

@@ -269,11 +269,12 @@ impl ClassLike {
         }
     }
 
-    /// Per-`use SomeTrait;` declaration locations (class + enum).
+    /// Per-`use SomeTrait;` declaration locations (class + enum + trait).
     pub fn trait_use_locations(&self) -> &[(Arc<str>, mir_types::Location)] {
         match self {
             ClassLike::Class(c) => &c.trait_use_locations,
             ClassLike::Enum(e) => &e.trait_use_locations,
+            ClassLike::Trait(t) => &t.trait_use_locations,
             _ => &[],
         }
     }

@@ -697,6 +697,12 @@ pub struct TraitDef {
     /// Traits used by this trait (`use OtherTrait;` inside a trait body).
     pub traits: Vec<Arc<str>>,
     pub location: Option<Location>,
+    /// Per-`use` statement locations for each used trait: `(fqcn, location)` in
+    /// declaration order, parallel to `traits`. Mirrors `ClassDef`/`EnumDef`'s
+    /// field of the same name. Absent from older serialized slices; defaults
+    /// to empty.
+    #[serde(default)]
+    pub trait_use_locations: Vec<(Arc<str>, Location)>,
     /// `@psalm-require-extends` / `@phpstan-require-extends` — FQCNs that using classes must extend.
     #[serde(default)]
     pub require_extends: Vec<Arc<str>>,
