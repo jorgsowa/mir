@@ -161,24 +161,35 @@ impl<'a> DefinitionCollector<'a> {
                         continue;
                     }
                     let prop_name = p.name.as_deref().unwrap_or_default();
-                    // phpstorm-stubs `#[LanguageLevelTypeAware]`: a version-specific
-                    // type override wins, mirroring class.rs's property handling.
+                    let hint_ty = self.resolve_union_opt(
+                        p.type_hint
+                            .as_ref()
+                            .map(|h| type_from_hint_owned(h, Some(&fqcn))),
+                    );
+                    // phpstorm-stubs `#[LanguageLevelTypeAware]` wins, then an `@var`
+                    // docblock (mirroring class.rs's precedence — a trait property's
+                    // @var was previously ignored entirely, only the native hint was
+                    // ever used), then the native hint.
                     let ty = self
                         .version_attr_type_string(&p.attributes)
                         .map(|s| crate::parser::docblock::parse_type_string(&s))
                         .or_else(|| {
-                            self.resolve_union_opt(
-                                p.type_hint
-                                    .as_ref()
-                                    .map(|h| type_from_hint_owned(h, Some(&fqcn))),
-                            )
-                        });
+                            prop_doc.var_type.clone().map(|t| {
+                                self.resolve_union_doc_with_templates(
+                                    t,
+                                    &trait_template_names,
+                                    fqcn.as_str(),
+                                    &trait_template_params,
+                                )
+                            })
+                        })
+                        .or_else(|| hint_ty.clone());
                     own_properties.insert(
                         Arc::from(prop_name),
                         PropertyDef {
                             name: Arc::from(prop_name),
-                            ty: mir_codebase::definitions::wrap_property_type(ty.clone()),
-                            native_ty: mir_codebase::definitions::wrap_property_type(ty),
+                            ty: mir_codebase::definitions::wrap_property_type(ty),
+                            native_ty: mir_codebase::definitions::wrap_property_type(hint_ty),
                             inferred_ty: None,
                             visibility: Self::convert_visibility(p.visibility),
                             is_static: p.is_static,
