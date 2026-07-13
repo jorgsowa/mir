@@ -1,5 +1,5 @@
 ===description===
-No intersection method
+A method missing from every part of an intersection type is UndefinedMethod.
 ===file===
 <?php
 interface A {}
@@ -10,3 +10,4 @@ function f($p): void {
     $p->zugzug();
 }
 ===expect===
+UndefinedMethod@7:4-7:16: Method B&A::zugzug() does not exist

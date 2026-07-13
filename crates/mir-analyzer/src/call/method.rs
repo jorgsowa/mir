@@ -468,6 +468,14 @@ impl CallAnalyzer {
                     if found_method {
                         result.merge_with(&intersection_result);
                     } else {
+                        ea.emit(
+                            IssueKind::UndefinedMethod {
+                                class: atomic.to_string(),
+                                method: method_name.to_string(),
+                            },
+                            Severity::Error,
+                            span,
+                        );
                         result.add_type(mir_types::Atomic::TMixed);
                     }
                     // self-out isn't tracked through intersection receivers —
