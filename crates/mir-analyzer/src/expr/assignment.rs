@@ -448,21 +448,32 @@ impl<'a> ExpressionAnalyzer<'a> {
                             let prop_declaring_class =
                                 prop_found.as_ref().map(|(cls, _)| cls.clone());
                             let prop_def = prop_found.map(|(_, p)| p);
+                            let prop_owner = prop_declaring_class
+                                .clone()
+                                .unwrap_or_else(|| std::sync::Arc::from(fqcn.as_ref()));
                             // Without this, hover/go-to-definition on the property name
                             // worked on the read side (analyze_property_access) but not
                             // on a plain-assignment write target ($this->prop = ...).
                             self.record_symbol(
                                 pa.property.span,
                                 crate::symbol::ReferenceKind::PropertyAccess {
-                                    class: prop_declaring_class
-                                        .clone()
-                                        .unwrap_or_else(|| std::sync::Arc::from(fqcn.as_ref())),
+                                    class: prop_owner.clone(),
                                     property: std::sync::Arc::from(prop_name.as_str()),
                                 },
                                 prop_def
                                     .as_ref()
                                     .and_then(|p| p.ty.as_deref().cloned())
                                     .unwrap_or_else(|| ty.clone()),
+                            );
+                            // Without this, find-all-references on a property only found
+                            // reads ($this->prop) — write targets ($this->prop = ...) were
+                            // invisible, unlike the read path which also calls record_ref.
+                            self.record_ref(
+                                std::sync::Arc::from(format!(
+                                    "prop:{}::{}",
+                                    prop_owner, prop_name
+                                )),
+                                pa.property.span,
                             );
                             // Emit DeprecatedProperty if the property is deprecated
                             if let Some(ref p) = prop_def {

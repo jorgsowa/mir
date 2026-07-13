@@ -522,6 +522,48 @@ fn property_references_inherited_property_end_to_end() {
 }
 
 #[test]
+fn property_write_target_appears_in_references() {
+    // A plain-assignment write ($this->prop = ...) must show up in find-all-references,
+    // same as a read ($this->prop) does.
+    use mir_analyzer::Name;
+    use mir_analyzer::FileAnalyzer;
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_all_stubs();
+
+    let file: Arc<str> = Arc::from("prop_write.php");
+    let source: Arc<str> = Arc::from(
+        "<?php\n\
+         class Foo {\n\
+         private string $v = '';\n\
+         function set(string $x): void { $this->v = $x; }\n\
+         function get(): string { return $this->v; }\n\
+         }\n",
+    );
+
+    session.ingest_file(file.clone(), source.clone());
+    let parsed = php_rs_parser::parse(&source);
+    let _analysis = FileAnalyzer::new(&session).analyze(
+        file.clone(),
+        &source,
+        &parsed.program,
+        &parsed.source_map,
+    );
+
+    let refs = session.references_to(&Name::property("Foo", "v"));
+    let lines: Vec<u32> = refs.iter().map(|(_, r)| r.start.line).collect();
+
+    assert!(
+        lines.contains(&4),
+        "expected the write site ($this->v = $x;, line 4) in references_to(Foo::v); got {lines:?}"
+    );
+    assert!(
+        lines.contains(&5),
+        "expected the read site (return $this->v;, line 5) in references_to(Foo::v); got {lines:?}"
+    );
+}
+
+#[test]
 fn property_references_direct_property_end_to_end() {
     // Non-inherited property: references_to(Foo::value) finds the access site.
     use mir_analyzer::FileAnalyzer;
