@@ -202,9 +202,7 @@ impl<'a> DefinitionCollector<'a> {
                                     default: mir_codebase::definitions::wrap_property_type(
                                         p.default.as_ref().map(|_| mir_types::Type::mixed()),
                                     ),
-                                    location: Some(
-                                        self.location(member.span.start, member.span.end),
-                                    ),
+                                    location: Some(self.location(p.span.start, p.span.end)),
                                     deprecated: None,
                                     has_native_type: p.type_hint.is_some(),
                                     from_docblock: false,

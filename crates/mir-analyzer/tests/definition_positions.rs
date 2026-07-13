@@ -100,6 +100,33 @@ fn definition_of_finds_property() {
 }
 
 #[test]
+fn definition_of_promoted_property_points_at_own_param_not_constructor() {
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "Point.php",
+        "<?php\nclass Point {\n    public function __construct(\n        public readonly int $x,\n        public readonly int $y,\n    ) {}\n}\n",
+    );
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(&[file], &BatchOptions::new());
+
+    let x_loc = analyzer
+        .definition_of(&Name::property("Point", "x"))
+        .expect("should find location for promoted property $x");
+    let y_loc = analyzer
+        .definition_of(&Name::property("Point", "y"))
+        .expect("should find location for promoted property $y");
+
+    assert_eq!(x_loc.line, 4, "$x is declared on line 4, not the constructor's line 3");
+    assert_eq!(y_loc.line, 5, "$y is declared on line 5, not the constructor's line 3");
+    assert_ne!(
+        x_loc, y_loc,
+        "each promoted property must have its own distinct location"
+    );
+}
+
+#[test]
 fn definition_of_returns_not_found_for_unknown() {
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
     assert_eq!(
