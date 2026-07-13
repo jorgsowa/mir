@@ -746,6 +746,17 @@ impl CallAnalyzer {
                     ))
                 })
                 .unwrap_or(false);
+            if is_trait {
+                // The call may be satisfied by whichever class ends up consuming
+                // this trait — record a per-trait marker so DeadCodeAnalyzer can
+                // credit any composing class's own private method of this name
+                // as used, instead of only ever seeing the trait's own (failed)
+                // resolution attempt. Mirrors the instance-call path in method.rs.
+                ea.record_ref(
+                    Arc::from(format!("traituse:{fqcn}::{method_name_lower}")),
+                    call.method.span,
+                );
+            }
             // In a trait body, self::/static:: resolve to the consuming class,
             // which may provide the method — not undefined.
             if is_abstract || is_trait || has_callstatic_magic || guarded_by_method_exists {
