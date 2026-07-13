@@ -816,6 +816,7 @@ impl<'a> BodyAnalyzer<'a> {
                     all_issues,
                     self.php_version,
                     self.mode == AnalysisMode::Full,
+                    all_symbols,
                 );
             }
         }
@@ -832,6 +833,7 @@ impl<'a> BodyAnalyzer<'a> {
                     all_issues,
                     self.php_version,
                     self.mode == AnalysisMode::Full,
+                all_symbols,
                 );
             }
         }
@@ -917,6 +919,7 @@ impl<'a> BodyAnalyzer<'a> {
                     all_issues,
                     self.php_version,
                     self.mode == AnalysisMode::Full,
+                    all_symbols,
                 );
             }
         }
@@ -933,6 +936,7 @@ impl<'a> BodyAnalyzer<'a> {
                     all_issues,
                     self.php_version,
                     self.mode == AnalysisMode::Full,
+                all_symbols,
                 );
             }
         }

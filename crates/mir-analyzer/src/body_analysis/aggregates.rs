@@ -221,6 +221,7 @@ impl<'a> BodyAnalyzer<'a> {
                 all_issues,
                 self.php_version,
                 self.mode == AnalysisMode::Full,
+                all_symbols,
             );
         }
 
@@ -303,6 +304,7 @@ impl<'a> BodyAnalyzer<'a> {
                 all_issues,
                 self.php_version,
                 self.mode == AnalysisMode::Full,
+                all_symbols,
             );
         }
 
@@ -355,6 +357,7 @@ impl<'a> BodyAnalyzer<'a> {
         source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<Issue>,
         guards: &rustc_hash::FxHashSet<std::sync::Arc<str>>,
+        all_symbols: &mut Vec<ResolvedSymbol>,
     ) {
         crate::attributes::check_interface_attributes(
             decl,
@@ -395,6 +398,7 @@ impl<'a> BodyAnalyzer<'a> {
                 all_issues,
                 self.php_version,
                 self.mode == AnalysisMode::Full,
+                all_symbols,
             );
         }
         let iface_fqcn_ref = crate::db::Fqcn::from_str(self.db, &iface_fqcn);

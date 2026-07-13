@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use crate::db::{class_exists, resolve_name, MirDatabase};
 use crate::php_version::PhpVersion;
+use crate::symbol::{ReferenceKind, ResolvedSymbol};
 
 // ---------------------------------------------------------------------------
 // Stored-location → Issue Location passthrough
@@ -249,6 +250,7 @@ pub(crate) fn check_name_class(
     issues: &mut Vec<mir_issues::Issue>,
     php_version: PhpVersion,
     record_refs: bool,
+    symbols: &mut Vec<ResolvedSymbol>,
 ) {
     check_name_class_with_context(
         name,
@@ -260,6 +262,7 @@ pub(crate) fn check_name_class(
         php_version,
         false,
         record_refs,
+        symbols,
     );
 }
 
@@ -273,6 +276,7 @@ pub(crate) fn check_name_class_for_extends(
     issues: &mut Vec<mir_issues::Issue>,
     php_version: PhpVersion,
     record_refs: bool,
+    symbols: &mut Vec<ResolvedSymbol>,
 ) {
     check_name_class_with_context(
         name,
@@ -284,6 +288,7 @@ pub(crate) fn check_name_class_for_extends(
         php_version,
         true,
         record_refs,
+        symbols,
     );
 }
 
@@ -298,6 +303,7 @@ fn check_name_class_with_context(
     php_version: PhpVersion,
     is_extends: bool,
     record_refs: bool,
+    symbols: &mut Vec<ResolvedSymbol>,
 ) {
     let name_str = crate::parser::name_to_string_owned(name);
     let resolved = resolve_name(db, file.as_ref(), &name_str);
@@ -347,6 +353,16 @@ fn check_name_class_with_context(
             line,
             col_start,
             col_end: clamp_col_end(line, line_end, col_start, col_end),
+        });
+        // Hover / go-to-definition on the extends/implements class-name token
+        // itself, matching every other class-name usage site (type hints,
+        // `new`, `instanceof`, use-imports).
+        symbols.push(ResolvedSymbol {
+            file: file.clone(),
+            span,
+            expr_span: None,
+            kind: ReferenceKind::ClassReference(Arc::from(resolved.as_str())),
+            resolved_type: mir_types::Type::single(mir_types::Atomic::TClassString(None)),
         });
     }
 

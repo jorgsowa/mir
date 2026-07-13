@@ -197,7 +197,7 @@ impl<'a> BodyAnalyzer<'a> {
                 }
                 StmtKind::Interface(decl) => {
                     self.analyze_interface_decl(
-                        decl, file, source, source_map, all_issues, &guards,
+                        decl, file, source, source_map, all_issues, &guards, all_symbols,
                     );
                 }
                 StmtKind::Trait(decl) => {
@@ -291,7 +291,7 @@ impl<'a> BodyAnalyzer<'a> {
                 }
                 StmtKind::Interface(decl) => {
                     self.analyze_interface_decl(
-                        decl, file, source, source_map, all_issues, &guards,
+                        decl, file, source, source_map, all_issues, &guards, all_symbols,
                     );
                 }
                 StmtKind::Trait(decl) => {

@@ -1722,3 +1722,95 @@ fn symbol_at_attribute_argument_does_not_resolve_to_class_reference() {
         sym.as_ref().map(|s| &s.kind)
     );
 }
+
+// ---------------------------------------------------------------------------
+// symbol_at — extends/implements/interface-extends class-name tokens
+// ---------------------------------------------------------------------------
+
+#[test]
+fn symbol_at_class_extends_name_resolves() {
+    let dir = create_temp_dir("symbol_at_class_extends_name_resolves");
+    let src = "<?php\nclass Base {}\nclass Child extends Base {}\n";
+    let file = write_file(&dir, "a.php", src);
+    let file_str = path_to_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let offset = src.rfind("Base {}").unwrap() as u32;
+    let sym = result
+        .symbol_at(file_str, offset)
+        .expect("symbol_at should find a symbol at the extends class-name token");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::ClassReference(n) if n.as_ref() == "Base"),
+        "expected ClassReference(Base), got {:?}",
+        sym.kind
+    );
+}
+
+#[test]
+fn symbol_at_class_implements_name_resolves() {
+    let dir = create_temp_dir("symbol_at_class_implements_name_resolves");
+    let src = "<?php\ninterface Greets {}\nclass Child implements Greets {}\n";
+    let file = write_file(&dir, "a.php", src);
+    let file_str = path_to_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let offset = src.rfind("Greets {}").unwrap() as u32;
+    let sym = result
+        .symbol_at(file_str, offset)
+        .expect("symbol_at should find a symbol at the implements class-name token");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::ClassReference(n) if n.as_ref() == "Greets"),
+        "expected ClassReference(Greets), got {:?}",
+        sym.kind
+    );
+}
+
+#[test]
+fn symbol_at_interface_extends_name_resolves() {
+    let dir = create_temp_dir("symbol_at_interface_extends_name_resolves");
+    let src = "<?php\ninterface Base {}\ninterface Child extends Base {}\n";
+    let file = write_file(&dir, "a.php", src);
+    let file_str = path_to_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let offset = src.rfind("Base {}").unwrap() as u32;
+    let sym = result
+        .symbol_at(file_str, offset)
+        .expect("symbol_at should find a symbol at the interface-extends class-name token");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::ClassReference(n) if n.as_ref() == "Base"),
+        "expected ClassReference(Base), got {:?}",
+        sym.kind
+    );
+}
+
+#[test]
+fn symbol_at_enum_implements_name_resolves() {
+    let dir = create_temp_dir("symbol_at_enum_implements_name_resolves");
+    let src = "<?php\ninterface HasLabel {}\nenum Suit implements HasLabel { case Hearts; }\n";
+    let file = write_file(&dir, "a.php", src);
+    let file_str = path_to_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let offset = src.rfind("HasLabel {").unwrap() as u32;
+    let sym = result
+        .symbol_at(file_str, offset)
+        .expect("symbol_at should find a symbol at the enum implements class-name token");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::ClassReference(n) if n.as_ref() == "HasLabel"),
+        "expected ClassReference(HasLabel), got {:?}",
+        sym.kind
+    );
+}
