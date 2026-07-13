@@ -1699,3 +1699,26 @@ fn symbol_at_finds_interface_declared_property_access() {
         "interface-typed property access should produce one reference location"
     );
 }
+
+#[test]
+fn symbol_at_attribute_argument_does_not_resolve_to_class_reference() {
+    // A cursor inside an attribute's argument list (not over the class name
+    // itself) must not resolve to the attribute's ClassReference symbol —
+    // previously the recorded span covered the whole `#[Attr(...)]`,
+    // including the arguments.
+    let dir = create_temp_dir("symbol_at_attribute_argument_does_not_resolve_to_class_reference");
+    let src = "<?php\n#[Attribute]\nclass Route {\n    public function __construct(public string $path) {}\n}\n#[Route(\"/x\")]\nclass Target {}\n";
+    let file = write_file(&dir, "a.php", src);
+    let file_str = path_to_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let offset = src.rfind("\"/x\"").unwrap() as u32 + 2; // inside the string literal argument
+    let sym = result.symbol_at(file_str, offset);
+    assert!(
+        !matches!(&sym, Some(s) if matches!(&s.kind, ReferenceKind::ClassReference(n) if n.as_ref() == "Route")),
+        "cursor inside attribute arguments must not resolve to the attribute's ClassReference, got {:?}",
+        sym.as_ref().map(|s| &s.kind)
+    );
+}

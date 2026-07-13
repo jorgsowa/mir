@@ -705,8 +705,14 @@ fn check_attribute_list(
                 // class used only via attribute annotations elsewhere is falsely
                 // flagged UnusedClass.
                 if record_refs {
-                    let (line, col_start) = offset_to_line_col(source, attr.span.start, source_map);
-                    let (line_end, col_end) = offset_to_line_col(source, attr.span.end, source_map);
+                    // Use the name token's own span, not the whole `#[Attr(...)]` —
+                    // otherwise a find-references hit reports the full attribute
+                    // (name and args), and a cursor anywhere inside the argument
+                    // list resolves to this ClassReference symbol even when it
+                    // isn't actually over the class name.
+                    let name_span = attr.name.span;
+                    let (line, col_start) = offset_to_line_col(source, name_span.start, source_map);
+                    let (line_end, col_end) = offset_to_line_col(source, name_span.end, source_map);
                     db.record_reference_location(crate::db::RefLoc {
                         symbol_key: Arc::from(format!("cls:{fqcn}")),
                         file: file.clone(),
@@ -722,7 +728,7 @@ fn check_attribute_list(
                     if let Some(symbols) = all_symbols.as_deref_mut() {
                         symbols.push(crate::symbol::ResolvedSymbol {
                             file: file.clone(),
-                            span: attr.span,
+                            span: name_span,
                             expr_span: None,
                             kind: crate::symbol::ReferenceKind::ClassReference(Arc::from(
                                 fqcn.as_str(),
