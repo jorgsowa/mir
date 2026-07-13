@@ -15,4 +15,4 @@ function process(callable $c): void {
 }
 process(function (int $a): void {});
 ===expect===
-InvalidArgument@6:8-6:34: Argument $callback of typed_callable() expects 'callable whose parameter #1 accepts 'bool'', got 'callable whose parameter #1 only accepts 'int''
+InvalidArgument@6:8-6:34: Argument $c of process() expects 'callable whose parameter #1 accepts bool', got 'callable whose parameter #1 only accepts int'

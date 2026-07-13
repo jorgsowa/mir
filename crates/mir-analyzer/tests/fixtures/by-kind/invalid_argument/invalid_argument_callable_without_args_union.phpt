@@ -13,4 +13,4 @@ acme("foo");
 ===expect===
 UnusedParam@2:13-2:19: Parameter $a is never used
 UnusedParam@8:14-8:23: Parameter $callable is never used
-InvalidArgument@9:5-9:10: Argument $callback of typed_callable() expects 'callable with 0 required parameter(s)', got 'callable with 1 required parameter(s)'
+InvalidArgument@9:5-9:10: Argument $callable of acme() expects 'callable with 0 required parameter(s)', got 'callable with 1 required parameter(s)'

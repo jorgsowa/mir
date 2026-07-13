@@ -14,4 +14,4 @@ accept_closure(
   }
 );
 ===expect===
-InvalidArgument@9:2-11:3: Argument $callback of typed_callable() expects 'callable with 0 required parameter(s)', got 'callable with 1 required parameter(s)'
+InvalidArgument@9:2-11:3: Argument $x of accept_closure() expects 'callable with 0 required parameter(s)', got 'callable with 1 required parameter(s)'

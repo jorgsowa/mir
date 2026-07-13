@@ -1666,8 +1666,11 @@ fn expected_fits_actual_param(expected: &Type, actual: &Type, ea: &ExpressionAna
 /// Validate a callback argument against a typed callable parameter (e.g., callable(str,str,str):bool).
 /// Emits InvalidArgument if the provided callable has more required params than expected, or if a
 /// resolvable parameter type is declared too narrow to accept what the signature promises to pass.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn check_typed_callable_arg(
     ea: &mut ExpressionAnalyzer<'_>,
+    fn_name: &str,
+    param_name: &str,
     arg_ty: &Type,
     expected_params: &[FnParam],
     expected_return: Option<&Type>,
@@ -1710,8 +1713,8 @@ pub(crate) fn check_typed_callable_arg(
     if actual_required > expected_required {
         ea.emit(
             IssueKind::InvalidArgument {
-                param: "callback".to_string(),
-                fn_name: "typed_callable".to_string(),
+                param: param_name.to_string(),
+                fn_name: fn_name.to_string(),
                 expected: format!("callable with {} required parameter(s)", expected_required),
                 actual: format!("callable with {} required parameter(s)", actual_required),
             },
@@ -1754,14 +1757,14 @@ pub(crate) fn check_typed_callable_arg(
             if !expected_fits_actual_param(&expected_ty, actual_ty, ea) {
                 ea.emit(
                     IssueKind::InvalidArgument {
-                        param: "callback".to_string(),
-                        fn_name: "typed_callable".to_string(),
+                        param: param_name.to_string(),
+                        fn_name: fn_name.to_string(),
                         expected: format!(
-                            "callable whose parameter #{} accepts '{expected_ty}'",
+                            "callable whose parameter #{} accepts {expected_ty}",
                             i + 1
                         ),
                         actual: format!(
-                            "callable whose parameter #{} only accepts '{actual_ty}'",
+                            "callable whose parameter #{} only accepts {actual_ty}",
                             i + 1
                         ),
                     },
@@ -1793,10 +1796,10 @@ pub(crate) fn check_typed_callable_arg(
                 if !expected_fits_actual_param(&actual_ret, expected_ret, ea) {
                     ea.emit(
                         IssueKind::InvalidArgument {
-                            param: "callback".to_string(),
-                            fn_name: "typed_callable".to_string(),
-                            expected: format!("callable returning '{expected_ret}'"),
-                            actual: format!("callable returning '{actual_ret}'"),
+                            param: param_name.to_string(),
+                            fn_name: fn_name.to_string(),
+                            expected: format!("callable returning {expected_ret}"),
+                            actual: format!("callable returning {actual_ret}"),
                         },
                         Severity::Error,
                         arg_span,

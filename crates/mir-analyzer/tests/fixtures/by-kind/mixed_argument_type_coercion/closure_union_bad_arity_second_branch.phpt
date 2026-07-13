@@ -19,4 +19,4 @@ $cb = $flag
 
 process($cb);
 ===expect===
-InvalidArgument@12:8-12:11: Argument $callback of typed_callable() expects 'callable with 1 required parameter(s)', got 'callable with 2 required parameter(s)'
+InvalidArgument@12:8-12:11: Argument $c of process() expects 'callable with 1 required parameter(s)', got 'callable with 2 required parameter(s)'

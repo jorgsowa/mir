@@ -64,6 +64,8 @@ pub(crate) fn check_one(
         };
         super::super::callable::check_typed_callable_arg(
             ea,
+            fn_name,
+            param_name,
             arg_ty,
             expected_params,
             expected_return,

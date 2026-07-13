@@ -17,4 +17,4 @@ function giveInt(int $x): int {
 
 takesCb('giveInt');
 ===expect===
-InvalidArgument@13:8-13:17: Argument $callback of typed_callable() expects 'callable returning 'string'', got 'callable returning 'int''
+InvalidArgument@13:8-13:17: Argument $cb of takesCb() expects 'callable returning string', got 'callable returning int'
