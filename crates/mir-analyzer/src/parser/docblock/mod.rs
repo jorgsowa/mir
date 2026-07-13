@@ -91,9 +91,11 @@ impl DocblockParser {
                 }
                 "throws" => {
                     if let Some(body_str) = body_text(&tag.body) {
-                        let class = body_str.split_whitespace().next().unwrap_or("").to_string();
-                        if !class.is_empty() {
-                            result.throws.push(class);
+                        let first_word = body_str.split_whitespace().next().unwrap_or("");
+                        for class in first_word.split('|') {
+                            if !class.is_empty() {
+                                result.throws.push(class.to_string());
+                            }
                         }
                     }
                 }
