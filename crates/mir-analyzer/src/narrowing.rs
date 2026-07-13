@@ -454,6 +454,21 @@ pub fn narrow_from_condition(
                     };
                     set_narrowed(ctx, &var_name, &current, narrowed, true);
                 }
+            } else if let Some((obj, prop)) = extract_nullsafe_prop_access(&b.left) {
+                if let Some(raw_name) = extract_class_name(
+                    &b.right,
+                    ctx.self_fqcn.as_deref(),
+                    ctx.parent_fqcn.as_deref(),
+                ) {
+                    let class_name = crate::db::resolve_name(db, file, &raw_name);
+                    narrow_prop_instanceof(ctx, &obj, &prop, &class_name, db, file, is_true);
+                    // `null instanceof X` is always false, so a true result also
+                    // proves the receiver itself is non-null (see
+                    // `narrow_nullsafe_prop_null` for the same reasoning).
+                    if is_true {
+                        narrow_var_null(ctx, &obj, false);
+                    }
+                }
             } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
                 if let Some(raw_name) = extract_class_name(
                     &b.right,
