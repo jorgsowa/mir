@@ -1167,3 +1167,68 @@ fn inherited_static_property_access_via_self_keys_by_declaring_class() {
         "self::$shared inside Child should record a reference keyed by the declaring class ParentC"
     );
 }
+
+#[test]
+fn attribute_argument_class_constant_records_constant_reference() {
+    // #[Route(Target::VERSION)] must record a reference to the specific
+    // constant Target::VERSION, not just the class Target — otherwise
+    // find-references from the constant declaration misses this usage.
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "attr_const_ref.php",
+        "<?php\nclass Target {\n    const VERSION = 'v1';\n}\n#[Attribute]\nclass Route {\n    public function __construct(public string $v) {}\n}\n#[Route(Target::VERSION)]\nclass Consumer {}\n",
+    );
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let locs: Vec<_> = analyzer
+        .reference_locations("cnst:Target::VERSION")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert!(
+        !locs.is_empty(),
+        "attribute argument Target::VERSION should record a constant reference"
+    );
+}
+
+#[test]
+fn attribute_argument_enum_case_records_constant_reference() {
+    // #[Route(Status::Active)] must record a reference to the specific enum
+    // case Status::Active, not just the enum class Status.
+    let dir = create_temp_dir("test");
+    let file = write_file(
+        &dir,
+        "attr_enum_case_ref.php",
+        "<?php\nenum Status {\n    case Active;\n    case Inactive;\n}\n#[Attribute]\nclass Route {\n    public function __construct(public Status $s) {}\n}\n#[Route(Status::Active)]\nclass Consumer {}\n",
+    );
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let locs: Vec<_> = analyzer
+        .reference_locations("cnst:Status::Active")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert!(
+        !locs.is_empty(),
+        "attribute argument Status::Active should record a reference to the specific case"
+    );
+
+    let inactive_locs: Vec<_> = analyzer
+        .reference_locations("cnst:Status::Inactive")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+    assert!(
+        inactive_locs.is_empty(),
+        "Status::Inactive was never referenced and must not show up"
+    );
+}

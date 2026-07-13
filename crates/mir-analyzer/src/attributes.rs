@@ -107,6 +107,31 @@ fn record_class_refs_in_expr(
         ExprKind::ClassConstAccess(cca) => {
             if let ExprKind::Identifier(id) = &cca.class.kind {
                 record(id.as_ref(), cca.class.span);
+                // `Foo::CONST`/`Foo::Case` (but not `Foo::class`, which has no
+                // constant/case of its own) is also a real reference to that
+                // specific constant/enum case — without this, `#[Attr(Status::Active)]`
+                // marked `Status` used but not `Status::Active`, so find-references
+                // and dead-code analysis both missed this usage.
+                if !matches!(&cca.member.kind, ExprKind::Identifier(m) if m.as_ref() == "class") {
+                    if let ExprKind::Identifier(member) = &cca.member.kind {
+                        let resolved = resolve_name(db, file.as_ref(), id.as_ref());
+                        if !matches!(resolved.as_str(), "self" | "static" | "parent") {
+                            let (line, col_start) =
+                                offset_to_line_col(source, cca.member.span.start, source_map);
+                            let (line_end, col_end) =
+                                offset_to_line_col(source, cca.member.span.end, source_map);
+                            db.record_reference_location(crate::db::RefLoc {
+                                symbol_key: Arc::from(format!("cnst:{resolved}::{member}")),
+                                file: file.clone(),
+                                line,
+                                col_start,
+                                col_end: crate::diagnostics::clamp_col_end(
+                                    line, line_end, col_start, col_end,
+                                ),
+                            });
+                        }
+                    }
+                }
             } else {
                 record_class_refs_in_expr(&cca.class, db, file, source, source_map);
             }
@@ -702,9 +727,9 @@ fn check_attribute_list(
                             kind: crate::symbol::ReferenceKind::ClassReference(Arc::from(
                                 fqcn.as_str(),
                             )),
-                            resolved_type: mir_types::Type::single(mir_types::Atomic::TClassString(
-                                None,
-                            )),
+                            resolved_type: mir_types::Type::single(
+                                mir_types::Atomic::TClassString(None),
+                            ),
                         });
                     }
                 }
