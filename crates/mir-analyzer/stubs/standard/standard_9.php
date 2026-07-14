@@ -332,7 +332,7 @@ function array_intersect_ukey(
  * @param callable $data_compare_func <p>
  * The callback comparison function.
  * </p>
- * @param array ...$rest
+ * @param mixed ...$rest
  * <p>
  * The user supplied callback function is used for comparison.
  * It must return an integer less than, equal to, or greater than zero if
@@ -380,7 +380,7 @@ function array_intersect_assoc(array $array, #[PhpStormStubsElementAvailable(fro
  * be respectively less than, equal to, or greater than the
  * second.
  * </p>
- * @param array ...$rest
+ * @param mixed ...$rest
  * @return array an array containing all the values of
  * <code>array</code> that are present in all the arguments.
  * @meta
@@ -404,7 +404,7 @@ function array_uintersect_assoc(
  * @param callable $key_compare_func <p>
  * User supplied callback function to do the comparison.
  * </p>
- * @param array ...$rest
+ * @param mixed ...$rest
  * @return array the values of <code>array</code> whose values exist in all of the arguments.
  * @meta
  */
@@ -434,7 +434,7 @@ function array_intersect_uassoc(
  * @param callable $key_compare_func <p>
  * Key comparison callback function.
  * </p>
- * @param array ...$rest
+ * @param mixed ...$rest
  * @return array an array containing all the values and keys of
  * array1 that are present in all the arguments.
  * @meta
@@ -493,7 +493,7 @@ function array_diff_key(array $array, #[PhpStormStubsElementAvailable(from: '5.3
  * to, or greater than zero if the first argument is considered to
  * be respectively less than, equal to, or greater than the second.
  * </p>
- * @param array ...$rest [optional]
+ * @param mixed ...$rest [optional]
  * @return array an array containing all the entries from
  * <code>array</code> that are not present in any of the other arrays.
  * @meta
@@ -523,7 +523,7 @@ function array_diff_ukey(
  * the first argument is considered to be respectively less than, equal
  * to, or greater than the second.
  * </p>
- * @param array ...$rest [optional]
+ * @param mixed ...$rest [optional]
  * @return array an array containing all the values of
  * <code>array</code> that are not present in any of the other arguments.
  * @meta
@@ -573,7 +573,7 @@ function array_diff_assoc(
  * the first argument is considered to be respectively less than, equal
  * to, or greater than the second.
  * </p>
- * @param array ...$rest [optional]
+ * @param mixed ...$rest [optional]
  * @return array returns an array containing all the values from <code>array</code>
  * that are not present in any of the other arguments.
  * Note that the keys are used in the comparison unlike
@@ -606,7 +606,7 @@ function array_udiff_assoc(
  * to, or greater than zero if the first argument is considered to
  * be respectively less than, equal to, or greater than the second.
  * </p>
- * @param array ...$rest [optional]
+ * @param mixed ...$rest [optional]
  * @return array an array containing all the values and keys from
  * <code>array</code> that are not present in any of the other arrays.
  * @meta
@@ -649,7 +649,7 @@ function array_diff_uassoc(
  * array_udiff_assoc does, since the latter compares
  * the indices by using an internal function.
  * </p>
- * @param array ...$rest [optional]
+ * @param mixed ...$rest [optional]
  * @return array an array containing all the values and keys from
  * <code>array</code> that are not present in any of the other
  * arguments.
