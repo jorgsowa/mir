@@ -69,6 +69,10 @@ pub fn narrow_from_condition(
             let is_identical = b.op == BinaryOp::Identical;
             let effective_true = if is_identical { is_true } else { !is_true };
 
+            // `count($arr) === N` / `strlen($str) !== N`, etc. — independent of
+            // the rest of this arm, mirrors the `<`/`<=`/`>`/`>=` handling below.
+            narrow_count_or_strlen_equality(ctx, &b.left, &b.right, b.op, is_true);
+
             // `($x ?? FALLBACK) === FALLBACK` — on the false branch, $x was defined
             // Must be checked before literal comparisons because `b.right` matching a literal
             // would otherwise consume the arm before we check for NullCoalesce on `b.left`.
@@ -420,6 +424,10 @@ pub fn narrow_from_condition(
         ExprKind::Binary(b) if b.op == BinaryOp::Equal || b.op == BinaryOp::NotEqual => {
             let is_equal = b.op == BinaryOp::Equal;
             let effective_true = if is_equal { is_true } else { !is_true };
+
+            // `count($arr) == N` / `strlen($str) != N`, etc.
+            narrow_count_or_strlen_equality(ctx, &b.left, &b.right, b.op, is_true);
+
             if matches!(b.right.kind, ExprKind::Null) {
                 if let Some(name) = extract_var_name(&b.left) {
                     narrow_var_null(ctx, &name, effective_true);
@@ -3929,6 +3937,43 @@ fn extract_strlen_of_var(expr: &php_ast::owned::Expr) -> Option<String> {
     None
 }
 
+/// `count($arr) op N` / `strlen($str) op N` for the equality operators
+/// (`===`, `!==`, `==`, `!=`) — the `<`/`<=`/`>`/`>=` forms are normalized
+/// and handled inline where those operators are matched; equality is
+/// symmetric so, unlike that relational-operator normalization, no operator
+/// flip is needed when the call is on the right-hand side.
+fn narrow_count_or_strlen_equality(
+    ctx: &mut FlowState,
+    left: &php_ast::owned::Expr,
+    right: &php_ast::owned::Expr,
+    op: BinaryOp,
+    is_true: bool,
+) {
+    let (count_expr, count_lit) = if extract_count_of_var(left).is_some() {
+        (left, right)
+    } else {
+        (right, left)
+    };
+    if let (Some(arr_var), Some(n)) = (
+        extract_count_of_var(count_expr),
+        extract_int_literal(count_lit),
+    ) {
+        narrow_array_count_comparison(ctx, &arr_var, op, n, is_true);
+        return;
+    }
+    let (strlen_expr, strlen_lit) = if extract_strlen_of_var(left).is_some() {
+        (left, right)
+    } else {
+        (right, left)
+    };
+    if let (Some(str_var), Some(n)) = (
+        extract_strlen_of_var(strlen_expr),
+        extract_int_literal(strlen_lit),
+    ) {
+        narrow_string_strlen_comparison(ctx, &str_var, op, n, is_true);
+    }
+}
+
 /// Narrow an array variable based on `count($arr) op n` being `is_true`.
 /// Promotes `array` / `list` to their non-empty variants when the comparison
 /// proves the count is >= 1.
@@ -3945,6 +3990,14 @@ fn narrow_array_count_comparison(
         (BinaryOp::GreaterOrEqual, true) if n >= 1 => true, // count >= 1
         (BinaryOp::Less, false) if n >= 1 => true,   // NOT (count < 1)
         (BinaryOp::LessOrEqual, false) if n >= 0 => true, // NOT (count <= 0)
+        // count($x) === N / == N, true, for a positive N: an exact positive count is non-empty.
+        (BinaryOp::Identical | BinaryOp::Equal, true) if n >= 1 => true,
+        // count($x) === 0 / == 0, false: count is proven not zero.
+        (BinaryOp::Identical | BinaryOp::Equal, false) if n == 0 => true,
+        // count($x) !== 0 / != 0, true: count is proven not zero.
+        (BinaryOp::NotIdentical | BinaryOp::NotEqual, true) if n == 0 => true,
+        // count($x) !== N / != N, false, for a positive N: count equals that N exactly.
+        (BinaryOp::NotIdentical | BinaryOp::NotEqual, false) if n >= 1 => true,
         _ => false,
     };
     if !non_empty {
@@ -3974,6 +4027,10 @@ fn narrow_string_strlen_comparison(
         (BinaryOp::GreaterOrEqual, true) if n >= 1 => true,
         (BinaryOp::Less, false) if n >= 1 => true,
         (BinaryOp::LessOrEqual, false) if n >= 0 => true,
+        (BinaryOp::Identical | BinaryOp::Equal, true) if n >= 1 => true,
+        (BinaryOp::Identical | BinaryOp::Equal, false) if n == 0 => true,
+        (BinaryOp::NotIdentical | BinaryOp::NotEqual, true) if n == 0 => true,
+        (BinaryOp::NotIdentical | BinaryOp::NotEqual, false) if n >= 1 => true,
         _ => false,
     };
     if !non_empty {
