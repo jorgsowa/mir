@@ -148,6 +148,17 @@ pub fn narrow_from_condition(
                 if let Some(obj_var_name) = extract_get_class_arg(&b.left) {
                     let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
                     narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true);
+                } else if let Some(var_name) = extract_gettype_arg(&b.left) {
+                    narrow_from_gettype_literal(ctx, &var_name, class_name_str, effective_true);
+                } else if let Some(var_name) = extract_get_debug_type_arg(&b.left) {
+                    narrow_from_get_debug_type_literal(
+                        ctx,
+                        &var_name,
+                        class_name_str,
+                        effective_true,
+                        db,
+                        file,
+                    );
                 } else if let Some(name) = extract_var_name(&b.left) {
                     // `$x === 'literal'`
                     narrow_var_literal_string(ctx, &name, class_name_str, effective_true);
@@ -156,6 +167,17 @@ pub fn narrow_from_condition(
                 if let Some(obj_var_name) = extract_get_class_arg(&b.right) {
                     let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
                     narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true);
+                } else if let Some(var_name) = extract_gettype_arg(&b.right) {
+                    narrow_from_gettype_literal(ctx, &var_name, class_name_str, effective_true);
+                } else if let Some(var_name) = extract_get_debug_type_arg(&b.right) {
+                    narrow_from_get_debug_type_literal(
+                        ctx,
+                        &var_name,
+                        class_name_str,
+                        effective_true,
+                        db,
+                        file,
+                    );
                 } else if let Some(name) = extract_var_name(&b.right) {
                     // `$x === 'literal'`
                     narrow_var_literal_string(ctx, &name, class_name_str, effective_true);
@@ -282,6 +304,21 @@ pub fn narrow_from_condition(
                         }
                     }
                 }
+                // `get_debug_type($x) === Foo::class` — same idiom as
+                // `get_class($x) === Foo::class` above, PHP 8's replacement for get_class().
+                else if let Some(obj_var_name) = extract_get_debug_type_arg(&b.left) {
+                    if let ExprKind::ClassConstAccess(cca) = &b.right.kind {
+                        if let Some(fqcn) = extract_class_const_fqcn(
+                            cca,
+                            ctx.self_fqcn.as_deref(),
+                            ctx.parent_fqcn.as_deref(),
+                            db,
+                            file,
+                        ) {
+                            narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true);
+                        }
+                    }
+                }
             } else if let ExprKind::ClassConstAccess(_) = &b.left.kind {
                 if let Some(var_name) = extract_var_name(&b.right) {
                     if let Some((enum_fqcn, case_name)) = extract_enum_case(
@@ -334,6 +371,20 @@ pub fn narrow_from_condition(
                 }
                 // `Foo::class === get_class($x)` — symmetric counterpart.
                 else if let Some(obj_var_name) = extract_get_class_arg(&b.right) {
+                    if let ExprKind::ClassConstAccess(cca) = &b.left.kind {
+                        if let Some(fqcn) = extract_class_const_fqcn(
+                            cca,
+                            ctx.self_fqcn.as_deref(),
+                            ctx.parent_fqcn.as_deref(),
+                            db,
+                            file,
+                        ) {
+                            narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true);
+                        }
+                    }
+                }
+                // `Foo::class === get_debug_type($x)` — symmetric counterpart.
+                else if let Some(obj_var_name) = extract_get_debug_type_arg(&b.right) {
                     if let ExprKind::ClassConstAccess(cca) = &b.left.kind {
                         if let Some(fqcn) = extract_class_const_fqcn(
                             cca,
@@ -4014,6 +4065,80 @@ fn extract_get_class_arg(expr: &php_ast::owned::Expr) -> Option<String> {
         }
     }
     None
+}
+
+fn extract_gettype_arg(expr: &php_ast::owned::Expr) -> Option<String> {
+    if let ExprKind::FunctionCall(call) = &expr.kind {
+        if let ExprKind::Identifier(name) = &call.name.kind {
+            if name.eq_ignore_ascii_case("gettype") {
+                if let Some(arg) = call.args.first() {
+                    return extract_var_name(&arg.value);
+                }
+            }
+        }
+    }
+    None
+}
+
+fn extract_get_debug_type_arg(expr: &php_ast::owned::Expr) -> Option<String> {
+    if let ExprKind::FunctionCall(call) = &expr.kind {
+        if let ExprKind::Identifier(name) = &call.name.kind {
+            if name.eq_ignore_ascii_case("get_debug_type") {
+                if let Some(arg) = call.args.first() {
+                    return extract_var_name(&arg.value);
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Narrow `$x` from `gettype($x) === 'literal'`, mapping `gettype()`'s fixed
+/// set of return strings to the equivalent `is_TYPE()` narrowing.
+fn narrow_from_gettype_literal(ctx: &mut FlowState, var_name: &str, literal: &str, is_true: bool) {
+    let type_fn = match literal {
+        "boolean" => "is_bool",
+        "integer" => "is_int",
+        "double" => "is_float",
+        "string" => "is_string",
+        "array" => "is_array",
+        "object" => "is_object",
+        "NULL" => "is_null",
+        "resource" | "resource (closed)" => "is_resource",
+        _ => return,
+    };
+    narrow_from_type_fn(ctx, type_fn, var_name, is_true);
+}
+
+/// Narrow `$x` from `get_debug_type($x) === 'literal'`. Unlike `gettype()`,
+/// `get_debug_type()`'s scalar names are lowercase and don't cover `object`
+/// (it returns the actual class name instead), so anything outside its fixed
+/// scalar set is treated as an exact class name — same semantics as
+/// `get_class($x) === 'literal'` above.
+fn narrow_from_get_debug_type_literal(
+    ctx: &mut FlowState,
+    var_name: &str,
+    literal: &str,
+    is_true: bool,
+    db: &dyn MirDatabase,
+    file: &str,
+) {
+    let type_fn = match literal {
+        "null" => Some("is_null"),
+        "bool" => Some("is_bool"),
+        "int" => Some("is_int"),
+        "float" => Some("is_float"),
+        "string" => Some("is_string"),
+        "array" => Some("is_array"),
+        "resource" | "resource (closed)" => Some("is_resource"),
+        _ => None,
+    };
+    if let Some(type_fn) = type_fn {
+        narrow_from_type_fn(ctx, type_fn, var_name, is_true);
+    } else {
+        let fqcn = crate::db::resolve_name(db, file, literal);
+        narrow_var_to_specific_class(ctx, var_name, &fqcn, is_true);
+    }
 }
 
 // ---------------------------------------------------------------------------
