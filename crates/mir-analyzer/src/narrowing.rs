@@ -3880,7 +3880,13 @@ impl UnionNarrowExt for Type {
 
 fn is_numeric_string(s: &str) -> bool {
     let t = s.trim();
-    !t.is_empty() && (t.parse::<i64>().is_ok() || t.parse::<f64>().is_ok())
+    if t.is_empty() {
+        return false;
+    }
+    // Rust's f64 parser accepts "inf"/"nan"/"infinity" (case-insensitively,
+    // optionally signed) as valid floats, but PHP's is_numeric() does not —
+    // reject non-finite results so e.g. "NAN" isn't treated as numeric.
+    t.parse::<i64>().is_ok() || t.parse::<f64>().is_ok_and(f64::is_finite)
 }
 
 /// Extract the variable name from `count($var)` / `sizeof($var)`.
@@ -4064,4 +4070,40 @@ fn in_array_loose_narrowing_is_safe(current: &Type, haystack: &Type) -> bool {
     }
     (all(current, Atomic::is_int) && all(haystack, Atomic::is_int))
         || (all(current, Atomic::is_string) && all(haystack, Atomic::is_string))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_numeric_string;
+
+    #[test]
+    fn numeric_strings_are_recognized() {
+        assert!(is_numeric_string("42"));
+        assert!(is_numeric_string("-42"));
+        assert!(is_numeric_string("+42"));
+        assert!(is_numeric_string("3.14"));
+        assert!(is_numeric_string(".5"));
+        assert!(is_numeric_string("1e10"));
+        assert!(is_numeric_string("  123  "));
+    }
+
+    #[test]
+    fn non_numeric_strings_are_rejected() {
+        assert!(!is_numeric_string(""));
+        assert!(!is_numeric_string("   "));
+        assert!(!is_numeric_string("hello"));
+        assert!(!is_numeric_string("0x1A"));
+        assert!(!is_numeric_string("12abc"));
+    }
+
+    #[test]
+    fn nan_and_infinity_keywords_are_not_numeric() {
+        // PHP's is_numeric() rejects these, unlike Rust's f64 parser.
+        assert!(!is_numeric_string("NAN"));
+        assert!(!is_numeric_string("nan"));
+        assert!(!is_numeric_string("INF"));
+        assert!(!is_numeric_string("-INF"));
+        assert!(!is_numeric_string("Infinity"));
+        assert!(!is_numeric_string("-Infinity"));
+    }
 }
