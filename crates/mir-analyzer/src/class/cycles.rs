@@ -269,9 +269,7 @@ impl<'a> ClassAnalyzer<'a> {
                 let mut issue = Issue::new(
                     IssueKind::InvalidTraitUse {
                         trait_name: short_name.to_string(),
-                        reason: format!(
-                            "{short_name} has a circular trait composition chain"
-                        ),
+                        reason: format!("{short_name} has a circular trait composition chain"),
                     },
                     loc,
                 );

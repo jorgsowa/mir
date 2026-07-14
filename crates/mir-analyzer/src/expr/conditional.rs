@@ -373,8 +373,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             uncovered.sort();
 
             if !uncovered.is_empty() || (subject_is_nullable && !null_covered) {
-                let mut cases: Vec<String> =
-                    uncovered.iter().map(|s| format!("\"{s}\"")).collect();
+                let mut cases: Vec<String> = uncovered.iter().map(|s| format!("\"{s}\"")).collect();
                 if subject_is_nullable && !null_covered {
                     cases.push("null".to_string());
                 }

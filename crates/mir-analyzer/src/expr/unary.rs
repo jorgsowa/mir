@@ -45,7 +45,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if operand_is_non_numeric(&operand_ty) {
                     self.emit(
                         IssueKind::InvalidOperand {
-                            op: if u.op == UnaryPrefixOp::Negate { "-" } else { "+" }.to_string(),
+                            op: if u.op == UnaryPrefixOp::Negate {
+                                "-"
+                            } else {
+                                "+"
+                            }
+                            .to_string(),
                             left: operand_ty.to_string(),
                             right: String::new(),
                         },

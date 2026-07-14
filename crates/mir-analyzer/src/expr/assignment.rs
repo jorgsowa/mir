@@ -259,9 +259,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // already-fixed property write case just below.
                 self.record_symbol(
                     target.span,
-                    crate::symbol::ReferenceKind::Variable(std::sync::Arc::from(
-                        name_str.as_str(),
-                    )),
+                    crate::symbol::ReferenceKind::Variable(std::sync::Arc::from(name_str.as_str())),
                     ty.clone(),
                 );
                 ctx.set_var(&name_str, ty);
@@ -490,10 +488,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             // reads ($this->prop) — write targets ($this->prop = ...) were
                             // invisible, unlike the read path which also calls record_ref.
                             self.record_ref(
-                                std::sync::Arc::from(format!(
-                                    "prop:{}::{}",
-                                    prop_owner, prop_name
-                                )),
+                                std::sync::Arc::from(format!("prop:{}::{}", prop_owner, prop_name)),
                                 pa.property.span,
                             );
                             // Emit DeprecatedProperty if the property is deprecated
@@ -534,16 +529,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 // checks own composition rather than comparing declaring-class
                                 // strings — `find_property_in_chain` reports a trait's own FQCN as
                                 // the "declaring class", which would otherwise never match self_fqcn.
-                                let in_declaring_scope = ctx.self_fqcn.as_deref().is_some_and(
-                                    |self_cls| {
+                                let in_declaring_scope =
+                                    ctx.self_fqcn.as_deref().is_some_and(|self_cls| {
                                         self_cls.eq_ignore_ascii_case(fqcn.as_ref())
                                             && crate::db::property_in_own_composition(
                                                 self.db,
                                                 crate::db::Fqcn::new(self.db, *fqcn),
                                                 &prop_name,
                                             )
-                                    },
-                                );
+                                    });
                                 if is_readonly
                                     && !(ctx.inside_constructor && in_declaring_scope)
                                     && !(has_native_readonly && in_declaring_scope)
@@ -745,9 +739,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                             // records both. Key by the declaring owner, not the
                             // accessed-through class, matching the read path.
                             let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
-                            let prop_owner = crate::db::find_property_in_chain(self.db, here, prop_name)
-                                .map(|(cls, _)| cls)
-                                .unwrap_or_else(|| fqcn.clone());
+                            let prop_owner =
+                                crate::db::find_property_in_chain(self.db, here, prop_name)
+                                    .map(|(cls, _)| cls)
+                                    .unwrap_or_else(|| fqcn.clone());
                             self.record_ref(
                                 std::sync::Arc::from(format!("prop:{}::{}", prop_owner, prop_name)),
                                 spa.member.span,

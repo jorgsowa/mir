@@ -127,6 +127,10 @@ mod tests {
 
         assert!(cache.get(&hash, 80).is_some());
         assert!(cache.get(&hash, 81).is_some());
-        assert_eq!(cache.len(), 2, "both version-specific entries must be retained");
+        assert_eq!(
+            cache.len(),
+            2,
+            "both version-specific entries must be retained"
+        );
     }
 }

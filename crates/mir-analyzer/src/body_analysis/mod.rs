@@ -1053,9 +1053,7 @@ pub(crate) fn check_use_decl_casing(
                             file: file.clone(),
                             span: item.span,
                             expr_span: None,
-                            kind: ReferenceKind::ClassReference(Arc::from(
-                                class.fqcn().as_ref(),
-                            )),
+                            kind: ReferenceKind::ClassReference(Arc::from(class.fqcn().as_ref())),
                             resolved_type: Type::single(mir_types::Atomic::TClassString(None)),
                         });
                     }

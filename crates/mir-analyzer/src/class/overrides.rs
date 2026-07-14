@@ -34,9 +34,13 @@ impl<'a> ClassAnalyzer<'a> {
             own_methods.iter().map(|(k, _)| k.clone()).collect();
         let mut trait_composed_methods: Vec<(Arc<str>, Arc<mir_codebase::definitions::MethodDef>)> =
             Vec::new();
-        for anc in crate::db::class_ancestors_by_fqcn(self.db, here).iter().skip(1) {
+        for anc in crate::db::class_ancestors_by_fqcn(self.db, here)
+            .iter()
+            .skip(1)
+        {
             let anc_here = crate::db::Fqcn::from_str(self.db, anc.as_ref());
-            let Some(crate::db::ClassLike::Trait(t)) = crate::db::find_class_like(self.db, anc_here)
+            let Some(crate::db::ClassLike::Trait(t)) =
+                crate::db::find_class_like(self.db, anc_here)
             else {
                 break;
             };
@@ -633,9 +637,13 @@ impl<'a> ClassAnalyzer<'a> {
             .unwrap_or_default();
         let mut seen_prop_keys: HashSet<Arc<str>> =
             own_properties.iter().map(|(k, _)| k.clone()).collect();
-        for anc in crate::db::class_ancestors_by_fqcn(self.db, here).iter().skip(1) {
+        for anc in crate::db::class_ancestors_by_fqcn(self.db, here)
+            .iter()
+            .skip(1)
+        {
             let anc_here = crate::db::Fqcn::from_str(self.db, anc.as_ref());
-            let Some(crate::db::ClassLike::Trait(t)) = crate::db::find_class_like(self.db, anc_here)
+            let Some(crate::db::ClassLike::Trait(t)) =
+                crate::db::find_class_like(self.db, anc_here)
             else {
                 break;
             };
@@ -837,10 +845,11 @@ impl<'a> ClassAnalyzer<'a> {
         let needs_rebind = m
             .return_type
             .as_deref()
-            .is_some_and(|t| Self::type_has_self_or_static_atomic(t))
-            || m.params
-                .iter()
-                .any(|p| p.ty.as_deref().is_some_and(|t| Self::type_has_self_or_static_atomic(t)));
+            .is_some_and(Self::type_has_self_or_static_atomic)
+            || m.params.iter().any(|p| {
+                p.ty.as_deref()
+                    .is_some_and(Self::type_has_self_or_static_atomic)
+            });
         if !needs_rebind {
             return m.clone();
         }
@@ -854,7 +863,9 @@ impl<'a> ClassAnalyzer<'a> {
             .iter()
             .map(|p| {
                 let mut p = p.clone();
-                p.ty = p.ty.as_deref().map(|t| Arc::new(Self::rebind_self_static(t, to_fqcn)));
+                p.ty =
+                    p.ty.as_deref()
+                        .map(|t| Arc::new(Self::rebind_self_static(t, to_fqcn)));
                 p
             })
             .collect();

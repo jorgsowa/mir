@@ -112,7 +112,11 @@ use php_ast::owned::{Expr, StaticVar};
 fn generator_return_component(declared: &Type) -> Type {
     for atomic in &declared.types {
         if let Atomic::TNamedObject { fqcn, type_params } = atomic {
-            if fqcn.as_ref().trim_start_matches('\\').eq_ignore_ascii_case("Generator") {
+            if fqcn
+                .as_ref()
+                .trim_start_matches('\\')
+                .eq_ignore_ascii_case("Generator")
+            {
                 if let Some(r) = type_params.get(3) {
                     return r.clone();
                 }
@@ -158,10 +162,7 @@ impl<'a> StatementsAnalyzer<'a> {
             // against that component instead of the whole declared `Generator` type.
             let generator_declared;
             let declared_opt = if ctx.is_generator {
-                generator_declared = ctx
-                    .fn_return_type
-                    .as_ref()
-                    .map(generator_return_component);
+                generator_declared = ctx.fn_return_type.as_ref().map(generator_return_component);
                 generator_declared.as_ref()
             } else {
                 ctx.fn_return_type.as_ref()

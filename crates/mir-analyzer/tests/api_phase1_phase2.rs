@@ -403,7 +403,9 @@ fn global_constant_references_end_to_end_symbol_at_flow() {
         sym.kind
     );
 
-    let name = sym.to_symbol().expect("GlobalConstant should map to a Name");
+    let name = sym
+        .to_symbol()
+        .expect("GlobalConstant should map to a Name");
     let refs = session.references_to(&name);
 
     assert!(
@@ -525,8 +527,8 @@ fn property_references_inherited_property_end_to_end() {
 fn property_write_target_appears_in_references() {
     // A plain-assignment write ($this->prop = ...) must show up in find-all-references,
     // same as a read ($this->prop) does.
-    use mir_analyzer::Name;
     use mir_analyzer::FileAnalyzer;
+    use mir_analyzer::Name;
 
     let session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
@@ -567,8 +569,8 @@ fn property_write_target_appears_in_references() {
 fn static_property_write_target_appears_in_references() {
     // Foo::$prop = ..., self::$prop = ..., and static::$prop = ... writes must show up
     // in find-all-references, same as a static property read does.
-    use mir_analyzer::Name;
     use mir_analyzer::FileAnalyzer;
+    use mir_analyzer::Name;
 
     let session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
@@ -1032,7 +1034,8 @@ fn file_structural_deps_includes_trait_property_and_method_type_hints() {
         Arc::from("/proj/Service.php"),
         Arc::from("<?php\nnamespace Vendor;\nclass Service {}\n"),
     );
-    let consumer_src = "<?php\nnamespace Vendor;\ntrait HasService {\n    public Service $service;\n}\n";
+    let consumer_src =
+        "<?php\nnamespace Vendor;\ntrait HasService {\n    public Service $service;\n}\n";
     session.set_file_text(Arc::from("/proj/Consumer.php"), Arc::from(consumer_src));
 
     let db = session.snapshot_db();

@@ -98,7 +98,11 @@ fn analyze_source_flags_attribute_on_function() {
             .iter()
             .any(|i| i.kind.name() == "InvalidAttribute"),
         "expected InvalidAttribute for #[Attribute] on a function, got: {:?}",
-        result.issues.iter().map(|i| i.kind.name()).collect::<Vec<_>>()
+        result
+            .issues
+            .iter()
+            .map(|i| i.kind.name())
+            .collect::<Vec<_>>()
     );
 }
 
@@ -112,7 +116,11 @@ fn analyze_source_flags_attribute_on_abstract_class() {
             .iter()
             .any(|i| i.kind.name() == "InvalidAttribute"),
         "expected InvalidAttribute for #[Attribute] on an abstract class, got: {:?}",
-        result.issues.iter().map(|i| i.kind.name()).collect::<Vec<_>>()
+        result
+            .issues
+            .iter()
+            .map(|i| i.kind.name())
+            .collect::<Vec<_>>()
     );
 }
 
@@ -126,7 +134,11 @@ fn analyze_source_flags_attribute_on_trait() {
             .iter()
             .any(|i| i.kind.name() == "InvalidAttribute"),
         "expected InvalidAttribute for #[Attribute] on a trait, got: {:?}",
-        result.issues.iter().map(|i| i.kind.name()).collect::<Vec<_>>()
+        result
+            .issues
+            .iter()
+            .map(|i| i.kind.name())
+            .collect::<Vec<_>>()
     );
 }
 
@@ -140,7 +152,11 @@ fn analyze_source_flags_undefined_class_in_param_default() {
             .iter()
             .any(|i| i.kind.name() == "UndefinedClass"),
         "expected UndefinedClass for an undefined class in a param default, got: {:?}",
-        result.issues.iter().map(|i| i.kind.name()).collect::<Vec<_>>()
+        result
+            .issues
+            .iter()
+            .map(|i| i.kind.name())
+            .collect::<Vec<_>>()
     );
 }
 
@@ -154,6 +170,10 @@ fn analyze_source_flags_duplicate_function_declaration() {
             .iter()
             .any(|i| i.kind.name() == "DuplicateFunction"),
         "expected DuplicateFunction for a re-declared function, got: {:?}",
-        result.issues.iter().map(|i| i.kind.name()).collect::<Vec<_>>()
+        result
+            .issues
+            .iter()
+            .map(|i| i.kind.name())
+            .collect::<Vec<_>>()
     );
 }

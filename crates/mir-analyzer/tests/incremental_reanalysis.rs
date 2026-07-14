@@ -430,7 +430,10 @@ fn re_analyze_file_flags_unused_suppress_without_cache() {
     let result = analyzer.re_analyze_file("Foo.php", source, &BatchOptions::new());
 
     assert!(
-        result.issues.iter().any(|i| i.kind.name() == "UnusedSuppress"),
+        result
+            .issues
+            .iter()
+            .any(|i| i.kind.name() == "UnusedSuppress"),
         "expected UnusedSuppress, got: {:?}",
         result
             .issues

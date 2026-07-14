@@ -271,9 +271,7 @@ pub(super) fn infer_const_value(
             }
             _ => None,
         },
-        php_ast::owned::ExprKind::Parenthesized(inner) => {
-            infer_const_value(collector, &inner.kind)
-        }
+        php_ast::owned::ExprKind::Parenthesized(inner) => infer_const_value(collector, &inner.kind),
         // Idiomatic bitflag declarations (`const FLAG_A = 1 << 0;`) and other
         // literal-int arithmetic. Only evaluated when both operands are
         // themselves literal ints, so `self::OTHER_CONST | 1` still falls
@@ -1549,7 +1547,9 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
                                         let const_type = call
                                             .args
                                             .get(1)
-                                            .and_then(|arg| infer_const_value(self, &arg.value.kind))
+                                            .and_then(|arg| {
+                                                infer_const_value(self, &arg.value.kind)
+                                            })
                                             .unwrap_or(Type::mixed());
                                         self.slice.constants.push((fqn, const_type));
                                     }

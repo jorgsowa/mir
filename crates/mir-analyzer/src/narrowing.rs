@@ -587,7 +587,8 @@ pub fn narrow_from_condition(
                             narrow_from_type_fn(ctx, fn_name, &var_name, is_true);
                         }
                         if is_true {
-                            if let Some(expr_key) = extract_expr_guard_key(&arg_expr.value, db, file)
+                            if let Some(expr_key) =
+                                extract_expr_guard_key(&arg_expr.value, db, file)
                             {
                                 if let Some(method_arg) = call.args.get(1) {
                                     if let ExprKind::String(method_name) = &method_arg.value.kind {
@@ -850,7 +851,13 @@ pub fn narrow_from_condition(
                                 extract_class_fqcn_from_expr(&class_arg.value, db, file)
                             {
                                 narrow_prop_is_subclass_of(
-                                    ctx, &obj, &prop, &class_name, db, file, is_true,
+                                    ctx,
+                                    &obj,
+                                    &prop,
+                                    &class_name,
+                                    db,
+                                    file,
+                                    is_true,
                                 );
                             }
                         }
@@ -2244,7 +2251,13 @@ fn narrow_static_prop_instanceof(
 
 /// Applies a narrowed property type computed from `current`, mirroring
 /// `set_narrowed`'s variable-side semantics for the property-refinement store.
-fn apply_prop_narrowed(ctx: &mut FlowState, obj_var: &str, prop: &str, current: Type, narrowed: Type) {
+fn apply_prop_narrowed(
+    ctx: &mut FlowState,
+    obj_var: &str,
+    prop: &str,
+    current: Type,
+    narrowed: Type,
+) {
     if !narrowed.is_empty() {
         if narrowed != current {
             ctx.set_prop_refined(obj_var, prop, narrowed);
@@ -2333,7 +2346,12 @@ fn narrow_prop_is_a(
         }
     } else {
         let narrowed = if is_true {
-            narrow_instanceof_preserving_subtypes(&current, class_name, db, &ctx.template_param_names)
+            narrow_instanceof_preserving_subtypes(
+                &current,
+                class_name,
+                db,
+                &ctx.template_param_names,
+            )
         } else {
             filter_out_instanceof_match(&current, class_name, db)
         };
@@ -2360,8 +2378,7 @@ fn narrow_prop_is_subclass_of(
     if current.is_mixed_not_template() {
         return;
     }
-    let narrowed =
-        narrow_strict_subclass_of(&current, class_name, db, &ctx.template_param_names);
+    let narrowed = narrow_strict_subclass_of(&current, class_name, db, &ctx.template_param_names);
     if !narrowed.is_empty() && narrowed != current {
         ctx.set_prop_refined(obj_var, prop, narrowed);
     }
@@ -3428,7 +3445,11 @@ fn narrow_shape_path_key_exists(
 ) -> Option<Type> {
     let Some((head, rest)) = path.split_first() else {
         let narrowed = add_key_to_sealed_shapes(ty, key);
-        return if narrowed != *ty { Some(narrowed) } else { None };
+        return if narrowed != *ty {
+            Some(narrowed)
+        } else {
+            None
+        };
     };
     let mut changed = false;
     let mut result = Type::empty();

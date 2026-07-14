@@ -114,7 +114,13 @@ impl<'a> BodyAnalyzer<'a> {
         use php_ast::owned::StmtKind;
         let mut all_issues = Vec::new();
         if self.mode == AnalysisMode::Full {
-            check_duplicate_declarations(&program.stmts, &file, source, source_map, &mut all_issues);
+            check_duplicate_declarations(
+                &program.stmts,
+                &file,
+                source,
+                source_map,
+                &mut all_issues,
+            );
         }
         self.analyze_top_level_stmts_typed(
             &program.stmts,
@@ -200,7 +206,13 @@ impl<'a> BodyAnalyzer<'a> {
                 }
                 StmtKind::Interface(decl) => {
                     self.analyze_interface_decl(
-                        decl, file, source, source_map, all_issues, &guards, all_symbols,
+                        decl,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                        &guards,
+                        all_symbols,
                     );
                 }
                 StmtKind::Trait(decl) => {
@@ -294,7 +306,13 @@ impl<'a> BodyAnalyzer<'a> {
                 }
                 StmtKind::Interface(decl) => {
                     self.analyze_interface_decl(
-                        decl, file, source, source_map, all_issues, &guards, all_symbols,
+                        decl,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                        &guards,
+                        all_symbols,
                     );
                 }
                 StmtKind::Trait(decl) => {

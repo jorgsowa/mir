@@ -362,6 +362,7 @@ impl<'a> BodyAnalyzer<'a> {
         self.check_trait_constraints(fqcn, file, all_issues);
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn analyze_interface_decl(
         &self,
         decl: &php_ast::owned::InterfaceDecl,

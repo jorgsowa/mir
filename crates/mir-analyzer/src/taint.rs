@@ -95,7 +95,9 @@ pub fn classify_method_sink(
     method_name: &str,
 ) -> Option<SinkKind> {
     let method = crate::util::php_ident_lowercase(method_name);
-    let is_a = |base: &str| fqcn.eq_ignore_ascii_case(base) || crate::db::extends_or_implements(db, fqcn, base);
+    let is_a = |base: &str| {
+        fqcn.eq_ignore_ascii_case(base) || crate::db::extends_or_implements(db, fqcn, base)
+    };
 
     if is_a("PDO") && matches!(method.as_str(), "query" | "exec" | "prepare") {
         return Some(SinkKind::Sql);

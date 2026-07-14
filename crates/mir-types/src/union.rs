@@ -304,15 +304,13 @@ impl Type {
         }
         // TTrue and TFalse together are exactly TBool — merge rather than
         // keeping both literals once both are present.
-        if matches!(atomic, Atomic::TTrue)
-            && self.types.iter().any(|t| matches!(t, Atomic::TFalse))
+        if matches!(atomic, Atomic::TTrue) && self.types.iter().any(|t| matches!(t, Atomic::TFalse))
         {
             self.types.retain(|t| !matches!(t, Atomic::TFalse));
             self.types.push(Atomic::TBool);
             return;
         }
-        if matches!(atomic, Atomic::TFalse)
-            && self.types.iter().any(|t| matches!(t, Atomic::TTrue))
+        if matches!(atomic, Atomic::TFalse) && self.types.iter().any(|t| matches!(t, Atomic::TTrue))
         {
             self.types.retain(|t| !matches!(t, Atomic::TTrue));
             self.types.push(Atomic::TBool);
@@ -1687,13 +1685,14 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         // own `is_subtype_structural` recurses, so e.g. two differently-named
         // interfaces only match when equal — same conservative stance as the
         // TClosure<:TClosure arm above for named types).
-        (Atomic::TIntersection { parts: sub_parts }, Atomic::TIntersection { parts: sup_parts }) => {
-            sup_parts.iter().all(|sup_part| {
-                sub_parts
-                    .iter()
-                    .any(|sub_part| sub_part.is_subtype_structural(sup_part))
-            })
-        }
+        (
+            Atomic::TIntersection { parts: sub_parts },
+            Atomic::TIntersection { parts: sup_parts },
+        ) => sup_parts.iter().all(|sup_part| {
+            sub_parts
+                .iter()
+                .any(|sub_part| sub_part.is_subtype_structural(sup_part))
+        }),
 
         // List <: array  (list key is always int; int must satisfy the array's key type)
         (Atomic::TList { value }, Atomic::TArray { key, value: av }) => {
@@ -1846,8 +1845,9 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
                 ..
             },
         ) => {
-            let keys_satisfied = sup_props.iter().all(|(key, sup_prop)| {
-                match sub_props.get(key) {
+            let keys_satisfied = sup_props
+                .iter()
+                .all(|(key, sup_prop)| match sub_props.get(key) {
                     Some(sub_prop) => {
                         let has_named_obj = sup_prop.ty.types.iter().any(|a| {
                             matches!(
@@ -1862,8 +1862,7 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
                         has_named_obj || sub_prop.ty.is_subtype_structural(&sup_prop.ty)
                     }
                     None => sup_prop.optional || *sub_open,
-                }
-            });
+                });
             let no_undeclared_extras =
                 *sup_open || sub_props.keys().all(|k| sup_props.contains_key(k));
             keys_satisfied && no_undeclared_extras

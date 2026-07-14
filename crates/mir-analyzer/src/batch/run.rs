@@ -675,7 +675,8 @@ impl AnalysisSession {
             .map_with(db_pass1, |db, (mut entry, salsa_file)| {
                 if let Some(slice) = entry.cached.take() {
                     let slice_arc = Arc::new(slice);
-                    db.parse_cache().insert(entry.hash, php_v, Arc::clone(&slice_arc));
+                    db.parse_cache()
+                        .insert(entry.hash, php_v, Arc::clone(&slice_arc));
                     return (*slice_arc).clone();
                 }
                 let defs = collect_file_definitions(&*db, salsa_file);

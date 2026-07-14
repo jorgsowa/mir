@@ -197,19 +197,23 @@ impl<'a> DefinitionCollector<'a> {
                             has_native_readonly: p.is_readonly,
                             default: None,
                             location: Some(self.location(member.span.start, member.span.end)),
-                            deprecated: prop_doc.deprecated.as_deref().map(Arc::from).or_else(|| {
-                                if p.attributes.iter().any(|a| {
-                                    a.name
-                                        .parts
-                                        .last()
-                                        .map(|part| part.as_ref().eq_ignore_ascii_case("Deprecated"))
-                                        .unwrap_or(false)
-                                }) {
-                                    Some(Arc::from(""))
-                                } else {
-                                    None
-                                }
-                            }),
+                            deprecated: prop_doc.deprecated.as_deref().map(Arc::from).or_else(
+                                || {
+                                    if p.attributes.iter().any(|a| {
+                                        a.name
+                                            .parts
+                                            .last()
+                                            .map(|part| {
+                                                part.as_ref().eq_ignore_ascii_case("Deprecated")
+                                            })
+                                            .unwrap_or(false)
+                                    }) {
+                                        Some(Arc::from(""))
+                                    } else {
+                                        None
+                                    }
+                                },
+                            ),
                             has_native_type: p.type_hint.is_some(),
                             from_docblock: false,
                         },
@@ -235,19 +239,21 @@ impl<'a> DefinitionCollector<'a> {
                             visibility: None,
                             is_final: c.is_final,
                             location: Some(self.location(member.span.start, member.span.end)),
-                            deprecated: const_doc.deprecated.as_deref().map(Arc::from).or_else(|| {
-                                if c.attributes.iter().any(|a| {
-                                    a.name
-                                        .parts
-                                        .last()
-                                        .map(|p| p.as_ref().eq_ignore_ascii_case("Deprecated"))
-                                        .unwrap_or(false)
-                                }) {
-                                    Some(Arc::from(""))
-                                } else {
-                                    None
-                                }
-                            }),
+                            deprecated: const_doc.deprecated.as_deref().map(Arc::from).or_else(
+                                || {
+                                    if c.attributes.iter().any(|a| {
+                                        a.name
+                                            .parts
+                                            .last()
+                                            .map(|p| p.as_ref().eq_ignore_ascii_case("Deprecated"))
+                                            .unwrap_or(false)
+                                    }) {
+                                        Some(Arc::from(""))
+                                    } else {
+                                        None
+                                    }
+                                },
+                            ),
                         },
                     );
                 }

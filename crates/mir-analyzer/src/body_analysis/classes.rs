@@ -49,7 +49,9 @@ impl<'a> BodyAnalyzer<'a> {
         all_issues: &mut Vec<Issue>,
     ) {
         if let Some(hint) = &prop.type_hint {
-            self.check_and_record_type_hint_classes(hint, file, source, source_map, all_issues, None);
+            self.check_and_record_type_hint_classes(
+                hint, file, source, source_map, all_issues, None,
+            );
         } else {
             self.check_property_docblock_classes(
                 prop,
@@ -487,10 +489,8 @@ impl<'a> BodyAnalyzer<'a> {
                 crate::db::ClassLike::Trait(tr) => (&tr.template_params, Vec::new()),
                 crate::db::ClassLike::Enum(_) => return,
             };
-        let own_template_names: rustc_hash::FxHashSet<&str> = template_params
-            .iter()
-            .map(|tp| tp.name.as_ref())
-            .collect();
+        let own_template_names: rustc_hash::FxHashSet<&str> =
+            template_params.iter().map(|tp| tp.name.as_ref()).collect();
         for tp in template_params.iter() {
             if let Some(bound) = tp.bound.as_deref() {
                 collect_named_object_fqcns(bound, &mut names);
@@ -833,13 +833,20 @@ impl<'a> BodyAnalyzer<'a> {
                     all_issues,
                     self.php_version,
                     self.mode == AnalysisMode::Full,
-                all_symbols,
+                    all_symbols,
                 );
             }
         }
 
         self.check_class_docblock_magic_members(decl, fqcn, file, source, source_map, all_issues);
-        self.check_class_generic_type_args(&decl.doc_comment, fqcn, file, source, source_map, all_issues);
+        self.check_class_generic_type_args(
+            &decl.doc_comment,
+            fqcn,
+            file,
+            source,
+            source_map,
+            all_issues,
+        );
 
         let scope_cx = MethodScopeCx {
             fqcn: Arc::from(fqcn),
@@ -956,13 +963,20 @@ impl<'a> BodyAnalyzer<'a> {
                     all_issues,
                     self.php_version,
                     self.mode == AnalysisMode::Full,
-                all_symbols,
+                    all_symbols,
                 );
             }
         }
 
         self.check_class_docblock_magic_members(decl, fqcn, file, source, source_map, all_issues);
-        self.check_class_generic_type_args(&decl.doc_comment, fqcn, file, source, source_map, all_issues);
+        self.check_class_generic_type_args(
+            &decl.doc_comment,
+            fqcn,
+            file,
+            source,
+            source_map,
+            all_issues,
+        );
 
         let scope_cx = MethodScopeCx {
             fqcn: Arc::from(fqcn),
@@ -1220,13 +1234,16 @@ impl<'a> BodyAnalyzer<'a> {
                     .next()
                     .map(Arc::from)
                     .unwrap_or_else(|| ancestor.clone());
-                let loc = class.location().cloned().unwrap_or_else(|| mir_types::Location {
-                    file: file.clone(),
-                    line: 1,
-                    line_end: 1,
-                    col_start: 0,
-                    col_end: 0,
-                });
+                let loc = class
+                    .location()
+                    .cloned()
+                    .unwrap_or_else(|| mir_types::Location {
+                        file: file.clone(),
+                        line: 1,
+                        line_end: 1,
+                        col_start: 0,
+                        col_end: 0,
+                    });
                 for req in t.require_extends.iter() {
                     let satisfies = fqcn == req.as_ref()
                         || class_all_parents.iter().any(|p| p.as_ref() == req.as_ref());

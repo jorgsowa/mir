@@ -409,7 +409,10 @@ pub fn collect_file_definitions_uncached(
     // Fast path 1: in-process parse cache (populated by collect_and_ingest_file).
     // Avoids re-parsing files that were already processed in the same session.
     // Safe inside a tracked query: content-addressed by source hash, not mutated.
-    if let Some(cached) = db.parse_cache().get(&content_hash, php_version.cache_byte()) {
+    if let Some(cached) = db
+        .parse_cache()
+        .get(&content_hash, php_version.cache_byte())
+    {
         crate::metrics::record_stub_cache_hit();
         if cached.file.as_deref() == Some(&*path) {
             // Path matches — share the Arc directly (no data clone needed).
@@ -480,8 +483,11 @@ pub fn collect_file_definitions_uncached(
     // caching.
     if !has_hard_parse_errors {
         // In-process cache: prevents re-parsing in the same session.
-        db.parse_cache()
-            .insert(content_hash, php_version.cache_byte(), Arc::clone(&slice_arc));
+        db.parse_cache().insert(
+            content_hash,
+            php_version.cache_byte(),
+            Arc::clone(&slice_arc),
+        );
         // Disk cache: prevents re-parsing in future sessions.
         if let Some((cache, php_v)) = &disk_cache_state {
             cache.put(&path, &content_hash, *php_v, &slice_arc);

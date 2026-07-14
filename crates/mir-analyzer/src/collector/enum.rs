@@ -212,19 +212,21 @@ impl DefinitionCollector<'_> {
                             visibility: c.visibility.map(|v| Self::convert_visibility(Some(v))),
                             is_final: c.is_final,
                             location: Some(self.location(member.span.start, member.span.end)),
-                            deprecated: const_doc.deprecated.as_deref().map(Arc::from).or_else(|| {
-                                if c.attributes.iter().any(|a| {
-                                    a.name
-                                        .parts
-                                        .last()
-                                        .map(|p| p.as_ref().eq_ignore_ascii_case("Deprecated"))
-                                        .unwrap_or(false)
-                                }) {
-                                    Some(Arc::from(""))
-                                } else {
-                                    None
-                                }
-                            }),
+                            deprecated: const_doc.deprecated.as_deref().map(Arc::from).or_else(
+                                || {
+                                    if c.attributes.iter().any(|a| {
+                                        a.name
+                                            .parts
+                                            .last()
+                                            .map(|p| p.as_ref().eq_ignore_ascii_case("Deprecated"))
+                                            .unwrap_or(false)
+                                    }) {
+                                        Some(Arc::from(""))
+                                    } else {
+                                        None
+                                    }
+                                },
+                            ),
                         },
                     );
                 }

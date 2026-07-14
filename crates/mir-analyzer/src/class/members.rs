@@ -189,8 +189,11 @@ impl<'a> ClassAnalyzer<'a> {
                 // (via `ancestor_fqcns`'s `ClassLike::Enum` arm), so the same
                 // ancestor-walking check used for classes correctly credits a
                 // trait-provided method as satisfying the interface.
-                let implemented =
-                    crate::db::is_method_concretely_implemented(self.db, enum_fqcn.as_ref(), &lower);
+                let implemented = crate::db::is_method_concretely_implemented(
+                    self.db,
+                    enum_fqcn.as_ref(),
+                    &lower,
+                );
 
                 if !implemented {
                     let loc = issue_location(
