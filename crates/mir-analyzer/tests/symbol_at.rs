@@ -445,6 +445,54 @@ fn symbol_at_finds_property_write_target() {
 }
 
 #[test]
+fn symbol_at_finds_variable_write_target() {
+    // $x = 5 (a plain-assignment write) must resolve on the variable name,
+    // matching the read side (echo $x).
+    let dir = create_temp_dir("test");
+    let src = "<?php\nfunction f(): void { $x = 5; echo $x; }\n";
+    let file = write_file(&dir, "var_write.php", src);
+    let file_str = path_to_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let offset = src.find("$x = 5").unwrap() as u32 + 1; // +1 skips '$'
+    let sym = result
+        .symbol_at(file_str, offset)
+        .expect("symbol_at should resolve the $x write target");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::Variable(name) if name.as_ref() == "x"),
+        "expected Variable(x) for the write target, got {:?}",
+        sym.kind
+    );
+}
+
+#[test]
+fn symbol_at_finds_array_destructuring_write_target() {
+    // [$a, $b] = $pair; — each destructuring target recurses through the same
+    // plain-variable write path and must resolve too, not just a bare `$x = ...`.
+    let dir = create_temp_dir("test");
+    let src = "<?php\nfunction f(array $pair): void { [$a, $b] = $pair; echo $a . $b; }\n";
+    let file = write_file(&dir, "destructure_write.php", src);
+    let file_str = path_to_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let offset = src.find("$a, $b").unwrap() as u32 + 1; // +1 skips '$'
+    let sym = result
+        .symbol_at(file_str, offset)
+        .expect("symbol_at should resolve the $a destructuring write target");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::Variable(name) if name.as_ref() == "a"),
+        "expected Variable(a) for the destructuring write target, got {:?}",
+        sym.kind
+    );
+}
+
+#[test]
 fn symbol_at_this_method_call_full_lsp_flow() {
     // Verify the full LSP flow: cursor → codebase_key → get_reference_locations.
     // Two calls to $this->helper() from the same method must both be indexed.

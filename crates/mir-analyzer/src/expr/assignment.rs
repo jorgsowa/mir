@@ -253,6 +253,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                         span,
                     );
                 }
+                // Without this, hover/go-to-definition on the variable name worked on
+                // the read side (analyze_variable) but not on a plain-assignment write
+                // target ($x = ... / list()/array-destructuring targets), unlike the
+                // already-fixed property write case just below.
+                self.record_symbol(
+                    target.span,
+                    crate::symbol::ReferenceKind::Variable(std::sync::Arc::from(
+                        name_str.as_str(),
+                    )),
+                    ty.clone(),
+                );
                 ctx.set_var(&name_str, ty);
                 let (line, col_start) = self.offset_to_line_col(target.span.start);
                 let (line_end, col_end) = self.offset_to_line_col(target.span.end);
