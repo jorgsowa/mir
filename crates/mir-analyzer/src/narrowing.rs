@@ -601,10 +601,16 @@ pub fn narrow_from_condition(
                             }
                         }
                     }
-                } else if bare.eq_ignore_ascii_case("array_key_exists") && is_true {
+                } else if matches!(
+                    bare.to_ascii_lowercase().as_str(),
+                    "array_key_exists" | "key_exists"
+                ) && is_true
+                {
                     // array_key_exists('k', $arr) in true-branch: prove the key
                     // exists in the array's sealed shape so that $arr['k'] does
                     // not trigger NonExistentArrayOffset afterwards.
+                    // `key_exists()` is a built-in alias of `array_key_exists()`
+                    // with identical semantics.
                     if let (Some(key_arg), Some(arr_arg)) = (call.args.first(), call.args.get(1)) {
                         let literal_key = match &key_arg.value.kind {
                             ExprKind::String(s) => Some(mir_types::atomic::ArrayKey::String(
