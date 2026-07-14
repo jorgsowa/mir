@@ -283,12 +283,22 @@ impl fmt::Display for Atomic {
             }
 
             Atomic::TIntersection { parts } => {
-                let mut iter = parts.iter();
-                if let Some(first) = iter.next() {
-                    write!(f, "{first}")?;
-                    for part in iter {
-                        write!(f, "&{part}")?;
+                // Skip exact-duplicate parts (e.g. a redundant `Foo&Foo`) —
+                // hierarchy-aware redundancy (like `Iterator&Traversable`)
+                // needs class info this crate doesn't have, so only drop
+                // parts that are structurally identical to an earlier one.
+                let mut printed: Vec<&Type> = Vec::new();
+                let mut first = true;
+                for part in parts.iter() {
+                    if printed.contains(&part) {
+                        continue;
                     }
+                    printed.push(part);
+                    if !first {
+                        f.write_str("&")?;
+                    }
+                    first = false;
+                    write!(f, "{part}")?;
                 }
                 Ok(())
             }
@@ -542,5 +552,46 @@ mod tests {
             format!("{u}"),
             "array<int, string>|Traversable<string, int>"
         );
+    }
+
+    fn named_object(fqcn: &str) -> Atomic {
+        Atomic::TNamedObject {
+            fqcn: fqcn.into(),
+            type_params: crate::union::empty_type_params(),
+        }
+    }
+
+    #[test]
+    fn intersection_drops_exact_duplicate_part() {
+        let atomic = Atomic::TIntersection {
+            parts: crate::union::vec_to_type_params(vec![
+                Type::single(named_object("Foo")),
+                Type::single(named_object("Foo")),
+            ]),
+        };
+        assert_eq!(format!("{atomic}"), "Foo");
+    }
+
+    #[test]
+    fn intersection_keeps_distinct_parts() {
+        let atomic = Atomic::TIntersection {
+            parts: crate::union::vec_to_type_params(vec![
+                Type::single(named_object("Countable")),
+                Type::single(named_object("Traversable")),
+            ]),
+        };
+        assert_eq!(format!("{atomic}"), "Countable&Traversable");
+    }
+
+    #[test]
+    fn intersection_drops_duplicate_among_three_parts() {
+        let atomic = Atomic::TIntersection {
+            parts: crate::union::vec_to_type_params(vec![
+                Type::single(named_object("Foo")),
+                Type::single(named_object("Bar")),
+                Type::single(named_object("Foo")),
+            ]),
+        };
+        assert_eq!(format!("{atomic}"), "Foo&Bar");
     }
 }
