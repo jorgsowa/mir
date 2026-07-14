@@ -2084,10 +2084,11 @@ fn is_truthy_bool_literal(expr: &php_ast::owned::Expr) -> bool {
 }
 
 /// Narrow from a call compared against the `false` literal — the idiomatic
-/// way to interpret `strpos()`'s `int|false` result, since a loose truthy
-/// check misfires on a match at offset 0. `is_false` is whether
-/// `expr === false` holds in this branch (so `!is_false` means the call
-/// proved a match — a substring was found).
+/// way to interpret `strpos()`/`array_search()`'s `int|string|false` result,
+/// since a loose truthy check misfires on a match at offset/key 0. `is_false`
+/// is whether `expr === false` holds in this branch (so `!is_false` means
+/// the call proved a match — a substring was found, or the needle is
+/// present in the haystack).
 fn narrow_from_false_comparable_call(
     expr: &php_ast::owned::Expr,
     ctx: &mut FlowState,
@@ -2129,6 +2130,48 @@ fn narrow_from_false_comparable_call(
                             let narrowed = narrow_string_to_non_empty(&current);
                             if narrowed != current {
                                 ctx.set_var(&var_name, narrowed);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } else if bare.eq_ignore_ascii_case("array_search") {
+        // array_search($needle, $haystack) !== false / === false — same
+        // haystack-literal narrowing as in_array(), keyed off the same
+        // strict/loose-safety rule (see in_array_loose_narrowing_is_safe).
+        let strict = call
+            .args
+            .get(2)
+            .map(|a| is_truthy_bool_literal(&a.value))
+            .unwrap_or(false);
+        if let (Some(needle_arg), Some(haystack_arg)) = (call.args.first(), call.args.get(1)) {
+            if let Some(var_name) = extract_var_name(&needle_arg.value) {
+                if let Some(haystack_ty) = extract_haystack_type(&haystack_arg.value, ctx) {
+                    let current = ctx.get_var(&var_name);
+                    let loose_safe =
+                        strict || in_array_loose_narrowing_is_safe(&current, &haystack_ty);
+                    if !current.is_mixed() && loose_safe {
+                        if !is_false {
+                            // Found: keep only atoms that could match a haystack value.
+                            let narrowed = narrow_to_haystack_values(&current, &haystack_ty);
+                            if !narrowed.is_empty() && narrowed != current {
+                                ctx.set_var(&var_name, narrowed);
+                            }
+                        } else {
+                            // Not found: safe only when current is a finite literal
+                            // union — remove the matched haystack values.
+                            let all_literals = !current.types.is_empty()
+                                && current
+                                    .types
+                                    .iter()
+                                    .all(|a| matches!(a, Atomic::TLiteralString(_) | Atomic::TLiteralInt(_)));
+                            if all_literals {
+                                let narrowed =
+                                    current.filter(|a| !haystack_ty.types.iter().any(|h| h == a));
+                                if !narrowed.is_empty() && narrowed != current {
+                                    ctx.set_var(&var_name, narrowed);
+                                }
                             }
                         }
                     }
