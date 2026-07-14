@@ -302,6 +302,22 @@ impl Type {
         {
             return;
         }
+        // TTrue and TFalse together are exactly TBool — merge rather than
+        // keeping both literals once both are present.
+        if matches!(atomic, Atomic::TTrue)
+            && self.types.iter().any(|t| matches!(t, Atomic::TFalse))
+        {
+            self.types.retain(|t| !matches!(t, Atomic::TFalse));
+            self.types.push(Atomic::TBool);
+            return;
+        }
+        if matches!(atomic, Atomic::TFalse)
+            && self.types.iter().any(|t| matches!(t, Atomic::TTrue))
+        {
+            self.types.retain(|t| !matches!(t, Atomic::TTrue));
+            self.types.push(Atomic::TBool);
+            return;
+        }
         // Adding TInt widens away all TLiteralInt variants.
         if matches!(atomic, Atomic::TInt) {
             self.types.retain(|t| !matches!(t, Atomic::TLiteralInt(_)));
@@ -1962,6 +1978,39 @@ mod tests {
         u.add_type(Atomic::TLiteralInt(42));
         assert_eq!(u.types.len(), 1);
         assert!(matches!(u.types[0], Atomic::TInt));
+    }
+
+    #[test]
+    fn true_then_false_merges_to_bool() {
+        let mut u = Type::single(Atomic::TTrue);
+        u.add_type(Atomic::TFalse);
+        assert_eq!(u.types.len(), 1);
+        assert!(matches!(u.types[0], Atomic::TBool));
+    }
+
+    #[test]
+    fn false_then_true_merges_to_bool() {
+        let mut u = Type::single(Atomic::TFalse);
+        u.add_type(Atomic::TTrue);
+        assert_eq!(u.types.len(), 1);
+        assert!(matches!(u.types[0], Atomic::TBool));
+    }
+
+    #[test]
+    fn true_alone_stays_true() {
+        let u = Type::single(Atomic::TTrue);
+        assert_eq!(u.types.len(), 1);
+        assert!(matches!(u.types[0], Atomic::TTrue));
+    }
+
+    #[test]
+    fn true_false_merge_preserves_other_union_members() {
+        let mut u = Type::single(Atomic::TTrue);
+        u.add_type(Atomic::TNull);
+        u.add_type(Atomic::TFalse);
+        assert_eq!(u.types.len(), 2);
+        assert!(u.contains(|t| matches!(t, Atomic::TBool)));
+        assert!(u.contains(|t| matches!(t, Atomic::TNull)));
     }
 
     #[test]
