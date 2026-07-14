@@ -784,6 +784,26 @@ pub fn narrow_from_condition(
                                     set_narrowed(ctx, &var_name, &current, narrowed, true);
                                 }
                             }
+                        } else if let Some((obj, prop)) = extract_prop_access(&obj_arg.value) {
+                            if let Some(class_name) =
+                                extract_class_fqcn_from_expr(&class_arg.value, db, file)
+                            {
+                                let allow_string = call
+                                    .args
+                                    .get(2)
+                                    .map(|a| is_truthy_bool_literal(&a.value))
+                                    .unwrap_or(false);
+                                narrow_prop_is_a(
+                                    ctx,
+                                    &obj,
+                                    &prop,
+                                    &class_name,
+                                    allow_string,
+                                    db,
+                                    file,
+                                    is_true,
+                                );
+                            }
                         }
                     }
                 } else if bare.eq_ignore_ascii_case("is_subclass_of") {
@@ -812,6 +832,14 @@ pub fn narrow_from_condition(
                                     set_narrowed(ctx, &var_name, &current, narrowed, false);
                                 }
                                 // False branch: leave current type unchanged.
+                            }
+                        } else if let Some((obj, prop)) = extract_prop_access(&obj_arg.value) {
+                            if let Some(class_name) =
+                                extract_class_fqcn_from_expr(&class_arg.value, db, file)
+                            {
+                                narrow_prop_is_subclass_of(
+                                    ctx, &obj, &prop, &class_name, db, file, is_true,
+                                );
                             }
                         }
                     }
@@ -2202,6 +2230,18 @@ fn narrow_static_prop_instanceof(
     }
 }
 
+/// Applies a narrowed property type computed from `current`, mirroring
+/// `set_narrowed`'s variable-side semantics for the property-refinement store.
+fn apply_prop_narrowed(ctx: &mut FlowState, obj_var: &str, prop: &str, current: Type, narrowed: Type) {
+    if !narrowed.is_empty() {
+        if narrowed != current {
+            ctx.set_prop_refined(obj_var, prop, narrowed);
+        }
+    } else if !current.is_empty() && !current.is_mixed() {
+        ctx.diverges = true;
+    }
+}
+
 fn narrow_prop_instanceof(
     ctx: &mut FlowState,
     obj_var: &str,
@@ -2211,46 +2251,7 @@ fn narrow_prop_instanceof(
     file: &str,
     is_true: bool,
 ) {
-    let current = if let Some(refined) = ctx.get_prop_refined(obj_var, prop) {
-        refined.clone()
-    } else {
-        let obj_ty = ctx.get_var(obj_var);
-        let mut prop_ty = mir_types::Type::mixed();
-        'outer: for atomic in &obj_ty.types {
-            if let mir_types::Atomic::TNamedObject { fqcn, .. } = atomic {
-                let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
-                if let Some((_, p_def)) = crate::db::find_property_in_chain(db, here, prop) {
-                    if let Some(ty) = p_def.ty.as_deref() {
-                        prop_ty = ty.clone();
-                        break 'outer;
-                    }
-                }
-            } else if let mir_types::Atomic::TSelf { fqcn }
-            | mir_types::Atomic::TStaticObject { fqcn } = atomic
-            {
-                let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
-                if let Some((_, p_def)) = crate::db::find_property_in_chain(db, here, prop) {
-                    if let Some(ty) = p_def.ty.as_deref() {
-                        prop_ty = ty.clone();
-                        break 'outer;
-                    }
-                }
-            }
-        }
-        if prop_ty.is_mixed() && obj_var == "this" {
-            if let Some(fqcn) = ctx.self_fqcn.as_ref() {
-                let resolved = crate::db::resolve_name(db, file, fqcn.as_ref());
-                let here = crate::db::Fqcn::from_str(db, &resolved);
-                if let Some((_, p_def)) = crate::db::find_property_in_chain(db, here, prop) {
-                    if let Some(ty) = p_def.ty.as_deref() {
-                        prop_ty = ty.clone();
-                    }
-                }
-            }
-        }
-        prop_ty
-    };
-
+    let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
     if current.is_mixed_not_template() {
         return;
     }
@@ -2259,12 +2260,98 @@ fn narrow_prop_instanceof(
     } else {
         filter_out_instanceof_match(&current, class_name, db)
     };
-    if !narrowed.is_empty() {
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed);
+}
+
+/// `is_a($obj->prop, ClassName::class)` / `is_a($obj->prop, ClassName::class, true)`
+/// narrowing — same semantics as the variable-based `is_a` branch in
+/// `narrow_from_condition`, applied to a property-access receiver instead.
+#[allow(clippy::too_many_arguments)]
+fn narrow_prop_is_a(
+    ctx: &mut FlowState,
+    obj_var: &str,
+    prop: &str,
+    class_name: &str,
+    allow_string: bool,
+    db: &dyn MirDatabase,
+    file: &str,
+    is_true: bool,
+) {
+    let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
+    if current.is_mixed_not_template() {
+        return;
+    }
+    if allow_string {
+        let narrowed = if is_true {
+            let mut result = Type::empty();
+            result.possibly_undefined = current.possibly_undefined;
+            result.from_docblock = current.from_docblock;
+            let mut obj_part = Type::empty();
+            for atom in &current.types {
+                if atom.is_string() || matches!(atom, Atomic::TClassString(_)) {
+                    result.add_type(atom.clone());
+                } else {
+                    obj_part.add_type(atom.clone());
+                }
+            }
+            if !obj_part.is_empty() || current.is_mixed() {
+                let obj_src = if obj_part.is_empty() {
+                    &current
+                } else {
+                    &obj_part
+                };
+                let obj_narrowed = narrow_instanceof_preserving_subtypes(
+                    obj_src,
+                    class_name,
+                    db,
+                    &ctx.template_param_names,
+                );
+                for atom in obj_narrowed.types.iter() {
+                    result.add_type(atom.clone());
+                }
+            }
+            result
+        } else {
+            filter_out_instanceof_match(&current, class_name, db)
+        };
+        // Same rationale as the variable case: don't mark diverges when
+        // allow_string is set, since a class-string value may still pass.
         if narrowed != current {
             ctx.set_prop_refined(obj_var, prop, narrowed);
         }
-    } else if !current.is_empty() && !current.is_mixed() {
-        ctx.diverges = true;
+    } else {
+        let narrowed = if is_true {
+            narrow_instanceof_preserving_subtypes(&current, class_name, db, &ctx.template_param_names)
+        } else {
+            filter_out_instanceof_match(&current, class_name, db)
+        };
+        apply_prop_narrowed(ctx, obj_var, prop, current, narrowed);
+    }
+}
+
+/// `is_subclass_of($obj->prop, ClassName::class)` narrowing — same semantics
+/// as the variable-based branch (strict-subclass only; the false branch never
+/// narrows since a non-subclass could still be the exact class itself).
+fn narrow_prop_is_subclass_of(
+    ctx: &mut FlowState,
+    obj_var: &str,
+    prop: &str,
+    class_name: &str,
+    db: &dyn MirDatabase,
+    file: &str,
+    is_true: bool,
+) {
+    if !is_true {
+        return;
+    }
+    let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
+    if current.is_mixed_not_template() {
+        return;
+    }
+    let narrowed =
+        narrow_strict_subclass_of(&current, class_name, db, &ctx.template_param_names);
+    if !narrowed.is_empty() && narrowed != current {
+        ctx.set_prop_refined(obj_var, prop, narrowed);
     }
 }
 
