@@ -81,7 +81,27 @@ impl<'a> DeadCodeAnalyzer<'a> {
                 continue;
             }
 
-            let used_traits = class.class_traits();
+            // Direct traits only miss the `traituse:` exemption for nested
+            // composition (`class C { use Outer; } trait Outer { use Inner; }`,
+            // where `Inner`'s own method calls the private member) — the marker
+            // is recorded under `Inner`'s FQCN, which never appears in `C`'s
+            // direct `use` list. Walk the already-transitive ancestor chain
+            // (also used for method/property resolution) and keep only the
+            // trait entries, mirroring the pattern already used for transitive
+            // `@psalm-require-extends` trait-constraint checking.
+            let here = crate::db::Fqcn::from_str(self.db, fqcn_str);
+            let used_traits: Vec<Arc<str>> = crate::db::class_ancestors_by_fqcn(self.db, here)
+                .iter()
+                .filter(|a| a.as_ref() != fqcn_str)
+                .filter(|a| {
+                    let ancestor_here = crate::db::Fqcn::from_str(self.db, a.as_ref());
+                    matches!(
+                        crate::db::find_class_like(self.db, ancestor_here),
+                        Some(crate::db::ClassLike::Trait(_))
+                    )
+                })
+                .cloned()
+                .collect();
 
             // `@dataProvider name` / `#[DataProvider('name')]` methods are invoked by
             // PHPUnit via reflection, never through an ordinary call site — collect every
