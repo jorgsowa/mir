@@ -125,6 +125,9 @@ pub fn narrow_from_condition(
             } else if matches!(b.right.kind, ExprKind::Bool(false)) {
                 if let Some(name) = extract_var_name(&b.left) {
                     narrow_var_bool(ctx, &name, false, effective_true);
+                } else {
+                    // `strpos($h, $n) !== false` / `array_search($n, $h) === false`
+                    narrow_from_false_comparable_call(&b.left, ctx, effective_true);
                 }
             }
             // `true === $x` / `false === $x` — symmetric; extract_var_name looks through
@@ -136,6 +139,8 @@ pub fn narrow_from_condition(
             } else if matches!(b.left.kind, ExprKind::Bool(false)) {
                 if let Some(name) = extract_var_name(&b.right) {
                     narrow_var_bool(ctx, &name, false, effective_true);
+                } else {
+                    narrow_from_false_comparable_call(&b.right, ctx, effective_true);
                 }
             }
             // `get_class($x) === 'ClassName'` — check before literal strings so it takes precedence
@@ -2076,6 +2081,61 @@ fn narrow_strict_subclass_of(
 /// Returns true if `expr` is the boolean literal `true`.
 fn is_truthy_bool_literal(expr: &php_ast::owned::Expr) -> bool {
     matches!(expr.kind, php_ast::owned::ExprKind::Bool(true))
+}
+
+/// Narrow from a call compared against the `false` literal — the idiomatic
+/// way to interpret `strpos()`'s `int|false` result, since a loose truthy
+/// check misfires on a match at offset 0. `is_false` is whether
+/// `expr === false` holds in this branch (so `!is_false` means the call
+/// proved a match — a substring was found).
+fn narrow_from_false_comparable_call(
+    expr: &php_ast::owned::Expr,
+    ctx: &mut FlowState,
+    is_false: bool,
+) {
+    let ExprKind::FunctionCall(call) = &expr.kind else {
+        return;
+    };
+    let fn_name_opt: Option<&str> = match &call.name.kind {
+        ExprKind::Identifier(name) => Some(name.as_ref()),
+        _ => None,
+    };
+    let Some(fn_name) = fn_name_opt else {
+        return;
+    };
+    let bare = fn_name.trim_start_matches('\\');
+    if matches!(
+        bare.to_ascii_lowercase().as_str(),
+        "strpos"
+            | "stripos"
+            | "strrpos"
+            | "strripos"
+            | "mb_strpos"
+            | "mb_stripos"
+            | "mb_strrpos"
+            | "mb_strripos"
+    ) {
+        // Found (result != false) proves the haystack is non-empty, mirroring
+        // str_contains()'s true-branch narrowing — only sound for a non-empty
+        // literal needle (an empty needle is "found" at offset 0 vacuously).
+        if !is_false {
+            if let (Some(haystack_arg), Some(needle_arg)) = (call.args.first(), call.args.get(1)) {
+                let needle_non_empty =
+                    matches!(&needle_arg.value.kind, ExprKind::String(s) if !s.is_empty());
+                if needle_non_empty {
+                    if let Some(var_name) = extract_var_name(&haystack_arg.value) {
+                        let current = ctx.get_var(&var_name);
+                        if !current.is_mixed() {
+                            let narrowed = narrow_string_to_non_empty(&current);
+                            if narrowed != current {
+                                ctx.set_var(&var_name, narrowed);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Apply a pre-computed narrowed type to a variable.
