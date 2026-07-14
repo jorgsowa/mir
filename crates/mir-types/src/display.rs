@@ -44,10 +44,81 @@ fn write_param_types(f: &mut fmt::Formatter<'_>, params: &[crate::atomic::FnPara
     Ok(())
 }
 
+/// PHP's `iterable` is defined as exactly `array|Traversable`, so a union
+/// containing a matching `TArray{key, value}` + `Traversable` pair prints no
+/// more information as those two members than it would as `iterable`. Returns
+/// the pair's indices (lower, higher) and the rendered replacement text.
+///
+/// The `Traversable` member only counts as a match when it's unparameterized
+/// (the bare-`iterable` decomposition) or when its type params are exactly
+/// `[key, value]` (the `iterable<K, V>` decomposition) — a bare `Traversable`
+/// paired with a *more specific* array (e.g. `array<int, string>|Traversable`)
+/// must NOT collapse, since the bare `Traversable` side carries no such
+/// key/value guarantee and collapsing would overclaim precision.
+fn iterable_span(types: &[Atomic]) -> Option<(usize, usize, String)> {
+    for (ai, a) in types.iter().enumerate() {
+        let Atomic::TArray { key, value } = a else {
+            continue;
+        };
+        for (ti, t) in types.iter().enumerate() {
+            if ti == ai {
+                continue;
+            }
+            let Atomic::TNamedObject { fqcn, type_params } = t else {
+                continue;
+            };
+            if fqcn.as_ref() != "Traversable" {
+                continue;
+            }
+            let is_default_key_value =
+                is_exactly_mixed(value) && (is_exactly_mixed(key) || key.is_array_key());
+            let matches = if type_params.is_empty() {
+                // A bare (unparameterized) Traversable makes no key/value
+                // guarantee, so it only pairs safely with the fully generic
+                // `array` — pairing it with a more specific array would
+                // claim the Traversable side shares that specificity too.
+                is_default_key_value
+            } else {
+                type_params.len() == 2
+                    && &type_params[0] == key.as_ref()
+                    && &type_params[1] == value.as_ref()
+            };
+            if !matches {
+                continue;
+            }
+            let rendered = if is_default_key_value {
+                "iterable".to_string()
+            } else {
+                format!("iterable<{key}, {value}>")
+            };
+            return Some((ai.min(ti), ai.max(ti), rendered));
+        }
+    }
+    None
+}
+
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.types.is_empty() {
             return write!(f, "never");
+        }
+        if let Some((lo, hi, rendered)) = iterable_span(&self.types) {
+            let mut first = true;
+            for (i, t) in self.types.iter().enumerate() {
+                if i == hi {
+                    continue;
+                }
+                if !first {
+                    f.write_str("|")?;
+                }
+                first = false;
+                if i == lo {
+                    f.write_str(&rendered)?;
+                } else {
+                    write!(f, "{t}")?;
+                }
+            }
+            return Ok(());
         }
         write_joined(f, self.types.iter(), "|")
     }
@@ -398,5 +469,78 @@ mod tests {
             type_params: crate::union::vec_to_type_params(vec![Type::single(template_param)]),
         };
         assert_eq!(format!("{atomic}"), "MyClass<T>");
+    }
+
+    fn bare_traversable() -> Atomic {
+        Atomic::TNamedObject {
+            fqcn: "Traversable".into(),
+            type_params: crate::union::empty_type_params(),
+        }
+    }
+
+    #[test]
+    fn array_mixed_mixed_or_traversable_collapses_to_iterable() {
+        let mut u = Type::single(Atomic::TArray {
+            key: Box::new(Type::array_key()),
+            value: Box::new(Type::mixed()),
+        });
+        u.add_type(bare_traversable());
+        assert_eq!(format!("{u}"), "iterable");
+    }
+
+    #[test]
+    fn parameterized_array_or_matching_traversable_collapses_to_iterable() {
+        let key = Type::string();
+        let value = Type::int();
+        let mut u = Type::single(Atomic::TArray {
+            key: Box::new(key.clone()),
+            value: Box::new(value.clone()),
+        });
+        u.add_type(Atomic::TNamedObject {
+            fqcn: "Traversable".into(),
+            type_params: crate::union::vec_to_type_params(vec![key, value]),
+        });
+        assert_eq!(format!("{u}"), "iterable<string, int>");
+    }
+
+    #[test]
+    fn iterable_collapse_preserves_other_union_members() {
+        let mut u = Type::single(Atomic::TArray {
+            key: Box::new(Type::array_key()),
+            value: Box::new(Type::mixed()),
+        });
+        u.add_type(bare_traversable());
+        u.add_type(Atomic::TNull);
+        assert_eq!(format!("{u}"), "iterable|null");
+    }
+
+    #[test]
+    fn array_with_mismatched_bare_traversable_does_not_collapse() {
+        // A bare (unparameterized) `Traversable` carries no key/value
+        // guarantee, so pairing it with a *more specific* array must not be
+        // rendered as `iterable<int, string>` — that would overclaim that the
+        // `Traversable` side is bound to the same key/value types too.
+        let mut u = Type::single(Atomic::TArray {
+            key: Box::new(Type::int()),
+            value: Box::new(Type::string()),
+        });
+        u.add_type(bare_traversable());
+        assert_eq!(format!("{u}"), "array<int, string>|Traversable");
+    }
+
+    #[test]
+    fn array_with_non_matching_parameterized_traversable_does_not_collapse() {
+        let mut u = Type::single(Atomic::TArray {
+            key: Box::new(Type::int()),
+            value: Box::new(Type::string()),
+        });
+        u.add_type(Atomic::TNamedObject {
+            fqcn: "Traversable".into(),
+            type_params: crate::union::vec_to_type_params(vec![Type::string(), Type::int()]),
+        });
+        assert_eq!(
+            format!("{u}"),
+            "array<int, string>|Traversable<string, int>"
+        );
     }
 }
