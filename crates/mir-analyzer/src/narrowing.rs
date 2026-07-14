@@ -1330,6 +1330,17 @@ const NARROWING_TYPE_FNS: &[&str] = &[
     "is_countable",
     "is_resource",
     "is_numeric",
+    "ctype_alpha",
+    "ctype_alnum",
+    "ctype_digit",
+    "ctype_lower",
+    "ctype_upper",
+    "ctype_punct",
+    "ctype_space",
+    "ctype_xdigit",
+    "ctype_print",
+    "ctype_graph",
+    "ctype_cntrl",
 ];
 
 /// Extract `(fn_name, var_name)` from a single-argument type-check call
@@ -2987,6 +2998,20 @@ fn narrow_from_type_fn(ctx: &mut FlowState, fn_name: &str, var_name: &str, is_tr
                             | Atomic::TLiteralFloat(..)
                     ) && !matches!(t, Atomic::TLiteralString(s) if is_numeric_string(s))
                 })
+            }
+        }
+        // ctype_*() returns false on an empty string for every variant, so a
+        // truthy result proves the string argument is non-empty. It says
+        // nothing when the argument isn't a string (e.g. ctype_digit(65) is
+        // true because 65 is ASCII 'A', unrelated to decimal digits), so
+        // only TString atoms are touched — everything else passes through.
+        "ctype_alpha" | "ctype_alnum" | "ctype_digit" | "ctype_lower" | "ctype_upper"
+        | "ctype_punct" | "ctype_space" | "ctype_xdigit" | "ctype_print" | "ctype_graph"
+        | "ctype_cntrl" => {
+            if is_true {
+                narrow_string_to_non_empty(&current)
+            } else {
+                current.clone()
             }
         }
         // method_exists($obj, 'method') — if true, narrow to TObject (suppresses
