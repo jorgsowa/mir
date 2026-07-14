@@ -10,8 +10,8 @@
 use std::sync::{Arc, Weak};
 
 use mir_analyzer::db::{
-    file_scopes, infer_function, infer_scope, FunctionInferenceResult, MirDatabase,
-    ScopeInferenceResult,
+    analyze_file, file_scopes, infer_function, infer_scope, AnalyzeOutput, FunctionInferenceResult,
+    MirDatabase, ScopeInferenceResult,
 };
 use mir_analyzer::{AnalysisSession, PhpVersion};
 
@@ -65,6 +65,55 @@ fn infer_function_memos_bounded_under_rename_storm() {
         alive <= LRU_CAP,
         "infer_function memo table not bounded: {alive} values alive after \
          {STORM} distinct keys (lru = {LRU_CAP})"
+    );
+    assert!(alive > 0, "eviction dropped everything — lru misconfigured");
+}
+
+#[test]
+fn analyze_file_memos_bounded_under_file_storm() {
+    // `analyze_file` is keyed per file; hosts that background-warm the whole
+    // workspace hold one memo per indexed file, so the table must be
+    // lru-bounded. Overflow the cap with tiny files and prove eviction via
+    // Weak handles, same as the per-scope tests above.
+    const FILE_CAP: usize = 16384;
+    const FILE_STORM: usize = FILE_CAP + 300;
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let paths: Vec<Arc<str>> = (0..FILE_STORM)
+        .map(|i| Arc::<str>::from(format!("/memo_bounds/files/f{i}.php")))
+        .collect();
+    for (i, path) in paths.iter().enumerate() {
+        session.set_file_text(
+            path.clone(),
+            Arc::from(format!(
+                "<?php\nfunction ff{i}(int $x): int {{ return $x + {i}; }}\n"
+            )),
+        );
+    }
+
+    let weaks: Vec<Weak<AnalyzeOutput>> = {
+        let db = session.snapshot_db();
+        paths
+            .iter()
+            .map(|path| {
+                let file = db.lookup_source_file(path.as_ref()).unwrap();
+                Arc::downgrade(&analyze_file(&db, file))
+            })
+            .collect()
+    };
+    assert_eq!(
+        alive_count(&weaks),
+        FILE_STORM,
+        "memos live before eviction"
+    );
+
+    session.set_file_text(Arc::from("/memo_bounds/other.php"), Arc::from("<?php\n"));
+
+    let alive = alive_count(&weaks);
+    assert!(
+        alive <= FILE_CAP,
+        "analyze_file memo table not bounded: {alive} values alive after \
+         {FILE_STORM} distinct files (lru = {FILE_CAP})"
     );
     assert!(alive > 0, "eviction dropped everything — lru misconfigured");
 }

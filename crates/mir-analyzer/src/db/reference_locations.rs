@@ -90,7 +90,13 @@ unsafe impl salsa::Update for AnalyzeOutput {
 /// when a dependency change invalidates it, only the scopes actually
 /// reached by the change re-execute — the rest return their memoized
 /// results during the merge.
-#[salsa::tracked]
+///
+/// `lru = 16384` bounds the memo table: hosts that background-warm the whole
+/// workspace (php-lsp's analysis warm sweep) would otherwise hold one memo
+/// per indexed file with no ceiling. The cap covers Laravel-scale workspaces
+/// fully; beyond it the least-recently-analyzed files fall back to the
+/// per-scope merge on next read.
+#[salsa::tracked(lru = 16384)]
 pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile) -> Arc<AnalyzeOutput> {
     let path = file.path(db);
     let text = file.text(db);
