@@ -830,7 +830,12 @@ impl CallAnalyzer {
                     super::callable::string_preserve_non_empty(&arg_types).unwrap_or(return_ty)
                 }
                 // sprintf/vsprintf: non-empty when the format string guarantees it.
-                "sprintf" => super::callable::sprintf_return_type(&arg_types).unwrap_or(return_ty),
+                // vsprintf's args are passed as a single array, but the return-type
+                // inference only ever looks at arg_types[0] (the format string), so
+                // the same helper applies unchanged.
+                "sprintf" | "vsprintf" => {
+                    super::callable::sprintf_return_type(&arg_types).unwrap_or(return_ty)
+                }
                 // number_format() always returns a non-empty string.
                 "number_format" => super::callable::number_format_return_type(),
                 // str_repeat() with a non-empty string and positive count returns non-empty.
