@@ -36,6 +36,28 @@ fn parse_list_of_int() {
 }
 
 #[test]
+fn parse_bare_array_keys_on_array_key_not_mixed() {
+    // Regression guard: a bare `array` used to build its key as a literal
+    // `mixed`, which both misrepresented the true PHP array-key domain
+    // (`int|string`) and defeated the `array<mixed, mixed>` -> `array`
+    // display collapse for the common no-generics case.
+    let u = parse_type_string("array");
+    assert!(u.contains(|t| matches!(t, Atomic::TArray { key, .. } if key.is_array_key())));
+}
+
+#[test]
+fn parse_bare_array_displays_as_bare_array() {
+    let u = parse_type_string("array");
+    assert_eq!(format!("{u}"), "array");
+}
+
+#[test]
+fn parse_bare_list_displays_as_bare_list() {
+    let u = parse_type_string("list");
+    assert_eq!(format!("{u}"), "list");
+}
+
+#[test]
 fn parse_named_class() {
     let u = parse_type_string("Foo\\Bar");
     assert!(u.contains(

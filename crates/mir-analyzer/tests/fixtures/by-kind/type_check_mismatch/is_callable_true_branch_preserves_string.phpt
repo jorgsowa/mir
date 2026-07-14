@@ -47,5 +47,5 @@ function test_false_branch_keeps_string(mixed $x): void {
 }
 ===expect===
 InvalidArgument@9:18-9:21: Argument $i of needs_int() expects 'int', got 'string'
-InvalidArgument@16:18-16:23: Argument $i of needs_int() expects 'int', got 'array<mixed, mixed>'
+InvalidArgument@16:18-16:23: Argument $i of needs_int() expects 'int', got 'array'
 InvalidArgument@25:18-25:20: Argument $i of needs_int() expects 'int', got 'string'

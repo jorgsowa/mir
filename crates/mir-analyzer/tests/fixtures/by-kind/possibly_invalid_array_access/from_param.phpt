@@ -9,4 +9,4 @@ function process(int|array $data): void {
     echo $data[0];
 }
 ===expect===
-PossiblyInvalidArrayAccess@3:9-3:17: Possibly invalid array access: 'int|array<mixed, mixed>' might not support []
+PossiblyInvalidArrayAccess@3:9-3:17: Possibly invalid array access: 'int|array' might not support []

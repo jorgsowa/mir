@@ -11,4 +11,4 @@ function test(array $arr, float $n, bool $cond): void {
     $x[0];
 }
 ===expect===
-PossiblyInvalidArrayAccess@4:4-4:9: Possibly invalid array access: 'array<mixed, mixed>|float' might not support []
+PossiblyInvalidArrayAccess@4:4-4:9: Possibly invalid array access: 'array|float' might not support []

@@ -1103,14 +1103,6 @@ pub(crate) fn rand_return_type(arg_types: &[Type]) -> Option<Type> {
     Some(Type::single(make_int_range_atom(Some(lo), Some(hi))))
 }
 
-/// The default PHP array-key type, `int|string`, used when a source array's
-/// key type cannot be determined more precisely.
-fn array_key_type() -> Type {
-    let mut k = Type::single(Atomic::TInt);
-    k.add_type(Atomic::TString);
-    k
-}
-
 /// Infer the result type of `array_map($callback, $array, ...)`.
 ///
 /// PHP semantics: `array_map` applies `$callback` to each element and returns
@@ -1176,7 +1168,7 @@ pub(crate) fn infer_array_map_return(
             },
             (false, true) => {
                 let (k, _) = crate::stmt::infer_foreach_types(source);
-                let key = if k.is_mixed() { array_key_type() } else { k };
+                let key = if k.is_mixed() { Type::array_key() } else { k };
                 Atomic::TNonEmptyArray {
                     key: Box::new(key),
                     value: Box::new(value),
@@ -1184,7 +1176,7 @@ pub(crate) fn infer_array_map_return(
             }
             (false, false) => {
                 let (k, _) = crate::stmt::infer_foreach_types(source);
-                let key = if k.is_mixed() { array_key_type() } else { k };
+                let key = if k.is_mixed() { Type::array_key() } else { k };
                 Atomic::TArray {
                     key: Box::new(key),
                     value: Box::new(value),

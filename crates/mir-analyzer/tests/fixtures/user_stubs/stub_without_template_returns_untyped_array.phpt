@@ -14,4 +14,4 @@ function test(): void {
     $_ = $keys;
 }
 ===expect===
-App.php: TypeCheckMismatch@5:4-5:15: Type of $keys is expected to be list<string>, got array<mixed, mixed>
+App.php: TypeCheckMismatch@5:4-5:15: Type of $keys is expected to be list<string>, got array

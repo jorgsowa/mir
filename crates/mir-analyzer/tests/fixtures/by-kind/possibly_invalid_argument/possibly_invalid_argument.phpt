@@ -16,4 +16,4 @@ $a = array_map(
     $foo[rand(0, 1)]
 );
 ===expect===
-PossiblyInvalidArgument@11:4-11:20: Argument $array of array_map() expects 'array<mixed, mixed>', possibly different type '"a"|array{0: "b"}' provided
+PossiblyInvalidArgument@11:4-11:20: Argument $array of array_map() expects 'array', possibly different type '"a"|array{0: "b"}' provided

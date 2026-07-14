@@ -8,4 +8,4 @@ function test(array $arr, float $f): void {
     if ($arr == $f) {}
 }
 ===expect===
-ImpossibleLooseComparison@3:8-3:18: '==' between 'array<mixed, mixed>' and 'float' is always false — these types can never be loosely equal
+ImpossibleLooseComparison@3:8-3:18: '==' between 'array' and 'float' is always false — these types can never be loosely equal

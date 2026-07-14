@@ -8,4 +8,4 @@ function test(array $arr): void {
     if ($arr === "foo") {}
 }
 ===expect===
-ImpossibleIdenticalComparison@3:8-3:22: '===' between 'array<mixed, mixed>' and '"foo"' is always false — these types can never be identical
+ImpossibleIdenticalComparison@3:8-3:22: '===' between 'array' and '"foo"' is always false — these types can never be identical

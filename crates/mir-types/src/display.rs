@@ -19,6 +19,16 @@ fn write_joined<T: fmt::Display>(
     Ok(())
 }
 
+/// True when `t` is precisely `mixed` and nothing else — deliberately
+/// stricter than [`Type::is_mixed`], which also treats an unconstrained
+/// template parameter as mixed. A template placeholder is a meaningful part
+/// of a generic signature (e.g. `array<TKey, TValue>`) and must still be
+/// printed, whereas a literal, unconstrained `mixed` is a default that adds
+/// no information and can be collapsed away.
+fn is_exactly_mixed(t: &Type) -> bool {
+    matches!(t.types.as_slice(), [Atomic::TMixed])
+}
+
 /// Write a comma-separated callable/closure parameter type list, printing
 /// `mixed` for untyped params.
 fn write_param_types(f: &mut fmt::Formatter<'_>, params: &[crate::atomic::FnParam]) -> fmt::Result {
@@ -88,7 +98,11 @@ impl fmt::Display for Atomic {
 
             Atomic::TObject => write!(f, "object"),
             Atomic::TNamedObject { fqcn, type_params } => {
-                if type_params.is_empty() {
+                // `Traversable<mixed, mixed>`/`Generator<mixed, mixed, mixed, mixed>`
+                // carry no more information than the bare class name — every
+                // param resolving to the unconstrained default is exactly the
+                // case an omitted type-param list would represent.
+                if type_params.is_empty() || type_params.iter().all(is_exactly_mixed) {
                     write!(f, "{fqcn}")
                 } else {
                     write!(f, "{fqcn}<")?;
@@ -128,13 +142,37 @@ impl fmt::Display for Atomic {
             }
 
             Atomic::TArray { key, value } => {
-                write!(f, "array<{key}, {value}>")
+                // `array<mixed, mixed>` and `array<array-key, mixed>` are both
+                // just `array` — `array-key` (int|string) is already the
+                // maximal legal key domain, so it's as much a "default" key
+                // as `mixed` is.
+                if is_exactly_mixed(value) && (is_exactly_mixed(key) || key.is_array_key()) {
+                    write!(f, "array")
+                } else {
+                    write!(f, "array<{key}, {value}>")
+                }
             }
-            Atomic::TList { value } => write!(f, "list<{value}>"),
+            Atomic::TList { value } => {
+                if is_exactly_mixed(value) {
+                    write!(f, "list")
+                } else {
+                    write!(f, "list<{value}>")
+                }
+            }
             Atomic::TNonEmptyArray { key, value } => {
-                write!(f, "non-empty-array<{key}, {value}>")
+                if is_exactly_mixed(value) && (is_exactly_mixed(key) || key.is_array_key()) {
+                    write!(f, "non-empty-array")
+                } else {
+                    write!(f, "non-empty-array<{key}, {value}>")
+                }
             }
-            Atomic::TNonEmptyList { value } => write!(f, "non-empty-list<{value}>"),
+            Atomic::TNonEmptyList { value } => {
+                if is_exactly_mixed(value) {
+                    write!(f, "non-empty-list")
+                } else {
+                    write!(f, "non-empty-list<{value}>")
+                }
+            }
             Atomic::TKeyedArray { properties, .. } => {
                 f.write_str("array{")?;
                 for (i, (k, v)) in properties.iter().enumerate() {
@@ -256,5 +294,109 @@ mod tests {
         });
         u.add_type(Atomic::TFalse);
         assert_eq!(format!("{u}"), "int|false");
+    }
+
+    #[test]
+    fn array_of_mixed_mixed_collapses_to_array() {
+        let atomic = Atomic::TArray {
+            key: Box::new(Type::mixed()),
+            value: Box::new(Type::mixed()),
+        };
+        assert_eq!(format!("{atomic}"), "array");
+    }
+
+    #[test]
+    fn array_of_array_key_mixed_collapses_to_array() {
+        let atomic = Atomic::TArray {
+            key: Box::new(Type::array_key()),
+            value: Box::new(Type::mixed()),
+        };
+        assert_eq!(format!("{atomic}"), "array");
+    }
+
+    #[test]
+    fn array_of_int_mixed_does_not_collapse() {
+        let atomic = Atomic::TArray {
+            key: Box::new(Type::int()),
+            value: Box::new(Type::mixed()),
+        };
+        assert_eq!(format!("{atomic}"), "array<int, mixed>");
+    }
+
+    #[test]
+    fn array_of_mixed_string_does_not_collapse() {
+        let atomic = Atomic::TArray {
+            key: Box::new(Type::mixed()),
+            value: Box::new(Type::string()),
+        };
+        assert_eq!(format!("{atomic}"), "array<mixed, string>");
+    }
+
+    #[test]
+    fn non_empty_array_of_mixed_mixed_collapses() {
+        let atomic = Atomic::TNonEmptyArray {
+            key: Box::new(Type::mixed()),
+            value: Box::new(Type::mixed()),
+        };
+        assert_eq!(format!("{atomic}"), "non-empty-array");
+    }
+
+    #[test]
+    fn list_of_mixed_collapses_to_list() {
+        let atomic = Atomic::TList {
+            value: Box::new(Type::mixed()),
+        };
+        assert_eq!(format!("{atomic}"), "list");
+    }
+
+    #[test]
+    fn list_of_string_does_not_collapse() {
+        let atomic = Atomic::TList {
+            value: Box::new(Type::string()),
+        };
+        assert_eq!(format!("{atomic}"), "list<string>");
+    }
+
+    #[test]
+    fn non_empty_list_of_mixed_collapses() {
+        let atomic = Atomic::TNonEmptyList {
+            value: Box::new(Type::mixed()),
+        };
+        assert_eq!(format!("{atomic}"), "non-empty-list");
+    }
+
+    #[test]
+    fn named_object_all_mixed_params_collapses_to_bare_name() {
+        let atomic = Atomic::TNamedObject {
+            fqcn: "Traversable".into(),
+            type_params: crate::union::vec_to_type_params(vec![Type::mixed(), Type::mixed()]),
+        };
+        assert_eq!(format!("{atomic}"), "Traversable");
+    }
+
+    #[test]
+    fn named_object_with_one_concrete_param_does_not_collapse() {
+        let atomic = Atomic::TNamedObject {
+            fqcn: "Traversable".into(),
+            type_params: crate::union::vec_to_type_params(vec![Type::int(), Type::mixed()]),
+        };
+        assert_eq!(format!("{atomic}"), "Traversable<int, mixed>");
+    }
+
+    #[test]
+    fn named_object_with_mixed_bounded_template_param_does_not_collapse() {
+        // An unresolved `T` template parameter (even one bounded by `mixed`)
+        // is a meaningful part of a generic signature and must never be
+        // confused with a literal, information-free `mixed` default.
+        let template_param = Atomic::TTemplateParam {
+            name: "T".into(),
+            as_type: Box::new(Type::mixed()),
+            defining_entity: "MyClass".into(),
+        };
+        let atomic = Atomic::TNamedObject {
+            fqcn: "MyClass".into(),
+            type_params: crate::union::vec_to_type_params(vec![Type::single(template_param)]),
+        };
+        assert_eq!(format!("{atomic}"), "MyClass<T>");
     }
 }

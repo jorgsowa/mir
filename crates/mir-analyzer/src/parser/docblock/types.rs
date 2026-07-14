@@ -144,7 +144,7 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         "mixed" => Type::single(Atomic::TMixed),
         "object" => Type::single(Atomic::TObject),
         "array" => Type::single(Atomic::TArray {
-            key: Box::new(Type::single(Atomic::TMixed)),
+            key: Box::new(Type::array_key()),
             value: Box::new(Type::mixed()),
         }),
         "list" => Type::single(Atomic::TList {
@@ -257,18 +257,13 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
     match name.to_lowercase().as_str() {
         "array" => {
             let params = split_generics(inner);
-            let array_key = || {
-                let mut k = Type::single(Atomic::TInt);
-                k.add_type(Atomic::TString);
-                k
-            };
             let (key, value) = match params.len() {
                 n if n >= 2 => (
                     parse_type_string(params[0].trim()),
                     parse_type_string(params[1].trim()),
                 ),
-                1 => (array_key(), parse_type_string(params[0].trim())),
-                _ => (array_key(), Type::mixed()),
+                1 => (Type::array_key(), parse_type_string(params[0].trim())),
+                _ => (Type::array_key(), Type::mixed()),
             };
             Type::single(Atomic::TArray {
                 key: Box::new(key),
@@ -289,18 +284,13 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
         }
         "non-empty-array" => {
             let params = split_generics(inner);
-            let array_key = || {
-                let mut k = Type::single(Atomic::TInt);
-                k.add_type(Atomic::TString);
-                k
-            };
             let (key, value) = match params.len() {
                 n if n >= 2 => (
                     parse_type_string(params[0].trim()),
                     parse_type_string(params[1].trim()),
                 ),
-                1 => (array_key(), parse_type_string(params[0].trim())),
-                _ => (array_key(), Type::mixed()),
+                1 => (Type::array_key(), parse_type_string(params[0].trim())),
+                _ => (Type::array_key(), Type::mixed()),
             };
             Type::single(Atomic::TNonEmptyArray {
                 key: Box::new(key),

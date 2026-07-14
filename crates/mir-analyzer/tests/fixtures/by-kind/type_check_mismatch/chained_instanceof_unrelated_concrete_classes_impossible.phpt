@@ -18,4 +18,3 @@ function f($x): void {
 }
 ===expect===
 RedundantCondition@7:8-7:42: Condition is always true/false for type 'bool'
-

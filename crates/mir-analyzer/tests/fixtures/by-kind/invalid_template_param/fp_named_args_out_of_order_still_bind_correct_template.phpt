@@ -54,4 +54,3 @@ new Pair(value: "hello", key: 42);
 makePair(value: 42, key: 1);
 ===expect===
 InvalidTemplateParam@46:0-46:27: Template type 'V' inferred as '42' does not satisfy bound 'string'
-

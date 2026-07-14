@@ -10,4 +10,4 @@ function getArray(): array {
 
 $x = (int) getArray();
 ===expect===
-InvalidCast@6:11-6:21: Cannot cast 'array<mixed, mixed>' to 'int'
+InvalidCast@6:11-6:21: Cannot cast 'array' to 'int'

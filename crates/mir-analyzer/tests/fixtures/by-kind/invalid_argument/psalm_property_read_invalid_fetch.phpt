@@ -17,4 +17,4 @@ class A {
 $a = new A();
 echo count($a->foo);
 ===expect===
-InvalidArgument@15:11-15:18: Argument $value of count() expects 'array<mixed, mixed>|Countable', got 'string'
+InvalidArgument@15:11-15:18: Argument $value of count() expects 'array|Countable', got 'string'

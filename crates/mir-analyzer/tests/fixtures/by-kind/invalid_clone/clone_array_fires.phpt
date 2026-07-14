@@ -8,4 +8,4 @@ function f(array $a): void {
     clone $a;
 }
 ===expect===
-InvalidClone@3:4-3:12: cannot clone non-object array<mixed, mixed>
+InvalidClone@3:4-3:12: cannot clone non-object array

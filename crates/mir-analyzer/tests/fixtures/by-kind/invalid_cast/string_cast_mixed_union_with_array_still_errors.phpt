@@ -13,4 +13,4 @@ function option(string $key): string|array|bool|null {
 
 $timeout = (string) option('timeout');
 ===expect===
-InvalidCast@6:20-6:37: Cannot cast 'string|array<mixed, mixed>|bool|null' to 'string'
+InvalidCast@6:20-6:37: Cannot cast 'string|array|bool|null' to 'string'

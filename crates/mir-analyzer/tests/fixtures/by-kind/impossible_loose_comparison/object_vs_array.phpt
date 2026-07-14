@@ -8,4 +8,4 @@ function test(\stdClass $obj, array $arr): void {
     if ($obj == $arr) {}
 }
 ===expect===
-ImpossibleLooseComparison@3:8-3:20: '==' between 'stdClass' and 'array<mixed, mixed>' is always false — these types can never be loosely equal
+ImpossibleLooseComparison@3:8-3:20: '==' between 'stdClass' and 'array' is always false — these types can never be loosely equal

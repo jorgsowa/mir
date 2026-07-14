@@ -106,6 +106,14 @@ impl Type {
         Self::single(Atomic::TString)
     }
 
+    /// `int|string` — the canonical PHP array-key type, used as the default
+    /// key type when a docblock/inferred array has no more specific key.
+    pub fn array_key() -> Self {
+        let mut u = Self::single(Atomic::TInt);
+        u.add_type(Atomic::TString);
+        u
+    }
+
     /// `T|null`
     pub fn nullable(atomic: Atomic) -> Self {
         // `mixed|null` = `mixed` — null is already included in mixed.
@@ -143,6 +151,16 @@ impl Type {
 
     pub fn is_nullable(&self) -> bool {
         self.types.iter().any(|t| matches!(t, Atomic::TNull))
+    }
+
+    /// True when this is exactly `int|string` — the array-key domain, which
+    /// is already the maximal set of legal PHP array keys and so should be
+    /// treated like a "default"/unconstrained key, same as `mixed` would be
+    /// for a non-key type parameter.
+    pub fn is_array_key(&self) -> bool {
+        self.types.len() == 2
+            && self.types.iter().any(|t| matches!(t, Atomic::TInt))
+            && self.types.iter().any(|t| matches!(t, Atomic::TString))
     }
 
     pub fn is_mixed(&self) -> bool {
@@ -1912,6 +1930,30 @@ mod tests {
         let mut u = Type::single(Atomic::TString);
         u.add_type(Atomic::TString);
         assert_eq!(u.types.len(), 1);
+    }
+
+    #[test]
+    fn array_key_is_int_string() {
+        let k = Type::array_key();
+        assert!(k.is_array_key());
+        assert_eq!(k.types.len(), 2);
+    }
+
+    #[test]
+    fn is_array_key_false_for_plain_int() {
+        assert!(!Type::int().is_array_key());
+    }
+
+    #[test]
+    fn is_array_key_false_for_mixed() {
+        assert!(!Type::mixed().is_array_key());
+    }
+
+    #[test]
+    fn is_array_key_false_for_int_string_null() {
+        let mut u = Type::array_key();
+        u.add_type(Atomic::TNull);
+        assert!(!u.is_array_key());
     }
 
     #[test]
