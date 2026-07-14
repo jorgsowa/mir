@@ -171,7 +171,7 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         "callable-string" => Type::single(Atomic::TCallableString),
         "iterable" => {
             let mut u = Type::single(Atomic::TArray {
-                key: Box::new(Type::single(Atomic::TMixed)),
+                key: Box::new(Type::array_key()),
                 value: Box::new(Type::mixed()),
             });
             u.add_type(Atomic::TNamedObject {
@@ -304,11 +304,8 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
                     parse_type_string(params[0].trim()),
                     parse_type_string(params[1].trim()),
                 ),
-                1 => (
-                    Type::single(Atomic::TMixed),
-                    parse_type_string(params[0].trim()),
-                ),
-                _ => (Type::single(Atomic::TMixed), Type::mixed()),
+                1 => (Type::array_key(), parse_type_string(params[0].trim())),
+                _ => (Type::array_key(), Type::mixed()),
             };
             let mut u = Type::single(Atomic::TArray {
                 key: Box::new(key.clone()),

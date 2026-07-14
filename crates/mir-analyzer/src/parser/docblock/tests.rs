@@ -58,6 +58,21 @@ fn parse_bare_list_displays_as_bare_list() {
 }
 
 #[test]
+fn parse_bare_iterable_keys_array_branch_on_array_key_not_mixed() {
+    // Same regression class as bare `array`: `iterable`'s array branch used
+    // to build its key as a literal `mixed` instead of the true array-key
+    // domain (`int|string`).
+    let u = parse_type_string("iterable");
+    assert!(u.contains(|t| matches!(t, Atomic::TArray { key, .. } if key.is_array_key())));
+}
+
+#[test]
+fn parse_iterable_with_one_param_keys_array_branch_on_array_key_not_mixed() {
+    let u = parse_type_string("iterable<string>");
+    assert!(u.contains(|t| matches!(t, Atomic::TArray { key, .. } if key.is_array_key())));
+}
+
+#[test]
 fn parse_named_class() {
     let u = parse_type_string("Foo\\Bar");
     assert!(u.contains(
