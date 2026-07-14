@@ -104,6 +104,24 @@ use mir_issues::{IssueKind, Location};
 use mir_types::{Atomic, Type};
 use php_ast::owned::{Expr, StaticVar};
 
+/// Extracts the `TReturn` (4th) type-param slot from a declared
+/// `Generator<TKey,TValue,TSend,TReturn>` return type. Falls back to `mixed`
+/// (which skips the return-statement check entirely) when the declared type
+/// carries no generic args, e.g. a bare `: Generator` native hint with no
+/// corresponding `@return Generator<...>` docblock.
+fn generator_return_component(declared: &Type) -> Type {
+    for atomic in &declared.types {
+        if let Atomic::TNamedObject { fqcn, type_params } = atomic {
+            if fqcn.as_ref().trim_start_matches('\\').eq_ignore_ascii_case("Generator") {
+                if let Some(r) = type_params.get(3) {
+                    return r.clone();
+                }
+            }
+        }
+    }
+    Type::mixed()
+}
+
 impl<'a> StatementsAnalyzer<'a> {
     // -----------------------------------------------------------------------
     // Return
@@ -134,8 +152,21 @@ impl<'a> StatementsAnalyzer<'a> {
                 ret_ty.clone()
             };
 
-            // Check against declared return type
-            if let Some(declared) = &ctx.fn_return_type.clone() {
+            // Check against declared return type. Inside a generator, `return <expr>;`
+            // sets `Generator::getReturn()`'s value (the `TReturn`/4th type-param slot
+            // of `Generator<K,V,S,R>`), not the generator object itself — compare
+            // against that component instead of the whole declared `Generator` type.
+            let generator_declared;
+            let declared_opt = if ctx.is_generator {
+                generator_declared = ctx
+                    .fn_return_type
+                    .as_ref()
+                    .map(generator_return_component);
+                generator_declared.as_ref()
+            } else {
+                ctx.fn_return_type.as_ref()
+            };
+            if let Some(declared) = &declared_opt.cloned() {
                 // Check return type compatibility. Special case: `void` functions must not
                 // return any value (named_object_return_compatible considers TVoid compatible
                 // with TNull, so handle void separately to avoid false suppression).
