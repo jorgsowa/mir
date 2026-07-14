@@ -594,12 +594,14 @@ pub fn narrow_from_condition(
                 {
                     // Narrow the first arg to TObject for simple variables (existing behaviour).
                     // Additionally record `(expr_key, method_name)` in method_exists_guards for
-                    // property-access first args where variable narrowing can't reach.
+                    // property-access first args where variable narrowing can't reach — but only
+                    // for method_exists(): properties and methods are independent namespaces in
+                    // PHP, so property_exists($obj, 'foo') proves nothing about a method 'foo'.
                     if let Some(arg_expr) = call.args.first() {
                         if let Some(var_name) = extract_var_name(&arg_expr.value) {
                             narrow_from_type_fn(ctx, fn_name, &var_name, is_true);
                         }
-                        if is_true {
+                        if is_true && fn_name.eq_ignore_ascii_case("method_exists") {
                             if let Some(expr_key) =
                                 extract_expr_guard_key(&arg_expr.value, db, file)
                             {
