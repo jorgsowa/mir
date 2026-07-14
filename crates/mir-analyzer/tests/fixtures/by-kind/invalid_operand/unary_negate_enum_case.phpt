@@ -10,4 +10,4 @@ enum Suit {
 }
 $a = -Suit::Hearts;
 ===expect===
-InvalidOperand@5:6-5:18: Operator '-' not supported between 'Suit' and ''
+InvalidOperand@5:6-5:18: Operator '-' not supported for operand of type 'Suit'

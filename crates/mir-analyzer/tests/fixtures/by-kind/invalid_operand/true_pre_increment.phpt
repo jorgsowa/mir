@@ -7,4 +7,4 @@ suppress=UnusedVariable
 $a = true;
 ++$a;
 ===expect===
-InvalidOperand@3:2-3:4: Operator '++' not supported between 'true' and ''
+InvalidOperand@3:2-3:4: Operator '++' not supported for operand of type 'true'

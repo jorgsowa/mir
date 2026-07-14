@@ -8,4 +8,4 @@ suppress=UnusedVariable
 $a = [1, 2];
 $b = -$a;
 ===expect===
-InvalidOperand@3:6-3:8: Operator '-' not supported between 'array{0: 1, 1: 2}' and ''
+InvalidOperand@3:6-3:8: Operator '-' not supported for operand of type 'array{0: 1, 1: 2}'

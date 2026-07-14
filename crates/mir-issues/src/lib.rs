@@ -1513,7 +1513,11 @@ impl IssueKind {
                 format!("Non-static method {class}::{method}() cannot be called statically")
             }
             IssueKind::InvalidOperand { op, left, right } => {
-                format!("Operator '{op}' not supported between '{left}' and '{right}'")
+                if right.is_empty() {
+                    format!("Operator '{op}' not supported for operand of type '{left}'")
+                } else {
+                    format!("Operator '{op}' not supported between '{left}' and '{right}'")
+                }
             }
             IssueKind::PossiblyInvalidOperand { op, left, right } => {
                 format!("Operator '{op}' might not be supported between '{left}' and '{right}'")

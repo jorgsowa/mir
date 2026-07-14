@@ -7,4 +7,4 @@ suppress=UnusedVariable
 <?php
 $a = +"abc";
 ===expect===
-InvalidOperand@2:6-2:11: Operator '+' not supported between '"abc"' and ''
+InvalidOperand@2:6-2:11: Operator '+' not supported for operand of type '"abc"'
