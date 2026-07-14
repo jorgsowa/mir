@@ -3014,11 +3014,27 @@ fn narrow_from_type_fn(ctx: &mut FlowState, fn_name: &str, var_name: &str, is_tr
                 current.clone()
             }
         }
-        // method_exists($obj, 'method') — if true, narrow to TObject (suppresses
-        // UndefinedMethod; the concrete type is unresolvable without knowing the method arg)
+        // method_exists($obj, 'method') / property_exists($obj, 'prop') — both accept
+        // object|string, so on true keep object atoms as-is (preserving the specific
+        // class instead of collapsing it to bare TObject) and keep string/class-string
+        // atoms as-is; only TMixed/TScalar are replaced, since a bare mixed doesn't
+        // otherwise narrow to anything usable.
         "method_exists" | "property_exists" => {
             if is_true {
-                Type::single(Atomic::TObject)
+                let mut result = Type::empty();
+                result.from_docblock = current.from_docblock;
+                for t in &current.types {
+                    if t.is_object() || t.is_string() {
+                        result.add_type(t.clone());
+                    } else if matches!(t, Atomic::TMixed | Atomic::TScalar) {
+                        result.add_type(Atomic::TObject);
+                    }
+                }
+                if result.is_empty() {
+                    current.clone()
+                } else {
+                    result
+                }
             } else {
                 current.clone()
             }
