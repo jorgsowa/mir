@@ -233,7 +233,16 @@ pub(crate) fn print_collector_stats() {
 
 /// Infer the type of a constant value from its AST expression (owned AST).
 /// This handles literal values like integers, strings, etc. used in define().
-pub(super) fn infer_const_value(expr_kind: &php_ast::owned::ExprKind) -> Option<Type> {
+///
+/// `collector` is consulted only for the `ClassConstAccess` arm (`Foo::BAR`),
+/// to resolve a same-file, already-collected enum case/constant — this
+/// collector has no cross-file or database access, so a reference to a class
+/// declared later in the file, or in a different file, still falls through to
+/// `None` (the pre-existing `mixed` fallback), same as today.
+pub(super) fn infer_const_value(
+    collector: &DefinitionCollector,
+    expr_kind: &php_ast::owned::ExprKind,
+) -> Option<Type> {
     use php_ast::ast::{BinaryOp, UnaryPrefixOp};
 
     match expr_kind {
@@ -262,7 +271,9 @@ pub(super) fn infer_const_value(expr_kind: &php_ast::owned::ExprKind) -> Option<
             }
             _ => None,
         },
-        php_ast::owned::ExprKind::Parenthesized(inner) => infer_const_value(&inner.kind),
+        php_ast::owned::ExprKind::Parenthesized(inner) => {
+            infer_const_value(collector, &inner.kind)
+        }
         // Idiomatic bitflag declarations (`const FLAG_A = 1 << 0;`) and other
         // literal-int arithmetic. Only evaluated when both operands are
         // themselves literal ints, so `self::OTHER_CONST | 1` still falls
@@ -276,8 +287,8 @@ pub(super) fn infer_const_value(expr_kind: &php_ast::owned::ExprKind) -> Option<
                     })
                     .flatten()
             };
-            let l = as_int(infer_const_value(&b.left.kind)?)?;
-            let r = as_int(infer_const_value(&b.right.kind)?)?;
+            let l = as_int(infer_const_value(collector, &b.left.kind)?)?;
+            let r = as_int(infer_const_value(collector, &b.right.kind)?)?;
             let result = match b.op {
                 BinaryOp::BitwiseOr => l | r,
                 BinaryOp::BitwiseAnd => l & r,
@@ -290,6 +301,50 @@ pub(super) fn infer_const_value(expr_kind: &php_ast::owned::ExprKind) -> Option<
                 _ => return None,
             };
             Some(Type::single(Atomic::TLiteralInt(result)))
+        }
+        // `Foo::BAR` / `self::BAR` referencing an enum case or a plain class
+        // constant of an already-collected same-file class-like.
+        php_ast::owned::ExprKind::ClassConstAccess(cca) => {
+            let php_ast::owned::ExprKind::Identifier(class_name) = &cca.class.kind else {
+                return None;
+            };
+            let php_ast::owned::ExprKind::Identifier(const_name) = &cca.member.kind else {
+                return None;
+            };
+            if const_name.as_ref() == "class" {
+                return None;
+            }
+            let resolved = collector.resolve_name(class_name.as_ref());
+            if let Some(enum_def) = collector
+                .slice
+                .enums
+                .iter()
+                .find(|e| e.fqcn.eq_ignore_ascii_case(&resolved))
+            {
+                if enum_def.cases.contains_key(const_name.as_ref()) {
+                    // Matches `find_class_constant_in_class`'s own enum-case
+                    // representation (a plain `TNamedObject`, not
+                    // `TLiteralEnumCase` — that atom is reserved for
+                    // match-narrowing/contradiction checks) so this constant's
+                    // inferred type subtypes the enum the same way a direct
+                    // `Suit::Hearts` access already does.
+                    return Some(Type::single(Atomic::TNamedObject {
+                        fqcn: Name::from(enum_def.fqcn.as_ref()),
+                        type_params: mir_types::union::empty_type_params(),
+                    }));
+                }
+                if let Some(c) = enum_def.own_constants.get(const_name.as_ref()) {
+                    return Some(c.ty.clone());
+                }
+                return None;
+            }
+            collector
+                .slice
+                .classes
+                .iter()
+                .find(|c| c.fqcn.eq_ignore_ascii_case(&resolved))
+                .and_then(|c| c.own_constants.get(const_name.as_ref()))
+                .map(|c| c.ty.clone())
         }
         _ => None,
     }
@@ -1494,7 +1549,7 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
                                         let const_type = call
                                             .args
                                             .get(1)
-                                            .and_then(|arg| infer_const_value(&arg.value.kind))
+                                            .and_then(|arg| infer_const_value(self, &arg.value.kind))
                                             .unwrap_or(Type::mixed());
                                         self.slice.constants.push((fqn, const_type));
                                     }

@@ -86,7 +86,7 @@ impl<'a> DefinitionCollector<'a> {
                 .filter_map(|m| match &m.kind {
                     ClassMemberKind::ClassConst(c) => {
                         let name = c.name.as_deref()?;
-                        match super::infer_const_value(&c.value.kind) {
+                        match super::infer_const_value(self, &c.value.kind) {
                             Some(t) if t.types.len() == 1 => match &t.types[0] {
                                 mir_types::Atomic::TLiteralInt(n) => Some((Arc::from(name), *n)),
                                 _ => None,
