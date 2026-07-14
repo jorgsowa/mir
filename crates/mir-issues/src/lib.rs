@@ -453,6 +453,24 @@ pub enum IssueKind {
         /// instance; false when the parent's is instance and the child redeclares it static.
         parent_static: bool,
     },
+    /// A `readonly class` extends a non-readonly parent, or vice versa — PHP
+    /// requires both sides of an extends relationship to agree on the
+    /// whole-class `readonly` modifier.
+    /// Emitted by `mir-analyzer/src/class/mod.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/readonly_class_extends_mismatch/`.
+    ReadonlyClassExtendsMismatch {
+        parent: String,
+        child: String,
+        /// True when the parent is readonly and the child isn't; false when
+        /// the child is readonly and the parent isn't.
+        parent_readonly: bool,
+    },
+    /// A native `readonly` property declaration carries a default value — a
+    /// PHP fatal. (The sibling untyped-readonly-property fatal is already
+    /// caught by the parser itself as a `ParseError`.)
+    /// Emitted by `mir-analyzer/src/collector/class.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_readonly_property_declaration/`.
+    InvalidReadonlyPropertyDeclaration { class: String, property: String },
     /// Emitted by `mir-analyzer/src/collector/enum.rs`.
     /// Fixtures: `tests/fixtures/by-kind/backed_enum_case_type_mismatch/`.
     BackedEnumCaseTypeMismatch {
@@ -793,6 +811,8 @@ impl IssueKind {
             | IssueKind::PropertyTypeRedeclarationMismatch { .. }
             | IssueKind::ReadonlyPropertyRedeclarationMismatch { .. }
             | IssueKind::StaticPropertyRedeclarationMismatch { .. }
+            | IssueKind::ReadonlyClassExtendsMismatch { .. }
+            | IssueKind::InvalidReadonlyPropertyDeclaration { .. }
             | IssueKind::BackedEnumCaseTypeMismatch { .. }
             | IssueKind::DivisionByZero { .. }
             | IssueKind::ParentNotFound => Severity::Error,
@@ -1062,6 +1082,8 @@ impl IssueKind {
             IssueKind::BackedEnumCaseTypeMismatch { .. } => "MIR0713",
             IssueKind::ReadonlyPropertyRedeclarationMismatch { .. } => "MIR0714",
             IssueKind::StaticPropertyRedeclarationMismatch { .. } => "MIR0715",
+            IssueKind::ReadonlyClassExtendsMismatch { .. } => "MIR0716",
+            IssueKind::InvalidReadonlyPropertyDeclaration { .. } => "MIR0717",
             IssueKind::InvalidExtendClass { .. } => "MIR0704",
             IssueKind::FinalMethodOverridden { .. } => "MIR0705",
             IssueKind::AbstractInstantiation { .. } => "MIR0706",
@@ -1155,7 +1177,7 @@ impl IssueKind {
             | "MIR0203" | "MIR0204" | "MIR0205" | "MIR0212" | "MIR0215" | "MIR0216" | "MIR0217"
             | "MIR0224" | "MIR0600" | "MIR0700" | "MIR0701" | "MIR0702" | "MIR0704" | "MIR0705"
             | "MIR0706" | "MIR0707" | "MIR0708" | "MIR0709" | "MIR0711" | "MIR0712" | "MIR0713"
-            | "MIR0714" | "MIR0715" | "MIR0228" | "MIR0229" | "MIR0800" | "MIR0801" | "MIR0802"
+            | "MIR0714" | "MIR0715" | "MIR0716" | "MIR0717" | "MIR0228" | "MIR0229" | "MIR0800" | "MIR0801" | "MIR0802"
             | "MIR0803" | "MIR0804" | "MIR0900" | "MIR1205" | "MIR1207" | "MIR1300" | "MIR1400"
             | "MIR1500" | "MIR1503" | "MIR1602" | "MIR1603" | "MIR1604" | "MIR1605" | "MIR1606" => {
                 Some(Severity::Error)
@@ -1291,6 +1313,10 @@ impl IssueKind {
             }
             IssueKind::StaticPropertyRedeclarationMismatch { .. } => {
                 "StaticPropertyRedeclarationMismatch"
+            }
+            IssueKind::ReadonlyClassExtendsMismatch { .. } => "ReadonlyClassExtendsMismatch",
+            IssueKind::InvalidReadonlyPropertyDeclaration { .. } => {
+                "InvalidReadonlyPropertyDeclaration"
             }
             IssueKind::BackedEnumCaseTypeMismatch { .. } => "BackedEnumCaseTypeMismatch",
             IssueKind::InvalidExtendClass { .. } => "InvalidExtendClass",
@@ -1748,6 +1774,20 @@ impl IssueKind {
                 format!(
                     "Backed enum case {enum_name}::{case_name} has value of type {actual}, but backing type is {expected}"
                 )
+            }
+            IssueKind::ReadonlyClassExtendsMismatch {
+                parent,
+                child,
+                parent_readonly,
+            } => {
+                if *parent_readonly {
+                    format!("Non-readonly class {child} cannot extend readonly class {parent}")
+                } else {
+                    format!("Readonly class {child} cannot extend non-readonly class {parent}")
+                }
+            }
+            IssueKind::InvalidReadonlyPropertyDeclaration { class, property } => {
+                format!("Readonly property {class}::${property} cannot have a default value")
             }
             IssueKind::ReadonlyPropertyAssignment { class, property } => {
                 format!(
@@ -2369,6 +2409,15 @@ mod code_tests {
                 property: s(),
                 parent_static: true,
             },
+            IssueKind::ReadonlyClassExtendsMismatch {
+                parent: s(),
+                child: s(),
+                parent_readonly: true,
+            },
+            IssueKind::InvalidReadonlyPropertyDeclaration {
+                class: s(),
+                property: s(),
+            },
             IssueKind::BackedEnumCaseTypeMismatch {
                 enum_name: s(),
                 case_name: s(),
@@ -2570,6 +2619,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 151);
+        assert_eq!(one_of_each().len(), 153);
     }
 }

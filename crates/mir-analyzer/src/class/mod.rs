@@ -117,6 +117,24 @@ impl<'a> ClassAnalyzer<'a> {
                             location.as_ref(),
                         );
                     }
+                    // A `readonly class` (PHP 8.2 whole-class modifier) must
+                    // extend another `readonly` class, and vice versa — both
+                    // directions are a hard PHP fatal.
+                    let parent_readonly = parent_pulled
+                        .as_ref()
+                        .map(|c| c.is_readonly())
+                        .unwrap_or(false);
+                    if class.is_readonly() != parent_readonly {
+                        self.push_located_issue(
+                            &mut issues,
+                            IssueKind::ReadonlyClassExtendsMismatch {
+                                parent: parent_fqcn.to_string(),
+                                child: fqcn.to_string(),
+                                parent_readonly,
+                            },
+                            location.as_ref(),
+                        );
+                    }
                     if let Some(msg) = parent_deprecated {
                         self.push_located_issue(
                             &mut issues,

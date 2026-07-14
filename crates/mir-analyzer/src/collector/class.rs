@@ -298,6 +298,22 @@ impl<'a> DefinitionCollector<'a> {
                         has_native_type: p.type_hint.is_some(),
                         from_docblock: false,
                     };
+                    // A native `readonly` property (own keyword or whole-class
+                    // `readonly class`) may not carry a default value — a PHP
+                    // fatal. (The untyped-readonly-property fatal is already
+                    // caught by the parser itself as a `ParseError`, so it's
+                    // not duplicated here.) A docblock-only `@readonly` tag is
+                    // advisory, not native syntax, so it's excluded.
+                    let has_native_readonly = p.is_readonly || decl.modifiers.is_readonly;
+                    if has_native_readonly && p.default.is_some() {
+                        self.issues.add(mir_issues::Issue::new(
+                            mir_issues::IssueKind::InvalidReadonlyPropertyDeclaration {
+                                class: fqcn.to_string(),
+                                property: prop_name.to_string(),
+                            },
+                            self.location(member.span.start, member.span.end),
+                        ));
+                    }
                     own_properties.insert(Arc::from(prop_name), prop);
                 }
                 ClassMemberKind::ClassConst(c) => {
