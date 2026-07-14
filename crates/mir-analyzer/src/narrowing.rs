@@ -93,7 +93,9 @@ pub fn narrow_from_condition(
             }
             // `$x === null`
             else if matches!(b.right.kind, ExprKind::Null) {
-                if let Some(name) = extract_var_name(&b.left) {
+                if let Some(arr_var) = extract_array_key_first_or_last_arg(&b.left) {
+                    narrow_array_key_first_or_last_null(ctx, &arr_var, effective_true);
+                } else if let Some(name) = extract_var_name(&b.left) {
                     narrow_var_null(ctx, &name, effective_true);
                 } else if let Some((obj, prop)) = extract_nullsafe_prop_access(&b.left) {
                     narrow_nullsafe_prop_null(ctx, &obj, &prop, db, file, effective_true);
@@ -105,7 +107,9 @@ pub fn narrow_from_condition(
                     narrow_static_prop_null(ctx, &fqcn, &prop, db, effective_true);
                 }
             } else if matches!(b.left.kind, ExprKind::Null) {
-                if let Some(name) = extract_var_name(&b.right) {
+                if let Some(arr_var) = extract_array_key_first_or_last_arg(&b.right) {
+                    narrow_array_key_first_or_last_null(ctx, &arr_var, effective_true);
+                } else if let Some(name) = extract_var_name(&b.right) {
                     narrow_var_null(ctx, &name, effective_true);
                 } else if let Some((obj, prop)) = extract_nullsafe_prop_access(&b.right) {
                     narrow_nullsafe_prop_null(ctx, &obj, &prop, db, file, effective_true);
@@ -4189,6 +4193,42 @@ fn extract_count_of_var(expr: &php_ast::owned::Expr) -> Option<String> {
         }
     }
     None
+}
+
+/// Extract the variable name from `array_key_first($var)` / `array_key_last($var)`.
+fn extract_array_key_first_or_last_arg(expr: &php_ast::owned::Expr) -> Option<String> {
+    if let ExprKind::FunctionCall(call) = &expr.kind {
+        let name = match &call.name.kind {
+            ExprKind::Identifier(n) => n.as_ref(),
+            _ => return None,
+        };
+        let bare = name.trim_start_matches('\\');
+        if bare.eq_ignore_ascii_case("array_key_first") || bare.eq_ignore_ascii_case("array_key_last")
+        {
+            if let Some(arg) = call.args.first() {
+                return extract_var_name(&arg.value);
+            }
+        }
+    }
+    None
+}
+
+/// `array_key_first($arr) !== null` / `array_key_last($arr) !== null` — a common
+/// non-empty-array idiom, equivalent to `count($arr) > 0`. Both functions return
+/// `null` only when the array is empty, so `!== null` proves it's non-empty;
+/// `=== null` proves it's empty, which has no dedicated narrowing today.
+fn narrow_array_key_first_or_last_null(ctx: &mut FlowState, arr_var: &str, is_null: bool) {
+    if is_null {
+        return;
+    }
+    let current = ctx.get_var(arr_var);
+    if current.is_mixed() {
+        return;
+    }
+    let narrowed = current.narrow_to_non_empty_collection();
+    if narrowed != current {
+        ctx.set_var(arr_var, narrowed);
+    }
 }
 
 /// Extract the variable name from `strlen($var)` / `mb_strlen($var, ...)`.
