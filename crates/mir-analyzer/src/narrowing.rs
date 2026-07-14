@@ -621,6 +621,18 @@ pub fn narrow_from_condition(
                                 }
                             } else if let Some((obj, prop)) = extract_prop_access(&arr_arg.value) {
                                 narrow_prop_array_key_exists(ctx, &obj, &prop, &key, db, file);
+                            } else if let Some((base, path)) =
+                                collect_array_access_path(&arr_arg.value)
+                            {
+                                // Nested container, e.g. array_key_exists('b', $arr['a']) —
+                                // walk down to the ['a'] shape and prove 'b' present there,
+                                // same as the single-level var/prop cases above.
+                                let current = ctx.get_var(&base);
+                                if let Some(narrowed) =
+                                    narrow_shape_path_key_exists(&current, &path, &key)
+                                {
+                                    ctx.set_var(&base, narrowed);
+                                }
                             }
                         }
                     }
@@ -3397,6 +3409,57 @@ fn narrow_shape_path(ty: &Type, path: &[mir_types::atomic::ArrayKey]) -> Option<
     // the original type rather than narrowing to an empty union — proving
     // the branch itself unreachable is a separate concern from key narrowing.
     if changed && !result.types.is_empty() {
+        Some(result)
+    } else {
+        None
+    }
+}
+
+/// For `array_key_exists('key', $base['a']['b']...)` where the array
+/// argument is itself a nested shape-key access: walk down `path` to the
+/// container shape, then apply `array_key_exists`'s own key-presence
+/// semantics (`add_key_to_sealed_shapes`) there — parallel to
+/// `narrow_shape_path`, but the leaf operation proves a *given* key present
+/// in the container rather than the last path segment itself.
+fn narrow_shape_path_key_exists(
+    ty: &Type,
+    path: &[mir_types::atomic::ArrayKey],
+    key: &mir_types::atomic::ArrayKey,
+) -> Option<Type> {
+    let Some((head, rest)) = path.split_first() else {
+        let narrowed = add_key_to_sealed_shapes(ty, key);
+        return if narrowed != *ty { Some(narrowed) } else { None };
+    };
+    let mut changed = false;
+    let mut result = Type::empty();
+    for atomic in &ty.types {
+        match atomic {
+            Atomic::TKeyedArray {
+                properties,
+                is_open,
+                is_list,
+            } => {
+                if properties.contains_key(head) {
+                    let mut new_props = properties.clone();
+                    if let Some(prop) = new_props.get_mut(head) {
+                        if let Some(deeper) = narrow_shape_path_key_exists(&prop.ty, rest, key) {
+                            prop.ty = deeper;
+                            changed = true;
+                        }
+                    }
+                    result.add_type(Atomic::TKeyedArray {
+                        properties: new_props,
+                        is_open: *is_open,
+                        is_list: *is_list,
+                    });
+                } else {
+                    result.add_type(atomic.clone());
+                }
+            }
+            _ => result.add_type(atomic.clone()),
+        }
+    }
+    if changed {
         Some(result)
     } else {
         None
