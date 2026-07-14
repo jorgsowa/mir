@@ -2670,14 +2670,19 @@ fn narrow_from_type_fn(ctx: &mut FlowState, fn_name: &str, var_name: &str, is_tr
             if is_true {
                 current.narrow_to_iterable()
             } else {
-                current.filter(|t| !t.is_array() && !t.is_object())
+                // Mirrors narrow_to_iterable's true-branch conservatism: we can't
+                // verify Traversable membership structurally, so only exclude the
+                // atom we know for certain satisfies is_iterable() — a plain array.
+                // Stripping all objects too would wrongly empty e.g. `SomeClass|array`,
+                // marking the else-branch unreachable.
+                current.filter(|t| !t.is_array())
             }
         }
         "is_countable" => {
             if is_true {
                 current.narrow_to_countable()
             } else {
-                current.filter(|t| !t.is_array() && !t.is_object())
+                current.filter(|t| !t.is_array())
             }
         }
         "is_resource" => {
