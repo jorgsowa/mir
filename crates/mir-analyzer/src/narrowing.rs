@@ -4252,17 +4252,18 @@ fn extract_array_key_first_or_last_arg(expr: &php_ast::owned::Expr) -> Option<St
 
 /// `array_key_first($arr) !== null` / `array_key_last($arr) !== null` — a common
 /// non-empty-array idiom, equivalent to `count($arr) > 0`. Both functions return
-/// `null` only when the array is empty, so `!== null` proves it's non-empty;
-/// `=== null` proves it's empty, which has no dedicated narrowing today.
+/// `null` only when the array is empty, so `!== null` proves it's non-empty and
+/// `=== null` proves it's empty.
 fn narrow_array_key_first_or_last_null(ctx: &mut FlowState, arr_var: &str, is_null: bool) {
-    if is_null {
-        return;
-    }
     let current = ctx.get_var(arr_var);
     if current.is_mixed() {
         return;
     }
-    let narrowed = current.narrow_to_non_empty_collection();
+    let narrowed = if is_null {
+        current.narrow_to_empty_collection()
+    } else {
+        current.narrow_to_non_empty_collection()
+    };
     if narrowed != current {
         ctx.set_var(arr_var, narrowed);
     }

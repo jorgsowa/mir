@@ -635,6 +635,14 @@ impl Type {
         out
     }
 
+    /// Narrow array/list types when proven empty (e.g. `array_key_first($x) === null`).
+    /// Drops the non-empty variants outright — they can never be empty — but
+    /// otherwise leaves atoms unchanged, since there's no atomic "provably
+    /// empty array" type to narrow a plain `array`/`list` down to.
+    pub fn narrow_to_empty_collection(&self) -> Type {
+        self.filter(|t| !matches!(t, Atomic::TNonEmptyArray { .. } | Atomic::TNonEmptyList { .. }))
+    }
+
     /// Narrow as if `array_is_list($x)` is true.
     /// Lists have sequential integer keys starting from 0, so:
     /// - `list<T>` / `non-empty-list<T>` are kept unchanged.
