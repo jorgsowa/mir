@@ -192,15 +192,26 @@ impl AnalysisSession {
         }
 
         let mut files_with_parse_errors: HashSet<Arc<str>> = HashSet::default();
-        for (defs, _hash, _hard_err, _surface) in file_defs {
-            for issue in defs.issues.iter() {
-                if matches!(issue.kind, mir_issues::IssueKind::ParseError { .. })
-                    && issue.severity == mir_issues::Severity::Error
-                {
-                    files_with_parse_errors.insert(issue.location.file.clone());
+        {
+            // Commit subtype-index class edges alongside issue collection —
+            // parity with `ingest_file`'s single-file path, so goto-implementation
+            // sees implementors from a batch/vendor run without waiting for
+            // each file to be individually touched by an on-demand commit path.
+            let guard = self.db.salsa.read();
+            for (parsed, (defs, _hash, _hard_err, _surface)) in
+                parsed_files.iter().zip(file_defs.into_iter())
+            {
+                for issue in defs.issues.iter() {
+                    if matches!(issue.kind, mir_issues::IssueKind::ParseError { .. })
+                        && issue.severity == mir_issues::Severity::Error
+                    {
+                        files_with_parse_errors.insert(issue.location.file.clone());
+                    }
                 }
+                let entries = crate::db::subtype_index::entries_from_slice(&defs.slice);
+                guard.set_file_class_edges(&parsed.file, entries);
+                all_issues.extend(Arc::unwrap_or_clone(defs.issues));
             }
-            all_issues.extend(Arc::unwrap_or_clone(defs.issues));
         }
         let _t_ingest = _t0.elapsed();
 
@@ -669,7 +680,7 @@ impl AnalysisSession {
             (**guard).clone()
         };
         let stub_cache = self.db.stub_cache.clone();
-        let prepared: Vec<mir_codebase::definitions::StubSlice> = entries
+        let prepared: Vec<(Arc<str>, mir_codebase::definitions::StubSlice)> = entries
             .into_par_iter()
             .zip(source_files.into_par_iter())
             .map_with(db_pass1, |db, (mut entry, salsa_file)| {
@@ -677,16 +688,28 @@ impl AnalysisSession {
                     let slice_arc = Arc::new(slice);
                     db.parse_cache()
                         .insert(entry.hash, php_v, Arc::clone(&slice_arc));
-                    return (*slice_arc).clone();
+                    return (entry.file.clone(), (*slice_arc).clone());
                 }
                 let defs = collect_file_definitions(&*db, salsa_file);
                 if let Some(cache) = stub_cache.as_ref() {
                     cache.put(&entry.file, &entry.hash, php_v, &defs.slice);
                 }
-                (*defs.slice).clone()
+                (entry.file.clone(), (*defs.slice).clone())
             })
             .collect();
         let _t_collect = _t0.elapsed();
+        // Commit subtype-index class edges for the vendor tree: without this,
+        // goto-implementation can't surface implementors that live only in
+        // vendor/ (index_batch's project-file warm sweep has the same gap for
+        // project files, but no StubSlice is cheaply available there — see
+        // the persistence work tracked separately).
+        {
+            let guard = self.db.salsa.read();
+            for (file, slice) in &prepared {
+                let entries = crate::db::subtype_index::entries_from_slice(slice);
+                guard.set_file_class_edges(file, entries);
+            }
+        }
         drop(prepared);
         let _t_ingest = _t0.elapsed();
 
