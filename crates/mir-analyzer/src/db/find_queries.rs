@@ -860,47 +860,6 @@ pub fn class_ancestors_by_fqcn<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -
     order.into()
 }
 
-/// Resolved inverse of [`class_ancestors_by_fqcn`]: the files declaring every
-/// transitive subclass (and sub-interface / using class) of `fqcn`, excluding
-/// `fqcn`'s own declaration.
-///
-/// Scans the workspace class index and keeps each class-like whose resolved
-/// ancestor chain contains `fqcn`. Because ancestors are real, resolved FQCNs,
-/// a subclass is matched regardless of whether it wrote `extends Base`,
-/// `extends \App\Base`, or an aliased `use App\Base as X; class C extends X` —
-/// the textual form is irrelevant. Powers visibility-scoped reference search
-/// for `protected` members.
-///
-/// Tracked: memoized per `fqcn` and invalidated when the class set or any
-/// ancestor chain changes. Returns `Arc<[Arc<str>]>` for cheap ptr_eq identity.
-#[salsa::tracked]
-pub fn class_subtype_files<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Arc<[Arc<str>]> {
-    let target = fqcn
-        .name(db)
-        .as_str()
-        .trim_start_matches('\\')
-        .to_ascii_lowercase();
-    let index = crate::db::workspace_index(db);
-    let mut files: Vec<Arc<str>> = Vec::new();
-    let mut seen = std::collections::HashSet::<Arc<str>>::new();
-    for (name, loc) in index.class_like.iter() {
-        let here = Fqcn::from_str(db, name.as_str());
-        // ancestors[0] is the class itself; skip it so a class is never its own
-        // subtype, then check whether `target` appears anywhere up the chain.
-        let is_subtype = class_ancestors_by_fqcn(db, here)
-            .iter()
-            .skip(1)
-            .any(|a| a.trim_start_matches('\\').eq_ignore_ascii_case(&target));
-        if is_subtype {
-            let path = loc.file().path(db);
-            if seen.insert(path.clone()) {
-                files.push(path);
-            }
-        }
-    }
-    files.into()
-}
-
 /// Existence check for "does any ancestor of `fqcn` have a method named
 /// `name`?". Used for magic-method dispatch checks (`__call`, `__callstatic`,
 /// `__toString`, `__invoke`, `__get`, …) where callers only need a boolean.

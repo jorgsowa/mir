@@ -150,7 +150,9 @@ fn references_to_takes_typed_symbol() {
     );
 
     // New typed API: pass Name::function, not &str
-    let refs = session.references_to(&Name::function("helper"));
+    let refs = session
+        .indexed_references_to(&Name::function("helper"), std::slice::from_ref(&file), false, &|| false)
+        .expect("not cancelled");
     assert!(
         refs.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
         "Should find references to helper in {}",
@@ -268,7 +270,9 @@ fn resolved_symbol_to_symbol_bridges_pass2_with_queries() {
     assert_eq!(typed_symbol, Name::function("helper"));
 
     // The typed Name can be passed directly to references_to
-    let refs = session.references_to(&typed_symbol);
+    let refs = session
+        .indexed_references_to(&typed_symbol, std::slice::from_ref(&file), false, &|| false)
+        .expect("not cancelled");
     assert!(refs.iter().any(|(f, _)| f.as_ref() == file.as_ref()));
 }
 
@@ -298,8 +302,12 @@ fn method_references_scoped_by_declaring_class() {
         &parsed.source_map,
     );
 
-    let foo_refs = session.references_to(&Name::method("Foo", "toString"));
-    let bar_refs = session.references_to(&Name::method("Bar", "toString"));
+    let foo_refs = session
+        .indexed_references_to(&Name::method("Foo", "toString"), std::slice::from_ref(&file), false, &|| false)
+        .expect("not cancelled");
+    let bar_refs = session
+        .indexed_references_to(&Name::method("Bar", "toString"), std::slice::from_ref(&file), false, &|| false)
+        .expect("not cancelled");
 
     assert!(
         !foo_refs.is_empty(),
@@ -358,7 +366,9 @@ fn method_references_end_to_end_symbol_at_flow() {
     );
 
     let name = sym.to_symbol().expect("MethodCall should map to a Name");
-    let refs = session.references_to(&name);
+    let refs = session
+        .indexed_references_to(&name, std::slice::from_ref(&file), false, &|| false)
+        .expect("not cancelled");
 
     assert!(
         !refs.is_empty(),
@@ -406,7 +416,9 @@ fn global_constant_references_end_to_end_symbol_at_flow() {
     let name = sym
         .to_symbol()
         .expect("GlobalConstant should map to a Name");
-    let refs = session.references_to(&name);
+    let refs = session
+        .indexed_references_to(&name, std::slice::from_ref(&file), false, &|| false)
+        .expect("not cancelled");
 
     assert!(
         !refs.is_empty(),
@@ -461,7 +473,9 @@ fn method_references_inherited_method_end_to_end() {
     );
 
     let name = sym.to_symbol().expect("MethodCall maps to Name");
-    let refs = session.references_to(&name);
+    let refs = session
+        .indexed_references_to(&name, std::slice::from_ref(&file), false, &|| false)
+        .expect("not cancelled");
 
     assert!(
         !refs.is_empty(),
@@ -514,7 +528,9 @@ fn property_references_inherited_property_end_to_end() {
     );
 
     let name = sym.to_symbol().expect("PropertyAccess maps to Name");
-    let refs = session.references_to(&name);
+    let refs = session
+        .indexed_references_to(&name, std::slice::from_ref(&file), false, &|| false)
+        .expect("not cancelled");
 
     assert!(
         !refs.is_empty(),
@@ -552,7 +568,9 @@ fn property_write_target_appears_in_references() {
         &parsed.source_map,
     );
 
-    let refs = session.references_to(&Name::property("Foo", "v"));
+    let refs = session
+        .indexed_references_to(&Name::property("Foo", "v"), std::slice::from_ref(&file), false, &|| false)
+        .expect("not cancelled");
     let lines: Vec<u32> = refs.iter().map(|(_, r)| r.start.line).collect();
 
     assert!(
@@ -595,7 +613,9 @@ fn static_property_write_target_appears_in_references() {
         &parsed.source_map,
     );
 
-    let refs = session.references_to(&Name::property("Counter", "n"));
+    let refs = session
+        .indexed_references_to(&Name::property("Counter", "n"), std::slice::from_ref(&file), false, &|| false)
+        .expect("not cancelled");
     let lines: Vec<u32> = refs.iter().map(|(_, r)| r.start.line).collect();
 
     assert!(
@@ -632,7 +652,9 @@ fn property_references_direct_property_end_to_end() {
         &parsed.source_map,
     );
 
-    let refs = session.references_to(&Name::property("Foo", "value"));
+    let refs = session
+        .indexed_references_to(&Name::property("Foo", "value"), std::slice::from_ref(&file), false, &|| false)
+        .expect("not cancelled");
     assert!(
         !refs.is_empty(),
         "references_to(Foo::value) must find the ->value access; got none"
@@ -1498,19 +1520,25 @@ fn references_to_finds_extends_implements_and_trait_use() {
         &parsed.source_map,
     );
 
-    let base_refs = session.references_to(&Name::class("Base"));
+    let base_refs = session
+        .indexed_references_to(&Name::class("Base"), std::slice::from_ref(&file), false, &|| false)
+        .expect("not cancelled");
     assert!(
         base_refs.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
         "references_to(Base) must find `class Child extends Base`"
     );
 
-    let iface_refs = session.references_to(&Name::class("Greets"));
+    let iface_refs = session
+        .indexed_references_to(&Name::class("Greets"), std::slice::from_ref(&file), false, &|| false)
+        .expect("not cancelled");
     assert!(
         iface_refs.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
         "references_to(Greets) must find `implements Greets`"
     );
 
-    let trait_refs = session.references_to(&Name::class("Helper"));
+    let trait_refs = session
+        .indexed_references_to(&Name::class("Helper"), std::slice::from_ref(&file), false, &|| false)
+        .expect("not cancelled");
     assert!(
         trait_refs.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
         "references_to(Helper) must find `use Helper;`"

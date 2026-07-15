@@ -498,7 +498,14 @@ function caller(): string { return helper(); }
     let _ =
         FileAnalyzer::new(&session).analyze(file.clone(), src, &parsed.program, &parsed.source_map);
 
-    let refs = session.references_to(&mir_analyzer::Name::function("helper"));
+    let refs = session
+        .indexed_references_to(
+            &mir_analyzer::Name::function("helper"),
+            std::slice::from_ref(&file),
+            false,
+            &|| false,
+        )
+        .expect("not cancelled");
     assert!(
         refs.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
         "helper() must have at least one reference recorded in {file}; got {refs:?}"
@@ -814,7 +821,14 @@ function caller_v1() { foo(); }
         FileAnalyzer::new(&session).analyze(file.clone(), v1, &parsed.program, &parsed.source_map);
     }
 
-    let foo_refs_v1 = session.references_to(&mir_analyzer::Name::function("foo"));
+    let foo_refs_v1 = session
+        .indexed_references_to(
+            &mir_analyzer::Name::function("foo"),
+            std::slice::from_ref(&file),
+            false,
+            &|| false,
+        )
+        .expect("not cancelled");
     assert!(
         foo_refs_v1.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
         "v1 must record a foo() call from {file}; got {foo_refs_v1:?}"
@@ -832,12 +846,26 @@ function caller_v2() { bar(); }
         FileAnalyzer::new(&session).analyze(file.clone(), v2, &parsed.program, &parsed.source_map);
     }
 
-    let foo_refs_v2 = session.references_to(&mir_analyzer::Name::function("foo"));
+    let foo_refs_v2 = session
+        .indexed_references_to(
+            &mir_analyzer::Name::function("foo"),
+            std::slice::from_ref(&file),
+            false,
+            &|| false,
+        )
+        .expect("not cancelled");
     assert!(
         !foo_refs_v2.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
         "after re-ingest without foo(), no foo-reference should remain from {file}; got {foo_refs_v2:?}"
     );
-    let bar_refs_v2 = session.references_to(&mir_analyzer::Name::function("bar"));
+    let bar_refs_v2 = session
+        .indexed_references_to(
+            &mir_analyzer::Name::function("bar"),
+            std::slice::from_ref(&file),
+            false,
+            &|| false,
+        )
+        .expect("not cancelled");
     assert!(
         bar_refs_v2.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
         "after re-ingest with bar(), bar-reference must be present in {file}; got {bar_refs_v2:?}"
@@ -1071,7 +1099,7 @@ fn vendor_autoload_files_functions_lazy_loaded_automatically() {
 /// Cancellable references: a pre-cancelled request aborts with `None` before
 /// doing any warm-up or analysis work.
 #[test]
-fn references_to_in_files_cancellable_aborts_when_cancelled() {
+fn indexed_references_to_aborts_when_cancelled() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
     let file: Arc<str> = Arc::from("/proj/cancel_refs.php");
     let src = "<?php
@@ -1080,19 +1108,19 @@ function caller(): string { return helper(); }
 ";
     session.ingest_file(file.clone(), Arc::from(src));
 
-    let refs = session.references_to_in_files_cancellable(
+    let refs = session.indexed_references_to(
         &mir_analyzer::Name::function("helper"),
         std::slice::from_ref(&file),
+        false,
         &|| true,
     );
     assert!(refs.is_none(), "cancelled request must return None");
 }
 
-/// The cancellable variant with a never-cancelling closure matches the plain
-/// `references_to_in_files`, and repeated queries (now served through the
+/// A never-cancelling query, and repeated queries (now served through the
 /// warm-up skip set) keep returning the same locations.
 #[test]
-fn references_to_in_files_warm_repeat_is_stable() {
+fn indexed_references_to_warm_repeat_is_stable() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
     let file: Arc<str> = Arc::from("/proj/warm_refs.php");
     let src = "<?php
@@ -1102,26 +1130,30 @@ function caller(): string { return helper(); }
     session.ingest_file(file.clone(), Arc::from(src));
 
     let name = mir_analyzer::Name::function("helper");
-    let first = session.references_to_in_files(&name, std::slice::from_ref(&file));
+    let first = session
+        .indexed_references_to(&name, std::slice::from_ref(&file), false, &|| false)
+        .expect("not cancelled");
     assert!(
         !first.is_empty(),
         "helper() must have a recorded reference; got none"
     );
 
     let cancellable = session
-        .references_to_in_files_cancellable(&name, std::slice::from_ref(&file), &|| false)
+        .indexed_references_to(&name, std::slice::from_ref(&file), false, &|| false)
         .expect("uncancelled request must return Some");
     assert_eq!(first, cancellable);
 
     // Second call takes the prepared-files skip path; results must not change.
-    let second = session.references_to_in_files(&name, std::slice::from_ref(&file));
+    let second = session
+        .indexed_references_to(&name, std::slice::from_ref(&file), false, &|| false)
+        .expect("not cancelled");
     assert_eq!(first, second);
 }
 
 /// Editing a file invalidates its warm-up skip entry: references added by the
 /// new text are found by the next query.
 #[test]
-fn references_to_in_files_sees_new_refs_after_edit() {
+fn indexed_references_to_sees_new_refs_after_edit() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
     let file: Arc<str> = Arc::from("/proj/edit_refs.php");
     let v1 = "<?php
@@ -1131,7 +1163,9 @@ function caller(): string { return helper(); }
     session.ingest_file(file.clone(), Arc::from(v1));
 
     let name = mir_analyzer::Name::function("helper");
-    let refs_v1 = session.references_to_in_files(&name, std::slice::from_ref(&file));
+    let refs_v1 = session
+        .indexed_references_to(&name, std::slice::from_ref(&file), false, &|| false)
+        .expect("not cancelled");
 
     let v2 = "<?php
 function helper(): string { return 'a'; }
@@ -1140,7 +1174,9 @@ function caller2(): string { return helper(); }
 ";
     session.ingest_file(file.clone(), Arc::from(v2));
 
-    let refs_v2 = session.references_to_in_files(&name, std::slice::from_ref(&file));
+    let refs_v2 = session
+        .indexed_references_to(&name, std::slice::from_ref(&file), false, &|| false)
+        .expect("not cancelled");
     assert!(
         refs_v2.len() > refs_v1.len(),
         "after adding a call site the query must find more references \

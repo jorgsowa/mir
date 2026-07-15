@@ -10,7 +10,7 @@
 //! gated on debug assertions so it fires under `cargo test`). The fix reads the
 //! epoch from an off-salsa atomic mirror instead, so it never touches salsa.
 //!
-//! This test runs several reader threads (parallel `references_to_in_files` /
+//! This test runs several reader threads (parallel `indexed_references_to` /
 //! `reanalyze_dependents`) plus a background indexer looping `index_batch`
 //! (which calls `index_generation`) and a writer toggling a base class, all on
 //! the shared rayon pool. Before the fix it aborts deterministically within a
@@ -151,7 +151,7 @@ fn concurrent_writes_do_not_abort_parallel_reference_reads() {
                     // cancellable path the LSP server uses.
                     let deadline = Instant::now() + CALL_BUDGET;
                     let _ = std::panic::catch_unwind(AssertUnwindSafe(|| {
-                        session.references_to_in_files_cancellable(&symbol, &callers, &|| {
+                        session.indexed_references_to(&symbol, &callers, false, &|| {
                             Instant::now() > deadline
                         })
                     }));
