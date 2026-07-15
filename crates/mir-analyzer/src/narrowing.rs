@@ -4090,7 +4090,7 @@ fn promote_assignment_effects(
 fn extract_get_class_arg(expr: &php_ast::owned::Expr) -> Option<String> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
         if let ExprKind::Identifier(name) = &call.name.kind {
-            if name.eq_ignore_ascii_case("get_class") {
+            if name.trim_start_matches('\\').eq_ignore_ascii_case("get_class") {
                 if let Some(arg) = call.args.first() {
                     return extract_var_name(&arg.value);
                 }
@@ -4103,7 +4103,7 @@ fn extract_get_class_arg(expr: &php_ast::owned::Expr) -> Option<String> {
 fn extract_gettype_arg(expr: &php_ast::owned::Expr) -> Option<String> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
         if let ExprKind::Identifier(name) = &call.name.kind {
-            if name.eq_ignore_ascii_case("gettype") {
+            if name.trim_start_matches('\\').eq_ignore_ascii_case("gettype") {
                 if let Some(arg) = call.args.first() {
                     return extract_var_name(&arg.value);
                 }
@@ -4116,7 +4116,10 @@ fn extract_gettype_arg(expr: &php_ast::owned::Expr) -> Option<String> {
 fn extract_get_debug_type_arg(expr: &php_ast::owned::Expr) -> Option<String> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
         if let ExprKind::Identifier(name) = &call.name.kind {
-            if name.eq_ignore_ascii_case("get_debug_type") {
+            if name
+                .trim_start_matches('\\')
+                .eq_ignore_ascii_case("get_debug_type")
+            {
                 if let Some(arg) = call.args.first() {
                     return extract_var_name(&arg.value);
                 }
