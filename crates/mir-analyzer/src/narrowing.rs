@@ -2247,10 +2247,9 @@ fn narrow_from_false_comparable_call(
                             // Not found: safe only when current is a finite literal
                             // union — remove the matched haystack values.
                             let all_literals = !current.types.is_empty()
-                                && current
-                                    .types
-                                    .iter()
-                                    .all(|a| matches!(a, Atomic::TLiteralString(_) | Atomic::TLiteralInt(_)));
+                                && current.types.iter().all(|a| {
+                                    matches!(a, Atomic::TLiteralString(_) | Atomic::TLiteralInt(_))
+                                });
                             if all_literals {
                                 let narrowed =
                                     current.filter(|a| !haystack_ty.types.iter().any(|h| h == a));
@@ -4095,7 +4094,10 @@ fn promote_assignment_effects(
 fn extract_get_class_arg(expr: &php_ast::owned::Expr) -> Option<String> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
         if let ExprKind::Identifier(name) = &call.name.kind {
-            if name.trim_start_matches('\\').eq_ignore_ascii_case("get_class") {
+            if name
+                .trim_start_matches('\\')
+                .eq_ignore_ascii_case("get_class")
+            {
                 if let Some(arg) = call.args.first() {
                     return extract_var_name(&arg.value);
                 }
@@ -4108,7 +4110,10 @@ fn extract_get_class_arg(expr: &php_ast::owned::Expr) -> Option<String> {
 fn extract_gettype_arg(expr: &php_ast::owned::Expr) -> Option<String> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
         if let ExprKind::Identifier(name) = &call.name.kind {
-            if name.trim_start_matches('\\').eq_ignore_ascii_case("gettype") {
+            if name
+                .trim_start_matches('\\')
+                .eq_ignore_ascii_case("gettype")
+            {
                 if let Some(arg) = call.args.first() {
                     return extract_var_name(&arg.value);
                 }
@@ -4240,7 +4245,8 @@ fn extract_array_key_first_or_last_arg(expr: &php_ast::owned::Expr) -> Option<St
             _ => return None,
         };
         let bare = name.trim_start_matches('\\');
-        if bare.eq_ignore_ascii_case("array_key_first") || bare.eq_ignore_ascii_case("array_key_last")
+        if bare.eq_ignore_ascii_case("array_key_first")
+            || bare.eq_ignore_ascii_case("array_key_last")
         {
             if let Some(arg) = call.args.first() {
                 return extract_var_name(&arg.value);

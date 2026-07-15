@@ -640,7 +640,12 @@ impl Type {
     /// otherwise leaves atoms unchanged, since there's no atomic "provably
     /// empty array" type to narrow a plain `array`/`list` down to.
     pub fn narrow_to_empty_collection(&self) -> Type {
-        self.filter(|t| !matches!(t, Atomic::TNonEmptyArray { .. } | Atomic::TNonEmptyList { .. }))
+        self.filter(|t| {
+            !matches!(
+                t,
+                Atomic::TNonEmptyArray { .. } | Atomic::TNonEmptyList { .. }
+            )
+        })
     }
 
     /// Narrow as if `array_is_list($x)` is true.

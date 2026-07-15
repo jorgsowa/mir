@@ -30,7 +30,13 @@ fn warm_start_files_replays_reference_locations_from_disk_cache() {
         // it, since postings are committed with replace-per-file semantics).
         let fabricated: Arc<[mir_analyzer::cache::CachedRefLoc]> =
             Arc::from(vec![(Arc::from("meth:App\\Other::bogus"), 5, 0, 5)]);
-        disk_cache.put(file_path, hash, String::new(), Arc::from(Vec::new()), fabricated);
+        disk_cache.put(
+            file_path,
+            hash,
+            String::new(),
+            Arc::from(Vec::new()),
+            fabricated,
+        );
         disk_cache.flush();
     }
 

@@ -303,12 +303,9 @@ fn static_call_name_fallback_on_unresolved_class() {
     )];
     let session = session_with(&files);
     let refs = session
-        .indexed_references_to(
-            &Name::method("", "doThing"),
-            &paths(&files),
-            false,
-            &|| false,
-        )
+        .indexed_references_to(&Name::method("", "doThing"), &paths(&files), false, &|| {
+            false
+        })
         .expect("not cancelled");
     assert_eq!(
         refs.len(),
@@ -326,12 +323,9 @@ fn static_call_name_fallback_on_undefined_method() {
     )];
     let session = session_with(&files);
     let refs = session
-        .indexed_references_to(
-            &Name::method("", "doThing"),
-            &paths(&files),
-            false,
-            &|| false,
-        )
+        .indexed_references_to(&Name::method("", "doThing"), &paths(&files), false, &|| {
+            false
+        })
         .expect("not cancelled");
     assert_eq!(
         refs.len(),
@@ -349,12 +343,9 @@ fn unknown_owner_property_declaration_reachable() {
     )];
     let session = session_with(&files);
     let refs = session
-        .indexed_references_to(
-            &Name::property("", "label"),
-            &paths(&files),
-            true,
-            &|| false,
-        )
+        .indexed_references_to(&Name::property("", "label"), &paths(&files), true, &|| {
+            false
+        })
         .expect("not cancelled");
     assert_eq!(
         refs.len(),
@@ -458,15 +449,27 @@ fn use_import_locations_reachable_but_excluded_from_plain_references() {
     );
 
     let cls_use = session.indexed_use_import_locations(&Name::class("App\\Widget"), &all);
-    assert_eq!(cls_use.len(), 1, "class import must be indexed: {cls_use:?}");
+    assert_eq!(
+        cls_use.len(),
+        1,
+        "class import must be indexed: {cls_use:?}"
+    );
     assert_eq!(cls_use[0].0.as_ref(), "main.php");
 
     let fn_use = session.indexed_use_import_locations(&Name::function("App\\helper"), &all);
-    assert_eq!(fn_use.len(), 1, "function import must be indexed: {fn_use:?}");
+    assert_eq!(
+        fn_use.len(),
+        1,
+        "function import must be indexed: {fn_use:?}"
+    );
 
     let const_use =
         session.indexed_use_import_locations(&Name::global_constant("App\\LIMIT"), &all);
-    assert_eq!(const_use.len(), 1, "const import must be indexed: {const_use:?}");
+    assert_eq!(
+        const_use.len(),
+        1,
+        "const import must be indexed: {const_use:?}"
+    );
 }
 
 #[test]

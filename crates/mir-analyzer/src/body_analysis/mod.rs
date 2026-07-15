@@ -1134,9 +1134,9 @@ pub(crate) fn check_use_decl_casing(
                             file: file.clone(),
                             span: item.span,
                             expr_span: None,
-                            kind: ReferenceKind::UseImport(Box::new(ReferenceKind::ClassReference(
-                                fqcn,
-                            ))),
+                            kind: ReferenceKind::UseImport(Box::new(
+                                ReferenceKind::ClassReference(fqcn),
+                            )),
                             resolved_type: Type::single(mir_types::Atomic::TClassString(None)),
                         });
                     }
@@ -1188,9 +1188,9 @@ pub(crate) fn check_use_decl_casing(
                             file: file.clone(),
                             span: item.span,
                             expr_span: None,
-                            kind: ReferenceKind::UseImport(Box::new(ReferenceKind::GlobalConstant(
-                                fqn,
-                            ))),
+                            kind: ReferenceKind::UseImport(Box::new(
+                                ReferenceKind::GlobalConstant(fqn),
+                            )),
                             resolved_type: (*ty).clone(),
                         });
                     }

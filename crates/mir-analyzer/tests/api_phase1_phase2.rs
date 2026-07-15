@@ -151,7 +151,12 @@ fn references_to_takes_typed_symbol() {
 
     // New typed API: pass Name::function, not &str
     let refs = session
-        .indexed_references_to(&Name::function("helper"), std::slice::from_ref(&file), false, &|| false)
+        .indexed_references_to(
+            &Name::function("helper"),
+            std::slice::from_ref(&file),
+            false,
+            &|| false,
+        )
         .expect("not cancelled");
     assert!(
         refs.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
@@ -303,10 +308,20 @@ fn method_references_scoped_by_declaring_class() {
     );
 
     let foo_refs = session
-        .indexed_references_to(&Name::method("Foo", "toString"), std::slice::from_ref(&file), false, &|| false)
+        .indexed_references_to(
+            &Name::method("Foo", "toString"),
+            std::slice::from_ref(&file),
+            false,
+            &|| false,
+        )
         .expect("not cancelled");
     let bar_refs = session
-        .indexed_references_to(&Name::method("Bar", "toString"), std::slice::from_ref(&file), false, &|| false)
+        .indexed_references_to(
+            &Name::method("Bar", "toString"),
+            std::slice::from_ref(&file),
+            false,
+            &|| false,
+        )
         .expect("not cancelled");
 
     assert!(
@@ -569,7 +584,12 @@ fn property_write_target_appears_in_references() {
     );
 
     let refs = session
-        .indexed_references_to(&Name::property("Foo", "v"), std::slice::from_ref(&file), false, &|| false)
+        .indexed_references_to(
+            &Name::property("Foo", "v"),
+            std::slice::from_ref(&file),
+            false,
+            &|| false,
+        )
         .expect("not cancelled");
     let lines: Vec<u32> = refs.iter().map(|(_, r)| r.start.line).collect();
 
@@ -614,7 +634,12 @@ fn static_property_write_target_appears_in_references() {
     );
 
     let refs = session
-        .indexed_references_to(&Name::property("Counter", "n"), std::slice::from_ref(&file), false, &|| false)
+        .indexed_references_to(
+            &Name::property("Counter", "n"),
+            std::slice::from_ref(&file),
+            false,
+            &|| false,
+        )
         .expect("not cancelled");
     let lines: Vec<u32> = refs.iter().map(|(_, r)| r.start.line).collect();
 
@@ -653,7 +678,12 @@ fn property_references_direct_property_end_to_end() {
     );
 
     let refs = session
-        .indexed_references_to(&Name::property("Foo", "value"), std::slice::from_ref(&file), false, &|| false)
+        .indexed_references_to(
+            &Name::property("Foo", "value"),
+            std::slice::from_ref(&file),
+            false,
+            &|| false,
+        )
         .expect("not cancelled");
     assert!(
         !refs.is_empty(),
@@ -1521,7 +1551,12 @@ fn references_to_finds_extends_implements_and_trait_use() {
     );
 
     let base_refs = session
-        .indexed_references_to(&Name::class("Base"), std::slice::from_ref(&file), false, &|| false)
+        .indexed_references_to(
+            &Name::class("Base"),
+            std::slice::from_ref(&file),
+            false,
+            &|| false,
+        )
         .expect("not cancelled");
     assert!(
         base_refs.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
@@ -1529,7 +1564,12 @@ fn references_to_finds_extends_implements_and_trait_use() {
     );
 
     let iface_refs = session
-        .indexed_references_to(&Name::class("Greets"), std::slice::from_ref(&file), false, &|| false)
+        .indexed_references_to(
+            &Name::class("Greets"),
+            std::slice::from_ref(&file),
+            false,
+            &|| false,
+        )
         .expect("not cancelled");
     assert!(
         iface_refs.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
@@ -1537,7 +1577,12 @@ fn references_to_finds_extends_implements_and_trait_use() {
     );
 
     let trait_refs = session
-        .indexed_references_to(&Name::class("Helper"), std::slice::from_ref(&file), false, &|| false)
+        .indexed_references_to(
+            &Name::class("Helper"),
+            std::slice::from_ref(&file),
+            false,
+            &|| false,
+        )
         .expect("not cancelled");
     assert!(
         trait_refs.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
