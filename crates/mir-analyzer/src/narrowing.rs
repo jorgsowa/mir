@@ -497,6 +497,18 @@ pub fn narrow_from_condition(
                     narrow_var_null(ctx, &name, effective_true);
                 }
             }
+            // `$x == true` / `$x == false` (and negated forms) — PHP defines loose
+            // comparison to a bool literal as `(bool)$x === value`, i.e. identical
+            // to the truthy/falsy narrowing a bare `if ($x)` already gets.
+            else if let ExprKind::Bool(value) = &b.right.kind {
+                if let Some(name) = extract_var_name(&b.left) {
+                    narrow_var_loose_bool(ctx, &name, *value == effective_true);
+                }
+            } else if let ExprKind::Bool(value) = &b.left.kind {
+                if let Some(name) = extract_var_name(&b.right) {
+                    narrow_var_loose_bool(ctx, &name, *value == effective_true);
+                }
+            }
         }
 
         // $x instanceof ClassName  /  $this->prop instanceof ClassName
@@ -2846,6 +2858,23 @@ fn narrow_var_null(ctx: &mut FlowState, name: &str, is_null: bool) {
         current.remove_null()
     };
     set_narrowed(ctx, name, &current, narrowed, true);
+}
+
+/// Narrow `name` to truthy (`want_truthy`) or falsy, for the loose
+/// `$x == true`/`$x == false` idiom — distinct from `narrow_var_bool`, which
+/// handles the strict `$x === true`/`$x === false` identity check.
+fn narrow_var_loose_bool(ctx: &mut FlowState, name: &str, want_truthy: bool) {
+    let current = ctx.get_var(name);
+    let narrowed = if want_truthy {
+        current.narrow_to_truthy()
+    } else {
+        current.narrow_to_falsy()
+    };
+    // mark_diverges=false: `impossible_loose_comparison` already owns detecting
+    // an always-true/always-false `== true`/`== false` contradiction (and does
+    // so conservatively); asserting divergence here would double-report the
+    // same fact as an unrelated RedundantCondition.
+    set_narrowed(ctx, name, &current, narrowed, false);
 }
 
 fn narrow_var_bool(ctx: &mut FlowState, name: &str, value: bool, is_value: bool) {
