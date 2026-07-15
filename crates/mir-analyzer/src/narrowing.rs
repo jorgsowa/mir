@@ -639,13 +639,13 @@ pub fn narrow_from_condition(
                             }
                         }
                     }
-                } else if fn_name.eq_ignore_ascii_case("assert") {
+                } else if bare.eq_ignore_ascii_case("assert") {
                     // assert($condition) — narrow as if the condition is is_true
                     if let Some(arg_expr) = call.args.first() {
                         narrow_from_condition(&arg_expr.value, ctx, is_true, db, file);
                     }
-                } else if fn_name.eq_ignore_ascii_case("method_exists")
-                    || fn_name.eq_ignore_ascii_case("property_exists")
+                } else if bare.eq_ignore_ascii_case("method_exists")
+                    || bare.eq_ignore_ascii_case("property_exists")
                 {
                     // Narrow the first arg to TObject for simple variables (existing behaviour).
                     // Additionally record `(expr_key, method_name)` in method_exists_guards for
@@ -654,9 +654,9 @@ pub fn narrow_from_condition(
                     // PHP, so property_exists($obj, 'foo') proves nothing about a method 'foo'.
                     if let Some(arg_expr) = call.args.first() {
                         if let Some(var_name) = extract_var_name(&arg_expr.value) {
-                            narrow_from_type_fn(ctx, fn_name, &var_name, is_true);
+                            narrow_from_type_fn(ctx, bare, &var_name, is_true);
                         }
-                        if is_true && fn_name.eq_ignore_ascii_case("method_exists") {
+                        if is_true && bare.eq_ignore_ascii_case("method_exists") {
                             if let Some(expr_key) =
                                 extract_expr_guard_key(&arg_expr.value, db, file)
                             {
@@ -942,7 +942,7 @@ pub fn narrow_from_condition(
                     // User-defined assertion applied.
                 } else if let Some(arg_expr) = call.args.first() {
                     if let Some(var_name) = extract_var_name(&arg_expr.value) {
-                        narrow_from_type_fn(ctx, fn_name, &var_name, is_true);
+                        narrow_from_type_fn(ctx, bare, &var_name, is_true);
                     }
                 }
             }

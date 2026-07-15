@@ -15,7 +15,11 @@ impl<'a> StatementsAnalyzer<'a> {
         self.check_docblock_contradiction(expr, ctx);
         if let ExprKind::FunctionCall(call) = &expr.kind {
             if let ExprKind::Identifier(fn_name) = &call.name.kind {
-                if fn_name.as_ref().eq_ignore_ascii_case("assert") {
+                if fn_name
+                    .as_ref()
+                    .trim_start_matches('\\')
+                    .eq_ignore_ascii_case("assert")
+                {
                     if let Some(arg) = call.args.first() {
                         // Check the asserted condition *before* narrowing, so the
                         // original (docblock) type is still in scope.
