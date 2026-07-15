@@ -580,13 +580,18 @@ pub fn narrow_from_condition(
             };
             if let Some(fn_name) = fn_name_opt {
                 let bare = fn_name.trim_start_matches('\\');
-                if matches!(bare, "class_exists" | "interface_exists" | "trait_exists") {
+                if matches!(
+                    bare.to_ascii_lowercase().as_str(),
+                    "class_exists" | "interface_exists" | "trait_exists" | "enum_exists"
+                ) {
                     // `if (class_exists(\Foo\Bar::class)) { ... }` — record \Foo\Bar as
                     // proven-to-exist in the true branch so that UndefinedClass is
                     // suppressed for all usages within the guarded block.
                     // Variable form: `if (class_exists($var)) { ... }` — narrow $var to
                     // class-string so it satisfies class-string-typed parameters.
                     // `interface_exists($var)` narrows to the more precise interface-string.
+                    // `enum_exists($var)`/`trait_exists($var)` narrow like class_exists —
+                    // no dedicated enum-string/trait-string atomic exists.
                     if is_true {
                         if let Some(arg_expr) = call.args.first() {
                             if let Some(fqcn) =
@@ -595,7 +600,7 @@ pub fn narrow_from_condition(
                                 ctx.class_exists_guards.insert(fqcn);
                             } else if let Some(var_name) = extract_var_name(&arg_expr.value) {
                                 let current = ctx.get_var(&var_name);
-                                let narrowed = if bare == "interface_exists" {
+                                let narrowed = if bare.eq_ignore_ascii_case("interface_exists") {
                                     current.narrow_to_interface_string()
                                 } else {
                                     current.narrow_to_class_string()
