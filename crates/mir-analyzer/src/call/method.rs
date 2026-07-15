@@ -333,6 +333,16 @@ impl CallAnalyzer {
                     span,
                 );
             }
+            // The receiver type is unknowable, so the callee can't be keyed to
+            // a class — record a name-only fallback so find-references on any
+            // `X::name` can still surface this call as a possible reference.
+            ea.record_ref(
+                Arc::from(format!(
+                    "methname:{}",
+                    crate::util::php_ident_lowercase(method_name)
+                )),
+                call.method.span,
+            );
             return Type::mixed();
         }
 
@@ -583,6 +593,16 @@ impl CallAnalyzer {
                 // which also keys by owner_fqcn — without walking the chain a
                 // second time.
                 let Some(declaring_class) = declaring.take() else {
+                    // Receiver names a class we couldn't resolve the method on
+                    // (unknown class, undeclared method) — keep a name-only
+                    // fallback so find-references can surface the call.
+                    ea.record_ref(
+                        Arc::from(format!(
+                            "methname:{}",
+                            crate::util::php_ident_lowercase(method_name)
+                        )),
+                        call.method.span,
+                    );
                     break;
                 };
                 ea.record_symbol_with_expr_span(

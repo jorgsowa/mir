@@ -266,6 +266,37 @@ impl<'a> ExpressionAnalyzer<'a> {
 
             // --- Anonymous class -------------------------------------------
             ExprKind::AnonymousClass(anon) => {
+                // Record subtype markers: anonymous classes never reach the
+                // definition collector, so `impl:{parent}` postings are how
+                // goto-implementation finds `new class implements X {}`.
+                let kw_start = self
+                    .source
+                    .get(expr.span.start as usize..)
+                    .and_then(|tail| tail.find("class"))
+                    .map(|p| expr.span.start + p as u32)
+                    .unwrap_or(expr.span.start);
+                let kw_span = php_ast::Span {
+                    start: kw_start,
+                    end: kw_start + "class".len() as u32,
+                };
+                let mut anon_supers: Vec<String> = Vec::new();
+                if let Some(parent) = &anon.extends {
+                    anon_supers.push(crate::parser::name_to_string_owned(parent));
+                }
+                for iface in anon.implements.iter() {
+                    anon_supers.push(crate::parser::name_to_string_owned(iface));
+                }
+                for name in anon_supers {
+                    let resolved = crate::db::resolve_name(self.db, self.file.as_ref(), &name);
+                    let lc = resolved.trim_start_matches('\\').to_ascii_lowercase();
+                    self.record_ref(Arc::from(format!("impl:{lc}")), kw_span);
+                    let short = lc.rsplit('\\').next().unwrap_or(&lc);
+                    if short != lc {
+                        self.record_ref(Arc::from(format!("implshort:{short}")), kw_span);
+                    } else {
+                        self.record_ref(Arc::from(format!("implshort:{lc}")), kw_span);
+                    }
+                }
                 let mut sa = crate::stmt::StatementsAnalyzer::new(
                     self.db,
                     self.file.clone(),
@@ -908,7 +939,27 @@ impl<'a> ExpressionAnalyzer<'a> {
         if self.mode == AnalysisMode::InferenceOnly {
             return;
         }
-        let (line, col_start) = self.offset_to_line_col(span.start);
+        // Static property tokens (`Cls::$prop`) span the `$` sigil while
+        // instance accesses (`$obj->prop`) don't — normalize property spans
+        // to the bare name so find-references ranges are uniform. Global
+        // constant tokens may span a qualified path (`\Config\DB_HOST`);
+        // narrow to the final segment for the same reason.
+        let mut start = span.start;
+        if symbol_key.starts_with("prop:")
+            && self.source.as_bytes().get(start as usize) == Some(&b'$')
+        {
+            start += 1;
+        }
+        if symbol_key.starts_with("gcnst:") {
+            let s = start as usize;
+            let e = (span.end as usize).min(self.source.len());
+            if let Some(slice) = self.source.get(s..e) {
+                if let Some(pos) = slice.rfind('\\') {
+                    start += pos as u32 + 1;
+                }
+            }
+        }
+        let (line, col_start) = self.offset_to_line_col(start);
         let (_, col_end) = self.offset_to_line_col(span.end);
         self.db.record_reference_location(crate::db::RefLoc {
             symbol_key,

@@ -59,10 +59,11 @@ impl<'a> BodyAnalyzer<'a> {
         all_issues: &mut Vec<Issue>,
         all_symbols: &mut Vec<ResolvedSymbol>,
     ) {
-        use php_ast::owned::StmtKind;
         if self.mode != AnalysisMode::Full {
             return;
         }
+        use php_ast::owned::StmtKind;
+
         use crate::flow_state::FlowState;
         use crate::stmt::StatementsAnalyzer;
         use mir_issues::IssueBuffer;
@@ -80,22 +81,59 @@ impl<'a> BodyAnalyzer<'a> {
             self.mode,
         );
         sa.collect_symbols = self.collect_symbols;
+        // Braced namespace bodies carry ordinary executable statements
+        // (`namespace Shop { $o = new Order(1); }`); walk them like top-level
+        // code. Declarations stay skipped at every level — they're analyzed
+        // by their own scopes.
+        //
+        // Only when the file's namespaces are uniform, though: name
+        // resolution is file-scoped (`resolve_name` reads the file's first
+        // namespace), so exec code inside a second, *different* namespace
+        // block would resolve against the wrong prefix and emit bogus
+        // diagnostics. Multi-namespace files keep the old skip.
+        let mut ns_names: Vec<Option<String>> = Vec::new();
         for stmt in program.stmts.iter() {
-            match &stmt.kind {
-                StmtKind::Function(_)
-                | StmtKind::Class(_)
-                | StmtKind::Enum(_)
-                | StmtKind::Interface(_)
-                | StmtKind::Trait(_)
-                | StmtKind::Namespace(_)
-                | StmtKind::Use(_) => {}
-                // Process Declare so that `declare(strict_types=1)` updates
-                // ctx.strict_types before later executable stmts are analyzed.
-                _ => {
-                    sa.analyze_stmt(stmt, &mut ctx);
+            if let StmtKind::Namespace(ns) = &stmt.kind {
+                ns_names.push(ns.name.as_ref().map(crate::parser::name_to_string_owned));
+            }
+        }
+        let uniform_namespace = {
+            let mut distinct = ns_names.clone();
+            distinct.sort();
+            distinct.dedup();
+            distinct.len() <= 1
+        };
+        fn exec_stmts(
+            sa: &mut crate::stmt::StatementsAnalyzer<'_>,
+            ctx: &mut crate::flow_state::FlowState,
+            stmts: &[php_ast::owned::Stmt],
+            recurse_namespaces: bool,
+        ) {
+            use php_ast::owned::StmtKind;
+            for stmt in stmts.iter() {
+                match &stmt.kind {
+                    StmtKind::Function(_)
+                    | StmtKind::Class(_)
+                    | StmtKind::Enum(_)
+                    | StmtKind::Interface(_)
+                    | StmtKind::Trait(_)
+                    | StmtKind::Use(_) => {}
+                    StmtKind::Namespace(ns) => {
+                        if recurse_namespaces {
+                            if let php_ast::owned::NamespaceBody::Braced(body) = &ns.body {
+                                exec_stmts(sa, ctx, &body.stmts, recurse_namespaces);
+                            }
+                        }
+                    }
+                    // Process Declare so that `declare(strict_types=1)` updates
+                    // ctx.strict_types before later executable stmts are analyzed.
+                    _ => {
+                        sa.analyze_stmt(stmt, ctx);
+                    }
                 }
             }
         }
+        exec_stmts(&mut sa, &mut ctx, &program.stmts, uniform_namespace);
         drop(sa);
         crate::diagnostics::emit_unused_variables(&ctx, file, all_issues);
         all_issues.extend(buf.into_all_issues());

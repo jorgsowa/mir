@@ -132,9 +132,13 @@ pub struct MirDbStorage {
     /// symbol→files views behind one lock with a single writer path, so the
     /// views cannot drift apart. See [`crate::db::ref_index::RefIndex`].
     ref_index: Arc<Mutex<crate::db::ref_index::RefIndex>>,
-    /// Times `ref_index` was locked, shared across clones. Hosts that opt out
-    /// of index maintenance assert this stays flat across edit/read paths.
+    /// Times `ref_index` was locked, shared across clones. Perf gates assert
+    /// read paths stay lookup-shaped (bounded locks per request).
     ref_index_locks: Arc<std::sync::atomic::AtomicU64>,
+    /// Delta-maintained inverted inheritance index: resolved parent FQCN →
+    /// direct children, replacing per-query workspace scans. See
+    /// [`crate::db::subtype_index::SubtypeIndex`].
+    subtype_index: Arc<Mutex<crate::db::subtype_index::SubtypeIndex>>,
     /// Per-clone staging area for reference locations.  Workers push here
     /// during parallel analysis; the orchestrator drains and commits serially.
     pending_ref_locs: PendingRefLocs,
@@ -260,6 +264,7 @@ impl Default for MirDbStorage {
             storage: salsa::Storage::default(),
             ref_index: Arc::default(),
             ref_index_locks: Arc::default(),
+            subtype_index: Arc::default(),
             pending_ref_locs: PendingRefLocs::default(),
             source_files: Arc::default(),
             deleted_files: Arc::default(),
@@ -996,6 +1001,48 @@ impl MirDbStorage {
     /// clearing those files.
     pub fn set_file_reference_locations(&self, file: &str, locs: Vec<RefLoc>) {
         self.locked_ref_index().set_file_refs(file, locs);
+    }
+
+    /// Replace `file`'s class-like declarations in the subtype edge index.
+    pub fn set_file_class_edges(
+        &self,
+        file: &Arc<str>,
+        entries: Vec<crate::db::subtype_index::SubtypeEntry>,
+    ) {
+        self.subtype_index.lock().set_file_classes(file, entries);
+    }
+
+    /// Drop `file`'s class-like declarations from the subtype edge index.
+    pub fn clear_file_class_edges(&self, file: &str) {
+        self.subtype_index.lock().clear_file(file);
+    }
+
+    /// Transitive subtypes of `fqcn` from the maintained edge index.
+    pub fn subtype_sites_of(
+        &self,
+        fqcn: &str,
+        include_trait_users: bool,
+    ) -> Vec<crate::db::subtype_index::SubtypeSite> {
+        self.subtype_index
+            .lock()
+            .subtypes_of(fqcn, include_trait_users)
+    }
+
+    /// Lenient variant of [`Self::subtype_sites_of`] (short-name root
+    /// fallback when the exact FQCN has no subtypes).
+    pub fn subtype_sites_of_lenient(
+        &self,
+        fqcn: &str,
+        include_trait_users: bool,
+    ) -> Vec<crate::db::subtype_index::SubtypeSite> {
+        self.subtype_index
+            .lock()
+            .subtypes_of_lenient(fqcn, include_trait_users)
+    }
+
+    /// Whether the subtype edge index has a declaration entry for `fqcn`.
+    pub fn subtype_index_has_decl(&self, fqcn: &str) -> bool {
+        self.subtype_index.lock().has_decl(fqcn)
     }
 
     /// Mark a file path as a user-provided stub so `workspace_symbol_index`

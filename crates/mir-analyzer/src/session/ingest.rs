@@ -80,11 +80,33 @@ impl AnalysisSession {
     /// [`crate::BatchFileAnalyzer`] after parallel body analysis to flush the pending
     /// buffers that accumulate in worker db clones.
     pub(crate) fn commit_ref_locs_batch(&self, locs: Vec<RefLoc>) {
-        if locs.is_empty() || !self.maintain_ref_index {
+        if locs.is_empty() {
             return;
         }
         let guard = self.db.salsa.read();
         guard.commit_reference_locations_batch(locs);
+    }
+
+    /// Replace `file`'s reference postings with `locs` (its complete set from
+    /// a fresh single-file analysis) and mark freshness against `text` — the
+    /// input text captured before the analysis, so a concurrent edit leaves
+    /// the mark stale (Arc identity mismatch), which is the safe direction.
+    pub(crate) fn commit_file_refs(
+        &self,
+        file: &Arc<str>,
+        text: Option<Arc<str>>,
+        locs: Vec<RefLoc>,
+    ) {
+        {
+            let guard = self.db.salsa.read();
+            guard.set_file_reference_locations(file.as_ref(), locs);
+        }
+        if let Some(text) = text {
+            // No memoized output on the imperative path — the empty weak
+            // handle makes the next re-analysis sweep recommit once (and
+            // record the real memo), which is the safe direction.
+            self.mark_ref_committed(file, &text, None);
+        }
     }
 
     /// Run a closure with read access to a database snapshot.
@@ -123,7 +145,7 @@ impl AnalysisSession {
             .cloned()
             .unwrap_or_default();
 
-        if self.maintain_ref_index {
+        {
             let mut guard = self.db.salsa.write();
             guard.remove_file_definitions(file.as_ref());
         }
@@ -199,6 +221,30 @@ impl AnalysisSession {
                 }
             }
         }
+
+        // Keep the inverted indexes in step with the edit. Class edges come
+        // straight from the definitions just collected; reference postings
+        // for the new text are recomputed lazily (analysis has not run yet),
+        // so the file's freshness mark is dropped rather than updated.
+        {
+            let entries = crate::db::subtype_index::entries_from_slice(&file_defs.slice);
+            let guard = self.db.salsa.read();
+            guard.set_file_class_edges(&file, entries);
+        }
+        // Freshness is keyed on the Arc actually stored on the input (the
+        // upsert keeps the prior Arc when content is equal), so read it back.
+        let stored_text = {
+            let db = self.snapshot_db();
+            db.lookup_source_file(file.as_ref())
+                .map(|sf| sf.text(&db as &dyn MirDatabase))
+        };
+        if let Some(text) = stored_text {
+            self.mark_defs_committed(&file, &text);
+        }
+        // `remove_file_definitions` above cleared the file's postings, so the
+        // freshness mark must drop unconditionally — even for unchanged text —
+        // or a query would trust the now-empty posting lists.
+        self.forget_ref_committed(file.as_ref());
     }
 
     /// [`Self::ingest_file`] followed by the file's Phase-1 warm-up
@@ -474,11 +520,12 @@ impl AnalysisSession {
     pub fn invalidate_file(&self, file: &str) {
         {
             let mut guard = self.db.salsa.write();
-            if self.maintain_ref_index {
-                guard.remove_file_definitions(file);
-            }
+            guard.remove_file_definitions(file);
             guard.remove_source_file(file);
+            guard.clear_file_class_edges(file);
         }
+        self.forget_ref_committed(file);
+        self.forget_defs_committed(file);
         // Outgoing structural edges disappear from the derived graph
         // automatically: the file is no longer in `source_file_paths()`, so
         // `dependency_graph()` stops iterating it.

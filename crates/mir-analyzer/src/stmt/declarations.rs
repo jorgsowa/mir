@@ -101,6 +101,15 @@ impl<'a> StatementsAnalyzer<'a> {
             ctx.strict_types,
             true,
         );
+        // Parameter defaults are constant expressions outside the body flow;
+        // analyze them so `Cfg::MODE`-style defaults record references.
+        for p in decl.params.iter() {
+            if let Some(default) = &p.default {
+                let mut default_ctx = ctx.clone();
+                let mut ea = self.expr_analyzer(&default_ctx);
+                let _ = ea.analyze(default, &mut default_ctx);
+            }
+        }
         for p in decl.params.iter() {
             if let Some(raw) = p.name.as_deref() {
                 let trimmed = raw.trim_start_matches('$');
@@ -187,6 +196,16 @@ impl<'a> StatementsAnalyzer<'a> {
         }
 
         for member in decl.body.members.iter() {
+            // Property initializers are constant expressions outside any body
+            // flow; analyze them so `Widget::class`-style defaults record
+            // class/constant references.
+            if let ClassMemberKind::Property(prop) = &member.kind {
+                if let Some(default) = &prop.default {
+                    let mut ea = self.expr_analyzer(&param_default_ctx);
+                    let _ = ea.analyze(default, &mut param_default_ctx);
+                }
+                continue;
+            }
             let ClassMemberKind::Method(method) = &member.kind else {
                 continue;
             };

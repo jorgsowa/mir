@@ -359,6 +359,595 @@ impl AnalysisSession {
         crate::db::class_subtype_files(&db, here).to_vec()
     }
 
+    /// Inverted-index find-references: posting-list lookup plus an on-demand
+    /// freshness/completeness pass over `files` (the host's text-prefiltered
+    /// candidate scope).
+    ///
+    /// A candidate whose postings were committed from its current input text
+    /// (Arc identity) is answered from the index with no salsa work at all.
+    /// Stale or never-committed candidates are analyzed via the memoized
+    /// `analyze_file` query and committed, so each file pays that cost once
+    /// per text change — after a background warm sweep the steady state is a
+    /// pure lookup, O(results) instead of O(candidates).
+    ///
+    /// Results are filtered to `files` (the host controls scope — e.g.
+    /// workspace files only, excluding stubs/vendor). With
+    /// `include_declaration`, the symbol's declaration name span is appended
+    /// when it lies inside the scope.
+    ///
+    /// `should_cancel` follows [`Self::references_to_in_files_cancellable`]'s
+    /// contract: polled at phase boundaries and between cancellation retries;
+    /// `true` aborts with `None`.
+    pub fn indexed_references_to(
+        &self,
+        symbol: &crate::Name,
+        files: &[Arc<str>],
+        include_declaration: bool,
+        should_cancel: &(dyn Fn() -> bool + Sync),
+    ) -> Option<Vec<(Arc<str>, crate::Range)>> {
+        use std::panic::AssertUnwindSafe;
+
+        use rayon::prelude::*;
+
+        let key = symbol.codebase_key();
+
+        // Freshness pass: candidates whose postings are not exact for their
+        // current text. Files not registered as `SourceFile` inputs are
+        // skipped (the caller's text pre-filter already scoped the set).
+        let stale: Vec<Arc<str>> = loop {
+            if should_cancel() {
+                return None;
+            }
+            let attempt = salsa::Cancelled::catch(AssertUnwindSafe(|| {
+                let db = self.snapshot_db();
+                files
+                    .iter()
+                    .filter(|f| {
+                        db.lookup_source_file(f.as_ref()).is_some_and(|sf| {
+                            let text = sf.text(&db as &dyn MirDatabase);
+                            !self.is_ref_committed(f.as_ref(), &text)
+                        })
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>()
+            }));
+            match attempt {
+                Ok(v) => break v,
+                Err(_) if should_cancel() => return None,
+                Err(_) => {}
+            }
+        };
+
+        if !stale.is_empty() {
+            // Phase 1 (serial, no live snapshot held): warm up stale
+            // candidates. See `references_to_in_files_cancellable` for why
+            // this must be serial and snapshot-free.
+            for path in &stale {
+                if should_cancel() {
+                    return None;
+                }
+                self.prepare_file_for_analysis(path);
+            }
+
+            // Phase 2 (parallel, pure) under a cancellation retry loop, then
+            // a serial commit into both inverted indexes.
+            let analyzed = loop {
+                if should_cancel() {
+                    return None;
+                }
+                let attempt = salsa::Cancelled::catch(AssertUnwindSafe(|| {
+                    let db_main = self.snapshot_db();
+                    stale
+                        .par_iter()
+                        .map_with(db_main, |db, path| {
+                            let sf = db.lookup_source_file(path.as_ref())?;
+                            let text = sf.text(&*db as &dyn MirDatabase);
+                            let out = crate::db::analyze_file(&*db as &dyn MirDatabase, sf);
+                            let defs =
+                                crate::db::collect_file_definitions(&*db as &dyn MirDatabase, sf);
+                            let entries = crate::db::subtype_index::entries_from_slice(&defs.slice);
+                            Some((path.clone(), text, out, entries))
+                        })
+                        .flatten()
+                        .collect::<Vec<_>>()
+                }));
+                match attempt {
+                    Ok(v) => break v,
+                    Err(_) if should_cancel() => return None,
+                    Err(_) => {}
+                }
+            };
+            let guard = self.db.salsa.read();
+            for (file, text, out, entries) in &analyzed {
+                guard.set_file_reference_locations(file.as_ref(), out.ref_locs.to_vec());
+                self.mark_ref_committed(file, text, Some(out));
+                if !self.is_defs_committed(file.as_ref(), text) {
+                    guard.set_file_class_edges(file, entries.clone());
+                    self.mark_defs_committed(file, text);
+                }
+            }
+        }
+
+        // Posting lookup, filtered to the candidate scope.
+        //
+        // Member symbols resolve against the queried class plus its hierarchy
+        // (mir records member refs under the *declaring* class, so a query on
+        // an interface method must include implementor keys and vice versa).
+        // Name-only fallback postings — receivers whose type couldn't be
+        // resolved — are consulted only when the typed keys produce nothing,
+        // mirroring the pre-index two-tier behavior: exact results when
+        // resolution succeeds, by-name matches when nothing resolves.
+        // `__construct` stays exact: `new Sub()` invokes `Sub::__construct`
+        // even when only a parent declares one, so hierarchy fan-out would
+        // wrongly return subtype instantiation sites for a parent query.
+        let hierarchy: Vec<String> = match symbol {
+            crate::Name::Method { class, name } => {
+                if name.as_ref() == "__construct" || class.is_empty() {
+                    if class.is_empty() {
+                        Vec::new()
+                    } else {
+                        vec![class.trim_start_matches('\\').to_string()]
+                    }
+                } else {
+                    self.member_hierarchy_classes(class.as_ref())
+                }
+            }
+            crate::Name::Property { class, .. } | crate::Name::ClassConstant { class, .. } => {
+                if class.is_empty() {
+                    Vec::new()
+                } else {
+                    self.member_hierarchy_classes(class.as_ref())
+                }
+            }
+            _ => Vec::new(),
+        };
+        let primary_keys: Vec<String> = match symbol {
+            crate::Name::Method { name, .. } => hierarchy
+                .iter()
+                .map(|c| format!("meth:{c}::{name}"))
+                .collect(),
+            crate::Name::Property { name, .. } => hierarchy
+                .iter()
+                .map(|c| format!("prop:{c}::{name}"))
+                .collect(),
+            crate::Name::ClassConstant { name, .. } => hierarchy
+                .iter()
+                .map(|c| format!("cnst:{c}::{name}"))
+                .collect(),
+            _ => vec![key.clone()],
+        };
+        let fallback_key: Option<String> = match symbol {
+            crate::Name::Method { name, .. } => Some(format!("methname:{name}")),
+            crate::Name::Property { name, .. } => Some(format!("propname:{name}")),
+            _ => None,
+        };
+        let scope: rustc_hash::FxHashSet<&str> = files.iter().map(|f| f.as_ref()).collect();
+        let read_keys = |keys: &[String]| -> Vec<(Arc<str>, crate::Range)> {
+            let guard = self.db.salsa.read();
+            let mut merged: Vec<(Arc<str>, u32, u16, u16)> = Vec::new();
+            for k in keys {
+                merged.extend(guard.reference_locations(k));
+            }
+            merged
+                .into_iter()
+                .filter(|(file, ..)| scope.contains(file.as_ref()))
+                .map(|(file, line, col_start, col_end)| {
+                    (file, span_range(line, col_start as u32, col_end as u32))
+                })
+                .collect()
+        };
+        let mut out = read_keys(&primary_keys);
+        if out.is_empty() {
+            if let Some(fk) = fallback_key {
+                out = read_keys(std::slice::from_ref(&fk));
+            }
+        }
+        out.sort_by(|a, b| {
+            a.0.cmp(&b.0)
+                .then(a.1.start.line.cmp(&b.1.start.line))
+                .then(a.1.start.column.cmp(&b.1.start.column))
+        });
+        out.dedup_by(|a, b| a.0 == b.0 && a.1 == b.1);
+
+        if include_declaration {
+            // Declaration lookup runs salsa queries (and may lazy-load); a
+            // concurrent write cancels it — declarations are then simply
+            // omitted rather than failing the whole request.
+            let decls: Vec<(Arc<str>, crate::Range)> = match symbol {
+                crate::Name::Method { class, .. }
+                | crate::Name::Property { class, .. }
+                | crate::Name::ClassConstant { class, .. } => {
+                    if class.is_empty() {
+                        // Unknown owner: declarations by name, recorded as
+                        // `methdecl:` postings during class analysis.
+                        match symbol {
+                            crate::Name::Method { name, .. } => {
+                                read_keys(&[format!("methdecl:{name}")])
+                            }
+                            _ => Vec::new(),
+                        }
+                    } else {
+                        salsa::Cancelled::catch(AssertUnwindSafe(|| {
+                            self.member_decl_sites(&hierarchy, symbol)
+                        }))
+                        .unwrap_or_default()
+                    }
+                }
+                _ => salsa::Cancelled::catch(AssertUnwindSafe(|| {
+                    self.declaration_name_range(symbol).into_iter().collect()
+                }))
+                .unwrap_or_default(),
+            };
+            for (file, range) in decls {
+                if scope.contains(file.as_ref())
+                    && !out.iter().any(|(f, r)| *f == file && *r == range)
+                {
+                    out.push((file, range));
+                }
+            }
+        }
+        Some(out)
+    }
+
+    /// The queried class plus every class its members' references could be
+    /// keyed under: resolved ancestors (a call on a subtype instance records
+    /// the declaring ancestor) and transitive subtypes including trait users
+    /// (a call on a subtype that overrides records the subtype). Display-form
+    /// FQCNs, deduplicated case-insensitively.
+    fn member_hierarchy_classes(&self, class_fqn: &str) -> Vec<String> {
+        use std::panic::AssertUnwindSafe;
+        let target = class_fqn.trim_start_matches('\\').to_string();
+        let mut out: Vec<String> = vec![target.clone()];
+        let ancestors = salsa::Cancelled::catch(AssertUnwindSafe(|| {
+            let db = self.snapshot_db();
+            let here = crate::db::Fqcn::from_str(&db, &target);
+            crate::db::class_ancestors_by_fqcn(&db, here)
+                .iter()
+                .skip(1)
+                .map(|a| a.trim_start_matches('\\').to_string())
+                .collect::<Vec<_>>()
+        }))
+        .unwrap_or_default();
+        out.extend(ancestors);
+        let subs = {
+            let guard = self.db.salsa.read();
+            guard.subtype_sites_of(&target, true)
+        };
+        out.extend(
+            subs.into_iter()
+                .map(|s| s.fqcn.trim_start_matches('\\').to_string()),
+        );
+        let mut seen: rustc_hash::FxHashSet<String> = rustc_hash::FxHashSet::default();
+        out.retain(|c| seen.insert(c.to_ascii_lowercase()));
+        out
+    }
+
+    /// Own-member declaration sites for `symbol` across `classes`: each class
+    /// that itself declares the member (not inherited) contributes its name
+    /// token. Kind-specific lookups — a class often declares a property and a
+    /// method with the same short name, and `member_location` can't tell them
+    /// apart.
+    fn member_decl_sites(
+        &self,
+        classes: &[String],
+        symbol: &crate::Name,
+    ) -> Vec<(Arc<str>, crate::Range)> {
+        let mut out: Vec<(Arc<str>, crate::Range)> = Vec::new();
+        let db = self.snapshot_db();
+        for class in classes {
+            let here = crate::db::Fqcn::from_str(&db, class);
+            let (loc, needle) = match symbol {
+                crate::Name::Method { name, .. } => {
+                    let Some(m) = crate::db::find_method_in_class(&db, here, name) else {
+                        continue;
+                    };
+                    (m.location.clone(), name.to_string())
+                }
+                crate::Name::Property { name, .. } => {
+                    let Some(p) = crate::db::find_property_in_class(&db, here, name) else {
+                        continue;
+                    };
+                    (p.location.clone(), name.to_string())
+                }
+                crate::Name::ClassConstant { name, .. } => {
+                    let Some(c) = crate::db::find_class_constant_in_class(&db, here, name) else {
+                        continue;
+                    };
+                    (c.location.clone(), name.to_string())
+                }
+                _ => continue,
+            };
+            let Some(loc) = loc else { continue };
+            let range = self.refine_location_to_name(&loc, &needle);
+            out.push((loc.file.clone(), range));
+        }
+        out
+    }
+
+    /// The symbol's declaration site, narrowed from the collector's
+    /// whole-declaration span to the declared name's own token (matching the
+    /// span shape of recorded references).
+    pub fn declaration_name_range(&self, symbol: &crate::Name) -> Option<(Arc<str>, crate::Range)> {
+        if let crate::Name::GlobalConstant(fqn) = symbol {
+            return self.global_constant_decl_range(fqn);
+        }
+        let loc = self.definition_of(symbol).ok()?;
+        let short = match symbol {
+            crate::Name::Class(f) | crate::Name::Function(f) | crate::Name::GlobalConstant(f) => {
+                crate::db::subtype_index::short_name_of(f)
+            }
+            crate::Name::Method { name, .. }
+            | crate::Name::Property { name, .. }
+            | crate::Name::ClassConstant { name, .. } => name.as_ref(),
+        };
+        // Property declarations carry a `$` sigil in source, but reference
+        // ranges cover the bare name; the word-boundary search below lands on
+        // the name right after the sigil.
+        let file = loc.file.clone();
+        let range = self.refine_location_to_name(&loc, short);
+        Some((file, range))
+    }
+
+    /// Narrow a whole-declaration [`mir_types::Location`] to the first
+    /// word-boundary occurrence of `needle` inside its line span. Falls back
+    /// to the location's own coordinates when the text is unavailable or the
+    /// name doesn't appear (e.g. stub-only declarations).
+    fn refine_location_to_name(&self, loc: &mir_types::Location, needle: &str) -> crate::Range {
+        let fallback = span_range(loc.line, loc.col_start as u32, loc.col_end as u32);
+        let text = {
+            let db = self.snapshot_db();
+            db.lookup_source_file(loc.file.as_ref())
+                .map(|sf| sf.text(&db as &dyn MirDatabase))
+        };
+        let Some(text) = text else {
+            return fallback;
+        };
+        let needle_chars = needle.chars().count() as u32;
+        let first_line = loc.line.saturating_sub(1) as usize;
+        // Exact-case first: PHP property/constant names are case-sensitive
+        // and an early case-insensitive hit can land on an unrelated token
+        // (a type hint sharing the name). Case-insensitive second, for
+        // method/class needles that arrive lowercase-normalized.
+        for case_insensitive in [false, true] {
+            for (idx, line_text) in text.lines().enumerate().skip(first_line) {
+                let line_no = idx as u32 + 1;
+                if line_no > loc.line_end {
+                    break;
+                }
+                let min_col = if line_no == loc.line {
+                    loc.col_start as usize
+                } else {
+                    0
+                };
+                if let Some(col) = identifier_char_col(line_text, needle, min_col, case_insensitive)
+                {
+                    return span_range(line_no, col, col + needle_chars);
+                }
+            }
+        }
+        fallback
+    }
+
+    /// Transitive subtypes of `class_fqn` (classes/interfaces/enums whose
+    /// resolved ancestor chain reaches it), answered from the maintained
+    /// subtype edge index.
+    ///
+    /// `files` is the host's candidate scope for the on-demand completeness
+    /// pass: per BFS round, not-yet-committed files whose text mentions a
+    /// frontier name get their definitions committed, so results are complete
+    /// even before a background sweep has covered the workspace. Committed
+    /// files answer from the index with no parsing at all.
+    ///
+    /// `include_trait_users` also counts `use Trait;` composition as a
+    /// subtype edge (visibility-scoping semantics); leave it off for
+    /// goto-implementation semantics (extends/implements only).
+    pub fn indexed_subtype_classes(
+        &self,
+        class_fqn: &str,
+        files: &[Arc<str>],
+        include_trait_users: bool,
+    ) -> Vec<SubtypeClassSite> {
+        let mut scanned: rustc_hash::FxHashSet<String> = rustc_hash::FxHashSet::default();
+        let mut pending: Vec<String> = vec![class_fqn.trim_start_matches('\\').to_string()];
+        let mut sites: Vec<crate::db::SubtypeSite> = Vec::new();
+        while !pending.is_empty() {
+            let needles: Vec<String> = pending
+                .drain(..)
+                .filter(|f| scanned.insert(f.clone()))
+                .map(|f| crate::db::subtype_index::short_name_of(&f).to_string())
+                .collect();
+            if !needles.is_empty() {
+                self.commit_defs_for_matching(files, &needles);
+            }
+            sites = {
+                let guard = self.db.salsa.read();
+                guard.subtype_sites_of_lenient(class_fqn, include_trait_users)
+            };
+            pending = sites
+                .iter()
+                .map(|s| s.fqcn.trim_start_matches('\\').to_string())
+                .filter(|f| !scanned.contains(f))
+                .collect();
+        }
+        let mut out: Vec<SubtypeClassSite> = sites
+            .into_iter()
+            .filter_map(|s| {
+                let loc = s.location.as_ref()?;
+                let short = crate::db::subtype_index::short_name_of(&s.fqcn).to_string();
+                let range = self.refine_location_to_name(loc, &short);
+                Some(SubtypeClassSite {
+                    fqcn: s.fqcn,
+                    kind: s.kind,
+                    is_abstract: s.is_abstract,
+                    file: s.file,
+                    range,
+                })
+            })
+            .collect();
+        // Anonymous classes never reach the definition collector; their
+        // `new class implements X {}` sites are recorded as `impl:` postings
+        // during body analysis (exact FQCN key plus a short-name key for the
+        // same written-form leniency named classes get above).
+        let root_lc = class_fqn.trim_start_matches('\\').to_ascii_lowercase();
+        let short_lc = crate::db::subtype_index::short_name_of(&root_lc).to_string();
+        let scope: rustc_hash::FxHashSet<&str> = files.iter().map(|f| f.as_ref()).collect();
+        let anon: Vec<(Arc<str>, u32, u16, u16)> = {
+            let guard = self.db.salsa.read();
+            let mut v = guard.reference_locations(&format!("impl:{root_lc}"));
+            v.extend(guard.reference_locations(&format!("implshort:{short_lc}")));
+            v.sort();
+            v.dedup();
+            v
+        };
+        for (file, line, cs, ce) in anon {
+            if !scope.contains(file.as_ref()) {
+                continue;
+            }
+            let range = span_range(line, cs as u32, ce as u32);
+            if out.iter().any(|s| s.file == file && s.range == range) {
+                continue;
+            }
+            out.push(SubtypeClassSite {
+                fqcn: Arc::from("class@anonymous"),
+                kind: crate::db::ClassLikeKind::Class,
+                is_abstract: false,
+                file,
+                range,
+            });
+        }
+        out
+    }
+
+    /// Concrete implementations of `class_fqn::method` across its transitive
+    /// subtypes: the same-named non-abstract method declared by each subtype,
+    /// as `(subtype fqcn, file, name range)`.
+    pub fn indexed_method_implementations(
+        &self,
+        class_fqn: &str,
+        method: &str,
+        files: &[Arc<str>],
+    ) -> Vec<(Arc<str>, Arc<str>, crate::Range)> {
+        use std::panic::AssertUnwindSafe;
+        let subs = self.indexed_subtype_classes(class_fqn, files, false);
+        if subs.is_empty() {
+            return Vec::new();
+        }
+        loop {
+            let attempt = salsa::Cancelled::catch(AssertUnwindSafe(|| {
+                let db = self.snapshot_db();
+                let mut out: Vec<(Arc<str>, Arc<str>, crate::Range)> = Vec::new();
+                for sub in &subs {
+                    let here = crate::db::Fqcn::from_str(&db, sub.fqcn.as_ref());
+                    let Some(m) = crate::db::find_method_in_class(&db, here, method) else {
+                        continue;
+                    };
+                    if m.is_abstract {
+                        continue;
+                    }
+                    let Some(loc) = m.location.as_ref() else {
+                        continue;
+                    };
+                    let range = self.refine_location_to_name(loc, method);
+                    out.push((sub.fqcn.clone(), loc.file.clone(), range));
+                }
+                out
+            }));
+            if let Ok(mut out) = attempt {
+                out.sort_by(|a, b| a.1.cmp(&b.1).then(a.2.start.line.cmp(&b.2.start.line)));
+                out.dedup_by(|a, b| a.1 == b.1 && a.2 == b.2);
+                return out;
+            }
+        }
+    }
+
+    /// Commit definitions (class edges + freshness) for every file in `files`
+    /// that is stale (committed against older text) or that has never been
+    /// committed and mentions one of `shorts` as a whole identifier.
+    fn commit_defs_for_matching(&self, files: &[Arc<str>], shorts: &[String]) {
+        use std::panic::AssertUnwindSafe;
+
+        use rayon::prelude::*;
+
+        let committed_any: rustc_hash::FxHashSet<Arc<str>> = {
+            let guard = self.defs_committed_keys();
+            guard.into_iter().collect()
+        };
+        let work = loop {
+            let attempt = salsa::Cancelled::catch(AssertUnwindSafe(|| {
+                let db_main = self.snapshot_db();
+                files
+                    .par_iter()
+                    .map_with(db_main, |db, path| {
+                        let sf = db.lookup_source_file(path.as_ref())?;
+                        let text = sf.text(&*db as &dyn MirDatabase);
+                        if self.is_defs_committed(path.as_ref(), &text) {
+                            return None;
+                        }
+                        // Never-committed files must mention a frontier name;
+                        // stale (previously committed) files recommit
+                        // unconditionally — their classes may have re-parented.
+                        if !committed_any.contains(path.as_ref())
+                            && !shorts.iter().any(|s| mentions_identifier(&text, s))
+                        {
+                            return None;
+                        }
+                        let defs =
+                            crate::db::collect_file_definitions(&*db as &dyn MirDatabase, sf);
+                        let entries = crate::db::subtype_index::entries_from_slice(&defs.slice);
+                        Some((path.clone(), text, entries))
+                    })
+                    .flatten()
+                    .collect::<Vec<_>>()
+            }));
+            if let Ok(v) = attempt {
+                break v;
+            }
+        };
+        if work.is_empty() {
+            return;
+        }
+        let guard = self.db.salsa.read();
+        for (file, text, entries) in &work {
+            guard.set_file_class_edges(file, entries.clone());
+            self.mark_defs_committed(file, text);
+        }
+    }
+
+    /// Declaration name span for a global constant. Constant slices carry no
+    /// stored location, so this finds the declaring file via the workspace
+    /// constants index and locates the `const NAME` / `define('NAME'` token
+    /// textually.
+    fn global_constant_decl_range(&self, fqn: &str) -> Option<(Arc<str>, crate::Range)> {
+        use std::panic::AssertUnwindSafe;
+        let short = crate::db::subtype_index::short_name_of(fqn).to_string();
+        salsa::Cancelled::catch(AssertUnwindSafe(|| {
+            let db = self.snapshot_db();
+            let index = crate::db::workspace_index(&db);
+            let loc = index
+                .constants
+                .get(&mir_types::Name::from(fqn.trim_start_matches('\\')))?;
+            let file = loc.file().path(&db);
+            let sf = db.lookup_source_file(file.as_ref())?;
+            let text = sf.text(&db as &dyn MirDatabase);
+            for (idx, line) in text.lines().enumerate() {
+                let trimmed = line.trim_start();
+                let is_decl_line = trimmed.starts_with("const ")
+                    || trimmed.contains("define(")
+                    || trimmed.contains("define (");
+                if !is_decl_line {
+                    continue;
+                }
+                if let Some(col) = identifier_char_col(line, &short, 0, false) {
+                    let n = short.chars().count() as u32;
+                    return Some((file, span_range(idx as u32 + 1, col, col + n)));
+                }
+            }
+            None
+        }))
+        .ok()
+        .flatten()
+    }
+
     /// Class-level issues (inheritance violations, abstract-method gaps, override
     /// incompatibilities) for the given set of files.
     ///
@@ -516,4 +1105,99 @@ impl AnalysisSession {
         }
         out
     }
+}
+
+/// A transitive subtype hit with its declaration name span, as returned by
+/// [`AnalysisSession::indexed_subtype_classes`].
+#[derive(Debug, Clone)]
+pub struct SubtypeClassSite {
+    /// Display-form FQCN (no leading `\`).
+    pub fqcn: Arc<str>,
+    pub kind: crate::db::ClassLikeKind,
+    pub is_abstract: bool,
+    pub file: Arc<str>,
+    /// The declared name's own token (1-based line, 0-based char columns).
+    pub range: crate::Range,
+}
+
+/// Build a [`crate::Range`] on one line from mir's native coordinates
+/// (1-based line, 0-based columns).
+fn span_range(line: u32, col_start: u32, col_end: u32) -> crate::Range {
+    crate::Range {
+        start: crate::Position {
+            line,
+            column: col_start,
+        },
+        end: crate::Position {
+            line,
+            column: col_end,
+        },
+    }
+}
+
+/// Char column of the first word-boundary occurrence of `needle` in `line`
+/// at or after char column `min_col`. Columns are code points, matching the
+/// collector's `Location` convention.
+fn identifier_char_col(
+    line: &str,
+    needle: &str,
+    min_col: usize,
+    case_insensitive: bool,
+) -> Option<u32> {
+    if needle.is_empty() {
+        return None;
+    }
+    let is_ident = |c: char| c.is_ascii_alphanumeric() || c == '_';
+    let chars: Vec<char> = line.chars().collect();
+    let needle_chars: Vec<char> = needle.chars().collect();
+    let n = needle_chars.len();
+    if chars.len() < n {
+        return None;
+    }
+    for start in min_col..=chars.len().saturating_sub(n) {
+        let matches = chars[start..start + n]
+            .iter()
+            .zip(needle_chars.iter())
+            .all(|(a, b)| {
+                if case_insensitive {
+                    a.eq_ignore_ascii_case(b)
+                } else {
+                    a == b
+                }
+            });
+        if !matches {
+            continue;
+        }
+        let before_ok = start == 0 || !is_ident(chars[start - 1]);
+        let after = start + n;
+        let after_ok = after >= chars.len() || !is_ident(chars[after]);
+        if before_ok && after_ok {
+            return Some(start as u32);
+        }
+    }
+    None
+}
+
+/// Whether `hay` mentions `needle` as a whole identifier (ASCII word
+/// boundaries; conservative near multibyte text). Mirrors the host-side
+/// candidate prefilter so the completeness pass never analyzes files that
+/// cannot name the symbol.
+fn mentions_identifier(hay: &str, needle: &str) -> bool {
+    if needle.is_empty() {
+        return false;
+    }
+    let hay_b = hay.as_bytes();
+    let is_ident = |b: u8| b.is_ascii_alphanumeric() || b == b'_';
+    let mut from = 0;
+    while let Some(rel) = hay[from..].find(needle) {
+        let idx = from + rel;
+        let before_ok = idx == 0 || !is_ident(hay_b[idx - 1]);
+        let end = idx + needle.len();
+        let after_ok = end >= hay_b.len() || !is_ident(hay_b[end]);
+        if before_ok && after_ok {
+            return true;
+        }
+        from = idx + 1;
+    }
+    false
 }

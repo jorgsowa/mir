@@ -112,7 +112,7 @@ impl<'a> FileAnalyzer<'a> {
         // Record the warm-up so later Phase-1 sweeps (references, dependent
         // re-analysis) skip this file's parse + AST walk while its salsa
         // input text is unchanged.
-        if let Some(text) = ingested_text {
+        if let Some(text) = ingested_text.clone() {
             self.session
                 .mark_prepared_for_analysis(&file, text, prepare_generation);
         }
@@ -126,8 +126,12 @@ impl<'a> FileAnalyzer<'a> {
         let db = self.session.snapshot_db();
         let driver = BodyAnalyzer::new(&db, self.session.php_version());
         let (issues, symbols) = driver.analyze_bodies(program, file.clone(), source, source_map);
+        // Replace (not append): this pass produced the file's complete
+        // reference set, and marking freshness against the pre-analysis text
+        // keeps the mark dead-on-arrival if a concurrent edit swapped the
+        // input mid-flight (Arc identity no longer matches).
         self.session
-            .commit_ref_locs_batch(db.take_pending_ref_locs());
+            .commit_file_refs(&file, ingested_text, db.take_pending_ref_locs());
         FileAnalysis { issues, symbols }
     }
 }

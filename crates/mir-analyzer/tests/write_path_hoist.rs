@@ -3,9 +3,9 @@
 //! 1. `ingest_file_prepared` runs the Phase-1 warm-up at write time — the
 //!    file's direct class references are lazy-loaded when the text lands,
 //!    not serially at the front of the next references / re-analysis read.
-//! 2. A session built `without_reference_index()` never takes the `RefIndex`
-//!    lock on any edit or read path (counter-asserted; a control session
-//!    keeps the counter honest).
+//! 2. The reference index is maintained with replace semantics on every
+//!    edit path, and a warm repeat of `indexed_references_to` is a pure
+//!    posting lookup: no re-analysis, bounded `RefIndex` locks.
 
 mod common;
 
@@ -78,60 +78,72 @@ fn ingest_file_prepared_faults_in_direct_references_at_write_time() {
 }
 
 #[test]
-fn no_ref_index_locks_on_edit_or_read_paths_when_opted_out() {
+fn indexed_references_warm_repeat_is_pure_lookup() {
     let file_a: Arc<str> = Arc::from("hoist_a.php");
     let file_b: Arc<str> = Arc::from("hoist_b.php");
     let src_a = "<?php\nclass HoistBase { public function m(): int { return 1; } }\n";
     let src_b = "<?php\nclass HoistDep extends HoistBase {}\nfunction hb(): int { $x = new HoistBase(); return $x->m(); }\n";
 
-    let run_flows = |session: &AnalysisSession| {
-        session.ensure_all_stubs();
-        // Edit path: ingest (twice — re-ingest exercises the definition
-        // removal branch) + prepared variant.
-        session.ingest_file(file_a.clone(), Arc::from(src_a));
-        session.ingest_file(file_a.clone(), Arc::from(src_a));
-        session.ingest_file_prepared(file_b.clone(), Arc::from(src_b));
-        // Analysis/read path: FileAnalyzer (the open-file hover/diagnostics
-        // flow) commits pending ref locs at the end — must be gated.
-        let parsed = php_rs_parser::parse(src_a);
-        let _ = FileAnalyzer::new(session).analyze(
-            file_a.clone(),
-            src_a,
-            &parsed.program,
-            &parsed.source_map,
-        );
-        // Pure references read.
-        let refs = session.references_to_in_files(
-            &mir_analyzer::Name::method("HoistBase", "m"),
-            &[file_a.clone(), file_b.clone()],
-        );
-        assert!(!refs.is_empty(), "pure references path must still work");
-        // Edit sweep (the per-keystroke republish path).
-        let _ =
-            session.reanalyze_files_cancellable(std::slice::from_ref(&file_b), &IndexCancel::new());
-        // Close path.
-        session.invalidate_file(file_b.as_ref());
-    };
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_all_stubs();
+    // Re-ingest exercises the definition-removal branch; both files land
+    // through the ordinary edit path.
+    session.ingest_file(file_a.clone(), Arc::from(src_a));
+    session.ingest_file(file_a.clone(), Arc::from(src_a));
+    session.ingest_file_prepared(file_b.clone(), Arc::from(src_b));
 
-    // Opted-out session: zero RefIndex locks across every flow above. The
-    // cache dir matters: it attaches an AnalysisCache, whose reverse-dep
-    // upkeep inside ingest_file read the index's forward view until gated.
-    let cache_dir = create_temp_dir("hoist_locks");
-    let session = AnalysisSession::new(PhpVersion::LATEST)
-        .with_cache_dir(cache_dir.path())
-        .without_reference_index();
-    run_flows(&session);
+    let files = [file_a.clone(), file_b.clone()];
+    let sym = mir_analyzer::Name::method("HoistBase", "m");
+    let refs = session
+        .indexed_references_to(&sym, &files, false, &|| false)
+        .expect("query not cancelled");
     assert_eq!(
-        session.ref_index_lock_count(),
-        0,
-        "RefIndex was locked on an edit/read path despite without_reference_index()"
+        refs.len(),
+        1,
+        "expected the single $x->m() call site, got {refs:?}"
+    );
+    assert_eq!(refs[0].0, file_b);
+
+    // Warm repeat: both files' postings are committed and fresh, so the
+    // query must not re-analyze anything — bounded RefIndex locks (the
+    // posting lookup itself) and no prepared-file churn.
+    let locks_before = session.ref_index_lock_count();
+    let warm = session
+        .indexed_references_to(&sym, &files, false, &|| false)
+        .expect("query not cancelled");
+    assert_eq!(warm.len(), 1);
+    // One lock per posting key (target class + hierarchy + name fallback) —
+    // bounded by the key-set size, never by candidate-file count.
+    let locks_taken = session.ref_index_lock_count() - locks_before;
+    assert!(
+        locks_taken <= 8,
+        "warm repeat should be a bounded posting lookup, took {locks_taken} RefIndex locks"
     );
 
-    // Control: the default session locks it — proves the counter counts.
-    let control = AnalysisSession::new(PhpVersion::LATEST);
-    run_flows(&control);
+    // An edit sweep replaces (never appends) a file's postings: re-running
+    // the sweep and the query must not duplicate results.
+    let _ = session.reanalyze_files_cancellable(std::slice::from_ref(&file_b), &IndexCancel::new());
+    let after_sweep = session
+        .indexed_references_to(&sym, &files, false, &|| false)
+        .expect("query not cancelled");
+    assert_eq!(after_sweep.len(), 1, "replace semantics must hold");
+
+    // Closing a file drops its postings.
+    session.invalidate_file(file_b.as_ref());
+    let after_close = session
+        .indexed_references_to(&sym, &files, false, &|| false)
+        .expect("query not cancelled");
     assert!(
-        control.ref_index_lock_count() > 0,
-        "control session should lock RefIndex; the counter is vacuous"
+        after_close.is_empty(),
+        "invalidated file's postings must be gone, got {after_close:?}"
+    );
+
+    // FileAnalyzer (the open-file flow) also commits with replace semantics.
+    let parsed = php_rs_parser::parse(src_a);
+    let _ = FileAnalyzer::new(&session).analyze(
+        file_a.clone(),
+        src_a,
+        &parsed.program,
+        &parsed.source_map,
     );
 }

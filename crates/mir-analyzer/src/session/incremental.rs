@@ -145,31 +145,56 @@ impl AnalysisSession {
         //
         // Each worker short-circuits when cancellation has been requested.
         let db_main = self.snapshot_db();
-        let results: Vec<(Arc<str>, std::sync::Arc<crate::db::AnalyzeOutput>)> = dependents
+        type Analyzed = (
+            Arc<str>,
+            Arc<str>,
+            std::sync::Arc<crate::db::AnalyzeOutput>,
+            Vec<crate::db::SubtypeEntry>,
+        );
+        let results: Vec<Analyzed> = dependents
             .into_par_iter()
             .map_with(db_main, |db, file| {
                 if cancel.is_cancelled() {
                     return None;
                 }
                 let sf = db.lookup_source_file(file.as_ref())?;
+                // Capture the text the analysis ran against: the freshness
+                // marks below must record exactly this Arc, so a text write
+                // racing the sweep leaves the file dirty rather than
+                // wrongly marked fresh.
+                let text = sf.text(&*db as &dyn crate::db::MirDatabase);
                 let out = crate::db::analyze_file(&*db as &dyn crate::db::MirDatabase, sf);
-                Some((file, out))
+                let defs =
+                    crate::db::collect_file_definitions(&*db as &dyn crate::db::MirDatabase, sf);
+                let entries = crate::db::subtype_index::entries_from_slice(&defs.slice);
+                Some((file, text, out, entries))
             })
             .flatten()
             .collect();
 
         // Serial commit: each dependent's output is its complete reference
-        // set, so replace rather than append.
-        if self.maintain_ref_index {
+        // set, so replace rather than append. Both inverted indexes and their
+        // freshness marks update here — this is what keeps read queries
+        // lookup-shaped instead of re-validating every candidate memo.
+        // Unchanged files (same text, same memoized output) skip the rebuild
+        // entirely, so a no-op re-sweep is a pointer compare per file.
+        {
             let guard = self.db.salsa.read();
-            for (file, out) in &results {
-                guard.set_file_reference_locations(file.as_ref(), out.ref_locs.to_vec());
+            for (file, text, out, entries) in &results {
+                if !self.ref_commit_is_current(file.as_ref(), text, out) {
+                    guard.set_file_reference_locations(file.as_ref(), out.ref_locs.to_vec());
+                    self.mark_ref_committed(file, text, Some(out));
+                }
+                if !self.is_defs_committed(file.as_ref(), text) {
+                    guard.set_file_class_edges(file, entries.clone());
+                    self.mark_defs_committed(file, text);
+                }
             }
         }
 
         results
             .into_iter()
-            .map(|(file, out)| {
+            .map(|(file, _, out, _)| {
                 (
                     file,
                     crate::FileAnalysis {
@@ -304,10 +329,7 @@ impl AnalysisSession {
     pub(super) fn update_reverse_deps_for(&self, file: &str) {
         if let Some(cache) = self.cache.as_deref() {
             let db = self.snapshot_db();
-            // Body-level bare-FQN edges live in the RefIndex; a session that
-            // opted out of index maintenance never commits them, so reading
-            // the (empty) index would only take the lock it promised not to.
-            let targets = file_outgoing_dependencies(&db, file, self.maintain_ref_index);
+            let targets = file_outgoing_dependencies(&db, file, true);
             cache.update_reverse_deps_for_file(file, &targets);
         }
     }

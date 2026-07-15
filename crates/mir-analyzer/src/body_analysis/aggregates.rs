@@ -53,6 +53,34 @@ impl<'a> BodyAnalyzer<'a> {
                     source_map,
                     all_issues,
                 );
+                // Property initializers are constant expressions outside any
+                // body flow; analyze them (mirroring the class path) so
+                // `self::init()`-style defaults record references.
+                if let Some(default) = &prop.default {
+                    use crate::flow_state::FlowState;
+                    use crate::stmt::StatementsAnalyzer;
+                    use mir_issues::IssueBuffer;
+                    let mut default_ctx = FlowState::new();
+                    default_ctx.self_fqcn = Some(scope_cx.fqcn.clone());
+                    default_ctx.static_fqcn = Some(scope_cx.fqcn.clone());
+                    default_ctx.strict_types = scope_cx.strict_types;
+                    let mut buf = IssueBuffer::new();
+                    let mut sa = StatementsAnalyzer::new(
+                        self.db,
+                        file.clone(),
+                        source,
+                        source_map,
+                        &mut buf,
+                        all_symbols,
+                        self.php_version,
+                        self.mode,
+                    );
+                    sa.collect_symbols = self.collect_symbols;
+                    let mut ea = sa.expr_analyzer(&default_ctx);
+                    let _ = ea.analyze(default, &mut default_ctx);
+                    drop(sa);
+                    all_issues.extend(buf.into_all_issues());
+                }
                 continue;
             }
             let php_ast::owned::ClassMemberKind::Method(method) = &member.kind else {

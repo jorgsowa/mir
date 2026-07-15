@@ -1032,7 +1032,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                             key_chain.push(inner_key);
                             base = &inner.array;
                         }
-                        _ => break,
+                        _ => {
+                            // Non-variable base (`self::$items[$k] = …`,
+                            // `$this->items[$k] = …`): analyze it as a read so
+                            // the property access records its reference.
+                            let _ = self.analyze(base, ctx);
+                            break;
+                        }
                     }
                 }
             }

@@ -33,17 +33,8 @@ impl<'a> BodyAnalyzer<'a> {
                     Some(&mut *all_symbols),
                 );
             }
-            if let Some(default_expr) = &param.default {
-                check_expr_for_undefined_classes(
-                    default_expr,
-                    self.db,
-                    file,
-                    source,
-                    source_map,
-                    all_issues,
-                    self.php_version,
-                );
-            }
+            // Defaults are fully analyzed below (the expression analyzer
+            // emits UndefinedClass itself and records references).
         }
         if let Some(hint) = &decl.return_type {
             self.check_and_record_type_hint_classes(
@@ -160,6 +151,19 @@ impl<'a> BodyAnalyzer<'a> {
             self.mode,
         );
         sa.collect_symbols = self.collect_symbols;
+        // Parameter defaults are constant expressions outside the body flow;
+        // analyze them (mirroring the class-method path) so `Cfg::MODE`-style
+        // defaults record references.
+        if self.mode == AnalysisMode::Full {
+            let mut default_ctx = FlowState::new();
+            default_ctx.strict_types = ctx.strict_types;
+            for p in decl.params.iter() {
+                if let Some(default) = &p.default {
+                    let mut ea = sa.expr_analyzer(&default_ctx);
+                    let _ = ea.analyze(default, &mut default_ctx);
+                }
+            }
+        }
         ctx.is_generator = body_has_yield(&decl.body.stmts);
         sa.analyze_stmts(&decl.body.stmts, &mut ctx);
         let inferred = merge_return_types(&sa.return_types);

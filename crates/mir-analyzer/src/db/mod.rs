@@ -209,6 +209,7 @@ pub use self::resolver::{resolve_fqcn_to_path, source_file_for_fqcn, Fqcn, Resol
 pub use self::scopes::{
     analyze_file_per_scope, file_scopes, infer_scope, ScopeInferenceResult, ScopeKey,
 };
+pub use self::subtype_index::{ClassLikeKind, SubtypeEntry, SubtypeIndex, SubtypeSite};
 pub use self::workspace::{
     collect_file_declarations, workspace_classes, workspace_functions, workspace_global_vars,
     workspace_index, workspace_symbol_index, FileDeclarations, GlobalVarMap, IndexDeclCounts,
@@ -228,6 +229,7 @@ pub(crate) mod ref_index;
 mod reference_locations;
 mod resolver;
 mod scopes;
+pub(crate) mod subtype_index;
 mod workspace;
 
 #[cfg(test)]

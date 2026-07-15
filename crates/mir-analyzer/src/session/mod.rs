@@ -98,12 +98,22 @@ pub struct AnalysisSession {
     /// warm-up re-run to lazy-load a replacement (e.g. a vendor class shadowed
     /// by a since-deleted project class).
     prepare_generation: Arc<std::sync::atomic::AtomicU64>,
-    /// Whether analysis maintains the legacy imperative reference index
-    /// ([`crate::db::RefIndex`]). On by default. Hosts that read references
-    /// exclusively through the memoized [`Self::references_to_in_files`] path
-    /// opt out via [`Self::without_reference_index`], removing every
-    /// `RefIndex` lock from their edit and read paths.
-    pub(crate) maintain_ref_index: bool,
+    /// file → (source text, analyze output) its reference locations were
+    /// last committed from. The [`crate::db::RefIndex`] posting lists are
+    /// exact for a file while its current input text is pointer-equal to the
+    /// stored text; a text write self-invalidates (the Arc changes), making
+    /// the file "dirty" for [`Self::indexed_references_to`]'s freshness pass.
+    /// The weak output handle lets re-analysis sweeps skip the index rebuild
+    /// when salsa returned the identical memo (no-op sweeps stay pointer
+    /// compares) while still recommitting on cross-file drift, where the
+    /// text is unchanged but the output is a new value. Files absent here
+    /// have never been committed.
+    ref_committed: CommittedRefs,
+    /// file → source text its subtype-index class edges were last committed
+    /// from. Same freshness contract as `ref_committed`, but definitions
+    /// depend only on the file's own text, so a pointer-equal entry is
+    /// always exact (no cross-file drift).
+    defs_committed: CommittedTexts,
 }
 
 /// FQCN → optional resolver-mapped path. See the field doc on
@@ -113,6 +123,15 @@ type UnresolvableCache = Arc<RwLock<HashMap<Arc<str>, Option<Arc<str>>>>>;
 /// Warm-up skip set keyed by file path. See the field doc on
 /// `AnalysisSession::prepared_files`.
 type PreparedFilesCache = Arc<RwLock<HashMap<Arc<str>, (Arc<str>, u64)>>>;
+
+/// file → text a per-file index commit was computed from. See the field docs
+/// on `AnalysisSession::ref_committed` / `defs_committed`.
+type CommittedTexts = Arc<RwLock<HashMap<Arc<str>, Arc<str>>>>;
+
+/// file → (text, weak analyze output) for reference-posting commits. See the
+/// field docs on `AnalysisSession::ref_committed`.
+type CommittedRefs =
+    Arc<RwLock<HashMap<Arc<str>, (Arc<str>, std::sync::Weak<crate::db::AnalyzeOutput>)>>>;
 
 /// Cap on the negative-resolution cache. Sized to accommodate a large
 /// workspace's worth of genuinely-missing references without unbounded
@@ -142,30 +161,77 @@ impl AnalysisSession {
             pending_eager_function_files: Arc::new(parking_lot::Mutex::new(Some(Vec::new()))),
             prepared_files: Arc::new(RwLock::new(HashMap::default())),
             prepare_generation: Arc::new(std::sync::atomic::AtomicU64::new(0)),
-            maintain_ref_index: true,
+            ref_committed: Arc::new(RwLock::new(HashMap::default())),
+            defs_committed: Arc::new(RwLock::new(HashMap::default())),
         }
-    }
-
-    /// Stop maintaining the legacy imperative reference index on the
-    /// incremental (LSP-style) paths: `ingest_file`, `invalidate_file`,
-    /// [`crate::FileAnalyzer`] commits, and the `reanalyze_*` sweeps.
-    ///
-    /// After this, [`Self::references_to`] / [`Self::reference_locations`]
-    /// return empty for files analyzed through those paths and
-    /// [`Self::dependency_graph`] loses body-level bare-FQN edges — callers
-    /// must use the memoized [`Self::references_to_in_files`] /
-    /// [`Self::reanalyze_files_cancellable`] paths instead. In exchange, no
-    /// edit or read ever takes the `RefIndex` lock (assert via
-    /// [`Self::ref_index_lock_count`]) and the index holds no memory.
-    /// The batch entry points (`analyze_paths`) still maintain the index.
-    pub fn without_reference_index(mut self) -> Self {
-        self.maintain_ref_index = false;
-        self
     }
 
     /// Times the reference index has been locked on this session's db.
     pub fn ref_index_lock_count(&self) -> u64 {
         self.db.salsa.read().ref_index_lock_count()
+    }
+
+    /// Whether `file`'s reference postings were committed from exactly
+    /// `current_text` (pointer identity — a text write self-invalidates).
+    pub(crate) fn is_ref_committed(&self, file: &str, current_text: &Arc<str>) -> bool {
+        self.ref_committed
+            .read()
+            .get(file)
+            .is_some_and(|(t, _)| Arc::ptr_eq(t, current_text))
+    }
+
+    /// Whether `file`'s postings were committed from exactly this
+    /// (text, analyze output) pair — the no-op detector for re-analysis
+    /// sweeps. The weak upgrade guards against ABA on evicted memos.
+    pub(crate) fn ref_commit_is_current(
+        &self,
+        file: &str,
+        current_text: &Arc<str>,
+        out: &Arc<crate::db::AnalyzeOutput>,
+    ) -> bool {
+        self.ref_committed.read().get(file).is_some_and(|(t, w)| {
+            Arc::ptr_eq(t, current_text) && w.upgrade().is_some_and(|prev| Arc::ptr_eq(&prev, out))
+        })
+    }
+
+    pub(crate) fn mark_ref_committed(
+        &self,
+        file: &Arc<str>,
+        text: &Arc<str>,
+        out: Option<&Arc<crate::db::AnalyzeOutput>>,
+    ) {
+        let weak = out.map(Arc::downgrade).unwrap_or_default();
+        self.ref_committed
+            .write()
+            .insert(file.clone(), (text.clone(), weak));
+    }
+
+    pub(crate) fn forget_ref_committed(&self, file: &str) {
+        self.ref_committed.write().remove(file);
+    }
+
+    /// Whether `file`'s subtype-index class edges were committed from exactly
+    /// `current_text`.
+    pub(crate) fn is_defs_committed(&self, file: &str, current_text: &Arc<str>) -> bool {
+        self.defs_committed
+            .read()
+            .get(file)
+            .is_some_and(|t| Arc::ptr_eq(t, current_text))
+    }
+
+    pub(crate) fn mark_defs_committed(&self, file: &Arc<str>, text: &Arc<str>) {
+        self.defs_committed
+            .write()
+            .insert(file.clone(), text.clone());
+    }
+
+    pub(crate) fn forget_defs_committed(&self, file: &str) {
+        self.defs_committed.write().remove(file);
+    }
+
+    /// Every file with a defs commit on record, regardless of staleness.
+    pub(crate) fn defs_committed_keys(&self) -> Vec<Arc<str>> {
+        self.defs_committed.read().keys().cloned().collect()
     }
 
     /// Swap in a custom [`crate::SourceProvider`]. LSPs install a VFS-backed
@@ -295,6 +361,8 @@ mod ingest;
 mod loading;
 mod queries;
 mod stubs;
+
+pub use queries::SubtypeClassSite;
 
 /// Compute the full set of files `file` depends on: structural edges from
 /// the memoized [`crate::db::file_structural_deps`] tracked query, plus

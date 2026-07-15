@@ -413,6 +413,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                     ty.clone(),
                 );
                 self.record_ref(Arc::from(format!("cls:{fqcn}")), n.class.span);
+                // A `new X(...)` site is also a constructor call: record it
+                // under the method key so find-references on `__construct`
+                // resolves instantiation sites without an AST re-walk.
+                self.record_ref(Arc::from(format!("meth:{fqcn}::__construct")), n.class.span);
                 ty
             }
             _ => {
@@ -478,6 +482,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                     Severity::Info,
                     expr_span,
                 );
+            }
+            // Unknowable receiver — record a name-only fallback so
+            // find-references on any `X::$name` can surface this access.
+            if prop_name != "<dynamic>" {
+                self.record_ref(Arc::from(format!("propname:{prop_name}")), pa.property.span);
             }
             return Type::mixed();
         }

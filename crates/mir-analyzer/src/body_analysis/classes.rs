@@ -531,6 +531,31 @@ impl<'a> BodyAnalyzer<'a> {
 
         let fqcn: &str = cx.fqcn.as_ref();
 
+        // Record the declaration name under a name-only key so
+        // find-references with an unresolvable receiver (`$x->foo()` on an
+        // untyped `$x`) can still surface matching declarations.
+        if self.mode == AnalysisMode::Full {
+            if let Some(name) = method.name.as_deref() {
+                let span = super::method_header_name_span(source, method);
+                if span.end > span.start {
+                    let (line, col_start) =
+                        crate::diagnostics::offset_to_line_col(source, span.start, source_map);
+                    let (_, col_end) =
+                        crate::diagnostics::offset_to_line_col(source, span.end, source_map);
+                    self.db.record_reference_location(crate::db::RefLoc {
+                        symbol_key: Arc::from(format!(
+                            "methdecl:{}",
+                            crate::util::php_ident_lowercase(name)
+                        )),
+                        file: file.clone(),
+                        line,
+                        col_start,
+                        col_end,
+                    });
+                }
+            }
+        }
+
         for param in method.params.iter() {
             if let Some(hint) = &param.type_hint {
                 self.check_and_record_type_hint_classes(
@@ -868,6 +893,35 @@ impl<'a> BodyAnalyzer<'a> {
                     source_map,
                     all_issues,
                 );
+                // Property initializers are constant expressions outside any
+                // body flow; analyze them (mirroring method param defaults)
+                // so `Widget::class`-style defaults record references.
+                if let Some(default) = &prop.default {
+                    use crate::flow_state::FlowState;
+                    use crate::stmt::StatementsAnalyzer;
+                    use mir_issues::IssueBuffer;
+                    let mut default_ctx = FlowState::new();
+                    default_ctx.self_fqcn = Some(scope_cx.fqcn.clone());
+                    default_ctx.parent_fqcn = scope_cx.parent_fqcn.clone();
+                    default_ctx.static_fqcn = Some(scope_cx.fqcn.clone());
+                    default_ctx.strict_types = scope_cx.strict_types;
+                    let mut buf = IssueBuffer::new();
+                    let mut sa = StatementsAnalyzer::new(
+                        self.db,
+                        file.clone(),
+                        source,
+                        source_map,
+                        &mut buf,
+                        all_symbols,
+                        self.php_version,
+                        self.mode,
+                    );
+                    sa.collect_symbols = self.collect_symbols;
+                    let mut ea = sa.expr_analyzer(&default_ctx);
+                    let _ = ea.analyze(default, &mut default_ctx);
+                    drop(sa);
+                    all_issues.extend(buf.into_all_issues());
+                }
                 continue;
             }
             let php_ast::owned::ClassMemberKind::Method(method) = &member.kind else {

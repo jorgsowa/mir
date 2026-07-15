@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.55.0] - 2026-07-15
+
+### Added
+
+- Delta-maintained inverted subtype index (`SubtypeIndex`): resolved parent
+  FQCN → direct children, updated per file commit instead of scanned per
+  query. New session queries `indexed_subtype_classes` (transitive subtypes
+  with declaration name ranges, short-name-lenient roots, anonymous-class
+  `impl:` postings) and `indexed_method_implementations` (concrete overrides
+  across subtypes).
+- `AnalysisSession::indexed_references_to`: posting-list find-references with
+  an on-demand freshness/completeness pass — committed-fresh files answer
+  from the index in O(results); stale/uncommitted candidates analyze once and
+  commit. Member queries fan out across the resolved class hierarchy and fall
+  back to name-keyed postings (`methname:`/`propname:`) when nothing typed
+  resolves; `include_declaration` contributes per-hierarchy-class declaration
+  name tokens (`methdecl:` postings for unknown owners).
+- `AnalysisSession::declaration_name_range`: a symbol's declaration site
+  narrowed to its name token (case-insensitive fallback for lowercased
+  method names; textual lookup for global constants).
+- Reference recording coverage: `meth:{fqcn}::__construct` at `new` sites,
+  free-function parameter defaults, class/trait property initializers,
+  braced-namespace top-level statements (uniform-namespace files only),
+  static/instance property writes through array subscripts, and name-keyed
+  fallbacks for calls/accesses on unresolvable receivers.
+- `SubtypeClassSite` public type; `db::{SubtypeIndex, SubtypeEntry,
+  SubtypeSite, ClassLikeKind}` exports.
+
+### Changed
+
+- The reference index is now always maintained with replace-per-file
+  semantics (`FileAnalyzer` commits via `set_file_reference_locations` and
+  marks per-file freshness); `reanalyze_*` sweeps also commit subtype edges.
+- Property reference spans are normalized to the bare name (static accesses
+  previously included the `$` sigil); global-constant spans narrow to the
+  final path segment.
+- `ingest_file` unconditionally clears the file's old definitions and
+  reference locations before re-ingesting.
+
+### Removed
+
+- `AnalysisSession::without_reference_index` — the opt-out existed because
+  per-request recomputation made the index dead weight; with delta
+  maintenance and posting-list reads it is the primary read path.
+
 ## [0.54.0] - 2026-07-14
 
 ### Added

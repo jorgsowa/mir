@@ -442,7 +442,9 @@ impl<'a> StatementsAnalyzer<'a> {
                 // Interfaces/traits/enums are collected in definition collection — skip here
             }
 
-            // ---- Namespace / use (at file level, already handled in definition collection) --
+            // ---- Namespace / use (at file level, already handled in definition
+            // collection; braced namespace bodies are walked by
+            // `BodyAnalyzer::analyze_global_exec` / `analyze_top_level_stmts`) --
             StmtKind::Namespace(_) | StmtKind::Use(_) | StmtKind::Const(_) => {}
 
             // ---- Inert --------------------------------------------------------
