@@ -32,6 +32,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fallbacks for calls/accesses on unresolvable receivers.
 - `SubtypeClassSite` public type; `db::{SubtypeIndex, SubtypeEntry,
   SubtypeSite, ClassLikeKind}` exports.
+- `AnalysisSession::warm_start_files`: replays a returning session's on-disk
+  cached reference-location postings and subtype edges (via `AnalysisCache`
+  and the `StubSliceCache` stub-cache sidecar) instead of rebuilding them
+  through the on-demand analysis sweep on first query. A cache miss falls
+  through to the existing lazy paths unchanged.
+- `ReferenceKind::UseImport` and a `use:`-prefixed index posting for
+  `use Foo\Bar;`/`use function`/`use const` import name tokens, plus
+  `AnalysisSession::indexed_use_import_locations` to read them back scoped to
+  a file set. Deliberately not folded into the plain `cls:`/`fn:`/`gcnst:`
+  key, since an import alone isn't a usage.
 
 ### Changed
 
@@ -44,11 +54,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ingest_file` unconditionally clears the file's old definitions and
   reference locations before re-ingesting.
 
+### Fixed
+
+- `collect_definitions` (the vendor-tree walker) and `analyze_paths` (the CLI
+  batch pipeline) never fed the subtype index from the `StubSlice` they
+  already collect, unlike the single-file LSP edit path (`ingest_file`) — an
+  implementor living only in `vendor/`, or seen only through a batch run, was
+  invisible to goto-implementation until something else individually touched
+  its file.
+- Property and class-constant declarations had no name-only fallback posting
+  (unlike `methdecl:` for methods), so an unknown-owner find-references query
+  surfaced fallback usages but never the declaration itself. Adds
+  `propdecl:`/`cnstdecl:` postings, plus a `methdecl:` posting for interface
+  methods (which have no body/params to anchor the existing name-span
+  heuristic on).
+
 ### Removed
 
 - `AnalysisSession::without_reference_index` — the opt-out existed because
   per-request recomputation made the index dead weight; with delta
   maintenance and posting-list reads it is the primary read path.
+- `AnalysisSession::references_to`, `references_to_in_files`, and
+  `references_to_in_files_cancellable` — superseded by
+  `indexed_references_to`. The scan-based `class_subtype_files` tracked query
+  is also gone; `subtype_files()` keeps its public signature, now backed by
+  `indexed_subtype_classes`.
+
+  **BREAKING CHANGE:** callers of the removed `references_to*` methods must
+  migrate to `indexed_references_to(symbol, files, include_declaration,
+  should_cancel)`.
 
 ## [0.54.0] - 2026-07-14
 
