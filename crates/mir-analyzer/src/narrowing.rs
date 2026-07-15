@@ -4196,7 +4196,7 @@ impl UnionNarrowExt for Type {
     }
 }
 
-fn is_numeric_string(s: &str) -> bool {
+pub(crate) fn is_numeric_string(s: &str) -> bool {
     let t = s.trim();
     if t.is_empty() {
         return false;

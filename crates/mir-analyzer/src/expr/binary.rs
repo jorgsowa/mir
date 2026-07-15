@@ -405,14 +405,6 @@ fn bitwise_op_symbol(op: BinaryOp) -> &'static str {
     }
 }
 
-/// Whether `s` is a PHP numeric string (so `"5" + 3` is valid). Conservative:
-/// anything that doesn't cleanly parse is treated as numeric to avoid false
-/// positives.
-fn is_numeric_string(s: &str) -> bool {
-    let t = s.trim();
-    !t.is_empty() && (t.parse::<i64>().is_ok() || t.parse::<f64>().is_ok())
-}
-
 /// Whether every member of `ty` is *definitely* a non-numeric value for
 /// arithmetic. Returns `false` for empty/`mixed`/unions that include any
 /// possibly-numeric member, so only clear errors are flagged.
@@ -421,7 +413,7 @@ pub(super) fn operand_is_non_numeric(ty: &Type) -> bool {
         return false;
     }
     ty.types.iter().all(|a| match a {
-        Atomic::TLiteralString(s) => !is_numeric_string(s),
+        Atomic::TLiteralString(s) => !crate::narrowing::is_numeric_string(s),
         Atomic::TArray { .. }
         | Atomic::TList { .. }
         | Atomic::TNonEmptyArray { .. }
@@ -447,7 +439,7 @@ fn operand_has_any_non_numeric_member(ty: &Type) -> bool {
         return false;
     }
     ty.types.iter().any(|a| match a {
-        Atomic::TLiteralString(s) => !is_numeric_string(s),
+        Atomic::TLiteralString(s) => !crate::narrowing::is_numeric_string(s),
         Atomic::TArray { .. }
         | Atomic::TList { .. }
         | Atomic::TNonEmptyArray { .. }
