@@ -27,8 +27,9 @@ use crate::php_version::PhpVersion;
 ///      for the clone without touching the original `ZalsaLocal`.
 ///   2. `source_file_count()` — reads `self.source_files.len()`, a plain
 ///      `HashMap` field, no Salsa involvement.
-///   3. `replay_reference_locations()` — writes into `Mutex<HashMap<_>>` fields
-///      (`file_references`, `reference_locations`), no `ZalsaLocal` access.
+///   3. `set_file_reference_locations()` / `set_file_class_edges()` — write
+///      into the `Arc<Mutex<RefIndex>>` / `Arc<Mutex<SubtypeIndex>>` fields,
+///      no `ZalsaLocal` access.
 ///
 /// None of these touch the `RefCell<QueryStack>` inside `ZalsaLocal`, so
 /// concurrent read-lock holders are data-race-free. Under the *write* lock

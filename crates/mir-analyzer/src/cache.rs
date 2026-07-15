@@ -306,8 +306,9 @@ impl AnalysisCache {
     /// Return cached issues and reference locations for `file_path` if its
     /// `content_hash` matches. Returns `None` if there is no entry or the file
     /// has changed. The second element of the tuple is the list of
-    /// `(symbol_key, line, col_start, col_end)` entries to replay into
-    /// the salsa db via `MirDatabase::replay_reference_locations`.
+    /// `(symbol_key, line, col_start, col_end)` entries to replay into the
+    /// salsa db via `MirDatabase::set_file_reference_locations` (see
+    /// `AnalysisSession::warm_start_files` for the session-level replay path).
     pub fn get(&self, file_path: &str, content_hash: &str) -> Option<CacheHit> {
         let id = self.file_id_map.lock().get(file_path)?;
         let entries = self.entries.lock();

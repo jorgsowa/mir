@@ -508,6 +508,90 @@ impl AnalysisSession {
         self.db.salsa.write().rebuild_workspace_symbol_index();
     }
 
+    /// Replay disk-cached reference-location postings and subtype-index class
+    /// edges for `files`, so a returning session's find-references /
+    /// goto-implementation queries are answered from the index immediately
+    /// instead of paying the on-demand analysis sweep the first time each
+    /// file is queried (`indexed_references_to`/`indexed_subtype_classes`'s
+    /// freshness pass already handles a miss correctly — this only shortens
+    /// the common warm-start case).
+    ///
+    /// A no-op (per file) unless the disk cache from a *previous* run has an
+    /// entry whose content hash matches `files`' current text: [`Self::with_cache`]/
+    /// [`Self::with_cache_dir`] must be attached, and each file's reference
+    /// locations ([`AnalysisCache`], populated by the CLI batch pipeline) or
+    /// definitions ([`crate::stub_cache::StubSliceCache`], populated by
+    /// [`Self::ingest_file`]/vendor ingestion) must already be on disk from
+    /// some earlier run/tool invocation against this exact content. A first-
+    /// ever run (nothing cached yet) is unaffected — every file simply falls
+    /// through to the existing lazy on-demand paths, same as without this call.
+    ///
+    /// Registers `files` as `Durability::HIGH` salsa inputs (like
+    /// [`Self::index_batch`]) if not already registered. Safe to call
+    /// alongside `index_batch` in any order; both merge into the same
+    /// maintained indexes.
+    pub fn warm_start_files(&self, files: &[(Arc<str>, Arc<str>)]) {
+        let Some(cache) = self.cache.clone() else {
+            return;
+        };
+        let stub_cache = self.db.stub_cache.clone();
+        let php_v = self.php_version.cache_byte();
+
+        {
+            let mut guard = self.db.salsa.write();
+            for (file, text) in files {
+                guard.upsert_source_file_with_durability(
+                    file.clone(),
+                    text.clone(),
+                    salsa::Durability::HIGH,
+                );
+            }
+        }
+
+        for (file, _) in files {
+            // Freshness is keyed on the Arc actually stored on the input — an
+            // upsert against already-registered, content-equal text keeps the
+            // prior Arc (see `ingest_file`), so read back what's really there
+            // rather than assume identity with the `text` passed in above.
+            let stored_text = {
+                let db = self.snapshot_db();
+                db.lookup_source_file(file.as_ref())
+                    .map(|sf| sf.text(&db as &dyn MirDatabase))
+            };
+            let Some(stored_text) = stored_text else {
+                continue;
+            };
+
+            let hex = crate::cache::hash_content(&stored_text);
+            if let Some((_, ref_locs)) = cache.get(file, &hex) {
+                let locs: Vec<RefLoc> = ref_locs
+                    .iter()
+                    .map(|(symbol, line, col_start, col_end)| RefLoc {
+                        symbol_key: Arc::clone(symbol),
+                        file: file.clone(),
+                        line: *line,
+                        col_start: *col_start,
+                        col_end: *col_end,
+                    })
+                    .collect();
+                self.commit_file_refs(file, Some(stored_text.clone()), locs);
+            }
+
+            if let Some(stub_cache) = &stub_cache {
+                let hash = crate::stub_cache::hash_source(&stored_text);
+                if let Some(mut slice) = stub_cache.get(file, &hash, php_v) {
+                    crate::stub_cache::prepare_for_ingest(&mut slice);
+                    let entries = crate::db::subtype_index::entries_from_slice(&slice);
+                    {
+                        let guard = self.db.salsa.read();
+                        guard.set_file_class_edges(file, entries);
+                    }
+                    self.mark_defs_committed(file, &stored_text);
+                }
+            }
+        }
+    }
+
     /// Drop a file's contribution to the session: codebase definitions,
     /// reference locations, salsa input handle, cache entry, and outgoing
     /// reverse-dependency edges. Cache entries of *dependent* files are
