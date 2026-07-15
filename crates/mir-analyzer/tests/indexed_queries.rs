@@ -342,6 +342,91 @@ fn static_call_name_fallback_on_undefined_method() {
 }
 
 #[test]
+fn unknown_owner_property_declaration_reachable() {
+    let files = [(
+        "widget.php",
+        "<?php\nclass Widget { public string $label = ''; }\n",
+    )];
+    let session = session_with(&files);
+    let refs = session
+        .indexed_references_to(
+            &Name::property("", "label"),
+            &paths(&files),
+            true,
+            &|| false,
+        )
+        .expect("not cancelled");
+    assert_eq!(
+        refs.len(),
+        1,
+        "propdecl: posting must surface the declaration for an unknown owner: {refs:?}"
+    );
+    assert_eq!(refs[0].0.as_ref(), "widget.php");
+    assert_eq!(refs[0].1.start.line, 2);
+}
+
+#[test]
+fn unknown_owner_constant_declaration_reachable() {
+    let files = [("cfg.php", "<?php\nclass Cfg { public const MODE = 'x'; }\n")];
+    let session = session_with(&files);
+    let refs = session
+        .indexed_references_to(
+            &Name::class_constant("", "MODE"),
+            &paths(&files),
+            true,
+            &|| false,
+        )
+        .expect("not cancelled");
+    assert_eq!(
+        refs.len(),
+        1,
+        "cnstdecl: posting must surface the declaration for an unknown owner: {refs:?}"
+    );
+    assert_eq!(refs[0].0.as_ref(), "cfg.php");
+}
+
+#[test]
+fn interface_method_declaration_reachable_with_unknown_owner() {
+    let files = [(
+        "shape.php",
+        "<?php\ninterface Shape { public function area(): float; }\n",
+    )];
+    let session = session_with(&files);
+    let refs = session
+        .indexed_references_to(&Name::method("", "area"), &paths(&files), true, &|| false)
+        .expect("not cancelled");
+    assert_eq!(
+        refs.len(),
+        1,
+        "interface method declarations must reach methdecl: too: {refs:?}"
+    );
+    assert_eq!(refs[0].0.as_ref(), "shape.php");
+}
+
+#[test]
+fn enum_constant_declaration_reachable_with_unknown_owner() {
+    let files = [(
+        "suit.php",
+        "<?php\nenum Suit { case Hearts; const DEFAULT = self::Hearts; }\n",
+    )];
+    let session = session_with(&files);
+    let refs = session
+        .indexed_references_to(
+            &Name::class_constant("", "DEFAULT"),
+            &paths(&files),
+            true,
+            &|| false,
+        )
+        .expect("not cancelled");
+    assert_eq!(
+        refs.len(),
+        1,
+        "enum-declared class constant must reach cnstdecl: too: {refs:?}"
+    );
+    assert_eq!(refs[0].0.as_ref(), "suit.php");
+}
+
+#[test]
 fn subtype_index_follows_reparenting_edit() {
     let files = [
         ("a.php", "<?php\nclass Base {}\nclass Other {}\n"),

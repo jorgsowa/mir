@@ -48,6 +48,35 @@ impl<'a> BodyAnalyzer<'a> {
         source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<Issue>,
     ) {
+        // Record the declaration name under a name-only key so find-references
+        // with an unresolvable receiver ($x->prop on an untyped $x) can still
+        // surface matching declarations, mirroring `methdecl:` for methods.
+        if self.mode == AnalysisMode::Full {
+            if let Some(name) = prop.name.as_deref() {
+                if !name.is_empty() {
+                    let span = super::property_name_span(source, member_span, name);
+                    if span.end > span.start {
+                        let (line, col_start) =
+                            crate::diagnostics::offset_to_line_col(source, span.start, source_map);
+                        let (_, col_end) =
+                            crate::diagnostics::offset_to_line_col(source, span.end, source_map);
+                        // The span covers `$name`; narrow past the sigil so the
+                        // posting's column range matches the bare name, same as
+                        // the `propname:` fallback recorded elsewhere.
+                        self.db.record_reference_location(crate::db::RefLoc {
+                            // Property names are case-sensitive in PHP (unlike
+                            // methods) — keyed as-declared, matching the
+                            // `propname:` fallback's casing.
+                            symbol_key: Arc::from(format!("propdecl:{name}")),
+                            file: file.clone(),
+                            line,
+                            col_start: col_start + 1,
+                            col_end,
+                        });
+                    }
+                }
+            }
+        }
         if let Some(hint) = &prop.type_hint {
             self.check_and_record_type_hint_classes(
                 hint, file, source, source_map, all_issues, None,
@@ -85,6 +114,44 @@ impl<'a> BodyAnalyzer<'a> {
                 ));
             }
         }
+    }
+
+    /// Record a class constant's declaration under a name-only `cnstdecl:`
+    /// key, mirroring `methdecl:`/`propdecl:` — so find-references with an
+    /// unknown owner (`Foo::BAR` on an unresolvable `Foo`) can still surface
+    /// the declaration. Shared by class/trait/interface/enum member loops.
+    pub(super) fn record_class_const_decl(
+        &self,
+        constant: &php_ast::owned::ClassConstDecl,
+        member_span: &php_ast::Span,
+        file: &Arc<str>,
+        source: &str,
+        source_map: &php_rs_parser::source_map::SourceMap,
+    ) {
+        if self.mode != AnalysisMode::Full {
+            return;
+        }
+        let Some(name) = constant.name.as_deref() else {
+            return;
+        };
+        if name.is_empty() {
+            return;
+        }
+        let span = super::bare_name_span_in(source, member_span, name);
+        if span.end <= span.start {
+            return;
+        }
+        let (line, col_start) =
+            crate::diagnostics::offset_to_line_col(source, span.start, source_map);
+        let (_, col_end) = crate::diagnostics::offset_to_line_col(source, span.end, source_map);
+        // Constant names are case-sensitive in PHP, same as properties.
+        self.db.record_reference_location(crate::db::RefLoc {
+            symbol_key: Arc::from(format!("cnstdecl:{name}")),
+            file: file.clone(),
+            line,
+            col_start,
+            col_end,
+        });
     }
 
     /// `UndefinedDocblockClass`/`cls:` usage for a property's `@var` docblock
@@ -925,6 +992,9 @@ impl<'a> BodyAnalyzer<'a> {
                 continue;
             }
             let php_ast::owned::ClassMemberKind::Method(method) = &member.kind else {
+                if let php_ast::owned::ClassMemberKind::ClassConst(c) = &member.kind {
+                    self.record_class_const_decl(c, &member.span, file, source, source_map);
+                }
                 continue;
             };
             self.analyze_method_scope(
@@ -1055,6 +1125,9 @@ impl<'a> BodyAnalyzer<'a> {
                 continue;
             }
             let php_ast::owned::ClassMemberKind::Method(method) = &member.kind else {
+                if let php_ast::owned::ClassMemberKind::ClassConst(c) = &member.kind {
+                    self.record_class_const_decl(c, &member.span, file, source, source_map);
+                }
                 continue;
             };
             self.analyze_method_scope(

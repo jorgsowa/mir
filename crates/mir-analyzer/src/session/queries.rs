@@ -559,10 +559,17 @@ impl AnalysisSession {
                 | crate::Name::ClassConstant { class, .. } => {
                     if class.is_empty() {
                         // Unknown owner: declarations by name, recorded as
-                        // `methdecl:` postings during class analysis.
+                        // `methdecl:`/`propdecl:`/`cnstdecl:` postings during
+                        // class/trait/interface/enum analysis.
                         match symbol {
                             crate::Name::Method { name, .. } => {
                                 read_keys(&[format!("methdecl:{name}")])
+                            }
+                            crate::Name::Property { name, .. } => {
+                                read_keys(&[format!("propdecl:{name}")])
+                            }
+                            crate::Name::ClassConstant { name, .. } => {
+                                read_keys(&[format!("cnstdecl:{name}")])
                             }
                             _ => Vec::new(),
                         }

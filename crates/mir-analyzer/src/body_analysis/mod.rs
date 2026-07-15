@@ -970,6 +970,65 @@ fn param_name_span(source: &str, p: &php_ast::owned::Param) -> php_ast::Span {
     }
 }
 
+/// Tight span for the `$name` token in a property declaration, mirroring
+/// [`param_name_span`] but searching within the member's own span (properties
+/// carry no dedicated name span either).
+pub(super) fn property_name_span(
+    source: &str,
+    member_span: &php_ast::Span,
+    bare_name: &str,
+) -> php_ast::Span {
+    if bare_name.is_empty() {
+        return *member_span;
+    }
+    let start = (member_span.start as usize).min(source.len());
+    let end = (member_span.end as usize).min(source.len());
+    if start >= end || !source.is_char_boundary(start) {
+        return *member_span;
+    }
+    let needle = format!("${bare_name}");
+    match source[start..end].find(needle.as_str()) {
+        Some(rel) => {
+            let s = member_span.start + rel as u32;
+            php_ast::Span {
+                start: s,
+                end: s + needle.len() as u32,
+            }
+        }
+        None => *member_span,
+    }
+}
+
+/// Tight span for a bare identifier (no `$` sigil) within a bounded region —
+/// a class constant's name within its declaration span, or an interface
+/// method's name within its member span (interface methods have no body and
+/// often no params, so `method_header_name_span`'s param/body anchor doesn't
+/// apply).
+pub(super) fn bare_name_span_in(
+    source: &str,
+    member_span: &php_ast::Span,
+    name: &str,
+) -> php_ast::Span {
+    if name.is_empty() {
+        return *member_span;
+    }
+    let start = (member_span.start as usize).min(source.len());
+    let end = (member_span.end as usize).min(source.len());
+    if start >= end || !source.is_char_boundary(start) {
+        return *member_span;
+    }
+    match source[start..end].find(name) {
+        Some(rel) => {
+            let s = member_span.start + rel as u32;
+            php_ast::Span {
+                start: s,
+                end: s + name.len() as u32,
+            }
+        }
+        None => *member_span,
+    }
+}
+
 /// Push one `Variable` symbol per parameter declaration into `all_symbols`.
 /// Called immediately after [`seed_param_locations`] at every function/method body entry.
 fn record_param_symbols(

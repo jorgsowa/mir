@@ -38,10 +38,10 @@ fn vendor_tree_implementor_reaches_subtype_index() {
     session.ensure_all_stubs();
 
     // Vendor ingestion: type definitions only, no body analysis.
-    session.collect_definitions(&[vendor_impl.clone()]);
+    session.collect_definitions(std::slice::from_ref(&vendor_impl));
 
     // Project ingestion via the batch pipeline (never touches `ingest_file`).
-    session.analyze_paths(&[shape.clone()], &BatchOptions::new());
+    session.analyze_paths(std::slice::from_ref(&shape), &BatchOptions::new());
 
     // Query scope deliberately excludes the vendor file: the on-demand
     // self-heal (`commit_defs_for_matching`) only ever looks at files in this

@@ -198,9 +198,7 @@ impl AnalysisSession {
             // sees implementors from a batch/vendor run without waiting for
             // each file to be individually touched by an on-demand commit path.
             let guard = self.db.salsa.read();
-            for (parsed, (defs, _hash, _hard_err, _surface)) in
-                parsed_files.iter().zip(file_defs.into_iter())
-            {
+            for (parsed, (defs, _hash, _hard_err, _surface)) in parsed_files.iter().zip(file_defs) {
                 for issue in defs.issues.iter() {
                     if matches!(issue.kind, mir_issues::IssueKind::ParseError { .. })
                         && issue.severity == mir_issues::Severity::Error
