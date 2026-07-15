@@ -746,6 +746,17 @@ impl CallAnalyzer {
                     ))
                 })
                 .unwrap_or(false);
+            // The method didn't resolve on an otherwise-known class — keep a
+            // name-only fallback so find-references on any `X::name` can
+            // still surface this call, mirroring the instance-call path in
+            // call/method.rs.
+            ea.record_ref(
+                Arc::from(format!(
+                    "methname:{}",
+                    crate::util::php_ident_lowercase(method_name)
+                )),
+                call.method.span,
+            );
             if is_trait {
                 // The call may be satisfied by whichever class ends up consuming
                 // this trait — record a per-trait marker so DeadCodeAnalyzer can
@@ -776,6 +787,15 @@ impl CallAnalyzer {
             && !matches!(fqcn.as_str(), "self" | "static" | "parent")
             && !ctx.is_class_guarded(fqcn.as_str())
         {
+            // The class itself couldn't be resolved — same name-only fallback
+            // as the known-class-unresolved-method branch above.
+            ea.record_ref(
+                Arc::from(format!(
+                    "methname:{}",
+                    crate::util::php_ident_lowercase(method_name)
+                )),
+                call.method.span,
+            );
             ea.emit(
                 IssueKind::UndefinedClass { name: fqcn },
                 Severity::Error,
@@ -783,6 +803,13 @@ impl CallAnalyzer {
             );
             Type::mixed()
         } else {
+            ea.record_ref(
+                Arc::from(format!(
+                    "methname:{}",
+                    crate::util::php_ident_lowercase(method_name)
+                )),
+                call.method.span,
+            );
             Type::mixed()
         }
     }

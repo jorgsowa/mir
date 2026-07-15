@@ -296,6 +296,52 @@ fn method_implementations_across_subtypes() {
 }
 
 #[test]
+fn static_call_name_fallback_on_unresolved_class() {
+    let files = [(
+        "caller.php",
+        "<?php\nfunction c(): void { UnknownClass::doThing(); }\n",
+    )];
+    let session = session_with(&files);
+    let refs = session
+        .indexed_references_to(
+            &Name::method("", "doThing"),
+            &paths(&files),
+            false,
+            &|| false,
+        )
+        .expect("not cancelled");
+    assert_eq!(
+        refs.len(),
+        1,
+        "UnknownClass::doThing() must record a methname: fallback: {refs:?}"
+    );
+    assert_eq!(refs[0].0.as_ref(), "caller.php");
+}
+
+#[test]
+fn static_call_name_fallback_on_undefined_method() {
+    let files = [(
+        "caller.php",
+        "<?php\nclass Known {}\nfunction c(): void { Known::doThing(); }\n",
+    )];
+    let session = session_with(&files);
+    let refs = session
+        .indexed_references_to(
+            &Name::method("", "doThing"),
+            &paths(&files),
+            false,
+            &|| false,
+        )
+        .expect("not cancelled");
+    assert_eq!(
+        refs.len(),
+        1,
+        "Known::doThing() with no such method must still record a methname: fallback: {refs:?}"
+    );
+    assert_eq!(refs[0].0.as_ref(), "caller.php");
+}
+
+#[test]
 fn subtype_index_follows_reparenting_edit() {
     let files = [
         ("a.php", "<?php\nclass Base {}\nclass Other {}\n"),
