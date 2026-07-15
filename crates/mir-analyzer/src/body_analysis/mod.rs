@@ -1056,6 +1056,7 @@ fn record_param_symbols(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn check_use_decl_casing(
     use_decl: &php_ast::owned::UseDecl,
     db: &dyn crate::db::MirDatabase,
@@ -1064,6 +1065,7 @@ pub(crate) fn check_use_decl_casing(
     source_map: &php_rs_parser::source_map::SourceMap,
     all_issues: &mut Vec<Issue>,
     mut all_symbols: Option<&mut Vec<ResolvedSymbol>>,
+    is_full: bool,
 ) {
     use php_ast::ast::UseKind;
     for item in use_decl.uses.iter() {
@@ -1085,6 +1087,24 @@ pub(crate) fn check_use_decl_casing(
             col_start,
             col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
         };
+        // Recorded under a `use:`-prefixed key distinct from the plain
+        // `cls:`/`fn:`/`gcnst:` postings a real usage would write — so a
+        // future index-based rename can also find/update the import line,
+        // while plain find-references and dead-code "is this ever used"
+        // checks (which only ever look up the unprefixed key) stay blind to
+        // it, preserving the "an import alone isn't a usage" invariant below.
+        let record_use_posting = |db: &dyn crate::db::MirDatabase, name: crate::Name| {
+            if !is_full {
+                return;
+            }
+            db.record_reference_location(crate::db::RefLoc {
+                symbol_key: Arc::from(format!("use:{}", name.codebase_key())),
+                file: file.clone(),
+                line,
+                col_start,
+                col_end,
+            });
+        };
         match effective_kind {
             UseKind::Normal => {
                 let here = crate::db::Fqcn::from_str(db, &full_name);
@@ -1100,6 +1120,8 @@ pub(crate) fn check_use_decl_casing(
                             loc,
                         ));
                     }
+                    let fqcn: Arc<str> = Arc::from(class.fqcn().as_ref());
+                    record_use_posting(db, crate::Name::class(fqcn.clone()));
                     // Without this, the import's own name token was a dead zone for
                     // hover/go-to-definition — a developer would reasonably expect
                     // to jump straight to the class from its `use` statement. Only
@@ -1112,7 +1134,9 @@ pub(crate) fn check_use_decl_casing(
                             file: file.clone(),
                             span: item.span,
                             expr_span: None,
-                            kind: ReferenceKind::ClassReference(Arc::from(class.fqcn().as_ref())),
+                            kind: ReferenceKind::UseImport(Box::new(ReferenceKind::ClassReference(
+                                fqcn,
+                            ))),
                             resolved_type: Type::single(mir_types::Atomic::TClassString(None)),
                         });
                     }
@@ -1132,6 +1156,7 @@ pub(crate) fn check_use_decl_casing(
                             loc,
                         ));
                     }
+                    record_use_posting(db, crate::Name::function(func.fqn.clone()));
                     // Same dead-zone fix as UseKind::Normal above, for `use function`.
                     if let Some(symbols) = all_symbols.as_deref_mut() {
                         use crate::symbol::ReferenceKind;
@@ -1139,7 +1164,9 @@ pub(crate) fn check_use_decl_casing(
                             file: file.clone(),
                             span: item.span,
                             expr_span: None,
-                            kind: ReferenceKind::FunctionCall(func.fqn.clone()),
+                            kind: ReferenceKind::UseImport(Box::new(ReferenceKind::FunctionCall(
+                                func.fqn.clone(),
+                            ))),
                             resolved_type: func
                                 .return_type
                                 .as_deref()
@@ -1152,6 +1179,8 @@ pub(crate) fn check_use_decl_casing(
             UseKind::Const => {
                 let here = crate::db::Fqcn::from_str(db, &full_name);
                 if let Some(ty) = crate::db::find_global_constant(db, here) {
+                    let fqn: Arc<str> = Arc::from(full_name.as_str());
+                    record_use_posting(db, crate::Name::global_constant(fqn.clone()));
                     // Same dead-zone fix as UseKind::Normal/Function above, for `use const`.
                     if let Some(symbols) = all_symbols.as_deref_mut() {
                         use crate::symbol::ReferenceKind;
@@ -1159,7 +1188,9 @@ pub(crate) fn check_use_decl_casing(
                             file: file.clone(),
                             span: item.span,
                             expr_span: None,
-                            kind: ReferenceKind::GlobalConstant(Arc::from(full_name.as_str())),
+                            kind: ReferenceKind::UseImport(Box::new(ReferenceKind::GlobalConstant(
+                                fqn,
+                            ))),
                             resolved_type: (*ty).clone(),
                         });
                     }

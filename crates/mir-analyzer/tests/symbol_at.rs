@@ -308,8 +308,12 @@ fn symbol_at_finds_use_function_import() {
         .expect("symbol_at should find a symbol on the use-function import");
 
     assert!(
-        matches!(&sym.kind, ReferenceKind::FunctionCall(n) if n.as_ref() == "App\\greet"),
-        "expected FunctionCall(App\\\\greet), got {:?}",
+        matches!(
+            &sym.kind,
+            ReferenceKind::UseImport(inner)
+                if matches!(inner.as_ref(), ReferenceKind::FunctionCall(n) if n.as_ref() == "App\\greet")
+        ),
+        "expected UseImport(FunctionCall(App\\\\greet)), got {:?}",
         sym.kind
     );
 }
@@ -334,8 +338,12 @@ fn symbol_at_finds_use_const_import() {
         .expect("symbol_at should find a symbol on the use-const import");
 
     assert!(
-        matches!(&sym.kind, ReferenceKind::GlobalConstant(n) if n.as_ref() == "App\\GREETING"),
-        "expected GlobalConstant(App\\\\GREETING), got {:?}",
+        matches!(
+            &sym.kind,
+            ReferenceKind::UseImport(inner)
+                if matches!(inner.as_ref(), ReferenceKind::GlobalConstant(n) if n.as_ref() == "App\\GREETING")
+        ),
+        "expected UseImport(GlobalConstant(App\\\\GREETING)), got {:?}",
         sym.kind
     );
 }
@@ -1443,8 +1451,12 @@ fn symbol_at_use_import_name_resolves_to_class_reference() {
         .symbol_at(user_file_str, offset)
         .expect("symbol_at must find ClassReference on the use-import class name");
     assert!(
-        matches!(&sym.kind, ReferenceKind::ClassReference(n) if n.as_ref() == "App\\Models\\Bar"),
-        "expected ClassReference(App\\Models\\Bar), got {:?}",
+        matches!(
+            &sym.kind,
+            ReferenceKind::UseImport(inner)
+                if matches!(inner.as_ref(), ReferenceKind::ClassReference(n) if n.as_ref() == "App\\Models\\Bar")
+        ),
+        "expected UseImport(ClassReference(App\\Models\\Bar)), got {:?}",
         sym.kind
     );
 }

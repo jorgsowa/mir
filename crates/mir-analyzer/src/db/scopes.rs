@@ -189,6 +189,7 @@ pub fn infer_scope(
                 text.as_ref(),
                 &parsed.source_map,
                 &mut issues,
+                true,
             );
         }
         ScopeKey::FileExec => {
@@ -301,18 +302,19 @@ fn check_use_decls(
     source: &str,
     source_map: &php_rs_parser::source_map::SourceMap,
     issues: &mut Vec<Issue>,
+    is_full: bool,
 ) {
     use php_ast::owned::StmtKind;
     for stmt in stmts.iter() {
         match &stmt.kind {
             StmtKind::Use(use_decl) => {
                 crate::body_analysis::check_use_decl_casing(
-                    use_decl, db, file, source, source_map, issues, None,
+                    use_decl, db, file, source, source_map, issues, None, is_full,
                 );
             }
             StmtKind::Namespace(ns) => {
                 if let php_ast::owned::NamespaceBody::Braced(inner) = &ns.body {
-                    check_use_decls(&inner.stmts, db, file, source, source_map, issues);
+                    check_use_decls(&inner.stmts, db, file, source, source_map, issues, is_full);
                 }
             }
             _ => {}

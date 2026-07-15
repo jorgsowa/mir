@@ -104,6 +104,15 @@ pub enum ReferenceKind {
     ConstantAccess { class: Arc<str>, constant: Arc<str> },
     /// A global constant reference (`FOO`, `\FOO`).
     GlobalConstant(Arc<str>),
+    /// A symbol occurrence inside a `use` import statement (`use Foo\Bar;`,
+    /// `use function foo\bar;`, `use const FOO\BAR;`) — the import's own name
+    /// token, not a usage site. Kept distinct from the wrapped kind so a
+    /// consumer walking reference-index postings (e.g. a future index-based
+    /// rename) can tell an import line apart from a genuine usage: renaming
+    /// must update the import too, but a plain find-references / dead-code
+    /// "is this ever used" check must not count the bare import as one (there
+    /// is deliberately no `UnusedImport` check).
+    UseImport(Box<ReferenceKind>),
 }
 
 impl ReferenceKind {
@@ -125,6 +134,7 @@ impl ReferenceKind {
             }
             ReferenceKind::GlobalConstant(fqn) => Some(crate::Name::global_constant(fqn.clone())),
             ReferenceKind::Variable(_) => None,
+            ReferenceKind::UseImport(inner) => inner.to_name(),
         }
     }
 }

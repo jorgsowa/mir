@@ -284,6 +284,7 @@ impl<'a> BodyAnalyzer<'a> {
                         source_map,
                         all_issues,
                         Some(&mut *all_symbols),
+                        self.mode == AnalysisMode::Full,
                     );
                 }
                 _ => {}
@@ -386,6 +387,7 @@ impl<'a> BodyAnalyzer<'a> {
                         source_map,
                         all_issues,
                         Some(&mut *all_symbols),
+                        self.mode == AnalysisMode::Full,
                     );
                 }
                 _ => {}

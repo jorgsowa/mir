@@ -427,6 +427,49 @@ fn enum_constant_declaration_reachable_with_unknown_owner() {
 }
 
 #[test]
+fn use_import_locations_reachable_but_excluded_from_plain_references() {
+    let files = [
+        (
+            "lib.php",
+            "<?php\nnamespace App;\nclass Widget {}\nfunction helper(): void {}\nconst LIMIT = 10;\n",
+        ),
+        (
+            "main.php",
+            "<?php\nnamespace Other;\nuse App\\Widget;\nuse function App\\helper;\nuse const App\\LIMIT;\nfunction go(): void {}\n",
+        ),
+    ];
+    let session = session_with(&files);
+    let all = paths(&files);
+
+    // `indexed_use_import_locations` is a pure posting read with no freshness
+    // pass (see its doc comment) — force analysis + commit via
+    // `indexed_references_to` first, same as any indexed-query consumer would
+    // for a file it hasn't already touched.
+    //
+    // A bare import must NOT show up as a plain find-references hit — there is
+    // deliberately no `UnusedImport` check, and counting an import as usage
+    // would hide genuinely dead classes/functions/constants.
+    let cls_refs = session
+        .indexed_references_to(&Name::class("App\\Widget"), &all, false, &|| false)
+        .expect("not cancelled");
+    assert!(
+        cls_refs.is_empty(),
+        "a bare import must not count as a usage: {cls_refs:?}"
+    );
+
+    let cls_use = session.indexed_use_import_locations(&Name::class("App\\Widget"), &all);
+    assert_eq!(cls_use.len(), 1, "class import must be indexed: {cls_use:?}");
+    assert_eq!(cls_use[0].0.as_ref(), "main.php");
+
+    let fn_use = session.indexed_use_import_locations(&Name::function("App\\helper"), &all);
+    assert_eq!(fn_use.len(), 1, "function import must be indexed: {fn_use:?}");
+
+    let const_use =
+        session.indexed_use_import_locations(&Name::global_constant("App\\LIMIT"), &all);
+    assert_eq!(const_use.len(), 1, "const import must be indexed: {const_use:?}");
+}
+
+#[test]
 fn subtype_index_follows_reparenting_edit() {
     let files = [
         ("a.php", "<?php\nclass Base {}\nclass Other {}\n"),

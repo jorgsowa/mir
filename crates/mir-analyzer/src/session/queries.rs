@@ -359,6 +359,42 @@ impl AnalysisSession {
         crate::db::class_subtype_files(&db, here).to_vec()
     }
 
+    /// `use`-import occurrences of `symbol` — the import statement's own name
+    /// token (`use Foo\Bar;`, `use function ...;`, `use const ...;`), not a
+    /// usage site. Recorded under a `use:`-prefixed posting distinct from the
+    /// plain `cls:`/`fn:`/`gcnst:` keys [`Self::indexed_references_to`] reads,
+    /// so a symbol rename can also find/update the import line without a
+    /// plain find-references query suddenly including import statements.
+    ///
+    /// Read-only posting-list lookup, filtered to `files` — no freshness pass:
+    /// callers that need guaranteed-fresh results for an uncommitted file
+    /// should analyze it first (e.g. via [`Self::indexed_references_to`] on
+    /// the same file set).
+    pub fn indexed_use_import_locations(
+        &self,
+        symbol: &crate::Name,
+        files: &[Arc<str>],
+    ) -> Vec<(Arc<str>, crate::Range)> {
+        let key = format!("use:{}", symbol.codebase_key());
+        let scope: rustc_hash::FxHashSet<&str> = files.iter().map(|f| f.as_ref()).collect();
+        let guard = self.db.salsa.read();
+        let mut out: Vec<(Arc<str>, crate::Range)> = guard
+            .reference_locations(&key)
+            .into_iter()
+            .filter(|(file, ..)| scope.contains(file.as_ref()))
+            .map(|(file, line, col_start, col_end)| {
+                (file, span_range(line, col_start as u32, col_end as u32))
+            })
+            .collect();
+        out.sort_by(|a, b| {
+            a.0.cmp(&b.0)
+                .then(a.1.start.line.cmp(&b.1.start.line))
+                .then(a.1.start.column.cmp(&b.1.start.column))
+        });
+        out.dedup();
+        out
+    }
+
     /// Inverted-index find-references: posting-list lookup plus an on-demand
     /// freshness/completeness pass over `files` (the host's text-prefiltered
     /// candidate scope).
