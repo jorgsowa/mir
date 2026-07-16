@@ -1,5 +1,6 @@
 ===description===
-$arr !== [] narrows $arr to non-empty in the true branch (and === [] narrows to non-empty in the false branch).
+$arr !== [] narrows to non-empty in the true branch (and === [] in the
+false branch); === [] also narrows to empty in its own true branch.
 ===config===
 suppress=UnusedVariable,UnusedParam
 ===file===
@@ -19,6 +20,14 @@ function test_equal_else_narrows(array $arr): void {
         // empty branch — no check needed
     } else {
         /** @mir-check $arr is non-empty-list<string> */
+        $_ = $arr;
+    }
+}
+
+/** @param list<int>|non-empty-array<string, int> $arr */
+function test_equal_narrows(array $arr): void {
+    if ($arr === []) {
+        /** @mir-check $arr is list<int> */
         $_ = $arr;
     }
 }

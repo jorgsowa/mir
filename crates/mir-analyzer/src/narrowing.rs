@@ -440,28 +440,32 @@ pub fn narrow_from_condition(
                     }
                 }
             }
-            // `$arr === []` — false-branch (i.e. `$arr !== []`) narrows $arr to non-empty.
+            // `$arr === []` narrows $arr to empty; `$arr !== []` narrows to non-empty.
             else if let ExprKind::Array(elems) = &b.right.kind {
                 if elems.is_empty() {
                     if let Some(var_name) = extract_var_name(&b.left) {
-                        if !effective_true {
-                            let current = ctx.get_var(&var_name);
-                            let narrowed = current.narrow_to_non_empty_collection();
-                            if !narrowed.is_empty() && narrowed != current {
-                                ctx.set_var(&var_name, narrowed);
-                            }
+                        let current = ctx.get_var(&var_name);
+                        let narrowed = if effective_true {
+                            current.narrow_to_empty_collection()
+                        } else {
+                            current.narrow_to_non_empty_collection()
+                        };
+                        if !narrowed.is_empty() && narrowed != current {
+                            ctx.set_var(&var_name, narrowed);
                         }
                     }
                 }
             } else if let ExprKind::Array(elems) = &b.left.kind {
                 if elems.is_empty() {
                     if let Some(var_name) = extract_var_name(&b.right) {
-                        if !effective_true {
-                            let current = ctx.get_var(&var_name);
-                            let narrowed = current.narrow_to_non_empty_collection();
-                            if !narrowed.is_empty() && narrowed != current {
-                                ctx.set_var(&var_name, narrowed);
-                            }
+                        let current = ctx.get_var(&var_name);
+                        let narrowed = if effective_true {
+                            current.narrow_to_empty_collection()
+                        } else {
+                            current.narrow_to_non_empty_collection()
+                        };
+                        if !narrowed.is_empty() && narrowed != current {
+                            ctx.set_var(&var_name, narrowed);
                         }
                     }
                 }
