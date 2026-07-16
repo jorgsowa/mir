@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.55.1] - 2026-07-16
+
+### Fixed
+
+- **Reference postings committed before a dependency existed stayed "fresh" forever:** a file's committed find-references postings were trusted for as long as its own source text was unchanged, so a file analyzed before a class/function it references was defined elsewhere (e.g. `$this->svc->run()` committed before `Svc` existed) kept serving its incomplete postings indefinitely — whether the definition later arrived via a newly-registered file, an edit to an already-registered file, or the postings were replayed from a previous session's disk cache (`warm_start_files`). Commits are now stamped with the workspace generation — which advances on file adds/removes and, newly, when an ingest defines symbols in an existing file — and are re-verified once it has moved on. The stamp is captured *before* the analysis snapshot, so a registration racing an in-flight analysis leaves the commit stale (self-healing on the next query) rather than wrongly fresh.
+
+### Changed
+
+- Freshness re-verification after workspace growth is scoped so warm find-references stays an O(results) lookup: commits whose analysis resolved every referenced name are immune to generation bumps (later definitions cannot change their postings), and re-verified files whose analysis memo came back pointer-identical re-stamp their freshness mark without rewriting posting lists. The resolved flag is derived from each commit's own issue set, so the open-file (`FileAnalyzer`) and disk-cache warm-start paths participate too — a returning session's replayed postings survive the background indexing and lazy vendor loads that follow warm-up. Background growth therefore no longer forces whole-scope posting rebuilds on the next query.
+
 ## [0.55.0] - 2026-07-15
 
 ### Added
