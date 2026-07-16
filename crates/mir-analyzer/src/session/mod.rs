@@ -125,6 +125,15 @@ type PreparedFilesCache = Arc<RwLock<HashMap<Arc<str>, (Arc<str>, u64)>>>;
 /// on `AnalysisSession::ref_committed` / `defs_committed`.
 type CommittedTexts = Arc<RwLock<HashMap<Arc<str>, Arc<str>>>>;
 
+/// A staged [`AnalysisCache`] write for one file's postings, prepared in the
+/// parallel analysis phase and applied during the serial index commit. See
+/// `AnalysisSession::stage_ref_cache_put`.
+pub(crate) struct RefCachePut {
+    content_hash: String,
+    surface_hash: String,
+    ref_locs: Arc<[crate::cache::CachedRefLoc]>,
+}
+
 /// One file's reference-posting commit. See `AnalysisSession::ref_committed`.
 pub(crate) struct RefCommit {
     /// Source text the postings were computed from (pointer identity; a
@@ -243,6 +252,68 @@ impl AnalysisSession {
 
     pub(crate) fn forget_ref_committed(&self, file: &str) {
         self.ref_committed.write().remove(file);
+    }
+
+    /// Stage a disk-cache write for `file`'s postings, computed in the
+    /// parallel analysis phase (needs a live db snapshot for the memoized
+    /// parse). `None` when no cache is attached or the stored entry already
+    /// matches this content — batch-written entries are never clobbered.
+    /// The caller applies the result via [`Self::apply_ref_cache_put`] in
+    /// its serial commit, alongside the in-memory index commit.
+    pub(crate) fn stage_ref_cache_put(
+        &self,
+        db: &dyn crate::db::MirDatabase,
+        sf: crate::db::SourceFile,
+        file: &str,
+        text: &Arc<str>,
+        out: &Arc<crate::db::AnalyzeOutput>,
+    ) -> Option<RefCachePut> {
+        let cache = self.cache.as_deref()?;
+        let content_hash = crate::cache::hash_content(text);
+        if cache.is_valid(file, &content_hash) {
+            return None;
+        }
+        let parsed = crate::db::parse_file(db, sf);
+        let surface_hash = crate::cache::surface_fingerprint(text, &parsed.0.program);
+        let ref_locs: Arc<[crate::cache::CachedRefLoc]> = out
+            .ref_locs
+            .iter()
+            .map(|r| (Arc::clone(&r.symbol_key), r.line, r.col_start, r.col_end))
+            .collect();
+        Some(RefCachePut {
+            content_hash,
+            surface_hash,
+            ref_locs,
+        })
+    }
+
+    pub(crate) fn apply_ref_cache_put(
+        &self,
+        file: &str,
+        out: &Arc<crate::db::AnalyzeOutput>,
+        put: RefCachePut,
+    ) {
+        if let Some(cache) = self.cache.as_deref() {
+            cache.put(
+                file,
+                put.content_hash,
+                put.surface_hash,
+                out.issues.clone(),
+                put.ref_locs,
+            );
+        }
+    }
+
+    /// Persist the attached [`AnalysisCache`] to disk. No-op without an
+    /// attached cache or when nothing changed since the last flush.
+    /// Reference postings committed by session sweeps and on-demand query
+    /// freshness passes reach disk only here — a host should call this after
+    /// its warm sweep completes and on shutdown so the next launch's
+    /// [`Self::warm_start_files`] finds them.
+    pub fn flush_analysis_cache(&self) {
+        if let Some(cache) = &self.cache {
+            cache.flush();
+        }
     }
 
     /// Whether `file`'s subtype-index class edges were committed from exactly

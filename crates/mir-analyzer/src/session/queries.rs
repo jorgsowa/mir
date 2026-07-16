@@ -360,7 +360,21 @@ impl AnalysisSession {
                             let defs =
                                 crate::db::collect_file_definitions(&*db as &dyn MirDatabase, sf);
                             let entries = crate::db::subtype_index::entries_from_slice(&defs.slice);
-                            Some((path.clone(), text, out, entries))
+                            // Stage the disk-cache write only when the commit
+                            // below will rewrite postings (see the sweep in
+                            // `reanalyze_file_set` for the cost rationale).
+                            let put = if self.ref_commit_is_current(path.as_ref(), &text, &out) {
+                                None
+                            } else {
+                                self.stage_ref_cache_put(
+                                    &*db as &dyn MirDatabase,
+                                    sf,
+                                    path.as_ref(),
+                                    &text,
+                                    &out,
+                                )
+                            };
+                            Some((path.clone(), text, out, entries, put))
                         })
                         .flatten()
                         .collect::<Vec<_>>()
@@ -371,12 +385,16 @@ impl AnalysisSession {
                     Err(_) => {}
                 }
             };
+            let mut analyzed = analyzed;
             let guard = self.db.salsa.read();
-            for (file, text, out, entries) in &analyzed {
+            for (file, text, out, entries, put) in analyzed.iter_mut() {
                 // Pointer-identical memo ⇒ identical postings: skip the
                 // index rewrite and only re-stamp the freshness mark.
                 if !self.ref_commit_is_current(file.as_ref(), text, out) {
                     guard.set_file_reference_locations(file.as_ref(), out.ref_locs.to_vec());
+                }
+                if let Some(put) = put.take() {
+                    self.apply_ref_cache_put(file.as_ref(), out, put);
                 }
                 self.mark_ref_committed(
                     file,

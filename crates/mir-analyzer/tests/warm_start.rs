@@ -195,6 +195,151 @@ fn warm_start_replay_reverifies_unresolved_files_after_growth() {
     );
 }
 
+/// End-to-end round trip for the LSP session paths: postings committed by a
+/// session's analysis sweep are persisted via `flush_analysis_cache`, and a
+/// fresh session against the same cache dir answers a references query from
+/// `warm_start_files` replay with no analysis sweep. The cancel probe flips
+/// to `true` after the first consultation (the stale-set computation), so the
+/// query can only complete if replay left nothing stale.
+#[test]
+fn session_sweep_persists_postings_for_next_launch() {
+    let dir = create_temp_dir("sweep_persists_postings");
+    let widget_path = "widget.php";
+    let widget_text = "<?php\nclass Widget { public function spin(): void {} }\n";
+    let caller_path = "caller.php";
+    let caller_text = "<?php\n$w = new Widget();\n$w->spin();\n";
+
+    {
+        let seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+        seed.ensure_all_stubs();
+        seed.ingest_file(Arc::from(widget_path), Arc::from(widget_text));
+        seed.ingest_file(Arc::from(caller_path), Arc::from(caller_text));
+        seed.reanalyze_files_cancellable(
+            &[Arc::from(widget_path), Arc::from(caller_path)],
+            &mir_analyzer::IndexCancel::new(),
+        );
+        seed.flush_analysis_cache();
+    }
+
+    // The write hook itself: the sweep must have stored caller.php's postings
+    // keyed by its content hash.
+    {
+        let php_v = PhpVersion::LATEST.cache_byte();
+        let disk_cache = AnalysisCache::open(dir.path(), php_v, 0);
+        let (_, ref_locs) = disk_cache
+            .get(caller_path, &hash_content(caller_text))
+            .expect("sweep must persist an AnalysisCache entry for caller.php");
+        assert!(
+            !ref_locs.is_empty(),
+            "persisted entry must carry the file's reference postings"
+        );
+    }
+
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    session.ensure_all_stubs();
+    session.warm_start_files(&[
+        (Arc::from(widget_path), Arc::from(widget_text)),
+        (Arc::from(caller_path), Arc::from(caller_text)),
+    ]);
+
+    let consultations = std::sync::atomic::AtomicU32::new(0);
+    let cancel_after_first =
+        || consultations.fetch_add(1, std::sync::atomic::Ordering::Relaxed) >= 1;
+    let refs = session
+        .indexed_references_to(
+            &Name::method("Widget", "spin"),
+            &[Arc::from(widget_path), Arc::from(caller_path)],
+            false,
+            &cancel_after_first,
+        )
+        .expect("replayed postings must answer the query with no analysis sweep");
+    assert_eq!(refs.len(), 1, "the $w->spin() call site: {refs:?}");
+    assert_eq!(refs[0].0.as_ref(), caller_path);
+}
+
+/// Same round trip through the other commit site: the on-demand freshness
+/// pass inside `indexed_references_to` (a query racing ahead of any sweep)
+/// must persist what it commits.
+#[test]
+fn on_demand_query_commit_persists_postings_for_next_launch() {
+    let dir = create_temp_dir("on_demand_persists_postings");
+    let widget_path = "widget.php";
+    let widget_text = "<?php\nclass Widget { public function spin(): void {} }\n";
+    let caller_path = "caller.php";
+    let caller_text = "<?php\n$w = new Widget();\n$w->spin();\n";
+
+    {
+        let seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+        seed.ensure_all_stubs();
+        seed.ingest_file(Arc::from(widget_path), Arc::from(widget_text));
+        seed.ingest_file(Arc::from(caller_path), Arc::from(caller_text));
+        // No sweep: the query's own freshness pass analyzes and commits.
+        let refs = seed
+            .indexed_references_to(
+                &Name::method("Widget", "spin"),
+                &[Arc::from(widget_path), Arc::from(caller_path)],
+                false,
+                &|| false,
+            )
+            .expect("not cancelled");
+        assert_eq!(refs.len(), 1, "sanity: live query finds the call site");
+        seed.flush_analysis_cache();
+    }
+
+    let php_v = PhpVersion::LATEST.cache_byte();
+    let disk_cache = AnalysisCache::open(dir.path(), php_v, 0);
+    let (_, ref_locs) = disk_cache
+        .get(caller_path, &hash_content(caller_text))
+        .expect("on-demand commit must persist an AnalysisCache entry");
+    assert!(!ref_locs.is_empty());
+}
+
+/// An entry already valid for the file's current content (e.g. written by the
+/// CLI batch pipeline, which records a surface hash) is left untouched by the
+/// session write hook — the fabricated postings prove no overwrite happened.
+#[test]
+fn session_sweep_does_not_clobber_valid_batch_entries() {
+    let dir = create_temp_dir("sweep_no_clobber");
+    let php_v = PhpVersion::LATEST.cache_byte();
+    let file_path = "widget.php";
+    let text = "<?php\nclass Widget {}\n";
+
+    {
+        let disk_cache = AnalysisCache::open(dir.path(), php_v, 0);
+        let fabricated: Arc<[mir_analyzer::cache::CachedRefLoc]> =
+            Arc::from(vec![(Arc::from("meth:App\\Other::bogus"), 5, 0, 5)]);
+        disk_cache.put(
+            file_path,
+            hash_content(text),
+            "batch-surface".to_string(),
+            Arc::from(Vec::new()),
+            fabricated,
+        );
+        disk_cache.flush();
+    }
+
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    session.ensure_all_stubs();
+    session.ingest_file(Arc::from(file_path), Arc::from(text));
+    session.reanalyze_files_cancellable(&[Arc::from(file_path)], &mir_analyzer::IndexCancel::new());
+    session.flush_analysis_cache();
+
+    let disk_cache = AnalysisCache::open(dir.path(), php_v, 0);
+    let (_, ref_locs) = disk_cache
+        .get(file_path, &hash_content(text))
+        .expect("entry must still exist");
+    assert_eq!(
+        ref_locs.len(),
+        1,
+        "a content-valid entry must not be overwritten by the session sweep"
+    );
+    assert_eq!(
+        disk_cache.surface_hash(file_path).as_deref(),
+        Some("batch-surface"),
+        "batch-written surface hash must survive"
+    );
+}
+
 #[test]
 fn warm_start_files_is_a_no_op_without_a_cache() {
     // No `with_cache`/`with_cache_dir` attached — must not panic, and must

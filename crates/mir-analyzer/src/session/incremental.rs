@@ -153,8 +153,9 @@ impl AnalysisSession {
             Arc<str>,
             std::sync::Arc<crate::db::AnalyzeOutput>,
             Vec<crate::db::SubtypeEntry>,
+            Option<super::RefCachePut>,
         );
-        let results: Vec<Analyzed> = dependents
+        let mut results: Vec<Analyzed> = dependents
             .into_par_iter()
             .map_with(db_main, |db, file| {
                 if cancel.is_cancelled() {
@@ -170,7 +171,21 @@ impl AnalysisSession {
                 let defs =
                     crate::db::collect_file_definitions(&*db as &dyn crate::db::MirDatabase, sf);
                 let entries = crate::db::subtype_index::entries_from_slice(&defs.slice);
-                Some((file, text, out, entries))
+                // Stage the disk-cache write only when the postings commit
+                // below will actually rewrite — a no-op re-sweep (current
+                // commit) adds no hashing or parse-walk cost per file.
+                let put = if self.ref_commit_is_current(file.as_ref(), &text, &out) {
+                    None
+                } else {
+                    self.stage_ref_cache_put(
+                        &*db as &dyn crate::db::MirDatabase,
+                        sf,
+                        file.as_ref(),
+                        &text,
+                        &out,
+                    )
+                };
+                Some((file, text, out, entries, put))
             })
             .flatten()
             .collect();
@@ -183,12 +198,15 @@ impl AnalysisSession {
         // entirely, so a no-op re-sweep is a pointer compare per file.
         {
             let guard = self.db.salsa.read();
-            for (file, text, out, entries) in &results {
+            for (file, text, out, entries, put) in results.iter_mut() {
                 // Pointer-identical memo ⇒ identical postings: skip the
                 // index rewrite. The mark is re-stamped unconditionally so a
                 // no-op sweep still advances the commit's generation.
                 if !self.ref_commit_is_current(file.as_ref(), text, out) {
                     guard.set_file_reference_locations(file.as_ref(), out.ref_locs.to_vec());
+                }
+                if let Some(put) = put.take() {
+                    self.apply_ref_cache_put(file.as_ref(), out, put);
                 }
                 self.mark_ref_committed(
                     file,
@@ -206,7 +224,7 @@ impl AnalysisSession {
 
         results
             .into_iter()
-            .map(|(file, _, out, _)| {
+            .map(|(file, _, out, _, _)| {
                 (
                     file,
                     crate::FileAnalysis {
