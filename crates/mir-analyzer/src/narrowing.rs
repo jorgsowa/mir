@@ -2971,7 +2971,12 @@ fn narrow_from_type_fn(ctx: &mut FlowState, fn_name: &str, var_name: &str, is_tr
             if is_true {
                 current.narrow_to_float()
             } else {
-                current.filter(|t| !matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..)))
+                current.filter(|t| {
+                    !matches!(
+                        t,
+                        Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..)
+                    )
+                })
             }
         }
         "is_bool" => {
