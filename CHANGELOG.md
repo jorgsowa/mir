@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.56.0] - 2026-07-16
+
+### Added
+
+- **Reference postings persist from LSP sessions:** the session's posting-commit sites — the parallel re-analysis sweep (`reanalyze_dependents`/`reanalyze_files_cancellable`) and `indexed_references_to`'s on-demand freshness pass — now write each committed file's reference locations into the attached `AnalysisCache`, keyed by content hash with a surface fingerprint, exactly like the CLI batch pipeline. A returning session's `warm_start_files` therefore replays *both* inverted indexes from disk, so the first find-references query after a relaunch is answered index-warm with no analysis sweep. Entries already valid for a file's current content (e.g. batch-written) are never clobbered, and a no-op re-sweep stages no cache work. New `AnalysisSession::flush_analysis_cache()` persists the staged entries — hosts should call it after their warm sweep completes and on shutdown.
+
 ## [0.55.1] - 2026-07-16
 
 ### Fixed
