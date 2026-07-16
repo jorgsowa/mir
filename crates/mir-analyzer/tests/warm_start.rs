@@ -94,6 +94,107 @@ fn warm_start_files_replays_subtype_edges_from_disk_definition_cache() {
     );
 }
 
+/// A warm-started file whose cached issue set shows full resolution keeps
+/// its replayed postings across workspace growth: registrations and lazy
+/// loads that follow warm-up must not force a re-analysis of the replayed
+/// set. The fabricated posting can only survive if no live re-analysis
+/// (replace semantics) ever ran.
+#[test]
+fn warm_start_replay_survives_workspace_growth_when_resolved() {
+    let dir = create_temp_dir("warm_start_immune");
+    let php_v = PhpVersion::LATEST.cache_byte();
+    let text = "<?php\nclass Widget {}\n";
+    let file_path = "widget.php";
+
+    {
+        let disk_cache = AnalysisCache::open(dir.path(), php_v, 0);
+        let fabricated: Arc<[mir_analyzer::cache::CachedRefLoc]> =
+            Arc::from(vec![(Arc::from("meth:App\\Other::bogus"), 5, 0, 5)]);
+        // Empty issue set: the previous run resolved everything.
+        disk_cache.put(
+            file_path,
+            hash_content(text),
+            String::new(),
+            Arc::from(Vec::new()),
+            fabricated,
+        );
+        disk_cache.flush();
+    }
+
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    session.ensure_all_stubs();
+    session.warm_start_files(&[(Arc::from(file_path), Arc::from(text))]);
+
+    // Workspace grows after warm-up — the pattern background indexing and
+    // lazy vendor loads produce in an LSP session.
+    session.ingest_file(Arc::from("later.php"), Arc::from("<?php\nclass Later {}\n"));
+
+    let refs = session
+        .indexed_references_to(
+            &Name::method("App\\Other", "bogus"),
+            &[Arc::from(file_path)],
+            false,
+            &|| false,
+        )
+        .expect("not cancelled");
+    assert_eq!(
+        refs.len(),
+        1,
+        "a fully-resolved replay must survive the growth bump: {refs:?}"
+    );
+}
+
+/// The counterpart: a replay whose cached issues include an unresolved name
+/// is re-verified once the workspace grows — live analysis of the empty
+/// class overwrites the fabricated posting.
+#[test]
+fn warm_start_replay_reverifies_unresolved_files_after_growth() {
+    let dir = create_temp_dir("warm_start_reverify");
+    let php_v = PhpVersion::LATEST.cache_byte();
+    let text = "<?php\nclass Widget {}\n";
+    let file_path = "widget.php";
+
+    {
+        let disk_cache = AnalysisCache::open(dir.path(), php_v, 0);
+        let fabricated: Arc<[mir_analyzer::cache::CachedRefLoc]> =
+            Arc::from(vec![(Arc::from("meth:App\\Other::bogus"), 5, 0, 5)]);
+        let unresolved = mir_issues::Issue::new(
+            mir_issues::IssueKind::UndefinedClass {
+                name: "App\\Other".into(),
+            },
+            mir_issues::Location::new(Arc::from(file_path), 5, 5, 0, 5),
+        );
+        disk_cache.put(
+            file_path,
+            hash_content(text),
+            String::new(),
+            Arc::from(vec![unresolved]),
+            fabricated,
+        );
+        disk_cache.flush();
+    }
+
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    session.ensure_all_stubs();
+    session.warm_start_files(&[(Arc::from(file_path), Arc::from(text))]);
+
+    session.ingest_file(Arc::from("later.php"), Arc::from("<?php\nclass Later {}\n"));
+
+    let refs = session
+        .indexed_references_to(
+            &Name::method("App\\Other", "bogus"),
+            &[Arc::from(file_path)],
+            false,
+            &|| false,
+        )
+        .expect("not cancelled");
+    assert!(
+        refs.is_empty(),
+        "an unresolved replay must be re-verified after growth, not served \
+         from the stale disk-cache posting: {refs:?}"
+    );
+}
+
 #[test]
 fn warm_start_files_is_a_no_op_without_a_cache() {
     // No `with_cache`/`with_cache_dir` attached — must not panic, and must

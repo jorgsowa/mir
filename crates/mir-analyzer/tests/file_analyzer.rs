@@ -1183,3 +1183,107 @@ function caller2(): string { return helper(); }
          (v1: {refs_v1:?}, v2: {refs_v2:?})"
     );
 }
+
+/// A file committed via `FileAnalyzer::analyze` before a class it
+/// references gets registered elsewhere must be re-verified once that class
+/// exists, even though its own text never changes.
+#[test]
+fn indexed_references_to_recovers_from_commit_before_dependency_registered() {
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let caller_path: Arc<str> = Arc::from("/proj/caller.php");
+    let caller_src = "<?php
+namespace App;
+class Caller {
+    private Svc $svc;
+    public function go(): void { $this->svc->run(); }
+}
+";
+    session.ingest_file(caller_path.clone(), Arc::from(caller_src));
+
+    // Commit caller.php's postings before Svc exists.
+    let parsed = php_rs_parser::parse(caller_src);
+    FileAnalyzer::new(&session).analyze(
+        caller_path.clone(),
+        caller_src,
+        &parsed.program,
+        &parsed.source_map,
+    );
+
+    let name = mir_analyzer::Name::method("App\\Svc", "run");
+    let before = session
+        .indexed_references_to(&name, std::slice::from_ref(&caller_path), false, &|| false)
+        .expect("not cancelled");
+    assert!(
+        before.is_empty(),
+        "Svc is not registered yet, so the typed key must not resolve: {before:?}"
+    );
+
+    // A new file bumps the workspace generation; caller.php's text is untouched.
+    let svc_path: Arc<str> = Arc::from("/proj/svc.php");
+    let svc_src = "<?php
+namespace App;
+class Svc { public function run(): void {} }
+";
+    session.ingest_file(svc_path.clone(), Arc::from(svc_src));
+
+    // No re-analysis of caller.php in between — staleness must catch this alone.
+    let files: Vec<Arc<str>> = vec![caller_path.clone(), svc_path.clone()];
+    let after = session
+        .indexed_references_to(&name, &files, false, &|| false)
+        .expect("not cancelled");
+    assert_eq!(
+        after.len(),
+        1,
+        "caller.php's stale pre-registration commit must be re-verified now \
+         that Svc exists, not served from the incomplete cached posting: {after:?}"
+    );
+}
+
+/// Same staleness class through the edit path: the missing class appears in
+/// an *already-registered* file, so no new-file registration is involved —
+/// the ingest of a newly-defined symbol must advance the generation itself.
+#[test]
+fn indexed_references_to_recovers_when_dependency_appears_in_existing_file() {
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let caller_path: Arc<str> = Arc::from("/proj/caller.php");
+    let caller_src = "<?php
+namespace App;
+class Caller {
+    private Svc $svc;
+    public function go(): void { $this->svc->run(); }
+}
+";
+    session.ingest_file(caller_path.clone(), Arc::from(caller_src));
+
+    // svc.php is registered from the start — but without Svc.
+    let svc_path: Arc<str> = Arc::from("/proj/svc.php");
+    session.ingest_file(svc_path.clone(), Arc::from("<?php\nnamespace App;\n"));
+
+    // Commit both files' postings while Svc is still undefined.
+    let name = mir_analyzer::Name::method("App\\Svc", "run");
+    let files: Vec<Arc<str>> = vec![caller_path.clone(), svc_path.clone()];
+    let before = session
+        .indexed_references_to(&name, &files, false, &|| false)
+        .expect("not cancelled");
+    assert!(
+        before.is_empty(),
+        "Svc is not defined yet, so the typed key must not resolve: {before:?}"
+    );
+
+    // Svc appears via an edit to the existing file — no file add, so this
+    // relies on the newly-defined-symbol generation bump in ingest_file.
+    session.ingest_file(
+        svc_path.clone(),
+        Arc::from("<?php\nnamespace App;\nclass Svc { public function run(): void {} }\n"),
+    );
+
+    let after = session
+        .indexed_references_to(&name, &files, false, &|| false)
+        .expect("not cancelled");
+    assert_eq!(
+        after.len(),
+        1,
+        "caller.php's commit predates Svc's definition and must be \
+         re-verified after the defining edit: {after:?}"
+    );
+}

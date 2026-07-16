@@ -308,13 +308,14 @@ impl AnalysisSession {
                 return None;
             }
             let attempt = salsa::Cancelled::catch(AssertUnwindSafe(|| {
+                let current_gen = self.index_generation();
                 let db = self.snapshot_db();
                 files
                     .iter()
                     .filter(|f| {
                         db.lookup_source_file(f.as_ref()).is_some_and(|sf| {
                             let text = sf.text(&db as &dyn MirDatabase);
-                            !self.is_ref_committed(f.as_ref(), &text)
+                            !self.is_ref_committed(f.as_ref(), &text, current_gen)
                         })
                     })
                     .cloned()
@@ -340,10 +341,14 @@ impl AnalysisSession {
 
             // Phase 2 (parallel, pure) under a cancellation retry loop, then
             // a serial commit into both inverted indexes.
-            let analyzed = loop {
+            let (commit_gen, analyzed) = loop {
                 if should_cancel() {
                     return None;
                 }
+                // Generation before the snapshot: a file add racing the
+                // analysis leaves these commits stale (self-healing on the
+                // next query), never wrongly fresh.
+                let gen = self.index_generation();
                 let attempt = salsa::Cancelled::catch(AssertUnwindSafe(|| {
                     let db_main = self.snapshot_db();
                     stale
@@ -361,15 +366,25 @@ impl AnalysisSession {
                         .collect::<Vec<_>>()
                 }));
                 match attempt {
-                    Ok(v) => break v,
+                    Ok(v) => break (gen, v),
                     Err(_) if should_cancel() => return None,
                     Err(_) => {}
                 }
             };
             let guard = self.db.salsa.read();
             for (file, text, out, entries) in &analyzed {
-                guard.set_file_reference_locations(file.as_ref(), out.ref_locs.to_vec());
-                self.mark_ref_committed(file, text, Some(out));
+                // Pointer-identical memo ⇒ identical postings: skip the
+                // index rewrite and only re-stamp the freshness mark.
+                if !self.ref_commit_is_current(file.as_ref(), text, out) {
+                    guard.set_file_reference_locations(file.as_ref(), out.ref_locs.to_vec());
+                }
+                self.mark_ref_committed(
+                    file,
+                    text,
+                    Some(out),
+                    commit_gen,
+                    !out.has_unresolved_names(),
+                );
                 if !self.is_defs_committed(file.as_ref(), text) {
                     guard.set_file_class_edges(file, entries.clone());
                     self.mark_defs_committed(file, text);

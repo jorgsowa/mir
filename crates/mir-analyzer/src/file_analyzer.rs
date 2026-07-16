@@ -119,6 +119,10 @@ impl<'a> FileAnalyzer<'a> {
 
         let _scope = crate::metrics::BodyAnalysisScope::new();
 
+        // Generation before the analysis snapshot — after the warm-up, so
+        // its lazy loads don't immediately stale the commit; a file add
+        // racing the analysis still leaves the mark stale, never fresh.
+        let commit_gen = self.session.index_generation();
         // Single pass against a frozen snapshot. With the eager-static-input
         // model the workspace index is complete (or priority-indexed for this
         // file's direct refs), so there are no body-analysis "misses" to fault
@@ -130,8 +134,14 @@ impl<'a> FileAnalyzer<'a> {
         // reference set, and marking freshness against the pre-analysis text
         // keeps the mark dead-on-arrival if a concurrent edit swapped the
         // input mid-flight (Arc identity no longer matches).
-        self.session
-            .commit_file_refs(&file, ingested_text, db.take_pending_ref_locs());
+        let resolved = !crate::db::issues_have_unresolved_names(&issues);
+        self.session.commit_file_refs(
+            &file,
+            ingested_text,
+            db.take_pending_ref_locs(),
+            commit_gen,
+            resolved,
+        );
         FileAnalysis { issues, symbols }
     }
 }

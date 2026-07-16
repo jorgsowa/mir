@@ -144,6 +144,9 @@ impl AnalysisSession {
         // flows analyze the open file directly via [`crate::FileAnalyzer`].
         //
         // Each worker short-circuits when cancellation has been requested.
+        // Generation before the snapshot: a file add racing the sweep leaves
+        // the commits stale (self-healing), never wrongly fresh.
+        let commit_gen = self.index_generation();
         let db_main = self.snapshot_db();
         type Analyzed = (
             Arc<str>,
@@ -181,10 +184,19 @@ impl AnalysisSession {
         {
             let guard = self.db.salsa.read();
             for (file, text, out, entries) in &results {
+                // Pointer-identical memo ⇒ identical postings: skip the
+                // index rewrite. The mark is re-stamped unconditionally so a
+                // no-op sweep still advances the commit's generation.
                 if !self.ref_commit_is_current(file.as_ref(), text, out) {
                     guard.set_file_reference_locations(file.as_ref(), out.ref_locs.to_vec());
-                    self.mark_ref_committed(file, text, Some(out));
                 }
+                self.mark_ref_committed(
+                    file,
+                    text,
+                    Some(out),
+                    commit_gen,
+                    !out.has_unresolved_names(),
+                );
                 if !self.is_defs_committed(file.as_ref(), text) {
                     guard.set_file_class_edges(file, entries.clone());
                     self.mark_defs_committed(file, text);

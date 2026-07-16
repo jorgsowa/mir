@@ -88,14 +88,17 @@ impl AnalysisSession {
     }
 
     /// Replace `file`'s reference postings with `locs` (its complete set from
-    /// a fresh single-file analysis) and mark freshness against `text` — the
-    /// input text captured before the analysis, so a concurrent edit leaves
-    /// the mark stale (Arc identity mismatch), which is the safe direction.
+    /// a fresh single-file analysis) and mark freshness against `text` and
+    /// `generation` — both captured before the analysis, so a concurrent
+    /// edit or file add leaves the mark stale, which is the safe direction.
+    /// `resolved` follows [`Self::mark_ref_committed`]'s contract.
     pub(crate) fn commit_file_refs(
         &self,
         file: &Arc<str>,
         text: Option<Arc<str>>,
         locs: Vec<RefLoc>,
+        generation: u64,
+        resolved: bool,
     ) {
         {
             let guard = self.db.salsa.read();
@@ -105,7 +108,7 @@ impl AnalysisSession {
             // No memoized output on the imperative path — the empty weak
             // handle makes the next re-analysis sweep recommit once (and
             // record the real memo), which is the safe direction.
-            self.mark_ref_committed(file, &text, None);
+            self.mark_ref_committed(file, &text, None, generation, resolved);
         }
     }
 
@@ -185,6 +188,14 @@ impl AnalysisSession {
             if entry.is_empty() {
                 stale.remove(file.as_ref());
             }
+        }
+        if !re_added.is_empty() {
+            // A newly-defined symbol may resolve references other files'
+            // commits left unresolved; advance the workspace generation so
+            // their freshness passes re-verify. New-file registration bumps
+            // on its own — this covers definitions appearing in an
+            // already-registered file (edits, `set_file_text` lazy loads).
+            self.db.salsa.write().bump_workspace_revision();
         }
 
         self.update_reverse_deps_for(&file);
@@ -548,6 +559,11 @@ impl AnalysisSession {
             }
         }
 
+        // Generation after registration: replayed postings reflect a *prior*
+        // session's workspace, so any later file/symbol add must re-verify
+        // them (the None-output mark below also disables resolved immunity).
+        let commit_gen = self.index_generation();
+
         for (file, _) in files {
             // Freshness is keyed on the Arc actually stored on the input — an
             // upsert against already-registered, content-equal text keeps the
@@ -563,7 +579,7 @@ impl AnalysisSession {
             };
 
             let hex = crate::cache::hash_content(&stored_text);
-            if let Some((_, ref_locs)) = cache.get(file, &hex) {
+            if let Some((issues, ref_locs)) = cache.get(file, &hex) {
                 let locs: Vec<RefLoc> = ref_locs
                     .iter()
                     .map(|(symbol, line, col_start, col_end)| RefLoc {
@@ -574,7 +590,11 @@ impl AnalysisSession {
                         col_end: *col_end,
                     })
                     .collect();
-                self.commit_file_refs(file, Some(stored_text.clone()), locs);
+                // Resolved from the cached issue set: a fully-resolved replay
+                // survives the registrations/lazy loads that follow warm-up
+                // instead of being invalidated by the first generation bump.
+                let resolved = !crate::db::issues_have_unresolved_names(&issues);
+                self.commit_file_refs(file, Some(stored_text.clone()), locs, commit_gen, resolved);
             }
 
             if let Some(stub_cache) = &stub_cache {

@@ -1192,7 +1192,7 @@ impl MirDbStorage {
     /// refreshing the singleton** (bulk-register paths call merge/finalize;
     /// edits call update; removes call remove). Steady-state body-only edits
     /// add no files, never bump, and never touch the singleton.
-    fn bump_workspace_revision(&mut self) {
+    pub(crate) fn bump_workspace_revision(&mut self) {
         use salsa::Setter as _;
         let existing = *self.workspace_revision_input.read();
         match existing {

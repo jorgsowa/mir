@@ -147,3 +147,45 @@ fn indexed_references_warm_repeat_is_pure_lookup() {
         &parsed.source_map,
     );
 }
+
+/// A fully-resolved commit survives workspace growth: registering an
+/// unrelated file bumps the generation, but files whose analysis resolved
+/// every name keep their postings — the warm repeat stays a bounded
+/// posting lookup instead of re-verifying the whole candidate set.
+#[test]
+fn warm_repeat_stays_pure_lookup_after_unrelated_file_add() {
+    let file_a: Arc<str> = Arc::from("immune_a.php");
+    let file_b: Arc<str> = Arc::from("immune_b.php");
+    let src_a = "<?php\nclass ImmuneBase { public function m(): int { return 1; } }\n";
+    let src_b = "<?php\nfunction ib(): int { $x = new ImmuneBase(); return $x->m(); }\n";
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_all_stubs();
+    session.ingest_file(file_a.clone(), Arc::from(src_a));
+    session.ingest_file(file_b.clone(), Arc::from(src_b));
+
+    let files = [file_a.clone(), file_b.clone()];
+    let sym = mir_analyzer::Name::method("ImmuneBase", "m");
+    let refs = session
+        .indexed_references_to(&sym, &files, false, &|| false)
+        .expect("query not cancelled");
+    assert_eq!(refs.len(), 1);
+
+    // Workspace grows: a brand-new unrelated file advances the generation.
+    session.ingest_file(
+        Arc::from("immune_unrelated.php"),
+        Arc::from("<?php\nclass ImmuneUnrelated {}\n"),
+    );
+
+    let locks_before = session.ref_index_lock_count();
+    let warm = session
+        .indexed_references_to(&sym, &files, false, &|| false)
+        .expect("query not cancelled");
+    assert_eq!(warm.len(), 1);
+    let locks_taken = session.ref_index_lock_count() - locks_before;
+    assert!(
+        locks_taken <= 8,
+        "fully-resolved commits must survive the generation bump; \
+         took {locks_taken} RefIndex locks"
+    );
+}

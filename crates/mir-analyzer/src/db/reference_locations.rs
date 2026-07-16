@@ -68,6 +68,38 @@ pub struct AnalyzeOutput {
     pub ref_locs: Arc<[RefLoc]>,
 }
 
+impl AnalyzeOutput {
+    /// See [`issues_have_unresolved_names`].
+    pub(crate) fn has_unresolved_names(&self) -> bool {
+        issues_have_unresolved_names(&self.issues)
+    }
+}
+
+/// Whether a body-analysis issue set references a workspace-level name it
+/// could not resolve. While false, no later file/symbol add can change the
+/// file's reference postings (see `AnalysisSession::ref_committed`). An
+/// unresolved hierarchy edge (extends/implements/trait use/docblock type)
+/// always surfaces as one of these kinds even when member-level diagnostics
+/// are suppressed for the incomplete hierarchy. Variable kinds are excluded —
+/// locals can't be defined by another file.
+pub(crate) fn issues_have_unresolved_names(issues: &[Issue]) -> bool {
+    use mir_issues::IssueKind as K;
+    issues.iter().any(|i| {
+        matches!(
+            i.kind,
+            K::UndefinedFunction { .. }
+                | K::UndefinedMethod { .. }
+                | K::UndefinedClass { .. }
+                | K::UndefinedProperty { .. }
+                | K::UndefinedConstant { .. }
+                | K::UndefinedTrait { .. }
+                | K::UndefinedTraitAliasMethod { .. }
+                | K::UndefinedDocblockClass { .. }
+                | K::UndefinedAttributeClass { .. }
+        )
+    })
+}
+
 unsafe impl salsa::Update for AnalyzeOutput {
     unsafe fn maybe_update(old_ptr: *mut Self, new_val: Self) -> bool {
         let old = unsafe { &mut *old_ptr };

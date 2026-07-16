@@ -98,16 +98,13 @@ pub struct AnalysisSession {
     /// warm-up re-run to lazy-load a replacement (e.g. a vendor class shadowed
     /// by a since-deleted project class).
     prepare_generation: Arc<std::sync::atomic::AtomicU64>,
-    /// file → (source text, analyze output) its reference locations were
-    /// last committed from. The [`crate::db::RefIndex`] posting lists are
-    /// exact for a file while its current input text is pointer-equal to the
-    /// stored text; a text write self-invalidates (the Arc changes), making
-    /// the file "dirty" for [`Self::indexed_references_to`]'s freshness pass.
-    /// The weak output handle lets re-analysis sweeps skip the index rebuild
-    /// when salsa returned the identical memo (no-op sweeps stay pointer
-    /// compares) while still recommitting on cross-file drift, where the
-    /// text is unchanged but the output is a new value. Files absent here
-    /// have never been committed.
+    /// file → [`RefCommit`] its reference locations were last committed
+    /// from. Exact while the text is pointer-equal and the commit either
+    /// fully resolved every name it referenced or was stamped at the current
+    /// [`Self::index_generation`] — a later symbol add elsewhere can resolve
+    /// a reference this file's analysis left unresolved, even though this
+    /// file's own text never changed. Files absent here have never been
+    /// committed.
     ref_committed: CommittedRefs,
     /// file → source text its subtype-index class edges were last committed
     /// from. Same freshness contract as `ref_committed`, but definitions
@@ -128,10 +125,27 @@ type PreparedFilesCache = Arc<RwLock<HashMap<Arc<str>, (Arc<str>, u64)>>>;
 /// on `AnalysisSession::ref_committed` / `defs_committed`.
 type CommittedTexts = Arc<RwLock<HashMap<Arc<str>, Arc<str>>>>;
 
-/// file → (text, weak analyze output) for reference-posting commits. See the
-/// field docs on `AnalysisSession::ref_committed`.
-type CommittedRefs =
-    Arc<RwLock<HashMap<Arc<str>, (Arc<str>, std::sync::Weak<crate::db::AnalyzeOutput>)>>>;
+/// One file's reference-posting commit. See `AnalysisSession::ref_committed`.
+pub(crate) struct RefCommit {
+    /// Source text the postings were computed from (pointer identity; a
+    /// text write self-invalidates).
+    text: Arc<str>,
+    /// Weak handle on the analyze memo — pointer-identical output means
+    /// identical postings, so sweeps can skip the index rewrite. The upgrade
+    /// guards against ABA on evicted memos.
+    out: std::sync::Weak<crate::db::AnalyzeOutput>,
+    /// Workspace generation whose resolution environment the postings
+    /// reflect, captured *before* the analysis snapshot.
+    generation: u64,
+    /// The analysis resolved every workspace-level name it referenced, so no
+    /// later symbol add can change the postings and the commit survives
+    /// generation bumps. FQCN shadowing and unqualified-call fallback
+    /// switches remain the reanalyze_dependents flow's job, as before.
+    resolved: bool,
+}
+
+/// file → [`RefCommit`] map shared across session clones.
+type CommittedRefs = Arc<RwLock<HashMap<Arc<str>, RefCommit>>>;
 
 /// Cap on the negative-resolution cache. Sized to accommodate a large
 /// workspace's worth of genuinely-missing references without unbounded
@@ -171,39 +185,60 @@ impl AnalysisSession {
         self.db.salsa.read().ref_index_lock_count()
     }
 
-    /// Whether `file`'s reference postings were committed from exactly
-    /// `current_text` (pointer identity — a text write self-invalidates).
-    pub(crate) fn is_ref_committed(&self, file: &str, current_text: &Arc<str>) -> bool {
-        self.ref_committed
-            .read()
-            .get(file)
-            .is_some_and(|(t, _)| Arc::ptr_eq(t, current_text))
+    /// Whether `file`'s reference postings are exact for `current_text` at
+    /// `current_gen`: text pointer-equal, and the commit either resolved
+    /// every name (immune to workspace growth) or was stamped at that
+    /// generation — catches a file analyzed before a class it references
+    /// was registered elsewhere, which would otherwise look fresh forever.
+    pub(crate) fn is_ref_committed(
+        &self,
+        file: &str,
+        current_text: &Arc<str>,
+        current_gen: u64,
+    ) -> bool {
+        self.ref_committed.read().get(file).is_some_and(|c| {
+            Arc::ptr_eq(&c.text, current_text) && (c.resolved || c.generation == current_gen)
+        })
     }
 
-    /// Whether `file`'s postings were committed from exactly this
-    /// (text, analyze output) pair — the no-op detector for re-analysis
-    /// sweeps. The weak upgrade guards against ABA on evicted memos.
+    /// Whether `file`'s stored postings came from exactly this
+    /// (text, output) pair — generation aside. Pointer-identical output
+    /// means identical postings (salsa backdates equal results to the same
+    /// Arc), so callers skip the index rewrite and only re-stamp the mark.
     pub(crate) fn ref_commit_is_current(
         &self,
         file: &str,
         current_text: &Arc<str>,
         out: &Arc<crate::db::AnalyzeOutput>,
     ) -> bool {
-        self.ref_committed.read().get(file).is_some_and(|(t, w)| {
-            Arc::ptr_eq(t, current_text) && w.upgrade().is_some_and(|prev| Arc::ptr_eq(&prev, out))
+        self.ref_committed.read().get(file).is_some_and(|c| {
+            Arc::ptr_eq(&c.text, current_text)
+                && c.out.upgrade().is_some_and(|prev| Arc::ptr_eq(&prev, out))
         })
     }
 
+    /// Record a commit computed against the workspace state at `generation`
+    /// — captured by the caller *before* its analysis snapshot, so a file
+    /// add racing the analysis leaves the commit stale (re-verified on the
+    /// next query) rather than wrongly fresh. `resolved` must come from the
+    /// producing analysis' own issue set
+    /// ([`crate::db::issues_have_unresolved_names`]); pass `false` when
+    /// unknown — the gen-guarded safe direction.
     pub(crate) fn mark_ref_committed(
         &self,
         file: &Arc<str>,
         text: &Arc<str>,
         out: Option<&Arc<crate::db::AnalyzeOutput>>,
+        generation: u64,
+        resolved: bool,
     ) {
-        let weak = out.map(Arc::downgrade).unwrap_or_default();
-        self.ref_committed
-            .write()
-            .insert(file.clone(), (text.clone(), weak));
+        let commit = RefCommit {
+            text: text.clone(),
+            out: out.map(Arc::downgrade).unwrap_or_default(),
+            generation,
+            resolved,
+        };
+        self.ref_committed.write().insert(file.clone(), commit);
     }
 
     pub(crate) fn forget_ref_committed(&self, file: &str) {
