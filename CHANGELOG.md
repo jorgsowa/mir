@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.57.0] - 2026-07-16
+
+### Added
+
+- **Narrowing:** `$arr === []` narrows to the empty collection (the `!== []` direction was already handled), and `$obj::class` comparisons narrow like `get_class()`.
+
+### Fixed
+
+- **`use:` postings for unresolvable imports:** `use` items whose target class/function/constant doesn't resolve (vendor-only, not yet loaded, or genuinely missing) previously recorded no `use:` posting, so an index-based rename couldn't find the import line. The miss path now records the posting keyed by the written FQN.
+- **Narrowing:** `!is_float()`/`!is_double()` no longer leaves `TIntegralFloat` in the negative branch.
+
 ## [0.56.0] - 2026-07-16
 
 ### Added
