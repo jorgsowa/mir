@@ -495,3 +495,45 @@ fn subtype_index_follows_reparenting_edit() {
     let subs = session.indexed_subtype_classes("Other", &all, false);
     assert_eq!(subs.len(), 1, "new edge must be present: {subs:?}");
 }
+
+/// An import whose target never resolves (not yet loaded, vendor-only, or
+/// genuinely missing) still gets a `use:` posting keyed by the written FQN —
+/// an index-based rename must find/update the import line even when the
+/// class it names isn't in the workspace.
+#[test]
+fn use_import_postings_recorded_for_unresolvable_targets() {
+    let files = [(
+        "main.php",
+        "<?php\nuse App\\Ghost;\nuse function App\\phantom;\nuse const App\\SPOOKY;\n$g = new Ghost();\n",
+    )];
+    let session = session_with(&files);
+    let all = paths(&files);
+
+    // Freshness pass commits main.php's postings (the class never resolves).
+    let _ = session
+        .indexed_references_to(&Name::class("App\\Ghost"), &all, false, &|| false)
+        .expect("not cancelled");
+
+    let cls_use = session.indexed_use_import_locations(&Name::class("App\\Ghost"), &all);
+    assert_eq!(
+        cls_use.len(),
+        1,
+        "unresolvable class import must still be indexed: {cls_use:?}"
+    );
+    assert_eq!(cls_use[0].0.as_ref(), "main.php");
+
+    let fn_use = session.indexed_use_import_locations(&Name::function("App\\phantom"), &all);
+    assert_eq!(
+        fn_use.len(),
+        1,
+        "unresolvable function import must still be indexed: {fn_use:?}"
+    );
+
+    let const_use =
+        session.indexed_use_import_locations(&Name::global_constant("App\\SPOOKY"), &all);
+    assert_eq!(
+        const_use.len(),
+        1,
+        "unresolvable const import must still be indexed: {const_use:?}"
+    );
+}

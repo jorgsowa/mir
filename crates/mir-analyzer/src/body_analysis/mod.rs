@@ -1140,6 +1140,13 @@ pub(crate) fn check_use_decl_casing(
                             resolved_type: Type::single(mir_types::Atomic::TClassString(None)),
                         });
                     }
+                } else {
+                    // Unresolvable target (not yet loaded, vendor-only, or
+                    // genuinely missing): key the posting by the written FQN
+                    // so an index-based rename still finds/updates the import
+                    // line — the same written name a rename query resolves
+                    // through this file's imports.
+                    record_use_posting(db, crate::Name::class(full_name.as_str()));
                 }
             }
             UseKind::Function => {
@@ -1174,6 +1181,9 @@ pub(crate) fn check_use_decl_casing(
                                 .unwrap_or_else(Type::mixed),
                         });
                     }
+                } else {
+                    // See the UseKind::Normal miss arm.
+                    record_use_posting(db, crate::Name::function(full_name.as_str()));
                 }
             }
             UseKind::Const => {
@@ -1194,6 +1204,9 @@ pub(crate) fn check_use_decl_casing(
                             resolved_type: (*ty).clone(),
                         });
                     }
+                } else {
+                    // See the UseKind::Normal miss arm.
+                    record_use_posting(db, crate::Name::global_constant(full_name.as_str()));
                 }
             }
         }
