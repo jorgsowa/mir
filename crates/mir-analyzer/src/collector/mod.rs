@@ -526,10 +526,6 @@ impl<'a> DefinitionCollector<'a> {
         resolution::fill_self_static_parent(union, class_fqcn)
     }
 
-    fn resolve_union(&self, union: Type) -> Type {
-        resolution::resolve_union(union, &self.namespace, &self.use_aliases)
-    }
-
     fn resolve_union_doc(&self, union: Type) -> Type {
         resolution::resolve_union_doc(union, &self.namespace, &self.use_aliases)
     }
@@ -1843,19 +1839,17 @@ impl<'a> DefinitionCollector<'a> {
                 // Expand type aliases first (no FQN change), then resolve.
                 let expanded = effective_aliases
                     .map_or(ty.clone(), |a| self.expand_aliases_only(ty.clone(), a));
-                let resolved = if !template_names.is_empty() {
-                    // Use template-aware resolution: FQN-qualifies the outer class in
-                    // generic return types (e.g. ObjectProphecy<T>) and converts T to
-                    // TTemplateParam.
-                    self.resolve_union_doc_with_templates(
-                        expanded,
-                        &template_names,
-                        class_fqcn,
-                        template_params_for_resolve,
-                    )
-                } else {
-                    self.resolve_union_doc(expanded)
-                };
+                // Template-aware resolution even with no templates in scope: it
+                // FQN-qualifies class names in generic return types (e.g.
+                // `Builder<static>` on a template-free method), which the plain
+                // doc resolution leaves relative — and nothing downstream
+                // resolves a stored return type against its declaring file.
+                let resolved = self.resolve_union_doc_with_templates(
+                    expanded,
+                    &template_names,
+                    class_fqcn,
+                    template_params_for_resolve,
+                );
                 Some(Self::fill_self_static_parent(resolved, class_fqcn))
             }
             (None, Some(h)) => {

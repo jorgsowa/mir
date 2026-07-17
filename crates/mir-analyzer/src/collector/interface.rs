@@ -86,12 +86,21 @@ impl<'a> DefinitionCollector<'a> {
             .extends
             .iter()
             .filter_map(|ty| {
-                if let Some(Atomic::TNamedObject { fqcn, type_params }) = ty.types.first() {
+                if let Some(Atomic::TNamedObject { fqcn: base, type_params }) = ty.types.first() {
                     Some((
-                        self.resolve_type_name(fqcn.as_str(), true).into(),
+                        self.resolve_type_name(base.as_str(), true).into(),
                         type_params
                             .iter()
-                            .map(|tp| self.resolve_union(tp.clone()))
+                            .map(|tp| {
+                                // Template-aware: `T1` in `@extends Base<T1>` is
+                                // this interface's own template param, not a class.
+                                self.resolve_union_doc_with_templates(
+                                    tp.clone(),
+                                    &iface_template_names,
+                                    &fqcn,
+                                    &iface_template_params,
+                                )
+                            })
                             .collect(),
                     ))
                 } else {

@@ -244,6 +244,19 @@ fn substitute_static_atom(a: Atomic, fqcn: &Arc<str>, receiver_type_params: &[Ty
                 receiver_type_params,
             )),
         },
+        // `static`/`self` nested in generic arguments (`Builder<static>`) must
+        // resolve like the top-level forms, or the unresolved atom degrades
+        // every downstream template binding on the returned object to mixed.
+        Atomic::TNamedObject { fqcn: obj_fqcn, type_params } if !type_params.is_empty() => {
+            let substituted: Vec<Type> = type_params
+                .iter()
+                .map(|t| substitute_static_in_type(t.clone(), fqcn, receiver_type_params))
+                .collect();
+            Atomic::TNamedObject {
+                fqcn: obj_fqcn,
+                type_params: mir_types::union::vec_to_type_params(substituted),
+            }
+        }
         other => other,
     }
 }

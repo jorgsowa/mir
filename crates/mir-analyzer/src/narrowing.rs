@@ -1834,6 +1834,9 @@ fn bare_named_type(ty: &Type) -> Option<&str> {
         {
             Some(fqcn.as_ref())
         }
+        // The collector stores `@extends Box<U>` args template-aware, so a
+        // template-param reference arrives as a proper TTemplateParam atom.
+        Atomic::TTemplateParam { name, .. } => Some(name.as_ref()),
         _ => None,
     }
 }

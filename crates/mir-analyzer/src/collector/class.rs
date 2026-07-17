@@ -447,6 +447,11 @@ impl<'a> DefinitionCollector<'a> {
 
         let template_params: Vec<TemplateParam> = class_template_params;
 
+        // Type args of `@template-extends Base<U>` / `@template-implements`
+        // routinely reference the class's own template params — resolve them
+        // template-aware so `U` stays a TTemplateParam instead of being
+        // namespace-qualified into a phantom `NS\U` class (which would make
+        // inherited_template_bindings unable to chase it to a bound type).
         let extends_type_args: Vec<mir_types::Type> = class_doc
             .extends
             .first()
@@ -455,7 +460,14 @@ impl<'a> DefinitionCollector<'a> {
                     Some(
                         type_params
                             .iter()
-                            .map(|tp| self.resolve_union(tp.clone()))
+                            .map(|tp| {
+                                self.resolve_union_doc_with_templates(
+                                    tp.clone(),
+                                    &class_template_names,
+                                    &fqcn,
+                                    &template_params,
+                                )
+                            })
                             .collect(),
                     )
                 } else {
@@ -468,12 +480,19 @@ impl<'a> DefinitionCollector<'a> {
             .implements
             .iter()
             .filter_map(|ty| {
-                if let Some(Atomic::TNamedObject { fqcn, type_params }) = ty.types.first() {
+                if let Some(Atomic::TNamedObject { fqcn: iface, type_params }) = ty.types.first() {
                     Some((
-                        self.resolve_type_name(fqcn.as_str(), true).into(),
+                        self.resolve_type_name(iface.as_str(), true).into(),
                         type_params
                             .iter()
-                            .map(|tp| self.resolve_union(tp.clone()))
+                            .map(|tp| {
+                                self.resolve_union_doc_with_templates(
+                                    tp.clone(),
+                                    &class_template_names,
+                                    &fqcn,
+                                    &template_params,
+                                )
+                            })
                             .collect(),
                     ))
                 } else {

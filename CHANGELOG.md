@@ -28,6 +28,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `@mir-suppress <Name>`, `<issueHandlers>`, and baselines under their own
     issue names.
 
+### Fixed
+
+- **Generics:** `static`/`self` nested inside generic docblock arguments
+  (`@return Builder<static>`) now resolve to the receiver class like the
+  top-level forms, instead of leaking an unresolved atom that degraded every
+  downstream template binding to `mixed`.
+- **Generics:** docblock return types on template-free methods now
+  namespace-qualify class names in generic positions — previously
+  `@return Builder<static>` stored a bare relative `Builder` (only methods
+  declaring their own `@template` got qualification) and the class was never
+  found again.
+- **Generics:** `@template-extends Base<U>` / `@template-implements` type args
+  referencing the class's own template params are now stored as template
+  params instead of being namespace-qualified into phantom classes (`NS\U`),
+  so methods inherited through a parameterized parent chain (`HasMany<Post>`
+  extending `Builder<TRelated>`) resolve their return templates to the
+  concrete bound type.
+
 ## [0.58.0] - 2026-07-17
 
 ### Added
