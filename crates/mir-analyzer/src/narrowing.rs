@@ -2451,9 +2451,7 @@ fn narrow_prop_null(
     } else {
         current.remove_null()
     };
-    if narrowed != current {
-        ctx.set_prop_refined(obj_var, prop, narrowed);
-    }
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed);
 }
 
 /// Narrow a nullsafe property access (`$obj?->prop`) by a null check.
@@ -2502,9 +2500,7 @@ fn narrow_static_prop_null(
     } else {
         current.remove_null()
     };
-    if narrowed != current {
-        ctx.set_prop_refined(fqcn, prop, narrowed);
-    }
+    apply_prop_narrowed(ctx, fqcn, prop, current, narrowed);
 }
 
 /// Narrow a static property's type when `self::$prop instanceof ClassName` /
@@ -3468,9 +3464,7 @@ fn narrow_prop_to_literal_enum_case(
                 if fqcn.as_ref() == enum_fqcn && c.as_ref() == case_name)
         })
     };
-    if !narrowed.is_empty() && narrowed != current {
-        ctx.set_prop_refined(obj_var, prop, narrowed);
-    }
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed);
 }
 
 fn narrow_var_to_class_string(ctx: &mut FlowState, name: &str, fqcn: &str, is_class: bool) {
