@@ -189,11 +189,7 @@ pub(super) fn validate_method_body(s: &str) -> Option<String> {
         return Some("@method annotation is missing a method definition".to_string());
     }
     // Strip optional `static` prefix
-    let rest = if s.to_lowercase().starts_with("static ") {
-        s["static ".len()..].trim_start()
-    } else {
-        s
-    };
+    let rest = strip_ascii_ci_prefix(s, "static ").map_or(s, str::trim_start);
     // Extract the method name (the token immediately before `(`)
     let open = rest.find('(').unwrap_or(rest.len());
     let prefix = rest[..open].trim();

@@ -583,8 +583,26 @@ pub(super) fn resolve_int_mask_of(inner: &str) -> Option<Type> {
     })
 }
 
+/// Case-insensitive ASCII prefix strip that can never panic on a char
+/// boundary: `prefix` must be pure ASCII, and the comparison runs byte-for-
+/// byte, so a multi-byte character in `s` can never spuriously "match" it the
+/// way `s.to_lowercase().starts_with(prefix)` could if lowercasing changed a
+/// character's byte length (the historical bug behind
+/// `docblock_unicode_type_no_panic.phpt`).
+pub(super) fn strip_ascii_ci_prefix<'a>(s: &'a str, prefix: &str) -> Option<&'a str> {
+    let bytes = s.as_bytes();
+    (bytes.len() >= prefix.len() && bytes[..prefix.len()].eq_ignore_ascii_case(prefix.as_bytes()))
+        .then(|| &s[prefix.len()..])
+}
+
 pub(super) fn strip_quotes(s: &str) -> &str {
-    if (s.starts_with('\'') && s.ends_with('\'')) || (s.starts_with('"') && s.ends_with('"')) {
+    // len() >= 2 excludes a lone quote, which would otherwise satisfy both
+    // starts_with/ends_with and panic on the slice below (same bug as the
+    // string-literal arm of parse_type_string).
+    if s.len() >= 2
+        && ((s.starts_with('\'') && s.ends_with('\''))
+            || (s.starts_with('"') && s.ends_with('"')))
+    {
         &s[1..s.len() - 1]
     } else {
         s
@@ -662,26 +680,18 @@ pub(super) fn parse_keyed_array(inner: &str, is_list: bool) -> Type {
 
 pub(super) fn parse_callable_syntax(s: &str) -> Option<Type> {
     let s = s.trim_start_matches('\\');
-    let lower = s.to_lowercase();
     // `pure-callable(...)` / `pure-Closure(...)` — mir does not track purity
     // on the type itself, so parse the structural shape and drop the
     // purity qualifier (purity is tracked separately at the function level).
-    let (lower, pure_prefix_len) = match lower.strip_prefix("pure-") {
-        Some(rest) => (rest.to_string(), "pure-".len()),
-        None => (lower, 0),
-    };
-    let is_closure = lower.starts_with("closure");
-    let is_callable = lower.starts_with("callable");
-    if !is_closure && !is_callable {
+    let s_after_pure = strip_ascii_ci_prefix(s, "pure-").unwrap_or(s);
+    let (is_closure, rest) = if let Some(rest) = strip_ascii_ci_prefix(s_after_pure, "closure") {
+        (true, rest)
+    } else if let Some(rest) = strip_ascii_ci_prefix(s_after_pure, "callable") {
+        (false, rest)
+    } else {
         return None;
-    }
-    let prefix_len = pure_prefix_len
-        + if is_closure {
-            "closure".len()
-        } else {
-            "callable".len()
-        };
-    let rest = s[prefix_len..].trim_start();
+    };
+    let rest = rest.trim_start();
     if !rest.starts_with('(') {
         return None;
     }

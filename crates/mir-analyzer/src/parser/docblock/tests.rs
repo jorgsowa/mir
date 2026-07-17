@@ -664,6 +664,55 @@ fn lone_quote_does_not_panic() {
 }
 
 #[test]
+fn lone_quote_array_shape_key_does_not_panic() {
+    // Array-shape key parsing runs the same lone-quote text through
+    // `strip_quotes`, which had the identical starts_with/ends_with-on-the-
+    // same-char bug as `parse_type_string`'s string-literal arm.
+    parse_type_string("array{': int}");
+    parse_type_string("array{\": int}");
+}
+
+#[test]
+fn callable_syntax_is_case_insensitive() {
+    // parse_callable_syntax was rewritten to match "closure"/"callable"/
+    // "pure-" case-insensitively via byte comparison instead of
+    // `s.to_lowercase().starts_with(..)` + slicing the original string by a
+    // fixed ASCII length (the same panic-prone pattern fixed in strip_quotes
+    // and parse_type_string). These lock in that the case-insensitive match
+    // still works after the rewrite.
+    assert!(matches!(
+        parse_type_string("CALLABLE(int): void").types[0],
+        Atomic::TCallable { .. }
+    ));
+    assert!(matches!(
+        parse_type_string("Closure(): void").types[0],
+        Atomic::TClosure { .. }
+    ));
+    assert!(matches!(
+        parse_type_string("Pure-Closure(): void").types[0],
+        Atomic::TClosure { .. }
+    ));
+    assert!(matches!(
+        parse_type_string("pure-CALLABLE(): void").types[0],
+        Atomic::TCallable { .. }
+    ));
+}
+
+#[test]
+fn validate_method_body_strips_static_prefix_case_insensitively() {
+    // The "static " prefix strip in validate_method_body was rewritten to use
+    // strip_ascii_ci_prefix instead of `s.to_lowercase().starts_with(..)` +
+    // slicing the original by a fixed length. Confirm the prefix is still
+    // recognized regardless of case, by checking the by-ref validation that
+    // only fires once "static " has been correctly stripped off the front.
+    let err = validate_method_body("STATIC int foo(&$x)");
+    assert!(
+        err.is_some_and(|m| m.contains("by-reference")),
+        "STATIC prefix must still be stripped so the by-ref param is reached"
+    );
+}
+
+#[test]
 fn value_of_union_of_lists_and_shapes() {
     let u = parse_type_string("value-of<list<0|1|2>|array{0: 3, 1: 4}>");
     for n in [0, 1, 2, 3, 4] {
