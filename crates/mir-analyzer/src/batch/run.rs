@@ -527,7 +527,7 @@ impl AnalysisSession {
         let file_defs = {
             let mut guard = self.db.salsa.write();
             let salsa_file = guard.upsert_source_file(file.clone(), Arc::from(new_content));
-            collect_file_definitions(&**guard, salsa_file)
+            collect_file_definitions(&**guard, salsa_file).clone()
         };
 
         let mut all_issues: Vec<Issue> = Arc::unwrap_or_clone(file_defs.issues.clone());

@@ -45,17 +45,6 @@ impl PartialEq for FunctionInferenceResult {
 
 impl Eq for FunctionInferenceResult {}
 
-unsafe impl salsa::Update for FunctionInferenceResult {
-    unsafe fn maybe_update(old_ptr: *mut Self, new_val: Self) -> bool {
-        let old = unsafe { &mut *old_ptr };
-        if *old == new_val {
-            return false;
-        }
-        *old = new_val;
-        true
-    }
-}
-
 /// Find the FunctionDecl in `program` whose resolved FQN equals `target_fqn`.
 ///
 /// Recurses through control-flow wrappers and braced namespaces via
@@ -116,6 +105,6 @@ pub fn infer_function(
     let decl = find_function_decl(&parsed.program, db, path.as_ref(), fn_fqn.as_ref())?;
 
     let driver = crate::body_analysis::BodyAnalyzer::new(db, php_version);
-    let result = driver.analyze_fn_decl_pure(decl, &path, text.as_ref(), &parsed.source_map);
+    let result = driver.analyze_fn_decl_pure(decl, path, text.as_ref(), &parsed.source_map);
     Some(Arc::new(result))
 }

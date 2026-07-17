@@ -43,7 +43,7 @@ pub fn inferred_function_return_type_demand(db: &dyn MirDatabase, fqn: &str) -> 
         SymbolLoc::Function { file, .. } => *file,
         _ => return None,
     };
-    let path = sf.path(db);
+    let path = sf.path(db).clone();
     let already_active = INFER_IN_PROGRESS.with(|s| s.borrow().contains(&path));
     if already_active {
         return None;
@@ -74,7 +74,7 @@ pub fn inferred_method_return_type_demand(
         | SymbolLoc::Enum { file, .. } => *file,
         _ => return None,
     };
-    let path = sf.path(db);
+    let path = sf.path(db).clone();
     let already_active = INFER_IN_PROGRESS.with(|s| s.borrow().contains(&path));
     if already_active {
         return None;

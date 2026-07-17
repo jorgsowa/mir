@@ -356,17 +356,6 @@ impl PartialEq for TrackedParseResult {
 
 impl Eq for TrackedParseResult {}
 
-unsafe impl salsa::Update for TrackedParseResult {
-    unsafe fn maybe_update(old_ptr: *mut Self, new_val: Self) -> bool {
-        let old = unsafe { &mut *old_ptr };
-        if *old == new_val {
-            return false;
-        }
-        *old = new_val;
-        true
-    }
-}
-
 /// Parse `file`'s source text into a fully-owned, lifetime-free
 /// [`php_rs_parser::ParseResult`] and memoize it in Salsa.
 ///
@@ -404,7 +393,7 @@ pub fn collect_file_definitions_uncached(
     let php_version = db_php_version(db);
 
     // Content hash needed for both in-process and disk cache lookups.
-    let content_hash = crate::stub_cache::hash_source(&text);
+    let content_hash = crate::stub_cache::hash_source(text);
 
     // Fast path 1: in-process parse cache (populated by collect_and_ingest_file).
     // Avoids re-parsing files that were already processed in the same session.
@@ -414,7 +403,7 @@ pub fn collect_file_definitions_uncached(
         .get(&content_hash, php_version.cache_byte())
     {
         crate::metrics::record_stub_cache_hit();
-        if cached.file.as_deref() == Some(&*path) {
+        if cached.file.as_deref() == Some(path) {
             // Path matches — share the Arc directly (no data clone needed).
             return FileDefinitions {
                 slice: cached,
@@ -439,7 +428,7 @@ pub fn collect_file_definitions_uncached(
         (cache, php_v)
     });
     if let Some((cache, php_v)) = &disk_cache_state {
-        if let Some(mut slice) = cache.get(&path, &content_hash, *php_v) {
+        if let Some(mut slice) = cache.get(path, &content_hash, *php_v) {
             crate::stub_cache::prepare_for_ingest(&mut slice);
             crate::metrics::record_stub_cache_hit();
             return FileDefinitions {
@@ -450,7 +439,7 @@ pub fn collect_file_definitions_uncached(
         crate::metrics::record_stub_cache_miss();
     }
 
-    let parsed = php_rs_parser::parse(&text);
+    let parsed = php_rs_parser::parse(text);
 
     let has_hard_parse_errors = parsed.errors.iter().any(crate::parser::is_hard_parse_error);
 
@@ -458,12 +447,12 @@ pub fn collect_file_definitions_uncached(
         .errors
         .iter()
         .filter(|err| !crate::parser::is_spurious_reserved_class_error(err))
-        .map(|err| crate::parser::parse_error_to_issue(err, &path, &text, &parsed.source_map))
+        .map(|err| crate::parser::parse_error_to_issue(err, path, text, &parsed.source_map))
         .collect();
 
     let collector = crate::collector::DefinitionCollector::new_for_slice(
         path.clone(),
-        &text,
+        text,
         &parsed.source_map,
     )
     .with_php_version(php_version);
@@ -490,7 +479,7 @@ pub fn collect_file_definitions_uncached(
         );
         // Disk cache: prevents re-parsing in future sessions.
         if let Some((cache, php_v)) = &disk_cache_state {
-            cache.put(&path, &content_hash, *php_v, &slice_arc);
+            cache.put(path, &content_hash, *php_v, &slice_arc);
         }
     }
 
@@ -558,17 +547,6 @@ impl PartialEq for InferredFileTypes {
     }
 }
 
-unsafe impl salsa::Update for InferredFileTypes {
-    unsafe fn maybe_update(old_ptr: *mut Self, new_val: Self) -> bool {
-        let old = unsafe { &mut *old_ptr };
-        if *old == new_val {
-            return false;
-        }
-        *old = new_val;
-        true
-    }
-}
-
 fn infer_file_return_types_initial(
     _db: &dyn MirDatabase,
     _id: salsa::Id,
@@ -592,7 +570,7 @@ fn infer_file_return_types_cycle(
 /// Reads the `AnalyzeFileInput.php_version` salsa input so that salsa tracks
 /// the dependency correctly; `from_str` is called at most once per version
 /// change instead of once per file.
-#[salsa::tracked]
+#[salsa::tracked(returns(copy))]
 pub fn db_php_version(db: &dyn MirDatabase) -> crate::php_version::PhpVersion {
     use std::str::FromStr as _;
     crate::php_version::PhpVersion::from_str(db.analyze_config().php_version(db).as_ref())
@@ -613,7 +591,12 @@ pub fn infer_file_return_types(db: &dyn MirDatabase, file: SourceFile) -> Inferr
     }
 
     let driver = crate::body_analysis::BodyAnalyzer::new_inference_only(db, php_version);
-    driver.analyze_bodies(&parsed.program, path, text.as_ref(), &parsed.source_map);
+    driver.analyze_bodies(
+        &parsed.program,
+        path.clone(),
+        text.as_ref(),
+        &parsed.source_map,
+    );
     let inferred = driver.take_inferred_types();
 
     let mut functions: FxHashMap<Arc<str>, Arc<Type>> =

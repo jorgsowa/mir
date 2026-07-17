@@ -103,7 +103,10 @@ fn new_path_issues_for(fn_name: &str, source: &str) -> Vec<mir_issues::Issue> {
     // PHP version comes from the AnalyzeFileInput singleton, seeded from the
     // session's configured version (PhpVersion::LATEST here).
     let result = infer_function(&db_snap, file, Arc::from(fn_name));
-    result.map(|r| r.issues.clone()).unwrap_or_default()
+    result
+        .as_ref()
+        .map(|r| r.issues.clone())
+        .unwrap_or_default()
 }
 
 /// Compare issues by `(IssueKind, line, col_start)`. Hash-based to avoid needing

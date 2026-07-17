@@ -91,7 +91,7 @@ mod tests {
         let o1 = analyze_file(&db, file);
         let o2 = analyze_file(&db, file);
         assert!(
-            Arc::ptr_eq(&o1, &o2),
+            Arc::ptr_eq(o1, o2),
             "unchanged file must return the memoized Arc<AnalyzeOutput>"
         );
     }
@@ -110,13 +110,13 @@ mod tests {
             Arc::from("/tmp/other.php"),
             Arc::from("<?php function bar(): int { return 1; }"),
         );
-        let o1 = analyze_file(&db, file);
+        let o1 = analyze_file(&db, file).clone();
         other
             .set_text(&mut db)
             .to(Arc::from("<?php function bar(): int { return 2; }"));
         let o2 = analyze_file(&db, file);
         assert!(
-            Arc::ptr_eq(&o1, &o2),
+            Arc::ptr_eq(&o1, o2),
             "edit to an unrelated file must not recompute the memo (backdating)"
         );
     }
@@ -133,11 +133,14 @@ mod tests {
             Arc::from("<?php function foo(): string { return \"hi\"; }"),
         );
         let worker = db.clone();
-        let o1 =
-            std::thread::scope(|s| s.spawn(move || analyze_file(&worker, file)).join().unwrap());
+        let o1 = std::thread::scope(|s| {
+            s.spawn(move || analyze_file(&worker, file).clone())
+                .join()
+                .unwrap()
+        });
         let o2 = analyze_file(&db, file);
         assert!(
-            Arc::ptr_eq(&o1, &o2),
+            Arc::ptr_eq(&o1, o2),
             "memo computed on a clone must be returned by the canonical db"
         );
     }
@@ -150,10 +153,10 @@ mod tests {
             Arc::from("/tmp/version_dep.php"),
             Arc::from("<?php function foo(): string { return \"hi\"; }"),
         );
-        let o1 = analyze_file(&db, file);
+        let o1 = analyze_file(&db, file).clone();
         let mut db = db;
         db.set_php_version(Arc::from("8.0"));
-        let o2 = analyze_file(&db, file);
+        let o2 = analyze_file(&db, file).clone();
         // The memo must be recomputed (the query reads the version through
         // the AnalyzeFileInput singleton). Output may be equal in content;
         // pointer inequality proves re-execution unless salsa backdated.
@@ -183,7 +186,7 @@ mod tests {
         let r1 = infer_scope(&db, file, scopes[0].clone());
         let r2 = infer_scope(&db, file, scopes[0].clone());
         assert!(
-            Arc::ptr_eq(&r1, &r2),
+            Arc::ptr_eq(r1, r2),
             "unchanged file + scope must reuse the memoized Arc<ScopeInferenceResult>"
         );
     }
@@ -199,7 +202,7 @@ mod tests {
         let _ = collect_file_definitions(&db, file);
         let result = infer_function(&db, file, Arc::from("foo"));
         assert!(result.is_some(), "expected infer_function to locate `foo`");
-        let r = result.unwrap();
+        let r = result.clone().unwrap();
         assert!(
             r.return_type.is_some(),
             "free fn should produce a return type"
@@ -228,8 +231,8 @@ mod tests {
             Arc::from("<?php function foo(): string { return \"hi\"; }"),
         );
         let _ = collect_file_definitions(&db, file);
-        let r1 = infer_function(&db, file, Arc::from("foo")).unwrap();
-        let r2 = infer_function(&db, file, Arc::from("foo")).unwrap();
+        let r1 = infer_function(&db, file, Arc::from("foo")).clone().unwrap();
+        let r2 = infer_function(&db, file, Arc::from("foo")).clone().unwrap();
         assert!(
             Arc::ptr_eq(&r1, &r2),
             "unchanged file + fqn must reuse the memoized Arc<FunctionInferenceResult>"
@@ -246,7 +249,7 @@ mod tests {
             Arc::from("<?php class Foo {}"),
         );
 
-        let defs1 = collect_file_definitions(&db, file);
+        let defs1 = collect_file_definitions(&db, file).clone();
         file.set_text(&mut db)
             .to(Arc::from("<?php class Foo {} class Bar {}"));
         let defs2 = collect_file_definitions(&db, file);

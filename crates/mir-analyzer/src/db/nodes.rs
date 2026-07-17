@@ -70,26 +70,6 @@ impl PartialEq for FileDefinitions {
     }
 }
 
-// SAFETY: FileDefinitions contains Arc pointers and Vec, which are Move-safe.
-// The pointer passed to maybe_update is provided by Salsa and points to
-// properly aligned and initialized memory. We have exclusive write access
-// through the mutable pointer (Salsa guarantees this). The in-place update
-// is safe because we own both the old and new values.
-//
-// Optimization: Use PartialEq to skip downstream recomputation when definitions
-// haven't changed (e.g., no-op file saves in LSP). This is especially valuable
-// in incremental scenarios where many files are unchanged.
-unsafe impl salsa::Update for FileDefinitions {
-    unsafe fn maybe_update(old_ptr: *mut Self, new_val: Self) -> bool {
-        let old = unsafe { &mut *old_ptr };
-        if *old == new_val {
-            return false; // Content unchanged; Salsa skips dependent queries
-        }
-        *old = new_val;
-        true
-    }
-}
-
 // Ancestors return type (S2)
 
 /// The computed ancestor list for a class or interface.
@@ -107,22 +87,5 @@ impl PartialEq for Ancestors {
                 .iter()
                 .zip(&other.0)
                 .all(|(a, b)| a.as_ref() == b.as_ref())
-    }
-}
-
-// SAFETY: Ancestors contains Arc pointers, which are Move-safe.
-// The pointer passed to maybe_update is provided by Salsa and points to
-// properly aligned and initialized memory. We dereference it to check equality
-// and conditionally update. Salsa guarantees exclusive write access through
-// the mutable pointer. The comparison is safe because we're comparing valid
-// initialized values.
-unsafe impl salsa::Update for Ancestors {
-    unsafe fn maybe_update(old_ptr: *mut Self, new_val: Self) -> bool {
-        let old = unsafe { &mut *old_ptr };
-        if *old == new_val {
-            return false;
-        }
-        *old = new_val;
-        true
     }
 }

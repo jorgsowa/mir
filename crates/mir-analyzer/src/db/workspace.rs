@@ -150,17 +150,6 @@ impl PartialEq for FileDeclarations {
     }
 }
 
-unsafe impl salsa::Update for FileDeclarations {
-    unsafe fn maybe_update(old_ptr: *mut Self, new_val: Self) -> bool {
-        let old = unsafe { &mut *old_ptr };
-        if *old == new_val {
-            return false;
-        }
-        *old = new_val;
-        true
-    }
-}
-
 /// Extract the declared names from one source file without exposing body
 /// content.  Used as the input to `workspace_symbol_index` so that body-only
 /// edits don't propagate to the workspace-wide FQCN index.
@@ -333,17 +322,6 @@ impl PartialEq for WorkspaceSymbolIndex {
     }
 }
 
-unsafe impl salsa::Update for WorkspaceSymbolIndex {
-    unsafe fn maybe_update(old_ptr: *mut Self, new_val: Self) -> bool {
-        let old = unsafe { &mut *old_ptr };
-        if *old == new_val {
-            return false;
-        }
-        *old = new_val;
-        true
-    }
-}
-
 /// Return the workspace symbol index, preferring the imperatively-populated
 /// `WorkspaceSymbolIndexSingleton` (cheap: O(1) singleton input read with
 /// HIGH durability) and falling back to the salsa-tracked
@@ -353,7 +331,7 @@ unsafe impl salsa::Update for WorkspaceSymbolIndex {
 /// In batch mode the singleton is always populated by
 /// `MirDbStorage::rebuild_workspace_symbol_index`. The fallback exists for unit
 /// tests that build a db directly without going through `AnalyzerDb`.
-pub fn workspace_index(db: &dyn MirDatabase) -> WorkspaceSymbolIndex {
+pub fn workspace_index(db: &dyn MirDatabase) -> &WorkspaceSymbolIndex {
     if let Some(s) = db.workspace_symbol_index_singleton() {
         s.index(db)
     } else {
@@ -407,13 +385,13 @@ pub fn workspace_symbol_index(db: &dyn MirDatabase) -> WorkspaceSymbolIndex {
             continue; // handled in pass 3
         }
         let decls = collect_file_declarations(db, *file);
-        for (key, loc) in decls.class_like {
+        for &(key, loc) in &decls.class_like {
             class_like.insert(key, loc);
         }
-        for (key, loc) in decls.functions {
+        for &(key, loc) in &decls.functions {
             functions.insert(key, loc);
         }
-        for (key, loc) in decls.constants {
+        for &(key, loc) in &decls.constants {
             constants.insert(key, loc);
         }
     }
@@ -421,13 +399,13 @@ pub fn workspace_symbol_index(db: &dyn MirDatabase) -> WorkspaceSymbolIndex {
     // Pass 3: user stubs overwrite everything.
     for file in &user_stub_set {
         let decls = collect_file_declarations(db, *file);
-        for (key, loc) in decls.class_like {
+        for &(key, loc) in &decls.class_like {
             class_like.insert(key, loc);
         }
-        for (key, loc) in decls.functions {
+        for &(key, loc) in &decls.functions {
             functions.insert(key, loc);
         }
-        for (key, loc) in decls.constants {
+        for &(key, loc) in &decls.constants {
             constants.insert(key, loc);
         }
     }
@@ -456,17 +434,6 @@ pub struct GlobalVarMap(pub Arc<FxHashMap<Arc<str>, mir_types::Type>>);
 impl PartialEq for GlobalVarMap {
     fn eq(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.0, &other.0)
-    }
-}
-
-unsafe impl salsa::Update for GlobalVarMap {
-    unsafe fn maybe_update(old_ptr: *mut Self, new_val: Self) -> bool {
-        let old = unsafe { &mut *old_ptr };
-        if *old == new_val {
-            return false;
-        }
-        *old = new_val;
-        true
     }
 }
 

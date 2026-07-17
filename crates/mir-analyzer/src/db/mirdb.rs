@@ -366,6 +366,7 @@ impl MirDatabase for MirDbStorage {
             };
             sf.path(self)
         })
+        .cloned()
     }
 
     fn symbol_referencers_of(&self, symbol_key: &str) -> Vec<Arc<str>> {
@@ -552,7 +553,7 @@ impl MirDbStorage {
         // singleton (e.g. unit-test dbs that never rebuild), leave `frozen_index`
         // None so callers fall back to the live `workspace_index(db)`.
         if let Some(handle) = self.workspace_symbol_index_singleton() {
-            let index = handle.index(self);
+            let index = handle.index(self).clone();
             self.frozen_index = Some((handle, Arc::new(index)));
         }
         // Begin the pass-scoped subtype cache. Sound regardless of the singleton:
@@ -636,7 +637,7 @@ impl MirDbStorage {
                         &user_stubs,
                     );
                 }
-                new_snapshots.insert(file, decls);
+                new_snapshots.insert(file, decls.clone());
             }
         }
 
@@ -661,7 +662,7 @@ impl MirDbStorage {
         match existing {
             Some(s) => {
                 let old = s.index(self);
-                if old != new_index {
+                if *old != new_index {
                     // Bump `revision` in lockstep with `index` so frozen-path
                     // readers (which anchor on `revision` to avoid cloning the
                     // maps) are invalidated exactly when the index changes.
@@ -859,7 +860,7 @@ impl MirDbStorage {
         // invalidate body-analysis memos. This is the warm-cache guarantee.
         let new_decls = {
             let db: &dyn MirDatabase = &*self;
-            collect_file_declarations(db, file)
+            collect_file_declarations(db, file).clone()
         };
         if old_decls.as_ref() == Some(&new_decls) {
             return true;
@@ -971,7 +972,7 @@ impl MirDbStorage {
     pub fn file_declarations_changed(&mut self, file: SourceFile) -> bool {
         let new_decls = {
             let db: &dyn MirDatabase = &*self;
-            crate::db::collect_file_declarations(db, file)
+            crate::db::collect_file_declarations(db, file).clone()
         };
         let mut snapshots = self.file_decl_snapshots.write();
         match snapshots.get(&file) {
@@ -1089,7 +1090,7 @@ impl MirDbStorage {
         let existing = self.resolver_state.read().config;
         match existing {
             Some(c) => {
-                let current = c.revision(self);
+                let current = *c.revision(self);
                 c.set_revision(self).to(current.wrapping_add(1));
             }
             None => {
@@ -1121,7 +1122,7 @@ impl MirDbStorage {
         use salsa::Setter as _;
         if let Some(&sf) = self.source_files.get(&path) {
             Arc::make_mut(&mut self.deleted_files).remove(path.as_ref());
-            if sf.text(self) != text {
+            if *sf.text(self) != text {
                 sf.set_text(self).with_durability(durability).to(text);
             }
             return sf;
@@ -1197,7 +1198,7 @@ impl MirDbStorage {
         let existing = *self.workspace_revision_input.read();
         match existing {
             Some(rev) => {
-                let cur = rev.revision(self);
+                let cur = *rev.revision(self);
                 rev.set_revision(self).to(cur.wrapping_add(1));
             }
             None => {

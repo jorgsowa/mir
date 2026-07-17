@@ -59,7 +59,7 @@ fn class_in_file_finds_class_after_set_file_text_only() {
         "class_in_file must demand collect_file_definitions and find App\\Foo"
     );
     assert_eq!(class.as_ref().unwrap().fqcn.as_ref(), "App\\Foo");
-    assert_eq!(class.unwrap().short_name.as_ref(), "Foo");
+    assert_eq!(class.as_ref().unwrap().short_name.as_ref(), "Foo");
 }
 
 #[test]
@@ -79,7 +79,7 @@ fn function_in_file_finds_function_after_set_file_text_only() {
         func.is_some(),
         "function_in_file must demand collect_file_definitions and find App\\greet"
     );
-    assert_eq!(func.unwrap().fqn.as_ref(), "App\\greet");
+    assert_eq!(func.as_ref().unwrap().fqn.as_ref(), "App\\greet");
 }
 
 #[test]

@@ -590,12 +590,18 @@ pub fn find_class_like<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option
         None => crate::db::workspace_index(db).class_like.get(&key).copied(),
     }?;
     match loc {
-        SymbolLoc::Class { file, idx } => class_def_at(db, file, idx as u32).map(ClassLike::Class),
-        SymbolLoc::Interface { file, idx } => {
-            interface_def_at(db, file, idx as u32).map(ClassLike::Interface)
-        }
-        SymbolLoc::Trait { file, idx } => trait_def_at(db, file, idx as u32).map(ClassLike::Trait),
-        SymbolLoc::Enum { file, idx } => enum_def_at(db, file, idx as u32).map(ClassLike::Enum),
+        SymbolLoc::Class { file, idx } => class_def_at(db, file, idx as u32)
+            .clone()
+            .map(ClassLike::Class),
+        SymbolLoc::Interface { file, idx } => interface_def_at(db, file, idx as u32)
+            .clone()
+            .map(ClassLike::Interface),
+        SymbolLoc::Trait { file, idx } => trait_def_at(db, file, idx as u32)
+            .clone()
+            .map(ClassLike::Trait),
+        SymbolLoc::Enum { file, idx } => enum_def_at(db, file, idx as u32)
+            .clone()
+            .map(ClassLike::Enum),
         SymbolLoc::Function { .. } | SymbolLoc::Constant { .. } => None,
     }
 }
@@ -607,7 +613,7 @@ pub fn class_like_decl_file(db: &dyn MirDatabase, fqcn: Fqcn<'_>) -> Option<Arc<
         Some(frozen) => frozen.class_like.get(&key).copied(),
         None => crate::db::workspace_index(db).class_like.get(&key).copied(),
     }?;
-    Some(loc.file().path(db))
+    Some(loc.file().path(db).clone())
 }
 
 /// Composite: resolve `fqn` to its defining file, then locate the
@@ -622,7 +628,7 @@ pub fn find_function<'db>(db: &'db dyn MirDatabase, fqn: Fqcn<'db>) -> Option<Ar
     let SymbolLoc::Function { file, idx } = loc? else {
         return None;
     };
-    function_def_at(db, file, idx as u32)
+    function_def_at(db, file, idx as u32).clone()
 }
 
 /// Composite: resolve `fqn` to its defining file, then locate a global
@@ -635,8 +641,8 @@ pub fn find_global_constant<'db>(
     // Constants are keyed case-sensitively (raw name), unlike class_like/functions.
     let key = fqn.name(db);
     let const_loc = match db.frozen_workspace_index() {
-        Some(frozen) => frozen.constants.get(&key).copied(),
-        None => crate::db::workspace_index(db).constants.get(&key).copied(),
+        Some(frozen) => frozen.constants.get(key).copied(),
+        None => crate::db::workspace_index(db).constants.get(key).copied(),
     };
     if let Some(SymbolLoc::Constant { file, idx }) = const_loc {
         let defs = collect_file_definitions(db, file);
@@ -645,7 +651,7 @@ pub fn find_global_constant<'db>(
         }
     }
     let file = source_file_for_fqcn(db, fqn)?;
-    global_constant_in_file(db, file, fqn)
+    global_constant_in_file(db, file, fqn).clone()
 }
 
 /// Locate a method named `name` (case-insensitive PHP semantics) on the
@@ -839,7 +845,7 @@ pub fn class_ancestors_by_fqcn<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -
     // inherited parent methods.
     let mut stack = Vec::<Arc<str>>::new();
 
-    let initial: Arc<str> = fqcn.name(db).into();
+    let initial: Arc<str> = (*fqcn.name(db)).into();
     stack.push(initial.clone());
     visited.insert(initial);
 
@@ -962,7 +968,7 @@ fn walk_method_with_precedence<'db>(
     method_lower: &str,
     visited: &mut std::collections::HashSet<Arc<str>>,
 ) -> Option<(Arc<str>, Arc<MethodDef>)> {
-    let class_name: Arc<str> = fqcn.name(db).into();
+    let class_name: Arc<str> = (*fqcn.name(db)).into();
     if !visited.insert(class_name.clone()) {
         return None;
     }

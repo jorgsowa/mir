@@ -315,7 +315,7 @@ impl AnalysisSession {
                     .filter(|f| {
                         db.lookup_source_file(f.as_ref()).is_some_and(|sf| {
                             let text = sf.text(&db as &dyn MirDatabase);
-                            !self.is_ref_committed(f.as_ref(), &text, current_gen)
+                            !self.is_ref_committed(f.as_ref(), text, current_gen)
                         })
                     })
                     .cloned()
@@ -355,8 +355,8 @@ impl AnalysisSession {
                         .par_iter()
                         .map_with(db_main, |db, path| {
                             let sf = db.lookup_source_file(path.as_ref())?;
-                            let text = sf.text(&*db as &dyn MirDatabase);
-                            let out = crate::db::analyze_file(&*db as &dyn MirDatabase, sf);
+                            let text = sf.text(&*db as &dyn MirDatabase).clone();
+                            let out = crate::db::analyze_file(&*db as &dyn MirDatabase, sf).clone();
                             let defs =
                                 crate::db::collect_file_definitions(&*db as &dyn MirDatabase, sf);
                             let entries = crate::db::subtype_index::entries_from_slice(&defs.slice);
@@ -646,7 +646,7 @@ impl AnalysisSession {
         let text = {
             let db = self.snapshot_db();
             db.lookup_source_file(loc.file.as_ref())
-                .map(|sf| sf.text(&db as &dyn MirDatabase))
+                .map(|sf| sf.text(&db as &dyn MirDatabase).clone())
         };
         let Some(text) = text else {
             return fallback;
@@ -828,7 +828,7 @@ impl AnalysisSession {
                     .par_iter()
                     .map_with(db_main, |db, path| {
                         let sf = db.lookup_source_file(path.as_ref())?;
-                        let text = sf.text(&*db as &dyn MirDatabase);
+                        let text = sf.text(&*db as &dyn MirDatabase).clone();
                         if self.is_defs_committed(path.as_ref(), &text) {
                             return None;
                         }
@@ -875,7 +875,7 @@ impl AnalysisSession {
             let loc = index
                 .constants
                 .get(&mir_types::Name::from(fqn.trim_start_matches('\\')))?;
-            let file = loc.file().path(&db);
+            let file = loc.file().path(&db).clone();
             let sf = db.lookup_source_file(file.as_ref())?;
             let text = sf.text(&db as &dyn MirDatabase);
             for (idx, line) in text.lines().enumerate() {
@@ -918,7 +918,10 @@ impl AnalysisSession {
             .iter()
             .filter_map(|f| {
                 let sf = db.lookup_source_file(f)?;
-                Some((f.clone(), sf.text(&db as &dyn crate::db::MirDatabase)))
+                Some((
+                    f.clone(),
+                    sf.text(&db as &dyn crate::db::MirDatabase).clone(),
+                ))
             })
             .collect();
         crate::class::ClassAnalyzer::with_files(&db, file_set, &file_data).analyze_all()

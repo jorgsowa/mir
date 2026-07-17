@@ -8,7 +8,7 @@ impl AnalysisSession {
     pub fn source_of(&self, file: &str) -> Option<Arc<str>> {
         let db = self.snapshot_db();
         let sf = db.lookup_source_file(file)?;
-        Some(sf.text(&db))
+        Some(sf.text(&db).clone())
     }
 
     /// Re-analyze every transitive dependent of `file` in parallel.
@@ -166,8 +166,8 @@ impl AnalysisSession {
                 // marks below must record exactly this Arc, so a text write
                 // racing the sweep leaves the file dirty rather than
                 // wrongly marked fresh.
-                let text = sf.text(&*db as &dyn crate::db::MirDatabase);
-                let out = crate::db::analyze_file(&*db as &dyn crate::db::MirDatabase, sf);
+                let text = sf.text(&*db as &dyn crate::db::MirDatabase).clone();
+                let out = crate::db::analyze_file(&*db as &dyn crate::db::MirDatabase, sf).clone();
                 let defs =
                     crate::db::collect_file_definitions(&*db as &dyn crate::db::MirDatabase, sf);
                 let entries = crate::db::subtype_index::entries_from_slice(&defs.slice);

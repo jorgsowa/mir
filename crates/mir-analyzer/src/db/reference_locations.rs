@@ -100,17 +100,6 @@ pub(crate) fn issues_have_unresolved_names(issues: &[Issue]) -> bool {
     })
 }
 
-unsafe impl salsa::Update for AnalyzeOutput {
-    unsafe fn maybe_update(old_ptr: *mut Self, new_val: Self) -> bool {
-        let old = unsafe { &mut *old_ptr };
-        if *old == new_val {
-            return false;
-        }
-        *old = new_val;
-        true
-    }
-}
-
 /// Analyze one file: parse-error issues plus full body analysis, assembled
 /// from per-scope memos (see [`super::scopes::infer_scope`]).
 ///
@@ -144,8 +133,8 @@ pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile) -> Arc<AnalyzeOutput
         }
         issues.push(crate::parser::parse_error_to_issue(
             err,
-            &path,
-            &text,
+            path,
+            text,
             &parsed.source_map,
         ));
     }

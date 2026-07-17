@@ -199,7 +199,7 @@ impl AnalysisSession {
             }
             let map = cache.entry(issue.location.file.clone()).or_insert_with(|| {
                 db.lookup_source_file(&issue.location.file)
-                    .map(|sf| SuppressionMap::from_source(&sf.text(&db)))
+                    .map(|sf| SuppressionMap::from_source(sf.text(&db)))
             });
             if let Some(map) = map.as_ref() {
                 if map.is_suppressed(issue.location.line, issue.kind.name(), issue.kind.code()) {
@@ -213,7 +213,7 @@ impl AnalysisSession {
         for file in analyzed_files {
             cache.entry(file.clone()).or_insert_with(|| {
                 db.lookup_source_file(file)
-                    .map(|sf| SuppressionMap::from_source(&sf.text(&db)))
+                    .map(|sf| SuppressionMap::from_source(sf.text(&db)))
             });
         }
         // Now emit UnusedSuppress for each file that has named suppressions.
@@ -342,7 +342,7 @@ pub fn analyze_source(source: &str) -> AnalysisResult {
     let salsa_file = db.upsert_source_file(file.clone(), Arc::from(source));
     let file_defs = collect_file_definitions(&db, salsa_file);
     let suppressions = crate::suppression::SuppressionMap::from_source(source);
-    let mut all_issues = Arc::unwrap_or_clone(file_defs.issues);
+    let mut all_issues = Arc::unwrap_or_clone(file_defs.issues.clone());
     if all_issues.iter().any(|issue| {
         matches!(issue.kind, mir_issues::IssueKind::ParseError { .. })
             && issue.severity == mir_issues::Severity::Error

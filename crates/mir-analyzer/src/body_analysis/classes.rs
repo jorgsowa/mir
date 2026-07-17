@@ -1162,7 +1162,7 @@ impl<'a> BodyAnalyzer<'a> {
         };
         let trait_list: Vec<Arc<str>> = class.class_traits().to_vec();
         let trait_locs: Vec<(Arc<str>, mir_types::Location)> = class.trait_use_locations().to_vec();
-        let class_all_parents: Vec<Arc<str>> = crate::db::class_ancestors(self.db, here).0;
+        let class_all_parents: Vec<Arc<str>> = crate::db::class_ancestors(self.db, here).0.clone();
 
         for trait_fqcn in trait_list.iter() {
             let tr_short: Arc<str> = trait_fqcn

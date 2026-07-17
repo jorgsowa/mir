@@ -200,12 +200,14 @@ impl AnalysisSession {
             let Some(sf) = db.lookup_source_file(path.as_ref()) else {
                 return;
             };
-            let text = sf.text(&db as &dyn crate::db::MirDatabase);
+            let text = sf.text(&db as &dyn crate::db::MirDatabase).clone();
             if self.is_prepared_for_analysis(path.as_ref(), &text, generation) {
                 return;
             }
             (
-                crate::db::parse_file(&db as &dyn crate::db::MirDatabase, sf).0,
+                crate::db::parse_file(&db as &dyn crate::db::MirDatabase, sf)
+                    .0
+                    .clone(),
                 text,
             )
         };

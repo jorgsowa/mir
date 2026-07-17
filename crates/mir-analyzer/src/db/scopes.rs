@@ -56,17 +56,6 @@ pub struct ScopeInferenceResult {
     pub ref_locs: Arc<[RefLoc]>,
 }
 
-unsafe impl salsa::Update for ScopeInferenceResult {
-    unsafe fn maybe_update(old_ptr: *mut Self, new_val: Self) -> bool {
-        let old = unsafe { &mut *old_ptr };
-        if *old == new_val {
-            return false;
-        }
-        *old = new_val;
-        true
-    }
-}
-
 /// Declaration scopes of `file` in source order (file-frame scopes are
 /// implicit). Drives [`analyze_file_per_scope`]'s merge order.
 #[salsa::tracked]
@@ -177,7 +166,7 @@ pub fn infer_scope(
         ScopeKey::FileHeader => {
             crate::body_analysis::check_duplicate_declarations(
                 &parsed.program.stmts,
-                &path,
+                path,
                 text.as_ref(),
                 &parsed.source_map,
                 &mut issues,
@@ -185,7 +174,7 @@ pub fn infer_scope(
             check_use_decls(
                 &parsed.program.stmts,
                 db,
-                &path,
+                path,
                 text.as_ref(),
                 &parsed.source_map,
                 &mut issues,
@@ -195,7 +184,7 @@ pub fn infer_scope(
         ScopeKey::FileExec => {
             driver.analyze_global_exec(
                 &parsed.program,
-                &path,
+                path,
                 text.as_ref(),
                 &parsed.source_map,
                 &mut issues,
@@ -238,7 +227,7 @@ pub fn infer_scope(
                 match &stmt.kind {
                     StmtKind::Function(decl) => driver.analyze_fn_decl(
                         decl,
-                        &path,
+                        path,
                         text.as_ref(),
                         &parsed.source_map,
                         &mut issues,
@@ -246,7 +235,7 @@ pub fn infer_scope(
                     ),
                     StmtKind::Class(decl) => driver.analyze_class_decl(
                         decl,
-                        &path,
+                        path,
                         text.as_ref(),
                         &parsed.source_map,
                         &mut issues,
@@ -255,7 +244,7 @@ pub fn infer_scope(
                     ),
                     StmtKind::Enum(decl) => driver.analyze_enum_decl(
                         decl,
-                        &path,
+                        path,
                         text.as_ref(),
                         &parsed.source_map,
                         &mut issues,
@@ -263,7 +252,7 @@ pub fn infer_scope(
                     ),
                     StmtKind::Interface(decl) => driver.analyze_interface_decl(
                         decl,
-                        &path,
+                        path,
                         text.as_ref(),
                         &parsed.source_map,
                         &mut issues,
@@ -272,7 +261,7 @@ pub fn infer_scope(
                     ),
                     StmtKind::Trait(decl) => driver.analyze_trait_decl(
                         decl,
-                        &path,
+                        path,
                         text.as_ref(),
                         &parsed.source_map,
                         &mut issues,
@@ -332,7 +321,7 @@ pub fn analyze_file_per_scope(db: &dyn MirDatabase, file: SourceFile) -> (Vec<Is
     let mut issues: Vec<Issue> = Vec::new();
     let mut ref_locs: Vec<RefLoc> = Vec::new();
 
-    let mut merge = |r: Arc<ScopeInferenceResult>| {
+    let mut merge = |r: &ScopeInferenceResult| {
         issues.extend(r.issues.iter().cloned());
         ref_locs.extend(r.ref_locs.iter().cloned());
     };

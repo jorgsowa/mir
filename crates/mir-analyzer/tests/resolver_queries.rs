@@ -50,7 +50,7 @@ fn resolve_fqcn_to_path_returns_none_without_resolver() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
     let db = session.snapshot_db();
     let fqcn = Fqcn::new(&db, Name::new("App\\Foo"));
-    assert_eq!(resolve_fqcn_to_path(&db, fqcn), None);
+    assert_eq!(*resolve_fqcn_to_path(&db, fqcn), None);
 }
 
 #[test]
@@ -59,7 +59,7 @@ fn resolve_fqcn_to_path_returns_none_for_unknown_name() {
         .with_class_resolver(make_resolver(&[("App\\Foo", "/proj/Foo.php")]));
     let db = session.snapshot_db();
     let fqcn = Fqcn::new(&db, Name::new("App\\Bar"));
-    assert_eq!(resolve_fqcn_to_path(&db, fqcn), None);
+    assert_eq!(*resolve_fqcn_to_path(&db, fqcn), None);
 }
 
 #[test]

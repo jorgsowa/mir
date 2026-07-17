@@ -105,7 +105,7 @@ impl<'a> FileAnalyzer<'a> {
         let ingested_text = {
             let db = self.session.snapshot_db();
             db.lookup_source_file(file.as_ref())
-                .map(|sf| sf.text(&db as &dyn crate::db::MirDatabase))
+                .map(|sf| sf.text(&db as &dyn crate::db::MirDatabase).clone())
         };
         self.session
             .prepare_ast_for_analysis(program, file.as_ref());

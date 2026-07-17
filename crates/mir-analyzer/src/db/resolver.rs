@@ -82,7 +82,7 @@ pub fn source_file_for_fqcn<'db>(
     fqcn: Fqcn<'db>,
 ) -> Option<crate::db::SourceFile> {
     if let Some(path) = resolve_fqcn_to_path(db, fqcn) {
-        if let Some(sf) = db.lookup_source_file(&path) {
+        if let Some(sf) = db.lookup_source_file(path) {
             return Some(sf);
         }
     }
@@ -107,13 +107,13 @@ pub fn source_file_for_fqcn<'db>(
         if let Some(crate::db::SymbolLoc::Function { file, .. }) = index.functions.get(&lower) {
             return Some(*file);
         }
-        if let Some(crate::db::SymbolLoc::Constant { file, .. }) = index.constants.get(&name) {
+        if let Some(crate::db::SymbolLoc::Constant { file, .. }) = index.constants.get(name) {
             return Some(*file);
         }
         None
     };
     match db.frozen_workspace_index() {
         Some(frozen) => lookup(frozen),
-        None => lookup(&crate::db::workspace_index(db)),
+        None => lookup(crate::db::workspace_index(db)),
     }
 }

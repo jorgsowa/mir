@@ -247,7 +247,7 @@ impl AnalysisSession {
         let stored_text = {
             let db = self.snapshot_db();
             db.lookup_source_file(file.as_ref())
-                .map(|sf| sf.text(&db as &dyn MirDatabase))
+                .map(|sf| sf.text(&db as &dyn MirDatabase).clone())
         };
         if let Some(text) = stored_text {
             self.mark_defs_committed(&file, &text);
@@ -467,7 +467,7 @@ impl AnalysisSession {
         //    write lock, so concurrent interactive reads are not blocked for the
         //    parse duration. Also primes the shared parse/disk caches.
         let collect_one = |db: &crate::db::MirDbStorage, sf: crate::db::SourceFile| {
-            (sf, crate::db::collect_file_declarations(db, sf))
+            (sf, crate::db::collect_file_declarations(db, sf).clone())
         };
         let decls: Vec<(crate::db::SourceFile, crate::db::FileDeclarations)> =
             if parallelism == crate::IndexParallelism::Rayon {
@@ -572,7 +572,7 @@ impl AnalysisSession {
             let stored_text = {
                 let db = self.snapshot_db();
                 db.lookup_source_file(file.as_ref())
-                    .map(|sf| sf.text(&db as &dyn MirDatabase))
+                    .map(|sf| sf.text(&db as &dyn MirDatabase).clone())
             };
             let Some(stored_text) = stored_text else {
                 continue;

@@ -50,6 +50,7 @@ fn infer_function_memos_bounded_under_rename_storm() {
         (0..STORM)
             .map(|i| {
                 let result = infer_function(&db, file, Arc::from(format!("f{i}")))
+                    .clone()
                     .unwrap_or_else(|| panic!("f{i} not found"));
                 Arc::downgrade(&result)
             })
@@ -97,7 +98,7 @@ fn analyze_file_memos_bounded_under_file_storm() {
             .iter()
             .map(|path| {
                 let file = db.lookup_source_file(path.as_ref()).unwrap();
-                Arc::downgrade(&analyze_file(&db, file))
+                Arc::downgrade(analyze_file(&db, file))
             })
             .collect()
     };
@@ -129,7 +130,7 @@ fn infer_scope_memos_bounded_under_rename_storm() {
         assert!(scopes.len() > LRU_CAP, "fixture must overflow the lru cap");
         scopes
             .iter()
-            .map(|key| Arc::downgrade(&infer_scope(&db, file, key.clone())))
+            .map(|key| Arc::downgrade(infer_scope(&db, file, key.clone())))
             .collect()
     };
     assert_eq!(
