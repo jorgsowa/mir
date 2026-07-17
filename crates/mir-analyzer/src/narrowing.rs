@@ -757,9 +757,9 @@ pub fn narrow_from_condition(
                             // an inline literal would be.
                             _ => extract_var_name(&key_arg.value).and_then(|name| {
                                 match ctx.get_var(&name).types.as_slice() {
-                                    [Atomic::TLiteralString(s)] => Some(
-                                        mir_types::atomic::ArrayKey::String(s.clone()),
-                                    ),
+                                    [Atomic::TLiteralString(s)] => {
+                                        Some(mir_types::atomic::ArrayKey::String(s.clone()))
+                                    }
                                     [Atomic::TLiteralInt(i)] => {
                                         Some(mir_types::atomic::ArrayKey::Int(*i))
                                     }
@@ -895,23 +895,13 @@ pub fn narrow_from_condition(
                                     // valid is_a() true-branch values — preserve them so the
                                     // true branch stays reachable and type is not wrongly erased.
                                     let narrowed = if is_true {
-                                        // Partition into string-like (kept as-is) and object-like
-                                        // (narrowed via instanceof) so `narrow_instanceof_preserving_subtypes`
-                                        // fallback doesn't inject a spurious named-object atom when
-                                        // the current type is purely string/class-string.
-                                        let mut result = Type::empty();
-                                        result.possibly_undefined = current.possibly_undefined;
-                                        result.from_docblock = current.from_docblock;
-                                        let mut obj_part = Type::empty();
-                                        for atom in &current.types {
-                                            if atom.is_string()
-                                                || matches!(atom, Atomic::TClassString(_))
-                                            {
-                                                result.add_type(atom.clone());
-                                            } else {
-                                                obj_part.add_type(atom.clone());
-                                            }
-                                        }
+                                        // Partition into string-like (kept only when consistent
+                                        // with class_name) and object-like (narrowed via
+                                        // instanceof) so `narrow_instanceof_preserving_subtypes`
+                                        // fallback doesn't inject a spurious named-object atom
+                                        // when the current type is purely string/class-string.
+                                        let (mut result, obj_part) =
+                                            partition_is_a_string_like(&current, &class_name, db);
                                         if !obj_part.is_empty() || current.is_mixed() {
                                             let obj_src = if obj_part.is_empty() {
                                                 &current
@@ -931,7 +921,7 @@ pub fn narrow_from_condition(
                                         }
                                         result
                                     } else {
-                                        filter_out_instanceof_match(&current, &class_name, db)
+                                        filter_out_is_a_string_match(&current, &class_name, db)
                                     };
                                     // Don't mark diverges when allow_string is set: a
                                     // class-string variable may still be a valid non-object
@@ -2152,6 +2142,48 @@ fn named_object_matches_instanceof(fqcn: &str, class_name: &str, db: &dyn MirDat
     fqcn == class_name || crate::db::extends_or_implements(db, fqcn, class_name)
 }
 
+/// Partition `current`'s atoms for the `allow_string: true` true-branch of
+/// `is_a($x, $class_name, true)`. A `class-string<C>` atom is kept only when
+/// `C` is (or extends) `class_name` — a class-string provably naming an
+/// unrelated class can never make `is_a()` true, so it's dropped rather than
+/// kept unconditionally. Any other string atom is kept as-is (it might name
+/// `class_name` at runtime; there's nothing more precise to narrow it to).
+/// The second element of the tuple is every non-string atom, handed back
+/// separately so the caller can narrow it via `instanceof` semantics.
+fn partition_is_a_string_like(
+    current: &Type,
+    class_name: &str,
+    db: &dyn MirDatabase,
+) -> (Type, Type) {
+    let mut string_part = Type::empty();
+    string_part.possibly_undefined = current.possibly_undefined;
+    string_part.from_docblock = current.from_docblock;
+    let mut obj_part = Type::empty();
+    for atom in &current.types {
+        if let Atomic::TClassString(Some(name)) = atom {
+            if named_object_matches_instanceof(name, class_name, db) {
+                string_part.add_type(atom.clone());
+            }
+        } else if atom.is_string() {
+            string_part.add_type(atom.clone());
+        } else {
+            obj_part.add_type(atom.clone());
+        }
+    }
+    (string_part, obj_part)
+}
+
+/// `filter_out_instanceof_match`, extended for the `allow_string: true`
+/// false-branch of `is_a()`: a `class-string<C>` atom provably matching
+/// `class_name` is also excluded (mirrors the object-atom exclusion above —
+/// `is_a()` being false rules out that specific class-string just as surely
+/// as it rules out that specific object class).
+fn filter_out_is_a_string_match(current: &Type, class_name: &str, db: &dyn MirDatabase) -> Type {
+    filter_out_instanceof_match(current, class_name, db).filter(|t| {
+        !matches!(t, Atomic::TClassString(Some(name)) if named_object_matches_instanceof(name, class_name, db))
+    })
+}
+
 /// Narrow `current` for the true branch of `is_subclass_of($obj, 'ClassName')`.
 ///
 /// Unlike `instanceof` / `is_a`, `is_subclass_of` requires a *strict* subclass:
@@ -2570,17 +2602,7 @@ fn narrow_prop_is_a(
     }
     if allow_string {
         let narrowed = if is_true {
-            let mut result = Type::empty();
-            result.possibly_undefined = current.possibly_undefined;
-            result.from_docblock = current.from_docblock;
-            let mut obj_part = Type::empty();
-            for atom in &current.types {
-                if atom.is_string() || matches!(atom, Atomic::TClassString(_)) {
-                    result.add_type(atom.clone());
-                } else {
-                    obj_part.add_type(atom.clone());
-                }
-            }
+            let (mut result, obj_part) = partition_is_a_string_like(&current, class_name, db);
             if !obj_part.is_empty() || current.is_mixed() {
                 let obj_src = if obj_part.is_empty() {
                     &current
@@ -2599,7 +2621,7 @@ fn narrow_prop_is_a(
             }
             result
         } else {
-            filter_out_instanceof_match(&current, class_name, db)
+            filter_out_is_a_string_match(&current, class_name, db)
         };
         // Same rationale as the variable case: don't mark diverges when
         // allow_string is set, since a class-string value may still pass.
