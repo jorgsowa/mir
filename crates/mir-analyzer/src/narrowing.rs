@@ -125,10 +125,14 @@ pub fn narrow_from_condition(
             else if matches!(b.right.kind, ExprKind::Bool(true)) {
                 if let Some(name) = extract_var_name(&b.left) {
                     narrow_var_bool(ctx, &name, true, effective_true);
+                } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
+                    narrow_prop_bool(ctx, &obj, &prop, db, file, true, effective_true);
                 }
             } else if matches!(b.right.kind, ExprKind::Bool(false)) {
                 if let Some(name) = extract_var_name(&b.left) {
                     narrow_var_bool(ctx, &name, false, effective_true);
+                } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
+                    narrow_prop_bool(ctx, &obj, &prop, db, file, false, effective_true);
                 } else {
                     // `strpos($h, $n) !== false` / `array_search($n, $h) === false`
                     narrow_from_false_comparable_call(&b.left, ctx, effective_true);
@@ -139,10 +143,14 @@ pub fn narrow_from_condition(
             else if matches!(b.left.kind, ExprKind::Bool(true)) {
                 if let Some(name) = extract_var_name(&b.right) {
                     narrow_var_bool(ctx, &name, true, effective_true);
+                } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
+                    narrow_prop_bool(ctx, &obj, &prop, db, file, true, effective_true);
                 }
             } else if matches!(b.left.kind, ExprKind::Bool(false)) {
                 if let Some(name) = extract_var_name(&b.right) {
                     narrow_var_bool(ctx, &name, false, effective_true);
+                } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
+                    narrow_prop_bool(ctx, &obj, &prop, db, file, false, effective_true);
                 } else {
                     narrow_from_false_comparable_call(&b.right, ctx, effective_true);
                 }
@@ -170,6 +178,17 @@ pub fn narrow_from_condition(
                 } else if let Some(name) = extract_var_name(&b.left) {
                     // `$x === 'literal'`
                     narrow_var_literal_string(ctx, &name, class_name_str, effective_true);
+                } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
+                    // `$this->prop === 'literal'`
+                    narrow_prop_literal_string(
+                        ctx,
+                        &obj,
+                        &prop,
+                        db,
+                        file,
+                        class_name_str,
+                        effective_true,
+                    );
                 }
             } else if let ExprKind::String(class_name_str) = &b.left.kind {
                 if let Some(obj_var_name) = extract_get_class_arg(&b.right) {
@@ -193,16 +212,31 @@ pub fn narrow_from_condition(
                 } else if let Some(name) = extract_var_name(&b.right) {
                     // `$x === 'literal'`
                     narrow_var_literal_string(ctx, &name, class_name_str, effective_true);
+                } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
+                    // `'literal' === $this->prop`
+                    narrow_prop_literal_string(
+                        ctx,
+                        &obj,
+                        &prop,
+                        db,
+                        file,
+                        class_name_str,
+                        effective_true,
+                    );
                 }
             }
             // `$x === 42`
             else if let ExprKind::Int(n) = &b.right.kind {
                 if let Some(name) = extract_var_name(&b.left) {
                     narrow_var_literal_int(ctx, &name, *n, effective_true);
+                } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
+                    narrow_prop_literal_int(ctx, &obj, &prop, db, file, *n, effective_true);
                 }
             } else if let ExprKind::Int(n) = &b.left.kind {
                 if let Some(name) = extract_var_name(&b.right) {
                     narrow_var_literal_int(ctx, &name, *n, effective_true);
+                } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
+                    narrow_prop_literal_int(ctx, &obj, &prop, db, file, *n, effective_true);
                 }
             }
             // `$x === EnumName::CaseName`
@@ -2482,7 +2516,7 @@ fn narrow_prop_null(
     } else {
         current.remove_null()
     };
-    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed);
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, true);
 }
 
 /// Narrow a nullsafe property access (`$obj?->prop`) by a null check.
@@ -2531,7 +2565,7 @@ fn narrow_static_prop_null(
     } else {
         current.remove_null()
     };
-    apply_prop_narrowed(ctx, fqcn, prop, current, narrowed);
+    apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, true);
 }
 
 /// Narrow a static property's type when `self::$prop instanceof ClassName` /
@@ -2578,12 +2612,13 @@ fn apply_prop_narrowed(
     prop: &str,
     current: Type,
     narrowed: Type,
+    mark_diverges: bool,
 ) {
     if !narrowed.is_empty() {
         if narrowed != current {
             ctx.set_prop_refined(obj_var, prop, narrowed);
         }
-    } else if !current.is_empty() && !current.is_mixed() {
+    } else if mark_diverges && !current.is_empty() && !current.is_mixed() {
         ctx.diverges = true;
     }
 }
@@ -2606,7 +2641,7 @@ fn narrow_prop_instanceof(
     } else {
         filter_out_instanceof_match(&current, class_name, db)
     };
-    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed);
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, true);
 }
 
 /// `is_a($obj->prop, ClassName::class)` / `is_a($obj->prop, ClassName::class, true)`
@@ -2666,7 +2701,7 @@ fn narrow_prop_is_a(
         } else {
             filter_out_instanceof_match(&current, class_name, db)
         };
-        apply_prop_narrowed(ctx, obj_var, prop, current, narrowed);
+        apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, true);
     }
 }
 
@@ -2999,8 +3034,34 @@ fn narrow_var_loose_bool(ctx: &mut FlowState, name: &str, want_truthy: bool) {
 
 fn narrow_var_bool(ctx: &mut FlowState, name: &str, value: bool, is_value: bool) {
     let current = ctx.get_var(name);
-    // `TBool` (PHP `bool`) must be split into TTrue/TFalse rather than kept wholesale.
-    // e.g. `$x: bool; if ($x === false)` → true-branch should be `false`, not `bool`.
+    let narrowed = bool_narrow_type(&current, value, is_value);
+    set_narrowed(ctx, name, &current, narrowed, false);
+}
+
+/// Property-access counterpart of `narrow_var_bool`, for
+/// `$this->prop === true`/`false` (or any `$obj->prop` receiver).
+fn narrow_prop_bool(
+    ctx: &mut FlowState,
+    obj_var: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    file: &str,
+    value: bool,
+    is_value: bool,
+) {
+    let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
+    if current.is_mixed() {
+        return;
+    }
+    let narrowed = bool_narrow_type(&current, value, is_value);
+    // mark_diverges=false: matches narrow_var_bool's rationale — a separate
+    // contradiction pass already owns flagging an always-true/false compare.
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, false);
+}
+
+/// `TBool` (PHP `bool`) must be split into TTrue/TFalse rather than kept wholesale.
+/// e.g. `$x: bool; if ($x === false)` → true-branch should be `false`, not `bool`.
+fn bool_narrow_type(current: &Type, value: bool, is_value: bool) -> Type {
     let mut narrowed = Type::empty();
     narrowed.from_docblock = current.from_docblock;
     for t in &current.types {
@@ -3025,7 +3086,7 @@ fn narrow_var_bool(ctx: &mut FlowState, name: &str, value: bool, is_value: bool)
             narrowed.add_type(t.clone());
         }
     }
-    set_narrowed(ctx, name, &current, narrowed, false);
+    narrowed
 }
 
 fn narrow_from_type_fn(ctx: &mut FlowState, fn_name: &str, var_name: &str, is_true: bool) {
@@ -3257,7 +3318,31 @@ fn narrow_from_type_fn(ctx: &mut FlowState, fn_name: &str, var_name: &str, is_tr
 
 fn narrow_var_literal_string(ctx: &mut FlowState, name: &str, value: &str, is_value: bool) {
     let current = ctx.get_var(name);
-    let narrowed = if is_value {
+    let narrowed = literal_string_narrow_type(&current, value, is_value);
+    set_narrowed(ctx, name, &current, narrowed, false);
+}
+
+/// Property-access counterpart of `narrow_var_literal_string`, for
+/// `$this->prop === 'literal'` (or any `$obj->prop` receiver).
+fn narrow_prop_literal_string(
+    ctx: &mut FlowState,
+    obj_var: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    file: &str,
+    value: &str,
+    is_value: bool,
+) {
+    let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
+    if current.is_mixed() {
+        return;
+    }
+    let narrowed = literal_string_narrow_type(&current, value, is_value);
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, false);
+}
+
+fn literal_string_narrow_type(current: &Type, value: &str, is_value: bool) -> Type {
+    if is_value {
         let lit: std::sync::Arc<str> = std::sync::Arc::from(value);
         let mut result = Type::empty();
         result.from_docblock = current.from_docblock;
@@ -3291,13 +3376,40 @@ fn narrow_var_literal_string(ctx: &mut FlowState, name: &str, value: &str, is_va
         result
     } else {
         current.filter(|t| !matches!(t, Atomic::TLiteralString(s) if s.as_ref() == value))
-    };
-    set_narrowed(ctx, name, &current, narrowed, false);
+    }
 }
 
 fn narrow_var_literal_int(ctx: &mut FlowState, name: &str, value: i64, is_value: bool) {
     let current = ctx.get_var(name);
-    let narrowed = if is_value {
+    let narrowed = literal_int_narrow_type(&current, value, is_value);
+    // For closed-precise types (bounded ranges, named int subtypes, literal unions),
+    // an empty result means the exclusion is a genuine contradiction — mark divergence.
+    let mark_diverges = crate::contradiction::is_closed_precise(&current);
+    set_narrowed(ctx, name, &current, narrowed, mark_diverges);
+}
+
+/// Property-access counterpart of `narrow_var_literal_int`, for
+/// `$this->prop === 42` (or any `$obj->prop` receiver).
+fn narrow_prop_literal_int(
+    ctx: &mut FlowState,
+    obj_var: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    file: &str,
+    value: i64,
+    is_value: bool,
+) {
+    let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
+    if current.is_mixed() {
+        return;
+    }
+    let narrowed = literal_int_narrow_type(&current, value, is_value);
+    let mark_diverges = crate::contradiction::is_closed_precise(&current);
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, mark_diverges);
+}
+
+fn literal_int_narrow_type(current: &Type, value: i64, is_value: bool) -> Type {
+    if is_value {
         let int_contains = |min: Option<i64>, max: Option<i64>| {
             min.is_none_or(|lo| value >= lo) && max.is_none_or(|hi| value <= hi)
         };
@@ -3395,11 +3507,7 @@ fn narrow_var_literal_int(ctx: &mut FlowState, name: &str, value: i64, is_value:
             }
         }
         result
-    };
-    // For closed-precise types (bounded ranges, named int subtypes, literal unions),
-    // an empty result means the exclusion is a genuine contradiction — mark divergence.
-    let mark_diverges = crate::contradiction::is_closed_precise(&current);
-    set_narrowed(ctx, name, &current, narrowed, mark_diverges);
+    }
 }
 
 /// If `ty` contains an atomic referring to the WHOLE enum `enum_fqcn` (a
@@ -3495,7 +3603,7 @@ fn narrow_prop_to_literal_enum_case(
                 if fqcn.as_ref() == enum_fqcn && c.as_ref() == case_name)
         })
     };
-    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed);
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, true);
 }
 
 fn narrow_var_to_class_string(ctx: &mut FlowState, name: &str, fqcn: &str, is_class: bool) {
