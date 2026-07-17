@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.58.0] - 2026-07-17
+
+### Added
+
+- **Narrowing:** `count()`/`strlen()` comparisons that prove an exact-zero length (`=== 0`, `< 1`, `<= 0`, etc.) now narrow to the empty collection/string, mirroring the non-empty direction (`> 0`, `!== 0`, ...) that was already handled.
+
+### Fixed
+
+- **Narrowing:** loose `==`/`!=` comparisons against `false` on call results (e.g. `strpos($h, $n) != false`) now narrow like the strict `===`/`!== false` arm already did.
+- **Narrowing:** `array_key_exists()`/`key_exists()` now resolve a variable holding an already-narrowed literal key (`$key = 'name'; array_key_exists($key, $arr)`), not just an inline string/int literal, so shape-narrowing applies to this common pattern.
+- **Narrowing:** `is_a($x, 'Foo', true)` now checks the class-string's subtype relationship instead of keeping every string/class-string atom unconditionally in the true branch — a `class-string<Bar>` atom unrelated to `Foo` is dropped from the true branch (and kept in the false branch), matching the existing object-side behavior.
+
+### Changed
+
+- Updated `salsa` from `0.27.0` to `0.28.0`; picks up php-rs-parser/php-ast/php-lexer/phpdoc-parser patch bumps transitively.
+
 ## [0.57.0] - 2026-07-16
 
 ### Added
