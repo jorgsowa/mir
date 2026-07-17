@@ -263,16 +263,16 @@ impl<'a> StatementsAnalyzer<'a> {
         // Check `@mir-check` directives
         let mir_checks = self.extract_mir_checks_from(doc.as_deref());
         let (line, line_end, col_start, col_end) = self.span_to_location(stmt.span);
-        for (var_name, expected_str) in mir_checks {
+        for (expr_text, expected_str) in mir_checks {
             let expected_raw = parse_type_string(&expected_str);
             // Resolve the expected type through the file's namespace/imports so that
             // `\Foo\Bar` in a @mir-check directive matches the stored `Foo\Bar` (sans `\`).
             let expected = resolve_union_for_file(expected_raw, self.db, &self.file);
-            let actual_raw = ctx.get_var(&var_name);
+            let actual_raw = self.expr_analyzer(ctx).eval_check_expr(&expr_text, ctx);
             if !mir_check_matches(&expected, &actual_raw) {
                 self.issues.add(Issue::new(
                     IssueKind::TypeCheckMismatch {
-                        var: var_name,
+                        var: expr_text,
                         expected: expected.to_string(),
                         actual: widen_for_check(actual_raw).to_string(),
                     },

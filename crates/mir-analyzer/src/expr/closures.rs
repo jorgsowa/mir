@@ -428,13 +428,13 @@ impl<'a> ExpressionAnalyzer<'a> {
             crate::parser::find_preceding_docblock(self.source, check_target.span.start)
         {
             let checks = crate::parser::DocblockParser::parse(&doc).mir_checks;
-            for (var_name, expected_str) in checks {
+            for (expr_text, expected_str) in checks {
                 let expected = crate::parser::docblock::parse_type_string(&expected_str);
-                let actual_raw = arrow_ctx.get_var(&var_name);
+                let actual_raw = self.eval_check_expr(&expr_text, &arrow_ctx);
                 if !mir_check_matches(&expected, &actual_raw) {
                     self.emit(
                         IssueKind::TypeCheckMismatch {
-                            var: var_name,
+                            var: expr_text,
                             expected: expected.to_string(),
                             actual: widen_for_check(actual_raw).to_string(),
                         },

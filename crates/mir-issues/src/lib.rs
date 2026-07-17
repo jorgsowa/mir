@@ -245,7 +245,10 @@ pub enum IssueKind {
         declared: String,
         inferred: String,
     },
-    /// Emitted by `mir-analyzer/src/stmt/mod.rs`.
+    /// Emitted by `@mir-check EXPR is TYPE` docblock directives (test-only —
+    /// never raised by real analysis of user code). `var` is the checked
+    /// expression's source text verbatim (e.g. `$x`, `$h->status`,
+    /// `self::$prop`), already including any `$` it needs.
     /// Fixtures: `tests/fixtures/by-kind/type_check_mismatch/`.
     TypeCheckMismatch {
         var: String,
@@ -1576,7 +1579,7 @@ impl IssueKind {
                 expected,
                 actual,
             } => {
-                format!("Type of ${var} is expected to be {expected}, got {actual}")
+                format!("Type of {var} is expected to be {expected}, got {actual}")
             }
             IssueKind::Trace {
                 variable,

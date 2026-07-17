@@ -406,11 +406,14 @@ impl DocblockParser {
                 }
                 "mir-check" => {
                     if let Some(body_str) = body_text(&tag.body) {
-                        if let Some((var_part, type_part)) = body_str.split_once(" is ") {
-                            let var_name = var_part.trim().trim_start_matches('$').to_string();
+                        if let Some((expr_part, type_part)) = body_str.split_once(" is ") {
+                            // Kept verbatim (including any leading `$`) — the
+                            // consumer parses this as a real PHP expression,
+                            // not just a bare variable name.
+                            let expr_text = expr_part.trim().to_string();
                             let type_string = type_part.trim().to_string();
-                            if !var_name.is_empty() && !type_string.is_empty() {
-                                result.mir_checks.push((var_name, type_string));
+                            if !expr_text.is_empty() && !type_string.is_empty() {
+                                result.mir_checks.push((expr_text, type_string));
                             }
                         }
                     }
@@ -588,7 +591,10 @@ pub struct ParsedDocblock {
     pub removed: Option<String>,
     /// Malformed type annotations detected during parsing.
     pub invalid_annotations: Vec<String>,
-    /// `@mir-check $var is TYPE` — (var_name_without_dollar, type_string)
+    /// `@mir-check EXPR is TYPE` — (expr_text, type_string). `expr_text` is
+    /// kept verbatim (e.g. `$h->status`, `self::$prop`, `$arr['key']`) and
+    /// parsed as a real PHP expression by the consumer, not just a bare
+    /// variable name.
     pub mir_checks: Vec<(String, String)>,
     /// `@trace $var1, $var2` or `@trace $var1 $var2` — variable names to trace
     pub trace_vars: Vec<String>,

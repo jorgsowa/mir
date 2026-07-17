@@ -29,6 +29,27 @@ pub(crate) use binary::operand_is_definitely_zero;
 #[allow(unused_imports)]
 pub use helpers::{duplicate_literal_conditions, extract_simple_var, infer_arithmetic, infer_div};
 
+/// Parses `text` as a standalone PHP expression by wrapping it as a
+/// throwaway one-statement program — the parser crate only exposes a
+/// full-program entry point, no snippet-only expression parser. Returns
+/// `None` on any parse error or if the snippet isn't a single expression
+/// statement.
+fn parse_check_expr(text: &str) -> Option<php_ast::owned::Expr> {
+    let wrapped = format!("<?php {text};");
+    let result = php_rs_parser::parse(&wrapped);
+    if !result.errors.is_empty() {
+        return None;
+    }
+    let mut stmts = result.program.stmts.into_vec();
+    if stmts.len() != 1 {
+        return None;
+    }
+    match stmts.remove(0).kind {
+        php_ast::owned::StmtKind::Expression(expr) => Some(*expr),
+        _ => None,
+    }
+}
+
 // ---------------------------------------------------------------------------
 // ExpressionAnalyzer
 // ---------------------------------------------------------------------------
@@ -102,6 +123,30 @@ impl<'a> ExpressionAnalyzer<'a> {
         let result = f(self);
         self.in_existence_check = old;
         result
+    }
+
+    /// Evaluate a test-only expression snippet (from an `@mir-check`/`@trace`
+    /// docblock directive, e.g. `$h->status` or `self::$prop`) against a flow
+    /// state, reusing the same `analyze` every other expression goes through
+    /// so any shape mir can already reason about is checkable — property
+    /// access, static properties, array/shape keys, and anything narrowing
+    /// later learns to handle, with no per-kind plumbing to maintain here.
+    /// Runs against a cloned `FlowState` and discards any issues/symbols the
+    /// check itself would have produced: it's an assertion about existing
+    /// state, not new analysis, so it must not leak into the real diagnostic
+    /// set. Returns `Type::mixed()` if `expr_text` fails to parse.
+    pub fn eval_check_expr(&mut self, expr_text: &str, ctx: &FlowState) -> Type {
+        let Some(expr) = parse_check_expr(expr_text) else {
+            return Type::mixed();
+        };
+        let mark = self.issues.issue_count();
+        let had_collect_symbols = self.collect_symbols;
+        self.collect_symbols = false;
+        let mut scratch_ctx = ctx.clone();
+        let ty = self.analyze(&expr, &mut scratch_ctx);
+        self.collect_symbols = had_collect_symbols;
+        self.issues.truncate_to(mark);
+        ty
     }
 
     /// Record a resolved symbol.
