@@ -496,6 +496,87 @@ fn subtype_index_follows_reparenting_edit() {
     assert_eq!(subs.len(), 1, "new edge must be present: {subs:?}");
 }
 
+/// `indexed_subtype_classes`'s on-demand completeness pass prefilters
+/// uncommitted files by scanning their raw text for the frontier class's
+/// short name (`mentions_identifier`). When that name is a multibyte PHP
+/// identifier, an uncommitted file containing it embedded as a substring of
+/// a longer identifier must not crash the scan — it must simply be
+/// correctly rejected as a non-match — and a real subtype declared
+/// elsewhere in the same uncommitted file must still be found.
+#[test]
+fn subtype_scan_survives_multibyte_identifier_false_match() {
+    let files = [
+        ("animal.php", "<?php\nnamespace Zoo;\ninterface Éclair {}\n"),
+        (
+            "cat.php",
+            // `xÉclairFoo` is a substring false-match for the short name
+            // `Éclair` that the prefilter must skip over without panicking,
+            // before it reaches the real `implements Éclair` below.
+            "<?php\nnamespace Pets;\nfunction xÉclairFoo(): void {}\nclass Cat implements \\Zoo\\Éclair {}\n",
+        ),
+    ];
+    let session = session_with(&files);
+    let subs = session.indexed_subtype_classes("Zoo\\Éclair", &paths(&files), false);
+    let names: Vec<&str> = subs.iter().map(|s| s.fqcn.as_ref()).collect();
+    assert_eq!(names, vec!["Pets\\Cat"], "{names:?}");
+}
+
+/// Same hazard as `subtype_scan_survives_multibyte_identifier_false_match`,
+/// but the scanned file contains *only* the false substring match and no
+/// real subtype at all — the prefilter must reject the whole file cleanly
+/// (empty result, no panic) rather than needing a later real match to
+/// terminate the scan loop correctly.
+#[test]
+fn subtype_scan_multibyte_identifier_with_only_false_match_does_not_panic() {
+    let files = [
+        ("animal.php", "<?php\nnamespace Zoo;\ninterface Éclair {}\n"),
+        (
+            "unrelated.php",
+            "<?php\nnamespace Pets;\nfunction xÉclairFoo(): void {}\n",
+        ),
+    ];
+    let session = session_with(&files);
+    let subs = session.indexed_subtype_classes("Zoo\\Éclair", &paths(&files), false);
+    assert!(subs.is_empty(), "{subs:?}");
+}
+
+/// Same hazard again, using leading characters of different UTF-8 encoded
+/// lengths (2-byte, 3-byte, 4-byte) as the first character of the class
+/// short name, so the prefilter's skip-forward must correctly step past
+/// codepoints of every width PHP identifiers can contain.
+#[test]
+fn subtype_scan_survives_three_and_four_byte_leading_char_identifiers() {
+    let files = [
+        (
+            "shapes.php",
+            "<?php\nnamespace Zoo;\ninterface 书Shape {}\ninterface 😀Shape {}\n",
+        ),
+        (
+            "impls.php",
+            // `x书ShapeFoo` / `x😀ShapeFoo` are substring false-matches the
+            // prefilter must skip over before reaching the real implements.
+            "<?php\nnamespace Pets;\nfunction x书ShapeFoo(): void {}\nfunction x😀ShapeFoo(): void {}\nclass Box implements \\Zoo\\书Shape, \\Zoo\\😀Shape {}\n",
+        ),
+    ];
+    let session = session_with(&files);
+    let three_byte = session.indexed_subtype_classes("Zoo\\书Shape", &paths(&files), false);
+    let four_byte = session.indexed_subtype_classes("Zoo\\😀Shape", &paths(&files), false);
+    assert_eq!(
+        three_byte
+            .iter()
+            .map(|s| s.fqcn.as_ref())
+            .collect::<Vec<_>>(),
+        vec!["Pets\\Box"]
+    );
+    assert_eq!(
+        four_byte
+            .iter()
+            .map(|s| s.fqcn.as_ref())
+            .collect::<Vec<_>>(),
+        vec!["Pets\\Box"]
+    );
+}
+
 /// An import whose target never resolves (not yet loaded, vendor-only, or
 /// genuinely missing) still gets a `use:` posting keyed by the written FQN —
 /// an index-based rename must find/update the import line even when the

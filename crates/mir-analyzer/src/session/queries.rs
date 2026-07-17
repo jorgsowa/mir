@@ -1149,7 +1149,13 @@ fn mentions_identifier(hay: &str, needle: &str) -> bool {
         if before_ok && after_ok {
             return true;
         }
+        // Step to the next char boundary, not just the next byte: PHP allows
+        // non-ASCII bytes in identifiers, so `idx + 1` can land mid-codepoint
+        // and panic the next `hay[from..]` slice.
         from = idx + 1;
+        while from < hay_b.len() && (hay_b[from] & 0xC0) == 0x80 {
+            from += 1;
+        }
     }
     false
 }
