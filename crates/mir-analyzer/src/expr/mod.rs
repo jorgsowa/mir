@@ -182,6 +182,30 @@ impl<'a> ExpressionAnalyzer<'a> {
         });
     }
 
+    /// Record a member-access receiver's type at the gap between
+    /// `receiver_span` and `member_span` — the `->`/`?->`/`::` operator (and
+    /// any whitespace around it). `symbol_at`'s primary lookup matches the
+    /// smallest recorded span containing the query offset, so this only ever
+    /// wins at offsets no more precise symbol already covers (e.g. inside the
+    /// operator itself) — it does not shadow the member's own resolved-type
+    /// symbol or a call's `expr_span` fallback.
+    pub fn record_receiver_type(
+        &mut self,
+        receiver_span: php_ast::Span,
+        member_span: php_ast::Span,
+        ty: Type,
+    ) {
+        if receiver_span.end >= member_span.start {
+            // No gap to record into — adjacent/overlapping/malformed spans.
+            return;
+        }
+        self.record_symbol(
+            php_ast::Span::new(receiver_span.end, member_span.start),
+            ReferenceKind::Receiver,
+            ty,
+        );
+    }
+
     pub fn analyze(&mut self, expr: &php_ast::owned::Expr, ctx: &mut FlowState) -> Type {
         match &expr.kind {
             // --- Literals ---------------------------------------------------

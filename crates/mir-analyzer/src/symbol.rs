@@ -113,6 +113,15 @@ pub enum ReferenceKind {
     /// "is this ever used" check must not count the bare import as one (there
     /// is deliberately no `UnusedImport` check).
     UseImport(Box<ReferenceKind>),
+    /// The type of a member-access receiver (`$obj` in `$obj->prop`, `Foo` in
+    /// `Foo::method()`), recorded at the gap between the receiver expression
+    /// and the member token — the `->`/`?->`/`::` operator and any
+    /// intervening whitespace — rather than at the receiver's own span. This
+    /// is what lets a cursor sitting right after the operator (the position a
+    /// member-completion request fires from) resolve a type, since that
+    /// offset falls outside both the receiver expression's span and the
+    /// member's span. Not a codebase-level symbol — `to_name` returns `None`.
+    Receiver,
 }
 
 impl ReferenceKind {
@@ -135,6 +144,7 @@ impl ReferenceKind {
             ReferenceKind::GlobalConstant(fqn) => Some(crate::Name::global_constant(fqn.clone())),
             ReferenceKind::Variable(_) => None,
             ReferenceKind::UseImport(inner) => inner.to_name(),
+            ReferenceKind::Receiver => None,
         }
     }
 }

@@ -1927,3 +1927,124 @@ fn symbol_at_enum_implements_name_resolves() {
         sym.kind
     );
 }
+
+// ---------------------------------------------------------------------------
+// symbol_at — receiver type recorded at the member-access operator gap
+// ---------------------------------------------------------------------------
+
+#[test]
+fn symbol_at_property_access_gap_returns_receiver_type() {
+    // A cursor sitting on the `->` between the receiver and the property name
+    // (member completion territory) used to fall entirely outside every
+    // recorded span and return None. It should now resolve to the receiver's
+    // own type via the dedicated `Receiver` symbol recorded in that gap.
+    let dir = create_temp_dir("test");
+    let src = "<?php\nclass Foo { public string $name = ''; }\nfunction read(Foo $obj): void { $obj->name; }\n";
+    let file = write_file(&dir, "p.php", src);
+    let file_str = path_to_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    // Cursor right after `$obj`, on the `-` of `->`.
+    let gap_off = src.find("$obj->name").unwrap() as u32 + "$obj".len() as u32;
+    let sym = result
+        .symbol_at(file_str, gap_off)
+        .expect("symbol_at must not return None for the `->` gap before a property name");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::Receiver),
+        "expected Receiver, got {:?}",
+        sym.kind
+    );
+    assert_eq!(format!("{}", sym.resolved_type), "Foo");
+
+    // The property's own symbol at `name` itself must still win over the gap
+    // symbol — the fix must not shadow the existing, more precise lookup.
+    let prop_off = src.find("->name").unwrap() as u32 + 2;
+    let prop_sym = result
+        .symbol_at(file_str, prop_off)
+        .expect("symbol_at should still find PropertyAccess on the property token");
+    assert!(
+        matches!(&prop_sym.kind, ReferenceKind::PropertyAccess { property, .. } if property.as_ref() == "name"),
+        "expected PropertyAccess(name) unaffected by the gap fix, got {:?}",
+        prop_sym.kind
+    );
+}
+
+#[test]
+fn symbol_at_nullsafe_property_access_gap_returns_receiver_type() {
+    let dir = create_temp_dir("test");
+    let src =
+        "<?php\nclass Box { public int $val = 0; }\nfunction read(?Box $b): void { $b?->val; }\n";
+    let file = write_file(&dir, "np.php", src);
+    let file_str = path_to_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    // Cursor right after `$b`, on the `?` of `?->`.
+    let gap_off = src.find("$b?->val").unwrap() as u32 + "$b".len() as u32;
+    let sym = result
+        .symbol_at(file_str, gap_off)
+        .expect("symbol_at must not return None for the `?->` gap before a property name");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::Receiver),
+        "expected Receiver, got {:?}",
+        sym.kind
+    );
+    let ty = format!("{}", sym.resolved_type);
+    assert!(
+        ty.contains("Box") && ty.contains("null"),
+        "expected the nullable receiver type (Box and null), got {ty}"
+    );
+}
+
+#[test]
+fn symbol_at_static_property_access_gap_returns_receiver_type() {
+    let dir = create_temp_dir("test");
+    let src = "<?php\nclass Config { public static string $env = ''; }\nfunction read(): void { Config::$env; }\n";
+    let file = write_file(&dir, "sp.php", src);
+    let file_str = path_to_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    // Cursor right after `Config`, on the first `:` of `::`.
+    let gap_off = src.find("Config::$env").unwrap() as u32 + "Config".len() as u32;
+    let sym = result
+        .symbol_at(file_str, gap_off)
+        .expect("symbol_at must not return None for the `::` gap before a static property name");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::Receiver),
+        "expected Receiver, got {:?}",
+        sym.kind
+    );
+    assert_eq!(format!("{}", sym.resolved_type), "class-string<Config>");
+}
+
+#[test]
+fn symbol_at_self_static_property_access_gap_returns_receiver_type() {
+    let dir = create_temp_dir("test");
+    let src = "<?php\nclass Config {\n    public static string $env = '';\n    public static function read(): void { self::$env; }\n}\n";
+    let file = write_file(&dir, "ssp.php", src);
+    let file_str = path_to_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    // Cursor right after `self`, on the first `:` of `::`.
+    let gap_off = src.find("self::$env").unwrap() as u32 + "self".len() as u32;
+    let sym = result.symbol_at(file_str, gap_off).expect(
+        "symbol_at must not return None for the `self::` gap before a static property name",
+    );
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::Receiver),
+        "expected Receiver, got {:?}",
+        sym.kind
+    );
+    assert_eq!(format!("{}", sym.resolved_type), "class-string<Config>");
+}

@@ -466,6 +466,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         ctx: &mut FlowState,
     ) -> Type {
         let obj_ty = self.analyze(&pa.object, ctx);
+        self.record_receiver_type(pa.object.span, pa.property.span, obj_ty.clone());
         let prop_name =
             extract_string_from_expr(&pa.property).unwrap_or_else(|| "<dynamic>".to_string());
 
@@ -591,6 +592,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         ctx: &mut FlowState,
     ) -> Type {
         let obj_ty = self.analyze(&pa.object, ctx);
+        self.record_receiver_type(pa.object.span, pa.property.span, obj_ty.clone());
         let prop_name =
             extract_string_from_expr(&pa.property).unwrap_or_else(|| "<dynamic>".to_string());
         if prop_name == "<dynamic>" {
@@ -691,6 +693,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                             },
                             result_ty.clone(),
                         );
+                        self.record_receiver_type(
+                            spa.class.span,
+                            spa.member.span,
+                            Type::single(Atomic::TClassString(Some(mir_types::Name::from(
+                                fqcn.as_ref(),
+                            )))),
+                        );
                     }
                 }
             } else if !crate::db::class_exists(self.db, &resolved)
@@ -760,6 +769,13 @@ impl<'a> ExpressionAnalyzer<'a> {
             class_expr.span,
             ReferenceKind::ClassReference(resolved.clone()),
             Type::single(Atomic::TClassString(None)),
+        );
+        self.record_receiver_type(
+            class_expr.span,
+            member_expr.span,
+            Type::single(Atomic::TClassString(Some(mir_types::Name::from(
+                resolved.as_ref(),
+            )))),
         );
         if let Some(prop_name) = expr_name_str(member_expr) {
             // Key the reference/symbol by the property's declaring owner, not
