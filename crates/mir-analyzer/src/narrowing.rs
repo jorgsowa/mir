@@ -752,7 +752,20 @@ pub fn narrow_from_condition(
                                 std::sync::Arc::from(s.as_ref()),
                             )),
                             ExprKind::Int(i) => Some(mir_types::atomic::ArrayKey::Int(*i)),
-                            _ => None,
+                            // `$key = 'name'; array_key_exists($key, $arr)` — resolve a
+                            // variable key already narrowed to a single literal, same as
+                            // an inline literal would be.
+                            _ => extract_var_name(&key_arg.value).and_then(|name| {
+                                match ctx.get_var(&name).types.as_slice() {
+                                    [Atomic::TLiteralString(s)] => Some(
+                                        mir_types::atomic::ArrayKey::String(s.clone()),
+                                    ),
+                                    [Atomic::TLiteralInt(i)] => {
+                                        Some(mir_types::atomic::ArrayKey::Int(*i))
+                                    }
+                                    _ => None,
+                                }
+                            }),
                         };
                         if let Some(key) = literal_key {
                             if let Some(var_name) = extract_var_name(&arr_arg.value) {
