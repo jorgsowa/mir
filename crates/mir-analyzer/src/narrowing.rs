@@ -2896,6 +2896,12 @@ fn narrow_string_to_non_empty(ty: &Type) -> Type {
     result
 }
 
+/// Drop the `non-empty-string` variant when a length check proves the string
+/// is exactly empty (mirrors `Type::narrow_to_empty_collection` for arrays).
+fn narrow_string_to_empty(ty: &Type) -> Type {
+    ty.filter(|t| !matches!(t, Atomic::TNonEmptyString))
+}
+
 fn narrow_var_null(ctx: &mut FlowState, name: &str, is_null: bool) {
     let current = ctx.get_var(name);
     let narrowed = if is_null {
@@ -4390,9 +4396,42 @@ fn narrow_count_or_strlen_equality(
     }
 }
 
+/// Whether `count()`/`strlen() op n` being `is_true` proves the underlying
+/// collection/string is non-empty (`Some(true)`) or empty (`Some(false)`);
+/// `None` if the comparison proves neither (count/strlen is always >= 0, so
+/// e.g. `count($x) < 5` proves nothing about emptiness either way).
+fn count_or_strlen_emptiness(op: BinaryOp, n: i64, is_true: bool) -> Option<bool> {
+    match (op, is_true) {
+        (BinaryOp::Greater, true) if n >= 0 => Some(true), // len > 0 (or > n>=0)
+        (BinaryOp::GreaterOrEqual, true) if n >= 1 => Some(true), // len >= 1
+        (BinaryOp::Less, false) if n >= 1 => Some(true),   // NOT (len < 1)
+        (BinaryOp::LessOrEqual, false) if n >= 0 => Some(true), // NOT (len <= 0)
+        // len === N / == N, true, for a positive N: an exact positive length is non-empty.
+        (BinaryOp::Identical | BinaryOp::Equal, true) if n >= 1 => Some(true),
+        // len === 0 / == 0, false: length is proven not zero.
+        (BinaryOp::Identical | BinaryOp::Equal, false) if n == 0 => Some(true),
+        // len !== 0 / != 0, true: length is proven not zero.
+        (BinaryOp::NotIdentical | BinaryOp::NotEqual, true) if n == 0 => Some(true),
+        // len !== N / != N, false, for a positive N: length equals that N exactly.
+        (BinaryOp::NotIdentical | BinaryOp::NotEqual, false) if n >= 1 => Some(true),
+        // Mirror image: len < n / len <= n / NOT(len >= n) / NOT(len > n) with
+        // n small enough that, combined with len >= 0, length must be exactly 0.
+        (BinaryOp::Less, true) if n <= 1 => Some(false),
+        (BinaryOp::LessOrEqual, true) if n <= 0 => Some(false),
+        (BinaryOp::GreaterOrEqual, false) if n <= 1 => Some(false),
+        (BinaryOp::Greater, false) if n <= 0 => Some(false),
+        // len === 0 / == 0, true: length is proven exactly zero.
+        (BinaryOp::Identical | BinaryOp::Equal, true) if n == 0 => Some(false),
+        // len !== N / != N, false, for N == 0: length equals zero exactly.
+        (BinaryOp::NotIdentical | BinaryOp::NotEqual, false) if n == 0 => Some(false),
+        _ => None,
+    }
+}
+
 /// Narrow an array variable based on `count($arr) op n` being `is_true`.
 /// Promotes `array` / `list` to their non-empty variants when the comparison
-/// proves the count is >= 1.
+/// proves the count is >= 1, or drops the non-empty variants when it proves
+/// the count is exactly 0.
 fn narrow_array_count_comparison(
     ctx: &mut FlowState,
     arr_var: &str,
@@ -4400,37 +4439,29 @@ fn narrow_array_count_comparison(
     n: i64,
     is_true: bool,
 ) {
-    // Determine whether the comparison proves count >= 1 (i.e., non-empty).
-    let non_empty = match (op, is_true) {
-        (BinaryOp::Greater, true) if n >= 0 => true, // count > 0 (or > n>=0)
-        (BinaryOp::GreaterOrEqual, true) if n >= 1 => true, // count >= 1
-        (BinaryOp::Less, false) if n >= 1 => true,   // NOT (count < 1)
-        (BinaryOp::LessOrEqual, false) if n >= 0 => true, // NOT (count <= 0)
-        // count($x) === N / == N, true, for a positive N: an exact positive count is non-empty.
-        (BinaryOp::Identical | BinaryOp::Equal, true) if n >= 1 => true,
-        // count($x) === 0 / == 0, false: count is proven not zero.
-        (BinaryOp::Identical | BinaryOp::Equal, false) if n == 0 => true,
-        // count($x) !== 0 / != 0, true: count is proven not zero.
-        (BinaryOp::NotIdentical | BinaryOp::NotEqual, true) if n == 0 => true,
-        // count($x) !== N / != N, false, for a positive N: count equals that N exactly.
-        (BinaryOp::NotIdentical | BinaryOp::NotEqual, false) if n >= 1 => true,
-        _ => false,
-    };
-    if !non_empty {
+    let Some(non_empty) = count_or_strlen_emptiness(op, n, is_true) else {
         return;
-    }
+    };
     let current = ctx.get_var(arr_var);
     if current.is_mixed() {
         return;
     }
-    let narrowed = current.narrow_to_non_empty_collection();
-    if narrowed != current {
+    let narrowed = if non_empty {
+        current.narrow_to_non_empty_collection()
+    } else {
+        current.narrow_to_empty_collection()
+    };
+    // `narrow_to_empty_collection` can filter every atom away when `current` is
+    // already known to be exclusively non-empty (a provably-dead branch); leave
+    // the type as-is rather than collapsing the variable to an empty union.
+    if !narrowed.is_empty() && narrowed != current {
         ctx.set_var(arr_var, narrowed);
     }
 }
 
 /// Narrow a string variable based on `strlen($str) op n` being `is_true`.
-/// Promotes `string` to `non-empty-string` when the comparison proves length >= 1.
+/// Promotes `string` to `non-empty-string` when the comparison proves length
+/// >= 1, or drops `non-empty-string` when it proves length is exactly 0.
 fn narrow_string_strlen_comparison(
     ctx: &mut FlowState,
     str_var: &str,
@@ -4438,26 +4469,20 @@ fn narrow_string_strlen_comparison(
     n: i64,
     is_true: bool,
 ) {
-    let non_empty = match (op, is_true) {
-        (BinaryOp::Greater, true) if n >= 0 => true,
-        (BinaryOp::GreaterOrEqual, true) if n >= 1 => true,
-        (BinaryOp::Less, false) if n >= 1 => true,
-        (BinaryOp::LessOrEqual, false) if n >= 0 => true,
-        (BinaryOp::Identical | BinaryOp::Equal, true) if n >= 1 => true,
-        (BinaryOp::Identical | BinaryOp::Equal, false) if n == 0 => true,
-        (BinaryOp::NotIdentical | BinaryOp::NotEqual, true) if n == 0 => true,
-        (BinaryOp::NotIdentical | BinaryOp::NotEqual, false) if n >= 1 => true,
-        _ => false,
-    };
-    if !non_empty {
+    let Some(non_empty) = count_or_strlen_emptiness(op, n, is_true) else {
         return;
-    }
+    };
     let current = ctx.get_var(str_var);
     if current.is_mixed() {
         return;
     }
-    let narrowed = narrow_string_to_non_empty(&current);
-    if narrowed != current {
+    let narrowed = if non_empty {
+        narrow_string_to_non_empty(&current)
+    } else {
+        narrow_string_to_empty(&current)
+    };
+    // Same rationale as the array case above: don't collapse to an empty union.
+    if !narrowed.is_empty() && narrowed != current {
         ctx.set_var(str_var, narrowed);
     }
 }
