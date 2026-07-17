@@ -557,6 +557,37 @@ pub fn narrow_from_condition(
                     narrow_from_false_comparable_call(&b.right, ctx, effective_true);
                 }
             }
+            // `$arr == []` / `$arr != []` — loose array equality requires identical
+            // key/value pairs, so this is exactly as sound as the strict `===` case.
+            else if let ExprKind::Array(elems) = &b.right.kind {
+                if elems.is_empty() {
+                    if let Some(var_name) = extract_var_name(&b.left) {
+                        let current = ctx.get_var(&var_name);
+                        let narrowed = if effective_true {
+                            current.narrow_to_empty_collection()
+                        } else {
+                            current.narrow_to_non_empty_collection()
+                        };
+                        if !narrowed.is_empty() && narrowed != current {
+                            ctx.set_var(&var_name, narrowed);
+                        }
+                    }
+                }
+            } else if let ExprKind::Array(elems) = &b.left.kind {
+                if elems.is_empty() {
+                    if let Some(var_name) = extract_var_name(&b.right) {
+                        let current = ctx.get_var(&var_name);
+                        let narrowed = if effective_true {
+                            current.narrow_to_empty_collection()
+                        } else {
+                            current.narrow_to_non_empty_collection()
+                        };
+                        if !narrowed.is_empty() && narrowed != current {
+                            ctx.set_var(&var_name, narrowed);
+                        }
+                    }
+                }
+            }
         }
 
         // $x instanceof ClassName  /  $this->prop instanceof ClassName
