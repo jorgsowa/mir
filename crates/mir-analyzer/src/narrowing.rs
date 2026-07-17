@@ -545,10 +545,16 @@ pub fn narrow_from_condition(
             else if let ExprKind::Bool(value) = &b.right.kind {
                 if let Some(name) = extract_var_name(&b.left) {
                     narrow_var_loose_bool(ctx, &name, *value == effective_true);
+                } else if !value {
+                    // `strpos($h, $n) == false` / `!= false` — same
+                    // false-comparable narrowing as the strict `===`/`!==` arm.
+                    narrow_from_false_comparable_call(&b.left, ctx, effective_true);
                 }
             } else if let ExprKind::Bool(value) = &b.left.kind {
                 if let Some(name) = extract_var_name(&b.right) {
                     narrow_var_loose_bool(ctx, &name, *value == effective_true);
+                } else if !value {
+                    narrow_from_false_comparable_call(&b.right, ctx, effective_true);
                 }
             }
         }
