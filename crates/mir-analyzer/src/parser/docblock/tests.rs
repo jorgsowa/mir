@@ -658,6 +658,12 @@ fn value_of_keyed_array_is_value_union() {
 }
 
 #[test]
+fn lone_quote_does_not_panic() {
+    assert!(matches!(parse_type_string("'").types[0], Atomic::TMixed));
+    assert!(matches!(parse_type_string("\"").types[0], Atomic::TMixed));
+}
+
+#[test]
 fn value_of_union_of_lists_and_shapes() {
     let u = parse_type_string("value-of<list<0|1|2>|array{0: 3, 1: 4}>");
     for n in [0, 1, 2, 3, 4] {

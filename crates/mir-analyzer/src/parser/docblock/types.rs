@@ -241,9 +241,11 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
             }
         }
 
-        // String literal: `'foo'` or `"bar"`
-        _ if (s.starts_with('\'') && s.ends_with('\''))
-            || (s.starts_with('"') && s.ends_with('"')) =>
+        // String literal: `'foo'` or `"bar"` (len check excludes a lone quote, which would
+        // otherwise satisfy both starts_with/ends_with and panic on the slice below)
+        _ if s.len() >= 2
+            && ((s.starts_with('\'') && s.ends_with('\''))
+                || (s.starts_with('"') && s.ends_with('"'))) =>
         {
             let inner = &s[1..s.len() - 1];
             Type::single(Atomic::TLiteralString(Arc::from(inner)))
