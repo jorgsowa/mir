@@ -2506,6 +2506,18 @@ fn narrow_prop_null(
     file: &str,
     is_null: bool,
 ) {
+    narrow_prop_null_with_divergence(ctx, obj_var, prop, db, file, is_null, true);
+}
+
+fn narrow_prop_null_with_divergence(
+    ctx: &mut FlowState,
+    obj_var: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    file: &str,
+    is_null: bool,
+    mark_diverges: bool,
+) {
     let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
 
     if current.is_mixed() {
@@ -2516,7 +2528,7 @@ fn narrow_prop_null(
     } else {
         current.remove_null()
     };
-    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, true);
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, mark_diverges);
 }
 
 /// Narrow a nullsafe property access (`$obj?->prop`) by a null check.
@@ -2532,7 +2544,12 @@ fn narrow_nullsafe_prop_null(
     file: &str,
     is_null: bool,
 ) {
-    narrow_prop_null(ctx, obj_var, prop, db, file, is_null);
+    // A nullsafe access reads as null when EITHER the receiver is null (the
+    // short-circuit) OR the property's own value is null — proving the
+    // property's own type excludes null doesn't rule out the receiver-null
+    // source, so the `is_null=true` direction must never mark divergence
+    // here, unlike the direct (non-nullsafe) `narrow_prop_null`.
+    narrow_prop_null_with_divergence(ctx, obj_var, prop, db, file, is_null, !is_null);
     if !is_null {
         narrow_var_null(ctx, obj_var, false);
     }

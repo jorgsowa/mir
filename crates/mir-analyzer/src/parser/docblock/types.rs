@@ -600,8 +600,7 @@ pub(super) fn strip_quotes(s: &str) -> &str {
     // starts_with/ends_with and panic on the slice below (same bug as the
     // string-literal arm of parse_type_string).
     if s.len() >= 2
-        && ((s.starts_with('\'') && s.ends_with('\''))
-            || (s.starts_with('"') && s.ends_with('"')))
+        && ((s.starts_with('\'') && s.ends_with('\'')) || (s.starts_with('"') && s.ends_with('"')))
     {
         &s[1..s.len() - 1]
     } else {
