@@ -1133,6 +1133,23 @@ pub(super) fn contains_unquoted(s: &str, target: char) -> bool {
     false
 }
 
+/// Whether `s` contains a `'` or `"` that is opened but never closed —
+/// e.g. a lone `'`, or `'foo` with no closing quote. PHP type syntax never
+/// contains an unterminated string literal, at top level or nested inside a
+/// generic/shape (`array{': int}`).
+pub(super) fn has_unterminated_quote(s: &str) -> bool {
+    let mut in_quote: Option<char> = None;
+    for ch in s.chars() {
+        match in_quote {
+            Some(q) if ch == q => in_quote = None,
+            Some(_) => {}
+            None if ch == '\'' || ch == '"' => in_quote = Some(ch),
+            None => {}
+        }
+    }
+    in_quote.is_some()
+}
+
 pub(super) fn is_inside_generics(s: &str) -> bool {
     let mut depth = 0i32;
     let mut in_quote: Option<char> = None;

@@ -494,6 +494,63 @@ fn validate_unclosed_generic_var() {
 }
 
 #[test]
+fn validate_unterminated_string_literal_lone_quote() {
+    let parsed = DocblockParser::parse("/** @var ' */");
+    assert_eq!(parsed.invalid_annotations.len(), 1);
+    assert!(
+        parsed.invalid_annotations[0].contains("unterminated string literal"),
+        "got: {}",
+        parsed.invalid_annotations[0]
+    );
+}
+
+#[test]
+fn validate_unterminated_string_literal_with_content() {
+    // Not just a lone quote — an opening quote with real content and no closer.
+    let parsed = DocblockParser::parse("/** @return 'foo */");
+    assert_eq!(parsed.invalid_annotations.len(), 1);
+    assert!(
+        parsed.invalid_annotations[0].contains("unterminated string literal"),
+        "got: {}",
+        parsed.invalid_annotations[0]
+    );
+}
+
+#[test]
+fn validate_unterminated_string_literal_in_array_shape_key() {
+    let parsed = DocblockParser::parse("/** @var array{': int} */");
+    assert_eq!(parsed.invalid_annotations.len(), 1);
+    assert!(
+        parsed.invalid_annotations[0].contains("unterminated string literal"),
+        "got: {}",
+        parsed.invalid_annotations[0]
+    );
+}
+
+#[test]
+fn validate_unterminated_string_literal_in_union() {
+    let parsed = DocblockParser::parse("/** @var 'a'|' */");
+    assert_eq!(parsed.invalid_annotations.len(), 1);
+    assert!(
+        parsed.invalid_annotations[0].contains("unterminated string literal"),
+        "got: {}",
+        parsed.invalid_annotations[0]
+    );
+}
+
+#[test]
+fn validate_balanced_quotes_are_not_flagged() {
+    // Sanity check: a properly closed literal-string union must not trip the
+    // unterminated-quote check.
+    let parsed = DocblockParser::parse("/** @var 'a'|'b' */");
+    assert!(
+        parsed.invalid_annotations.is_empty(),
+        "unexpected error: {:?}",
+        parsed.invalid_annotations
+    );
+}
+
+#[test]
 fn validate_variable_in_template_bound() {
     let parsed = DocblockParser::parse("/** @template T of $invalid */");
     assert_eq!(parsed.invalid_annotations.len(), 1);

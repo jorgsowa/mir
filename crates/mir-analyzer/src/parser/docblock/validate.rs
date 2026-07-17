@@ -16,6 +16,7 @@ pub(super) fn normalize_fqcn(s: &str) -> String {
 /// - unclosed generics (`array<`, `Foo<Bar`)
 /// - `$variable` in type position (only `$this` is valid)
 /// - a stray `@` (an adjacent tag glued on with no separating space)
+/// - an unterminated string literal (a lone `'`/`"`, or `'foo` with no closing quote)
 pub(super) fn validate_type_str(s: &str, tag: &str) -> Option<String> {
     let s = s.trim();
     if s.is_empty() {
@@ -29,6 +30,14 @@ pub(super) fn validate_type_str(s: &str, tag: &str) -> Option<String> {
     if contains_unquoted(s, '@') {
         return Some(format!(
             "@{tag} has a malformed type `{s}` — a neighboring tag may be missing a space"
+        ));
+    }
+    // Must run before is_inside_generics: an unterminated quote (e.g. a lone
+    // `'`) swallows any following brackets into the quote, which is_inside_generics
+    // would otherwise misreport as an unclosed generic instead of the real problem.
+    if has_unterminated_quote(s) {
+        return Some(format!(
+            "@{tag} has an unterminated string literal in `{s}`"
         ));
     }
     if is_inside_generics(s) {
