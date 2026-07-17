@@ -251,6 +251,17 @@ impl AnalysisSession {
         // ---- Class-level checks ---------------------------------------------
         let analyzed_file_set: HashSet<Arc<str>> =
             file_data.iter().map(|(f, _)| f.clone()).collect();
+
+        // Definitions are all collected and indexed — fire the plugin hook
+        // (Psalm's AfterCodebasePopulated) before any body/class analysis.
+        if let Some(plugins) = mir_plugin::snapshot() {
+            if plugins.hooks().after_codebase_populated {
+                let files: Vec<Arc<str>> = analyzed_file_set.iter().cloned().collect();
+                plugins.after_codebase_populated(&mut mir_plugin::AfterCodebasePopulatedEvent {
+                    files: &files,
+                });
+            }
+        }
         let _t_class_analyzer = std::time::Instant::now();
         {
             let class_db = {
@@ -459,6 +470,14 @@ impl AnalysisSession {
                 (_t_body_analysis - _t_class_checks).as_secs_f64() * 1000.0,
                 _t_total.as_secs_f64() * 1000.0,
             );
+        }
+
+        // Plugin issue veto (Psalm's BeforeAddIssue) — applied to the final
+        // set before config-level suppression so a veto can't be shadowed.
+        if let Some(plugins) = mir_plugin::snapshot() {
+            if plugins.hooks().before_add_issue {
+                all_issues.retain(|i| plugins.before_add_issue(i));
+            }
         }
 
         opts.apply(&mut all_issues);

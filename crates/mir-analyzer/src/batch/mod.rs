@@ -110,13 +110,14 @@ impl BatchOptions {
             .any(|k| !self.suppressed_issue_kinds.contains(*k))
     }
 
-    /// Drop issues whose [`IssueKind::name()`] is listed in
-    /// [`Self::suppressed_issue_kinds`].
+    /// Drop issues whose [`IssueKind::display_name()`] is listed in
+    /// [`Self::suppressed_issue_kinds`] (display_name so plugin issues can be
+    /// suppressed by their own names).
     fn apply(&self, issues: &mut Vec<Issue>) {
         if self.suppressed_issue_kinds.is_empty() {
             return;
         }
-        issues.retain(|i| !self.suppressed_issue_kinds.contains(i.kind.name()));
+        issues.retain(|i| !self.suppressed_issue_kinds.contains(i.kind.display_name()));
     }
 }
 
@@ -202,7 +203,7 @@ impl AnalysisSession {
                     .map(|sf| SuppressionMap::from_source(sf.text(&db)))
             });
             if let Some(map) = map.as_ref() {
-                if map.is_suppressed(issue.location.line, issue.kind.name(), issue.kind.code()) {
+                if map.is_suppressed(issue.location.line, issue.kind.display_name(), issue.kind.code()) {
                     issue.suppressed = true;
                 }
             }
@@ -257,7 +258,7 @@ impl AnalysisSession {
                 for (line, kind) in unused {
                     let loc = mir_types::Location::new(file.clone(), line, line, 0, 0);
                     let mut issue = Issue::new(mir_issues::IssueKind::UnusedSuppress { kind }, loc);
-                    if map.is_suppressed(line, issue.kind.name(), issue.kind.code()) {
+                    if map.is_suppressed(line, issue.kind.display_name(), issue.kind.code()) {
                         issue.suppressed = true;
                     }
                     new_issues.push(issue);
@@ -363,6 +364,11 @@ pub fn analyze_source(source: &str) -> AnalysisResult {
         &mut type_envs,
         &mut all_symbols,
     ));
+    if let Some(plugins) = mir_plugin::snapshot() {
+        if plugins.hooks().before_add_issue {
+            all_issues.retain(|i| plugins.before_add_issue(i));
+        }
+    }
     mark_suppressed(&mut all_issues, &suppressions);
     emit_unused_suppressions(&mut all_issues, &suppressions, &file);
     AnalysisResult::build(all_issues, type_envs, all_symbols)
@@ -377,7 +383,7 @@ fn mark_suppressed(issues: &mut [Issue], suppressions: &crate::suppression::Supp
     }
     for issue in issues.iter_mut() {
         if !issue.suppressed
-            && suppressions.is_suppressed(issue.location.line, issue.kind.name(), issue.kind.code())
+            && suppressions.is_suppressed(issue.location.line, issue.kind.display_name(), issue.kind.code())
         {
             issue.suppressed = true;
         }
@@ -398,7 +404,7 @@ fn emit_unused_suppressions(
     for (line, kind) in unused {
         let loc = mir_types::Location::new(file.clone(), line, line, 0, 0);
         let mut issue = Issue::new(mir_issues::IssueKind::UnusedSuppress { kind }, loc);
-        if suppressions.is_suppressed(line, issue.kind.name(), issue.kind.code()) {
+        if suppressions.is_suppressed(line, issue.kind.display_name(), issue.kind.code()) {
             issue.suppressed = true;
         }
         all_issues.push(issue);

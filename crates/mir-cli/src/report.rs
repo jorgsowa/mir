@@ -81,7 +81,7 @@ pub fn run_output(
                 .enumerate()
                 .filter_map(|(idx, issue)| {
                     let file = issue.location.file.as_ref();
-                    let kind = issue.kind.name();
+                    let kind = issue.kind.display_name();
                     let snippet = issue.snippet.as_deref().unwrap_or("");
                     let matched = bl.consume(file, kind, snippet);
                     if matched {
@@ -247,7 +247,7 @@ fn effective_severity(issue: &Issue, config: &Config) -> Option<Severity> {
     if issue.suppressed {
         return None;
     }
-    let sev = if let Some(level) = config.issue_handlers.get(issue.kind.name()) {
+    let sev = if let Some(level) = config.issue_handlers.get(issue.kind.display_name()) {
         match level {
             ErrorLevel::Error => Severity::Error,
             ErrorLevel::Warning => Severity::Warning,
@@ -266,7 +266,7 @@ fn baseline_from_issues(issues: &[Issue]) -> Baseline {
         bl.entries
             .entry(issue.location.file.to_string())
             .or_default()
-            .entry(issue.kind.name().to_string())
+            .entry(issue.kind.display_name().to_string())
             .or_default()
             .push(issue.snippet.clone().unwrap_or_default());
     }

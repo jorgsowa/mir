@@ -883,6 +883,15 @@ impl CallAnalyzer {
                 _ => return_ty,
             };
 
+            let mut return_ty = return_ty;
+            ea.apply_function_call_plugins(
+                resolved.fqn.as_ref(),
+                &call.args,
+                &arg_types,
+                span,
+                &mut return_ty,
+            );
+
             // array_push/array_unshift: the by-ref loop above set $arr to the stub's
             // generic `array` type — replace it with the precise post-push type derived
             // from the original array type (arg_types[0]) and the pushed value types.

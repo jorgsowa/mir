@@ -10,7 +10,7 @@ mod return_type;
 pub(crate) use loops::infer_foreach_types;
 use loops::{vars_stabilized, widen_unstable};
 pub(crate) use return_type::named_object_return_compatible;
-use return_type::resolve_union_for_file;
+pub(crate) use return_type::resolve_union_for_file;
 
 use std::sync::Arc;
 
@@ -116,6 +116,9 @@ pub struct StatementsAnalyzer<'a> {
     /// real loop, `false` if it's a `switch`. `continue` behaves differently
     /// depending on which kind its target level is — see `analyze_continue_stmt`.
     loop_kind_stack: Vec<bool>,
+    /// Snapshot of the installed plugin registry — see
+    /// `ExpressionAnalyzer::plugins`.
+    plugins: Option<std::sync::Arc<mir_plugin::PluginRegistry>>,
 }
 
 impl<'a> StatementsAnalyzer<'a> {
@@ -144,6 +147,7 @@ impl<'a> StatementsAnalyzer<'a> {
             yielded_types: Vec::new(),
             break_ctx_stack: Vec::new(),
             loop_kind_stack: Vec::new(),
+            plugins: mir_plugin::snapshot(),
         }
     }
 
@@ -498,8 +502,58 @@ impl<'a> StatementsAnalyzer<'a> {
             apply_post_narrow(stmt, ann, ctx);
         }
 
+        if let Some(plugins) = self.plugins.clone() {
+            if plugins.hooks().after_statement_analysis {
+                let file = self.file.clone();
+                let mut event = mir_plugin::AfterStatementAnalysisEvent {
+                    stmt,
+                    file: file.as_ref(),
+                    issues: Vec::new(),
+                };
+                plugins.after_statement_analysis(&mut event);
+                let issues = event.issues;
+                self.emit_plugin_issues(issues, stmt.span);
+            }
+        }
+
+        // Runs after the plugin hook so statement-level `@mir-suppress` also
+        // covers plugin-raised issues.
         if !suppressions.is_empty() {
             self.issues.suppress_range(before, &suppressions);
+        }
+    }
+
+    /// Convert plugin-raised issues into diagnostics — statement-level twin
+    /// of `ExpressionAnalyzer::emit_plugin_issues`.
+    fn emit_plugin_issues(
+        &mut self,
+        issues: Vec<mir_plugin::PluginIssue>,
+        default_span: php_ast::Span,
+    ) {
+        for pi in issues {
+            let span = pi.span.unwrap_or(default_span);
+            let (line, line_end, col_start, col_end) = self.span_to_location(span);
+            let mut issue = Issue::new(
+                IssueKind::PluginIssue {
+                    name: pi.name,
+                    message: pi.message,
+                },
+                Location {
+                    file: self.file.clone(),
+                    line,
+                    line_end,
+                    col_start,
+                    col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
+                },
+            );
+            issue.severity = pi.severity;
+            if let Some(text) = crate::parser::span_text(self.source, span) {
+                let trimmed = text.trim();
+                if !trimmed.is_empty() {
+                    issue.snippet = Some(trimmed.to_string());
+                }
+            }
+            self.issues.add(issue);
         }
     }
 

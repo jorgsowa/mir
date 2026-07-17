@@ -15,7 +15,7 @@ pub fn format_issue(issue: &Issue) -> String {
         issue.location.bright_black(),
         sev,
         issue.kind.code().bright_black(),
-        issue.kind.name().bold(),
+        issue.kind.display_name().bold(),
         issue.kind.message()
     )
 }
@@ -58,7 +58,7 @@ pub fn format_junit(issues: &[&Issue]) -> String {
             failures,
         ));
         for issue in file_issues.iter() {
-            let name = issue.kind.name();
+            let name = issue.kind.display_name();
             let msg = issue.kind.message();
             let severity = match issue.severity {
                 Severity::Error => "failure",
@@ -113,7 +113,7 @@ pub fn format_sarif(issues: &[&Issue]) -> String {
         std::collections::HashMap::new();
     for issue in issues {
         rule_map
-            .entry(issue.kind.name().to_string())
+            .entry(issue.kind.display_name().to_string())
             .or_insert_with(|| issue.kind.default_severity());
     }
     let mut rule_ids: Vec<String> = rule_map.keys().cloned().collect();
@@ -156,7 +156,7 @@ pub fn format_sarif(issues: &[&Issue]) -> String {
             // GitHub Code Scanning can track findings across renames/reformats.
             let fingerprint_input = format!(
                 "{}:{}",
-                issue.kind.name(),
+                issue.kind.display_name(),
                 issue.snippet.as_deref().unwrap_or("")
             );
             let fingerprint = format!("{:016x}", fnv1a(&fingerprint_input));
@@ -170,7 +170,7 @@ pub fn format_sarif(issues: &[&Issue]) -> String {
 
             // SARIF 2.1.0 §3.30.5: columns are 1-based; col_start/col_end are 0-based.
             serde_json::json!({
-                "ruleId": issue.kind.name(),
+                "ruleId": issue.kind.display_name(),
                 "level": level,
                 "rank": rank,
                 "message": { "text": issue.kind.message() },

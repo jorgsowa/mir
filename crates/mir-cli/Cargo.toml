@@ -16,6 +16,7 @@ path = "src/main.rs"
 mir-analyzer = { workspace = true }
 mir-issues   = { workspace = true }
 mir-codebase = { workspace = true }
+mir-plugin   = { workspace = true, features = ["dylib", "psalm-bridge"] }
 mimalloc     = { workspace = true }
 clap         = { workspace = true }
 indicatif    = { workspace = true }

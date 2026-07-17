@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Plugin system** (new `mir-plugin` crate), modeled on Psalm's plugin API:
+  - Rust plugins implement the `MirPlugin` trait with Psalm-style hooks —
+    `after_expression_analysis`, `after_statement_analysis`,
+    `after_function_call_analysis`, `after_method_call_analysis`,
+    function/method return-type providers, `before_add_issue`, and
+    `after_codebase_populated` — and are either compiled in or loaded from a
+    cdylib declared via `<plugins><rustPlugin path="..."/></plugins>`
+    (`mir_plugin::export_plugin!`; same-toolchain builds required).
+  - Existing Psalm PHP plugins are reused through
+    `<plugins><pluginClass class="..."/></plugins>` (psalm.xml syntax): mir
+    spawns a PHP host that boots the project's composer autoloader, runs each
+    plugin's entry point, and bridges over JSON-RPC. Supported in this first
+    cut: `addStubFile` (full), `FunctionReturnTypeProviderInterface` and
+    `MethodReturnTypeProviderInterface` (best effort, cached per call
+    signature); other hook registrations are reported and skipped.
+  - Plugins emit custom issues (`PluginIssue`, code `MIR1509`) that respect
+    `@mir-suppress <Name>`, `<issueHandlers>`, and baselines under their own
+    issue names.
+
 ## [0.58.0] - 2026-07-17
 
 ### Added

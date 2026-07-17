@@ -12,6 +12,7 @@ homepage.workspace   = true
 mir-types    = { workspace = true }
 mir-issues   = { workspace = true }
 mir-codebase = { workspace = true }
+mir-plugin   = { workspace = true }
 php-ast       = { workspace = true }
 php-rs-parser = { workspace = true }
 php-lexer     = { workspace = true }
@@ -34,6 +35,7 @@ rayon = { workspace = true }
 
 [dev-dependencies]
 mir-issues     = { workspace = true }
+mir-plugin     = { workspace = true }
 tempfile = "3.27.0"
 criterion = { version = "0.8", features = ["html_reports"] }
 mimalloc  = { workspace = true }

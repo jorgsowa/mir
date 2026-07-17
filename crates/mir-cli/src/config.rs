@@ -27,6 +27,17 @@ impl ErrorLevel {
     }
 }
 
+/// One `<pluginClass class="..."/>` entry from `<plugins>` — a Psalm PHP
+/// plugin entry-point class, exactly as psalm.xml declares them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PsalmPluginEntry {
+    pub class: String,
+    /// The `<pluginClass>` element re-wrapped around its inner XML, when the
+    /// entry carried plugin-specific config; passed to the plugin as its
+    /// `SimpleXMLElement`.
+    pub config_xml: Option<String>,
+}
+
 /// Parsed contents of `mir.xml`.
 #[derive(Debug, Clone)]
 pub struct Config {
@@ -48,6 +59,10 @@ pub struct Config {
     pub stub_files: Vec<String>,
     /// External stub directories to load (from `<stubs><directory name="..."/>`).
     pub stub_dirs: Vec<String>,
+    /// Psalm PHP plugins (from `<plugins><pluginClass class="..."/>`).
+    pub psalm_plugins: Vec<PsalmPluginEntry>,
+    /// Rust cdylib plugins (from `<plugins><rustPlugin path="..."/>`).
+    pub rust_plugins: Vec<String>,
 }
 
 impl Default for Config {
@@ -62,6 +77,8 @@ impl Default for Config {
             find_unused_variables: false,
             stub_files: Vec::new(),
             stub_dirs: Vec::new(),
+            psalm_plugins: Vec::new(),
+            rust_plugins: Vec::new(),
         }
     }
 }
@@ -169,6 +186,35 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
                     collect_stub_entry(&e, &path, &mut config);
                 }
 
+                // <pluginClass class="..."> inside <plugins>: consume the whole
+                // element (its inner XML is the plugin's own config, passed
+                // through verbatim) — so it is NOT pushed onto the path.
+                if name == "pluginClass" && path.last().is_some_and(|s: &String| s == "plugins") {
+                    let class = attr_value(&e, "class");
+                    let inner = reader
+                        .read_text(e.name())
+                        .map_err(|e| ConfigError::Parse(e.to_string()))?;
+                    if let Some(class) = class {
+                        // Raw inner XML (markup included) — passed through to
+                        // the plugin verbatim as its config element body.
+                        let inner_raw = String::from_utf8_lossy(inner.as_ref());
+                        let inner = inner_raw.trim();
+                        config.psalm_plugins.push(PsalmPluginEntry {
+                            class,
+                            config_xml: (!inner.is_empty())
+                                .then(|| format!("<pluginClass>{inner}</pluginClass>")),
+                        });
+                    }
+                    continue;
+                }
+
+                // <rustPlugin path="..."> inside <plugins>
+                if name == "rustPlugin" && path.last().is_some_and(|s: &String| s == "plugins") {
+                    if let Some(p) = attr_value(&e, "path") {
+                        config.rust_plugins.push(p);
+                    }
+                }
+
                 text_buf.clear();
                 path.push(name);
             }
@@ -195,6 +241,21 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
                 // <file name="..."/> or <directory name="..."/> inside <stubs>
                 if name == "file" || name == "directory" {
                     collect_stub_entry(&e, &path, &mut config);
+                }
+
+                if path.last().is_some_and(|s: &String| s == "plugins") {
+                    if name == "pluginClass" {
+                        if let Some(class) = attr_value(&e, "class") {
+                            config.psalm_plugins.push(PsalmPluginEntry {
+                                class,
+                                config_xml: None,
+                            });
+                        }
+                    } else if name == "rustPlugin" {
+                        if let Some(p) = attr_value(&e, "path") {
+                            config.rust_plugins.push(p);
+                        }
+                    }
                 }
             }
 
@@ -281,6 +342,13 @@ fn collect_stub_entry<'a>(
 
 fn bytes_to_string(b: &[u8]) -> String {
     String::from_utf8_lossy(b).into_owned()
+}
+
+/// Value of the named attribute on an element, if present.
+fn attr_value(e: &quick_xml::events::BytesStart<'_>, name: &str) -> Option<String> {
+    e.attributes().flatten().find_map(|attr| {
+        (bytes_to_string(attr.key.as_ref()) == name).then(|| bytes_to_string(&attr.value))
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -515,6 +583,65 @@ mod tests {
         .unwrap();
         assert_eq!(cfg.stub_dirs, vec!["stubs/doctrine"]);
         assert!(cfg.stub_files.is_empty());
+    }
+
+    #[test]
+    fn parses_plugin_class_entries() {
+        let cfg = Config::parse(
+            r#"<psalm>
+                <plugins>
+                    <pluginClass class="Psalm\PhpUnitPlugin\Plugin"/>
+                    <pluginClass class="Foo\Plugin">
+                        <option value="1"/>
+                    </pluginClass>
+                </plugins>
+            </psalm>"#,
+        )
+        .unwrap();
+        assert_eq!(
+            cfg.psalm_plugins,
+            vec![
+                PsalmPluginEntry {
+                    class: "Psalm\\PhpUnitPlugin\\Plugin".to_string(),
+                    config_xml: None,
+                },
+                PsalmPluginEntry {
+                    class: "Foo\\Plugin".to_string(),
+                    config_xml: Some("<pluginClass><option value=\"1\"/></pluginClass>".to_string()),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn parses_rust_plugin_entries() {
+        let cfg = Config::parse(
+            r#"<mir>
+                <plugins>
+                    <rustPlugin path="plugins/libmy_plugin.dylib"/>
+                </plugins>
+            </mir>"#,
+        )
+        .unwrap();
+        assert_eq!(cfg.rust_plugins, vec!["plugins/libmy_plugin.dylib"]);
+        assert!(cfg.psalm_plugins.is_empty());
+    }
+
+    #[test]
+    fn plugin_class_with_config_still_parses_following_elements() {
+        let cfg = Config::parse(
+            r#"<mir>
+                <plugins>
+                    <pluginClass class="Foo\Plugin"><x/></pluginClass>
+                </plugins>
+                <projectFiles>
+                    <directory name="src"/>
+                </projectFiles>
+            </mir>"#,
+        )
+        .unwrap();
+        assert_eq!(cfg.psalm_plugins.len(), 1);
+        assert_eq!(cfg.project_dirs, vec!["src"]);
     }
 
     #[test]

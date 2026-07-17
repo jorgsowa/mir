@@ -641,6 +641,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68ab91017fe16c622486840e4c83c9a37afeff978bd239b5293d61ece587de66"
 
 [[package]]
+name = "libloading"
+version = "0.8.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7c4b02199fee7c5d21a5ae7d8cfa79a6ef5bb2fc834d6e9058e89c825efdc55"
+dependencies = [
+ "cfg-if",
+ "windows-link",
+]
+
+[[package]]
 name = "libmimalloc-sys"
 version = "0.1.49"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -739,6 +749,7 @@ dependencies = [
  "mimalloc",
  "mir-codebase",
  "mir-issues",
+ "mir-plugin",
  "mir-types",
  "parking_lot",
  "php-ast",
@@ -785,11 +796,35 @@ dependencies = [
  "mir-analyzer",
  "mir-codebase",
  "mir-issues",
+ "mir-plugin",
  "owo-colors",
  "quick-xml",
  "rayon",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "mir-plugin"
+version = "0.58.0"
+dependencies = [
+ "libloading",
+ "mir-issues",
+ "mir-types",
+ "parking_lot",
+ "php-ast",
+ "rustc-hash",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
+name = "mir-plugin-example"
+version = "0.58.0"
+dependencies = [
+ "mir-plugin",
 ]
 
 [[package]]

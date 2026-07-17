@@ -347,7 +347,7 @@ pub(super) fn is_plain_checkable(ty: &Type) -> bool {
 
 /// Resolve all TNamedObject FQCNs in a Type using the codebase's file-level imports/namespace.
 /// Used to fix up `@var` annotation types that were parsed without namespace context.
-pub(super) fn resolve_union_for_file(union: Type, db: &dyn MirDatabase, file: &str) -> Type {
+pub(crate) fn resolve_union_for_file(union: Type, db: &dyn MirDatabase, file: &str) -> Type {
     let mut result = Type::empty();
     result.possibly_undefined = union.possibly_undefined;
     result.from_docblock = union.from_docblock;

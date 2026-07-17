@@ -14,6 +14,7 @@ mod analyze;
 mod composer;
 mod config;
 mod format;
+mod plugins;
 mod report;
 
 use config::Config;
@@ -147,6 +148,8 @@ fn main() {
     }
 
     let composer_root = resolve_composer_root(&cli, &cwd);
+
+    plugins::setup_plugins(&cli, &mut config, &config_base, composer_root.as_deref());
 
     let baseline = report::load_baseline(&cli, &config);
 

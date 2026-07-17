@@ -4,6 +4,8 @@ members = [
     "crates/mir-types",
     "crates/mir-issues",
     "crates/mir-codebase",
+    "crates/mir-plugin",
+    "crates/mir-plugin-example",
     "crates/mir-analyzer",
     "crates/mir-cli",
     "crates/mir-wasm",
@@ -22,6 +24,7 @@ homepage = "https://github.com/jorgsowa/mir"
 mir-types      = { path = "crates/mir-types",      version = "0.58.0" }
 mir-issues     = { path = "crates/mir-issues",     version = "0.58.0" }
 mir-codebase   = { path = "crates/mir-codebase",   version = "0.58.0" }
+mir-plugin     = { path = "crates/mir-plugin",     version = "0.58.0" }
 mir-analyzer   = { path = "crates/mir-analyzer",   version = "0.58.0" }
 
 # PHP parsing

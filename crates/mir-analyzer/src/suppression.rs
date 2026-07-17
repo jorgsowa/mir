@@ -190,7 +190,7 @@ impl SuppressionMap {
                 // Compare case-insensitively, same as `KindSet::matches` —
                 // a directive can name a kind in any casing.
                 let kind_matches = |issue: &&mir_issues::Issue| {
-                    issue.kind.name().eq_ignore_ascii_case(kind.as_str())
+                    issue.kind.display_name().eq_ignore_ascii_case(kind.as_str())
                         || issue.kind.code().eq_ignore_ascii_case(kind.as_str())
                 };
                 // Normal case: SuppressionMap-suppressed issue at the exact target line.

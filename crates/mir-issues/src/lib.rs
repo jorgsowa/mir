@@ -752,6 +752,11 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/body_analysis/mod.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_argument/function_redefinition*.phpt`.
     DuplicateFunction { name: String },
+
+    // --- Plugins --------------------------------------------------------------
+    /// Raised by a registered plugin (mir-plugin). `name` is the plugin's own
+    /// issue identifier, used for display and suppression matching.
+    PluginIssue { name: String, message: String },
 }
 
 fn append_deprecation_message(base: String, message: &Option<Arc<str>>) -> String {
@@ -935,6 +940,9 @@ impl IssueKind {
             | IssueKind::DuplicateTrait { .. }
             | IssueKind::DuplicateEnum { .. }
             | IssueKind::DuplicateFunction { .. } => Severity::Error,
+            // Plugins pick their own severity per issue; Error is only the
+            // fallback when none was set.
+            IssueKind::PluginIssue { .. } => Severity::Error,
         }
     }
 
@@ -1162,6 +1170,7 @@ impl IssueKind {
             IssueKind::InvalidThrow { .. } => "MIR1500",
             IssueKind::InvalidCatch { .. } => "MIR1503",
             IssueKind::UnreachableCatch { .. } => "MIR1508",
+            IssueKind::PluginIssue { .. } => "MIR1509",
             IssueKind::ImplicitToStringCast { .. } => "MIR1501",
             IssueKind::ImplicitFloatToIntCast { .. } => "MIR1502",
         }
@@ -1380,6 +1389,17 @@ impl IssueKind {
             IssueKind::DuplicateTrait { .. } => "DuplicateTrait",
             IssueKind::DuplicateEnum { .. } => "DuplicateEnum",
             IssueKind::DuplicateFunction { .. } => "DuplicateFunction",
+            IssueKind::PluginIssue { .. } => "PluginIssue",
+        }
+    }
+
+    /// Like [`IssueKind::name`], but for plugin-raised issues returns the
+    /// plugin's own issue name. Use this for suppression / issue-handler
+    /// matching so `@mir-suppress MyPluginIssue` works.
+    pub fn display_name(&self) -> &str {
+        match self {
+            IssueKind::PluginIssue { name, .. } => name,
+            other => other.name(),
         }
     }
 
@@ -2010,6 +2030,7 @@ impl IssueKind {
             IssueKind::DuplicateFunction { name } => {
                 format!("Function {name}() has already been defined")
             }
+            IssueKind::PluginIssue { message, .. } => message.clone(),
         }
     }
 }
@@ -2088,7 +2109,7 @@ impl IssueBuffer {
         self.issues
             .into_iter()
             .filter(|i| !i.suppressed)
-            .filter(|i| !self.file_suppressions.contains(&i.kind.name().to_string()))
+            .filter(|i| !self.file_suppressions.iter().any(|s| s == i.kind.display_name()))
             .collect()
     }
 
@@ -2100,7 +2121,7 @@ impl IssueBuffer {
         self.issues
             .into_iter()
             .map(|mut i| {
-                if self.file_suppressions.contains(&i.kind.name().to_string()) {
+                if self.file_suppressions.iter().any(|s| s == i.kind.display_name()) {
                     i.suppressed = true;
                 }
                 i
@@ -2115,7 +2136,7 @@ impl IssueBuffer {
             return;
         }
         for issue in self.issues[from..].iter_mut() {
-            if suppressions.iter().any(|s| s == issue.kind.name()) {
+            if suppressions.iter().any(|s| s == issue.kind.display_name()) {
                 issue.suppressed = true;
             }
         }

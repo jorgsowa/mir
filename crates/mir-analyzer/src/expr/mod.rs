@@ -81,6 +81,9 @@ pub struct ExpressionAnalyzer<'a> {
     /// while walking one function body. Read back by `body_analysis` to
     /// build the function's inferred `Generator<K, V, S, R>` return type.
     pub(crate) yielded_types: &'a mut Vec<(Type, Type)>,
+    /// Snapshot of the installed plugin registry (`None` when no plugins are
+    /// loaded — the common case, making every hook site a single check).
+    pub(crate) plugins: Option<std::sync::Arc<mir_plugin::PluginRegistry>>,
 }
 
 impl<'a> ExpressionAnalyzer<'a> {
@@ -109,6 +112,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             collect_symbols: true,
             in_existence_check: false,
             yielded_types,
+            plugins: mir_plugin::snapshot(),
         }
     }
 
@@ -207,6 +211,25 @@ impl<'a> ExpressionAnalyzer<'a> {
     }
 
     pub fn analyze(&mut self, expr: &php_ast::owned::Expr, ctx: &mut FlowState) -> Type {
+        let ty = self.analyze_inner(expr, ctx);
+        if let Some(plugins) = self.plugins.clone() {
+            if plugins.hooks().after_expression_analysis {
+                let file = self.file.clone();
+                let mut event = mir_plugin::AfterExpressionAnalysisEvent {
+                    expr,
+                    expr_type: &ty,
+                    file: file.as_ref(),
+                    issues: Vec::new(),
+                };
+                plugins.after_expression_analysis(&mut event);
+                let issues = event.issues;
+                self.emit_plugin_issues(issues, expr.span);
+            }
+        }
+        ty
+    }
+
+    fn analyze_inner(&mut self, expr: &php_ast::owned::Expr, ctx: &mut FlowState) -> Type {
         match &expr.kind {
             // --- Literals ---------------------------------------------------
             ExprKind::Int(_)
@@ -1110,6 +1133,155 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
             }
             TypeHintKind::Keyword(_, _) => {}
+        }
+    }
+
+    /// Convert plugin-raised issues into real diagnostics at their spans.
+    pub(crate) fn emit_plugin_issues(
+        &mut self,
+        issues: Vec<mir_plugin::PluginIssue>,
+        default_span: php_ast::Span,
+    ) {
+        for pi in issues {
+            let span = pi.span.unwrap_or(default_span);
+            self.emit(
+                IssueKind::PluginIssue {
+                    name: pi.name,
+                    message: pi.message,
+                },
+                pi.severity,
+                span,
+            );
+        }
+    }
+
+    /// Turn a plugin-provided type into a concrete `Type`. `Parse` strings go
+    /// through the docblock type parser and are namespace-resolved against
+    /// the current file, so `SomeClass` from a plugin matches the codebase's
+    /// stored FQCNs.
+    pub(crate) fn resolve_provided_type(&self, provided: mir_plugin::ProvidedType) -> Type {
+        match provided {
+            mir_plugin::ProvidedType::Union(t) => t,
+            mir_plugin::ProvidedType::Parse(s) => {
+                let raw = crate::parser::docblock::parse_type_string(&s);
+                crate::stmt::resolve_union_for_file(raw, self.db, &self.file)
+            }
+        }
+    }
+
+    /// Run function-call plugin hooks: return-type providers first (a
+    /// provider result replaces the inferred return type, mirroring Psalm's
+    /// `FunctionReturnTypeProviderInterface`), then `AfterFunctionCallAnalysis`.
+    pub(crate) fn apply_function_call_plugins(
+        &mut self,
+        fqn: &str,
+        args: &[php_ast::owned::Arg],
+        arg_types: &[Type],
+        span: php_ast::Span,
+        return_ty: &mut Type,
+    ) {
+        let Some(plugins) = self.plugins.clone() else {
+            return;
+        };
+        let has_after = plugins.hooks().after_function_call_analysis;
+        if !plugins.has_any_function_provider() && !has_after {
+            return;
+        }
+        let function_id = mir_plugin::normalize_id(fqn);
+        let file = self.file.clone();
+        if plugins.has_function_provider(&function_id) {
+            let snippet = crate::parser::span_text(self.source, span);
+            let event = mir_plugin::FunctionReturnTypeProviderEvent {
+                function_id: &function_id,
+                args,
+                arg_types,
+                span,
+                file: file.as_ref(),
+                call_snippet: snippet.as_deref(),
+            };
+            if let Some(provided) = plugins.function_return_type(&event) {
+                *return_ty = self.resolve_provided_type(provided);
+            }
+        }
+        if has_after {
+            let mut event = mir_plugin::AfterFunctionCallAnalysisEvent {
+                function_id: &function_id,
+                args,
+                arg_types,
+                span,
+                file: file.as_ref(),
+                return_type: return_ty,
+                issues: Vec::new(),
+            };
+            plugins.after_function_call_analysis(&mut event);
+            let issues = std::mem::take(&mut event.issues);
+            drop(event);
+            self.emit_plugin_issues(issues, span);
+        }
+    }
+
+    /// Run method-call plugin hooks. Providers are matched against the
+    /// receiver class first, then the declaring class, mirroring how Psalm
+    /// dispatches `MethodReturnTypeProviderInterface` up the hierarchy.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn apply_method_call_plugins(
+        &mut self,
+        receiver_fqcn: &str,
+        owner_fqcn: &str,
+        method_name: &str,
+        args: &[php_ast::owned::Arg],
+        arg_types: &[Type],
+        span: php_ast::Span,
+        return_ty: &mut Type,
+    ) {
+        let Some(plugins) = self.plugins.clone() else {
+            return;
+        };
+        let has_after = plugins.hooks().after_method_call_analysis;
+        if !plugins.has_any_method_provider() && !has_after {
+            return;
+        }
+        let method_lower = method_name.to_ascii_lowercase();
+        let file = self.file.clone();
+        let snippet = crate::parser::span_text(self.source, span);
+        let mut candidates = vec![receiver_fqcn];
+        if !owner_fqcn.eq_ignore_ascii_case(receiver_fqcn) {
+            candidates.push(owner_fqcn);
+        }
+        for fqcn in candidates {
+            let normalized = mir_plugin::normalize_id(fqcn);
+            if !plugins.has_method_provider(&normalized) {
+                continue;
+            }
+            let event = mir_plugin::MethodReturnTypeProviderEvent {
+                fqcn,
+                method_name: &method_lower,
+                args,
+                arg_types,
+                span,
+                file: file.as_ref(),
+                call_snippet: snippet.as_deref(),
+            };
+            if let Some(provided) = plugins.method_return_type(&normalized, &event) {
+                *return_ty = self.resolve_provided_type(provided);
+                break;
+            }
+        }
+        if has_after {
+            let method_id = format!("{receiver_fqcn}::{method_lower}");
+            let mut event = mir_plugin::AfterMethodCallAnalysisEvent {
+                method_id: &method_id,
+                args,
+                arg_types,
+                span,
+                file: file.as_ref(),
+                return_type: return_ty,
+                issues: Vec::new(),
+            };
+            plugins.after_method_call_analysis(&mut event);
+            let issues = std::mem::take(&mut event.issues);
+            drop(event);
+            self.emit_plugin_issues(issues, span);
         }
     }
 

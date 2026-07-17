@@ -1,0 +1,4 @@
+<?php
+
+/** @return non-empty-string */
+function test_helper_stubbed(): string {}

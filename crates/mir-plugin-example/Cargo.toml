@@ -1,0 +1,16 @@
+[package]
+name    = "mir-plugin-example"
+description = "Example Rust plugin for mir, loadable via <plugins><rustPlugin path=\"...\"/>"
+publish = false
+version.workspace = true
+edition.workspace = true
+license.workspace    = true
+authors.workspace    = true
+repository.workspace = true
+homepage.workspace   = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+mir-plugin = { workspace = true }
