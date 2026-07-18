@@ -190,7 +190,8 @@ impl<'a> StatementsAnalyzer<'a> {
         let suppressions = self.extract_suppressions_from(doc.as_deref());
         let before = self.issues.issue_count();
 
-        let var_annotation = self.extract_var_annotation_from(doc.as_deref(), ctx.self_fqcn.as_deref());
+        let var_annotation =
+            self.extract_var_annotation_from(doc.as_deref(), ctx.self_fqcn.as_deref());
 
         // Pre-narrow: `@var Type $varname` before any statement narrows that variable.
         if let Some(ref ann) = var_annotation {

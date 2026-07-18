@@ -333,7 +333,10 @@ fn materialize_host_script(dir: Option<&Path>) -> Result<PathBuf, BridgeError> {
     let digest = content_hash_hex(HOST_PHP);
     let path = dir.join(format!("mir-psalm-host-{digest}.php"));
     if !path.exists() {
-        let tmp = dir.join(format!("mir-psalm-host-{digest}.php.tmp.{}", std::process::id()));
+        let tmp = dir.join(format!(
+            "mir-psalm-host-{digest}.php.tmp.{}",
+            std::process::id()
+        ));
         std::fs::write(&tmp, HOST_PHP).map_err(BridgeError::WriteHost)?;
         std::fs::rename(&tmp, &path).map_err(BridgeError::WriteHost)?;
     }

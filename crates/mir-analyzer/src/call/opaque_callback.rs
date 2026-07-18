@@ -27,9 +27,9 @@ use std::collections::HashSet;
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
+use mir_types::Type;
 use php_ast::owned::visitor::{walk_owned_expr, OwnedVisitor};
 use php_ast::owned::{CallableCreateKind, Expr, ExprKind};
-use mir_types::Type;
 
 use crate::db::{MirDatabase, SourceFile};
 use crate::parser::type_from_hint_owned;
@@ -66,8 +66,9 @@ fn resolve_plain_function_name(db: &dyn MirDatabase, file: &str, fn_name: &str) 
     } else {
         fn_name.to_string()
     };
-    let exists =
-        |name: &str| -> bool { crate::db::find_function(db, crate::db::Fqcn::from_str(db, name)).is_some() };
+    let exists = |name: &str| -> bool {
+        crate::db::find_function(db, crate::db::Fqcn::from_str(db, name)).is_some()
+    };
     if exists(&qualified) {
         qualified
     } else if exists(fn_name) {
@@ -154,7 +155,10 @@ impl OwnedVisitor for OpaqueCallScanner<'_> {
 /// than sharing a parse cache (matching the rest of this crate's per-query
 /// parsing convention).
 #[salsa::tracked]
-pub(crate) fn file_callable_call_args(db: &dyn MirDatabase, file: SourceFile) -> Arc<[CallArgReturn]> {
+pub(crate) fn file_callable_call_args(
+    db: &dyn MirDatabase,
+    file: SourceFile,
+) -> Arc<[CallArgReturn]> {
     let path = file.path(db);
     let text = file.text(db);
     let parsed = php_rs_parser::parse(text);

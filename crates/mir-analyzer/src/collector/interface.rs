@@ -86,7 +86,11 @@ impl<'a> DefinitionCollector<'a> {
             .extends
             .iter()
             .filter_map(|ty| {
-                if let Some(Atomic::TNamedObject { fqcn: base, type_params }) = ty.types.first() {
+                if let Some(Atomic::TNamedObject {
+                    fqcn: base,
+                    type_params,
+                }) = ty.types.first()
+                {
                     Some((
                         self.resolve_type_name(base.as_str(), true).into(),
                         type_params

@@ -607,7 +607,9 @@ mod tests {
                 },
                 PsalmPluginEntry {
                     class: "Foo\\Plugin".to_string(),
-                    config_xml: Some("<pluginClass><option value=\"1\"/></pluginClass>".to_string()),
+                    config_xml: Some(
+                        "<pluginClass><option value=\"1\"/></pluginClass>".to_string()
+                    ),
                 },
             ]
         );

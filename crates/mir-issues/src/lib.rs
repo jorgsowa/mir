@@ -2109,7 +2109,12 @@ impl IssueBuffer {
         self.issues
             .into_iter()
             .filter(|i| !i.suppressed)
-            .filter(|i| !self.file_suppressions.iter().any(|s| s == i.kind.display_name()))
+            .filter(|i| {
+                !self
+                    .file_suppressions
+                    .iter()
+                    .any(|s| s == i.kind.display_name())
+            })
             .collect()
     }
 
@@ -2121,7 +2126,11 @@ impl IssueBuffer {
         self.issues
             .into_iter()
             .map(|mut i| {
-                if self.file_suppressions.iter().any(|s| s == i.kind.display_name()) {
+                if self
+                    .file_suppressions
+                    .iter()
+                    .any(|s| s == i.kind.display_name())
+                {
                     i.suppressed = true;
                 }
                 i

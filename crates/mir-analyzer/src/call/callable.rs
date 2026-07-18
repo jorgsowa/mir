@@ -528,7 +528,14 @@ fn resolve_opaque_callback_via_callers(
     // resolved it, so this avoids re-deriving a perfectly good declared
     // signature through the (slower) caller scan.
     let is_bare_callable = f.params[index].ty.as_ref().is_some_and(|t| {
-        t.types.len() == 1 && matches!(&t.types[0], Atomic::TCallable { return_type: None, .. })
+        t.types.len() == 1
+            && matches!(
+                &t.types[0],
+                Atomic::TCallable {
+                    return_type: None,
+                    ..
+                }
+            )
     });
     if !is_bare_callable {
         return None;

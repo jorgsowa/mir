@@ -203,7 +203,11 @@ impl AnalysisSession {
                     .map(|sf| SuppressionMap::from_source(sf.text(&db)))
             });
             if let Some(map) = map.as_ref() {
-                if map.is_suppressed(issue.location.line, issue.kind.display_name(), issue.kind.code()) {
+                if map.is_suppressed(
+                    issue.location.line,
+                    issue.kind.display_name(),
+                    issue.kind.code(),
+                ) {
                     issue.suppressed = true;
                 }
             }
@@ -383,7 +387,11 @@ fn mark_suppressed(issues: &mut [Issue], suppressions: &crate::suppression::Supp
     }
     for issue in issues.iter_mut() {
         if !issue.suppressed
-            && suppressions.is_suppressed(issue.location.line, issue.kind.display_name(), issue.kind.code())
+            && suppressions.is_suppressed(
+                issue.location.line,
+                issue.kind.display_name(),
+                issue.kind.code(),
+            )
         {
             issue.suppressed = true;
         }

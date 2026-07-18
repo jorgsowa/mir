@@ -198,9 +198,8 @@ function h(PluginContainer $c): void {
 #[test]
 fn after_function_call_hook_fires_for_declared_function() {
     setup();
-    let issues = unsuppressed(
-        "<?php function dangerous(): void {} function k(): void { dangerous(); }",
-    );
+    let issues =
+        unsuppressed("<?php function dangerous(): void {} function k(): void { dangerous(); }");
     assert!(
         plugin_issue_names(&issues).contains(&"DangerousCall"),
         "expected DangerousCall in {issues:?}"

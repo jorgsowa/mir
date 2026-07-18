@@ -1845,8 +1845,8 @@ impl<'a> DefinitionCollector<'a> {
             (Some(mut ty), _) => {
                 ty.from_docblock = true;
                 // Expand type aliases first (no FQN change), then resolve.
-                let expanded = effective_aliases
-                    .map_or(ty.clone(), |a| expand_aliases_only(ty.clone(), a));
+                let expanded =
+                    effective_aliases.map_or(ty.clone(), |a| expand_aliases_only(ty.clone(), a));
                 // Template-aware resolution even with no templates in scope: it
                 // FQN-qualifies class names in generic return types (e.g.
                 // `Builder<static>` on a template-free method), which the plain

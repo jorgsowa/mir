@@ -1409,7 +1409,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                     {
                         // Give a plugin (e.g. Eloquent `$casts`) a chance to
                         // supply the type before flagging the property undefined.
-                        if let Some(ty) = self.class_property_from_plugin(fqcn.as_ref(), prop_name) {
+                        if let Some(ty) = self.class_property_from_plugin(fqcn.as_ref(), prop_name)
+                        {
                             self.record_ref(
                                 Arc::from(format!("prop:{}::{}", fqcn, prop_name)),
                                 span,
