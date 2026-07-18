@@ -1082,6 +1082,42 @@ pub fn narrow_from_condition(
                                     }
                                 }
                             }
+                        } else if let Some((obj, prop)) = extract_prop_access(&needle_arg.value) {
+                            // Property-access counterpart of the plain-variable case
+                            // above, e.g. `in_array($this->status, ['a', 'b'])`.
+                            if let Some(haystack_ty) =
+                                extract_haystack_type(&haystack_arg.value, ctx)
+                            {
+                                let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
+                                let loose_safe = strict
+                                    || in_array_loose_narrowing_is_safe(&current, &haystack_ty);
+                                if !current.is_mixed() && is_true && loose_safe {
+                                    let narrowed =
+                                        narrow_to_haystack_values(&current, &haystack_ty);
+                                    if !narrowed.is_empty() {
+                                        apply_prop_narrowed(
+                                            ctx, &obj, &prop, current, narrowed, false,
+                                        );
+                                    }
+                                } else if !current.is_mixed() && !is_true && loose_safe {
+                                    let all_literals = !current.types.is_empty()
+                                        && current.types.iter().all(|a| {
+                                            matches!(
+                                                a,
+                                                Atomic::TLiteralString(_) | Atomic::TLiteralInt(_)
+                                            )
+                                        });
+                                    if all_literals {
+                                        let narrowed = current
+                                            .filter(|a| !haystack_ty.types.iter().any(|h| h == a));
+                                        if !narrowed.is_empty() {
+                                            apply_prop_narrowed(
+                                                ctx, &obj, &prop, current, narrowed, false,
+                                            );
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 } else if bare.eq_ignore_ascii_case("is_a") {
