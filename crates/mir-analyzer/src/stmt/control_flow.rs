@@ -614,6 +614,7 @@ impl<'a> StatementsAnalyzer<'a> {
                         if let Some(vn) = crate::narrowing::narrow_type_fn_disjuncts(
                             &pending_conditions,
                             &mut union_ctx,
+                            self.db,
                         ) {
                             case_ctx.set_var(&vn, union_ctx.get_var(&vn));
                         } else {

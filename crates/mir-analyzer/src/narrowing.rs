@@ -1056,7 +1056,7 @@ pub fn narrow_from_condition(
                     // PHP, so property_exists($obj, 'foo') proves nothing about a method 'foo'.
                     if let Some(arg_expr) = call.args.first() {
                         if let Some(var_name) = extract_var_name(&arg_expr.value) {
-                            narrow_from_type_fn(ctx, bare, &var_name, is_true);
+                            narrow_from_type_fn(ctx, bare, &var_name, db, is_true);
                         } else if let Some((obj, prop)) = extract_prop_access(&arg_expr.value) {
                             narrow_prop_from_type_fn(ctx, bare, &obj, &prop, db, file, is_true);
                         }
@@ -1481,7 +1481,7 @@ pub fn narrow_from_condition(
                     // User-defined assertion applied.
                 } else if let Some(arg_expr) = call.args.first() {
                     if let Some(var_name) = extract_var_name(&arg_expr.value) {
-                        narrow_from_type_fn(ctx, bare, &var_name, is_true);
+                        narrow_from_type_fn(ctx, bare, &var_name, db, is_true);
                     } else if let Some((obj, prop)) = extract_prop_access(&arg_expr.value) {
                         narrow_prop_from_type_fn(ctx, bare, &obj, &prop, db, file, is_true);
                     }
@@ -2128,6 +2128,7 @@ fn extract_type_fn_check_prop(expr: &php_ast::owned::Expr) -> Option<(&str, Stri
 pub(crate) fn narrow_type_fn_disjuncts(
     conditions: &[&php_ast::owned::Expr],
     ctx: &mut FlowState,
+    db: &dyn MirDatabase,
 ) -> Option<String> {
     if conditions.len() < 2 {
         return None;
@@ -2149,7 +2150,7 @@ pub(crate) fn narrow_type_fn_disjuncts(
     for fn_name in &fn_names {
         let mut scratch = ctx.branch();
         scratch.set_var(&vn, original.clone());
-        narrow_from_type_fn(&mut scratch, fn_name, &vn, true);
+        narrow_from_type_fn(&mut scratch, fn_name, &vn, db, true);
         union_ty.merge_with(&scratch.get_var(&vn));
     }
     if !union_ty.is_empty() {
@@ -2277,7 +2278,7 @@ fn narrow_or_instanceof_true(
     file: &str,
 ) {
     if narrow_instanceof_disjuncts(&[left, right], ctx, db, file).is_none()
-        && narrow_type_fn_disjuncts(&[left, right], ctx).is_none()
+        && narrow_type_fn_disjuncts(&[left, right], ctx, db).is_none()
         && !narrow_prop_instanceof_disjuncts(&[left, right], ctx, db, file)
     {
         narrow_mixed_disjuncts(&[left, right], ctx, db, file);
@@ -3871,9 +3872,15 @@ fn bool_narrow_type(current: &Type, value: bool, is_value: bool) -> Type {
     narrowed
 }
 
-fn narrow_from_type_fn(ctx: &mut FlowState, fn_name: &str, var_name: &str, is_true: bool) {
+fn narrow_from_type_fn(
+    ctx: &mut FlowState,
+    fn_name: &str,
+    var_name: &str,
+    db: &dyn MirDatabase,
+    is_true: bool,
+) {
     let current = ctx.get_var(var_name);
-    let Some(narrowed) = type_fn_narrowed(&current, fn_name, is_true) else {
+    let Some(narrowed) = type_fn_narrowed(&current, fn_name, db, is_true) else {
         return;
     };
     set_narrowed(ctx, var_name, &current, narrowed, true);
@@ -3898,7 +3905,7 @@ fn narrow_prop_from_type_fn(
     if current.is_mixed() {
         return;
     }
-    let Some(narrowed) = type_fn_narrowed(&current, fn_name, is_true) else {
+    let Some(narrowed) = type_fn_narrowed(&current, fn_name, db, is_true) else {
         return;
     };
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, true);
@@ -3909,7 +3916,12 @@ fn narrow_prop_from_type_fn(
 /// (`narrow_from_type_fn`) and property-receiver (`narrow_prop_from_type_fn`)
 /// entry points. Returns `None` for an unrecognized function name — the
 /// caller should leave the type untouched.
-fn type_fn_narrowed(current: &Type, fn_name: &str, is_true: bool) -> Option<Type> {
+fn type_fn_narrowed(
+    current: &Type,
+    fn_name: &str,
+    db: &dyn MirDatabase,
+    is_true: bool,
+) -> Option<Type> {
     Some(match crate::util::php_ident_lowercase(fn_name).as_str() {
         "is_string" => {
             if is_true {
@@ -4011,19 +4023,22 @@ fn type_fn_narrowed(current: &Type, fn_name: &str, is_true: bool) -> Option<Type
             if is_true {
                 current.narrow_to_iterable()
             } else {
-                // Mirrors narrow_to_iterable's true-branch conservatism: we can't
-                // verify Traversable membership structurally, so only exclude the
-                // atom we know for certain satisfies is_iterable() — a plain array.
-                // Stripping all objects too would wrongly empty e.g. `SomeClass|array`,
-                // marking the else-branch unreachable.
-                current.filter(|t| !t.is_array())
+                // Beyond the array atom (always excludable), a named-object atom
+                // is only excludable when it's `final` (no subclass could add
+                // `implements Traversable` later) AND its own hierarchy provably
+                // doesn't already extend/implement Traversable — same
+                // final-class soundness gate `narrow_var_to_specific_class` uses
+                // for its false branch. A non-final or unresolvable class stays,
+                // same conservatism as before this class-hierarchy check existed.
+                current
+                    .filter(|t| !atom_excluded_from_is_iterable_or_countable(t, "Traversable", db))
             }
         }
         "is_countable" => {
             if is_true {
                 current.narrow_to_countable()
             } else {
-                current.filter(|t| !t.is_array())
+                current.filter(|t| !atom_excluded_from_is_iterable_or_countable(t, "Countable", db))
             }
         }
         "is_resource" => {
@@ -4138,6 +4153,32 @@ fn type_fn_narrowed(current: &Type, fn_name: &str, is_true: bool) -> Option<Type
         }
         _ => return None,
     })
+}
+
+/// Whether `t` is provably excluded from `is_iterable()`/`is_countable()`'s
+/// false branch: always true for the `array` atom (the one type both
+/// functions are unconditionally true for), and true for a named-object atom
+/// only when it's `final` (no subclass could add `implements $interface`
+/// later) AND its own hierarchy provably doesn't already extend/implement
+/// `$interface` — the same final-class soundness gate
+/// `narrow_var_to_specific_class`'s false branch uses for exact-class
+/// exclusion. A non-final or unresolvable class is left alone, matching this
+/// function's conservative behavior before this class-hierarchy check
+/// existed (stripping a non-final class here risks falsely excluding a
+/// legitimately Countable/Traversable subclass).
+fn atom_excluded_from_is_iterable_or_countable(
+    t: &Atomic,
+    interface: &str,
+    db: &dyn MirDatabase,
+) -> bool {
+    if t.is_array() {
+        return true;
+    }
+    if let Atomic::TNamedObject { fqcn, .. } = t {
+        return crate::db::is_final(db, fqcn)
+            && !crate::db::extends_or_implements(db, fqcn, interface);
+    }
+    false
 }
 
 fn narrow_var_literal_string(ctx: &mut FlowState, name: &str, value: &str, is_value: bool) {
@@ -5426,7 +5467,7 @@ fn narrow_from_gettype_literal(
         _ => return,
     };
     match target {
-        ScalarArgTarget::Var(var_name) => narrow_from_type_fn(ctx, type_fn, var_name, is_true),
+        ScalarArgTarget::Var(var_name) => narrow_from_type_fn(ctx, type_fn, var_name, db, is_true),
         ScalarArgTarget::Prop(obj, prop) => {
             narrow_prop_from_type_fn(ctx, type_fn, obj, prop, db, file, is_true)
         }
@@ -5458,7 +5499,9 @@ fn narrow_from_get_debug_type_literal(
     };
     if let Some(type_fn) = type_fn {
         match target {
-            ScalarArgTarget::Var(var_name) => narrow_from_type_fn(ctx, type_fn, var_name, is_true),
+            ScalarArgTarget::Var(var_name) => {
+                narrow_from_type_fn(ctx, type_fn, var_name, db, is_true)
+            }
             ScalarArgTarget::Prop(obj, prop) => {
                 narrow_prop_from_type_fn(ctx, type_fn, obj, prop, db, file, is_true)
             }

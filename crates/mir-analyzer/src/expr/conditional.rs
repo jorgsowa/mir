@@ -211,7 +211,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                     &self.file,
                 )
                 .is_some()
-                    || crate::narrowing::narrow_type_fn_disjuncts(&refs, &mut arm_ctx).is_some()
+                    || crate::narrowing::narrow_type_fn_disjuncts(&refs, &mut arm_ctx, self.db)
+                        .is_some()
                     || crate::narrowing::narrow_mixed_disjuncts(
                         &refs,
                         &mut arm_ctx,
