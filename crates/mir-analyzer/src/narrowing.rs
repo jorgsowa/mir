@@ -2507,8 +2507,13 @@ fn resolve_prop_current_type(
 }
 
 /// Narrow a property access `$obj->prop` by a null check.
-/// Looks up the declared property type through the database and stores the
-/// narrowed result in `ctx.prop_refined`.
+/// PHP 8 reads a plain `->` access on a null receiver as a warning, not a
+/// fatal error, evaluating to `null` just like `?->` would — so when the
+/// receiver's type actually admits null, `$obj->prop` carries the exact same
+/// null-source ambiguity as the nullsafe form and is narrowed identically
+/// (see `narrow_nullsafe_prop_null`). When the receiver's type provably
+/// excludes null, that ambiguity doesn't exist and a property-null
+/// contradiction is a genuine contradiction, so divergence is still marked.
 fn narrow_prop_null(
     ctx: &mut FlowState,
     obj_var: &str,
@@ -2517,7 +2522,11 @@ fn narrow_prop_null(
     file: &str,
     is_null: bool,
 ) {
-    narrow_prop_null_with_divergence(ctx, obj_var, prop, db, file, is_null, true);
+    if !ctx.get_var(obj_var).is_nullable() {
+        narrow_prop_null_with_divergence(ctx, obj_var, prop, db, file, is_null, true);
+        return;
+    }
+    narrow_nullsafe_prop_null(ctx, obj_var, prop, db, file, is_null);
 }
 
 fn narrow_prop_null_with_divergence(
@@ -2542,11 +2551,15 @@ fn narrow_prop_null_with_divergence(
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, mark_diverges);
 }
 
-/// Narrow a nullsafe property access (`$obj?->prop`) by a null check.
-/// Beyond narrowing the property itself, a proven-non-null result also
-/// proves the receiver is non-null — `$obj?->prop` only evaluates to `null`
-/// without reading `prop` when `$obj` is null, so the negative case can't
-/// tell us anything about `$obj`, but the non-null case can.
+/// Narrow a nullsafe property access (`$obj?->prop`) by a null check. Also
+/// used by the plain (`->`) form via `narrow_prop_null` — both read as
+/// `null` when EITHER the receiver is null OR the property's own value is
+/// null, so:
+/// - the `is_null=true` direction must never mark divergence: proving the
+///   property's own declared type excludes null doesn't rule out the
+///   receiver-null source.
+/// - the `is_null=false` direction additionally proves the receiver itself
+///   is non-null, since a null receiver could only ever produce `null` here.
 fn narrow_nullsafe_prop_null(
     ctx: &mut FlowState,
     obj_var: &str,
@@ -2555,11 +2568,6 @@ fn narrow_nullsafe_prop_null(
     file: &str,
     is_null: bool,
 ) {
-    // A nullsafe access reads as null when EITHER the receiver is null (the
-    // short-circuit) OR the property's own value is null — proving the
-    // property's own type excludes null doesn't rule out the receiver-null
-    // source, so the `is_null=true` direction must never mark divergence
-    // here, unlike the direct (non-nullsafe) `narrow_prop_null`.
     narrow_prop_null_with_divergence(ctx, obj_var, prop, db, file, is_null, !is_null);
     if !is_null {
         narrow_var_null(ctx, obj_var, false);
@@ -3717,9 +3725,10 @@ fn extract_prop_access(expr: &php_ast::owned::Expr) -> Option<(String, String)> 
 }
 
 /// Like `extract_prop_access`, but only matches the nullsafe (`?->`) form.
-/// Kept separate because a nullsafe access being non-null also proves the
-/// receiver itself is non-null (a null receiver short-circuits the whole
-/// chain to `null`), which a plain `->` access can't imply.
+/// Kept as a separate matcher purely to distinguish the two operators in the
+/// AST — both are narrowed by the same logic (`narrow_nullsafe_prop_null`),
+/// since a plain `->` on a null receiver also evaluates to `null` in PHP 8
+/// (a warning, not a fatal error), same as `?->`'s short-circuit.
 fn extract_nullsafe_prop_access(expr: &php_ast::owned::Expr) -> Option<(String, String)> {
     match &expr.kind {
         ExprKind::NullsafePropertyAccess(pa) => {
