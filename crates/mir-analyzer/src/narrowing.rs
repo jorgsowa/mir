@@ -942,8 +942,7 @@ pub fn narrow_from_condition(
                 } else if matches!(
                     bare.to_ascii_lowercase().as_str(),
                     "array_key_exists" | "key_exists"
-                ) && is_true
-                {
+                ) {
                     // array_key_exists('k', $arr) in true-branch: prove the key
                     // exists in the array's sealed shape so that $arr['k'] does
                     // not trigger NonExistentArrayOffset afterwards.
@@ -971,25 +970,50 @@ pub fn narrow_from_condition(
                             }),
                         };
                         if let Some(key) = literal_key {
-                            if let Some(var_name) = extract_var_name(&arr_arg.value) {
-                                let current = ctx.get_var(&var_name);
-                                let narrowed = add_key_to_sealed_shapes(&current, &key);
-                                if narrowed != current {
-                                    ctx.set_var(&var_name, narrowed);
-                                }
-                            } else if let Some((obj, prop)) = extract_prop_access(&arr_arg.value) {
-                                narrow_prop_array_key_exists(ctx, &obj, &prop, &key, db, file);
-                            } else if let Some((base, path)) =
-                                collect_array_access_path(&arr_arg.value)
-                            {
-                                // Nested container, e.g. array_key_exists('b', $arr['a']) —
-                                // walk down to the ['a'] shape and prove 'b' present there,
-                                // same as the single-level var/prop cases above.
-                                let current = ctx.get_var(&base);
-                                if let Some(narrowed) =
-                                    narrow_shape_path_key_exists(&current, &path, &key)
+                            if is_true {
+                                if let Some(var_name) = extract_var_name(&arr_arg.value) {
+                                    let current = ctx.get_var(&var_name);
+                                    let narrowed = add_key_to_sealed_shapes(&current, &key);
+                                    if narrowed != current {
+                                        ctx.set_var(&var_name, narrowed);
+                                    }
+                                } else if let Some((obj, prop)) =
+                                    extract_prop_access(&arr_arg.value)
                                 {
-                                    ctx.set_var(&base, narrowed);
+                                    narrow_prop_array_key_exists(ctx, &obj, &prop, &key, db, file);
+                                } else if let Some((base, path)) =
+                                    collect_array_access_path(&arr_arg.value)
+                                {
+                                    // Nested container, e.g. array_key_exists('b', $arr['a']) —
+                                    // walk down to the ['a'] shape and prove 'b' present there,
+                                    // same as the single-level var/prop cases above.
+                                    let current = ctx.get_var(&base);
+                                    if let Some(narrowed) =
+                                        narrow_shape_path_key_exists(&current, &path, &key)
+                                    {
+                                        ctx.set_var(&base, narrowed);
+                                    }
+                                }
+                            } else {
+                                // False branch: exclude shape members that
+                                // guarantee the key's presence — see
+                                // `remove_key_from_sealed_shapes`.
+                                if let Some(var_name) = extract_var_name(&arr_arg.value) {
+                                    let current = ctx.get_var(&var_name);
+                                    let narrowed = remove_key_from_sealed_shapes(&current, &key);
+                                    set_narrowed(ctx, &var_name, &current, narrowed, true);
+                                } else if let Some((obj, prop)) =
+                                    extract_prop_access(&arr_arg.value)
+                                {
+                                    let current =
+                                        resolve_prop_current_type(ctx, &obj, &prop, db, file);
+                                    if !current.is_mixed() {
+                                        let narrowed =
+                                            remove_key_from_sealed_shapes(&current, &key);
+                                        apply_prop_narrowed(
+                                            ctx, &obj, &prop, current, narrowed, true,
+                                        );
+                                    }
                                 }
                             }
                         }
@@ -3230,6 +3254,51 @@ fn add_key_to_sealed_shapes(
     }
     // Every union member turned out to be an impossible closed shape — keep
     // the original type rather than narrowing to an empty union.
+    if result.types.is_empty() {
+        return ty.clone();
+    }
+    result.from_docblock = ty.from_docblock;
+    result
+}
+
+/// False-branch counterpart of `add_key_to_sealed_shapes`, for
+/// `!array_key_exists($key, $arr)`: among a real union (`ty.types.len() > 1`)
+/// of shape *alternatives*, excludes any `TKeyedArray` member that declares
+/// `key` as present and non-optional — such a member guarantees the key
+/// exists, so it can never satisfy the key's absence, the same reasoning
+/// `add_key_to_sealed_shapes` already applies in the opposite direction to
+/// members lacking the key. A *lone* (non-union) shape is left untouched
+/// even when it declares the key mandatory: same "hint, not proof" caution
+/// as the true-branch helper — a single docblock shape isn't necessarily
+/// exhaustive proof about one specific real array's actual contents.
+/// Optional or undeclared keys are also left untouched: both are already
+/// consistent with the key's absence.
+fn remove_key_from_sealed_shapes(
+    ty: &mir_types::Type,
+    key: &mir_types::atomic::ArrayKey,
+) -> mir_types::Type {
+    if ty.types.len() <= 1 {
+        return ty.clone();
+    }
+    let mut changed = false;
+    let mut result = mir_types::Type::empty();
+    for a in &ty.types {
+        if let Atomic::TKeyedArray { properties, .. } = a {
+            if let Some(prop) = properties.get(key) {
+                if !prop.optional {
+                    changed = true;
+                    continue;
+                }
+            }
+        }
+        result.add_type(a.clone());
+    }
+    if !changed {
+        return ty.clone();
+    }
+    // Every union member turned out to guarantee the key's presence — keep
+    // the original type rather than narrowing to an empty union, mirroring
+    // `add_key_to_sealed_shapes`'s same fallback in the opposite direction.
     if result.types.is_empty() {
         return ty.clone();
     }
