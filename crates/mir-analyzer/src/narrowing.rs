@@ -159,7 +159,7 @@ pub fn narrow_from_condition(
             else if let ExprKind::String(class_name_str) = &b.right.kind {
                 if let Some(obj_var_name) = extract_get_class_arg(&b.left) {
                     let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
-                    narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true);
+                    narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true, db);
                 } else if let Some(var_name) = extract_gettype_arg(&b.left) {
                     narrow_from_gettype_literal(ctx, &var_name, class_name_str, effective_true);
                 } else if let Some(var_name) = extract_get_debug_type_arg(&b.left) {
@@ -174,7 +174,7 @@ pub fn narrow_from_condition(
                 } else if let Some(obj_var_name) = extract_dynamic_class_const_var(&b.left) {
                     // `$obj::class === 'ClassName'`
                     let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
-                    narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true);
+                    narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true, db);
                 } else if let Some(name) = extract_var_name(&b.left) {
                     // `$x === 'literal'`
                     narrow_var_literal_string(ctx, &name, class_name_str, effective_true);
@@ -193,7 +193,7 @@ pub fn narrow_from_condition(
             } else if let ExprKind::String(class_name_str) = &b.left.kind {
                 if let Some(obj_var_name) = extract_get_class_arg(&b.right) {
                     let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
-                    narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true);
+                    narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true, db);
                 } else if let Some(var_name) = extract_gettype_arg(&b.right) {
                     narrow_from_gettype_literal(ctx, &var_name, class_name_str, effective_true);
                 } else if let Some(var_name) = extract_get_debug_type_arg(&b.right) {
@@ -208,7 +208,7 @@ pub fn narrow_from_condition(
                 } else if let Some(obj_var_name) = extract_dynamic_class_const_var(&b.right) {
                     // `'ClassName' === $obj::class`
                     let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
-                    narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true);
+                    narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true, db);
                 } else if let Some(name) = extract_var_name(&b.right) {
                     // `$x === 'literal'`
                     narrow_var_literal_string(ctx, &name, class_name_str, effective_true);
@@ -307,7 +307,7 @@ pub fn narrow_from_condition(
                             db,
                             file,
                         ) {
-                            narrow_var_to_class_string(ctx, &var_name, &fqcn, effective_true);
+                            narrow_var_to_class_string(ctx, &var_name, &fqcn, effective_true, db);
                         }
                     }
                 }
@@ -346,7 +346,13 @@ pub fn narrow_from_condition(
                             db,
                             file,
                         ) {
-                            narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true);
+                            narrow_var_to_specific_class(
+                                ctx,
+                                &obj_var_name,
+                                &fqcn,
+                                effective_true,
+                                db,
+                            );
                         }
                     }
                 }
@@ -361,7 +367,13 @@ pub fn narrow_from_condition(
                             db,
                             file,
                         ) {
-                            narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true);
+                            narrow_var_to_specific_class(
+                                ctx,
+                                &obj_var_name,
+                                &fqcn,
+                                effective_true,
+                                db,
+                            );
                         }
                     }
                 }
@@ -375,7 +387,13 @@ pub fn narrow_from_condition(
                             db,
                             file,
                         ) {
-                            narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true);
+                            narrow_var_to_specific_class(
+                                ctx,
+                                &obj_var_name,
+                                &fqcn,
+                                effective_true,
+                                db,
+                            );
                         }
                     }
                 }
@@ -391,7 +409,13 @@ pub fn narrow_from_condition(
                             db,
                             file,
                         ) {
-                            narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true);
+                            narrow_var_to_specific_class(
+                                ctx,
+                                &obj_var_name,
+                                &fqcn,
+                                effective_true,
+                                db,
+                            );
                         }
                     }
                 }
@@ -420,7 +444,7 @@ pub fn narrow_from_condition(
                             db,
                             file,
                         ) {
-                            narrow_var_to_class_string(ctx, &var_name, &fqcn, effective_true);
+                            narrow_var_to_class_string(ctx, &var_name, &fqcn, effective_true, db);
                         }
                     }
                 }
@@ -455,7 +479,13 @@ pub fn narrow_from_condition(
                             db,
                             file,
                         ) {
-                            narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true);
+                            narrow_var_to_specific_class(
+                                ctx,
+                                &obj_var_name,
+                                &fqcn,
+                                effective_true,
+                                db,
+                            );
                         }
                     }
                 }
@@ -469,7 +499,13 @@ pub fn narrow_from_condition(
                             db,
                             file,
                         ) {
-                            narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true);
+                            narrow_var_to_specific_class(
+                                ctx,
+                                &obj_var_name,
+                                &fqcn,
+                                effective_true,
+                                db,
+                            );
                         }
                     }
                 }
@@ -3640,17 +3676,40 @@ fn narrow_prop_to_literal_enum_case(
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, true);
 }
 
-fn narrow_var_to_class_string(ctx: &mut FlowState, name: &str, fqcn: &str, is_class: bool) {
+/// `$cls === Foo::class` / `!== Foo::class` narrowing. Unlike `instanceof`/
+/// `is_a`, `Foo::class` (like `get_class()`) names the *exact* runtime
+/// class — so on the false branch, a `class-string<Foo>` atom (which,
+/// everywhere else in this file, means "Foo or any subclass") can only be
+/// dropped outright when `Foo` is `final` and so provably has no subclass
+/// that could still satisfy `!== Foo::class`.
+fn narrow_var_to_class_string(
+    ctx: &mut FlowState,
+    name: &str,
+    fqcn: &str,
+    is_class: bool,
+    db: &dyn MirDatabase,
+) {
     let current = ctx.get_var(name);
     let narrowed = if is_class {
         Type::single(Atomic::TClassString(Some(mir_types::Name::from(fqcn))))
     } else {
-        current.filter(|t| !matches!(t, Atomic::TClassString(Some(f)) if f.as_ref() == fqcn))
+        current.filter(|t| {
+            !matches!(t, Atomic::TClassString(Some(f)) if f.as_ref() == fqcn && crate::db::is_final(db, fqcn))
+        })
     };
     set_narrowed(ctx, name, &current, narrowed, true);
 }
 
-fn narrow_var_to_specific_class(ctx: &mut FlowState, name: &str, fqcn: &str, is_exact_class: bool) {
+/// `get_class($x)`/`get_debug_type($x)`/`$x::class` compared to a literal —
+/// see `narrow_var_to_class_string`'s doc comment for why the false branch
+/// can only drop a matching `TNamedObject` atom when the class is `final`.
+fn narrow_var_to_specific_class(
+    ctx: &mut FlowState,
+    name: &str,
+    fqcn: &str,
+    is_exact_class: bool,
+    db: &dyn MirDatabase,
+) {
     let current = ctx.get_var(name);
     let narrowed = if is_exact_class {
         Type::single(Atomic::TNamedObject {
@@ -3659,7 +3718,9 @@ fn narrow_var_to_specific_class(ctx: &mut FlowState, name: &str, fqcn: &str, is_
         })
     } else {
         current.filter(|t| match t {
-            Atomic::TNamedObject { fqcn: obj_fqcn, .. } => obj_fqcn.as_ref() != fqcn,
+            Atomic::TNamedObject { fqcn: obj_fqcn, .. } => {
+                obj_fqcn.as_ref() != fqcn || !crate::db::is_final(db, fqcn)
+            }
             _ => true,
         })
     };
@@ -4459,7 +4520,7 @@ fn narrow_from_get_debug_type_literal(
         narrow_from_type_fn(ctx, type_fn, var_name, is_true);
     } else {
         let fqcn = crate::db::resolve_name(db, file, literal);
-        narrow_var_to_specific_class(ctx, var_name, &fqcn, is_true);
+        narrow_var_to_specific_class(ctx, var_name, &fqcn, is_true, db);
     }
 }
 

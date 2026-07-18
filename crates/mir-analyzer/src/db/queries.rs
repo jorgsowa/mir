@@ -33,6 +33,13 @@ pub fn class_exists(db: &dyn MirDatabase, fqcn: &str) -> bool {
     crate::db::find_class_like(db, here).is_some()
 }
 
+/// True when `fqcn` is a `final` class (or an enum, which is implicitly
+/// final) — i.e. provably has no subclasses. Unknown classes are not final.
+pub fn is_final(db: &dyn MirDatabase, fqcn: &str) -> bool {
+    let here = crate::db::Fqcn::from_str(db, fqcn);
+    crate::db::find_class_like(db, here).is_some_and(|c| c.is_final())
+}
+
 pub fn function_exists(db: &dyn MirDatabase, fqn: &str) -> bool {
     let here = crate::db::Fqcn::from_str(db, fqn);
     crate::db::find_function(db, here).is_some()

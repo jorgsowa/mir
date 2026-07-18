@@ -4,8 +4,8 @@
 suppress=UnusedVariable,UnusedParam,MixedArgument
 ===file===
 <?php
-class Foo {}
-class Bar {}
+final class Foo {}
+final class Bar {}
 
 function test_literal(Foo|Bar $x): void {
     if ($x::class === Foo::class) {

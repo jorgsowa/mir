@@ -4,11 +4,11 @@ get_class() string comparison narrowing
 suppress=MissingReturnType
 ===file===
 <?php
-class Foo {
+final class Foo {
     public function foo() {}
 }
 
-class Bar {
+final class Bar {
     public function bar() {}
 }
 
