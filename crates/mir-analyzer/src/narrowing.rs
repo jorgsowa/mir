@@ -194,6 +194,16 @@ pub fn narrow_from_condition(
                         db,
                         file,
                     );
+                } else if let Some(target) = extract_get_parent_class_arg(&b.left) {
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    narrow_from_get_parent_class_literal(
+                        ctx,
+                        &target,
+                        &fqcn,
+                        effective_true,
+                        db,
+                        file,
+                    );
                 } else if let Some(obj_var_name) = extract_dynamic_class_const_var(&b.left) {
                     // `$obj::class === 'ClassName'`
                     let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
@@ -232,6 +242,16 @@ pub fn narrow_from_condition(
                         ctx,
                         &target,
                         class_name_str,
+                        effective_true,
+                        db,
+                        file,
+                    );
+                } else if let Some(target) = extract_get_parent_class_arg(&b.right) {
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    narrow_from_get_parent_class_literal(
+                        ctx,
+                        &target,
+                        &fqcn,
                         effective_true,
                         db,
                         file,
@@ -423,6 +443,29 @@ pub fn narrow_from_condition(
                         }
                     }
                 }
+                // `get_parent_class($x) === Foo::class` — same idiom as
+                // `get_class($x) === Foo::class` above, proving $x a strict
+                // subclass instance of Foo (see narrow_from_get_parent_class_literal).
+                else if let Some(target) = extract_get_parent_class_arg(&b.left) {
+                    if let ExprKind::ClassConstAccess(cca) = &b.right.kind {
+                        if let Some(fqcn) = extract_class_const_fqcn(
+                            cca,
+                            ctx.self_fqcn.as_deref(),
+                            ctx.parent_fqcn.as_deref(),
+                            db,
+                            file,
+                        ) {
+                            narrow_from_get_parent_class_literal(
+                                ctx,
+                                &target,
+                                &fqcn,
+                                effective_true,
+                                db,
+                                file,
+                            );
+                        }
+                    }
+                }
                 // `$obj::class === Foo::class` — dynamic get_class()-equivalent.
                 else if let Some(obj_var_name) = extract_dynamic_class_const_var(&b.left) {
                     if let ExprKind::ClassConstAccess(cca) = &b.right.kind {
@@ -564,6 +607,27 @@ pub fn narrow_from_condition(
                                     file,
                                 ),
                             }
+                        }
+                    }
+                }
+                // `Foo::class === get_parent_class($x)` — symmetric counterpart.
+                else if let Some(target) = extract_get_parent_class_arg(&b.right) {
+                    if let ExprKind::ClassConstAccess(cca) = &b.left.kind {
+                        if let Some(fqcn) = extract_class_const_fqcn(
+                            cca,
+                            ctx.self_fqcn.as_deref(),
+                            ctx.parent_fqcn.as_deref(),
+                            db,
+                            file,
+                        ) {
+                            narrow_from_get_parent_class_literal(
+                                ctx,
+                                &target,
+                                &fqcn,
+                                effective_true,
+                                db,
+                                file,
+                            );
                         }
                     }
                 }
@@ -767,6 +831,16 @@ pub fn narrow_from_condition(
                         db,
                         file,
                     );
+                } else if let Some(target) = extract_get_parent_class_arg(&b.left) {
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    narrow_from_get_parent_class_literal(
+                        ctx,
+                        &target,
+                        &fqcn,
+                        effective_true,
+                        db,
+                        file,
+                    );
                 } else if let Some(obj_var_name) = extract_dynamic_class_const_var(&b.left) {
                     let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
                     narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true, db);
@@ -789,6 +863,16 @@ pub fn narrow_from_condition(
                         ctx,
                         &target,
                         class_name_str,
+                        effective_true,
+                        db,
+                        file,
+                    );
+                } else if let Some(target) = extract_get_parent_class_arg(&b.right) {
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    narrow_from_get_parent_class_literal(
+                        ctx,
+                        &target,
+                        &fqcn,
                         effective_true,
                         db,
                         file,
@@ -5184,6 +5268,53 @@ fn extract_get_debug_type_arg(expr: &php_ast::owned::Expr) -> Option<ScalarArgTa
         }
     }
     None
+}
+
+fn extract_get_parent_class_arg(expr: &php_ast::owned::Expr) -> Option<ScalarArgTarget> {
+    if let ExprKind::FunctionCall(call) = &expr.kind {
+        if let ExprKind::Identifier(name) = &call.name.kind {
+            if name
+                .trim_start_matches('\\')
+                .eq_ignore_ascii_case("get_parent_class")
+            {
+                if let Some(arg) = call.args.first() {
+                    return ScalarArgTarget::extract(&arg.value);
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Narrow `$x`/`$this->prop` from `get_parent_class(...) === 'ClassName'` (or
+/// `=== ClassName::class`): the receiver's class's immediate parent being
+/// exactly `fqcn` proves the receiver is a strict subclass instance of
+/// `fqcn` — the same relationship `is_subclass_of($x, ClassName::class)`
+/// proves, so this reuses that narrowing (`narrow_strict_subclass_of`/
+/// `narrow_prop_is_subclass_of`) rather than duplicating it. Like
+/// `is_subclass_of`, the false branch narrows nothing: a parent name other
+/// than `fqcn` doesn't rule out the receiver being exactly `fqcn` itself.
+fn narrow_from_get_parent_class_literal(
+    ctx: &mut FlowState,
+    target: &ScalarArgTarget,
+    fqcn: &str,
+    is_true: bool,
+    db: &dyn MirDatabase,
+    file: &str,
+) {
+    match target {
+        ScalarArgTarget::Var(var_name) => {
+            if is_true {
+                let current = ctx.get_var(var_name);
+                let narrowed =
+                    narrow_strict_subclass_of(&current, fqcn, db, &ctx.template_param_names);
+                set_narrowed(ctx, var_name, &current, narrowed, false);
+            }
+        }
+        ScalarArgTarget::Prop(obj, prop) => {
+            narrow_prop_is_subclass_of(ctx, obj, prop, fqcn, db, file, is_true);
+        }
+    }
 }
 
 /// Extract the variable name from `$obj::class` — PHP 8's `get_class($obj)`
