@@ -3187,19 +3187,34 @@ fn flip_comparison_op(op: BinaryOp) -> BinaryOp {
 /// Narrow a variable by a comparison `$var op n` being `is_true`.
 /// The range constraint implied by `$x <op> n` resolving to `is_true`.
 /// Negation (`!is_true`) flips the constraint (e.g. NOT `< N` becomes `>= N`).
+/// Sentinel bound pair meaning "no `i64` value can satisfy this range" — a
+/// deliberately inverted (`min > max`) pair rather than a distinct enum
+/// variant, so every existing consumer (`intersect_int_range_into`'s
+/// `lo > hi` check, and `TLiteralInt`'s direct bounds check in
+/// `narrow_type_to_int_range`) already treats it as empty with no extra
+/// plumbing.
+const IMPOSSIBLE_BOUNDS: (Option<i64>, Option<i64>) = (Some(1), Some(0));
+
 fn int_comparison_bounds(
     op: BinaryOp,
     n: i64,
     is_true: bool,
 ) -> Option<(Option<i64>, Option<i64>)> {
     match (op, is_true) {
-        (BinaryOp::Less, true) | (BinaryOp::GreaterOrEqual, false) => {
-            Some((None, n.checked_sub(1)))
-        }
+        // `$x < i64::MIN` (or its `!($x >= i64::MIN)` negation) can never be
+        // true — `n - 1` would underflow, so treat that as a genuinely empty
+        // range instead of silently falling back to an unconstrained upper
+        // bound.
+        (BinaryOp::Less, true) | (BinaryOp::GreaterOrEqual, false) => Some(
+            n.checked_sub(1)
+                .map_or(IMPOSSIBLE_BOUNDS, |hi| (None, Some(hi))),
+        ),
         (BinaryOp::LessOrEqual, true) | (BinaryOp::Greater, false) => Some((None, Some(n))),
-        (BinaryOp::Greater, true) | (BinaryOp::LessOrEqual, false) => {
-            Some((n.checked_add(1), None))
-        }
+        // Mirror image: `$x > i64::MAX` can never be true — `n + 1` overflows.
+        (BinaryOp::Greater, true) | (BinaryOp::LessOrEqual, false) => Some(
+            n.checked_add(1)
+                .map_or(IMPOSSIBLE_BOUNDS, |lo| (Some(lo), None)),
+        ),
         (BinaryOp::GreaterOrEqual, true) | (BinaryOp::Less, false) => Some((Some(n), None)),
         _ => None,
     }
@@ -3256,7 +3271,12 @@ fn narrow_type_to_int_range(ty: &Type, min: Option<i64>, max: Option<i64>) -> Ty
     for atomic in &ty.types {
         match atomic {
             Atomic::TInt => {
-                result.add_type(Atomic::TIntRange { min, max });
+                // Route through the same intersection helper as the named
+                // int-subtype/range arms below (treating plain `int` as the
+                // fully-unbounded range) so an impossible `min > max` result
+                // (see `IMPOSSIBLE_BOUNDS`) is dropped instead of being
+                // constructed as a nonsensical `int<min, max>` atom.
+                intersect_int_range_into(&mut result, None, None, min, max);
             }
             // Named int subtypes carry implicit bounds; intersect rather than replace.
             Atomic::TPositiveInt => {
