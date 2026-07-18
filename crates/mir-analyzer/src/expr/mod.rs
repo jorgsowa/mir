@@ -1285,6 +1285,51 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
     }
 
+    /// Consult class-property providers for an otherwise-undeclared property.
+    /// Fires when the receiver's own class or any ancestor is registered as a
+    /// class-property marker (Psalm's `PropertiesProviderInterface` shape), so
+    /// a framework base class covers every user subclass. Returns the provided
+    /// type, or `None` to fall through to normal `UndefinedProperty` reporting.
+    pub(crate) fn class_property_from_plugin(&self, fqcn: &str, prop_name: &str) -> Option<Type> {
+        let plugins = self.plugins.clone()?;
+        if !plugins.has_any_class_property_provider() {
+            return None;
+        }
+        let here = crate::db::Fqcn::from_str(self.db, fqcn);
+        let chain = crate::db::class_ancestors_by_fqcn(self.db, here);
+        let matched: Vec<String> = chain
+            .iter()
+            .map(|c| mir_plugin::normalize_id(c))
+            .filter(|n| plugins.has_class_property_marker(n))
+            .collect();
+        if matched.is_empty() {
+            return None;
+        }
+        // Aggregate array-literal property defaults along the chain,
+        // nearest-class-wins, so a subclass `$casts` shadows a base class's.
+        let mut defaults: Vec<mir_plugin::ArrayPropertyDefault> = Vec::new();
+        for c in chain.iter() {
+            let cf = crate::db::Fqcn::from_str(self.db, c);
+            for d in crate::db::class_array_property_defaults(self.db, cf).iter() {
+                if !defaults.iter().any(|e| e.property == d.property) {
+                    defaults.push(d.clone());
+                }
+            }
+        }
+        let event = mir_plugin::ClassPropertyProviderEvent {
+            fqcn,
+            property_name: prop_name,
+            array_property_defaults: &defaults,
+            file: self.file.as_ref(),
+        };
+        for marker in &matched {
+            if let Some(provided) = plugins.class_property(marker, &event) {
+                return Some(self.resolve_provided_type(provided));
+            }
+        }
+        None
+    }
+
     pub fn emit(&mut self, kind: IssueKind, severity: Severity, span: php_ast::Span) {
         let (line, col_start) = self.offset_to_line_col(span.start);
 

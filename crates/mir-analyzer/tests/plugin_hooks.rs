@@ -10,8 +10,8 @@ use mir_issues::{Issue, IssueKind, Severity};
 use mir_plugin::php_ast::owned::{ExprKind, StmtKind};
 use mir_plugin::{
     AfterExpressionAnalysisEvent, AfterFunctionCallAnalysisEvent, AfterStatementAnalysisEvent,
-    FunctionReturnTypeProviderEvent, HookFlags, MethodReturnTypeProviderEvent, MirPlugin,
-    PluginIssue, PluginRegistry, ProvidedType,
+    ClassPropertyProviderEvent, FunctionReturnTypeProviderEvent, HookFlags,
+    MethodReturnTypeProviderEvent, MirPlugin, PluginIssue, PluginRegistry, ProvidedType,
 };
 
 struct TestPlugin;
@@ -52,6 +52,22 @@ impl MirPlugin for TestPlugin {
         event: &MethodReturnTypeProviderEvent<'_>,
     ) -> Option<ProvidedType> {
         (event.method_name == "get").then(|| ProvidedType::Parse("int".to_string()))
+    }
+
+    fn class_property_classes(&self) -> Vec<String> {
+        vec!["PluginModel".to_string()]
+    }
+
+    fn class_property(&self, event: &ClassPropertyProviderEvent<'_>) -> Option<ProvidedType> {
+        let casts = event
+            .array_property_defaults
+            .iter()
+            .find(|d| d.property == "casts")?;
+        let (_, value) = casts
+            .entries
+            .iter()
+            .find(|(k, _)| k == event.property_name)?;
+        Some(ProvidedType::Parse(value.clone()))
     }
 
     fn after_expression_analysis(&self, event: &mut AfterExpressionAnalysisEvent<'_>) {
@@ -226,5 +242,43 @@ fn before_add_issue_vetoes_and_statement_hook_fires() {
     assert!(
         !names.contains(&"VetoedEcho"),
         "before_add_issue veto should drop VetoedEcho: {names:?}"
+    );
+}
+
+#[test]
+fn class_property_provider_supplies_undeclared_property_via_ancestor() {
+    setup();
+    // The marker is registered on the base `PluginModel`, but `$casts` lives on
+    // the subclass `PluginUser` — proving ancestor-aware dispatch plus the
+    // array-literal-default exposure. `$u->age` must resolve to `int` from the
+    // cast entry, with no UndefinedProperty flagged.
+    let issues = unsuppressed(
+        r#"<?php
+class PluginModel {}
+class PluginUser extends PluginModel {
+    protected $casts = ['age' => 'int'];
+}
+function h(PluginUser $u): void {
+    $x = $u->age;
+    /** @mir-check $x is int */
+    print $x;
+}
+"#,
+    );
+    let undefined: Vec<_> = issues
+        .iter()
+        .filter(|i| matches!(i.kind, IssueKind::UndefinedProperty { .. }))
+        .collect();
+    assert!(
+        undefined.is_empty(),
+        "provider should have supplied $age: {undefined:?}"
+    );
+    let mismatches: Vec<_> = issues
+        .iter()
+        .filter(|i| matches!(i.kind, IssueKind::TypeCheckMismatch { .. }))
+        .collect();
+    assert!(
+        mismatches.is_empty(),
+        "cast entry should have typed $age as int: {mismatches:?}"
     );
 }

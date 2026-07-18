@@ -33,7 +33,7 @@ pub mod psalm;
 
 /// Bumped whenever the [`MirPlugin`] trait or event types change incompatibly.
 /// Dylib plugins built against a different version are refused at load time.
-pub const MIR_PLUGIN_API_VERSION: u32 = 1;
+pub const MIR_PLUGIN_API_VERSION: u32 = 2;
 
 // ---------------------------------------------------------------------------
 // Issues emitted by plugins
@@ -166,6 +166,35 @@ pub struct AfterCodebasePopulatedEvent<'a> {
     pub files: &'a [Arc<str>],
 }
 
+/// An array-literal property default declared on a class, exposed to
+/// [`ClassPropertyProviderEvent`] so a plugin can interpret framework
+/// conventions like Eloquent's `protected $casts = [...]` without re-parsing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArrayPropertyDefault {
+    /// Property name (no leading `$`), e.g. `casts`.
+    pub property: String,
+    /// Ordered `(key, value)` entries of the array literal. String-literal
+    /// values are unquoted; `Foo::class` values become the resolved class
+    /// FQCN. List-style arrays get positional string keys (`"0"`, `"1"`).
+    pub entries: Vec<(String, String)>,
+}
+
+/// Counterpart of Psalm's `PropertiesProviderInterface`: supply the type of a
+/// property that is not declared on the class (nor reachable via `@property`),
+/// e.g. an Eloquent attribute synthesized from `$casts`. Dispatched when a
+/// property access misses on a class whose own FQCN or an ancestor is listed
+/// in [`MirPlugin::class_property_classes`].
+pub struct ClassPropertyProviderEvent<'a> {
+    /// Concrete receiver class the property is resolved on (no leading `\`).
+    pub fqcn: &'a str,
+    /// Property name being resolved (no leading `$`).
+    pub property_name: &'a str,
+    /// Array-literal property defaults declared on `fqcn` or an ancestor,
+    /// nearest-class-wins.
+    pub array_property_defaults: &'a [ArrayPropertyDefault],
+    pub file: &'a str,
+}
+
 // ---------------------------------------------------------------------------
 // Plugin trait
 // ---------------------------------------------------------------------------
@@ -235,6 +264,20 @@ pub trait MirPlugin: Send + Sync {
         None
     }
 
+    /// Class FQCNs (no leading `\`) this plugin provides undeclared-property
+    /// types for. A listed class matches when it is the receiver's own class
+    /// *or any ancestor*, so a framework base class (e.g.
+    /// `Illuminate\Database\Eloquent\Model`) covers every user subclass.
+    fn class_property_classes(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    /// Supply the type of an otherwise-undeclared property. `None` falls
+    /// through to the next plugin / normal `UndefinedProperty` reporting.
+    fn class_property(&self, _event: &ClassPropertyProviderEvent<'_>) -> Option<ProvidedType> {
+        None
+    }
+
     fn after_expression_analysis(&self, _event: &mut AfterExpressionAnalysisEvent<'_>) {}
 
     fn after_statement_analysis(&self, _event: &mut AfterStatementAnalysisEvent<'_>) {}
@@ -271,6 +314,9 @@ pub struct PluginRegistry {
     function_providers: FxHashMap<String, Vec<usize>>,
     /// normalized FQCN → plugin indices, in registration order.
     method_providers: FxHashMap<String, Vec<usize>>,
+    /// normalized marker FQCN → plugin indices for undeclared-property
+    /// providers. Matched against the receiver's own class and its ancestors.
+    class_property_providers: FxHashMap<String, Vec<usize>>,
     /// Indices of plugins subscribed to each hook, so dispatch skips
     /// non-subscribers without a virtual call.
     after_expr: Vec<usize>,
@@ -312,6 +358,12 @@ impl PluginRegistry {
         }
         for fqcn in plugin.method_return_type_classes() {
             self.method_providers
+                .entry(normalize_id(&fqcn))
+                .or_default()
+                .push(idx);
+        }
+        for fqcn in plugin.class_property_classes() {
+            self.class_property_providers
                 .entry(normalize_id(&fqcn))
                 .or_default()
                 .push(idx);
@@ -382,6 +434,29 @@ impl PluginRegistry {
         indices
             .iter()
             .find_map(|&i| self.plugins[i].method_return_type(event))
+    }
+
+    pub fn has_any_class_property_provider(&self) -> bool {
+        !self.class_property_providers.is_empty()
+    }
+
+    /// Whether any plugin registered `marker_normalized` (pre-normalized) as a
+    /// class-property-provider marker. The analyzer calls this for the
+    /// receiver's own class and each ancestor.
+    pub fn has_class_property_marker(&self, marker_normalized: &str) -> bool {
+        self.class_property_providers
+            .contains_key(marker_normalized)
+    }
+
+    pub fn class_property(
+        &self,
+        marker_normalized: &str,
+        event: &ClassPropertyProviderEvent<'_>,
+    ) -> Option<ProvidedType> {
+        let indices = self.class_property_providers.get(marker_normalized)?;
+        indices
+            .iter()
+            .find_map(|&i| self.plugins[i].class_property(event))
     }
 
     pub fn after_expression_analysis(&self, event: &mut AfterExpressionAnalysisEvent<'_>) {

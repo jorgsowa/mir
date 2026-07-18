@@ -866,6 +866,94 @@ pub fn class_ancestors_by_fqcn<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -
     order.into()
 }
 
+/// Array-literal property defaults declared directly on `fqcn` (own class,
+/// not ancestors). Each entry is a property whose declared default is an
+/// array literal, with its `(key, value)` pairs flattened to strings: string
+/// literals unquoted, `Foo::class` resolved to a FQCN, positional (list)
+/// entries keyed by their index.
+///
+/// Lazily parses the defining file — only the class-property-provider plugin
+/// path (`ExpressionAnalyzer::class_property_from_plugin`) demands it, so the
+/// parse cost is bounded to classes that actually miss a property under a
+/// registered marker ancestor (e.g. Eloquent models). Salsa memoizes per `fqcn`.
+#[salsa::tracked]
+pub fn class_array_property_defaults<'db>(
+    db: &'db dyn MirDatabase,
+    fqcn: Fqcn<'db>,
+) -> Arc<Vec<mir_plugin::ArrayPropertyDefault>> {
+    use php_ast::owned::{ClassMemberKind, ExprKind, StmtKind};
+
+    let empty = Arc::new(Vec::new());
+    let Some(file) = source_file_for_fqcn(db, fqcn) else {
+        return empty;
+    };
+    let path = file.path(db);
+    let target = fqcn.name(db);
+    let parsed = crate::db::parse_file(db, file);
+    let program = &parsed.0.program;
+
+    let expr_to_string = |e: &php_ast::owned::Expr| -> Option<String> {
+        match &e.kind {
+            ExprKind::String(s) => Some(s.to_string()),
+            ExprKind::Int(n) => Some(n.to_string()),
+            ExprKind::ClassConstAccess(cca) => match (&cca.class.kind, &cca.member.kind) {
+                (ExprKind::Identifier(cls), ExprKind::Identifier(m)) if m.as_ref() == "class" => {
+                    Some(crate::db::resolve_name(db, path.as_ref(), cls))
+                }
+                _ => None,
+            },
+            _ => None,
+        }
+    };
+
+    let mut result: Vec<mir_plugin::ArrayPropertyDefault> = Vec::new();
+    crate::body_analysis::for_each_file_scope_decl(&program.stmts, &mut |stmt| {
+        if !result.is_empty() {
+            return;
+        }
+        let StmtKind::Class(decl) = &stmt.kind else {
+            return;
+        };
+        let Some(name) = decl.name.as_ref().and_then(|n| n.as_deref()) else {
+            return;
+        };
+        if !crate::db::resolve_name(db, path.as_ref(), name).eq_ignore_ascii_case(target.as_str()) {
+            return;
+        }
+        for member in decl.body.members.iter() {
+            let ClassMemberKind::Property(p) = &member.kind else {
+                continue;
+            };
+            let (Some(prop_name), Some(default)) = (p.name.as_deref(), p.default.as_ref()) else {
+                continue;
+            };
+            let ExprKind::Array(elements) = &default.kind else {
+                continue;
+            };
+            let mut entries = Vec::new();
+            for (idx, el) in elements.iter().enumerate() {
+                let key = match el.key.as_ref() {
+                    Some(k) => match expr_to_string(k) {
+                        Some(s) => s,
+                        None => continue,
+                    },
+                    None => idx.to_string(),
+                };
+                let Some(value) = expr_to_string(&el.value) else {
+                    continue;
+                };
+                entries.push((key, value));
+            }
+            result.push(mir_plugin::ArrayPropertyDefault {
+                property: prop_name.to_string(),
+                entries,
+            });
+        }
+    });
+
+    Arc::new(result)
+}
+
 /// Existence check for "does any ancestor of `fqcn` have a method named
 /// `name`?". Used for magic-method dispatch checks (`__call`, `__callstatic`,
 /// `__toString`, `__invoke`, `__get`, …) where callers only need a boolean.

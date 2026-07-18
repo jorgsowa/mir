@@ -1406,16 +1406,27 @@ impl<'a> ExpressionAnalyzer<'a> {
                     if get_method.is_none()
                         && !allows_dynamic
                         && !crate::db::has_unknown_ancestor(self.db, fqcn.as_ref())
-                        && !self.in_existence_check
                     {
-                        self.emit(
-                            IssueKind::UndefinedProperty {
-                                class: fqcn.to_string(),
-                                property: prop_name.to_string(),
-                            },
-                            Severity::Warning,
-                            span,
-                        );
+                        // Give a plugin (e.g. Eloquent `$casts`) a chance to
+                        // supply the type before flagging the property undefined.
+                        if let Some(ty) = self.class_property_from_plugin(fqcn.as_ref(), prop_name) {
+                            self.record_ref(
+                                Arc::from(format!("prop:{}::{}", fqcn, prop_name)),
+                                span,
+                            );
+                            *declaring_class = Some((*fqcn).into());
+                            return ty;
+                        }
+                        if !self.in_existence_check {
+                            self.emit(
+                                IssueKind::UndefinedProperty {
+                                    class: fqcn.to_string(),
+                                    property: prop_name.to_string(),
+                                },
+                                Severity::Warning,
+                                span,
+                            );
+                        }
                     }
                     return get_method
                         .and_then(|(_, m)| m.effective_return_type().cloned())

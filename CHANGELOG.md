@@ -27,6 +27,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Plugins emit custom issues (`PluginIssue`, code `MIR1509`) that respect
     `@mir-suppress <Name>`, `<issueHandlers>`, and baselines under their own
     issue names.
+  - **Class-property providers** (Psalm's `PropertiesProviderInterface` shape):
+    a plugin declares marker classes via `class_property_classes()` and types
+    otherwise-undeclared properties from `class_property()`. Dispatch is
+    ancestor-aware — a marker on a framework base class covers every subclass —
+    and the `ClassPropertyProviderEvent` exposes the receiver's array-literal
+    property defaults (e.g. Eloquent `$casts`) so the plugin needs no AST
+    access. Fires on a property-access miss before `UndefinedProperty` is
+    reported. `MIR_PLUGIN_API_VERSION` bumped to 2.
 
 ### Fixed
 
