@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.59.1] - 2026-07-18
+
+### Fixed
+
+- **CI:** the release workflow never published `mir-plugin`, so `mir-analyzer` (which depends on it) failed to publish and broke the 0.59.0 release partway through. Each publish step now also skips crates/versions already uploaded, so a rerun after a partial failure doesn't error out on the ones that already succeeded.
+
+### Performance
+
+- **`@var` alias expansion:** `extract_var_annotation_from` did a fresh `find_class_like` lookup for every `@var`-annotated statement, even when consecutive statements in the same method/class share the same enclosing class — a ~13% single-threaded regression on the full Laravel corpus benchmark introduced in 0.59.0. The lookup is now memoized per `(fqcn, ClassLike)` on `StatementsAnalyzer`.
+
 ## [0.59.0] - 2026-07-18
 
 ### Added
