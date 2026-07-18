@@ -172,7 +172,9 @@ impl<'a> StatementsAnalyzer<'a> {
                 crate::db::find_class_like(self.db, crate::db::Fqcn::from_str(self.db, fqcn));
             self.class_like_cache = Some((Arc::from(fqcn), resolved));
         }
-        self.class_like_cache.as_ref().and_then(|(_, cl)| cl.as_ref())
+        self.class_like_cache
+            .as_ref()
+            .and_then(|(_, cl)| cl.as_ref())
     }
 
     pub fn analyze_stmts(&mut self, stmts: &[php_ast::owned::Stmt], ctx: &mut FlowState) {
