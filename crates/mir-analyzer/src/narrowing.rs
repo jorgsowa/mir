@@ -4129,8 +4129,10 @@ fn type_fn_narrowed(
         // method_exists($obj, 'method') / property_exists($obj, 'prop') — both accept
         // object|string, so on true keep object atoms as-is (preserving the specific
         // class instead of collapsing it to bare TObject) and keep string/class-string
-        // atoms as-is; only TMixed/TScalar are replaced, since a bare mixed doesn't
-        // otherwise narrow to anything usable.
+        // atoms as-is; TMixed is replaced with bare TObject (a usable placeholder — the
+        // string alternative isn't worth widening a plain mixed into a union for).
+        // TScalar excludes object entirely though, so it can only narrow to TString,
+        // never TObject (bool|int|float|string can never be an object instance).
         "method_exists" | "property_exists" => {
             if is_true {
                 let mut result = Type::empty();
@@ -4138,8 +4140,10 @@ fn type_fn_narrowed(
                 for t in &current.types {
                     if t.is_object() || t.is_string() {
                         result.add_type(t.clone());
-                    } else if matches!(t, Atomic::TMixed | Atomic::TScalar) {
+                    } else if matches!(t, Atomic::TMixed) {
                         result.add_type(Atomic::TObject);
+                    } else if matches!(t, Atomic::TScalar) {
+                        result.add_type(Atomic::TString);
                     }
                 }
                 if result.is_empty() {
