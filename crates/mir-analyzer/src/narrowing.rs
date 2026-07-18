@@ -1942,6 +1942,31 @@ fn extract_type_fn_check(expr: &php_ast::owned::Expr) -> Option<(&str, String)> 
     Some((canonical, var_name))
 }
 
+/// Property-access counterpart of `extract_type_fn_check`, for
+/// `is_int($this->prop)` — returns `(fn_name, obj_var, prop)`. Kept separate
+/// (rather than folding into `extract_type_fn_check`) for the same reason
+/// `collect_prop_instanceof` is kept separate from `collect_instanceof`: the
+/// var-only extractor's result feeds `narrow_type_fn_disjuncts`'s
+/// `Option<String>`, which switch-fallthrough narrowing consumes via plain
+/// `ctx.get_var`/`set_var` — a property receiver has no such representation.
+fn extract_type_fn_check_prop(expr: &php_ast::owned::Expr) -> Option<(&str, String, String)> {
+    let ExprKind::FunctionCall(call) = &expr.kind else {
+        return None;
+    };
+    let ExprKind::Identifier(name) = &call.name.kind else {
+        return None;
+    };
+    let bare = name.as_ref().trim_start_matches('\\');
+    let canonical = NARROWING_TYPE_FNS
+        .iter()
+        .find(|f| f.eq_ignore_ascii_case(bare))?;
+    if call.args.len() != 1 {
+        return None;
+    }
+    let (obj, prop) = extract_prop_access(&call.args[0].value)?;
+    Some((canonical, obj, prop))
+}
+
 /// Narrow `$x` to the union of every `is_TYPE($x)` truthy-narrowing
 /// collected from `conditions`, when EVERY condition is a recognized
 /// single-argument type-check call on the SAME variable — the scalar-type
@@ -1983,6 +2008,52 @@ pub(crate) fn narrow_type_fn_disjuncts(
         ctx.set_var(&vn, union_ty);
     }
     Some(vn)
+}
+
+/// Property-access counterpart of `narrow_type_fn_disjuncts`, for the
+/// `match(true)`/`switch(true)` fallthrough shape applied to `$this->prop`
+/// (e.g. `is_int($this->prop), is_string($this->prop)`). Returns `true` when
+/// it matched and applied narrowing — returns the narrowed `(obj_var, prop)`
+/// receiver on success, the property-side equivalent of the var-side
+/// function's `Option<String>` (see `extract_type_fn_check_prop`'s doc
+/// comment for why a plain variable name can't represent this).
+pub(crate) fn narrow_prop_type_fn_disjuncts(
+    conditions: &[&php_ast::owned::Expr],
+    ctx: &mut FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<(String, String)> {
+    if conditions.len() < 2 {
+        return None;
+    }
+    let mut receiver: Option<(String, String)> = None;
+    let mut fn_names: Vec<&str> = Vec::with_capacity(conditions.len());
+    for cond in conditions {
+        let (fn_name, obj, prop) = extract_type_fn_check_prop(cond)?;
+        match &receiver {
+            None => receiver = Some((obj, prop)),
+            Some((existing_obj, existing_prop))
+                if *existing_obj == obj && *existing_prop == prop => {}
+            _ => return None, // different receiver — bail out
+        }
+        fn_names.push(fn_name);
+    }
+    let (obj_var, prop) = receiver?;
+
+    let original = resolve_prop_current_type(ctx, &obj_var, &prop, db, file);
+    let mut union_ty = Type::empty();
+    for fn_name in &fn_names {
+        let mut scratch = ctx.branch();
+        scratch.set_prop_refined(&obj_var, &prop, original.clone());
+        narrow_prop_from_type_fn(&mut scratch, fn_name, &obj_var, &prop, db, file, true);
+        union_ty.merge_with(&resolve_prop_current_type(
+            &scratch, &obj_var, &prop, db, file,
+        ));
+    }
+    if !union_ty.is_empty() {
+        apply_prop_narrowed(ctx, &obj_var, &prop, original, union_ty, true);
+    }
+    Some((obj_var, prop))
 }
 
 /// Extract the single variable a leaf disjunct condition narrows — either a

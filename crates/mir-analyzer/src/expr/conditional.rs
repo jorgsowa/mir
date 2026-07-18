@@ -218,6 +218,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                         self.db,
                         &self.file,
                     )
+                    .is_some()
+                    || crate::narrowing::narrow_prop_type_fn_disjuncts(
+                        &refs,
+                        &mut arm_ctx,
+                        self.db,
+                        &self.file,
+                    )
                     .is_some();
                 if !narrowed {
                     for cond in conditions.iter() {
