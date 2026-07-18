@@ -958,7 +958,15 @@ pub fn narrow_from_condition(
                         {
                             let needle_non_empty = match &needle_arg.value.kind {
                                 ExprKind::String(s) => !s.is_empty(),
-                                _ => false,
+                                // `$needle = 'x'; str_contains($h, $needle)` — resolve a
+                                // variable needle already narrowed to a single literal
+                                // string, same as an inline literal would be.
+                                _ => extract_var_name(&needle_arg.value).is_some_and(|name| {
+                                    matches!(
+                                        ctx.get_var(&name).types.as_slice(),
+                                        [Atomic::TLiteralString(s)] if !s.is_empty()
+                                    )
+                                }),
                             };
                             if needle_non_empty {
                                 if let Some(var_name) = extract_var_name(&haystack_arg.value) {
