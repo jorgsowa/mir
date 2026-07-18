@@ -533,6 +533,8 @@ pub fn narrow_from_condition(
                         if !narrowed.is_empty() && narrowed != current {
                             ctx.set_var(&var_name, narrowed);
                         }
+                    } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
+                        narrow_prop_array_empty(ctx, &obj, &prop, db, file, effective_true);
                     }
                 }
             } else if let ExprKind::Array(elems) = &b.left.kind {
@@ -547,6 +549,8 @@ pub fn narrow_from_condition(
                         if !narrowed.is_empty() && narrowed != current {
                             ctx.set_var(&var_name, narrowed);
                         }
+                    } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
+                        narrow_prop_array_empty(ctx, &obj, &prop, db, file, effective_true);
                     }
                 }
             }
@@ -667,6 +671,8 @@ pub fn narrow_from_condition(
                         if !narrowed.is_empty() && narrowed != current {
                             ctx.set_var(&var_name, narrowed);
                         }
+                    } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
+                        narrow_prop_array_empty(ctx, &obj, &prop, db, file, effective_true);
                     }
                 }
             } else if let ExprKind::Array(elems) = &b.left.kind {
@@ -681,6 +687,8 @@ pub fn narrow_from_condition(
                         if !narrowed.is_empty() && narrowed != current {
                             ctx.set_var(&var_name, narrowed);
                         }
+                    } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
+                        narrow_prop_array_empty(ctx, &obj, &prop, db, file, effective_true);
                     }
                 }
             }
@@ -2854,6 +2862,27 @@ fn apply_prop_narrowed(
     } else if mark_diverges && !current.is_empty() && !current.is_mixed() {
         ctx.diverges = true;
     }
+}
+
+/// Property-access counterpart of the `$arr === []`/`$arr !== []` (and loose
+/// `==`/`!=`) var-based array-emptiness narrowing above, for `$this->prop`.
+/// `mark_diverges=false` matches the var-side behavior, which also leaves an
+/// empty narrowing result untouched instead of flagging a contradiction.
+fn narrow_prop_array_empty(
+    ctx: &mut FlowState,
+    obj_var: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    file: &str,
+    is_empty: bool,
+) {
+    let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
+    let narrowed = if is_empty {
+        current.narrow_to_empty_collection()
+    } else {
+        current.narrow_to_non_empty_collection()
+    };
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, false);
 }
 
 fn narrow_prop_instanceof(
