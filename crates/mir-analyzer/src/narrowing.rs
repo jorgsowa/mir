@@ -4820,7 +4820,9 @@ pub(crate) fn is_numeric_string(s: &str) -> bool {
     t.parse::<i64>().is_ok() || t.parse::<f64>().is_ok_and(f64::is_finite)
 }
 
-/// Extract the variable name from `count($var)` / `sizeof($var)`.
+/// Extract the variable name from `count($var)` / `sizeof($var)` /
+/// `iterator_count($var)` — all three return an int length and narrow
+/// identically.
 fn extract_count_of_var(expr: &php_ast::owned::Expr) -> Option<String> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
         let name = match &call.name.kind {
@@ -4828,7 +4830,10 @@ fn extract_count_of_var(expr: &php_ast::owned::Expr) -> Option<String> {
             _ => return None,
         };
         let bare = name.trim_start_matches('\\');
-        if bare.eq_ignore_ascii_case("count") || bare.eq_ignore_ascii_case("sizeof") {
+        if bare.eq_ignore_ascii_case("count")
+            || bare.eq_ignore_ascii_case("sizeof")
+            || bare.eq_ignore_ascii_case("iterator_count")
+        {
             if let Some(arg) = call.args.first() {
                 return extract_var_name(&arg.value);
             }
