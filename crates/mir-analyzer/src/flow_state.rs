@@ -83,6 +83,14 @@ pub struct FlowState {
     /// `None` for free functions and closures.
     pub current_method_name: Option<Arc<str>>,
 
+    /// The FQN of the free function currently being analyzed, if any.
+    /// `None` for methods (use `self_fqcn` + `current_method_name` instead)
+    /// and for closures. Lets a callee identify "which function am I in" so
+    /// it can look up its own declared parameters — e.g. to resolve an
+    /// opaque `callable` parameter's return type from how *callers* invoke
+    /// this function (`call::opaque_callback`).
+    pub current_function_fqn: Option<Arc<str>>,
+
     /// Whether we are inside a @pure function/method body.
     pub is_in_pure_fn: bool,
 
@@ -283,6 +291,7 @@ impl FlowState {
             is_generator: false,
             inside_constructor: false,
             current_method_name: None,
+            current_function_fqn: None,
             is_in_pure_fn: false,
             is_in_immutable_method: false,
             is_in_external_mutation_free_method: false,

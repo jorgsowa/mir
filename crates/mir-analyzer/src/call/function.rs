@@ -684,13 +684,17 @@ impl CallAnalyzer {
             // value type. Falls back to the stub return when inference is unsure.
             let return_ty = match resolved_fn_name.as_str() {
                 "array_map" => {
-                    super::callable::infer_array_map_return(ea, &arg_types).unwrap_or(return_ty)
+                    let callback_expr = call.args.first().map(|a| &a.value);
+                    super::callable::infer_array_map_return(ea, &arg_types, ctx, callback_expr)
+                        .unwrap_or(return_ty)
                 }
                 "array_filter" => {
                     super::callable::infer_array_filter_return(&arg_types).unwrap_or(return_ty)
                 }
                 "array_reduce" => {
-                    super::callable::infer_array_reduce_return(ea, &arg_types).unwrap_or(return_ty)
+                    let callback_expr = call.args.get(1).map(|a| &a.value);
+                    super::callable::infer_array_reduce_return(ea, &arg_types, ctx, callback_expr)
+                        .unwrap_or(return_ty)
                 }
                 "array_values" => {
                     super::callable::infer_array_values_return(&arg_types).unwrap_or(return_ty)

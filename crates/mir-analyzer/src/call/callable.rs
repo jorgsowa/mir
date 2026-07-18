@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use php_ast::owned::{Expr, ExprKind};
 use php_ast::Span;
 
 use mir_issues::{IssueKind, Severity};
@@ -7,6 +8,7 @@ use mir_types::atomic::FnParam;
 use mir_types::{Atomic, Type};
 
 use crate::expr::ExpressionAnalyzer;
+use crate::flow_state::FlowState;
 
 /// A bare string-literal callback (`array_map('formatRow', ...)`, `usort($a, 'my_cmp')`,
 /// `usort($a, 'MyComparator::compare')`) is a real runtime reference to the named
@@ -452,11 +454,22 @@ pub(crate) fn check_array_filter_callback(
 /// - `TClosure` / `TCallable` carry their return type directly.
 /// - `TLiteralString` is resolved as a function name and its declared return is used.
 /// - `TIntersection` is searched part by part.
+/// - A bare opaque `TCallable` (no declared signature) falls through to
+///   `resolve_opaque_callback_via_callers` — if `callback_expr` is a
+///   variable matching one of the *enclosing* function's own opaque
+///   `callable` parameters, resolve its return type from how that
+///   function's own callers actually invoke it.
 ///
-/// Returns `None` when the callback's return type cannot be determined (bare
-/// `callable`, unknown string, `null`, …) so callers can fall back to the
-/// generic stub return type rather than inventing a wrong element type.
-fn callable_return_type(union: &Type, ea: &ExpressionAnalyzer<'_>) -> Option<Type> {
+/// Returns `None` when the callback's return type cannot be determined
+/// (unknown string, `null`, an opaque callable with no resolvable callers,
+/// …) so callers can fall back to the generic stub return type rather than
+/// inventing a wrong element type.
+fn callable_return_type(
+    union: &Type,
+    ea: &ExpressionAnalyzer<'_>,
+    ctx: &FlowState,
+    callback_expr: Option<&Expr>,
+) -> Option<Type> {
     for atomic in &union.types {
         match atomic {
             Atomic::TClosure { data } => return Some(data.return_type.clone()),
@@ -464,6 +477,13 @@ fn callable_return_type(union: &Type, ea: &ExpressionAnalyzer<'_>) -> Option<Typ
                 return_type: Some(rt),
                 ..
             } => return Some((**rt).clone()),
+            Atomic::TCallable {
+                return_type: None, ..
+            } => {
+                if let Some(rt) = resolve_opaque_callback_via_callers(ea, ctx, callback_expr) {
+                    return Some(rt);
+                }
+            }
             Atomic::TLiteralString(fn_name) if !fn_name.is_empty() => {
                 let here = crate::db::Fqcn::from_str(ea.db, fn_name.as_ref());
                 if let Some(f) = crate::db::find_function(ea.db, here) {
@@ -474,7 +494,7 @@ fn callable_return_type(union: &Type, ea: &ExpressionAnalyzer<'_>) -> Option<Typ
             }
             Atomic::TIntersection { parts } => {
                 for part in parts.iter() {
-                    if let Some(rt) = callable_return_type(part, ea) {
+                    if let Some(rt) = callable_return_type(part, ea, ctx, callback_expr) {
                         return Some(rt);
                     }
                 }
@@ -483,6 +503,38 @@ fn callable_return_type(union: &Type, ea: &ExpressionAnalyzer<'_>) -> Option<Typ
         }
     }
     None
+}
+
+/// When `callback_expr` is a bare `$variable` matching one of the enclosing
+/// function's own declared parameters, and that parameter's declared type is
+/// itself a bare opaque `callable` (no docblock refinement), resolve its
+/// return type from how the enclosing function's own callers actually invoke
+/// it. Scoped to plain function parameters — see the `opaque_callback`
+/// module docs for why method parameters are out of scope.
+fn resolve_opaque_callback_via_callers(
+    ea: &ExpressionAnalyzer<'_>,
+    ctx: &FlowState,
+    callback_expr: Option<&Expr>,
+) -> Option<Type> {
+    let ExprKind::Variable(name) = &callback_expr?.kind else {
+        return None;
+    };
+    let var_name = name.trim_start_matches('$');
+    let fqn = ctx.current_function_fqn.as_ref()?;
+    let f = crate::db::find_function(ea.db, crate::db::Fqcn::from_str(ea.db, fqn))?;
+    let index = f.params.iter().position(|p| p.name.as_ref() == var_name)?;
+    // Only meaningful when the *declared* param type is itself a bare opaque
+    // callable — if it already carries a signature, the arms above already
+    // resolved it, so this avoids re-deriving a perfectly good declared
+    // signature through the (slower) caller scan.
+    let is_bare_callable = f.params[index].ty.as_ref().is_some_and(|t| {
+        t.types.len() == 1 && matches!(&t.types[0], Atomic::TCallable { return_type: None, .. })
+    });
+    if !is_bare_callable {
+        return None;
+    }
+    let callee = super::opaque_callback::CalleeKey::Function(Arc::clone(fqn));
+    super::opaque_callback::opaque_callback_return_type(ea.db, &callee, index as u16)
 }
 
 /// Whether every member of `ty` is a statically non-empty collection, so a
@@ -1116,6 +1168,8 @@ pub(crate) fn rand_return_type(arg_types: &[Type]) -> Option<Type> {
 pub(crate) fn infer_array_map_return(
     ea: &ExpressionAnalyzer<'_>,
     arg_types: &[Type],
+    ctx: &FlowState,
+    callback_expr: Option<&Expr>,
 ) -> Option<Type> {
     let callback = arg_types.first()?;
     // `array_map(null, ...)` (zip mode) and other non-callable first args are
@@ -1123,7 +1177,7 @@ pub(crate) fn infer_array_map_return(
     if callback.types.iter().any(|a| matches!(a, Atomic::TNull)) {
         return None;
     }
-    let value = callable_return_type(callback, ea)?;
+    let value = callable_return_type(callback, ea, ctx, callback_expr)?;
     // A `void`/`never` callback is degenerate (the runtime fills `null`); don't
     // fabricate an `array<…, void>` element type that would surface dubious
     // downstream diagnostics — keep the generic stub `array`.
@@ -1219,9 +1273,11 @@ pub(crate) fn infer_array_map_return(
 pub(crate) fn infer_array_reduce_return(
     ea: &ExpressionAnalyzer<'_>,
     arg_types: &[Type],
+    ctx: &FlowState,
+    callback_expr: Option<&Expr>,
 ) -> Option<Type> {
     let callback = arg_types.get(1)?;
-    let mut result = callable_return_type(callback, ea)?;
+    let mut result = callable_return_type(callback, ea, ctx, callback_expr)?;
     if result
         .types
         .iter()

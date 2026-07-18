@@ -137,6 +137,7 @@ impl<'a> BodyAnalyzer<'a> {
             Some(&template_params),
         );
         ctx.is_in_pure_fn = resolved.as_ref().map(|(_, s)| s.is_pure).unwrap_or(false);
+        ctx.current_function_fqn = fqn.clone();
         seed_param_locations(&mut ctx, &decl.params, source, source_map);
         record_param_symbols(all_symbols, file, source, &decl.params, &ctx);
         let mut buf = IssueBuffer::new();
@@ -799,6 +800,7 @@ impl<'a> BodyAnalyzer<'a> {
             true,
         );
         ctx.is_in_pure_fn = resolved.as_ref().map(|(_, s)| s.is_pure).unwrap_or(false);
+        ctx.current_function_fqn = fqn.clone();
         seed_param_locations(&mut ctx, &decl.params, source, source_map);
         record_param_symbols(all_symbols, file, source, &decl.params, &ctx);
         let mut buf = IssueBuffer::new();

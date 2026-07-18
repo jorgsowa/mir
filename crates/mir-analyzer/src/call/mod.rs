@@ -2,6 +2,7 @@ mod args;
 mod callable;
 mod function;
 pub(crate) mod method;
+mod opaque_callback;
 mod static_call;
 
 pub(crate) use args::substitute_static_in_return;
