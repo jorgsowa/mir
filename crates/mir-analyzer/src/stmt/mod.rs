@@ -129,7 +129,10 @@ pub struct StatementsAnalyzer<'a> {
     /// Cache of the last `find_function` lookup done for `@var`-annotation
     /// alias expansion in a free function's own body, mirroring
     /// `class_like_cache`.
-    function_cache: Option<(Arc<str>, Option<Arc<mir_codebase::definitions::FunctionDef>>)>,
+    function_cache: Option<(
+        Arc<str>,
+        Option<Arc<mir_codebase::definitions::FunctionDef>>,
+    )>,
 }
 
 impl<'a> StatementsAnalyzer<'a> {
@@ -185,7 +188,10 @@ impl<'a> StatementsAnalyzer<'a> {
     /// `find_function(fqn)`, memoized against the immediately preceding call —
     /// mirrors `cached_class_like` for the free-function `@var` alias-expansion
     /// fallback below.
-    fn cached_function(&mut self, fqn: &str) -> Option<Arc<mir_codebase::definitions::FunctionDef>> {
+    fn cached_function(
+        &mut self,
+        fqn: &str,
+    ) -> Option<Arc<mir_codebase::definitions::FunctionDef>> {
         let hit = self
             .function_cache
             .as_ref()
