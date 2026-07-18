@@ -5,7 +5,7 @@ use mir_codebase::definitions::{
 };
 use mir_types::Name;
 
-use super::DefinitionCollector;
+use super::{expand_aliases_only, DefinitionCollector};
 use crate::parser::type_from_hint_owned;
 
 /// Returns `true` if `stmts` (does not recurse into nested function/closure
@@ -232,7 +232,7 @@ impl DefinitionCollector<'_> {
                 .map(|s| crate::parser::docblock::parse_type_string(&s))
                 .or_else(|| {
                     doc.get_param_type(param_name).cloned().map(|u| {
-                        let expanded = self.expand_aliases_only(u, &type_aliases);
+                        let expanded = expand_aliases_only(u, &type_aliases);
                         let doc_ty = self.resolve_union_doc_with_templates(
                             expanded,
                             &template_names,
@@ -276,7 +276,7 @@ impl DefinitionCollector<'_> {
             }
 
             let out_ty = doc.get_out_param_type(param_name).cloned().map(|u| {
-                let expanded = self.expand_aliases_only(u, &type_aliases);
+                let expanded = expand_aliases_only(u, &type_aliases);
                 let mut doc_ty = self.resolve_union_doc_with_templates(
                     expanded,
                     &template_names,
@@ -330,7 +330,7 @@ impl DefinitionCollector<'_> {
         let return_type = if let Some(s) = self.version_attr_type_string(&decl.attributes) {
             let mut ty = crate::parser::docblock::parse_type_string(&s);
             ty.from_docblock = true;
-            let expanded = self.expand_aliases_only(ty, &type_aliases);
+            let expanded = expand_aliases_only(ty, &type_aliases);
             Some(self.resolve_union_doc_with_templates(
                 expanded,
                 &template_names,
@@ -341,7 +341,7 @@ impl DefinitionCollector<'_> {
             match (doc.return_type.clone(), decl.return_type.as_ref()) {
                 (Some(mut ty), _) => {
                     ty.from_docblock = true;
-                    let expanded = self.expand_aliases_only(ty, &type_aliases);
+                    let expanded = expand_aliases_only(ty, &type_aliases);
                     Some(self.resolve_union_doc_with_templates(
                         expanded,
                         &template_names,

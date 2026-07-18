@@ -2025,6 +2025,64 @@ fn symbol_at_static_property_access_gap_returns_receiver_type() {
     assert_eq!(format!("{}", sym.resolved_type), "class-string<Config>");
 }
 
+// ---------------------------------------------------------------------------
+// symbol_at — bare `@var` expands class-scoped @psalm-type/@phpstan-type aliases
+// ---------------------------------------------------------------------------
+
+#[test]
+fn symbol_at_bare_var_expands_class_scoped_psalm_type_alias() {
+    // A `@var Result $x` annotation (not a function/method signature) must
+    // expand `Result` to what the alias declares, exactly like `@param`/
+    // `@return` references to the same alias already do.
+    let src = r#"<?php
+class SomeClass {}
+/**
+ * @psalm-type Result = SomeClass
+ */
+class Repo {
+    public function find(): void {
+        /** @var Result $x */
+        $x = null;
+        $x;
+    }
+}
+"#;
+    let result = mir_analyzer::analyze_source(src);
+    let off = (src.rfind("$x;").unwrap() + 1) as u32;
+    let sym = result
+        .symbol_at("<source>", off)
+        .expect("symbol_at should find $x");
+
+    assert_eq!(format!("{}", sym.resolved_type), "SomeClass");
+}
+
+#[test]
+fn symbol_at_bare_var_expands_nested_psalm_type_alias_chain() {
+    // `A = B`, `B = SomeClass` must fully resolve to `SomeClass`, not stop
+    // at the first-level `B`.
+    let src = r#"<?php
+class SomeClass {}
+/**
+ * @psalm-type A = B
+ * @psalm-type B = SomeClass
+ */
+class Repo {
+    public function find(): void {
+        /** @var A $x */
+        $x = null;
+        $x;
+    }
+}
+"#;
+    let result = mir_analyzer::analyze_source(src);
+    let off = (src.rfind("$x;").unwrap() + 1) as u32;
+    let sym = result
+        .symbol_at("<source>", off)
+        .expect("symbol_at should find $x");
+
+    assert_eq!(format!("{}", sym.resolved_type), "SomeClass");
+}
+
 #[test]
 fn symbol_at_self_static_property_access_gap_returns_receiver_type() {
     let dir = create_temp_dir("test");

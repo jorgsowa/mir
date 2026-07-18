@@ -190,7 +190,7 @@ impl<'a> StatementsAnalyzer<'a> {
         let suppressions = self.extract_suppressions_from(doc.as_deref());
         let before = self.issues.issue_count();
 
-        let var_annotation = self.extract_var_annotation_from(doc.as_deref());
+        let var_annotation = self.extract_var_annotation_from(doc.as_deref(), ctx.self_fqcn.as_deref());
 
         // Pre-narrow: `@var Type $varname` before any statement narrows that variable.
         if let Some(ref ann) = var_annotation {
@@ -723,9 +723,34 @@ impl<'a> StatementsAnalyzer<'a> {
 
     /// Extract a `@var` annotation from a parsed docblock string.
     /// The type is resolved through the file's imports/namespace.
-    fn extract_var_annotation_from(&self, doc: Option<&str>) -> Option<VarAnnotation> {
+    /// `self_fqcn` — the class/interface/trait/enum whose body is currently
+    /// being analysed (`FlowState::self_fqcn`), if any — supplies that
+    /// class-like's own `@psalm-type`/`@phpstan-type` aliases so a bare
+    /// `@var Result $x` expands exactly like a `@param`/`@return` reference
+    /// to the same alias already does (see `collector::build_method_storage`
+    /// / the "expand aliases first, then resolve" precedent). Expansion runs
+    /// before `resolve_union_for_file` so the `UndefinedDocblockClass`/
+    /// reference-recording checks in `analyze_stmt` see the real referenced
+    /// class(es), not the opaque alias name. A global function's own
+    /// `@psalm-type` (no enclosing class) is intentionally out of scope here
+    /// — `self_fqcn` is `None` in that case, same as today.
+    fn extract_var_annotation_from(
+        &self,
+        doc: Option<&str>,
+        self_fqcn: Option<&str>,
+    ) -> Option<VarAnnotation> {
         let parsed = crate::parser::DocblockParser::parse(doc?);
-        let ty = parsed.var_type?;
+        let mut ty = parsed.var_type?;
+        if let Some(fqcn) = self_fqcn {
+            if let Some(class_like) =
+                crate::db::find_class_like(self.db, crate::db::Fqcn::from_str(self.db, fqcn))
+            {
+                let aliases = class_like.type_aliases();
+                if !aliases.is_empty() {
+                    ty = crate::collector::expand_aliases_only(ty, aliases);
+                }
+            }
+        }
         Some(VarAnnotation {
             name: parsed.var_name,
             ty: resolve_union_for_file(ty, self.db, &self.file),

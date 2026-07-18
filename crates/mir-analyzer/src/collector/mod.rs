@@ -210,6 +210,42 @@ fn is_php_builtin_type(name: &str) -> bool {
     )
 }
 
+/// Substitute alias names in `union` with their pre-built definitions.
+/// Does not touch FQN resolution; that is left to the caller's resolution pass.
+///
+/// Generic over the alias map's key type so both the collector's in-progress
+/// `FxHashMap<String, Type>` and a class-like's already-built
+/// `FxHashMap<Arc<str>, Type>` (`ClassLike::type_aliases`) can be passed
+/// without cloning keys.
+pub(crate) fn expand_aliases_only<K>(union: Type, aliases: &FxHashMap<K, Type>) -> Type
+where
+    K: std::borrow::Borrow<str> + std::hash::Hash + Eq,
+{
+    if aliases.is_empty() {
+        return union;
+    }
+    let from_docblock = union.from_docblock;
+    let mut result = Type::empty();
+    result.possibly_undefined = union.possibly_undefined;
+    result.from_docblock = from_docblock;
+    for atomic in union.types {
+        match atomic {
+            mir_types::Atomic::TNamedObject {
+                ref fqcn,
+                ref type_params,
+            } if type_params.is_empty() => {
+                if let Some(alias_ty) = aliases.get(fqcn.as_ref()) {
+                    result.merge_with(alias_ty);
+                } else {
+                    result.add_type(atomic);
+                }
+            }
+            other => result.add_type(other),
+        }
+    }
+    result
+}
+
 /// Print profiling statistics for type collection.
 pub(crate) fn print_collector_stats() {
     let scalar = SCALAR_PARAM_COUNT.load(Relaxed);
@@ -1116,34 +1152,6 @@ impl<'a> DefinitionCollector<'a> {
         }
     }
 
-    /// Substitute alias names in `union` with their pre-built definitions.
-    /// Does not touch FQN resolution; that is left to the caller's resolution pass.
-    fn expand_aliases_only(&self, union: Type, aliases: &FxHashMap<String, Type>) -> Type {
-        if aliases.is_empty() {
-            return union;
-        }
-        let from_docblock = union.from_docblock;
-        let mut result = Type::empty();
-        result.possibly_undefined = union.possibly_undefined;
-        result.from_docblock = from_docblock;
-        for atomic in union.types {
-            match atomic {
-                mir_types::Atomic::TNamedObject {
-                    ref fqcn,
-                    ref type_params,
-                } if type_params.is_empty() => {
-                    if let Some(alias_ty) = aliases.get(fqcn.as_ref()) {
-                        result.merge_with(alias_ty);
-                    } else {
-                        result.add_type(atomic);
-                    }
-                }
-                other => result.add_type(other),
-            }
-        }
-        result
-    }
-
     fn build_type_aliases(&self, doc: &crate::parser::ParsedDocblock) -> FxHashMap<String, Type> {
         let mut aliases = FxHashMap::default();
         for alias in &doc.type_aliases {
@@ -1215,7 +1223,7 @@ impl<'a> DefinitionCollector<'a> {
         for _ in 0..aliases.len() {
             let snapshot = aliases.clone();
             for ty in aliases.values_mut() {
-                *ty = self.expand_aliases_only(ty.clone(), &snapshot);
+                *ty = expand_aliases_only(ty.clone(), &snapshot);
             }
         }
     }
@@ -1838,7 +1846,7 @@ impl<'a> DefinitionCollector<'a> {
                 ty.from_docblock = true;
                 // Expand type aliases first (no FQN change), then resolve.
                 let expanded = effective_aliases
-                    .map_or(ty.clone(), |a| self.expand_aliases_only(ty.clone(), a));
+                    .map_or(ty.clone(), |a| expand_aliases_only(ty.clone(), a));
                 // Template-aware resolution even with no templates in scope: it
                 // FQN-qualifies class names in generic return types (e.g.
                 // `Builder<static>` on a template-free method), which the plain

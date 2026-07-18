@@ -17,7 +17,8 @@ use mir_codebase::definitions::{
     ClassDef, ConstantDef, DeclaredParam, EnumDef, FunctionDef, InterfaceDef, MethodDef,
     PropertyDef, TraitDef,
 };
-use mir_types::{Atomic, Name};
+use mir_types::{Atomic, Name, Type};
+use rustc_hash::FxHashMap;
 
 use crate::db::{collect_file_definitions, source_file_for_fqcn, Fqcn, MirDatabase, SourceFile};
 
@@ -176,6 +177,18 @@ impl ClassLike {
         match self {
             ClassLike::Class(c) => &c.pending_import_types,
             _ => &[],
+        }
+    }
+
+    /// Own `@psalm-type`/`@phpstan-type` aliases declared on this class-like's
+    /// docblock, already fully fixpoint-expanded (chains like `A = B`, `B =
+    /// SomeClass` resolve to `SomeClass` — see `ClassDef::type_aliases`).
+    pub fn type_aliases(&self) -> &FxHashMap<Arc<str>, Type> {
+        match self {
+            ClassLike::Class(c) => &c.type_aliases,
+            ClassLike::Interface(i) => &i.type_aliases,
+            ClassLike::Trait(t) => &t.type_aliases,
+            ClassLike::Enum(e) => &e.type_aliases,
         }
     }
 
