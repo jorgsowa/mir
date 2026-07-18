@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.59.2] - 2026-07-18
+
+### Fixed
+
+- **CI:** 0.59.1's crates.io publish still failed on `mir-plugin`, since a first-time crate publish needs the `publish-new` token scope that the CI token doesn't have; `mir-analyzer` and `mir-php` were never reached. `mir-plugin` has now been published manually so the crate exists on the index, and this release carries no other changes — it exists so the remaining crates land on crates.io at a version CI can publish end to end.
+
 ## [0.59.1] - 2026-07-18
 
 ### Fixed
