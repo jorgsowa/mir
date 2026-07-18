@@ -82,12 +82,24 @@ pub fn narrow_from_condition(
                         let current = ctx.get_var(&var_name);
                         ctx.set_var(&var_name, current.remove_null());
                     }
+                } else if let Some((obj, prop)) = extract_prop_access(&nc.left) {
+                    if !effective_true && same_literal(&nc.right, &b.right) {
+                        let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
+                        let narrowed = current.remove_null();
+                        apply_prop_narrowed(ctx, &obj, &prop, current, narrowed, false);
+                    }
                 }
             } else if let Some(nc) = extract_null_coalesce(&b.right) {
                 if let Some(var_name) = extract_var_name(&nc.left) {
                     if !effective_true && same_literal(&nc.right, &b.left) {
                         let current = ctx.get_var(&var_name);
                         ctx.set_var(&var_name, current.remove_null());
+                    }
+                } else if let Some((obj, prop)) = extract_prop_access(&nc.left) {
+                    if !effective_true && same_literal(&nc.right, &b.left) {
+                        let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
+                        let narrowed = current.remove_null();
+                        apply_prop_narrowed(ctx, &obj, &prop, current, narrowed, false);
                     }
                 }
             }
