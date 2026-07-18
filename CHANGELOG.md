@@ -5,6 +5,73 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.60.0] - 2026-07-19
+
+### Added
+
+- **Narrowing:** `is_countable()`/`is_iterable()`'s false branch now excludes a
+  `final` non-implementing class atom (when its own hierarchy doesn't already
+  implement `Countable`/`Traversable`), mirroring the existing final-class
+  exact-exclusion soundness gate.
+- **`filter_var()`:** infers the real result type from a literal
+  `FILTER_VALIDATE_*` filter constant (int/float/bool/regexp/url/email/ip/mac/domain)
+  instead of the stub's blanket `mixed`; falls back to the stub whenever a 3rd
+  (options) argument is present.
+- **Narrowing:** `class_implements()`/`class_parents()` combined with
+  `array_key_exists()` now narrow like `instanceof`, for both plain-variable
+  and property receivers.
+- **Narrowing:** `get_parent_class() === 'ClassName'` (either comparison
+  order/strictness) now narrows to a strict subclass instance, for both
+  plain-variable and property receivers.
+- **Narrowing:** `array_key_exists()` on a nested path
+  (`array_key_exists('b', $arr['a'])`) now narrows the false branch too,
+  excluding shape alternatives that guarantee the key.
+- **Narrowing:** the `match(true)`/`switch(true)` `is_TYPE()` disjunct merger
+  now narrows property receivers, not just variables.
+- **Narrowing:** `gettype()`/`get_debug_type()` literal comparisons now
+  narrow property receivers.
+- **Narrowing:** the `is_string()`/`is_array()`/`ctype_*()`/`array_is_list()`/
+  `method_exists()`/`property_exists()` family now narrows property
+  receivers, not just variables.
+- **Narrowing:** `array_key_exists()`/`key_exists()` now narrows the false
+  branch on shape unions, excluding alternatives that declare the key
+  mandatory.
+- **Narrowing:** `in_array()`'s needle argument now narrows a property-access
+  receiver, for both the true and false branch.
+- **Narrowing:** `get_class()`/`gettype()`/`get_debug_type()`/`::class` now
+  narrow on loose `==`/`!=`, not just strict `===`/`!==`.
+- **Narrowing:** `str_contains()` and its sibling functions now resolve a
+  variable already narrowed to a single string literal as the needle, not
+  just an inline literal.
+- **Narrowing:** `iterator_count()` now narrows like
+  `count()`/`sizeof()`/`strlen()`.
+- **Narrowing:** `($this->prop ?? FALLBACK) === FALLBACK` now narrows the
+  property receiver, matching the existing plain-variable arm.
+- **Narrowing:** `$this->prop === []`/`!== []` (strict and loose) now narrows
+  property receivers, matching the existing plain-variable arm.
+- **Narrowing:** `$this->prop < N`/`N < $this->prop` (and `<=`/`>`/`>=`) now
+  narrows property receivers, matching the existing plain-variable arm.
+- **Narrowing:** `$obj->prop === true`/`42`/`'x'`/`EnumCase::Case` and
+  `$obj->prop instanceof X` now also prove `$obj` itself non-null, matching
+  the existing nullsafe/null-check arms.
+
+### Fixed
+
+- **Narrowing:** `array_is_list()` now recognizes `TKeyedArray` shapes —
+  previously any array literal or docblock shape was narrowed as if it could
+  never be a list, regardless of its own `is_list` flag.
+- **`@var` annotations:** a free function's own `@psalm-type`/`@phpstan-type`
+  alias is now expanded in a bare `@var Result $x` annotation, matching how
+  class-scoped aliases already resolved.
+- **Narrowing:** a dynamic `$fn()` call (a variable holding a callable) no
+  longer coincidentally matches a builtin of the same name as the variable's
+  own identifier (e.g. `$is_null(...)` no longer narrows as if `is_null()`
+  were called).
+- **Narrowing:** int-comparison narrowing (`$x > PHP_INT_MAX`,
+  `$x < PHP_INT_MIN`) no longer treats the `i64::MIN`/`MAX` boundary as
+  unconstrained — the comparison is now recognized as impossible instead of
+  leaving a dead branch reachable.
+
 ## [0.59.2] - 2026-07-18
 
 ### Fixed
