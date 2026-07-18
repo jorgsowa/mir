@@ -562,18 +562,34 @@ pub fn narrow_from_condition(
                     | BinaryOp::GreaterOrEqual
             ) =>
         {
-            // Normalize: variable on left, integer literal on right.
-            // If the literal is on the left (`5 > $x`), swap and flip the operator.
-            let (var_expr, cmp_op, lit_expr) = if extract_var_name(&b.left).is_some() {
-                (&b.left, b.op, &b.right)
-            } else {
-                (&b.right, flip_comparison_op(b.op), &b.left)
-            };
-
-            if let (Some(var_name), Some(n)) =
-                (extract_var_name(var_expr), extract_int_literal(lit_expr))
-            {
-                narrow_var_int_comparison(ctx, &var_name, cmp_op, n, is_true);
+            // `$x < N` / `N < $x` (and `$this->prop < N` / `N < $this->prop`) —
+            // normalize so the variable/property is always on the left,
+            // flipping the operator when the literal was on the left instead.
+            if let Some(var_name) = extract_var_name(&b.left) {
+                if let Some(n) = extract_int_literal(&b.right) {
+                    narrow_var_int_comparison(ctx, &var_name, b.op, n, is_true);
+                }
+            } else if let Some(var_name) = extract_var_name(&b.right) {
+                if let Some(n) = extract_int_literal(&b.left) {
+                    narrow_var_int_comparison(ctx, &var_name, flip_comparison_op(b.op), n, is_true);
+                }
+            } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
+                if let Some(n) = extract_int_literal(&b.right) {
+                    narrow_prop_int_comparison(ctx, &obj, &prop, db, file, b.op, n, is_true);
+                }
+            } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
+                if let Some(n) = extract_int_literal(&b.left) {
+                    narrow_prop_int_comparison(
+                        ctx,
+                        &obj,
+                        &prop,
+                        db,
+                        file,
+                        flip_comparison_op(b.op),
+                        n,
+                        is_true,
+                    );
+                }
             }
             // count($arr) op N  /  N op count($arr) — normalize so count call is on left.
             let (count_expr, count_cmp_op, count_lit) = if extract_count_of_var(&b.left).is_some() {
@@ -3115,15 +3131,29 @@ fn flip_comparison_op(op: BinaryOp) -> BinaryOp {
 }
 
 /// Narrow a variable by a comparison `$var op n` being `is_true`.
+/// The range constraint implied by `$x <op> n` resolving to `is_true`.
+/// Negation (`!is_true`) flips the constraint (e.g. NOT `< N` becomes `>= N`).
+fn int_comparison_bounds(
+    op: BinaryOp,
+    n: i64,
+    is_true: bool,
+) -> Option<(Option<i64>, Option<i64>)> {
+    match (op, is_true) {
+        (BinaryOp::Less, true) | (BinaryOp::GreaterOrEqual, false) => {
+            Some((None, n.checked_sub(1)))
+        }
+        (BinaryOp::LessOrEqual, true) | (BinaryOp::Greater, false) => Some((None, Some(n))),
+        (BinaryOp::Greater, true) | (BinaryOp::LessOrEqual, false) => {
+            Some((n.checked_add(1), None))
+        }
+        (BinaryOp::GreaterOrEqual, true) | (BinaryOp::Less, false) => Some((Some(n), None)),
+        _ => None,
+    }
+}
+
 fn narrow_var_int_comparison(ctx: &mut FlowState, name: &str, op: BinaryOp, n: i64, is_true: bool) {
-    // Determine the range constraint when the condition holds.
-    // Negation (`!is_true`) flips the constraint (e.g. NOT `< N` becomes `>= N`).
-    let (min, max): (Option<i64>, Option<i64>) = match (op, is_true) {
-        (BinaryOp::Less, true) | (BinaryOp::GreaterOrEqual, false) => (None, n.checked_sub(1)),
-        (BinaryOp::LessOrEqual, true) | (BinaryOp::Greater, false) => (None, Some(n)),
-        (BinaryOp::Greater, true) | (BinaryOp::LessOrEqual, false) => (n.checked_add(1), None),
-        (BinaryOp::GreaterOrEqual, true) | (BinaryOp::Less, false) => (Some(n), None),
-        _ => return,
+    let Some((min, max)) = int_comparison_bounds(op, n, is_true) else {
+        return;
     };
     let current = ctx.get_var(name);
     let narrowed = narrow_type_to_int_range(&current, min, max);
@@ -3133,6 +3163,31 @@ fn narrow_var_int_comparison(ctx: &mut FlowState, name: &str, op: BinaryOp, n: i
     // A plain `int` narrowed to an empty range is just conservative widening, not a bug.
     let mark_diverges = crate::contradiction::is_closed_precise(&current);
     set_narrowed(ctx, name, &current, narrowed, mark_diverges);
+}
+
+/// Property-access counterpart of `narrow_var_int_comparison`, for
+/// `$this->prop < N` (or any `$obj->prop` receiver).
+#[allow(clippy::too_many_arguments)]
+fn narrow_prop_int_comparison(
+    ctx: &mut FlowState,
+    obj_var: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    file: &str,
+    op: BinaryOp,
+    n: i64,
+    is_true: bool,
+) {
+    let Some((min, max)) = int_comparison_bounds(op, n, is_true) else {
+        return;
+    };
+    let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
+    if current.is_mixed() {
+        return;
+    }
+    let narrowed = narrow_type_to_int_range(&current, min, max);
+    let mark_diverges = crate::contradiction::is_closed_precise(&current);
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, mark_diverges);
 }
 
 /// Apply integer bounds `[min, max]` to all integer components of a type.
