@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process;
 
 use mir_plugin::psalm::{BridgeOptions, PsalmBridgePlugin, PsalmPluginSpec};
-use mir_plugin::{MirPlugin, PluginRegistry};
+use mir_plugin::PluginRegistry;
 
 use crate::config::Config;
 use crate::Cli;
