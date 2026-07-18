@@ -127,12 +127,14 @@ pub fn narrow_from_condition(
                     narrow_var_bool(ctx, &name, true, effective_true);
                 } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
                     narrow_prop_bool(ctx, &obj, &prop, db, file, true, effective_true);
+                    narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                 }
             } else if matches!(b.right.kind, ExprKind::Bool(false)) {
                 if let Some(name) = extract_var_name(&b.left) {
                     narrow_var_bool(ctx, &name, false, effective_true);
                 } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
                     narrow_prop_bool(ctx, &obj, &prop, db, file, false, effective_true);
+                    narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                 } else {
                     // `strpos($h, $n) !== false` / `array_search($n, $h) === false`
                     narrow_from_false_comparable_call(&b.left, ctx, effective_true);
@@ -145,12 +147,14 @@ pub fn narrow_from_condition(
                     narrow_var_bool(ctx, &name, true, effective_true);
                 } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
                     narrow_prop_bool(ctx, &obj, &prop, db, file, true, effective_true);
+                    narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                 }
             } else if matches!(b.left.kind, ExprKind::Bool(false)) {
                 if let Some(name) = extract_var_name(&b.right) {
                     narrow_var_bool(ctx, &name, false, effective_true);
                 } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
                     narrow_prop_bool(ctx, &obj, &prop, db, file, false, effective_true);
+                    narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                 } else {
                     narrow_from_false_comparable_call(&b.right, ctx, effective_true);
                 }
@@ -189,6 +193,7 @@ pub fn narrow_from_condition(
                         class_name_str,
                         effective_true,
                     );
+                    narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                 }
             } else if let ExprKind::String(class_name_str) = &b.left.kind {
                 if let Some(obj_var_name) = extract_get_class_arg(&b.right) {
@@ -223,6 +228,7 @@ pub fn narrow_from_condition(
                         class_name_str,
                         effective_true,
                     );
+                    narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                 }
             }
             // `$x === 42`
@@ -231,12 +237,14 @@ pub fn narrow_from_condition(
                     narrow_var_literal_int(ctx, &name, *n, effective_true);
                 } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
                     narrow_prop_literal_int(ctx, &obj, &prop, db, file, *n, effective_true);
+                    narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                 }
             } else if let ExprKind::Int(n) = &b.left.kind {
                 if let Some(name) = extract_var_name(&b.right) {
                     narrow_var_literal_int(ctx, &name, *n, effective_true);
                 } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
                     narrow_prop_literal_int(ctx, &obj, &prop, db, file, *n, effective_true);
+                    narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                 }
             }
             // `$x === EnumName::CaseName`
@@ -331,6 +339,7 @@ pub fn narrow_from_condition(
                             (&enum_fqcn, &case_name),
                             effective_true,
                         );
+                        narrow_receiver_non_null_on_prop_match(ctx, &obj_var, effective_true);
                     }
                 }
                 // `get_class($x) === Foo::class` — the far more idiomatic
@@ -467,6 +476,7 @@ pub fn narrow_from_condition(
                             (&enum_fqcn, &case_name),
                             effective_true,
                         );
+                        narrow_receiver_non_null_on_prop_match(ctx, &obj_var, effective_true);
                     }
                 }
                 // `Foo::class === get_class($x)` — symmetric counterpart.
@@ -706,6 +716,13 @@ pub fn narrow_from_condition(
                 ) {
                     let class_name = crate::db::resolve_name(db, file, &raw_name);
                     narrow_prop_instanceof(ctx, &obj, &prop, &class_name, db, file, is_true);
+                    // Same reasoning as the nullsafe arm above: `null instanceof X`
+                    // is always false, so proving it true also proves `$obj` itself
+                    // wasn't null (PHP 8 reads `$obj->prop` on a null `$obj` as a
+                    // warning, still evaluating to null).
+                    if is_true {
+                        narrow_var_null(ctx, &obj, false);
+                    }
                 }
             } else if let Some((fqcn, prop)) = extract_static_prop_access(&b.left, ctx, db, file) {
                 if let Some(raw_name) = extract_class_name(
@@ -3211,6 +3228,16 @@ fn narrow_var_null(ctx: &mut FlowState, name: &str, is_null: bool) {
         current.remove_null()
     };
     set_narrowed(ctx, name, &current, narrowed, true);
+}
+
+/// After proving `$obj->prop` equals a definite non-null literal value
+/// (`proved_match`), the receiver itself must also be non-null: PHP 8 reads
+/// `$obj->prop` on a null `$obj` as a warning, still evaluating to `null`
+/// (same ambiguity as `narrow_nullsafe_prop_null`).
+fn narrow_receiver_non_null_on_prop_match(ctx: &mut FlowState, obj_var: &str, proved_match: bool) {
+    if proved_match {
+        narrow_var_null(ctx, obj_var, false);
+    }
 }
 
 /// Narrow `name` to truthy (`want_truthy`) or falsy, for the loose
