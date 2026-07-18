@@ -1945,6 +1945,39 @@ pub(crate) fn array_search_return_type(arg_types: &[Type]) -> Option<Type> {
     Some(result)
 }
 
+/// Infer the return type of `filter_var($value, $filter)`, mapping a literal
+/// `FILTER_VALIDATE_*` constant to its real result type instead of the
+/// stub's blanket `mixed`.
+///
+/// Deliberately bails (falls back to the stub) whenever a 3rd (`$options`)
+/// argument is present: the `FILTER_NULL_ON_FAILURE` flag — settable either
+/// as a bare int or nested in `['flags' => ...]` — changes the failure case
+/// from `false` to `null`, and this doesn't attempt to evaluate that flag
+/// out of the options argument. Only the exactly-2-argument call (no
+/// options, so `FILTER_NULL_ON_FAILURE` cannot be set) gets a precise type.
+pub(crate) fn filter_var_return_type(arg_types: &[Type]) -> Option<Type> {
+    if arg_types.len() > 2 {
+        return None;
+    }
+    let filter_arg = arg_types.get(1)?;
+    let [Atomic::TLiteralInt(filter)] = filter_arg.types.as_slice() else {
+        return None;
+    };
+    // Constant values from stubs/filter/filter.php.
+    let mut ty = match filter {
+        257 => Type::single(Atomic::TInt),   // FILTER_VALIDATE_INT
+        259 => Type::single(Atomic::TFloat), // FILTER_VALIDATE_FLOAT
+        // FILTER_VALIDATE_BOOLEAN/BOOL: bool already covers the no-options
+        // failure case (false), so no |false needed.
+        258 => return Some(Type::single(Atomic::TBool)),
+        // FILTER_VALIDATE_REGEXP/URL/EMAIL/IP/MAC/DOMAIN
+        272..=277 => Type::single(Atomic::TString),
+        _ => return None,
+    };
+    ty.add_type(Atomic::TFalse);
+    Some(ty)
+}
+
 /// Infer the return type of `preg_split($pattern, $subject, $limit?, $flags?)`.
 ///
 /// `preg_split` always produces at least one string unless `PREG_SPLIT_NO_EMPTY` (value 1) is

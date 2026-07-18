@@ -884,6 +884,11 @@ impl CallAnalyzer {
                 "substr_replace" => {
                     super::callable::string_if_string_arg(&arg_types, 0).unwrap_or(return_ty)
                 }
+                // filter_var: map a literal FILTER_VALIDATE_* $filter argument to its
+                // real result type instead of the stub's blanket `mixed`.
+                "filter_var" => {
+                    super::callable::filter_var_return_type(&arg_types).unwrap_or(return_ty)
+                }
                 _ => return_ty,
             };
 
