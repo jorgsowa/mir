@@ -3016,7 +3016,7 @@ fn add_key_to_sealed_shapes(
     ty: &mir_types::Type,
     key: &mir_types::atomic::ArrayKey,
 ) -> mir_types::Type {
-    use mir_types::atomic::KeyedProperty;
+    use mir_types::atomic::{ArrayKey, KeyedProperty};
     let is_real_union = ty.types.len() > 1;
     let mut changed = false;
     let mut result = mir_types::Type::empty();
@@ -3031,6 +3031,12 @@ fn add_key_to_sealed_shapes(
                 changed = true;
                 if *is_open || !is_real_union {
                     let mut new_props = properties.clone();
+                    // A newly-proven key only keeps the shape a list if it
+                    // continues the sequence (next contiguous int index) —
+                    // a string key, or any non-contiguous int, proves this
+                    // can no longer be `array_is_list()`-true.
+                    let stays_list = *is_list
+                        && matches!(key, ArrayKey::Int(n) if *n == properties.len() as i64);
                     new_props.insert(
                         key.clone(),
                         KeyedProperty {
@@ -3041,7 +3047,7 @@ fn add_key_to_sealed_shapes(
                     result.add_type(Atomic::TKeyedArray {
                         properties: new_props,
                         is_open: *is_open,
-                        is_list: *is_list,
+                        is_list: stays_list,
                     });
                 }
                 continue;
@@ -3368,8 +3374,14 @@ fn narrow_from_type_fn(ctx: &mut FlowState, fn_name: &str, var_name: &str, is_tr
             if is_true {
                 current.narrow_to_list()
             } else {
-                current
-                    .filter(|t| !matches!(t, Atomic::TList { .. } | Atomic::TNonEmptyList { .. }))
+                current.filter(|t| {
+                    !matches!(
+                        t,
+                        Atomic::TList { .. }
+                            | Atomic::TNonEmptyList { .. }
+                            | Atomic::TKeyedArray { is_list: true, .. }
+                    )
+                })
             }
         }
         "is_object" => {

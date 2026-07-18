@@ -653,6 +653,10 @@ impl Type {
     /// - `list<T>` / `non-empty-list<T>` are kept unchanged.
     /// - `array<int, T>` is narrowed to `list<T>` (could be sequential).
     /// - `non-empty-array<int, T>` is narrowed to `non-empty-list<T>`.
+    /// - `TKeyedArray` (shape) is kept only when its own `is_list` flag is
+    ///   already true — that flag is precise (set from the actual literal's
+    ///   keys, or an explicit `list{...}` docblock), not a hint, so a
+    ///   string-keyed or non-contiguous shape is correctly excluded.
     /// - `mixed` becomes `list<mixed>` (array_is_list implies array).
     /// - All other types (string-keyed arrays, non-arrays) are dropped.
     pub fn narrow_to_list(&self) -> Type {
@@ -673,6 +677,7 @@ impl Type {
                         value: value.clone(),
                     });
                 }
+                Atomic::TKeyedArray { is_list: true, .. } => out.add_type(t.clone()),
                 Atomic::TMixed => out.add_type(Atomic::TList {
                     value: Box::new(Type::mixed()),
                 }),
