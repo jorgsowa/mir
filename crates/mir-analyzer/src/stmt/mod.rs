@@ -126,6 +126,10 @@ pub struct StatementsAnalyzer<'a> {
     /// `Arc<ClassDef>`-cloning workspace-index lookup that measurably added
     /// up across a large corpus (see the alias-expansion commit's perf note).
     class_like_cache: Option<(Arc<str>, Option<crate::db::ClassLike>)>,
+    /// Cache of the last `find_function` lookup done for `@var`-annotation
+    /// alias expansion in a free function's own body, mirroring
+    /// `class_like_cache`.
+    function_cache: Option<(Arc<str>, Option<Arc<mir_codebase::definitions::FunctionDef>>)>,
 }
 
 impl<'a> StatementsAnalyzer<'a> {
@@ -156,6 +160,7 @@ impl<'a> StatementsAnalyzer<'a> {
             loop_kind_stack: Vec::new(),
             plugins: mir_plugin::snapshot(),
             class_like_cache: None,
+            function_cache: None,
         }
     }
 
@@ -175,6 +180,22 @@ impl<'a> StatementsAnalyzer<'a> {
         self.class_like_cache
             .as_ref()
             .and_then(|(_, cl)| cl.as_ref())
+    }
+
+    /// `find_function(fqn)`, memoized against the immediately preceding call —
+    /// mirrors `cached_class_like` for the free-function `@var` alias-expansion
+    /// fallback below.
+    fn cached_function(&mut self, fqn: &str) -> Option<Arc<mir_codebase::definitions::FunctionDef>> {
+        let hit = self
+            .function_cache
+            .as_ref()
+            .is_some_and(|(cached_fqn, _)| cached_fqn.as_ref() == fqn);
+        if !hit {
+            let resolved =
+                crate::db::find_function(self.db, crate::db::Fqcn::from_str(self.db, fqn));
+            self.function_cache = Some((Arc::from(fqn), resolved));
+        }
+        self.function_cache.as_ref().and_then(|(_, f)| f.clone())
     }
 
     pub fn analyze_stmts(&mut self, stmts: &[php_ast::owned::Stmt], ctx: &mut FlowState) {
@@ -216,8 +237,11 @@ impl<'a> StatementsAnalyzer<'a> {
         let suppressions = self.extract_suppressions_from(doc.as_deref());
         let before = self.issues.issue_count();
 
-        let var_annotation =
-            self.extract_var_annotation_from(doc.as_deref(), ctx.self_fqcn.as_deref());
+        let var_annotation = self.extract_var_annotation_from(
+            doc.as_deref(),
+            ctx.self_fqcn.as_deref(),
+            ctx.current_function_fqn.as_deref(),
+        );
 
         // Pre-narrow: `@var Type $varname` before any statement narrows that variable.
         if let Some(ref ann) = var_annotation {
@@ -758,13 +782,15 @@ impl<'a> StatementsAnalyzer<'a> {
     /// / the "expand aliases first, then resolve" precedent). Expansion runs
     /// before `resolve_union_for_file` so the `UndefinedDocblockClass`/
     /// reference-recording checks in `analyze_stmt` see the real referenced
-    /// class(es), not the opaque alias name. A global function's own
-    /// `@psalm-type` (no enclosing class) is intentionally out of scope here
-    /// — `self_fqcn` is `None` in that case, same as today.
+    /// class(es), not the opaque alias name. When `self_fqcn` is `None` (a
+    /// free function's body, or a nested function decl that doesn't set
+    /// `current_function_fqn`), `current_function_fqn` supplies that
+    /// function's own `@psalm-type`/`@phpstan-type` aliases the same way.
     fn extract_var_annotation_from(
         &mut self,
         doc: Option<&str>,
         self_fqcn: Option<&str>,
+        current_function_fqn: Option<&str>,
     ) -> Option<VarAnnotation> {
         let parsed = crate::parser::DocblockParser::parse(doc?);
         let mut ty = parsed.var_type?;
@@ -773,6 +799,12 @@ impl<'a> StatementsAnalyzer<'a> {
                 let aliases = class_like.type_aliases();
                 if !aliases.is_empty() {
                     ty = crate::collector::expand_aliases_only(ty, aliases);
+                }
+            }
+        } else if let Some(fqn) = current_function_fqn {
+            if let Some(function) = self.cached_function(fqn) {
+                if !function.type_aliases.is_empty() {
+                    ty = crate::collector::expand_aliases_only(ty, &function.type_aliases);
                 }
             }
         }

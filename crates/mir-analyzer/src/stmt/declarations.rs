@@ -50,10 +50,13 @@ impl<'a> StatementsAnalyzer<'a> {
                     )
                 })
             };
-        let (params, return_ty) = if let Some(ns) = self.db.file_namespace(&self.file) {
+        let (params, return_ty, resolved_fqn) = if let Some(ns) = self.db.file_namespace(&self.file)
+        {
             let fqn = format!("{}\\{}", ns, fn_name);
-            if let Some(found) = resolve_fn(&fqn).or_else(|| resolve_fn(&fn_name)) {
-                found
+            if let Some(found) = resolve_fn(&fqn) {
+                (found.0, found.1, Some(fqn))
+            } else if let Some(found) = resolve_fn(&fn_name) {
+                (found.0, found.1, Some(fn_name.clone()))
             } else {
                 let ast_params: Vec<mir_codebase::DeclaredParam> = decl
                     .params
@@ -68,27 +71,25 @@ impl<'a> StatementsAnalyzer<'a> {
                         is_optional: p.default.is_some() || p.variadic,
                     })
                     .collect();
-                (ast_params, None)
+                (ast_params, None, None)
             }
+        } else if let Some(found) = resolve_fn(&fn_name) {
+            (found.0, found.1, Some(fn_name.clone()))
         } else {
-            if let Some(found) = resolve_fn(&fn_name) {
-                found
-            } else {
-                let ast_params: Vec<mir_codebase::DeclaredParam> = decl
-                    .params
-                    .iter()
-                    .map(|p| mir_codebase::DeclaredParam {
-                        name: Name::new(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
-                        ty: None,
-                        out_ty: None,
-                        has_default: p.default.is_some(),
-                        is_variadic: p.variadic,
-                        is_byref: p.by_ref,
-                        is_optional: p.default.is_some() || p.variadic,
-                    })
-                    .collect();
-                (ast_params, None)
-            }
+            let ast_params: Vec<mir_codebase::DeclaredParam> = decl
+                .params
+                .iter()
+                .map(|p| mir_codebase::DeclaredParam {
+                    name: Name::new(p.name.as_deref().unwrap_or("").trim_start_matches('$')),
+                    ty: None,
+                    out_ty: None,
+                    has_default: p.default.is_some(),
+                    is_variadic: p.variadic,
+                    is_byref: p.by_ref,
+                    is_optional: p.default.is_some() || p.variadic,
+                })
+                .collect();
+            (ast_params, None, None)
         };
 
         let mut fn_ctx = FlowState::for_function(
@@ -101,6 +102,7 @@ impl<'a> StatementsAnalyzer<'a> {
             ctx.strict_types,
             true,
         );
+        fn_ctx.current_function_fqn = resolved_fqn.map(|fqn| Arc::from(fqn.as_str()));
         // Parameter defaults are constant expressions outside the body flow;
         // analyze them so `Cfg::MODE`-style defaults record references.
         for p in decl.params.iter() {

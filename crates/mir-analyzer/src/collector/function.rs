@@ -405,6 +405,10 @@ impl DefinitionCollector<'_> {
                 .iter()
                 .map(|(param, kind)| (Arc::from(param.as_str()), Arc::from(kind.as_str())))
                 .collect(),
+            type_aliases: type_aliases
+                .iter()
+                .map(|(k, v)| (Arc::from(k.as_str()), v.clone()))
+                .collect(),
         };
 
         self.slice.functions.push(std::sync::Arc::new(storage));

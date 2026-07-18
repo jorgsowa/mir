@@ -2084,6 +2084,62 @@ class Repo {
 }
 
 #[test]
+fn symbol_at_bare_var_expands_free_function_scoped_psalm_type_alias() {
+    // Mirrors symbol_at_bare_var_expands_class_scoped_psalm_type_alias, but the
+    // `@psalm-type` is declared on a free function's own docblock rather than a
+    // class-like's. Must expand exactly the same way.
+    let src = r#"<?php
+class SomeClass {}
+/**
+ * @psalm-type Result = SomeClass
+ */
+function find(): void {
+    /** @var Result $x */
+    $x = null;
+    $x;
+}
+"#;
+    let result = mir_analyzer::analyze_source(src);
+    let off = (src.rfind("$x;").unwrap() + 1) as u32;
+    let sym = result
+        .symbol_at("<source>", off)
+        .expect("symbol_at should find $x");
+
+    assert_eq!(format!("{}", sym.resolved_type), "SomeClass");
+}
+
+#[test]
+fn symbol_at_bare_var_free_function_alias_resolves_method_call() {
+    // Once the free function's own `@psalm-type` alias expands the `@var`
+    // annotation to the real class, a method call on that variable must
+    // resolve to the real class too (goto-definition on `$x->helper()`
+    // depends on this, not on the raw unexpanded alias name).
+    let src = r#"<?php
+class SomeClass {
+    public function helper(): void {}
+}
+/**
+ * @psalm-type Result = SomeClass
+ */
+function find(): void {
+    /** @var Result $x */
+    $x = null;
+    $x->helper();
+}
+"#;
+    let result = mir_analyzer::analyze_source(src);
+    let found = result.symbols.iter().any(|s| {
+        matches!(&s.kind, ReferenceKind::MethodCall { class, method }
+            if class.as_ref() == "SomeClass" && method.as_ref() == "helper")
+    });
+    assert!(
+        found,
+        "expected MethodCall(SomeClass::helper) once the free-function-scoped alias expands, got {:?}",
+        result.symbols.iter().map(|s| &s.kind).collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn symbol_at_self_static_property_access_gap_returns_receiver_type() {
     let dir = create_temp_dir("test");
     let src = "<?php\nclass Config {\n    public static string $env = '';\n    public static function read(): void { self::$env; }\n}\n";

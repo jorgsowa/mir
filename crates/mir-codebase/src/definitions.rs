@@ -802,6 +802,9 @@ pub struct FunctionDef {
     /// Each entry is `(param_name_without_dollar, sink_kind_string)`.
     #[serde(default)]
     pub taint_sink_params: Vec<(Arc<str>, Arc<str>)>,
+    /// Type aliases declared on this function via `@psalm-type` / `@phpstan-type`.
+    #[serde(default)]
+    pub type_aliases: FxHashMap<Arc<str>, Type>,
 }
 
 impl FunctionDef {
