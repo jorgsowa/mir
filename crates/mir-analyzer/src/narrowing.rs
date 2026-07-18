@@ -1129,6 +1129,34 @@ pub fn narrow_from_condition(
                                     {
                                         ctx.set_var(&base, narrowed);
                                     }
+                                } else if let (
+                                    mir_types::atomic::ArrayKey::String(iface_name),
+                                    Some(target),
+                                ) = (
+                                    &key,
+                                    extract_class_implements_or_parents_arg(&arr_arg.value),
+                                ) {
+                                    // array_key_exists('Iface', class_implements($x)) /
+                                    // ('Ancestor', class_parents($x)) — same relationship
+                                    // `$x instanceof Iface`/`instanceof Ancestor` proves.
+                                    let fqcn = crate::db::resolve_name(db, file, iface_name);
+                                    match &target {
+                                        ScalarArgTarget::Var(var_name) => {
+                                            let current = ctx.get_var(var_name);
+                                            let narrowed = narrow_instanceof_preserving_subtypes(
+                                                &current,
+                                                &fqcn,
+                                                db,
+                                                &ctx.template_param_names,
+                                            );
+                                            set_narrowed(ctx, var_name, &current, narrowed, true);
+                                        }
+                                        ScalarArgTarget::Prop(obj, prop) => {
+                                            narrow_prop_instanceof(
+                                                ctx, obj, prop, &fqcn, db, file, true,
+                                            );
+                                        }
+                                    }
                                 }
                             } else {
                                 // False branch: exclude shape members that
@@ -1162,6 +1190,29 @@ pub fn narrow_from_condition(
                                         narrow_shape_path_key_exists_false(&current, &path, &key)
                                     {
                                         ctx.set_var(&base, narrowed);
+                                    }
+                                } else if let (
+                                    mir_types::atomic::ArrayKey::String(iface_name),
+                                    Some(target),
+                                ) = (
+                                    &key,
+                                    extract_class_implements_or_parents_arg(&arr_arg.value),
+                                ) {
+                                    // !array_key_exists('Iface', class_implements($x)) —
+                                    // exclude Iface, same as `!($x instanceof Iface)`.
+                                    let fqcn = crate::db::resolve_name(db, file, iface_name);
+                                    match &target {
+                                        ScalarArgTarget::Var(var_name) => {
+                                            let current = ctx.get_var(var_name);
+                                            let narrowed =
+                                                filter_out_instanceof_match(&current, &fqcn, db);
+                                            set_narrowed(ctx, var_name, &current, narrowed, true);
+                                        }
+                                        ScalarArgTarget::Prop(obj, prop) => {
+                                            narrow_prop_instanceof(
+                                                ctx, obj, prop, &fqcn, db, file, false,
+                                            );
+                                        }
                                     }
                                 }
                             }
@@ -5276,6 +5327,27 @@ fn extract_get_parent_class_arg(expr: &php_ast::owned::Expr) -> Option<ScalarArg
             if name
                 .trim_start_matches('\\')
                 .eq_ignore_ascii_case("get_parent_class")
+            {
+                if let Some(arg) = call.args.first() {
+                    return ScalarArgTarget::extract(&arg.value);
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Extract the receiver from `class_implements($x)`/`class_parents($x)` —
+/// both return an array keyed (and valued) by interface/ancestor-class name,
+/// so `array_key_exists('IfaceOrAncestor', class_implements($x))` proves `$x`
+/// an instance of that interface/ancestor, the same relationship
+/// `$x instanceof IfaceOrAncestor` proves.
+fn extract_class_implements_or_parents_arg(expr: &php_ast::owned::Expr) -> Option<ScalarArgTarget> {
+    if let ExprKind::FunctionCall(call) = &expr.kind {
+        if let ExprKind::Identifier(name) = &call.name.kind {
+            let bare = name.trim_start_matches('\\');
+            if bare.eq_ignore_ascii_case("class_implements")
+                || bare.eq_ignore_ascii_case("class_parents")
             {
                 if let Some(arg) = call.args.first() {
                     return ScalarArgTarget::extract(&arg.value);
