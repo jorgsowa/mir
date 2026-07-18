@@ -923,6 +923,8 @@ pub fn narrow_from_condition(
                     if let Some(arg_expr) = call.args.first() {
                         if let Some(var_name) = extract_var_name(&arg_expr.value) {
                             narrow_from_type_fn(ctx, bare, &var_name, is_true);
+                        } else if let Some((obj, prop)) = extract_prop_access(&arg_expr.value) {
+                            narrow_prop_from_type_fn(ctx, bare, &obj, &prop, db, file, is_true);
                         }
                         if is_true && bare.eq_ignore_ascii_case("method_exists") {
                             if let Some(expr_key) =
@@ -1282,6 +1284,8 @@ pub fn narrow_from_condition(
                 } else if let Some(arg_expr) = call.args.first() {
                     if let Some(var_name) = extract_var_name(&arg_expr.value) {
                         narrow_from_type_fn(ctx, bare, &var_name, is_true);
+                    } else if let Some((obj, prop)) = extract_prop_access(&arg_expr.value) {
+                        narrow_prop_from_type_fn(ctx, bare, &obj, &prop, db, file, is_true);
                     }
                 }
             }
@@ -3600,7 +3604,44 @@ fn bool_narrow_type(current: &Type, value: bool, is_value: bool) -> Type {
 
 fn narrow_from_type_fn(ctx: &mut FlowState, fn_name: &str, var_name: &str, is_true: bool) {
     let current = ctx.get_var(var_name);
-    let narrowed = match crate::util::php_ident_lowercase(fn_name).as_str() {
+    let Some(narrowed) = type_fn_narrowed(&current, fn_name, is_true) else {
+        return;
+    };
+    set_narrowed(ctx, var_name, &current, narrowed, true);
+}
+
+/// Property-access counterpart of `narrow_from_type_fn`, for
+/// `is_string($this->prop)`, `is_array($this->prop)`, `array_is_list($this->prop)`,
+/// `ctype_digit($this->prop)`, `method_exists($this->prop, ...)`, etc. — the
+/// whole `is_*`/`ctype_*`/type-check family previously only ever narrowed a
+/// plain-variable receiver, unlike the analogous `instanceof`/null/literal-match
+/// arms elsewhere in this file, which all have a property-access fallback.
+fn narrow_prop_from_type_fn(
+    ctx: &mut FlowState,
+    fn_name: &str,
+    obj_var: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    file: &str,
+    is_true: bool,
+) {
+    let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
+    if current.is_mixed() {
+        return;
+    }
+    let Some(narrowed) = type_fn_narrowed(&current, fn_name, is_true) else {
+        return;
+    };
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, true);
+}
+
+/// Core `is_*`/`ctype_*`/`array_is_list`/`method_exists`/`property_exists`
+/// narrowing logic, shared between the variable-receiver
+/// (`narrow_from_type_fn`) and property-receiver (`narrow_prop_from_type_fn`)
+/// entry points. Returns `None` for an unrecognized function name — the
+/// caller should leave the type untouched.
+fn type_fn_narrowed(current: &Type, fn_name: &str, is_true: bool) -> Option<Type> {
+    Some(match crate::util::php_ident_lowercase(fn_name).as_str() {
         "is_string" => {
             if is_true {
                 current.narrow_to_string()
@@ -3796,7 +3837,7 @@ fn narrow_from_type_fn(ctx: &mut FlowState, fn_name: &str, var_name: &str, is_tr
         | "ctype_punct" | "ctype_space" | "ctype_xdigit" | "ctype_print" | "ctype_graph"
         | "ctype_cntrl" => {
             if is_true {
-                narrow_string_to_non_empty(&current)
+                narrow_string_to_non_empty(current)
             } else {
                 current.clone()
             }
@@ -3826,9 +3867,8 @@ fn narrow_from_type_fn(ctx: &mut FlowState, fn_name: &str, var_name: &str, is_tr
                 current.clone()
             }
         }
-        _ => return,
-    };
-    set_narrowed(ctx, var_name, &current, narrowed, true);
+        _ => return None,
+    })
 }
 
 fn narrow_var_literal_string(ctx: &mut FlowState, name: &str, value: &str, is_value: bool) {
