@@ -1066,6 +1066,19 @@ pub fn narrow_from_condition(
                                             ctx, &obj, &prop, current, narrowed, true,
                                         );
                                     }
+                                } else if let Some((base, path)) =
+                                    collect_array_access_path(&arr_arg.value)
+                                {
+                                    // Nested container, false branch, e.g.
+                                    // array_key_exists('b', $arr['a']) proven
+                                    // false — same as the single-level
+                                    // var/prop cases above.
+                                    let current = ctx.get_var(&base);
+                                    if let Some(narrowed) =
+                                        narrow_shape_path_key_exists_false(&current, &path, &key)
+                                    {
+                                        ctx.set_var(&base, narrowed);
+                                    }
                                 }
                             }
                         }
@@ -4670,6 +4683,62 @@ fn narrow_shape_path_key_exists(
                     let mut new_props = properties.clone();
                     if let Some(prop) = new_props.get_mut(head) {
                         if let Some(deeper) = narrow_shape_path_key_exists(&prop.ty, rest, key) {
+                            prop.ty = deeper;
+                            changed = true;
+                        }
+                    }
+                    result.add_type(Atomic::TKeyedArray {
+                        properties: new_props,
+                        is_open: *is_open,
+                        is_list: *is_list,
+                    });
+                } else {
+                    result.add_type(atomic.clone());
+                }
+            }
+            _ => result.add_type(atomic.clone()),
+        }
+    }
+    if changed {
+        Some(result)
+    } else {
+        None
+    }
+}
+
+/// False-branch counterpart of `narrow_shape_path_key_exists`: walk down
+/// `path` to the container shape, then exclude union members that guarantee
+/// `key`'s presence there (`remove_key_from_sealed_shapes`) — same
+/// leaf-operation swap `remove_key_from_sealed_shapes` is to
+/// `add_key_to_sealed_shapes` for the single-level (non-nested) false branch.
+fn narrow_shape_path_key_exists_false(
+    ty: &Type,
+    path: &[mir_types::atomic::ArrayKey],
+    key: &mir_types::atomic::ArrayKey,
+) -> Option<Type> {
+    let Some((head, rest)) = path.split_first() else {
+        let narrowed = remove_key_from_sealed_shapes(ty, key);
+        return if narrowed != *ty {
+            Some(narrowed)
+        } else {
+            None
+        };
+    };
+    let mut changed = false;
+    let mut result = Type::empty();
+    for atomic in &ty.types {
+        match atomic {
+            Atomic::TKeyedArray {
+                properties,
+                is_open,
+                is_list,
+            } => {
+                if properties.contains_key(head) {
+                    let mut new_props = properties.clone();
+                    if let Some(prop) = new_props.get_mut(head) {
+                        if let Some(deeper) =
+                            narrow_shape_path_key_exists_false(&prop.ty, rest, key)
+                        {
                             prop.ty = deeper;
                             changed = true;
                         }
