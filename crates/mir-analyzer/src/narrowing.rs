@@ -775,9 +775,14 @@ pub fn narrow_from_condition(
         // is_string($x), is_int($x), is_null($x), is_array($x), etc.
         // Also handles assert($x instanceof Y) — narrows like a bare condition.
         ExprKind::FunctionCall(call) => {
+            // `ExprKind::Variable` (a dynamic `$fn()` call) is deliberately not
+            // matched here: `name` would be the callable variable's own
+            // identifier text, not its runtime string value, so every builtin
+            // check below would only ever match by coincidence (e.g. a
+            // variable literally named `$is_array`) while never actually
+            // calling that builtin.
             let fn_name_opt: Option<&str> = match &call.name.kind {
                 ExprKind::Identifier(name) => Some(name.as_ref()),
-                ExprKind::Variable(name) => Some(name.as_ref()),
                 _ => None,
             };
             if let Some(fn_name) = fn_name_opt {
