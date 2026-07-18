@@ -1711,6 +1711,8 @@ fn narrow_or_isset_true(
                 let saved_vars = ctx.vars.clone();
                 let saved_assigned = ctx.assigned_vars.clone();
                 let saved_possibly_assigned = ctx.possibly_assigned_vars.clone();
+                let saved_prop_refined = ctx.prop_refined.clone();
+                let saved_diverges = ctx.diverges;
 
                 // Apply isset narrowing: remove null and mark as definitely assigned,
                 // so RHS's own narrowing logic can see $x as set while it's analyzed.
@@ -1727,11 +1729,17 @@ fn narrow_or_isset_true(
                 narrow_from_condition(right, ctx, true, db, file);
 
                 // Discard every narrowing effect of the above — RHS's narrowing (of $x
-                // or any other variable) only holds on the path where $x was set, not
-                // on the merged true-branch as a whole.
+                // or any other variable/property) only holds on the path where $x was
+                // set, not on the merged true-branch as a whole. This includes
+                // `diverges`: a contradiction found while analyzing RHS in isolation
+                // (e.g. an unrelated `instanceof` that can never hold) does not make
+                // the whole condition unreachable, since the "$x unset" path is still
+                // live.
                 ctx.vars = saved_vars;
                 ctx.assigned_vars = saved_assigned;
                 ctx.possibly_assigned_vars = saved_possibly_assigned;
+                ctx.prop_refined = saved_prop_refined;
+                ctx.diverges = saved_diverges;
             }
         }
     }
