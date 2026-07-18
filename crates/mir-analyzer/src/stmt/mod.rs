@@ -119,6 +119,13 @@ pub struct StatementsAnalyzer<'a> {
     /// Snapshot of the installed plugin registry — see
     /// `ExpressionAnalyzer::plugins`.
     plugins: Option<std::sync::Arc<mir_plugin::PluginRegistry>>,
+    /// Cache of the last `find_class_like` lookup done for `@var`-annotation
+    /// alias expansion (`extract_var_annotation_from`), keyed by FQCN. Many
+    /// consecutive `@var`-annotated statements within the same method/class
+    /// body share the same `self_fqcn`; without this, each one repeats an
+    /// `Arc<ClassDef>`-cloning workspace-index lookup that measurably added
+    /// up across a large corpus (see the alias-expansion commit's perf note).
+    class_like_cache: Option<(Arc<str>, Option<crate::db::ClassLike>)>,
 }
 
 impl<'a> StatementsAnalyzer<'a> {
@@ -148,7 +155,24 @@ impl<'a> StatementsAnalyzer<'a> {
             break_ctx_stack: Vec::new(),
             loop_kind_stack: Vec::new(),
             plugins: mir_plugin::snapshot(),
+            class_like_cache: None,
         }
+    }
+
+    /// `find_class_like(fqcn)`, memoized against the immediately preceding
+    /// call — cheap when consecutive calls share the same FQCN (the common
+    /// case: many `@var`-annotated statements in the same method body).
+    fn cached_class_like(&mut self, fqcn: &str) -> Option<&crate::db::ClassLike> {
+        let hit = self
+            .class_like_cache
+            .as_ref()
+            .is_some_and(|(cached_fqcn, _)| cached_fqcn.as_ref() == fqcn);
+        if !hit {
+            let resolved =
+                crate::db::find_class_like(self.db, crate::db::Fqcn::from_str(self.db, fqcn));
+            self.class_like_cache = Some((Arc::from(fqcn), resolved));
+        }
+        self.class_like_cache.as_ref().and_then(|(_, cl)| cl.as_ref())
     }
 
     pub fn analyze_stmts(&mut self, stmts: &[php_ast::owned::Stmt], ctx: &mut FlowState) {
@@ -736,16 +760,14 @@ impl<'a> StatementsAnalyzer<'a> {
     /// `@psalm-type` (no enclosing class) is intentionally out of scope here
     /// — `self_fqcn` is `None` in that case, same as today.
     fn extract_var_annotation_from(
-        &self,
+        &mut self,
         doc: Option<&str>,
         self_fqcn: Option<&str>,
     ) -> Option<VarAnnotation> {
         let parsed = crate::parser::DocblockParser::parse(doc?);
         let mut ty = parsed.var_type?;
         if let Some(fqcn) = self_fqcn {
-            if let Some(class_like) =
-                crate::db::find_class_like(self.db, crate::db::Fqcn::from_str(self.db, fqcn))
-            {
+            if let Some(class_like) = self.cached_class_like(fqcn) {
                 let aliases = class_like.type_aliases();
                 if !aliases.is_empty() {
                     ty = crate::collector::expand_aliases_only(ty, aliases);
