@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.59.0] - 2026-07-18
 
 ### Added
 
@@ -35,6 +35,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     property defaults (e.g. Eloquent `$casts`) so the plugin needs no AST
     access. Fires on a property-access miss before `UndefinedProperty` is
     reported. `MIR_PLUGIN_API_VERSION` bumped to 2.
+- **Narrowing:** `$this->prop instanceof A || $this->prop instanceof B`
+  (OR-disjunct `instanceof`) now narrows property receivers, not just plain
+  variables.
+- **Narrowing:** literal `bool`/`int`/`string` comparisons now narrow
+  properties, not just variables.
+- **Narrowing:** loose `==`/`!=` `[]` array-emptiness comparisons now narrow,
+  mirroring the existing strict-comparison handling.
+- **`@mir-check`:** extended to arbitrary expressions, not just a bare
+  variable.
+- **`symbol_at`:** a cursor sitting in the `->`/`?->`/`::` gap between a
+  property-access receiver and the member name (right after typing the
+  operator, where member completion fires) now resolves to the receiver's
+  type via a new `ReferenceKind::Receiver`. Scoped to property access
+  (instance + static, including `self`/`$cls::`); method-call receivers
+  already had an equivalent chain-gap answer via their `expr_span` fallback.
+- **`array_map`/`array_reduce`:** the element/result type now resolves
+  through an opaque, unrefined `callable` parameter of the *enclosing*
+  function by looking at how that function's own callers actually invoke it
+  — the concrete closure/named-function passed at each call site is
+  resolved and unioned across the workspace. Scoped to plain function
+  parameters (not method receivers, which would need flow-sensitive
+  resolution this pass deliberately avoids) and to callback arguments that
+  are themselves statically resolvable (an inline closure/arrow function
+  with an explicit return type, a named-function reference, or a first-class
+  callable) — an unresolvable caller simply contributes nothing rather than
+  poisoning the result.
 
 ### Fixed
 
@@ -53,6 +79,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so methods inherited through a parameterized parent chain (`HasMany<Post>`
   extending `Builder<TRelated>`) resolve their return templates to the
   concrete bound type.
+- **Properties:** `$obj->prop`'s inferred type now widens to include `null`
+  when `$obj` itself is nullable, matching the already-correct `?->`
+  behavior.
+- **Narrowing:** `get_class()`/`::class`/`class-string` `!==` comparisons no
+  longer over-eagerly drop a same-named class atom from the false branch —
+  it's exact-class equality, not subtype equality, so the false branch must
+  stay subclass-safe.
+- **Properties:** unified plain vs. nullsafe property-null narrowing logic.
+- **Control flow:** `!isset($x) || RHS` no longer leaks `RHS`'s `diverges`
+  flag into the surrounding scope.
+- **Narrowing:** `array_key_exists()` no longer strips `null` from an
+  already-proven key's type.
+- **Narrowing:** fixed a false-positive `RedundantCondition` on nullsafe
+  property null-checks.
+- **Narrowing:** property-narrowing contradictions are now correctly marked
+  unreachable.
+- **Parser:** fixed a mid-codepoint panic in the subtype-scan identifier
+  prefilter (`mentions_identifier`) when a searched class short-name begins
+  with a non-ASCII byte.
+- **Docblock parser:** a lone unmatched quote in a docblock type (`@var '`)
+  no longer panics; unterminated string literals — top-level, inside a
+  union, or nested in array-shape keys/generics — are now reported as
+  `InvalidDocblock` instead of silently falling back to `mixed` or producing
+  a misleading "unclosed generic type" message.
+- **`@var` annotations:** a bare `@var Result $x` variable annotation now
+  expands `@psalm-type`/`@phpstan-type` aliases declared on the enclosing
+  class/interface/trait/enum's own docblock, matching how `@param`/`@return`
+  references to the same alias already resolved. A global function's own
+  `@psalm-type` (not tied to a class) remains out of scope, as before.
 
 ## [0.58.0] - 2026-07-17
 
