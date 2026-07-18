@@ -1533,6 +1533,133 @@ pub(crate) fn narrow_instanceof_disjuncts(
     Some(vn)
 }
 
+/// Property-access counterpart of `collect_instanceof`, for the OR-disjunct
+/// `$this->prop instanceof A || $this->prop instanceof B` idiom that the
+/// variable-only `collect_instanceof` can't reach (`extract_var_name` fails
+/// on a property receiver). Kept as its own narrower helper — used only by
+/// `narrow_or_instanceof_true` — rather than folding into
+/// `collect_instanceof`/`narrow_instanceof_disjuncts`: that function's
+/// `Option<String>` result is also consumed by switch/match fallthrough
+/// narrowing (`stmt/control_flow.rs`, `expr/conditional.rs`) via plain
+/// `ctx.get_var`/`set_var`, which has no property equivalent.
+fn collect_prop_instanceof(
+    expr: &php_ast::owned::Expr,
+    receiver: &mut Option<(String, String)>,
+    class_names: &mut Vec<String>,
+    db: &dyn MirDatabase,
+    file: &str,
+    self_fqcn: Option<&str>,
+    parent_fqcn: Option<&str>,
+) -> bool {
+    match &expr.kind {
+        ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => {
+            if let (Some((obj, prop)), Some(cn)) = (
+                extract_prop_access(&b.left),
+                extract_class_name(&b.right, self_fqcn, parent_fqcn),
+            ) {
+                let resolved = crate::db::resolve_name(db, file, &cn);
+                match receiver {
+                    None => {
+                        *receiver = Some((obj, prop));
+                        class_names.push(resolved);
+                        true
+                    }
+                    Some((existing_obj, existing_prop))
+                        if *existing_obj == obj && *existing_prop == prop =>
+                    {
+                        class_names.push(resolved);
+                        true
+                    }
+                    _ => false, // different receiver — bail out
+                }
+            } else {
+                false
+            }
+        }
+        ExprKind::Binary(b) if b.op == BinaryOp::BooleanOr || b.op == BinaryOp::LogicalOr => {
+            collect_prop_instanceof(
+                &b.left,
+                receiver,
+                class_names,
+                db,
+                file,
+                self_fqcn,
+                parent_fqcn,
+            ) && collect_prop_instanceof(
+                &b.right,
+                receiver,
+                class_names,
+                db,
+                file,
+                self_fqcn,
+                parent_fqcn,
+            )
+        }
+        ExprKind::Parenthesized(inner) => collect_prop_instanceof(
+            inner,
+            receiver,
+            class_names,
+            db,
+            file,
+            self_fqcn,
+            parent_fqcn,
+        ),
+        _ => false,
+    }
+}
+
+/// For `$this->prop instanceof A || $this->prop instanceof B` (true branch):
+/// narrow the property to `A|B`, mirroring `narrow_instanceof_disjuncts` but
+/// for a property-access receiver. Returns `true` if it matched and applied
+/// narrowing. See `collect_prop_instanceof`'s doc comment for why this is a
+/// separate function rather than an extension of the shared one.
+fn narrow_prop_instanceof_disjuncts(
+    conditions: &[&php_ast::owned::Expr],
+    ctx: &mut FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> bool {
+    if conditions.len() < 2 {
+        return false;
+    }
+    let self_fqcn = ctx.self_fqcn.as_deref();
+    let parent_fqcn = ctx.parent_fqcn.as_deref();
+
+    let mut receiver: Option<(String, String)> = None;
+    let mut class_names: Vec<String> = vec![];
+    let all_ok = conditions.iter().all(|cond| {
+        collect_prop_instanceof(
+            cond,
+            &mut receiver,
+            &mut class_names,
+            db,
+            file,
+            self_fqcn,
+            parent_fqcn,
+        )
+    });
+
+    if !all_ok || class_names.len() < 2 {
+        return false;
+    }
+    let Some((obj_var, prop)) = receiver else {
+        return false;
+    };
+
+    let current = resolve_prop_current_type(ctx, &obj_var, &prop, db, file);
+    let narrowed =
+        narrow_or_instanceof_union(&current, &class_names, db, &ctx.template_param_names);
+    let result = if narrowed.is_empty() {
+        current.clone()
+    } else {
+        narrowed
+    };
+    if !result.is_empty() {
+        apply_prop_narrowed(ctx, &obj_var, &prop, current, result, true);
+    }
+    true
+}
+
 /// Recognized single-argument type-check functions whose truthy narrowing
 /// `narrow_from_type_fn` implements. Matches its match arms (excluding
 /// `method_exists`/`property_exists`, which take two arguments and are
@@ -1708,6 +1835,7 @@ fn narrow_or_instanceof_true(
 ) {
     if narrow_instanceof_disjuncts(&[left, right], ctx, db, file).is_none()
         && narrow_type_fn_disjuncts(&[left, right], ctx).is_none()
+        && !narrow_prop_instanceof_disjuncts(&[left, right], ctx, db, file)
     {
         narrow_mixed_disjuncts(&[left, right], ctx, db, file);
     }
