@@ -1,10 +1,6 @@
 ===description===
-`array_key_exists('k', $arr)` proving an optional/nullable shape key present
-must clear the key's `optional` flag and strip `null` from its type, the
-same way `isset($arr['k'])` narrowing already does — add_key_to_sealed_shapes
-only handled a key that was entirely absent from the shape (adding it as
-`mixed`); a key that was already declared but `optional: true` fell through
-unchanged, leaving later reads nullable/optional despite the proven guard.
+array_key_exists() clears `optional` but must not strip `null` — it proves
+key presence, not a non-null value.
 ===config===
 suppress=MixedAssignment
 ===file===
@@ -21,6 +17,9 @@ function greet(array $data): string {
 function contact(array $data): string {
     if (array_key_exists('email', $data)) {
         $email = $data['email'];
+        if ($email === null) {
+            return 'unknown';
+        }
         /** @mir-check $email is string */
         return $email;
     }
