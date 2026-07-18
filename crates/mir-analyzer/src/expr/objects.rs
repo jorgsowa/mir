@@ -555,21 +555,33 @@ impl<'a> ExpressionAnalyzer<'a> {
             self.record_dynamic_member_access(&obj_ty, pa.property.span);
             return Type::mixed();
         }
+        let non_null_ty = obj_ty.remove_null();
         let mut declaring = None;
         let resolved =
-            self.resolve_property_type(&obj_ty, &prop_name, pa.property.span, &mut declaring);
+            self.resolve_property_type(&non_null_ty, &prop_name, pa.property.span, &mut declaring);
 
         // If we have a narrowed type for this property access ($var->prop),
         // return it instead of the declared type.
-        let resolved = if let ExprKind::Variable(obj_var) = &pa.object.kind {
+        let mut resolved = if let ExprKind::Variable(obj_var) = &pa.object.kind {
             ctx.get_prop_refined(obj_var.as_ref(), &prop_name)
                 .cloned()
                 .unwrap_or(resolved)
         } else {
             resolved
         };
+        // PHP 8 reads a plain `->` access on a null receiver as a warning
+        // (not fatal), still evaluating to null — same observable value as
+        // `?->`'s short-circuit (see analyze_nullsafe_property_access, which
+        // this mirrors). So the expression's type must include null too
+        // whenever the receiver itself could be null. Guarded on `obj_ty`
+        // (not `non_null_ty`) so a receiver already narrowed non-null (e.g.
+        // inside `if ($obj->prop !== null)`, which also narrows `$obj`)
+        // doesn't get re-widened.
+        if obj_ty.is_nullable() {
+            resolved.add_type(Atomic::TNull);
+        }
 
-        for atomic in &obj_ty.types {
+        for atomic in &non_null_ty.types {
             if let Atomic::TNamedObject { fqcn, .. } = atomic {
                 let declaring_class = declaring.take().unwrap_or_else(|| Arc::from(fqcn.as_ref()));
                 self.record_symbol(

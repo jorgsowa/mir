@@ -30,6 +30,5 @@ function receiverNarrowed(?Box $b): void {
     }
 }
 ===expect===
-ImpossibleIdenticalComparison@8:8-8:26: '===' between 'string' and 'null' is always false — these types can never be identical
 PossiblyNullPropertyFetch@8:8-8:17: Cannot access property $bar on possibly null value
 PossiblyNullPropertyFetch@20:8-20:17: Cannot access property $value on possibly null value
