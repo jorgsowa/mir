@@ -704,6 +704,50 @@ pub fn narrow_from_condition(
                     }
                 }
             }
+            // `get_class($x) == 'ClassName'` / `get_debug_type($x) == 'ClassName'` /
+            // `gettype($x) == 'ClassName'` / `$x::class == 'ClassName'` — loose `==`
+            // mirrors the `===` handling below the `Identical`/`NotIdentical` arm:
+            // class/type names are never numeric-looking strings, so loose
+            // comparison agrees with strict comparison here.
+            else if let ExprKind::String(class_name_str) = &b.right.kind {
+                if let Some(obj_var_name) = extract_get_class_arg(&b.left) {
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true, db);
+                } else if let Some(var_name) = extract_gettype_arg(&b.left) {
+                    narrow_from_gettype_literal(ctx, &var_name, class_name_str, effective_true);
+                } else if let Some(var_name) = extract_get_debug_type_arg(&b.left) {
+                    narrow_from_get_debug_type_literal(
+                        ctx,
+                        &var_name,
+                        class_name_str,
+                        effective_true,
+                        db,
+                        file,
+                    );
+                } else if let Some(obj_var_name) = extract_dynamic_class_const_var(&b.left) {
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true, db);
+                }
+            } else if let ExprKind::String(class_name_str) = &b.left.kind {
+                if let Some(obj_var_name) = extract_get_class_arg(&b.right) {
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true, db);
+                } else if let Some(var_name) = extract_gettype_arg(&b.right) {
+                    narrow_from_gettype_literal(ctx, &var_name, class_name_str, effective_true);
+                } else if let Some(var_name) = extract_get_debug_type_arg(&b.right) {
+                    narrow_from_get_debug_type_literal(
+                        ctx,
+                        &var_name,
+                        class_name_str,
+                        effective_true,
+                        db,
+                        file,
+                    );
+                } else if let Some(obj_var_name) = extract_dynamic_class_const_var(&b.right) {
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true, db);
+                }
+            }
         }
 
         // $x instanceof ClassName  /  $this->prop instanceof ClassName
