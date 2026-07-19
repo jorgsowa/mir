@@ -1958,6 +1958,19 @@ fn apply_docblock_assertions(
                     };
                     ctx.set_var(&var_name, ty);
                     applied = true;
+                } else if let Some((obj, prop)) = extract_prop_access(&arg.value) {
+                    let ty = match &template_bindings {
+                        Some(b) => assertion.ty.substitute_templates(b),
+                        None => assertion.ty.clone(),
+                    };
+                    let ty = if assertion.negated {
+                        let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
+                        negate_assertion_type(&current, &ty, db)
+                    } else {
+                        ty
+                    };
+                    ctx.set_prop_refined(&obj, &prop, ty);
+                    applied = true;
                 }
             }
         }
@@ -3422,7 +3435,7 @@ fn set_narrowed(
 /// refinement if one is already tracked, else the declared type looked up
 /// through the object variable's own type (including `self`/`static`, and
 /// falling back to `self_fqcn` for `$this`).
-fn resolve_prop_current_type(
+pub(crate) fn resolve_prop_current_type(
     ctx: &FlowState,
     obj_var: &str,
     prop: &str,
@@ -5081,7 +5094,7 @@ pub(crate) fn extract_class_fqcn_from_expr(
 }
 
 /// Extract `(obj_var, prop_name)` from a simple `$var->prop` expression.
-fn extract_prop_access(expr: &php_ast::owned::Expr) -> Option<(String, String)> {
+pub(crate) fn extract_prop_access(expr: &php_ast::owned::Expr) -> Option<(String, String)> {
     match &expr.kind {
         ExprKind::PropertyAccess(pa) => {
             let obj = extract_var_name(&pa.object)?;

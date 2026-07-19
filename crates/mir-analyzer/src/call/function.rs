@@ -660,6 +660,26 @@ impl CallAnalyzer {
                                 asserted_ty
                             };
                             ctx.set_var(var_name, asserted_ty);
+                        } else if let Some((obj, prop)) =
+                            crate::narrowing::extract_prop_access(&arg.value)
+                        {
+                            let asserted_ty = match &template_bindings {
+                                Some(b) => assertion.ty.substitute_templates(b),
+                                None => assertion.ty.clone(),
+                            };
+                            let asserted_ty = if assertion.negated {
+                                let current = crate::narrowing::resolve_prop_current_type(
+                                    ctx, &obj, &prop, ea.db, &ea.file,
+                                );
+                                crate::narrowing::negate_assertion_type(
+                                    &current,
+                                    &asserted_ty,
+                                    ea.db,
+                                )
+                            } else {
+                                asserted_ty
+                            };
+                            ctx.set_prop_refined(&obj, &prop, asserted_ty);
                         }
                     }
                 }
