@@ -113,6 +113,8 @@ impl<'a> DefinitionCollector<'a> {
             })
             .collect();
 
+        let type_aliases = self.build_type_aliases(&iface_doc);
+
         let mut own_methods = mir_codebase::definitions::MemberMap::default();
         let mut own_constants = mir_codebase::definitions::MemberMap::default();
 
@@ -148,7 +150,7 @@ impl<'a> DefinitionCollector<'a> {
                         m,
                         &fqcn,
                         Some(&member.span),
-                        None,
+                        Some(&type_aliases),
                         &iface_template_params,
                     ) {
                         own_methods.insert(
@@ -220,7 +222,6 @@ impl<'a> DefinitionCollector<'a> {
             }
         }
 
-        let type_aliases = self.build_type_aliases(&iface_doc);
         let mut own_properties = mir_codebase::definitions::MemberMap::default();
         self.add_docblock_members(
             &iface_doc,
