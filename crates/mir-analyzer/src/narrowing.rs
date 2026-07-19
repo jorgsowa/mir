@@ -7410,6 +7410,10 @@ fn narrow_prop_array_count_comparison(
         current.narrow_to_empty_collection()
     };
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, false);
+    // count() on a non-Countable (including null) is a TypeError in PHP 8, so
+    // reaching either comparison result at all proves $obj->prop — and thus
+    // $obj — was non-null, regardless of which direction was proven.
+    narrow_receiver_non_null_on_prop_match(ctx, obj_var, true);
 }
 
 /// Property-access counterpart of `narrow_string_strlen_comparison`.
@@ -7437,6 +7441,12 @@ fn narrow_prop_string_strlen_comparison(
         narrow_string_to_empty(&current)
     };
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, false);
+    // strlen(null) returns 0 (no TypeError), so only a proven-non-empty
+    // result excludes a null receiver — the empty direction is also
+    // satisfiable by $obj being null.
+    if non_empty {
+        narrow_receiver_non_null_on_prop_match(ctx, obj_var, true);
+    }
 }
 
 /// Shared by the `Variable` and property-access arms of `extract_haystack_type`:
