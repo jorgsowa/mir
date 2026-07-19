@@ -25,6 +25,20 @@ fn class_template_params(
         .unwrap_or_default()
 }
 
+/// Like `class_template_params`, but walks up to the nearest ancestor that
+/// declares `@template` when `fqcn` itself doesn't — a bare subclass
+/// (`class IntBox extends Box {}`) still inherits `Box`'s template slots
+/// (and their `@template-covariant`/`-contravariant` variance), so variance
+/// checking must see those, not an empty own-declarations-only list.
+fn effective_class_template_params(
+    ea: &ExpressionAnalyzer<'_>,
+    fqcn: &str,
+) -> Vec<mir_codebase::definitions::TemplateParam> {
+    crate::db::effective_class_template_params(ea.db, fqcn)
+        .map(|tps| tps.to_vec())
+        .unwrap_or_default()
+}
+
 /// Returns true when `arg` is a structural subtype of `param` for scalar / primitive types.
 /// Named-object cases (class hierarchies) are always handled separately by named_object_subtype
 /// or array_list_compatible; this function is only called when those checks have already
@@ -624,7 +638,7 @@ fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -
                     _ => &[],
                 };
                 if !arg_type_params.is_empty() || !param_type_params.is_empty() {
-                    let class_tps = class_template_params(ea, &resolved_param);
+                    let class_tps = effective_class_template_params(ea, &resolved_param);
                     return generic_type_params_compatible(
                         arg_type_params,
                         param_type_params,
@@ -689,7 +703,7 @@ fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -
                         )
                     });
                     if let Some(arg_as_param_params) = ancestor_args {
-                        let class_tps = class_template_params(ea, &resolved_param);
+                        let class_tps = effective_class_template_params(ea, &resolved_param);
                         return generic_type_params_compatible(
                             &arg_as_param_params,
                             param_type_params,
