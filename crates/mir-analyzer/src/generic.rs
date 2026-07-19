@@ -446,6 +446,17 @@ fn is_template_atomic(a: &Atomic, template_names: &FxHashSet<Name>) -> bool {
         Atomic::TNamedObject { fqcn, type_params } => {
             type_params.is_empty() && !fqcn.contains('\\') && template_names.contains(fqcn)
         }
+        // `(T&Countable)|null`: the intersection carries the template, so it must
+        // be classified the same as a bare `T` alternative — otherwise it's
+        // mistaken for a *concrete* alternative and the union's real template
+        // never registers, so `null` (matched by the sibling `|null` alternative)
+        // gets bound to `T` directly instead of being recognized as fully
+        // explained by that alternative.
+        Atomic::TIntersection { parts } => parts.iter().any(|p| {
+            p.types
+                .iter()
+                .any(|pa| is_template_atomic(pa, template_names))
+        }),
         _ => false,
     }
 }
@@ -819,6 +830,24 @@ fn infer_from_pair(
                 }
                 for part in parts.iter() {
                     infer_from_pair(db, part, arg, template_names, bindings, risky);
+                }
+                // The outer union's residual already determined this whole
+                // intersection alternative was only explained by a sibling
+                // (e.g. the `null` in `(T&Countable)|null`) — that risk doesn't
+                // carry through the recursive infer_from_pair calls above (each
+                // recomputes its own residual against just the intersection
+                // part, unaware of the sibling), so propagate it explicitly onto
+                // any template bound from inside this intersection.
+                if template_residual.is_risky() {
+                    for part in parts.iter() {
+                        for pa in &part.types {
+                            if let Atomic::TTemplateParam { name, .. } = pa {
+                                if template_names.contains(name) {
+                                    risky.insert(*name);
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
