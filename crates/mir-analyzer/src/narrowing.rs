@@ -1768,6 +1768,10 @@ pub fn narrow_from_condition(
                     // reachable at runtime.
                     ctx.diverges = true;
                 }
+            } else if let Some((obj_var, prop)) = extract_prop_access(expr) {
+                // `if ($this->prop)` — property-receiver counterpart of the
+                // bare-variable truthy/falsy case above.
+                narrow_prop_loose_bool(ctx, &obj_var, &prop, db, file, is_true);
             }
         }
     }
