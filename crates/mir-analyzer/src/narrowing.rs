@@ -2992,8 +2992,16 @@ fn narrow_from_false_comparable_call(
         // literal needle (an empty needle is "found" at offset 0 vacuously).
         if !is_false {
             if let (Some(haystack_arg), Some(needle_arg)) = (call.args.first(), call.args.get(1)) {
-                let needle_non_empty =
-                    matches!(&needle_arg.value.kind, ExprKind::String(s) if !s.is_empty());
+                let needle_non_empty = match &needle_arg.value.kind {
+                    ExprKind::String(s) => !s.is_empty(),
+                    // `$needle = 'x'; strpos($haystack, $needle)` — resolve a variable
+                    // already narrowed to a single non-empty string literal, same as
+                    // an inline literal would be (mirrors array_key_exists's handling
+                    // of a variable-held literal key).
+                    _ => extract_var_name(&needle_arg.value).is_some_and(|name| {
+                        matches!(ctx.get_var(&name).types.as_slice(), [Atomic::TLiteralString(s)] if !s.is_empty())
+                    }),
+                };
                 if needle_non_empty {
                     if let Some(var_name) = extract_var_name(&haystack_arg.value) {
                         let current = ctx.get_var(&var_name);
