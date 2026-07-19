@@ -1677,6 +1677,17 @@ pub fn narrow_from_condition(
                     // read inside the guard isn't reported as possibly-null (the
                     // isset check just proved the key is present and non-null).
                     narrow_isset_shape_key(var_expr, ctx);
+                    // `isset($this->prop)` implies the property is non-null too
+                    // — the property-receiver counterpart of the bare-variable
+                    // case above, since `isset()` is false for both an unset
+                    // and a null-valued property.
+                    if let Some((obj_var, prop)) = extract_prop_access(var_expr) {
+                        let current = resolve_prop_current_type(ctx, &obj_var, &prop, db, file);
+                        if !current.is_mixed() {
+                            let narrowed = current.remove_null();
+                            apply_prop_narrowed(ctx, &obj_var, &prop, current, narrowed, true);
+                        }
+                    }
                 }
             }
         }
