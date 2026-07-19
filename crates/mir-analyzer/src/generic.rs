@@ -447,6 +447,7 @@ fn compute_template_residual(
     residual.from_docblock = arg_ty.from_docblock;
     residual.possibly_undefined = arg_ty.possibly_undefined;
     let mut class_string_consumed = false;
+    let mut container_consumed = false;
     for a in &arg_ty.types {
         let consumed_by_class_string = has_template_class_string
             && matches!(a, Atomic::TClassString(_) | Atomic::TInterfaceString(_))
@@ -455,14 +456,28 @@ fn compute_template_residual(
             class_string_consumed = true;
             continue;
         }
-        if !concrete.iter().any(|c| atomics_match_for_filter(c, a)) {
-            residual.add_type(a.clone());
+        if let Some(c) = concrete.iter().find(|c| atomics_match_for_filter(c, a)) {
+            // `T|array<T>` matched against `array<X>`: the blanket
+            // "any array matches any array" rule in `atomics_match_for_filter`
+            // consumes this arg atomic here, but `array<T>` itself carries the
+            // template — its element is bound properly by the dedicated
+            // `TArray`/`TList`/`TClosure` arm in `infer_from_pair`. Don't also
+            // let the bare `T` slot absorb the whole wrapper (that would bind
+            // `T` to e.g. `array<X>` instead of `X`, and any bound check on it
+            // would then always fail regardless of `X`).
+            if atomic_carries_template(c, template_names) {
+                container_consumed = true;
+            }
+            continue;
         }
+        residual.add_type(a.clone());
     }
     if residual.types.is_empty() {
         // An EMPTY residual is meaningful when a `class-string<T>` alternative
-        // consumed the args: the bare template binds nothing at all.
-        if class_string_consumed {
+        // or a template-carrying container alternative (`array<T>`,
+        // `Closure(): T`, ...) consumed the args: the bare template binds
+        // nothing at all here, since the real binding comes from elsewhere.
+        if class_string_consumed || container_consumed {
             return TemplateResidual::Filtered(residual);
         }
         // Otherwise every arg atomic matched a plain concrete alternative
@@ -512,6 +527,47 @@ fn is_template_atomic(a: &Atomic, template_names: &FxHashSet<Name>) -> bool {
                 .iter()
                 .any(|pa| is_template_atomic(pa, template_names))
         }),
+        _ => false,
+    }
+}
+
+/// Whether a *concrete-shaped* atomic (one `is_template_atomic` already ruled
+/// out of the bare-template bucket) still carries the template somewhere
+/// inside — e.g. `array<T>`, `list<T>`, `Closure(T): R`. Those container
+/// kinds have their own dedicated structural arm in `infer_from_pair`, which
+/// binds the template from the container's element/param/return type
+/// directly; used only to keep `compute_template_residual` from *also*
+/// letting the bare template absorb the whole container when one of these
+/// matches an arg atomic (see its `container_consumed` handling).
+fn atomic_carries_template(a: &Atomic, template_names: &FxHashSet<Name>) -> bool {
+    match a {
+        Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value } => {
+            key.types
+                .iter()
+                .any(|t| is_template_atomic(t, template_names))
+                || value
+                    .types
+                    .iter()
+                    .any(|t| is_template_atomic(t, template_names))
+        }
+        Atomic::TList { value } | Atomic::TNonEmptyList { value } => value
+            .types
+            .iter()
+            .any(|t| is_template_atomic(t, template_names)),
+        Atomic::TClosure { data } => {
+            data.params.iter().any(|p| {
+                p.ty.as_ref().is_some_and(|t| {
+                    t.to_union()
+                        .types
+                        .iter()
+                        .any(|a| is_template_atomic(a, template_names))
+                })
+            }) || data
+                .return_type
+                .types
+                .iter()
+                .any(|t| is_template_atomic(t, template_names))
+        }
         _ => false,
     }
 }

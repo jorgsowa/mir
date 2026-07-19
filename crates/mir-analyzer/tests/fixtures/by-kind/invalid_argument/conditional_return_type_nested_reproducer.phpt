@@ -27,7 +27,7 @@ takesArray($str_result);
 
 // Array arg: outer resolves to if_false, inner resolves to if_true — no TConditional survives.
 $arr_result = wrap(['a', 'b']);
-/** @mir-check $arr_result is array<int, array{0: "a", 1: "b"}|"a"|"b"> */
+/** @mir-check $arr_result is array<int, "a"|"b"> */
 takesArray($arr_result);
 
 // Union arg (string|null): outer can't resolve, so both branches are widened.
