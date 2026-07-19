@@ -278,15 +278,18 @@ fn narrow_from_static_or_class_const_comparison(
                             effective_true,
                             db,
                         ),
-                        ScalarArgTarget::Prop(obj, prop) => narrow_prop_to_specific_class(
-                            ctx,
-                            obj,
-                            prop,
-                            &fqcn,
-                            effective_true,
-                            db,
-                            file,
-                        ),
+                        ScalarArgTarget::Prop(obj, prop) => {
+                            narrow_prop_to_specific_class(
+                                ctx,
+                                obj,
+                                prop,
+                                &fqcn,
+                                effective_true,
+                                db,
+                                file,
+                            );
+                            narrow_receiver_non_null_on_prop_match(ctx, obj, effective_true);
+                        }
                     }
                 }
             }
@@ -496,15 +499,18 @@ fn narrow_from_static_or_class_const_comparison(
                             effective_true,
                             db,
                         ),
-                        ScalarArgTarget::Prop(obj, prop) => narrow_prop_to_specific_class(
-                            ctx,
-                            obj,
-                            prop,
-                            &fqcn,
-                            effective_true,
-                            db,
-                            file,
-                        ),
+                        ScalarArgTarget::Prop(obj, prop) => {
+                            narrow_prop_to_specific_class(
+                                ctx,
+                                obj,
+                                prop,
+                                &fqcn,
+                                effective_true,
+                                db,
+                                file,
+                            );
+                            narrow_receiver_non_null_on_prop_match(ctx, obj, effective_true);
+                        }
                     }
                 }
             }
@@ -7002,7 +7008,8 @@ fn narrow_from_get_debug_type_literal(
                 narrow_var_to_specific_class(ctx, var_name, &fqcn, is_true, db)
             }
             ScalarArgTarget::Prop(obj, prop) => {
-                narrow_prop_to_specific_class(ctx, obj, prop, &fqcn, is_true, db, file)
+                narrow_prop_to_specific_class(ctx, obj, prop, &fqcn, is_true, db, file);
+                narrow_receiver_non_null_on_prop_match(ctx, obj, is_true);
             }
         }
     }
