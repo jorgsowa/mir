@@ -23,7 +23,8 @@ use super::args::{
 use super::method::resolve_method_from_db;
 use super::CallAnalyzer;
 use crate::generic::{
-    check_template_bounds_with_inheritance, infer_arg_template_bindings, infer_template_bindings,
+    build_class_bindings, check_template_bounds_with_inheritance, infer_arg_template_bindings,
+    infer_template_bindings,
 };
 
 /// Widen scalar literal atomics to their base type before attaching an
@@ -130,6 +131,25 @@ fn extract_object_fqcn(ty: &Type) -> Option<String> {
     result
 }
 
+/// The concrete type args a `$var::method()`/`$this::method()` receiver
+/// carries for its own class-level `@template` (e.g. `int` from a `Box<int>
+/// $b` receiver in `$b::peek()`). Mirrors what `method.rs`'s instance-call
+/// path reads straight off the `TNamedObject` atom — without this, a
+/// receiver's own type args never reach the static-call template binding,
+/// so a `@return T` leaks the raw template atom instead of resolving it.
+fn extract_receiver_type_params(ty: &Type, fqcn: &str) -> Vec<Type> {
+    ty.types
+        .iter()
+        .find_map(|atom| match atom {
+            Atomic::TNamedObject {
+                fqcn: f,
+                type_params,
+            } if f.as_ref() == fqcn => Some(type_params.to_vec()),
+            _ => None,
+        })
+        .unwrap_or_default()
+}
+
 impl CallAnalyzer {
     pub fn analyze_static_method_call<'a>(
         ea: &mut ExpressionAnalyzer<'a>,
@@ -142,6 +162,7 @@ impl CallAnalyzer {
             _ => return Type::mixed(),
         };
 
+        let mut receiver_type_params: Vec<Type> = Vec::new();
         let fqcn = match &call.class.kind {
             ExprKind::Identifier(name) => crate::db::resolve_name(ea.db, &ea.file, name.as_ref()),
             _ => {
@@ -157,6 +178,7 @@ impl CallAnalyzer {
                             call.class.span,
                         );
                     }
+                    receiver_type_params = extract_receiver_type_params(&ty, &fqcn);
                     fqcn
                 } else {
                     // All-object unions (Foo|Bar, object) are valid PHP — skip error
@@ -495,10 +517,18 @@ impl CallAnalyzer {
                 arity_unknown = true;
             }
             // `Foo::bar()` has no receiver value to carry type params, so the
-            // seed is empty — class-level bindings come solely from `fqcn`'s
-            // own `@extends`/`@implements` chain.
-            let class_bindings =
-                crate::db::inherited_template_bindings(ea.db, &fqcn, &FxHashMap::default());
+            // seed is empty and class-level bindings come solely from `fqcn`'s
+            // own `@extends`/`@implements` chain. `$var::bar()`/`$this::bar()`
+            // seeds `receiver_type_params` from the receiver's own concrete
+            // type args (e.g. `int` from a `Box<int>` receiver) the same way
+            // method.rs's instance-call path does, so a class-level `@template`
+            // bound on the receiver resolves instead of leaking through raw.
+            let class_tps =
+                crate::db::effective_class_template_params(ea.db, &fqcn).unwrap_or_default();
+            let mut class_bindings = build_class_bindings(&class_tps, &receiver_type_params);
+            for (k, v) in crate::db::inherited_template_bindings(ea.db, &fqcn, &class_bindings) {
+                class_bindings.entry(k).or_insert(v);
+            }
             let mut param_bindings = class_bindings.clone();
             for tp in resolved.template_params.iter() {
                 param_bindings.remove(&Name::from(tp.name.as_ref()));
@@ -609,8 +639,7 @@ impl CallAnalyzer {
             // IntBox extends Box {}`) still shares Box's template slot, so
             // `IntBox::make(42)` must infer against Box's declared params —
             // walk up to the nearest ancestor that actually declares them.
-            let class_tps =
-                crate::db::effective_class_template_params(ea.db, &fqcn).unwrap_or_default();
+            // (`class_tps` is already computed above, alongside `class_bindings`.)
             let class_arg_bindings: FxHashMap<Name, Type> = if class_tps.is_empty() {
                 FxHashMap::default()
             } else {
