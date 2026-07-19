@@ -2760,6 +2760,11 @@ fn narrow_or_isset_true(
                 let saved_possibly_assigned = ctx.possibly_assigned_vars.clone();
                 let saved_prop_refined = ctx.prop_refined.clone();
                 let saved_diverges = ctx.diverges;
+                let saved_class_exists_guards = ctx.class_exists_guards.clone();
+                let saved_defined_guards = ctx.defined_guards.clone();
+                let saved_function_exists_guards = ctx.function_exists_guards.clone();
+                let saved_method_exists_guards = ctx.method_exists_guards.clone();
+                let saved_extension_loaded_guards = ctx.extension_loaded_guards.clone();
 
                 // Apply isset narrowing: remove null and mark as definitely assigned,
                 // so RHS's own narrowing logic can see $x as set while it's analyzed.
@@ -2787,6 +2792,11 @@ fn narrow_or_isset_true(
                 ctx.possibly_assigned_vars = saved_possibly_assigned;
                 ctx.prop_refined = saved_prop_refined;
                 ctx.diverges = saved_diverges;
+                ctx.class_exists_guards = saved_class_exists_guards;
+                ctx.defined_guards = saved_defined_guards;
+                ctx.function_exists_guards = saved_function_exists_guards;
+                ctx.method_exists_guards = saved_method_exists_guards;
+                ctx.extension_loaded_guards = saved_extension_loaded_guards;
             }
         }
     }
