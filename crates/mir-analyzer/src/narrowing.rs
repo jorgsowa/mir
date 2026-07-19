@@ -3195,6 +3195,17 @@ fn narrow_or_instanceof_union(
                     result.add_type(class_atom(cn));
                 }
             }
+            // As in narrow_instanceof_preserving_subtypes, a Closure(...): R atom
+            // genuinely IS an instance of Closure at runtime — keep it when one
+            // of the OR-chain's classes is Closure, instead of falling through
+            // to the catch-all drop.
+            Atomic::TClosure { .. }
+                if class_names
+                    .iter()
+                    .any(|cn| cn.eq_ignore_ascii_case("Closure")) =>
+            {
+                result.add_type(atomic.clone());
+            }
             Atomic::TIntersection { parts } => {
                 let mut remaining = Type::empty();
                 for cn in class_names {
@@ -3315,6 +3326,10 @@ fn filter_out_instanceof_match(current: &Type, class_name: &str, db: &dyn MirDat
         | Atomic::TSelf { fqcn }
         | Atomic::TStaticObject { fqcn }
         | Atomic::TParent { fqcn } => !named_object_matches_instanceof(fqcn, class_name, db),
+        // A Closure(...): R atom genuinely IS an instance of Closure at
+        // runtime, so it's excluded by the false branch of `instanceof Closure`
+        // just like a TNamedObject would be.
+        Atomic::TClosure { .. } => !class_name.eq_ignore_ascii_case("Closure"),
         // A&B is provably excluded by `!($x instanceof C)` when EITHER part
         // alone would satisfy it — a value that's simultaneously an A and a B
         // is also a C the moment either A or B extends/implements C, so the
