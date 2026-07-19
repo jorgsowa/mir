@@ -4781,11 +4781,27 @@ fn int_comparison_bounds(
 /// regardless of `n`, so those two directions exclude `null` unconditionally.
 /// `>=`/`<` are the opposite: whether `null` survives depends on whether
 /// `n == 0`, so those stay untouched here (deferred, `n`-dependent).
-fn int_comparison_excludes_null(op: BinaryOp, is_true: bool) -> bool {
-    matches!(
-        (op, is_true),
-        (BinaryOp::Greater, true) | (BinaryOp::LessOrEqual, false)
-    )
+/// Whether a null-valued receiver is excluded by `$x op N` holding
+/// `is_true`. PHP compares `null` to an int via its ordering-comparison
+/// table by converting `null` to `bool(false)` and the int literal to
+/// `bool(N)` (`true` iff `N != 0`), then comparing the two bools.
+///
+/// `Greater`/`LessOrEqual` are N-independent: `false > bool(N)` is always
+/// false, and `false <= bool(N)` is always true, regardless of N — so
+/// `$x > N` true (or `$x <= N` false) always excludes null, and `$x > N`
+/// false (or `$x <= N` true) never does.
+///
+/// `Less`/`GreaterOrEqual` are N-dependent: `false < bool(N)` and
+/// `false >= bool(N)` each flip on whether `N == 0`, so whether null
+/// survives hinges on N too, not just the (op, is_true) shape.
+fn int_comparison_excludes_null(op: BinaryOp, n: i64, is_true: bool) -> bool {
+    match (op, is_true) {
+        (BinaryOp::Greater, true) | (BinaryOp::LessOrEqual, false) => true,
+        (BinaryOp::Greater, false) | (BinaryOp::LessOrEqual, true) => false,
+        (BinaryOp::Less, true) | (BinaryOp::GreaterOrEqual, false) => n == 0,
+        (BinaryOp::Less, false) | (BinaryOp::GreaterOrEqual, true) => n != 0,
+        _ => false,
+    }
 }
 
 fn narrow_var_int_comparison(ctx: &mut FlowState, name: &str, op: BinaryOp, n: i64, is_true: bool) {
@@ -4794,7 +4810,7 @@ fn narrow_var_int_comparison(ctx: &mut FlowState, name: &str, op: BinaryOp, n: i
     };
     let current = ctx.get_var(name);
     let mut narrowed = narrow_type_to_int_range(&current, min, max);
-    if int_comparison_excludes_null(op, is_true) {
+    if int_comparison_excludes_null(op, n, is_true) {
         narrowed = narrowed.remove_null();
     }
     // Mark the branch unreachable only when the current type is "closed precise"
@@ -4826,7 +4842,7 @@ fn narrow_prop_int_comparison(
         return;
     }
     let mut narrowed = narrow_type_to_int_range(&current, min, max);
-    if int_comparison_excludes_null(op, is_true) {
+    if int_comparison_excludes_null(op, n, is_true) {
         narrowed = narrowed.remove_null();
     }
     // A nullable $obj means the comparison can also be satisfied by the
@@ -4863,7 +4879,7 @@ fn narrow_static_prop_int_comparison(
         return;
     }
     let mut narrowed = narrow_type_to_int_range(&current, min, max);
-    if int_comparison_excludes_null(op, is_true) {
+    if int_comparison_excludes_null(op, n, is_true) {
         narrowed = narrowed.remove_null();
     }
     let mark_diverges = crate::contradiction::is_closed_precise(&current);

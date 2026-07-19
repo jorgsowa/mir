@@ -2,8 +2,9 @@
 `$x > N` (and its `!($x <= N)` negation) proves `$x` isn't null,
 independent of N — PHP's null/int ordering-comparison table converts
 null to `false` and the literal to `bool(N)`, and `false > bool(N)` can
-never be true. `>=`/`<` stay untouched: whether null survives depends on
-whether N is 0, so that case is deliberately not covered here.
+never be true. `>=`/`<` are N-dependent (see
+`int_comparison_n_dependent_null_stripping.phpt` for the full truth
+table); `$x >= 5` here correctly excludes null since N != 0.
 ===config===
 suppress=UnusedVariable,UnusedParam,PossiblyNullPropertyAccess
 ===file===
@@ -23,9 +24,9 @@ function lessOrEqualFalseBranch(?int $x): void {
     $_ = 1;
 }
 
-function greaterOrEqualStillAdmitsNull(?int $x): void {
+function greaterOrEqualNonzeroExcludesNull(?int $x): void {
     if ($x >= 5) {
-        /** @mir-check $x is int<5, max>|null */
+        /** @mir-check $x is int<5, max> */
         $_ = 1;
     }
 }
