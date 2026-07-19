@@ -411,7 +411,8 @@ impl<'a> ClassAnalyzer<'a> {
         location: Option<&mir_types::Location>,
         issues: &mut Vec<Issue>,
     ) {
-        let Some(target_tps) = crate::db::class_template_params(self.db, target_fqcn) else {
+        let Some(target_tps) = crate::db::effective_class_template_params(self.db, target_fqcn)
+        else {
             return;
         };
         let bindings: HashMap<mir_types::Name, mir_types::Type> = target_tps
