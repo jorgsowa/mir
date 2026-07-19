@@ -2285,7 +2285,11 @@ pub fn narrow_from_condition(
                 }
             } else if let Some((obj_var, prop)) = extract_prop_access(&a.target) {
                 // `if ($this->prop = expr)` — property-access counterpart of
-                // the plain-variable case above.
+                // the plain-variable case above. Reaching the assignment at
+                // all (regardless of branch) already proves $obj_var was
+                // non-null: PHP fatals assigning a property on a null
+                // receiver, unlike a plain read.
+                narrow_var_null(ctx, &obj_var, false);
                 let current = resolve_prop_current_type(ctx, &obj_var, &prop, db, file);
                 let mut narrowed = if is_true {
                     current.narrow_to_truthy()
