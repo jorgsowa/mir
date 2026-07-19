@@ -5724,6 +5724,13 @@ fn narrow_shape_path_key_exists_false(
                             prop.ty = deeper;
                             changed = true;
                         }
+                        // Same reasoning as the true-branch twin above:
+                        // reaching here at all proves `head` is a real array,
+                        // regardless of the false-branch key result.
+                        if prop.optional {
+                            prop.optional = false;
+                            changed = true;
+                        }
                     }
                     result.add_type(Atomic::TKeyedArray {
                         properties: new_props,
