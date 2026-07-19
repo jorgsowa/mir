@@ -1293,9 +1293,14 @@ pub fn narrow_from_condition(
                     // no dedicated enum-string/trait-string atomic exists.
                     if is_true {
                         if let Some(arg_expr) = call.args.first() {
-                            if let Some(fqcn) =
-                                extract_class_fqcn_from_expr(&arg_expr.value, db, file)
-                            {
+                            if let Some(fqcn) = extract_class_fqcn_from_expr(
+                                &arg_expr.value,
+                                ctx.self_fqcn.as_deref(),
+                                ctx.static_fqcn.as_deref(),
+                                ctx.parent_fqcn.as_deref(),
+                                db,
+                                file,
+                            ) {
                                 ctx.class_exists_guards.insert(fqcn);
                             } else if let Some(var_name) = extract_var_name(&arg_expr.value) {
                                 let current = ctx.get_var(&var_name);
@@ -1689,9 +1694,14 @@ pub fn narrow_from_condition(
                     if let (Some(obj_arg), Some(class_arg)) = (call.args.first(), call.args.get(1))
                     {
                         if let Some(var_name) = extract_var_name(&obj_arg.value) {
-                            if let Some(class_name) =
-                                extract_class_fqcn_from_expr(&class_arg.value, db, file)
-                            {
+                            if let Some(class_name) = extract_class_fqcn_from_expr(
+                                &class_arg.value,
+                                ctx.self_fqcn.as_deref(),
+                                ctx.static_fqcn.as_deref(),
+                                ctx.parent_fqcn.as_deref(),
+                                db,
+                                file,
+                            ) {
                                 let allow_string = call
                                     .args
                                     .get(2)
@@ -1750,9 +1760,14 @@ pub fn narrow_from_condition(
                                 }
                             }
                         } else if let Some((obj, prop)) = extract_prop_access(&obj_arg.value) {
-                            if let Some(class_name) =
-                                extract_class_fqcn_from_expr(&class_arg.value, db, file)
-                            {
+                            if let Some(class_name) = extract_class_fqcn_from_expr(
+                                &class_arg.value,
+                                ctx.self_fqcn.as_deref(),
+                                ctx.static_fqcn.as_deref(),
+                                ctx.parent_fqcn.as_deref(),
+                                db,
+                                file,
+                            ) {
                                 let allow_string = call
                                     .args
                                     .get(2)
@@ -1781,9 +1796,14 @@ pub fn narrow_from_condition(
                     if let (Some(obj_arg), Some(class_arg)) = (call.args.first(), call.args.get(1))
                     {
                         if let Some(var_name) = extract_var_name(&obj_arg.value) {
-                            if let Some(class_name) =
-                                extract_class_fqcn_from_expr(&class_arg.value, db, file)
-                            {
+                            if let Some(class_name) = extract_class_fqcn_from_expr(
+                                &class_arg.value,
+                                ctx.self_fqcn.as_deref(),
+                                ctx.static_fqcn.as_deref(),
+                                ctx.parent_fqcn.as_deref(),
+                                db,
+                                file,
+                            ) {
                                 let current = ctx.get_var(&var_name);
                                 if is_true {
                                     let narrowed = narrow_strict_subclass_of(
@@ -1799,9 +1819,14 @@ pub fn narrow_from_condition(
                                 // False branch: leave current type unchanged.
                             }
                         } else if let Some((obj, prop)) = extract_prop_access(&obj_arg.value) {
-                            if let Some(class_name) =
-                                extract_class_fqcn_from_expr(&class_arg.value, db, file)
-                            {
+                            if let Some(class_name) = extract_class_fqcn_from_expr(
+                                &class_arg.value,
+                                ctx.self_fqcn.as_deref(),
+                                ctx.static_fqcn.as_deref(),
+                                ctx.parent_fqcn.as_deref(),
+                                db,
+                                file,
+                            ) {
                                 narrow_prop_is_subclass_of(
                                     ctx,
                                     &obj,
@@ -2160,7 +2185,14 @@ fn assertion_arg_type(
     if let Some((obj_var, prop)) = extract_prop_access(expr) {
         return resolve_prop_current_type(ctx, &obj_var, &prop, db, file);
     }
-    if let Some(fqcn) = extract_class_fqcn_from_expr(expr, db, file) {
+    if let Some(fqcn) = extract_class_fqcn_from_expr(
+        expr,
+        ctx.self_fqcn.as_deref(),
+        ctx.static_fqcn.as_deref(),
+        ctx.parent_fqcn.as_deref(),
+        db,
+        file,
+    ) {
         return Type::single(Atomic::TClassString(Some(mir_types::Name::from(
             fqcn.as_ref(),
         ))));
@@ -5262,12 +5294,15 @@ fn narrow_prop_to_specific_class(
 /// - `'Foo\Bar'` or `'Foo\\Bar'` — string literals
 pub(crate) fn extract_class_fqcn_from_expr(
     expr: &php_ast::owned::Expr,
+    self_fqcn: Option<&str>,
+    static_fqcn: Option<&str>,
+    parent_fqcn: Option<&str>,
     db: &dyn MirDatabase,
     file: &str,
 ) -> Option<std::sync::Arc<str>> {
     let expr = peel_parens(expr);
     match &expr.kind {
-        // \Foo\Bar::class  or  Foo\Bar::class
+        // \Foo\Bar::class  or  Foo\Bar::class  (also self::class/static::class/parent::class)
         ExprKind::ClassConstAccess(cca) => {
             if let ExprKind::Identifier(id) = &cca.class.kind {
                 let member = match &cca.member.kind {
@@ -5275,9 +5310,20 @@ pub(crate) fn extract_class_fqcn_from_expr(
                     _ => return None,
                 };
                 if member.eq_ignore_ascii_case("class") {
-                    let resolved = crate::db::resolve_name(db, file, id.as_ref());
-                    if !matches!(resolved.as_str(), "self" | "static" | "parent") {
-                        return Some(std::sync::Arc::from(resolved.as_str()));
+                    match id.to_ascii_lowercase().as_str() {
+                        "self" | "static" => {
+                            let fqcn = if id.eq_ignore_ascii_case("static") {
+                                static_fqcn.or(self_fqcn)
+                            } else {
+                                self_fqcn
+                            };
+                            return fqcn.map(std::sync::Arc::from);
+                        }
+                        "parent" => return parent_fqcn.map(std::sync::Arc::from),
+                        _ => {
+                            let resolved = crate::db::resolve_name(db, file, id.as_ref());
+                            return Some(std::sync::Arc::from(resolved.as_str()));
+                        }
                     }
                 }
             }

@@ -441,7 +441,9 @@ fn accumulate_class_exists_guard(
         return;
     }
     if let Some(arg) = call.args.first() {
-        if let Some(fqcn) = crate::narrowing::extract_class_fqcn_from_expr(&arg.value, db, file) {
+        if let Some(fqcn) =
+            crate::narrowing::extract_class_fqcn_from_expr(&arg.value, None, None, None, db, file)
+        {
             guards.insert(fqcn);
         }
     }
