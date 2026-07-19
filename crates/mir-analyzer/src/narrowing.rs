@@ -3900,7 +3900,7 @@ fn narrow_prop_is_a(
         };
         // Same rationale as the variable case: don't mark diverges when
         // allow_string is set, since a class-string value may still pass.
-        if narrowed != current {
+        if !narrowed.is_empty() && narrowed != current {
             ctx.set_prop_refined(obj_var, prop, narrowed);
         }
     } else {
