@@ -3433,6 +3433,28 @@ fn narrow_strict_subclass_of(
                 });
             }
             Atomic::TObject | Atomic::TMixed => result.add_type(narrowed_ty.clone()),
+            // `is_subclass_of($x, class_name)` on an `A&B`-typed value adds
+            // class_name to the intersection rather than discarding it —
+            // mirrors narrow_instanceof_preserving_subtypes's TIntersection
+            // handling above.
+            Atomic::TIntersection { parts } => {
+                let already_covered = parts.iter().any(|p| {
+                    p.types.iter().any(|a| {
+                        matches!(a, Atomic::TNamedObject { fqcn, .. }
+                            if crate::db::extends_or_implements(db, fqcn.as_ref(), class_name)
+                                && fqcn.as_ref() != class_name)
+                    })
+                });
+                if already_covered {
+                    result.add_type(atomic.clone());
+                } else {
+                    let mut new_parts: Vec<Type> = parts.iter().cloned().collect();
+                    new_parts.push(Type::single(narrowed_ty.clone()));
+                    result.add_type(Atomic::TIntersection {
+                        parts: std::sync::Arc::from(new_parts),
+                    });
+                }
+            }
             _ => {}
         }
     }
