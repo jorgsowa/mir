@@ -3061,13 +3061,18 @@ fn named_object_matches_instanceof(fqcn: &str, class_name: &str, db: &dyn MirDat
 }
 
 /// Partition `current`'s atoms for the `allow_string: true` true-branch of
-/// `is_a($x, $class_name, true)`. A `class-string<C>` atom is kept only when
-/// `C` is (or extends) `class_name` — a class-string provably naming an
-/// unrelated class can never make `is_a()` true, so it's dropped rather than
-/// kept unconditionally. Any other string atom is kept as-is (it might name
-/// `class_name` at runtime; there's nothing more precise to narrow it to).
-/// The second element of the tuple is every non-string atom, handed back
-/// separately so the caller can narrow it via `instanceof` semantics.
+/// `is_a($x, $class_name, true)`. A `class-string<C>` atom is dropped only
+/// when `C` is provably unrelated to `class_name` in both directions AND
+/// the two can't coexist on a single class (mirrors the object-atom
+/// coexistence check in `narrow_instanceof_preserving_subtypes` above,
+/// via `classes_can_coexist`) — a class-string naming an interface, or a
+/// concrete class unrelated to `class_name` where `class_name` itself
+/// names an interface, could still describe a subtype that also satisfies
+/// `class_name`, so it isn't provably excluded. Any other string atom is
+/// kept as-is (it might name `class_name` at runtime; there's nothing more
+/// precise to narrow it to). The second element of the tuple is every
+/// non-string atom, handed back separately so the caller can narrow it via
+/// `instanceof` semantics.
 fn partition_is_a_string_like(
     current: &Type,
     class_name: &str,
@@ -3079,7 +3084,9 @@ fn partition_is_a_string_like(
     let mut obj_part = Type::empty();
     for atom in &current.types {
         if let Atomic::TClassString(Some(name)) = atom {
-            if named_object_matches_instanceof(name, class_name, db) {
+            if named_object_matches_instanceof(name, class_name, db)
+                || classes_can_coexist(name, class_name, db)
+            {
                 string_part.add_type(atom.clone());
             }
         } else if atom.is_string() {
