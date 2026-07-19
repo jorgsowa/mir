@@ -1017,6 +1017,58 @@ fn generic_ancestor_type_args_inner(
     None
 }
 
+/// Coarse int-vs-string classification of an array key type, used only to
+/// catch a *definitely* wrong key — anything not a single concrete int/string
+/// atomic (a union, `array-key`, a template param, ...) classifies as
+/// `Other` and is treated permissively, since it might resolve to either
+/// kind at runtime.
+enum ArrayKeyKind {
+    Int,
+    Str,
+    Other,
+}
+
+fn classify_array_key(ty: &Type) -> ArrayKeyKind {
+    if ty.types.len() != 1 {
+        return ArrayKeyKind::Other;
+    }
+    match &ty.types[0] {
+        Atomic::TInt
+        | Atomic::TLiteralInt(_)
+        | Atomic::TPositiveInt
+        | Atomic::TNonNegativeInt
+        | Atomic::TNegativeInt
+        | Atomic::TIntRange { .. } => ArrayKeyKind::Int,
+        Atomic::TString
+        | Atomic::TLiteralString(_)
+        | Atomic::TNonEmptyString
+        | Atomic::TNumericString => ArrayKeyKind::Str,
+        _ => ArrayKeyKind::Other,
+    }
+}
+
+/// The array key type of an aggregate array atom (`TList`/`TNonEmptyList`
+/// have an implicit `int` key), or `None` for anything else.
+fn array_key_of(atomic: &Atomic) -> Option<Type> {
+    match atomic {
+        Atomic::TArray { key, .. } | Atomic::TNonEmptyArray { key, .. } => Some((**key).clone()),
+        Atomic::TList { .. } | Atomic::TNonEmptyList { .. } => Some(Type::single(Atomic::TInt)),
+        _ => None,
+    }
+}
+
+/// True only when the arg's key type is a *definite*, statically-known-wrong
+/// kind for the param's key type (int-only vs string-only, in either
+/// direction) — anything merely unresolved/dynamic on either side is left
+/// permissive, matching this codebase's existing leniency for computed
+/// array keys (see `by-kind/argument_type_coercion/explicit_variable_key.phpt`).
+fn array_key_definitely_mismatched(arg_key: &Type, param_key: &Type) -> bool {
+    matches!(
+        (classify_array_key(arg_key), classify_array_key(param_key)),
+        (ArrayKeyKind::Int, ArrayKeyKind::Str) | (ArrayKeyKind::Str, ArrayKeyKind::Int)
+    )
+}
+
 fn union_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>) -> bool {
     arg_ty.types.iter().all(|av| {
         let av_fqcn: &Name = match av {
@@ -1028,6 +1080,7 @@ fn union_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>)
             | Atomic::TNonEmptyArray { value, .. }
             | Atomic::TList { value }
             | Atomic::TNonEmptyList { value } => {
+                let arg_key = array_key_of(av).unwrap_or_else(Type::mixed);
                 return param_ty.types.iter().any(|pv| {
                     let pv_val: &Type = match pv {
                         Atomic::TArray { value, .. }
@@ -1036,7 +1089,9 @@ fn union_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>)
                         | Atomic::TNonEmptyList { value } => value,
                         _ => return false,
                     };
-                    union_compatible(value, pv_val, ea)
+                    let param_key = array_key_of(pv).unwrap_or_else(Type::mixed);
+                    !array_key_definitely_mismatched(&arg_key, &param_key)
+                        && union_compatible(value, pv_val, ea)
                 });
             }
             // An open shape may carry additional keys of unknown type — stay
@@ -1131,6 +1186,7 @@ fn array_list_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer
             }
             _ => return false,
         };
+        let arg_key = array_key_of(a_atomic).unwrap_or_else(Type::mixed);
 
         param_ty.types.iter().any(|p_atomic| {
             let param_value: &Type = match p_atomic {
@@ -1140,8 +1196,10 @@ fn array_list_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer
                 | Atomic::TNonEmptyList { value } => value,
                 _ => return false,
             };
+            let param_key = array_key_of(p_atomic).unwrap_or_else(Type::mixed);
 
-            union_compatible(arg_value, param_value, ea)
+            !array_key_definitely_mismatched(&arg_key, &param_key)
+                && union_compatible(arg_value, param_value, ea)
         })
     })
 }
