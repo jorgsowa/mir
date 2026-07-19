@@ -2241,15 +2241,7 @@ pub(crate) fn narrow_instanceof_disjuncts(
     // merging afterward).
     let narrowed =
         narrow_or_instanceof_union(&current, &class_names, db, &ctx.template_param_names);
-    // Fall back to current if narrowed is empty (e.g. mixed)
-    let result = if narrowed.is_empty() {
-        current.clone()
-    } else {
-        narrowed
-    };
-    if !result.is_empty() {
-        ctx.set_var(&vn, result);
-    }
+    set_narrowed(ctx, &vn, &current, narrowed, true);
     Some(vn)
 }
 
@@ -2369,14 +2361,7 @@ fn narrow_prop_instanceof_disjuncts(
     let current = resolve_prop_current_type(ctx, &obj_var, &prop, db, file);
     let narrowed =
         narrow_or_instanceof_union(&current, &class_names, db, &ctx.template_param_names);
-    let result = if narrowed.is_empty() {
-        current.clone()
-    } else {
-        narrowed
-    };
-    if !result.is_empty() {
-        apply_prop_narrowed(ctx, &obj_var, &prop, current, result, true);
-    }
+    apply_prop_narrowed(ctx, &obj_var, &prop, current, narrowed, true);
     true
 }
 
@@ -3174,20 +3159,16 @@ fn narrow_or_instanceof_union(
         }
     }
 
-    if result.is_empty() {
-        // No atomic in `current` extends/implements any disjunct (e.g.
-        // `current` is an interface the disjuncts implement, not vice versa)
-        // — mirrors narrow_instanceof_preserving_subtypes's fallback: assume
-        // the instanceof check(s) narrow to the union of the checked classes
-        // rather than silently keeping the pre-narrowing type.
-        let mut out = Type::empty();
-        for cn in class_names {
-            out.add_type(class_atom(cn));
-        }
-        out
-    } else {
-        result
-    }
+    // Unlike the early-return above (truly unconstrained `mixed`/empty
+    // `current`), reaching here with an empty `result` means `current` had
+    // at least one real atom and NONE of them survived narrowing against any
+    // disjunct — every atom was proven incompatible with every disjunct
+    // (e.g. unrelated `final` classes). Propagate the emptiness instead of
+    // resetting to the disjuncts' bare union, mirroring
+    // `narrow_instanceof_preserving_subtypes`, so the caller can correctly
+    // flag the branch as unreachable instead of silently widening a
+    // provably-impossible `instanceof` chain to `A|B`.
+    result
 }
 
 /// Whether a value could simultaneously be (a subtype of) both `a` and `b` —
