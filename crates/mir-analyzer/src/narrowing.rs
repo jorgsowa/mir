@@ -177,7 +177,7 @@ pub fn narrow_from_condition(
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                 } else {
                     // `strpos($h, $n) !== false` / `array_search($n, $h) === false`
-                    narrow_from_false_comparable_call(&b.left, ctx, effective_true);
+                    narrow_from_false_comparable_call(&b.left, ctx, db, file, effective_true);
                 }
             }
             // `true === $x` / `false === $x` — symmetric; extract_var_name looks through
@@ -196,7 +196,7 @@ pub fn narrow_from_condition(
                     narrow_prop_bool(ctx, &obj, &prop, db, file, false, effective_true);
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                 } else {
-                    narrow_from_false_comparable_call(&b.right, ctx, effective_true);
+                    narrow_from_false_comparable_call(&b.right, ctx, db, file, effective_true);
                 }
             }
             // `get_class($x) === 'ClassName'` — check before literal strings so it takes precedence
@@ -933,7 +933,7 @@ pub fn narrow_from_condition(
                 } else if !value {
                     // `strpos($h, $n) == false` / `!= false` — same
                     // false-comparable narrowing as the strict `===`/`!==` arm.
-                    narrow_from_false_comparable_call(&b.left, ctx, effective_true);
+                    narrow_from_false_comparable_call(&b.left, ctx, db, file, effective_true);
                 }
             } else if let ExprKind::Bool(value) = &b.left.kind {
                 if let Some(name) = extract_var_name(&b.right) {
@@ -941,7 +941,7 @@ pub fn narrow_from_condition(
                 } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
                     narrow_prop_loose_bool(ctx, &obj, &prop, db, file, *value == effective_true);
                 } else if !value {
-                    narrow_from_false_comparable_call(&b.right, ctx, effective_true);
+                    narrow_from_false_comparable_call(&b.right, ctx, db, file, effective_true);
                 }
             }
             // `$arr == []` / `$arr != []` — loose array equality requires identical
@@ -3270,6 +3270,8 @@ fn is_truthy_bool_literal(expr: &php_ast::owned::Expr) -> bool {
 fn narrow_from_false_comparable_call(
     expr: &php_ast::owned::Expr,
     ctx: &mut FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
     is_false: bool,
 ) {
     let ExprKind::FunctionCall(call) = &expr.kind else {
@@ -3310,14 +3312,24 @@ fn narrow_from_false_comparable_call(
                     }),
                 };
                 if needle_non_empty {
-                    if let Some(var_name) = extract_var_name(&haystack_arg.value) {
-                        let current = ctx.get_var(&var_name);
-                        if !current.is_mixed() {
-                            let narrowed = narrow_string_to_non_empty(&current);
-                            if narrowed != current {
-                                ctx.set_var(&var_name, narrowed);
+                    match ScalarArgTarget::extract(&haystack_arg.value) {
+                        Some(ScalarArgTarget::Var(var_name)) => {
+                            let current = ctx.get_var(&var_name);
+                            if !current.is_mixed() {
+                                let narrowed = narrow_string_to_non_empty(&current);
+                                if narrowed != current {
+                                    ctx.set_var(&var_name, narrowed);
+                                }
                             }
                         }
+                        Some(ScalarArgTarget::Prop(obj, prop)) => {
+                            let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
+                            if !current.is_mixed() {
+                                let narrowed = narrow_string_to_non_empty(&current);
+                                apply_prop_narrowed(ctx, &obj, &prop, current, narrowed, false);
+                            }
+                        }
+                        None => {}
                     }
                 }
             }
@@ -3332,18 +3344,21 @@ fn narrow_from_false_comparable_call(
             .map(|a| is_truthy_bool_literal(&a.value))
             .unwrap_or(false);
         if let (Some(needle_arg), Some(haystack_arg)) = (call.args.first(), call.args.get(1)) {
-            if let Some(var_name) = extract_var_name(&needle_arg.value) {
+            if let Some(target) = ScalarArgTarget::extract(&needle_arg.value) {
                 if let Some(haystack_ty) = extract_haystack_type(&haystack_arg.value, ctx) {
-                    let current = ctx.get_var(&var_name);
+                    let current = match &target {
+                        ScalarArgTarget::Var(name) => ctx.get_var(name),
+                        ScalarArgTarget::Prop(obj, prop) => {
+                            resolve_prop_current_type(ctx, obj, prop, db, file)
+                        }
+                    };
                     let loose_safe =
                         strict || in_array_loose_narrowing_is_safe(&current, &haystack_ty);
                     if !current.is_mixed() && loose_safe {
-                        if !is_false {
+                        let narrowed = if !is_false {
                             // Found: keep only atoms that could match a haystack value.
                             let narrowed = narrow_to_haystack_values(&current, &haystack_ty);
-                            if !narrowed.is_empty() && narrowed != current {
-                                ctx.set_var(&var_name, narrowed);
-                            }
+                            (!narrowed.is_empty() && narrowed != current).then_some(narrowed)
                         } else {
                             // Not found: safe only when current is a finite literal
                             // union — remove the matched haystack values.
@@ -3351,11 +3366,17 @@ fn narrow_from_false_comparable_call(
                                 && current.types.iter().all(|a| {
                                     matches!(a, Atomic::TLiteralString(_) | Atomic::TLiteralInt(_))
                                 });
-                            if all_literals {
-                                let narrowed =
-                                    current.filter(|a| !haystack_ty.types.iter().any(|h| h == a));
-                                if !narrowed.is_empty() && narrowed != current {
-                                    ctx.set_var(&var_name, narrowed);
+                            all_literals
+                                .then(|| {
+                                    current.filter(|a| !haystack_ty.types.iter().any(|h| h == a))
+                                })
+                                .filter(|narrowed| !narrowed.is_empty() && *narrowed != current)
+                        };
+                        if let Some(narrowed) = narrowed {
+                            match target {
+                                ScalarArgTarget::Var(name) => ctx.set_var(&name, narrowed),
+                                ScalarArgTarget::Prop(obj, prop) => {
+                                    apply_prop_narrowed(ctx, &obj, &prop, current, narrowed, false)
                                 }
                             }
                         }
