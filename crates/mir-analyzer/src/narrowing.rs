@@ -2519,6 +2519,58 @@ pub(crate) fn narrow_mixed_disjuncts(
     Some(vn)
 }
 
+/// Property-access counterpart of `single_leaf_disjunct_var`, for
+/// `$this->prop instanceof A` / `is_TYPE($this->prop)` leaf disjuncts.
+fn single_leaf_disjunct_prop(expr: &php_ast::owned::Expr) -> Option<(String, String)> {
+    let expr = peel_parens(expr);
+    match &expr.kind {
+        ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => extract_prop_access(&b.left),
+        _ => extract_type_fn_check_prop(expr).map(|(_, obj, prop)| (obj, prop)),
+    }
+}
+
+/// Property-access counterpart of `narrow_mixed_disjuncts`, for a mixed
+/// `instanceof`/`is_TYPE()` OR-chain on `$this->prop` (e.g. `$this->prop
+/// instanceof Foo || is_string($this->prop)`) — the property side has a
+/// dedicated pure-instanceof (`narrow_prop_instanceof_disjuncts`) and
+/// pure-type-fn (`narrow_prop_type_fn_disjuncts`) counterpart already, but no
+/// mixed-kind counterpart, unlike the plain-variable case.
+pub(crate) fn narrow_mixed_prop_disjuncts(
+    conditions: &[&php_ast::owned::Expr],
+    ctx: &mut FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<(String, String)> {
+    if conditions.len() < 2 {
+        return None;
+    }
+    let mut receiver: Option<(String, String)> = None;
+    for cond in conditions {
+        let (obj, prop) = single_leaf_disjunct_prop(cond)?;
+        match &receiver {
+            None => receiver = Some((obj, prop)),
+            Some((existing_obj, existing_prop))
+                if *existing_obj == obj && *existing_prop == prop => {}
+            _ => return None, // different receiver — bail out
+        }
+    }
+    let (obj_var, prop) = receiver?;
+    let original = resolve_prop_current_type(ctx, &obj_var, &prop, db, file);
+    let mut union_ty = Type::empty();
+    for cond in conditions {
+        let mut scratch = ctx.branch();
+        scratch.set_prop_refined(&obj_var, &prop, original.clone());
+        narrow_from_condition(cond, &mut scratch, true, db, file);
+        union_ty.merge_with(&resolve_prop_current_type(
+            &scratch, &obj_var, &prop, db, file,
+        ));
+    }
+    if !union_ty.is_empty() {
+        apply_prop_narrowed(ctx, &obj_var, &prop, original, union_ty, true);
+    }
+    Some((obj_var, prop))
+}
+
 /// For `$x instanceof A || $x instanceof B` (true branch): narrow $x to A|B.
 /// Handles OR chains recursively, e.g. `$x instanceof A || $x instanceof B || $x instanceof C`.
 /// Also handles the scalar-type-check counterpart (`is_int($x) || is_string($x)`)
@@ -2536,8 +2588,9 @@ fn narrow_or_instanceof_true(
         && narrow_type_fn_disjuncts(&[left, right], ctx, db).is_none()
         && !narrow_prop_instanceof_disjuncts(&[left, right], ctx, db, file)
         && narrow_prop_type_fn_disjuncts(&[left, right], ctx, db, file).is_none()
+        && narrow_mixed_disjuncts(&[left, right], ctx, db, file).is_none()
     {
-        narrow_mixed_disjuncts(&[left, right], ctx, db, file);
+        narrow_mixed_prop_disjuncts(&[left, right], ctx, db, file);
     }
 }
 
