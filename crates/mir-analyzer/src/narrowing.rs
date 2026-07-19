@@ -1970,6 +1970,26 @@ pub fn narrow_from_condition(
                                     is_true,
                                 );
                             }
+                        } else if let Some((fqcn, prop)) =
+                            extract_static_prop_access(&obj_arg.value, ctx, db, file)
+                        {
+                            if let Some(class_name) = extract_class_fqcn_from_expr(
+                                &class_arg.value,
+                                ctx.self_fqcn.as_deref(),
+                                ctx.static_fqcn.as_deref(),
+                                ctx.parent_fqcn.as_deref(),
+                                db,
+                                file,
+                            ) {
+                                narrow_static_prop_is_subclass_of(
+                                    ctx,
+                                    &fqcn,
+                                    &prop,
+                                    &class_name,
+                                    db,
+                                    is_true,
+                                );
+                            }
                         }
                     }
                 } else if apply_docblock_assertions(call, ctx, is_true, db, file, fn_name) {
@@ -4193,6 +4213,30 @@ fn narrow_prop_is_a(
         let mark_diverges = is_true || !ctx.get_var(obj_var).is_nullable();
         apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, mark_diverges);
     }
+}
+
+/// Static-property counterpart of `narrow_prop_is_subclass_of`, for
+/// `is_subclass_of(self::$prop, ClassName::class)` (and `static::$prop`/
+/// `Class::$prop`) — same strict-subclass-only semantics.
+fn narrow_static_prop_is_subclass_of(
+    ctx: &mut FlowState,
+    fqcn: &str,
+    prop: &str,
+    class_name: &str,
+    db: &dyn MirDatabase,
+    is_true: bool,
+) {
+    if !is_true {
+        return;
+    }
+    let current = resolve_static_prop_current_type(ctx, fqcn, prop, db);
+    if current.is_mixed_not_template() {
+        return;
+    }
+    let narrowed = narrow_strict_subclass_of(&current, class_name, db, &ctx.template_param_names);
+    // mark_diverges=false: the exact class being absent from strict-subclass
+    // narrowing doesn't make the branch dead, mirroring the var/prop siblings.
+    apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, false);
 }
 
 /// `is_subclass_of($obj->prop, ClassName::class)` narrowing — same semantics
