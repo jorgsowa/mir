@@ -76,7 +76,10 @@ fn resolve_array_access_value_type(
     let bare = fqcn.as_ref().trim_start_matches('\\');
     let class = crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, bare))?;
     let class_tps = crate::db::class_template_params(db, bare).unwrap_or_default();
-    let bindings = crate::generic::build_class_bindings(&class_tps, type_params);
+    let mut bindings = crate::generic::build_class_bindings(&class_tps, type_params);
+    for (k, v) in crate::db::inherited_template_bindings(db, bare, &bindings) {
+        bindings.entry(k).or_insert(v);
+    }
 
     let annotated = class
         .implements_type_args()
