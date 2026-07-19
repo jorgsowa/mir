@@ -71,7 +71,7 @@ pub fn narrow_from_condition(
 
             // `count($arr) === N` / `strlen($str) !== N`, etc. — independent of
             // the rest of this arm, mirrors the `<`/`<=`/`>`/`>=` handling below.
-            narrow_count_or_strlen_equality(ctx, &b.left, &b.right, b.op, is_true);
+            narrow_count_or_strlen_equality(ctx, db, file, &b.left, &b.right, b.op, is_true);
 
             // `($x ?? FALLBACK) === FALLBACK` — on the false branch, $x was defined
             // Must be checked before literal comparisons because `b.right` matching a literal
@@ -105,8 +105,22 @@ pub fn narrow_from_condition(
             }
             // `$x === null`
             else if matches!(b.right.kind, ExprKind::Null) {
-                if let Some(arr_var) = extract_array_key_first_or_last_arg(&b.left) {
-                    narrow_array_key_first_or_last_null(ctx, &arr_var, effective_true);
+                if let Some(target) = extract_array_key_first_or_last_arg(&b.left) {
+                    match target {
+                        ScalarArgTarget::Var(arr_var) => {
+                            narrow_array_key_first_or_last_null(ctx, &arr_var, effective_true)
+                        }
+                        ScalarArgTarget::Prop(obj, prop) => {
+                            narrow_prop_array_key_first_or_last_null(
+                                ctx,
+                                &obj,
+                                &prop,
+                                db,
+                                file,
+                                effective_true,
+                            )
+                        }
+                    }
                 } else if let Some(name) = extract_var_name(&b.left) {
                     narrow_var_null(ctx, &name, effective_true);
                 } else if let Some((obj, prop)) = extract_nullsafe_prop_access(&b.left) {
@@ -119,8 +133,22 @@ pub fn narrow_from_condition(
                     narrow_static_prop_null(ctx, &fqcn, &prop, db, effective_true);
                 }
             } else if matches!(b.left.kind, ExprKind::Null) {
-                if let Some(arr_var) = extract_array_key_first_or_last_arg(&b.right) {
-                    narrow_array_key_first_or_last_null(ctx, &arr_var, effective_true);
+                if let Some(target) = extract_array_key_first_or_last_arg(&b.right) {
+                    match target {
+                        ScalarArgTarget::Var(arr_var) => {
+                            narrow_array_key_first_or_last_null(ctx, &arr_var, effective_true)
+                        }
+                        ScalarArgTarget::Prop(obj, prop) => {
+                            narrow_prop_array_key_first_or_last_null(
+                                ctx,
+                                &obj,
+                                &prop,
+                                db,
+                                file,
+                                effective_true,
+                            )
+                        }
+                    }
                 } else if let Some(name) = extract_var_name(&b.right) {
                     narrow_var_null(ctx, &name, effective_true);
                 } else if let Some((obj, prop)) = extract_nullsafe_prop_access(&b.right) {
@@ -819,29 +847,57 @@ pub fn narrow_from_condition(
                 }
             }
             // count($arr) op N  /  N op count($arr) — normalize so count call is on left.
-            let (count_expr, count_cmp_op, count_lit) = if extract_count_of_var(&b.left).is_some() {
+            let (count_expr, count_cmp_op, count_lit) = if extract_count_arg(&b.left).is_some() {
                 (&b.left, b.op, &b.right)
             } else {
                 (&b.right, flip_comparison_op(b.op), &b.left)
             };
-            if let (Some(arr_var), Some(n)) = (
-                extract_count_of_var(count_expr),
+            if let (Some(target), Some(n)) = (
+                extract_count_arg(count_expr),
                 extract_int_literal(count_lit),
             ) {
-                narrow_array_count_comparison(ctx, &arr_var, count_cmp_op, n, is_true);
+                match target {
+                    ScalarArgTarget::Var(arr_var) => {
+                        narrow_array_count_comparison(ctx, &arr_var, count_cmp_op, n, is_true)
+                    }
+                    ScalarArgTarget::Prop(obj, prop) => narrow_prop_array_count_comparison(
+                        ctx,
+                        &obj,
+                        &prop,
+                        db,
+                        file,
+                        count_cmp_op,
+                        n,
+                        is_true,
+                    ),
+                }
             }
             // strlen($str) op N  /  N op strlen($str) — same normalization.
-            let (strlen_expr, strlen_cmp_op, strlen_lit) =
-                if extract_strlen_of_var(&b.left).is_some() {
-                    (&b.left, b.op, &b.right)
-                } else {
-                    (&b.right, flip_comparison_op(b.op), &b.left)
-                };
-            if let (Some(str_var), Some(n)) = (
-                extract_strlen_of_var(strlen_expr),
+            let (strlen_expr, strlen_cmp_op, strlen_lit) = if extract_strlen_arg(&b.left).is_some()
+            {
+                (&b.left, b.op, &b.right)
+            } else {
+                (&b.right, flip_comparison_op(b.op), &b.left)
+            };
+            if let (Some(target), Some(n)) = (
+                extract_strlen_arg(strlen_expr),
                 extract_int_literal(strlen_lit),
             ) {
-                narrow_string_strlen_comparison(ctx, &str_var, strlen_cmp_op, n, is_true);
+                match target {
+                    ScalarArgTarget::Var(str_var) => {
+                        narrow_string_strlen_comparison(ctx, &str_var, strlen_cmp_op, n, is_true)
+                    }
+                    ScalarArgTarget::Prop(obj, prop) => narrow_prop_string_strlen_comparison(
+                        ctx,
+                        &obj,
+                        &prop,
+                        db,
+                        file,
+                        strlen_cmp_op,
+                        n,
+                        is_true,
+                    ),
+                }
             }
         }
 
@@ -851,7 +907,7 @@ pub fn narrow_from_condition(
             let effective_true = if is_equal { is_true } else { !is_true };
 
             // `count($arr) == N` / `strlen($str) != N`, etc.
-            narrow_count_or_strlen_equality(ctx, &b.left, &b.right, b.op, is_true);
+            narrow_count_or_strlen_equality(ctx, db, file, &b.left, &b.right, b.op, is_true);
 
             if matches!(b.right.kind, ExprKind::Null) {
                 if let Some(name) = extract_var_name(&b.left) {
@@ -5845,10 +5901,10 @@ pub(crate) fn is_numeric_string(s: &str) -> bool {
     t.parse::<i64>().is_ok() || t.parse::<f64>().is_ok_and(f64::is_finite)
 }
 
-/// Extract the variable name from `count($var)` / `sizeof($var)` /
+/// Extract the variable/property target from `count($var)` / `sizeof($var)` /
 /// `iterator_count($var)` — all three return an int length and narrow
 /// identically.
-fn extract_count_of_var(expr: &php_ast::owned::Expr) -> Option<String> {
+fn extract_count_arg(expr: &php_ast::owned::Expr) -> Option<ScalarArgTarget> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
         let name = match &call.name.kind {
             ExprKind::Identifier(n) => n.as_ref(),
@@ -5860,15 +5916,16 @@ fn extract_count_of_var(expr: &php_ast::owned::Expr) -> Option<String> {
             || bare.eq_ignore_ascii_case("iterator_count")
         {
             if let Some(arg) = call.args.first() {
-                return extract_var_name(&arg.value);
+                return ScalarArgTarget::extract(&arg.value);
             }
         }
     }
     None
 }
 
-/// Extract the variable name from `array_key_first($var)` / `array_key_last($var)`.
-fn extract_array_key_first_or_last_arg(expr: &php_ast::owned::Expr) -> Option<String> {
+/// Extract the variable/property target from `array_key_first($var)` /
+/// `array_key_last($var)`.
+fn extract_array_key_first_or_last_arg(expr: &php_ast::owned::Expr) -> Option<ScalarArgTarget> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
         let name = match &call.name.kind {
             ExprKind::Identifier(n) => n.as_ref(),
@@ -5879,7 +5936,7 @@ fn extract_array_key_first_or_last_arg(expr: &php_ast::owned::Expr) -> Option<St
             || bare.eq_ignore_ascii_case("array_key_last")
         {
             if let Some(arg) = call.args.first() {
-                return extract_var_name(&arg.value);
+                return ScalarArgTarget::extract(&arg.value);
             }
         }
     }
@@ -5905,8 +5962,29 @@ fn narrow_array_key_first_or_last_null(ctx: &mut FlowState, arr_var: &str, is_nu
     }
 }
 
-/// Extract the variable name from `strlen($var)` / `mb_strlen($var, ...)`.
-fn extract_strlen_of_var(expr: &php_ast::owned::Expr) -> Option<String> {
+/// Property-access counterpart of `narrow_array_key_first_or_last_null`.
+fn narrow_prop_array_key_first_or_last_null(
+    ctx: &mut FlowState,
+    obj_var: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    file: &str,
+    is_null: bool,
+) {
+    let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
+    if current.is_mixed() {
+        return;
+    }
+    let narrowed = if is_null {
+        current.narrow_to_empty_collection()
+    } else {
+        current.narrow_to_non_empty_collection()
+    };
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, false);
+}
+
+/// Extract the variable/property target from `strlen($var)` / `mb_strlen($var, ...)`.
+fn extract_strlen_arg(expr: &php_ast::owned::Expr) -> Option<ScalarArgTarget> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
         let name = match &call.name.kind {
             ExprKind::Identifier(n) => n.as_ref(),
@@ -5915,7 +5993,7 @@ fn extract_strlen_of_var(expr: &php_ast::owned::Expr) -> Option<String> {
         let bare = name.trim_start_matches('\\');
         if bare.eq_ignore_ascii_case("strlen") || bare.eq_ignore_ascii_case("mb_strlen") {
             if let Some(arg) = call.args.first() {
-                return extract_var_name(&arg.value);
+                return ScalarArgTarget::extract(&arg.value);
             }
         }
     }
@@ -5929,33 +6007,49 @@ fn extract_strlen_of_var(expr: &php_ast::owned::Expr) -> Option<String> {
 /// flip is needed when the call is on the right-hand side.
 fn narrow_count_or_strlen_equality(
     ctx: &mut FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
     left: &php_ast::owned::Expr,
     right: &php_ast::owned::Expr,
     op: BinaryOp,
     is_true: bool,
 ) {
-    let (count_expr, count_lit) = if extract_count_of_var(left).is_some() {
+    let (count_expr, count_lit) = if extract_count_arg(left).is_some() {
         (left, right)
     } else {
         (right, left)
     };
-    if let (Some(arr_var), Some(n)) = (
-        extract_count_of_var(count_expr),
+    if let (Some(target), Some(n)) = (
+        extract_count_arg(count_expr),
         extract_int_literal(count_lit),
     ) {
-        narrow_array_count_comparison(ctx, &arr_var, op, n, is_true);
+        match target {
+            ScalarArgTarget::Var(arr_var) => {
+                narrow_array_count_comparison(ctx, &arr_var, op, n, is_true)
+            }
+            ScalarArgTarget::Prop(obj, prop) => {
+                narrow_prop_array_count_comparison(ctx, &obj, &prop, db, file, op, n, is_true)
+            }
+        }
         return;
     }
-    let (strlen_expr, strlen_lit) = if extract_strlen_of_var(left).is_some() {
+    let (strlen_expr, strlen_lit) = if extract_strlen_arg(left).is_some() {
         (left, right)
     } else {
         (right, left)
     };
-    if let (Some(str_var), Some(n)) = (
-        extract_strlen_of_var(strlen_expr),
+    if let (Some(target), Some(n)) = (
+        extract_strlen_arg(strlen_expr),
         extract_int_literal(strlen_lit),
     ) {
-        narrow_string_strlen_comparison(ctx, &str_var, op, n, is_true);
+        match target {
+            ScalarArgTarget::Var(str_var) => {
+                narrow_string_strlen_comparison(ctx, &str_var, op, n, is_true)
+            }
+            ScalarArgTarget::Prop(obj, prop) => {
+                narrow_prop_string_strlen_comparison(ctx, &obj, &prop, db, file, op, n, is_true)
+            }
+        }
     }
 }
 
@@ -6048,6 +6142,60 @@ fn narrow_string_strlen_comparison(
     if !narrowed.is_empty() && narrowed != current {
         ctx.set_var(str_var, narrowed);
     }
+}
+
+/// Property-access counterpart of `narrow_array_count_comparison`.
+#[allow(clippy::too_many_arguments)]
+fn narrow_prop_array_count_comparison(
+    ctx: &mut FlowState,
+    obj_var: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    file: &str,
+    op: BinaryOp,
+    n: i64,
+    is_true: bool,
+) {
+    let Some(non_empty) = count_or_strlen_emptiness(op, n, is_true) else {
+        return;
+    };
+    let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
+    if current.is_mixed() {
+        return;
+    }
+    let narrowed = if non_empty {
+        current.narrow_to_non_empty_collection()
+    } else {
+        current.narrow_to_empty_collection()
+    };
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, false);
+}
+
+/// Property-access counterpart of `narrow_string_strlen_comparison`.
+#[allow(clippy::too_many_arguments)]
+fn narrow_prop_string_strlen_comparison(
+    ctx: &mut FlowState,
+    obj_var: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    file: &str,
+    op: BinaryOp,
+    n: i64,
+    is_true: bool,
+) {
+    let Some(non_empty) = count_or_strlen_emptiness(op, n, is_true) else {
+        return;
+    };
+    let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
+    if current.is_mixed() {
+        return;
+    }
+    let narrowed = if non_empty {
+        narrow_string_to_non_empty(&current)
+    } else {
+        narrow_string_to_empty(&current)
+    };
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, false);
 }
 
 /// Extract a union Type from an `in_array` haystack argument.
