@@ -4166,7 +4166,13 @@ fn narrow_var_loose_null(ctx: &mut FlowState, name: &str, is_null: bool) {
     set_narrowed(ctx, name, &current, narrowed, true);
 }
 
-/// Property-access counterpart of `narrow_var_loose_null`.
+/// Property-access counterpart of `narrow_var_loose_null`. Like
+/// `narrow_prop_null`, a *nullable* `$obj` receiver means `$obj->prop == null`
+/// can be true purely because the receiver is null (PHP 8's plain `->`
+/// access on a null receiver warns and evaluates to `null`, same as `?->`) —
+/// so the `is_null=true` direction must never mark divergence in that case.
+/// The `is_null=false` direction stays sound either way and additionally
+/// proves the receiver itself is non-null when it was nullable.
 fn narrow_prop_loose_null(
     ctx: &mut FlowState,
     obj_var: &str,
@@ -4184,7 +4190,12 @@ fn narrow_prop_loose_null(
     } else {
         current.remove_null()
     };
-    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, true);
+    let receiver_nullable = ctx.get_var(obj_var).is_nullable();
+    let mark_diverges = !receiver_nullable || !is_null;
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, mark_diverges);
+    if !is_null && receiver_nullable {
+        narrow_var_null(ctx, obj_var, false);
+    }
 }
 
 /// After proving `$obj->prop` equals a definite non-null literal value
