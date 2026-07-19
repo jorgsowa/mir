@@ -173,9 +173,25 @@ pub fn narrow_from_condition(
             }
             // `get_class($x) === 'ClassName'` — check before literal strings so it takes precedence
             else if let ExprKind::String(class_name_str) = &b.right.kind {
-                if let Some(obj_var_name) = extract_get_class_arg(&b.left) {
+                if let Some(target) = extract_get_class_arg(&b.left) {
                     let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
-                    narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true, db);
+                    match target {
+                        ScalarArgTarget::Var(name) => {
+                            narrow_var_to_specific_class(ctx, &name, &fqcn, effective_true, db)
+                        }
+                        ScalarArgTarget::Prop(obj, prop) => {
+                            narrow_prop_to_specific_class(
+                                ctx,
+                                &obj,
+                                &prop,
+                                &fqcn,
+                                effective_true,
+                                db,
+                                file,
+                            );
+                            narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
+                        }
+                    }
                 } else if let Some(target) = extract_gettype_arg(&b.left) {
                     narrow_from_gettype_literal(
                         ctx,
@@ -225,9 +241,25 @@ pub fn narrow_from_condition(
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                 }
             } else if let ExprKind::String(class_name_str) = &b.left.kind {
-                if let Some(obj_var_name) = extract_get_class_arg(&b.right) {
+                if let Some(target) = extract_get_class_arg(&b.right) {
                     let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
-                    narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true, db);
+                    match target {
+                        ScalarArgTarget::Var(name) => {
+                            narrow_var_to_specific_class(ctx, &name, &fqcn, effective_true, db)
+                        }
+                        ScalarArgTarget::Prop(obj, prop) => {
+                            narrow_prop_to_specific_class(
+                                ctx,
+                                &obj,
+                                &prop,
+                                &fqcn,
+                                effective_true,
+                                db,
+                                file,
+                            );
+                            narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
+                        }
+                    }
                 } else if let Some(target) = extract_gettype_arg(&b.right) {
                     narrow_from_gettype_literal(
                         ctx,
@@ -392,7 +424,7 @@ pub fn narrow_from_condition(
                 // counterpart of the `get_class($x) === 'Foo'` string-literal
                 // case above; only reached once extract_var_name on the left
                 // fails (i.e. the left side is the get_class(...) call itself).
-                else if let Some(obj_var_name) = extract_get_class_arg(&b.left) {
+                else if let Some(target) = extract_get_class_arg(&b.left) {
                     if let ExprKind::ClassConstAccess(cca) = &b.right.kind {
                         if let Some(fqcn) = extract_class_const_fqcn(
                             cca,
@@ -401,13 +433,31 @@ pub fn narrow_from_condition(
                             db,
                             file,
                         ) {
-                            narrow_var_to_specific_class(
-                                ctx,
-                                &obj_var_name,
-                                &fqcn,
-                                effective_true,
-                                db,
-                            );
+                            match target {
+                                ScalarArgTarget::Var(name) => narrow_var_to_specific_class(
+                                    ctx,
+                                    &name,
+                                    &fqcn,
+                                    effective_true,
+                                    db,
+                                ),
+                                ScalarArgTarget::Prop(obj, prop) => {
+                                    narrow_prop_to_specific_class(
+                                        ctx,
+                                        &obj,
+                                        &prop,
+                                        &fqcn,
+                                        effective_true,
+                                        db,
+                                        file,
+                                    );
+                                    narrow_receiver_non_null_on_prop_match(
+                                        ctx,
+                                        &obj,
+                                        effective_true,
+                                    );
+                                }
+                            }
                         }
                     }
                 }
@@ -560,7 +610,7 @@ pub fn narrow_from_condition(
                     }
                 }
                 // `Foo::class === get_class($x)` — symmetric counterpart.
-                else if let Some(obj_var_name) = extract_get_class_arg(&b.right) {
+                else if let Some(target) = extract_get_class_arg(&b.right) {
                     if let ExprKind::ClassConstAccess(cca) = &b.left.kind {
                         if let Some(fqcn) = extract_class_const_fqcn(
                             cca,
@@ -569,13 +619,31 @@ pub fn narrow_from_condition(
                             db,
                             file,
                         ) {
-                            narrow_var_to_specific_class(
-                                ctx,
-                                &obj_var_name,
-                                &fqcn,
-                                effective_true,
-                                db,
-                            );
+                            match target {
+                                ScalarArgTarget::Var(name) => narrow_var_to_specific_class(
+                                    ctx,
+                                    &name,
+                                    &fqcn,
+                                    effective_true,
+                                    db,
+                                ),
+                                ScalarArgTarget::Prop(obj, prop) => {
+                                    narrow_prop_to_specific_class(
+                                        ctx,
+                                        &obj,
+                                        &prop,
+                                        &fqcn,
+                                        effective_true,
+                                        db,
+                                        file,
+                                    );
+                                    narrow_receiver_non_null_on_prop_match(
+                                        ctx,
+                                        &obj,
+                                        effective_true,
+                                    );
+                                }
+                            }
                         }
                     }
                 }
@@ -818,9 +886,25 @@ pub fn narrow_from_condition(
             // class/type names are never numeric-looking strings, so loose
             // comparison agrees with strict comparison here.
             else if let ExprKind::String(class_name_str) = &b.right.kind {
-                if let Some(obj_var_name) = extract_get_class_arg(&b.left) {
+                if let Some(target) = extract_get_class_arg(&b.left) {
                     let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
-                    narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true, db);
+                    match target {
+                        ScalarArgTarget::Var(name) => {
+                            narrow_var_to_specific_class(ctx, &name, &fqcn, effective_true, db)
+                        }
+                        ScalarArgTarget::Prop(obj, prop) => {
+                            narrow_prop_to_specific_class(
+                                ctx,
+                                &obj,
+                                &prop,
+                                &fqcn,
+                                effective_true,
+                                db,
+                                file,
+                            );
+                            narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
+                        }
+                    }
                 } else if let Some(target) = extract_gettype_arg(&b.left) {
                     narrow_from_gettype_literal(
                         ctx,
@@ -854,9 +938,25 @@ pub fn narrow_from_condition(
                     narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true, db);
                 }
             } else if let ExprKind::String(class_name_str) = &b.left.kind {
-                if let Some(obj_var_name) = extract_get_class_arg(&b.right) {
+                if let Some(target) = extract_get_class_arg(&b.right) {
                     let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
-                    narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true, db);
+                    match target {
+                        ScalarArgTarget::Var(name) => {
+                            narrow_var_to_specific_class(ctx, &name, &fqcn, effective_true, db)
+                        }
+                        ScalarArgTarget::Prop(obj, prop) => {
+                            narrow_prop_to_specific_class(
+                                ctx,
+                                &obj,
+                                &prop,
+                                &fqcn,
+                                effective_true,
+                                db,
+                                file,
+                            );
+                            narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
+                        }
+                    }
                 } else if let Some(target) = extract_gettype_arg(&b.right) {
                     narrow_from_gettype_literal(
                         ctx,
@@ -5395,7 +5495,7 @@ fn promote_assignment_effects(
     }
 }
 
-fn extract_get_class_arg(expr: &php_ast::owned::Expr) -> Option<String> {
+fn extract_get_class_arg(expr: &php_ast::owned::Expr) -> Option<ScalarArgTarget> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
         if let ExprKind::Identifier(name) = &call.name.kind {
             if name
@@ -5403,7 +5503,7 @@ fn extract_get_class_arg(expr: &php_ast::owned::Expr) -> Option<String> {
                 .eq_ignore_ascii_case("get_class")
             {
                 if let Some(arg) = call.args.first() {
-                    return extract_var_name(&arg.value);
+                    return ScalarArgTarget::extract(&arg.value);
                 }
             }
         }
