@@ -5190,9 +5190,6 @@ fn narrow_prop_from_type_fn(
     is_true: bool,
 ) {
     let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
-    if current.is_mixed() {
-        return;
-    }
     let Some(narrowed) = type_fn_narrowed(&current, fn_name, db, is_true) else {
         return;
     };
