@@ -2826,7 +2826,7 @@ fn project_type_params_onto_subclass(
     atom_type_params: &[Type],
     class_name: &str,
 ) -> std::sync::Arc<[Type]> {
-    let Some(class_own_tps) = crate::db::class_template_params(db, class_name) else {
+    let Some(class_own_tps) = crate::db::effective_class_template_params(db, class_name) else {
         return mir_types::union::empty_type_params();
     };
     if class_own_tps.is_empty() {
