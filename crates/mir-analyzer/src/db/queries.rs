@@ -127,11 +127,18 @@ pub fn effective_class_template_params(
     db: &dyn MirDatabase,
     fqcn: &str,
 ) -> Option<Arc<[TemplateParam]>> {
-    let mut current: Arc<str> = Arc::from(fqcn);
     let mut visited: FxHashSet<Arc<str>> = FxHashSet::default();
-    loop {
+    // A worklist, not a linear `current = parent` chain: a bare interface
+    // (`interface DogContainer extends AnimalContainer {}`) may extend
+    // several bases at once, and PHP/Psalm don't require it to redeclare an
+    // un-narrowed inherited `@template` — same reasoning `class_template_params`'s
+    // doc comment already gives for the class case, which this used to be the
+    // only branch for (see `inherited_template_bindings` for the analogous
+    // worklist over interfaces' multi-base `extends`).
+    let mut worklist: Vec<Arc<str>> = vec![Arc::from(fqcn)];
+    while let Some(current) = worklist.pop() {
         if !visited.insert(current.clone()) {
-            return None;
+            continue;
         }
         if let Some(tps) = class_template_params(db, current.as_ref()) {
             if !tps.is_empty() {
@@ -141,11 +148,17 @@ pub fn effective_class_template_params(
         let here = crate::db::Fqcn::from_str(db, current.as_ref());
         match crate::db::find_class_like(db, here) {
             Some(crate::db::ClassLike::Class(cls)) => {
-                current = cls.parent.clone()?;
+                if let Some(parent) = cls.parent.clone() {
+                    worklist.push(parent);
+                }
             }
-            _ => return None,
+            Some(crate::db::ClassLike::Interface(iface)) => {
+                worklist.extend(iface.extends.iter().cloned());
+            }
+            _ => {}
         }
     }
+    None
 }
 
 pub fn inherited_template_bindings(
