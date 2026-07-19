@@ -744,11 +744,15 @@ pub fn narrow_from_condition(
 
             if matches!(b.right.kind, ExprKind::Null) {
                 if let Some(name) = extract_var_name(&b.left) {
-                    narrow_var_null(ctx, &name, effective_true);
+                    narrow_var_loose_null(ctx, &name, effective_true);
+                } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
+                    narrow_prop_loose_null(ctx, &obj, &prop, db, file, effective_true);
                 }
             } else if matches!(b.left.kind, ExprKind::Null) {
                 if let Some(name) = extract_var_name(&b.right) {
-                    narrow_var_null(ctx, &name, effective_true);
+                    narrow_var_loose_null(ctx, &name, effective_true);
+                } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
+                    narrow_prop_loose_null(ctx, &obj, &prop, db, file, effective_true);
                 }
             }
             // `$x == true` / `$x == false` (and negated forms) — PHP defines loose
@@ -3786,6 +3790,47 @@ fn narrow_var_null(ctx: &mut FlowState, name: &str, is_null: bool) {
         current.remove_null()
     };
     set_narrowed(ctx, name, &current, narrowed, true);
+}
+
+/// Loose-equality counterpart of `narrow_var_null`, for `$x == null`/`!= null`.
+/// PHP's loose-null comparison is also true for `false`/`0`/`0.0`/`""`/`[]`, not
+/// just `null` itself, so narrowing the true branch all the way down to `TNull`
+/// (as the strict `=== null` form does) would be unsound. `narrow_to_falsy` is
+/// the same safe superset already used for `== true`/`== false`
+/// (`narrow_var_loose_bool`) — it over-includes the string `"0"` (falsy but not
+/// loose-null-equal), the standard approximation this file already accepts
+/// elsewhere. The false direction (`$x != null`) stays exactly as sound as the
+/// strict form: if `$x` were null the comparison would be true, so a false
+/// result still proves `$x` isn't the null value.
+fn narrow_var_loose_null(ctx: &mut FlowState, name: &str, is_null: bool) {
+    let current = ctx.get_var(name);
+    let narrowed = if is_null {
+        current.narrow_to_falsy()
+    } else {
+        current.remove_null()
+    };
+    set_narrowed(ctx, name, &current, narrowed, true);
+}
+
+/// Property-access counterpart of `narrow_var_loose_null`.
+fn narrow_prop_loose_null(
+    ctx: &mut FlowState,
+    obj_var: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    file: &str,
+    is_null: bool,
+) {
+    let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
+    if current.is_mixed() {
+        return;
+    }
+    let narrowed = if is_null {
+        current.narrow_to_falsy()
+    } else {
+        current.remove_null()
+    };
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, true);
 }
 
 /// After proving `$obj->prop` equals a definite non-null literal value

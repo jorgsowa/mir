@@ -523,8 +523,10 @@ fn is_php_numeric_string(s: &str) -> bool {
 ///
 /// Only returns `false` for provably-impossible cases:
 /// - any object vs null, false, int, float, string, or array
-/// - any array vs null, int, float, string, or object
-/// - a non-empty array vs false (non-empty arrays are always truthy)
+/// - any array vs int, float, string, or object
+/// - a non-empty array vs false or null (null converts to an empty array for
+///   this comparison, so `[] == null` is true but `[1] == null` is false —
+///   the same emptiness condition as `== false`)
 /// - a non-numeric literal string vs any integer/float (PHP 8.0+)
 /// - a non-numeric literal string vs a non-zero literal integer (all versions)
 fn atomics_can_be_loose_equal(left: &Atomic, right: &Atomic, php_version: PhpVersion) -> bool {
@@ -559,10 +561,15 @@ fn atomics_can_be_loose_equal(left: &Atomic, right: &Atomic, php_version: PhpVer
             _ if is_array_atomic(other) => true,
             // arr == true: possible (non-empty array is truthy)
             Atomic::TTrue | Atomic::TBool => true,
-            // arr == false: only possible when the array could be empty;
-            // a non-empty array is always truthy so == false is impossible
-            Atomic::TFalse => !is_nonempty_array_atomic(arr_side),
-            // arr vs null/int/float/string/object → always false in PHP
+            // arr == false / arr == null: both convert the other side to an
+            // empty array for comparison, so both are only possible when the
+            // array could itself be empty; a non-empty array is always
+            // truthy and can never equal null either (`[1] == null` is
+            // false, `[] == null` is true — verified against PHP: `null` is
+            // NOT unconditionally disjoint from `array` the way int/float/
+            // string/object are).
+            Atomic::TFalse | Atomic::TNull => !is_nonempty_array_atomic(arr_side),
+            // arr vs int/float/string/object → always false in PHP
             _ => false,
         };
     }
