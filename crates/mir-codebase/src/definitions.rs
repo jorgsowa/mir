@@ -759,6 +759,9 @@ pub struct EnumDef {
     /// Type aliases declared on this enum via `@psalm-type` / `@phpstan-type`.
     #[serde(default)]
     pub type_aliases: FxHashMap<Arc<str>, Type>,
+    /// Properties declared via `@property*` docblock annotations on the enum.
+    #[serde(default)]
+    pub own_properties: MemberMap<PropertyDef>,
 }
 
 // ---------------------------------------------------------------------------

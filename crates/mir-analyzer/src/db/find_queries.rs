@@ -99,13 +99,15 @@ impl ClassLike {
         }
     }
 
-    /// Own properties. Interfaces don't have properties, so we return an
-    /// empty map for them (avoids match callers having to special-case).
+    /// Own properties. Interfaces and enums can both declare `@property*`
+    /// docblock properties (no real storage, but still valid access
+    /// targets), so both carry their own populated map too.
     pub fn own_properties(&self) -> Option<&mir_codebase::definitions::MemberMap<PropertyDef>> {
         match self {
             ClassLike::Class(c) => Some(&c.own_properties),
             ClassLike::Trait(t) => Some(&t.own_properties),
-            ClassLike::Interface(_) | ClassLike::Enum(_) => None,
+            ClassLike::Interface(i) => Some(&i.own_properties),
+            ClassLike::Enum(e) => Some(&e.own_properties),
         }
     }
 

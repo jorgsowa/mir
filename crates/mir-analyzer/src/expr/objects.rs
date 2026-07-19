@@ -1520,6 +1520,19 @@ impl<'a> ExpressionAnalyzer<'a> {
                             return Type::mixed();
                         }
                         _ => {
+                            let here = crate::db::Fqcn::new(self.db, *fqcn);
+                            if let Some(crate::db::ClassLike::Enum(e)) =
+                                crate::db::find_class_like(self.db, here)
+                            {
+                                if let Some(p) = e.own_properties.get(prop_name) {
+                                    self.record_ref(
+                                        Arc::from(format!("prop:{}::{}", fqcn, prop_name)),
+                                        span,
+                                    );
+                                    *declaring_class = Some((*fqcn).into());
+                                    return p.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
+                                }
+                            }
                             if !self.in_existence_check {
                                 self.emit(
                                     IssueKind::UndefinedProperty {

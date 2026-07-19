@@ -276,13 +276,13 @@ impl DefinitionCollector<'_> {
             .collect();
 
         let type_aliases = self.build_type_aliases(&enum_doc);
-        let mut dummy_properties = mir_codebase::definitions::MemberMap::default();
+        let mut own_properties = mir_codebase::definitions::MemberMap::default();
         self.add_docblock_members(
             &enum_doc,
             &type_aliases,
             &fqcn,
             &mut own_methods,
-            &mut dummy_properties,
+            &mut own_properties,
             Some(self.location(stmt_span.start, stmt_span.end)),
             &rustc_hash::FxHashSet::default(),
             &[],
@@ -310,6 +310,7 @@ impl DefinitionCollector<'_> {
                     .iter()
                     .map(|(k, v)| (Arc::from(k.as_str()), v.clone()))
                     .collect(),
+                own_properties,
             }));
         ControlFlow::Continue(())
     }
