@@ -40,6 +40,33 @@ pub fn infer_template_bindings(
             });
     }
 
+    // A default/bound can itself reference another template (`@template
+    // TReturn = T`, `@template U of T`) — resolve those chains against the
+    // bindings just computed above (arg-bound templates and sibling
+    // fallbacks alike), or the raw unresolved template atom leaks through
+    // (e.g. into a return type, turning a concrete arg's type into `mixed`
+    // downstream). Substituting an already-concrete binding is a no-op, so
+    // this only affects entries that still carry a raw template atom.
+    // Iterate to a fixed point since chains can nest (`U = T`, `V = U`);
+    // `template_params.len()` iterations is always enough to resolve any
+    // acyclic chain of that length.
+    for _ in 0..template_params.len() {
+        let mut changed = false;
+        for tp in template_params {
+            let name = Name::from(tp.name.as_ref());
+            if let Some(current) = bindings.get(&name) {
+                let substituted = current.substitute_templates(&bindings);
+                if substituted != *current {
+                    bindings.insert(name, substituted);
+                    changed = true;
+                }
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+
     (bindings, unchecked)
 }
 
