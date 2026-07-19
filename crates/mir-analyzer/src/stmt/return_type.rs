@@ -261,16 +261,26 @@ pub(super) fn declared_return_has_template(declared: &Type, db: &dyn MirDatabase
                 || !crate::db::class_exists(db, fqcn.as_ref())
                 || crate::db::class_kind(db, fqcn.as_ref()).is_some_and(|k| k.is_interface)
         }
-        Atomic::TArray { value, .. }
-        | Atomic::TList { value }
-        | Atomic::TNonEmptyArray { value, .. }
-        | Atomic::TNonEmptyList { value } => value.types.iter().any(|v| match v {
-            Atomic::TTemplateParam { .. } => true,
-            Atomic::TNamedObject { fqcn, .. } => {
-                !fqcn.contains('\\') && !crate::db::class_exists(db, fqcn.as_ref())
-            }
-            _ => false,
-        }),
+        Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value } => {
+            array_part_has_template_or_unknown_class(key, db)
+                || array_part_has_template_or_unknown_class(value, db)
+        }
+        Atomic::TList { value } | Atomic::TNonEmptyList { value } => {
+            array_part_has_template_or_unknown_class(value, db)
+        }
+        _ => false,
+    })
+}
+
+/// Shared by both the array key and value side of `declared_return_has_template` —
+/// a template appearing only in the key (`array<TKey, string>`) must bail on the
+/// same leniency path as one in the value, not just be silently ignored.
+fn array_part_has_template_or_unknown_class(part: &Type, db: &dyn MirDatabase) -> bool {
+    part.types.iter().any(|v| match v {
+        Atomic::TTemplateParam { .. } => true,
+        Atomic::TNamedObject { fqcn, .. } => {
+            !fqcn.contains('\\') && !crate::db::class_exists(db, fqcn.as_ref())
+        }
         _ => false,
     })
 }
