@@ -1099,6 +1099,17 @@ pub fn narrow_from_condition(
                                     current.narrow_to_class_string()
                                 };
                                 set_narrowed(ctx, &var_name, &current, narrowed, true);
+                            } else if let Some((obj, prop)) = extract_prop_access(&arg_expr.value) {
+                                let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
+                                if !current.is_mixed() {
+                                    let narrowed = if bare.eq_ignore_ascii_case("interface_exists")
+                                    {
+                                        current.narrow_to_interface_string()
+                                    } else {
+                                        current.narrow_to_class_string()
+                                    };
+                                    apply_prop_narrowed(ctx, &obj, &prop, current, narrowed, true);
+                                }
                             }
                         }
                     }
