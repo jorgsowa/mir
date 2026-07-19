@@ -916,7 +916,7 @@ fn generic_ancestor_type_args(
     if raw.is_empty() {
         return Some(raw);
     }
-    let own_tps = class_template_params(ea, child);
+    let own_tps = effective_class_template_params(ea, child);
     if own_tps.is_empty() {
         return Some(raw);
     }
