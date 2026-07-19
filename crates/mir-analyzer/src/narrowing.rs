@@ -6427,7 +6427,10 @@ fn narrow_array_key_first_or_last_null(ctx: &mut FlowState, arr_var: &str, is_nu
     } else {
         current.narrow_to_non_empty_collection()
     };
-    if narrowed != current {
+    // `narrow_to_empty_collection` can filter every atom away when `current` is
+    // already known to be exclusively non-empty (a provably-dead branch); leave
+    // the type as-is rather than collapsing the variable to an empty union.
+    if !narrowed.is_empty() && narrowed != current {
         ctx.set_var(arr_var, narrowed);
     }
 }
