@@ -394,10 +394,15 @@ impl CallAnalyzer {
                 );
             }
             // Detect call to an abstract method via an explicit class name.
-            let is_self_parent_call = if let ExprKind::Identifier(id) = &call.class.kind {
-                matches!(id.as_ref(), "self" | "static" | "parent")
-            } else {
-                false
+            // `$this::method()` is self-referential too (LSB against the
+            // current instance), same as the `self`/`static`/`parent`
+            // keywords — otherwise it falls into the "explicit class name"
+            // path below and produces a false `InvalidStaticInvocation` on
+            // a non-static method, and drops `@psalm-self-out` narrowing.
+            let is_self_parent_call = match &call.class.kind {
+                ExprKind::Identifier(id) => matches!(id.as_ref(), "self" | "static" | "parent"),
+                ExprKind::Variable(name) => name.trim_start_matches('$') == "this",
+                _ => false,
             };
             // Only static:: uses LSB and resolves to the concrete subclass at runtime.
             // self:: resolves to the declaring class (abstract → no body to call).
