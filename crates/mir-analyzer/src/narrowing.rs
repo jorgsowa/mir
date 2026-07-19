@@ -1924,6 +1924,13 @@ pub fn narrow_from_condition(
                 // also narrow that key's OWN value type by truthiness, mirroring
                 // narrow_isset_shape_key.
                 narrow_empty_shape_key(var_expr, ctx, is_true, db, file);
+                // `empty($this->prop)` — property-receiver counterpart of the
+                // bare-variable truthy/falsy case, mirroring the `if ($this->prop)`
+                // arm below (narrow_prop_loose_bool). `empty()` inverts truthiness:
+                // is_true means the property is falsy.
+                if let Some((obj_var, prop)) = extract_prop_access(var_expr) {
+                    narrow_prop_loose_bool(ctx, &obj_var, &prop, db, file, !is_true);
+                }
             }
         }
 
