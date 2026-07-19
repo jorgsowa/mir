@@ -893,19 +893,12 @@ pub fn narrow_from_condition(
                     narrow_static_prop_literal_int(ctx, &fqcn, &prop, db, *n, effective_true);
                 }
             }
-            // `$x === EnumName::CaseName` / get_class()/get_debug_type()/
-            // get_parent_class()/$obj::class compared against `Foo::class` —
-            // factored into narrow_from_static_or_class_const_comparison so
-            // the loose `==`/`!=` arm can reuse it (see that function's doc
-            // comment for why loose comparison is sound here specifically).
-            else if matches!(b.right.kind, ExprKind::StaticPropertyAccess(_))
-                || matches!(b.left.kind, ExprKind::StaticPropertyAccess(_))
-                || matches!(b.right.kind, ExprKind::ClassConstAccess(_))
-                || matches!(b.left.kind, ExprKind::ClassConstAccess(_))
-            {
-                narrow_from_static_or_class_const_comparison(ctx, b, effective_true, db, file);
-            }
             // `$arr === []` narrows $arr to empty; `$arr !== []` narrows to non-empty.
+            // Checked before the enum-case/class-const guard below: a bare
+            // `self::$prop === []` would otherwise match that guard's
+            // "either side is a StaticPropertyAccess" condition and be
+            // silently swallowed (that function only handles enum-case/
+            // get_class-family comparisons, not array-emptiness).
             else if let ExprKind::Array(elems) = &b.right.kind {
                 if elems.is_empty() {
                     if let Some(var_name) = extract_var_name(&b.left) {
@@ -921,6 +914,10 @@ pub fn narrow_from_condition(
                     } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
                         narrow_prop_array_empty(ctx, &obj, &prop, db, file, effective_true);
                         narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
+                    } else if let Some((fqcn, prop)) =
+                        extract_static_prop_access(&b.left, ctx, db, file)
+                    {
+                        narrow_static_prop_array_empty(ctx, &fqcn, &prop, db, effective_true);
                     }
                 }
             } else if let ExprKind::Array(elems) = &b.left.kind {
@@ -938,8 +935,24 @@ pub fn narrow_from_condition(
                     } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
                         narrow_prop_array_empty(ctx, &obj, &prop, db, file, effective_true);
                         narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
+                    } else if let Some((fqcn, prop)) =
+                        extract_static_prop_access(&b.right, ctx, db, file)
+                    {
+                        narrow_static_prop_array_empty(ctx, &fqcn, &prop, db, effective_true);
                     }
                 }
+            }
+            // `$x === EnumName::CaseName` / get_class()/get_debug_type()/
+            // get_parent_class()/$obj::class compared against `Foo::class` —
+            // factored into narrow_from_static_or_class_const_comparison so
+            // the loose `==`/`!=` arm can reuse it (see that function's doc
+            // comment for why loose comparison is sound here specifically).
+            else if matches!(b.right.kind, ExprKind::StaticPropertyAccess(_))
+                || matches!(b.left.kind, ExprKind::StaticPropertyAccess(_))
+                || matches!(b.right.kind, ExprKind::ClassConstAccess(_))
+                || matches!(b.left.kind, ExprKind::ClassConstAccess(_))
+            {
+                narrow_from_static_or_class_const_comparison(ctx, b, effective_true, db, file);
             }
         }
 
@@ -1155,6 +1168,10 @@ pub fn narrow_from_condition(
                     } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
                         narrow_prop_array_empty(ctx, &obj, &prop, db, file, effective_true);
                         narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
+                    } else if let Some((fqcn, prop)) =
+                        extract_static_prop_access(&b.left, ctx, db, file)
+                    {
+                        narrow_static_prop_array_empty(ctx, &fqcn, &prop, db, effective_true);
                     }
                 }
             } else if let ExprKind::Array(elems) = &b.left.kind {
@@ -1172,6 +1189,10 @@ pub fn narrow_from_condition(
                     } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
                         narrow_prop_array_empty(ctx, &obj, &prop, db, file, effective_true);
                         narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
+                    } else if let Some((fqcn, prop)) =
+                        extract_static_prop_access(&b.right, ctx, db, file)
+                    {
+                        narrow_static_prop_array_empty(ctx, &fqcn, &prop, db, effective_true);
                     }
                 }
             }
@@ -4172,6 +4193,24 @@ fn narrow_prop_array_empty(
         current.narrow_to_non_empty_collection()
     };
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, false);
+}
+
+/// Static-property counterpart of `narrow_prop_array_empty`, for
+/// `self::$prop === []`/`!==`/`==`/`!=` (and `static::$prop`/`Class::$prop`).
+fn narrow_static_prop_array_empty(
+    ctx: &mut FlowState,
+    fqcn: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    is_empty: bool,
+) {
+    let current = resolve_static_prop_current_type(ctx, fqcn, prop, db);
+    let narrowed = if is_empty {
+        current.narrow_to_empty_collection()
+    } else {
+        current.narrow_to_non_empty_collection()
+    };
+    apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, false);
 }
 
 fn narrow_prop_instanceof(
