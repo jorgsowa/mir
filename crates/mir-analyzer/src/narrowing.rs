@@ -3065,6 +3065,11 @@ fn single_leaf_disjunct_prop(expr: &php_ast::owned::Expr) -> Option<(String, Str
     let expr = peel_parens(expr);
     match &expr.kind {
         ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => extract_prop_access(&b.left),
+        ExprKind::Binary(b) if b.op == BinaryOp::BooleanOr || b.op == BinaryOp::LogicalOr => {
+            let l = single_leaf_disjunct_prop(&b.left)?;
+            let r = single_leaf_disjunct_prop(&b.right)?;
+            (l == r).then_some(l)
+        }
         _ => extract_type_fn_check_prop(expr).map(|(_, obj, prop)| (obj, prop)),
     }
 }
