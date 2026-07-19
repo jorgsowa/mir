@@ -341,6 +341,15 @@ impl<'a> ClassAnalyzer<'a> {
             }
             self.check_magic_method_casing(&enum_fqcn, &mut issues);
 
+            // Same generic-bound check as class `@implements`/`@extends` type
+            // args above (1c) — an enum's own `@implements Interface<Arg>`
+            // type args were parsed and used for binding substitution
+            // elsewhere but never bound-checked here, unlike the identical
+            // class case.
+            for (iface, args) in enum_def.implements_type_args.iter() {
+                self.check_generic_type_args(iface.as_ref(), args, location.as_ref(), &mut issues);
+            }
+
             // ---- Enum interface methods must be implemented --------------------
             self.check_enum_interface_methods_implemented(
                 &enum_fqcn,
