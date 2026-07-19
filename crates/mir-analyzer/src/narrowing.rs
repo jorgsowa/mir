@@ -912,7 +912,40 @@ pub fn narrow_from_condition(
             // `count($arr) == N` / `strlen($str) != N`, etc.
             narrow_count_or_strlen_equality(ctx, db, file, &b.left, &b.right, b.op, is_true);
 
-            if matches!(b.right.kind, ExprKind::Null) {
+            // `($x ?? FALLBACK) == FALLBACK` / `!= FALLBACK` — same reasoning as the
+            // strict `===`/`!==` arm: `same_literal` requires an identical literal
+            // AST, so when $x is null the coalesce result is exactly FALLBACK,
+            // making `FALLBACK == FALLBACK` trivially true regardless of loose vs
+            // strict — a `!=` result still proves $x wasn't null. Must be checked
+            // before the literal-comparison arms below for the same reason as the
+            // strict arm (a literal on the other side would otherwise consume it).
+            if let Some(nc) = extract_null_coalesce(&b.left) {
+                if let Some(var_name) = extract_var_name(&nc.left) {
+                    if !effective_true && same_literal(&nc.right, &b.right) {
+                        let current = ctx.get_var(&var_name);
+                        ctx.set_var(&var_name, current.remove_null());
+                    }
+                } else if let Some((obj, prop)) = extract_prop_access(&nc.left) {
+                    if !effective_true && same_literal(&nc.right, &b.right) {
+                        let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
+                        let narrowed = current.remove_null();
+                        apply_prop_narrowed(ctx, &obj, &prop, current, narrowed, false);
+                    }
+                }
+            } else if let Some(nc) = extract_null_coalesce(&b.right) {
+                if let Some(var_name) = extract_var_name(&nc.left) {
+                    if !effective_true && same_literal(&nc.right, &b.left) {
+                        let current = ctx.get_var(&var_name);
+                        ctx.set_var(&var_name, current.remove_null());
+                    }
+                } else if let Some((obj, prop)) = extract_prop_access(&nc.left) {
+                    if !effective_true && same_literal(&nc.right, &b.left) {
+                        let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
+                        let narrowed = current.remove_null();
+                        apply_prop_narrowed(ctx, &obj, &prop, current, narrowed, false);
+                    }
+                }
+            } else if matches!(b.right.kind, ExprKind::Null) {
                 if let Some(name) = extract_var_name(&b.left) {
                     narrow_var_loose_null(ctx, &name, effective_true);
                 } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
