@@ -860,10 +860,12 @@ fn generic_type_params_compatible(
     template_params: &[mir_codebase::definitions::TemplateParam],
     ea: &ExpressionAnalyzer<'_>,
 ) -> bool {
-    if arg_params.len() != param_params.len() {
-        return true;
-    }
-    if arg_params.is_empty() {
+    // Only an empty side means "no generic info to check" — genuinely
+    // mismatched arity (e.g. `TypedMap<string>` against an expected
+    // `TypedMap<string, int>`) still has type args in both sides worth
+    // comparing position-by-position; `zip` below just stops at the
+    // shorter side instead of silently skipping the check entirely.
+    if arg_params.is_empty() || param_params.is_empty() {
         return true;
     }
 
