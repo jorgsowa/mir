@@ -294,6 +294,30 @@ fn narrow_from_static_or_class_const_comparison(
                 }
             }
         }
+        // `get_debug_type(self::$prop) === Foo::class` — static-property
+        // counterpart of the block above.
+        else if let Some((fqcn_recv, prop)) =
+            extract_get_debug_type_static_prop_arg(&b.left, ctx, db, file)
+        {
+            if let ExprKind::ClassConstAccess(cca) = &b.right.kind {
+                if let Some(fqcn) = extract_class_const_fqcn(
+                    cca,
+                    ctx.self_fqcn.as_deref(),
+                    ctx.parent_fqcn.as_deref(),
+                    db,
+                    file,
+                ) {
+                    narrow_static_prop_to_specific_class(
+                        ctx,
+                        &fqcn_recv,
+                        &prop,
+                        &fqcn,
+                        effective_true,
+                        db,
+                    );
+                }
+            }
+        }
         // `get_parent_class($x) === Foo::class` — same idiom as
         // `get_class($x) === Foo::class` above, proving $x a strict
         // subclass instance of Foo (see narrow_from_get_parent_class_literal).
@@ -512,6 +536,29 @@ fn narrow_from_static_or_class_const_comparison(
                             narrow_receiver_non_null_on_prop_match(ctx, obj, effective_true);
                         }
                     }
+                }
+            }
+        }
+        // `Foo::class === get_debug_type(self::$prop)` — symmetric counterpart.
+        else if let Some((fqcn_recv, prop)) =
+            extract_get_debug_type_static_prop_arg(&b.right, ctx, db, file)
+        {
+            if let ExprKind::ClassConstAccess(cca) = &b.left.kind {
+                if let Some(fqcn) = extract_class_const_fqcn(
+                    cca,
+                    ctx.self_fqcn.as_deref(),
+                    ctx.parent_fqcn.as_deref(),
+                    db,
+                    file,
+                ) {
+                    narrow_static_prop_to_specific_class(
+                        ctx,
+                        &fqcn_recv,
+                        &prop,
+                        &fqcn,
+                        effective_true,
+                        db,
+                    );
                 }
             }
         }
@@ -797,6 +844,29 @@ pub fn narrow_from_condition(
                         db,
                         file,
                     );
+                } else if let Some((fqcn, prop)) =
+                    extract_gettype_static_prop_arg(&b.left, ctx, db, file)
+                {
+                    narrow_static_prop_from_gettype_literal(
+                        ctx,
+                        &fqcn,
+                        &prop,
+                        class_name_str,
+                        effective_true,
+                        db,
+                    );
+                } else if let Some((fqcn, prop)) =
+                    extract_get_debug_type_static_prop_arg(&b.left, ctx, db, file)
+                {
+                    narrow_static_prop_from_get_debug_type_literal(
+                        ctx,
+                        &fqcn,
+                        &prop,
+                        class_name_str,
+                        effective_true,
+                        db,
+                        file,
+                    );
                 } else if let Some(target) = extract_get_parent_class_arg(&b.left) {
                     let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
                     narrow_from_get_parent_class_literal(
@@ -888,6 +958,29 @@ pub fn narrow_from_condition(
                     narrow_from_get_debug_type_literal(
                         ctx,
                         &target,
+                        class_name_str,
+                        effective_true,
+                        db,
+                        file,
+                    );
+                } else if let Some((fqcn, prop)) =
+                    extract_gettype_static_prop_arg(&b.right, ctx, db, file)
+                {
+                    narrow_static_prop_from_gettype_literal(
+                        ctx,
+                        &fqcn,
+                        &prop,
+                        class_name_str,
+                        effective_true,
+                        db,
+                    );
+                } else if let Some((fqcn, prop)) =
+                    extract_get_debug_type_static_prop_arg(&b.right, ctx, db, file)
+                {
+                    narrow_static_prop_from_get_debug_type_literal(
+                        ctx,
+                        &fqcn,
+                        &prop,
                         class_name_str,
                         effective_true,
                         db,
@@ -1338,6 +1431,29 @@ pub fn narrow_from_condition(
                         db,
                         file,
                     );
+                } else if let Some((fqcn, prop)) =
+                    extract_gettype_static_prop_arg(&b.left, ctx, db, file)
+                {
+                    narrow_static_prop_from_gettype_literal(
+                        ctx,
+                        &fqcn,
+                        &prop,
+                        class_name_str,
+                        effective_true,
+                        db,
+                    );
+                } else if let Some((fqcn, prop)) =
+                    extract_get_debug_type_static_prop_arg(&b.left, ctx, db, file)
+                {
+                    narrow_static_prop_from_get_debug_type_literal(
+                        ctx,
+                        &fqcn,
+                        &prop,
+                        class_name_str,
+                        effective_true,
+                        db,
+                        file,
+                    );
                 } else if let Some(target) = extract_get_parent_class_arg(&b.left) {
                     let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
                     narrow_from_get_parent_class_literal(
@@ -1401,6 +1517,29 @@ pub fn narrow_from_condition(
                     narrow_from_get_debug_type_literal(
                         ctx,
                         &target,
+                        class_name_str,
+                        effective_true,
+                        db,
+                        file,
+                    );
+                } else if let Some((fqcn, prop)) =
+                    extract_gettype_static_prop_arg(&b.right, ctx, db, file)
+                {
+                    narrow_static_prop_from_gettype_literal(
+                        ctx,
+                        &fqcn,
+                        &prop,
+                        class_name_str,
+                        effective_true,
+                        db,
+                    );
+                } else if let Some((fqcn, prop)) =
+                    extract_get_debug_type_static_prop_arg(&b.right, ctx, db, file)
+                {
+                    narrow_static_prop_from_get_debug_type_literal(
+                        ctx,
+                        &fqcn,
+                        &prop,
                         class_name_str,
                         effective_true,
                         db,
@@ -6038,6 +6177,37 @@ fn narrow_prop_to_specific_class(
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, mark_diverges);
 }
 
+/// Static-property counterpart of `narrow_prop_to_specific_class`. There's no
+/// nullable-receiver variable for a static property, so unlike the instance
+/// version this always marks a divergence on an empty result.
+fn narrow_static_prop_to_specific_class(
+    ctx: &mut FlowState,
+    fqcn_receiver: &str,
+    prop: &str,
+    fqcn: &str,
+    is_exact_class: bool,
+    db: &dyn MirDatabase,
+) {
+    let current = resolve_static_prop_current_type(ctx, fqcn_receiver, prop, db);
+    let narrowed = if is_exact_class {
+        Type::single(Atomic::TNamedObject {
+            fqcn: fqcn.into(),
+            type_params: mir_types::union::empty_type_params(),
+        })
+    } else {
+        current.filter(|t| match t {
+            Atomic::TNamedObject { fqcn: obj_fqcn, .. }
+            | Atomic::TSelf { fqcn: obj_fqcn }
+            | Atomic::TStaticObject { fqcn: obj_fqcn }
+            | Atomic::TParent { fqcn: obj_fqcn } => {
+                obj_fqcn.as_ref() != fqcn || !crate::db::is_final(db, fqcn)
+            }
+            _ => true,
+        })
+    };
+    apply_prop_narrowed(ctx, fqcn_receiver, prop, current, narrowed, true);
+}
+
 /// Extract a fully-qualified class name from the first argument of
 /// `class_exists()` / `interface_exists()` / `trait_exists()`.
 ///
@@ -6944,6 +7114,55 @@ fn extract_get_debug_type_arg(expr: &php_ast::owned::Expr) -> Option<ScalarArgTa
     None
 }
 
+/// Static-property counterpart of `extract_gettype_arg` — `ScalarArgTarget`
+/// only extracts Var/Prop targets (see the ROADMAP's `ScalarArgTarget`
+/// static-property gap), so `gettype(self::$prop)` needs its own,
+/// call-site-local extraction via `extract_static_prop_access`, mirroring
+/// how `is_a()`/`is_subclass_of()` already special-case it as a third
+/// branch alongside `ScalarArgTarget` rather than widening the enum.
+fn extract_gettype_static_prop_arg(
+    expr: &php_ast::owned::Expr,
+    ctx: &FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<(std::sync::Arc<str>, String)> {
+    if let ExprKind::FunctionCall(call) = &expr.kind {
+        if let ExprKind::Identifier(name) = &call.name.kind {
+            if name
+                .trim_start_matches('\\')
+                .eq_ignore_ascii_case("gettype")
+            {
+                if let Some(arg) = call.args.first() {
+                    return extract_static_prop_access(&arg.value, ctx, db, file);
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Static-property counterpart of `extract_get_debug_type_arg`.
+fn extract_get_debug_type_static_prop_arg(
+    expr: &php_ast::owned::Expr,
+    ctx: &FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<(std::sync::Arc<str>, String)> {
+    if let ExprKind::FunctionCall(call) = &expr.kind {
+        if let ExprKind::Identifier(name) = &call.name.kind {
+            if name
+                .trim_start_matches('\\')
+                .eq_ignore_ascii_case("get_debug_type")
+            {
+                if let Some(arg) = call.args.first() {
+                    return extract_static_prop_access(&arg.value, ctx, db, file);
+                }
+            }
+        }
+    }
+    None
+}
+
 fn extract_get_parent_class_arg(expr: &php_ast::owned::Expr) -> Option<ScalarArgTarget> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
         if let ExprKind::Identifier(name) = &call.name.kind {
@@ -7099,6 +7318,59 @@ fn narrow_from_get_debug_type_literal(
                 narrow_receiver_non_null_on_prop_match(ctx, obj, is_true);
             }
         }
+    }
+}
+
+/// Static-property counterpart of `narrow_from_gettype_literal`, for
+/// `gettype(self::$prop) === 'literal'`.
+fn narrow_static_prop_from_gettype_literal(
+    ctx: &mut FlowState,
+    fqcn: &str,
+    prop: &str,
+    literal: &str,
+    is_true: bool,
+    db: &dyn MirDatabase,
+) {
+    let type_fn = match literal {
+        "boolean" => "is_bool",
+        "integer" => "is_int",
+        "double" => "is_float",
+        "string" => "is_string",
+        "array" => "is_array",
+        "object" => "is_object",
+        "NULL" => "is_null",
+        "resource" | "resource (closed)" => "is_resource",
+        _ => return,
+    };
+    narrow_static_prop_from_type_fn(ctx, type_fn, fqcn, prop, db, is_true);
+}
+
+/// Static-property counterpart of `narrow_from_get_debug_type_literal`, for
+/// `get_debug_type(self::$prop) === 'literal'`.
+fn narrow_static_prop_from_get_debug_type_literal(
+    ctx: &mut FlowState,
+    fqcn: &str,
+    prop: &str,
+    literal: &str,
+    is_true: bool,
+    db: &dyn MirDatabase,
+    file: &str,
+) {
+    let type_fn = match literal {
+        "null" => Some("is_null"),
+        "bool" => Some("is_bool"),
+        "int" => Some("is_int"),
+        "float" => Some("is_float"),
+        "string" => Some("is_string"),
+        "array" => Some("is_array"),
+        "resource" | "resource (closed)" => Some("is_resource"),
+        _ => None,
+    };
+    if let Some(type_fn) = type_fn {
+        narrow_static_prop_from_type_fn(ctx, type_fn, fqcn, prop, db, is_true);
+    } else {
+        let resolved = crate::db::resolve_name(db, file, literal);
+        narrow_static_prop_to_specific_class(ctx, fqcn, prop, &resolved, is_true, db);
     }
 }
 
