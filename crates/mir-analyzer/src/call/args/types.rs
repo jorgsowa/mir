@@ -16,20 +16,11 @@ fn is_interface(ea: &ExpressionAnalyzer<'_>, fqcn: &str) -> bool {
     crate::db::class_kind(ea.db, fqcn).is_some_and(|k| k.is_interface)
 }
 
-fn declared_template_params(
-    ea: &ExpressionAnalyzer<'_>,
-    fqcn: &str,
-) -> Vec<mir_codebase::definitions::TemplateParam> {
-    crate::db::declared_template_params(ea.db, fqcn)
-        .map(|tps| tps.to_vec())
-        .unwrap_or_default()
-}
-
-/// Like `declared_template_params`, but walks up to the nearest ancestor that
-/// declares `@template` when `fqcn` itself doesn't — a bare subclass
-/// (`class IntBox extends Box {}`) still inherits `Box`'s template slots
-/// (and their `@template-covariant`/`-contravariant` variance), so variance
-/// checking must see those, not an empty own-declarations-only list.
+/// Walks up to the nearest ancestor that declares `@template` when `fqcn`
+/// itself doesn't — a bare subclass (`class IntBox extends Box {}`) still
+/// inherits `Box`'s template slots (and their `@template-covariant`/
+/// `-contravariant` variance), so variance checking must see those, not an
+/// empty own-declarations-only list.
 fn class_template_params(
     ea: &ExpressionAnalyzer<'_>,
     fqcn: &str,
@@ -905,6 +896,31 @@ fn generic_type_params_compatible(
     true
 }
 
+/// Binds each of `tps` to the corresponding entry in `args` by position,
+/// falling back to the template's own declared `@template T = Default`,
+/// then its bound, then `mixed` for any param `args` doesn't supply (e.g. a
+/// bare, unparameterized `Generator` return with no `@return Generator<...>`
+/// annotation, or an intermediate class in an inheritance chain that
+/// bare-re-extends its parent without redeclaring its own `<T>` args). This
+/// is the same fallback `infer_template_bindings` uses, so a bare ancestor
+/// placeholder doesn't leak through unresolved and then read as a concrete
+/// mismatch against the expected type.
+fn template_bindings_with_fallback(tps: &[TemplateParam], args: &[Type]) -> FxHashMap<Name, Type> {
+    tps.iter()
+        .enumerate()
+        .map(|(i, tp)| {
+            let ty = args.get(i).cloned().unwrap_or_else(|| {
+                tp.default
+                    .as_deref()
+                    .or(tp.bound.as_deref())
+                    .cloned()
+                    .unwrap_or_else(Type::mixed)
+            });
+            (Name::from(tp.name.as_ref()), ty)
+        })
+        .collect()
+}
+
 fn generic_ancestor_type_args(
     child: &str,
     child_own_args: &[Type],
@@ -920,27 +936,7 @@ fn generic_ancestor_type_args(
     if own_tps.is_empty() {
         return Some(raw);
     }
-    // A `child` template param not supplied by `child_own_args` (e.g. a bare,
-    // unparameterized `Generator` return with no `@return Generator<...>`
-    // annotation) is effectively unbound — default it to its declared
-    // `@template T = Default`, then its bound, then `mixed`, the same
-    // fallback `infer_template_bindings` uses, so a bare ancestor placeholder
-    // doesn't leak through unresolved and then read as a concrete mismatch
-    // against the expected type.
-    let own_bindings: FxHashMap<Name, Type> = own_tps
-        .iter()
-        .enumerate()
-        .map(|(i, tp)| {
-            let ty = child_own_args.get(i).cloned().unwrap_or_else(|| {
-                tp.default
-                    .as_deref()
-                    .or(tp.bound.as_deref())
-                    .cloned()
-                    .unwrap_or_else(Type::mixed)
-            });
-            (Name::from(tp.name.as_ref()), ty)
-        })
-        .collect();
+    let own_bindings = template_bindings_with_fallback(&own_tps, child_own_args);
     Some(
         raw.into_iter()
             .map(|ty| ty.substitute_templates(&own_bindings))
@@ -983,7 +979,16 @@ fn generic_ancestor_type_args_inner(
         if found.is_empty() {
             return Some(found);
         }
-        let edge_template_params = declared_template_params(ea, edge);
+        // `edge`'s EFFECTIVE (ancestor-walked) template list, not just its own
+        // declarations — when `edge` bare-re-extends its own parent without
+        // redeclaring `@template` (e.g. `class NamedContainer extends
+        // Container {}` where only `Container` declares `@template T`),
+        // `edge_args` here (from the *subclass's* `@extends edge<...>`)
+        // binds the template `edge` inherited from ITS OWN ancestor, not a
+        // (nonexistent) template `edge` declares itself. Using the
+        // own-declarations-only query here would zip against the wrong
+        // (empty) list and leave the inherited template unbound.
+        let edge_template_params = class_template_params(ea, edge);
         let bindings: FxHashMap<Name, Type> = edge_template_params
             .iter()
             .zip(edge_args.iter())
