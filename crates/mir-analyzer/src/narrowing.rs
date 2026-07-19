@@ -577,6 +577,14 @@ pub fn narrow_from_condition(
                 } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
                     narrow_prop_bool(ctx, &obj, &prop, db, file, true, effective_true);
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
+                } else {
+                    // `is_string($x) === true` / `($x instanceof Y) === true` — the
+                    // left side is guaranteed to be a real bool (not just truthy),
+                    // so narrowing it as a bare condition is exactly as sound as
+                    // strict equality requires; re-entering the top-level match
+                    // dispatches to whatever arm (FunctionCall, Instanceof, Isset,
+                    // ...) already handles that expression shape directly.
+                    narrow_from_condition(&b.left, ctx, effective_true, db, file);
                 }
             } else if matches!(b.right.kind, ExprKind::Bool(false)) {
                 if let Some(name) = extract_var_name(&b.left) {
@@ -587,6 +595,8 @@ pub fn narrow_from_condition(
                 } else {
                     // `strpos($h, $n) !== false` / `array_search($n, $h) === false`
                     narrow_from_false_comparable_call(&b.left, ctx, db, file, effective_true);
+                    // `is_string($x) === false` — see the `=== true` comment above.
+                    narrow_from_condition(&b.left, ctx, !effective_true, db, file);
                 }
             }
             // `true === $x` / `false === $x` — symmetric; extract_var_name looks through
@@ -597,6 +607,8 @@ pub fn narrow_from_condition(
                 } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
                     narrow_prop_bool(ctx, &obj, &prop, db, file, true, effective_true);
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
+                } else {
+                    narrow_from_condition(&b.right, ctx, effective_true, db, file);
                 }
             } else if matches!(b.left.kind, ExprKind::Bool(false)) {
                 if let Some(name) = extract_var_name(&b.right) {
@@ -606,6 +618,7 @@ pub fn narrow_from_condition(
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                 } else {
                     narrow_from_false_comparable_call(&b.right, ctx, db, file, effective_true);
+                    narrow_from_condition(&b.right, ctx, !effective_true, db, file);
                 }
             }
             // `get_class($x) === 'ClassName'` — check before literal strings so it takes precedence
@@ -968,18 +981,28 @@ pub fn narrow_from_condition(
                     narrow_var_loose_bool(ctx, &name, *value == effective_true);
                 } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
                     narrow_prop_loose_bool(ctx, &obj, &prop, db, file, *value == effective_true);
-                } else if !value {
-                    // `strpos($h, $n) == false` / `!= false` — same
-                    // false-comparable narrowing as the strict `===`/`!==` arm.
-                    narrow_from_false_comparable_call(&b.left, ctx, db, file, effective_true);
+                } else {
+                    if !value {
+                        // `strpos($h, $n) == false` / `!= false` — same
+                        // false-comparable narrowing as the strict `===`/`!==` arm.
+                        narrow_from_false_comparable_call(&b.left, ctx, db, file, effective_true);
+                    }
+                    // `is_string($x) == true` / `== false` — loose comparison to a
+                    // bool literal is `(bool)$x === value` for ANY $x (not just a
+                    // guaranteed-bool expression), i.e. exactly the bare truthy/
+                    // falsy narrowing `narrow_from_condition` itself provides.
+                    narrow_from_condition(&b.left, ctx, *value == effective_true, db, file);
                 }
             } else if let ExprKind::Bool(value) = &b.left.kind {
                 if let Some(name) = extract_var_name(&b.right) {
                     narrow_var_loose_bool(ctx, &name, *value == effective_true);
                 } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
                     narrow_prop_loose_bool(ctx, &obj, &prop, db, file, *value == effective_true);
-                } else if !value {
-                    narrow_from_false_comparable_call(&b.right, ctx, db, file, effective_true);
+                } else {
+                    if !value {
+                        narrow_from_false_comparable_call(&b.right, ctx, db, file, effective_true);
+                    }
+                    narrow_from_condition(&b.right, ctx, *value == effective_true, db, file);
                 }
             }
             // `$arr == []` / `$arr != []` — loose array equality requires identical
