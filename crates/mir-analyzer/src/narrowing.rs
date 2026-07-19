@@ -491,11 +491,16 @@ pub fn narrow_from_condition(
                         let current = ctx.get_var(&var_name);
                         ctx.set_var(&var_name, current.remove_null());
                     }
-                } else if let Some((obj, prop)) = extract_prop_access(&nc.left) {
+                } else if let Some((obj, prop)) = extract_any_prop_access(&nc.left) {
                     if !effective_true && same_literal(&nc.right, &b.right) {
                         let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
                         let narrowed = current.remove_null();
                         apply_prop_narrowed(ctx, &obj, &prop, current, narrowed, false);
+                        // A non-FALLBACK result also proves the receiver itself wasn't
+                        // null (a null receiver's `?->`/`->` access coalesces straight
+                        // to FALLBACK) — without this, a later plain read of the same
+                        // property re-admits null via the receiver's own nullability.
+                        narrow_receiver_non_null_on_prop_match(ctx, &obj, !effective_true);
                     }
                 }
             } else if let Some(nc) = extract_null_coalesce(&b.right) {
@@ -504,11 +509,12 @@ pub fn narrow_from_condition(
                         let current = ctx.get_var(&var_name);
                         ctx.set_var(&var_name, current.remove_null());
                     }
-                } else if let Some((obj, prop)) = extract_prop_access(&nc.left) {
+                } else if let Some((obj, prop)) = extract_any_prop_access(&nc.left) {
                     if !effective_true && same_literal(&nc.right, &b.left) {
                         let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
                         let narrowed = current.remove_null();
                         apply_prop_narrowed(ctx, &obj, &prop, current, narrowed, false);
+                        narrow_receiver_non_null_on_prop_match(ctx, &obj, !effective_true);
                     }
                 }
             }
@@ -993,6 +999,7 @@ pub fn narrow_from_condition(
                         let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
                         let narrowed = current.remove_null();
                         apply_prop_narrowed(ctx, &obj, &prop, current, narrowed, false);
+                        narrow_receiver_non_null_on_prop_match(ctx, &obj, !effective_true);
                     }
                 }
             } else if let Some(nc) = extract_null_coalesce(&b.right) {
@@ -1006,6 +1013,7 @@ pub fn narrow_from_condition(
                         let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
                         let narrowed = current.remove_null();
                         apply_prop_narrowed(ctx, &obj, &prop, current, narrowed, false);
+                        narrow_receiver_non_null_on_prop_match(ctx, &obj, !effective_true);
                     }
                 }
             } else if matches!(b.right.kind, ExprKind::Null) {
