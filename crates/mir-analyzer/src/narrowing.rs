@@ -5028,7 +5028,12 @@ fn narrow_prop_to_literal_enum_case(
                 if fqcn.as_ref() == enum_fqcn && c.as_ref() == case_name)
         })
     };
-    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, true);
+    // The exclusion branch (`$obj->prop !== Status::Active`) is also satisfied
+    // whenever $obj itself is null (`null !== <enum case>` is true), so a
+    // nullable receiver means an empty narrowed-out result here isn't a real
+    // contradiction — same reasoning as `narrow_prop_to_specific_class`.
+    let mark_diverges = is_case || !ctx.get_var(obj_var).is_nullable();
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, mark_diverges);
 }
 
 /// `$cls === Foo::class` / `!== Foo::class` narrowing. Unlike `instanceof`/
@@ -5075,7 +5080,12 @@ fn narrow_prop_to_class_string(
             !matches!(t, Atomic::TClassString(Some(f)) if f.as_ref() == fqcn && crate::db::is_final(db, fqcn))
         })
     };
-    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, true);
+    // The exclusion branch (`$obj->prop !== Foo::class`) is also satisfied
+    // whenever $obj itself is null (`null !== 'Foo'` is true), so a nullable
+    // receiver means an empty narrowed-out result here isn't a real
+    // contradiction — same reasoning as `narrow_prop_to_specific_class`.
+    let mark_diverges = is_class || !ctx.get_var(obj_var).is_nullable();
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, mark_diverges);
 }
 
 /// `get_class($x)`/`get_debug_type($x)`/`$x::class` compared to a literal —
