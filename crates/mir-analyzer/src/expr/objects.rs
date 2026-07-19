@@ -1369,32 +1369,24 @@ impl<'a> ExpressionAnalyzer<'a> {
                         // an ancestor with its own separate template, resolve THAT
                         // ancestor's params through the same `@extends`/`@implements`
                         // chain walk used everywhere else for inherited bindings.
-                        let ty = if type_params.is_empty() {
-                            ty
-                        } else {
-                            // `None` (no `@template`-declaring ancestor found, e.g. an
-                            // enum with no parent to walk up to) is equivalent to an
-                            // empty list here, NOT an abort — `own_bindings` staying
-                            // empty still lets `inherited_template_bindings` below
-                            // resolve the class's own `@implements Iface<T>` literal
-                            // type args.
-                            let class_tps =
-                                crate::db::class_template_params(self.db, fqcn.as_ref())
-                                    .unwrap_or_default();
-                            let own_bindings: rustc_hash::FxHashMap<mir_types::Name, Type> =
-                                class_tps
-                                    .iter()
-                                    .zip(type_params.iter())
-                                    .map(|(tp, t)| (tp.name, t.clone()))
-                                    .collect();
-                            let mut substitution = own_bindings.clone();
-                            substitution.extend(crate::db::inherited_template_bindings(
-                                self.db,
-                                fqcn.as_ref(),
-                                &own_bindings,
-                            ));
-                            ty.substitute_templates(&substitution)
-                        };
+                        // Run this even when the receiver itself has no own type
+                        // params (a bare subclass) — `inherited_template_bindings`
+                        // still needs to resolve a `@extends Box<int>`-fixed
+                        // ancestor template with no receiver-supplied args at all.
+                        let class_tps = crate::db::class_template_params(self.db, fqcn.as_ref())
+                            .unwrap_or_default();
+                        let own_bindings: rustc_hash::FxHashMap<mir_types::Name, Type> = class_tps
+                            .iter()
+                            .zip(type_params.iter())
+                            .map(|(tp, t)| (tp.name, t.clone()))
+                            .collect();
+                        let mut substitution = own_bindings.clone();
+                        substitution.extend(crate::db::inherited_template_bindings(
+                            self.db,
+                            fqcn.as_ref(),
+                            &own_bindings,
+                        ));
+                        let ty = ty.substitute_templates(&substitution);
                         self.record_ref(Arc::from(format!("prop:{}::{}", owner, prop_name)), span);
                         *declaring_class = Some(owner);
                         return ty;
