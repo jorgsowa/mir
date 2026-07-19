@@ -15,6 +15,415 @@ use crate::flow_state::FlowState;
 // Public entry point
 // ---------------------------------------------------------------------------
 
+/// Shared by the strict `===`/`!==` arm and the loose `==`/`!=` arm: narrows
+/// `$x`/`$this->prop` against an enum-case (`EnumName::CaseName`) or a
+/// `get_class()`/`get_debug_type()`/`get_parent_class()`/`$obj::class`
+/// comparison against `Foo::class`. Sound for loose comparison too — enum
+/// cases are singleton objects (`==` and `===` agree on them), and these
+/// functions always return plain strings, so a string==string loose
+/// comparison can never diverge from strict here. NOT a general green light
+/// for loose class-string comparison: a bare `$x == 'literal'` where `$x`'s
+/// type admits bool/object atoms is a separate case intentionally left
+/// unhandled (loose/strict diverge there), so this function must only ever
+/// be called for the specific shapes it matches on below.
+fn narrow_from_static_or_class_const_comparison(
+    ctx: &mut FlowState,
+    b: &php_ast::owned::BinaryExpr,
+    effective_true: bool,
+    db: &dyn MirDatabase,
+    file: &str,
+) {
+    if let ExprKind::StaticPropertyAccess(_) = &b.right.kind {
+        if let Some(var_name) = extract_var_name(&b.left) {
+            if let Some((enum_fqcn, case_name)) = extract_enum_case(
+                &b.right,
+                ctx.self_fqcn.as_deref(),
+                ctx.parent_fqcn.as_deref(),
+                db,
+                file,
+            ) {
+                narrow_var_to_literal_enum_case(
+                    db,
+                    ctx,
+                    &var_name,
+                    &enum_fqcn,
+                    &case_name,
+                    effective_true,
+                );
+            }
+        }
+    } else if let ExprKind::StaticPropertyAccess(_) = &b.left.kind {
+        if let Some(var_name) = extract_var_name(&b.right) {
+            if let Some((enum_fqcn, case_name)) = extract_enum_case(
+                &b.left,
+                ctx.self_fqcn.as_deref(),
+                ctx.parent_fqcn.as_deref(),
+                db,
+                file,
+            ) {
+                narrow_var_to_literal_enum_case(
+                    db,
+                    ctx,
+                    &var_name,
+                    &enum_fqcn,
+                    &case_name,
+                    effective_true,
+                );
+            }
+        }
+    }
+    // `$x === EnumName::CaseName` (real enum-case access parses as
+    // ClassConstAccess, the same node `Foo::class` uses — try case
+    // narrowing first, falling back to the class-string case below).
+    else if let ExprKind::ClassConstAccess(_) = &b.right.kind {
+        if let Some(var_name) = extract_var_name(&b.left) {
+            if let Some((enum_fqcn, case_name)) = extract_enum_case(
+                &b.right,
+                ctx.self_fqcn.as_deref(),
+                ctx.parent_fqcn.as_deref(),
+                db,
+                file,
+            ) {
+                narrow_var_to_literal_enum_case(
+                    db,
+                    ctx,
+                    &var_name,
+                    &enum_fqcn,
+                    &case_name,
+                    effective_true,
+                );
+            } else if let ExprKind::ClassConstAccess(cca) = &b.right.kind {
+                if let Some(fqcn) = extract_class_const_fqcn(
+                    cca,
+                    ctx.self_fqcn.as_deref(),
+                    ctx.parent_fqcn.as_deref(),
+                    db,
+                    file,
+                ) {
+                    narrow_var_to_class_string(ctx, &var_name, &fqcn, effective_true, db);
+                }
+            }
+        }
+        // `$this->prop === EnumName::CaseName` / `$obj->prop === ...`
+        // — property-access counterpart of the plain-variable case
+        // above, only reached once extract_var_name on the left fails.
+        else if let Some((obj_var, prop)) = extract_prop_access(&b.left) {
+            if let Some((enum_fqcn, case_name)) = extract_enum_case(
+                &b.right,
+                ctx.self_fqcn.as_deref(),
+                ctx.parent_fqcn.as_deref(),
+                db,
+                file,
+            ) {
+                narrow_prop_to_literal_enum_case(
+                    db,
+                    ctx,
+                    &obj_var,
+                    &prop,
+                    file,
+                    (&enum_fqcn, &case_name),
+                    effective_true,
+                );
+                narrow_receiver_non_null_on_prop_match(ctx, &obj_var, effective_true);
+            } else if let ExprKind::ClassConstAccess(cca) = &b.right.kind {
+                // `$this->prop === Foo::class` — plain class-string
+                // comparison, not an enum case; property counterpart of
+                // the plain-variable `narrow_var_to_class_string` case.
+                if let Some(fqcn) = extract_class_const_fqcn(
+                    cca,
+                    ctx.self_fqcn.as_deref(),
+                    ctx.parent_fqcn.as_deref(),
+                    db,
+                    file,
+                ) {
+                    narrow_prop_to_class_string(
+                        ctx,
+                        &obj_var,
+                        &prop,
+                        &fqcn,
+                        effective_true,
+                        db,
+                        file,
+                    );
+                    narrow_receiver_non_null_on_prop_match(ctx, &obj_var, effective_true);
+                }
+            }
+        }
+        // `get_class($x) === Foo::class` — the far more idiomatic
+        // counterpart of the `get_class($x) === 'Foo'` string-literal
+        // case above; only reached once extract_var_name on the left
+        // fails (i.e. the left side is the get_class(...) call itself).
+        else if let Some(target) = extract_get_class_arg(&b.left) {
+            if let ExprKind::ClassConstAccess(cca) = &b.right.kind {
+                if let Some(fqcn) = extract_class_const_fqcn(
+                    cca,
+                    ctx.self_fqcn.as_deref(),
+                    ctx.parent_fqcn.as_deref(),
+                    db,
+                    file,
+                ) {
+                    match target {
+                        ScalarArgTarget::Var(name) => {
+                            narrow_var_to_specific_class(ctx, &name, &fqcn, effective_true, db)
+                        }
+                        ScalarArgTarget::Prop(obj, prop) => {
+                            narrow_prop_to_specific_class(
+                                ctx,
+                                &obj,
+                                &prop,
+                                &fqcn,
+                                effective_true,
+                                db,
+                                file,
+                            );
+                            narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
+                        }
+                    }
+                }
+            }
+        }
+        // `get_debug_type($x) === Foo::class` — same idiom as
+        // `get_class($x) === Foo::class` above, PHP 8's replacement for get_class().
+        else if let Some(target) = extract_get_debug_type_arg(&b.left) {
+            if let ExprKind::ClassConstAccess(cca) = &b.right.kind {
+                if let Some(fqcn) = extract_class_const_fqcn(
+                    cca,
+                    ctx.self_fqcn.as_deref(),
+                    ctx.parent_fqcn.as_deref(),
+                    db,
+                    file,
+                ) {
+                    match &target {
+                        ScalarArgTarget::Var(obj_var_name) => narrow_var_to_specific_class(
+                            ctx,
+                            obj_var_name,
+                            &fqcn,
+                            effective_true,
+                            db,
+                        ),
+                        ScalarArgTarget::Prop(obj, prop) => narrow_prop_to_specific_class(
+                            ctx,
+                            obj,
+                            prop,
+                            &fqcn,
+                            effective_true,
+                            db,
+                            file,
+                        ),
+                    }
+                }
+            }
+        }
+        // `get_parent_class($x) === Foo::class` — same idiom as
+        // `get_class($x) === Foo::class` above, proving $x a strict
+        // subclass instance of Foo (see narrow_from_get_parent_class_literal).
+        else if let Some(target) = extract_get_parent_class_arg(&b.left) {
+            if let ExprKind::ClassConstAccess(cca) = &b.right.kind {
+                if let Some(fqcn) = extract_class_const_fqcn(
+                    cca,
+                    ctx.self_fqcn.as_deref(),
+                    ctx.parent_fqcn.as_deref(),
+                    db,
+                    file,
+                ) {
+                    narrow_from_get_parent_class_literal(
+                        ctx,
+                        &target,
+                        &fqcn,
+                        effective_true,
+                        db,
+                        file,
+                    );
+                }
+            }
+        }
+        // `$obj::class === Foo::class` — dynamic get_class()-equivalent.
+        else if let Some(obj_var_name) = extract_dynamic_class_const_var(&b.left) {
+            if let ExprKind::ClassConstAccess(cca) = &b.right.kind {
+                if let Some(fqcn) = extract_class_const_fqcn(
+                    cca,
+                    ctx.self_fqcn.as_deref(),
+                    ctx.parent_fqcn.as_deref(),
+                    db,
+                    file,
+                ) {
+                    narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true, db);
+                }
+            }
+        }
+        // `Foo::class === $obj::class` — reached here (rather than the
+        // `b.left is ClassConstAccess` arm below) because `$obj::class`
+        // also parses as ClassConstAccess, matching this arm's guard first.
+        else if let Some(obj_var_name) = extract_dynamic_class_const_var(&b.right) {
+            if let ExprKind::ClassConstAccess(cca) = &b.left.kind {
+                if let Some(fqcn) = extract_class_const_fqcn(
+                    cca,
+                    ctx.self_fqcn.as_deref(),
+                    ctx.parent_fqcn.as_deref(),
+                    db,
+                    file,
+                ) {
+                    narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true, db);
+                }
+            }
+        }
+    } else if let ExprKind::ClassConstAccess(_) = &b.left.kind {
+        if let Some(var_name) = extract_var_name(&b.right) {
+            if let Some((enum_fqcn, case_name)) = extract_enum_case(
+                &b.left,
+                ctx.self_fqcn.as_deref(),
+                ctx.parent_fqcn.as_deref(),
+                db,
+                file,
+            ) {
+                narrow_var_to_literal_enum_case(
+                    db,
+                    ctx,
+                    &var_name,
+                    &enum_fqcn,
+                    &case_name,
+                    effective_true,
+                );
+            } else if let ExprKind::ClassConstAccess(cca) = &b.left.kind {
+                if let Some(fqcn) = extract_class_const_fqcn(
+                    cca,
+                    ctx.self_fqcn.as_deref(),
+                    ctx.parent_fqcn.as_deref(),
+                    db,
+                    file,
+                ) {
+                    narrow_var_to_class_string(ctx, &var_name, &fqcn, effective_true, db);
+                }
+            }
+        }
+        // `EnumName::CaseName === $this->prop` — property-access
+        // counterpart, symmetric with the left-side case above.
+        else if let Some((obj_var, prop)) = extract_prop_access(&b.right) {
+            if let Some((enum_fqcn, case_name)) = extract_enum_case(
+                &b.left,
+                ctx.self_fqcn.as_deref(),
+                ctx.parent_fqcn.as_deref(),
+                db,
+                file,
+            ) {
+                narrow_prop_to_literal_enum_case(
+                    db,
+                    ctx,
+                    &obj_var,
+                    &prop,
+                    file,
+                    (&enum_fqcn, &case_name),
+                    effective_true,
+                );
+                narrow_receiver_non_null_on_prop_match(ctx, &obj_var, effective_true);
+            } else if let ExprKind::ClassConstAccess(cca) = &b.left.kind {
+                // `Foo::class === $this->prop` — symmetric counterpart
+                // of the plain class-string case above.
+                if let Some(fqcn) = extract_class_const_fqcn(
+                    cca,
+                    ctx.self_fqcn.as_deref(),
+                    ctx.parent_fqcn.as_deref(),
+                    db,
+                    file,
+                ) {
+                    narrow_prop_to_class_string(
+                        ctx,
+                        &obj_var,
+                        &prop,
+                        &fqcn,
+                        effective_true,
+                        db,
+                        file,
+                    );
+                    narrow_receiver_non_null_on_prop_match(ctx, &obj_var, effective_true);
+                }
+            }
+        }
+        // `Foo::class === get_class($x)` — symmetric counterpart.
+        else if let Some(target) = extract_get_class_arg(&b.right) {
+            if let ExprKind::ClassConstAccess(cca) = &b.left.kind {
+                if let Some(fqcn) = extract_class_const_fqcn(
+                    cca,
+                    ctx.self_fqcn.as_deref(),
+                    ctx.parent_fqcn.as_deref(),
+                    db,
+                    file,
+                ) {
+                    match target {
+                        ScalarArgTarget::Var(name) => {
+                            narrow_var_to_specific_class(ctx, &name, &fqcn, effective_true, db)
+                        }
+                        ScalarArgTarget::Prop(obj, prop) => {
+                            narrow_prop_to_specific_class(
+                                ctx,
+                                &obj,
+                                &prop,
+                                &fqcn,
+                                effective_true,
+                                db,
+                                file,
+                            );
+                            narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
+                        }
+                    }
+                }
+            }
+        }
+        // `Foo::class === get_debug_type($x)` — symmetric counterpart.
+        else if let Some(target) = extract_get_debug_type_arg(&b.right) {
+            if let ExprKind::ClassConstAccess(cca) = &b.left.kind {
+                if let Some(fqcn) = extract_class_const_fqcn(
+                    cca,
+                    ctx.self_fqcn.as_deref(),
+                    ctx.parent_fqcn.as_deref(),
+                    db,
+                    file,
+                ) {
+                    match &target {
+                        ScalarArgTarget::Var(obj_var_name) => narrow_var_to_specific_class(
+                            ctx,
+                            obj_var_name,
+                            &fqcn,
+                            effective_true,
+                            db,
+                        ),
+                        ScalarArgTarget::Prop(obj, prop) => narrow_prop_to_specific_class(
+                            ctx,
+                            obj,
+                            prop,
+                            &fqcn,
+                            effective_true,
+                            db,
+                            file,
+                        ),
+                    }
+                }
+            }
+        }
+        // `Foo::class === get_parent_class($x)` — symmetric counterpart.
+        else if let Some(target) = extract_get_parent_class_arg(&b.right) {
+            if let ExprKind::ClassConstAccess(cca) = &b.left.kind {
+                if let Some(fqcn) = extract_class_const_fqcn(
+                    cca,
+                    ctx.self_fqcn.as_deref(),
+                    ctx.parent_fqcn.as_deref(),
+                    db,
+                    file,
+                ) {
+                    narrow_from_get_parent_class_literal(
+                        ctx,
+                        &target,
+                        &fqcn,
+                        effective_true,
+                        db,
+                        file,
+                    );
+                }
+            }
+        }
+    }
+}
+
 /// Narrow the types in `ctx` as if `expr` evaluates to `is_true`.
 pub fn narrow_from_condition(
     expr: &php_ast::owned::Expr,
@@ -353,423 +762,17 @@ pub fn narrow_from_condition(
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                 }
             }
-            // `$x === EnumName::CaseName`
-            else if let ExprKind::StaticPropertyAccess(_) = &b.right.kind {
-                if let Some(var_name) = extract_var_name(&b.left) {
-                    if let Some((enum_fqcn, case_name)) = extract_enum_case(
-                        &b.right,
-                        ctx.self_fqcn.as_deref(),
-                        ctx.parent_fqcn.as_deref(),
-                        db,
-                        file,
-                    ) {
-                        narrow_var_to_literal_enum_case(
-                            db,
-                            ctx,
-                            &var_name,
-                            &enum_fqcn,
-                            &case_name,
-                            effective_true,
-                        );
-                    }
-                }
-            } else if let ExprKind::StaticPropertyAccess(_) = &b.left.kind {
-                if let Some(var_name) = extract_var_name(&b.right) {
-                    if let Some((enum_fqcn, case_name)) = extract_enum_case(
-                        &b.left,
-                        ctx.self_fqcn.as_deref(),
-                        ctx.parent_fqcn.as_deref(),
-                        db,
-                        file,
-                    ) {
-                        narrow_var_to_literal_enum_case(
-                            db,
-                            ctx,
-                            &var_name,
-                            &enum_fqcn,
-                            &case_name,
-                            effective_true,
-                        );
-                    }
-                }
-            }
-            // `$x === EnumName::CaseName` (real enum-case access parses as
-            // ClassConstAccess, the same node `Foo::class` uses — try case
-            // narrowing first, falling back to the class-string case below).
-            else if let ExprKind::ClassConstAccess(_) = &b.right.kind {
-                if let Some(var_name) = extract_var_name(&b.left) {
-                    if let Some((enum_fqcn, case_name)) = extract_enum_case(
-                        &b.right,
-                        ctx.self_fqcn.as_deref(),
-                        ctx.parent_fqcn.as_deref(),
-                        db,
-                        file,
-                    ) {
-                        narrow_var_to_literal_enum_case(
-                            db,
-                            ctx,
-                            &var_name,
-                            &enum_fqcn,
-                            &case_name,
-                            effective_true,
-                        );
-                    } else if let ExprKind::ClassConstAccess(cca) = &b.right.kind {
-                        if let Some(fqcn) = extract_class_const_fqcn(
-                            cca,
-                            ctx.self_fqcn.as_deref(),
-                            ctx.parent_fqcn.as_deref(),
-                            db,
-                            file,
-                        ) {
-                            narrow_var_to_class_string(ctx, &var_name, &fqcn, effective_true, db);
-                        }
-                    }
-                }
-                // `$this->prop === EnumName::CaseName` / `$obj->prop === ...`
-                // — property-access counterpart of the plain-variable case
-                // above, only reached once extract_var_name on the left fails.
-                else if let Some((obj_var, prop)) = extract_prop_access(&b.left) {
-                    if let Some((enum_fqcn, case_name)) = extract_enum_case(
-                        &b.right,
-                        ctx.self_fqcn.as_deref(),
-                        ctx.parent_fqcn.as_deref(),
-                        db,
-                        file,
-                    ) {
-                        narrow_prop_to_literal_enum_case(
-                            db,
-                            ctx,
-                            &obj_var,
-                            &prop,
-                            file,
-                            (&enum_fqcn, &case_name),
-                            effective_true,
-                        );
-                        narrow_receiver_non_null_on_prop_match(ctx, &obj_var, effective_true);
-                    } else if let ExprKind::ClassConstAccess(cca) = &b.right.kind {
-                        // `$this->prop === Foo::class` — plain class-string
-                        // comparison, not an enum case; property counterpart of
-                        // the plain-variable `narrow_var_to_class_string` case.
-                        if let Some(fqcn) = extract_class_const_fqcn(
-                            cca,
-                            ctx.self_fqcn.as_deref(),
-                            ctx.parent_fqcn.as_deref(),
-                            db,
-                            file,
-                        ) {
-                            narrow_prop_to_class_string(
-                                ctx,
-                                &obj_var,
-                                &prop,
-                                &fqcn,
-                                effective_true,
-                                db,
-                                file,
-                            );
-                            narrow_receiver_non_null_on_prop_match(ctx, &obj_var, effective_true);
-                        }
-                    }
-                }
-                // `get_class($x) === Foo::class` — the far more idiomatic
-                // counterpart of the `get_class($x) === 'Foo'` string-literal
-                // case above; only reached once extract_var_name on the left
-                // fails (i.e. the left side is the get_class(...) call itself).
-                else if let Some(target) = extract_get_class_arg(&b.left) {
-                    if let ExprKind::ClassConstAccess(cca) = &b.right.kind {
-                        if let Some(fqcn) = extract_class_const_fqcn(
-                            cca,
-                            ctx.self_fqcn.as_deref(),
-                            ctx.parent_fqcn.as_deref(),
-                            db,
-                            file,
-                        ) {
-                            match target {
-                                ScalarArgTarget::Var(name) => narrow_var_to_specific_class(
-                                    ctx,
-                                    &name,
-                                    &fqcn,
-                                    effective_true,
-                                    db,
-                                ),
-                                ScalarArgTarget::Prop(obj, prop) => {
-                                    narrow_prop_to_specific_class(
-                                        ctx,
-                                        &obj,
-                                        &prop,
-                                        &fqcn,
-                                        effective_true,
-                                        db,
-                                        file,
-                                    );
-                                    narrow_receiver_non_null_on_prop_match(
-                                        ctx,
-                                        &obj,
-                                        effective_true,
-                                    );
-                                }
-                            }
-                        }
-                    }
-                }
-                // `get_debug_type($x) === Foo::class` — same idiom as
-                // `get_class($x) === Foo::class` above, PHP 8's replacement for get_class().
-                else if let Some(target) = extract_get_debug_type_arg(&b.left) {
-                    if let ExprKind::ClassConstAccess(cca) = &b.right.kind {
-                        if let Some(fqcn) = extract_class_const_fqcn(
-                            cca,
-                            ctx.self_fqcn.as_deref(),
-                            ctx.parent_fqcn.as_deref(),
-                            db,
-                            file,
-                        ) {
-                            match &target {
-                                ScalarArgTarget::Var(obj_var_name) => narrow_var_to_specific_class(
-                                    ctx,
-                                    obj_var_name,
-                                    &fqcn,
-                                    effective_true,
-                                    db,
-                                ),
-                                ScalarArgTarget::Prop(obj, prop) => narrow_prop_to_specific_class(
-                                    ctx,
-                                    obj,
-                                    prop,
-                                    &fqcn,
-                                    effective_true,
-                                    db,
-                                    file,
-                                ),
-                            }
-                        }
-                    }
-                }
-                // `get_parent_class($x) === Foo::class` — same idiom as
-                // `get_class($x) === Foo::class` above, proving $x a strict
-                // subclass instance of Foo (see narrow_from_get_parent_class_literal).
-                else if let Some(target) = extract_get_parent_class_arg(&b.left) {
-                    if let ExprKind::ClassConstAccess(cca) = &b.right.kind {
-                        if let Some(fqcn) = extract_class_const_fqcn(
-                            cca,
-                            ctx.self_fqcn.as_deref(),
-                            ctx.parent_fqcn.as_deref(),
-                            db,
-                            file,
-                        ) {
-                            narrow_from_get_parent_class_literal(
-                                ctx,
-                                &target,
-                                &fqcn,
-                                effective_true,
-                                db,
-                                file,
-                            );
-                        }
-                    }
-                }
-                // `$obj::class === Foo::class` — dynamic get_class()-equivalent.
-                else if let Some(obj_var_name) = extract_dynamic_class_const_var(&b.left) {
-                    if let ExprKind::ClassConstAccess(cca) = &b.right.kind {
-                        if let Some(fqcn) = extract_class_const_fqcn(
-                            cca,
-                            ctx.self_fqcn.as_deref(),
-                            ctx.parent_fqcn.as_deref(),
-                            db,
-                            file,
-                        ) {
-                            narrow_var_to_specific_class(
-                                ctx,
-                                &obj_var_name,
-                                &fqcn,
-                                effective_true,
-                                db,
-                            );
-                        }
-                    }
-                }
-                // `Foo::class === $obj::class` — reached here (rather than the
-                // `b.left is ClassConstAccess` arm below) because `$obj::class`
-                // also parses as ClassConstAccess, matching this arm's guard first.
-                else if let Some(obj_var_name) = extract_dynamic_class_const_var(&b.right) {
-                    if let ExprKind::ClassConstAccess(cca) = &b.left.kind {
-                        if let Some(fqcn) = extract_class_const_fqcn(
-                            cca,
-                            ctx.self_fqcn.as_deref(),
-                            ctx.parent_fqcn.as_deref(),
-                            db,
-                            file,
-                        ) {
-                            narrow_var_to_specific_class(
-                                ctx,
-                                &obj_var_name,
-                                &fqcn,
-                                effective_true,
-                                db,
-                            );
-                        }
-                    }
-                }
-            } else if let ExprKind::ClassConstAccess(_) = &b.left.kind {
-                if let Some(var_name) = extract_var_name(&b.right) {
-                    if let Some((enum_fqcn, case_name)) = extract_enum_case(
-                        &b.left,
-                        ctx.self_fqcn.as_deref(),
-                        ctx.parent_fqcn.as_deref(),
-                        db,
-                        file,
-                    ) {
-                        narrow_var_to_literal_enum_case(
-                            db,
-                            ctx,
-                            &var_name,
-                            &enum_fqcn,
-                            &case_name,
-                            effective_true,
-                        );
-                    } else if let ExprKind::ClassConstAccess(cca) = &b.left.kind {
-                        if let Some(fqcn) = extract_class_const_fqcn(
-                            cca,
-                            ctx.self_fqcn.as_deref(),
-                            ctx.parent_fqcn.as_deref(),
-                            db,
-                            file,
-                        ) {
-                            narrow_var_to_class_string(ctx, &var_name, &fqcn, effective_true, db);
-                        }
-                    }
-                }
-                // `EnumName::CaseName === $this->prop` — property-access
-                // counterpart, symmetric with the left-side case above.
-                else if let Some((obj_var, prop)) = extract_prop_access(&b.right) {
-                    if let Some((enum_fqcn, case_name)) = extract_enum_case(
-                        &b.left,
-                        ctx.self_fqcn.as_deref(),
-                        ctx.parent_fqcn.as_deref(),
-                        db,
-                        file,
-                    ) {
-                        narrow_prop_to_literal_enum_case(
-                            db,
-                            ctx,
-                            &obj_var,
-                            &prop,
-                            file,
-                            (&enum_fqcn, &case_name),
-                            effective_true,
-                        );
-                        narrow_receiver_non_null_on_prop_match(ctx, &obj_var, effective_true);
-                    } else if let ExprKind::ClassConstAccess(cca) = &b.left.kind {
-                        // `Foo::class === $this->prop` — symmetric counterpart
-                        // of the plain class-string case above.
-                        if let Some(fqcn) = extract_class_const_fqcn(
-                            cca,
-                            ctx.self_fqcn.as_deref(),
-                            ctx.parent_fqcn.as_deref(),
-                            db,
-                            file,
-                        ) {
-                            narrow_prop_to_class_string(
-                                ctx,
-                                &obj_var,
-                                &prop,
-                                &fqcn,
-                                effective_true,
-                                db,
-                                file,
-                            );
-                            narrow_receiver_non_null_on_prop_match(ctx, &obj_var, effective_true);
-                        }
-                    }
-                }
-                // `Foo::class === get_class($x)` — symmetric counterpart.
-                else if let Some(target) = extract_get_class_arg(&b.right) {
-                    if let ExprKind::ClassConstAccess(cca) = &b.left.kind {
-                        if let Some(fqcn) = extract_class_const_fqcn(
-                            cca,
-                            ctx.self_fqcn.as_deref(),
-                            ctx.parent_fqcn.as_deref(),
-                            db,
-                            file,
-                        ) {
-                            match target {
-                                ScalarArgTarget::Var(name) => narrow_var_to_specific_class(
-                                    ctx,
-                                    &name,
-                                    &fqcn,
-                                    effective_true,
-                                    db,
-                                ),
-                                ScalarArgTarget::Prop(obj, prop) => {
-                                    narrow_prop_to_specific_class(
-                                        ctx,
-                                        &obj,
-                                        &prop,
-                                        &fqcn,
-                                        effective_true,
-                                        db,
-                                        file,
-                                    );
-                                    narrow_receiver_non_null_on_prop_match(
-                                        ctx,
-                                        &obj,
-                                        effective_true,
-                                    );
-                                }
-                            }
-                        }
-                    }
-                }
-                // `Foo::class === get_debug_type($x)` — symmetric counterpart.
-                else if let Some(target) = extract_get_debug_type_arg(&b.right) {
-                    if let ExprKind::ClassConstAccess(cca) = &b.left.kind {
-                        if let Some(fqcn) = extract_class_const_fqcn(
-                            cca,
-                            ctx.self_fqcn.as_deref(),
-                            ctx.parent_fqcn.as_deref(),
-                            db,
-                            file,
-                        ) {
-                            match &target {
-                                ScalarArgTarget::Var(obj_var_name) => narrow_var_to_specific_class(
-                                    ctx,
-                                    obj_var_name,
-                                    &fqcn,
-                                    effective_true,
-                                    db,
-                                ),
-                                ScalarArgTarget::Prop(obj, prop) => narrow_prop_to_specific_class(
-                                    ctx,
-                                    obj,
-                                    prop,
-                                    &fqcn,
-                                    effective_true,
-                                    db,
-                                    file,
-                                ),
-                            }
-                        }
-                    }
-                }
-                // `Foo::class === get_parent_class($x)` — symmetric counterpart.
-                else if let Some(target) = extract_get_parent_class_arg(&b.right) {
-                    if let ExprKind::ClassConstAccess(cca) = &b.left.kind {
-                        if let Some(fqcn) = extract_class_const_fqcn(
-                            cca,
-                            ctx.self_fqcn.as_deref(),
-                            ctx.parent_fqcn.as_deref(),
-                            db,
-                            file,
-                        ) {
-                            narrow_from_get_parent_class_literal(
-                                ctx,
-                                &target,
-                                &fqcn,
-                                effective_true,
-                                db,
-                                file,
-                            );
-                        }
-                    }
-                }
+            // `$x === EnumName::CaseName` / get_class()/get_debug_type()/
+            // get_parent_class()/$obj::class compared against `Foo::class` —
+            // factored into narrow_from_static_or_class_const_comparison so
+            // the loose `==`/`!=` arm can reuse it (see that function's doc
+            // comment for why loose comparison is sound here specifically).
+            else if matches!(b.right.kind, ExprKind::StaticPropertyAccess(_))
+                || matches!(b.left.kind, ExprKind::StaticPropertyAccess(_))
+                || matches!(b.right.kind, ExprKind::ClassConstAccess(_))
+                || matches!(b.left.kind, ExprKind::ClassConstAccess(_))
+            {
+                narrow_from_static_or_class_const_comparison(ctx, b, effective_true, db, file);
             }
             // `$arr === []` narrows $arr to empty; `$arr !== []` narrows to non-empty.
             else if let ExprKind::Array(elems) = &b.right.kind {
@@ -1088,6 +1091,18 @@ pub fn narrow_from_condition(
                     let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
                     narrow_var_to_specific_class(ctx, &obj_var_name, &fqcn, effective_true, db);
                 }
+            }
+            // `$x == EnumName::CaseName` / `get_class($x) == Foo::class` etc. —
+            // the `Foo::class`/enum-case counterpart of the string-literal arms
+            // above, reusing the same logic the strict `===` arm uses (sound for
+            // loose comparison — see narrow_from_static_or_class_const_comparison's
+            // doc comment for why).
+            else if matches!(b.right.kind, ExprKind::StaticPropertyAccess(_))
+                || matches!(b.left.kind, ExprKind::StaticPropertyAccess(_))
+                || matches!(b.right.kind, ExprKind::ClassConstAccess(_))
+                || matches!(b.left.kind, ExprKind::ClassConstAccess(_))
+            {
+                narrow_from_static_or_class_const_comparison(ctx, b, effective_true, db, file);
             }
         }
 
