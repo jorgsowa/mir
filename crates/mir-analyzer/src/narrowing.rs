@@ -1591,6 +1591,12 @@ pub fn narrow_from_condition(
                                     extract_prop_access(&arr_arg.value)
                                 {
                                     narrow_prop_array_key_exists(ctx, &obj, &prop, &key, db, file);
+                                } else if let Some((fqcn, prop)) =
+                                    extract_static_prop_access(&arr_arg.value, ctx, db, file)
+                                {
+                                    narrow_static_prop_array_key_exists(
+                                        ctx, &fqcn, &prop, &key, db,
+                                    );
                                 } else if let Some((base, path)) =
                                     collect_array_access_path(&arr_arg.value)
                                 {
@@ -1651,6 +1657,18 @@ pub fn narrow_from_condition(
                                             remove_key_from_sealed_shapes(&current, &key);
                                         apply_prop_narrowed(
                                             ctx, &obj, &prop, current, narrowed, true,
+                                        );
+                                    }
+                                } else if let Some((fqcn, prop)) =
+                                    extract_static_prop_access(&arr_arg.value, ctx, db, file)
+                                {
+                                    let current =
+                                        resolve_static_prop_current_type(ctx, &fqcn, &prop, db);
+                                    if !current.is_mixed() {
+                                        let narrowed =
+                                            remove_key_from_sealed_shapes(&current, &key);
+                                        apply_prop_narrowed(
+                                            ctx, &fqcn, &prop, current, narrowed, true,
                                         );
                                     }
                                 } else if let Some((base, path)) =
@@ -4351,6 +4369,27 @@ fn narrow_prop_is_subclass_of(
     let narrowed = narrow_strict_subclass_of(&current, class_name, db, &ctx.template_param_names);
     if !narrowed.is_empty() && narrowed != current {
         ctx.set_prop_refined(obj_var, prop, narrowed);
+    }
+}
+
+/// Static-property counterpart of `narrow_prop_array_key_exists`, for
+/// `array_key_exists('k', self::$prop)` (and `static::$prop`/`Class::$prop`).
+/// Mirrors the var/prop siblings' true-branch convention: just apply the
+/// narrowed shape, no divergence marking.
+fn narrow_static_prop_array_key_exists(
+    ctx: &mut FlowState,
+    fqcn: &str,
+    prop: &str,
+    key: &mir_types::atomic::ArrayKey,
+    db: &dyn MirDatabase,
+) {
+    let current = resolve_static_prop_current_type(ctx, fqcn, prop, db);
+    if current.is_mixed() {
+        return;
+    }
+    let narrowed = add_key_to_sealed_shapes(&current, key);
+    if narrowed != current {
+        ctx.set_prop_refined(fqcn, prop, narrowed);
     }
 }
 
