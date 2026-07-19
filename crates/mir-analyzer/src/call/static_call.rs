@@ -528,8 +528,7 @@ impl CallAnalyzer {
             // type args (e.g. `int` from a `Box<int>` receiver) the same way
             // method.rs's instance-call path does, so a class-level `@template`
             // bound on the receiver resolves instead of leaking through raw.
-            let class_tps =
-                crate::db::effective_class_template_params(ea.db, &fqcn).unwrap_or_default();
+            let class_tps = crate::db::class_template_params(ea.db, &fqcn).unwrap_or_default();
             let mut class_bindings = build_class_bindings(&class_tps, &receiver_type_params);
             for (k, v) in crate::db::inherited_template_bindings(ea.db, &fqcn, &class_bindings) {
                 class_bindings.entry(k).or_insert(v);

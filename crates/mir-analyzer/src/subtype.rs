@@ -15,8 +15,7 @@ use rustc_hash::FxHashMap;
 use mir_types::{Atomic, Name, Type, Variance};
 
 use crate::db::{
-    effective_class_template_params, extends_or_implements, inherited_template_bindings,
-    MirDatabase,
+    class_template_params, extends_or_implements, inherited_template_bindings, MirDatabase,
 };
 
 /// A supertype type-parameter that's effectively wildcarded — an unbound
@@ -48,7 +47,7 @@ fn variance_compatible(
     // A bare subclass that doesn't redeclare `@template` (`class IntBox
     // extends Box {}`) still carries its type args positioned against the
     // nearest ancestor that actually declares them — walk up to that
-    // ancestor via `effective_class_template_params` instead of finding zero
+    // ancestor via `class_template_params` instead of finding zero
     // templates on `fqcn` itself. An empty result here (no template-declaring
     // ancestor at all) can't vacuously pass a caller-supplied non-empty
     // `sub_params`/`sup_params` pair (already known to differ, since the
@@ -56,7 +55,7 @@ fn variance_compatible(
     // circuited otherwise) — there's no variance info to justify treating
     // them as compatible, so this must return false, not the previous
     // `tps.iter().zip(..)` vacuous-empty-iterator `true`.
-    let tps = effective_class_template_params(db, fqcn).unwrap_or_default();
+    let tps = class_template_params(db, fqcn).unwrap_or_default();
     if tps.len() != sub_params.len() {
         return false;
     }
@@ -104,7 +103,7 @@ fn variance_compatible_across_hierarchy(
     // `@implements` clause, so an empty `own_bindings` is fine. Only bail
     // when the sub class DOES declare templates but the caller supplied a
     // mismatched arity — a malformed receiver, not "nothing to check".
-    let sub_tps = effective_class_template_params(db, sub_fqcn).unwrap_or_default();
+    let sub_tps = class_template_params(db, sub_fqcn).unwrap_or_default();
     if !sub_tps.is_empty() && sub_tps.len() != sub_params.len() {
         return false;
     }
@@ -114,7 +113,7 @@ fn variance_compatible_across_hierarchy(
         .map(|(tp, ty)| (tp.name, ty.clone()))
         .collect();
     let ancestor_bindings = inherited_template_bindings(db, sub_fqcn, &own_bindings);
-    let sup_tps = effective_class_template_params(db, sup_fqcn).unwrap_or_default();
+    let sup_tps = class_template_params(db, sup_fqcn).unwrap_or_default();
     let resolved_sup_params: Vec<Type> = sup_tps
         .iter()
         .map(|tp| {

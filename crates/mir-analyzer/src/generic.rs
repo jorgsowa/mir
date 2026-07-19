@@ -1063,18 +1063,18 @@ fn infer_from_generic_ancestor(
     // nearest ancestor that actually declares them — walk up to that
     // ancestor instead of finding zero templates on `pfqcn`/`afqcn`
     // themselves and discarding every bound type param (mirrors
-    // `effective_class_template_params`'s use elsewhere, e.g.
+    // `class_template_params`'s use elsewhere, e.g.
     // `call/method.rs`, `call/static_call.rs`, `expr/objects.rs`). `None`
     // (no `@template`-declaring ancestor found at all, e.g. an enum with no
     // parent to walk up to) is equivalent to an empty list here, NOT an
     // abort — `unwrap_or_default` so a template-less `afqcn` still reaches
     // `inherited_template_bindings` below for its own `@implements Iface<T>`
     // literal type args.
-    let pfqcn_tps = crate::db::effective_class_template_params(db, pfqcn).unwrap_or_default();
+    let pfqcn_tps = crate::db::class_template_params(db, pfqcn).unwrap_or_default();
     if pfqcn_tps.is_empty() || !crate::db::extends_or_implements(db, afqcn, pfqcn) {
         return;
     }
-    let afqcn_tps = crate::db::effective_class_template_params(db, afqcn).unwrap_or_default();
+    let afqcn_tps = crate::db::class_template_params(db, afqcn).unwrap_or_default();
     let own_bindings: FxHashMap<Name, Type> = afqcn_tps
         .iter()
         .zip(ap)

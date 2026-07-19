@@ -108,30 +108,34 @@ pub fn resolve_name(db: &dyn MirDatabase, file: &str, name: &str) -> String {
     name.to_string()
 }
 
-pub fn class_template_params(db: &dyn MirDatabase, fqcn: &str) -> Option<Arc<[TemplateParam]>> {
+/// The `@template` params `fqcn` itself declares in its own docblock — empty
+/// (or `None`) if it declares none, even when an ancestor further up the
+/// chain does. Only the handful of callers that specifically care about
+/// *this type's own declaration* (e.g. comparing a subclass's declared arity
+/// against an ancestor's) should reach for this; almost everyone else wants
+/// [`class_template_params`], which resolves the inherited case too.
+pub fn declared_template_params(db: &dyn MirDatabase, fqcn: &str) -> Option<Arc<[TemplateParam]>> {
     let here = crate::db::Fqcn::from_str(db, fqcn);
     let class = crate::db::find_class_like(db, here)?;
     Some(Arc::from(class.template_params().to_vec()))
 }
 
-/// Like [`class_template_params`], but when `fqcn` itself declares no
-/// `@template` (or none at all), walks up its native `extends` chain to find
-/// the nearest ancestor that does. A plain subclass that doesn't redeclare
-/// `@template` (`class IntBox extends Box {}`) is still implicitly
-/// parameterized the same way its generic ancestor is — PHP/Psalm don't
-/// require re-declaring an un-narrowed inherited template — so callers that
-/// need "does this receiver have template slots to bind" (constructor-arg
-/// inference on `new`, building bindings for a method call) should use this
-/// instead of the direct, own-declarations-only query.
-pub fn effective_class_template_params(
-    db: &dyn MirDatabase,
-    fqcn: &str,
-) -> Option<Arc<[TemplateParam]>> {
+/// The `@template` params that parameterize `fqcn` — its own, or if it
+/// declares none, the nearest ancestor's found by walking up its native
+/// `extends` chain. A plain subclass that doesn't redeclare `@template`
+/// (`class IntBox extends Box {}`) is still implicitly parameterized the
+/// same way its generic ancestor is — PHP/Psalm don't require re-declaring
+/// an un-narrowed inherited template. This is what almost every caller wants
+/// ("does this receiver have template slots to bind" — constructor-arg
+/// inference on `new`, building bindings for a method call); reach for
+/// [`declared_template_params`] instead only when own-declaration-only is
+/// specifically the question being asked.
+pub fn class_template_params(db: &dyn MirDatabase, fqcn: &str) -> Option<Arc<[TemplateParam]>> {
     let mut visited: FxHashSet<Arc<str>> = FxHashSet::default();
     // A worklist, not a linear `current = parent` chain: a bare interface
     // (`interface DogContainer extends AnimalContainer {}`) may extend
     // several bases at once, and PHP/Psalm don't require it to redeclare an
-    // un-narrowed inherited `@template` — same reasoning `class_template_params`'s
+    // un-narrowed inherited `@template` — same reasoning `declared_template_params`'s
     // doc comment already gives for the class case, which this used to be the
     // only branch for (see `inherited_template_bindings` for the analogous
     // worklist over interfaces' multi-base `extends`).
@@ -140,7 +144,7 @@ pub fn effective_class_template_params(
         if !visited.insert(current.clone()) {
             continue;
         }
-        if let Some(tps) = class_template_params(db, current.as_ref()) {
+        if let Some(tps) = declared_template_params(db, current.as_ref()) {
             if !tps.is_empty() {
                 return Some(tps);
             }

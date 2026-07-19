@@ -90,7 +90,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         // extends Box {}`) is still implicitly parameterized the same way
         // `Box` is — walk up to the nearest ancestor that actually declares
         // templates instead of bailing out just because `fqcn` itself has none.
-        let class_tps = match crate::db::effective_class_template_params(self.db, fqcn) {
+        let class_tps = match crate::db::class_template_params(self.db, fqcn) {
             Some(tps) if !tps.is_empty() => tps,
             _ => return empty,
         };
@@ -1379,7 +1379,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             // resolve the class's own `@implements Iface<T>` literal
                             // type args.
                             let class_tps =
-                                crate::db::effective_class_template_params(self.db, fqcn.as_ref())
+                                crate::db::class_template_params(self.db, fqcn.as_ref())
                                     .unwrap_or_default();
                             let own_bindings: rustc_hash::FxHashMap<mir_types::Name, Type> =
                                 class_tps

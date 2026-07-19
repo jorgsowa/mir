@@ -16,25 +16,25 @@ fn is_interface(ea: &ExpressionAnalyzer<'_>, fqcn: &str) -> bool {
     crate::db::class_kind(ea.db, fqcn).is_some_and(|k| k.is_interface)
 }
 
+fn declared_template_params(
+    ea: &ExpressionAnalyzer<'_>,
+    fqcn: &str,
+) -> Vec<mir_codebase::definitions::TemplateParam> {
+    crate::db::declared_template_params(ea.db, fqcn)
+        .map(|tps| tps.to_vec())
+        .unwrap_or_default()
+}
+
+/// Like `declared_template_params`, but walks up to the nearest ancestor that
+/// declares `@template` when `fqcn` itself doesn't — a bare subclass
+/// (`class IntBox extends Box {}`) still inherits `Box`'s template slots
+/// (and their `@template-covariant`/`-contravariant` variance), so variance
+/// checking must see those, not an empty own-declarations-only list.
 fn class_template_params(
     ea: &ExpressionAnalyzer<'_>,
     fqcn: &str,
 ) -> Vec<mir_codebase::definitions::TemplateParam> {
     crate::db::class_template_params(ea.db, fqcn)
-        .map(|tps| tps.to_vec())
-        .unwrap_or_default()
-}
-
-/// Like `class_template_params`, but walks up to the nearest ancestor that
-/// declares `@template` when `fqcn` itself doesn't — a bare subclass
-/// (`class IntBox extends Box {}`) still inherits `Box`'s template slots
-/// (and their `@template-covariant`/`-contravariant` variance), so variance
-/// checking must see those, not an empty own-declarations-only list.
-fn effective_class_template_params(
-    ea: &ExpressionAnalyzer<'_>,
-    fqcn: &str,
-) -> Vec<mir_codebase::definitions::TemplateParam> {
-    crate::db::effective_class_template_params(ea.db, fqcn)
         .map(|tps| tps.to_vec())
         .unwrap_or_default()
 }
@@ -638,7 +638,7 @@ fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -
                     _ => &[],
                 };
                 if !arg_type_params.is_empty() || !param_type_params.is_empty() {
-                    let class_tps = effective_class_template_params(ea, &resolved_param);
+                    let class_tps = class_template_params(ea, &resolved_param);
                     return generic_type_params_compatible(
                         arg_type_params,
                         param_type_params,
@@ -703,7 +703,7 @@ fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -
                         )
                     });
                     if let Some(arg_as_param_params) = ancestor_args {
-                        let class_tps = effective_class_template_params(ea, &resolved_param);
+                        let class_tps = class_template_params(ea, &resolved_param);
                         return generic_type_params_compatible(
                             &arg_as_param_params,
                             param_type_params,
@@ -916,7 +916,7 @@ fn generic_ancestor_type_args(
     if raw.is_empty() {
         return Some(raw);
     }
-    let own_tps = effective_class_template_params(ea, child);
+    let own_tps = class_template_params(ea, child);
     if own_tps.is_empty() {
         return Some(raw);
     }
@@ -983,7 +983,7 @@ fn generic_ancestor_type_args_inner(
         if found.is_empty() {
             return Some(found);
         }
-        let edge_template_params = class_template_params(ea, edge);
+        let edge_template_params = declared_template_params(ea, edge);
         let bindings: FxHashMap<Name, Type> = edge_template_params
             .iter()
             .zip(edge_args.iter())

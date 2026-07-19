@@ -186,7 +186,7 @@ fn resolve_iterator_item_types(
     }
 
     let class = crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, bare))?;
-    let class_tps = crate::db::effective_class_template_params(db, bare).unwrap_or_default();
+    let class_tps = crate::db::class_template_params(db, bare).unwrap_or_default();
     let bindings = crate::generic::build_class_bindings(&class_tps, type_params);
 
     // Prefer an explicit `@implements Iterator<TKey, TValue>` (or
