@@ -4857,9 +4857,6 @@ fn narrow_prop_literal_string(
     is_value: bool,
 ) {
     let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
-    if current.is_mixed() {
-        return;
-    }
     let narrowed = literal_string_narrow_type(&current, value, is_value);
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, false);
 }
@@ -4924,9 +4921,6 @@ fn narrow_prop_literal_int(
     is_value: bool,
 ) {
     let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
-    if current.is_mixed() {
-        return;
-    }
     let narrowed = literal_int_narrow_type(&current, value, is_value);
     let mark_diverges = crate::contradiction::is_closed_precise(&current);
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, mark_diverges);
@@ -5127,9 +5121,6 @@ fn narrow_prop_to_literal_enum_case(
     is_case: bool,
 ) {
     let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
-    if current.is_mixed() {
-        return;
-    }
     let narrowed = if is_case {
         Type::single(Atomic::TLiteralEnumCase {
             enum_fqcn: enum_fqcn.into(),
