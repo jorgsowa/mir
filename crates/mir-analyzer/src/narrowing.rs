@@ -789,6 +789,7 @@ pub fn narrow_from_condition(
                         }
                     } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
                         narrow_prop_array_empty(ctx, &obj, &prop, db, file, effective_true);
+                        narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                     }
                 }
             } else if let ExprKind::Array(elems) = &b.left.kind {
@@ -805,6 +806,7 @@ pub fn narrow_from_condition(
                         }
                     } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
                         narrow_prop_array_empty(ctx, &obj, &prop, db, file, effective_true);
+                        narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                     }
                 }
             }
@@ -996,6 +998,7 @@ pub fn narrow_from_condition(
                         }
                     } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
                         narrow_prop_array_empty(ctx, &obj, &prop, db, file, effective_true);
+                        narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                     }
                 }
             } else if let ExprKind::Array(elems) = &b.left.kind {
@@ -1012,6 +1015,7 @@ pub fn narrow_from_condition(
                         }
                     } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
                         narrow_prop_array_empty(ctx, &obj, &prop, db, file, effective_true);
+                        narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                     }
                 }
             }
