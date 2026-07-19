@@ -761,6 +761,8 @@ pub fn narrow_from_condition(
             else if let ExprKind::Bool(value) = &b.right.kind {
                 if let Some(name) = extract_var_name(&b.left) {
                     narrow_var_loose_bool(ctx, &name, *value == effective_true);
+                } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
+                    narrow_prop_loose_bool(ctx, &obj, &prop, db, file, *value == effective_true);
                 } else if !value {
                     // `strpos($h, $n) == false` / `!= false` — same
                     // false-comparable narrowing as the strict `===`/`!==` arm.
@@ -769,6 +771,8 @@ pub fn narrow_from_condition(
             } else if let ExprKind::Bool(value) = &b.left.kind {
                 if let Some(name) = extract_var_name(&b.right) {
                     narrow_var_loose_bool(ctx, &name, *value == effective_true);
+                } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
+                    narrow_prop_loose_bool(ctx, &obj, &prop, db, file, *value == effective_true);
                 } else if !value {
                     narrow_from_false_comparable_call(&b.right, ctx, effective_true);
                 }
@@ -3859,6 +3863,30 @@ fn narrow_var_loose_bool(ctx: &mut FlowState, name: &str, want_truthy: bool) {
     // so conservatively); asserting divergence here would double-report the
     // same fact as an unrelated RedundantCondition.
     set_narrowed(ctx, name, &current, narrowed, false);
+}
+
+/// Property-access counterpart of `narrow_var_loose_bool`, for
+/// `$this->prop == true`/`false` (or any `$obj->prop` receiver).
+fn narrow_prop_loose_bool(
+    ctx: &mut FlowState,
+    obj_var: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    file: &str,
+    want_truthy: bool,
+) {
+    let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
+    if current.is_mixed() {
+        return;
+    }
+    let narrowed = if want_truthy {
+        current.narrow_to_truthy()
+    } else {
+        current.narrow_to_falsy()
+    };
+    // mark_diverges=false: matches narrow_var_loose_bool's rationale — a
+    // separate contradiction pass already owns flagging an always-true/false compare.
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, false);
 }
 
 fn narrow_var_bool(ctx: &mut FlowState, name: &str, value: bool, is_value: bool) {
