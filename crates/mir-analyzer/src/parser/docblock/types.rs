@@ -822,12 +822,36 @@ pub(super) fn parse_template_line(
     let name = tokens.next()?;
     let bound = if matches!(tokens.peek(), Some(&"of") | Some(&"as")) {
         tokens.next();
-        let mut bound_tokens = Vec::new();
+        let mut bound_tokens: Vec<&str> = Vec::new();
+        let mut depth: i32 = 0;
         while let Some(&t) = tokens.peek() {
             // A trailing `= Default` (e.g. `@template T of Bound = Default`)
             // belongs to the default value, not the bound.
-            if t == "=" {
+            if t == "=" && depth == 0 {
                 break;
+            }
+            // Stop at trailing free-text description once the bound's own
+            // brackets are balanced (e.g. `@template T of Collection<int> the
+            // type of the collection's items`) — a token reached at depth 0
+            // that isn't glued to the previous one by a dangling `|`/`&`
+            // union/intersection operator marks the end of the type
+            // expression, not a continuation of it. The first bound token is
+            // always kept regardless (a bound is never empty).
+            if depth == 0 && !bound_tokens.is_empty() {
+                let prev_ends_with_op = bound_tokens
+                    .last()
+                    .is_some_and(|p| p.ends_with('|') || p.ends_with('&'));
+                let starts_with_op = t.starts_with('|') || t.starts_with('&');
+                if !prev_ends_with_op && !starts_with_op {
+                    break;
+                }
+            }
+            for c in t.chars() {
+                match c {
+                    '<' | '(' | '[' | '{' => depth += 1,
+                    '>' | ')' | ']' | '}' => depth -= 1,
+                    _ => {}
+                }
             }
             bound_tokens.push(t);
             tokens.next();
