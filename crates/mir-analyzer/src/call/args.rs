@@ -407,19 +407,14 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
         }
 
         if let Some(raw_param_ty) = &param.ty {
-            let param_ty_owned;
+            // A variadic param's docblock type may be spelled either as the
+            // bare element (`string ...$args`) or as an aggregate array/list
+            // (`array<int, V> ...$args`, `list<V> ...$args`) — each individual
+            // argument must be checked against the element type either way.
+            // Reuses generic.rs's inference-side unwrapper so both call paths
+            // agree on which spellings count as "aggregate".
             let param_ty: &Type = if param.is_variadic {
-                if let Some(elem_ty) = raw_param_ty.types.iter().find_map(|a| match a {
-                    Atomic::TList { value } | Atomic::TNonEmptyList { value } => {
-                        Some(*value.clone())
-                    }
-                    _ => None,
-                }) {
-                    param_ty_owned = elem_ty;
-                    &param_ty_owned
-                } else {
-                    raw_param_ty
-                }
+                crate::generic::variadic_element_type(raw_param_ty)
             } else {
                 raw_param_ty
             };

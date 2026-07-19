@@ -172,7 +172,7 @@ fn bind_args_to_params<'p, 'a>(
 /// or `list<X>`), return the element type `X` that each individual argument
 /// must match. Types that aren't a single array/list atomic are returned
 /// unchanged (e.g. `@param string ...$args` stores the bare element type).
-fn variadic_element_type(ty: &Type) -> &Type {
+pub(crate) fn variadic_element_type(ty: &Type) -> &Type {
     if ty.types.len() == 1 {
         match &ty.types[0] {
             Atomic::TArray { value, .. } | Atomic::TNonEmptyArray { value, .. } => value,
