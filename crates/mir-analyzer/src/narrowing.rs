@@ -1877,12 +1877,11 @@ pub fn narrow_from_condition(
                     }
                 } else if is_true {
                     // `isset($base[$k])` implies `$base` is a non-null, indexable
-                    // value — remove null/false from the base variable so a
-                    // guarded access (`preg_split()` returns array|false) does
-                    // not report PossiblyInvalidArrayAccess.
-                    if let Some(base) = array_access_base_var(var_expr) {
-                        let current = ctx.get_var(&base);
-                        ctx.set_var(&base, current.remove_null().remove_false());
+                    // value — remove null/false from the base (variable or
+                    // property receiver) so a guarded access (`preg_split()`
+                    // returns array|false) does not report PossiblyInvalidArrayAccess.
+                    if let Some(target) = array_access_base_target(var_expr) {
+                        narrow_container_non_null_non_false(ctx, &target, db, file);
                     }
                     // For a single-level `isset($arr['key'])` on a shape-typed
                     // base, also narrow that key's OWN value type: remove null
@@ -1923,9 +1922,8 @@ pub fn narrow_from_condition(
                 if !is_true {
                     // `!empty($base[$k])` implies `$base` is a non-null, indexable
                     // value, same as the `isset($base[$k])` case above.
-                    if let Some(base) = array_access_base_var(var_expr) {
-                        let current = ctx.get_var(&base);
-                        ctx.set_var(&base, current.remove_null().remove_false());
+                    if let Some(target) = array_access_base_target(var_expr) {
+                        narrow_container_non_null_non_false(ctx, &target, db, file);
                     }
                 }
                 // For a single-level `empty($arr['key'])` on a shape-typed base,
@@ -5565,14 +5563,42 @@ pub(crate) fn extract_expr_guard_key(
     }
 }
 
-/// The base variable name of a (possibly nested) array-access expression:
-/// `$a[1][2]` → `a`. Returns `None` if the base is not a plain variable.
-fn array_access_base_var(expr: &php_ast::owned::Expr) -> Option<String> {
+/// The base (variable or property receiver) of a (possibly nested)
+/// array-access expression: `$a[1][2]` → `Var("a")`, `$this->data[1]` →
+/// `Prop("this", "data")`. Unlike `collect_array_access_path`, doesn't
+/// require every key along the way to be a literal — stripping null/false
+/// from the container itself doesn't depend on the key being statically
+/// known.
+fn array_access_base_target(expr: &php_ast::owned::Expr) -> Option<ScalarArgTarget> {
     match &expr.kind {
-        ExprKind::ArrayAccess(aa) => array_access_base_var(&aa.array),
-        ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),
-        ExprKind::Parenthesized(inner) => array_access_base_var(inner),
-        _ => None,
+        ExprKind::ArrayAccess(aa) => array_access_base_target(&aa.array),
+        ExprKind::Parenthesized(inner) => array_access_base_target(inner),
+        _ => ScalarArgTarget::extract(expr),
+    }
+}
+
+/// Remove `null`/`false` from an `isset($base[...])`/`!empty($base[...])`
+/// container, whichever receiver shape `base` is — the property-receiver
+/// counterpart of the plain-variable case, since `->` access on a nullable
+/// property is just as valid an `isset()`/`empty()` target as a variable.
+fn narrow_container_non_null_non_false(
+    ctx: &mut FlowState,
+    target: &ScalarArgTarget,
+    db: &dyn MirDatabase,
+    file: &str,
+) {
+    match target {
+        ScalarArgTarget::Var(name) => {
+            let current = ctx.get_var(name);
+            ctx.set_var(name, current.remove_null().remove_false());
+        }
+        ScalarArgTarget::Prop(obj, prop) => {
+            let current = resolve_prop_current_type(ctx, obj, prop, db, file);
+            if !current.is_mixed() {
+                let narrowed = current.remove_null().remove_false();
+                apply_prop_narrowed(ctx, obj, prop, current, narrowed, true);
+            }
+        }
     }
 }
 
