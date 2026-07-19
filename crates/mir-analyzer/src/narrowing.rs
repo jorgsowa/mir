@@ -2058,6 +2058,7 @@ pub fn narrow_from_condition(
                                     file,
                                     is_true,
                                 );
+                                narrow_receiver_non_null_on_prop_match(ctx, &obj, is_true);
                             }
                         } else if let Some((fqcn, prop)) =
                             extract_static_prop_access(&obj_arg.value, ctx, db, file)
@@ -2137,6 +2138,7 @@ pub fn narrow_from_condition(
                                     file,
                                     is_true,
                                 );
+                                narrow_receiver_non_null_on_prop_match(ctx, &obj, is_true);
                             }
                         } else if let Some((fqcn, prop)) =
                             extract_static_prop_access(&obj_arg.value, ctx, db, file)
@@ -6927,6 +6929,7 @@ fn narrow_from_get_parent_class_literal(
         }
         ScalarArgTarget::Prop(obj, prop) => {
             narrow_prop_is_subclass_of(ctx, obj, prop, fqcn, db, file, is_true);
+            narrow_receiver_non_null_on_prop_match(ctx, obj, is_true);
         }
     }
 }
