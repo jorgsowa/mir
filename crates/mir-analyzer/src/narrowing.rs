@@ -3206,7 +3206,7 @@ fn project_type_params_onto_subclass(
     if class_own_tps.is_empty() {
         return mir_types::union::empty_type_params();
     }
-    let Some(atom_own_tps) = crate::db::declared_template_params(db, atom_fqcn) else {
+    let Some(atom_own_tps) = crate::db::class_template_params(db, atom_fqcn) else {
         return mir_types::union::empty_type_params();
     };
     let here = crate::db::Fqcn::from_str(db, class_name);
