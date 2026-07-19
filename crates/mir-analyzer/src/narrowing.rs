@@ -1917,6 +1917,32 @@ pub fn narrow_from_condition(
                                     is_true,
                                 );
                             }
+                        } else if let Some((fqcn, prop)) =
+                            extract_static_prop_access(&obj_arg.value, ctx, db, file)
+                        {
+                            if let Some(class_name) = extract_class_fqcn_from_expr(
+                                &class_arg.value,
+                                ctx.self_fqcn.as_deref(),
+                                ctx.static_fqcn.as_deref(),
+                                ctx.parent_fqcn.as_deref(),
+                                db,
+                                file,
+                            ) {
+                                let allow_string = call
+                                    .args
+                                    .get(2)
+                                    .map(|a| is_truthy_bool_literal(&a.value))
+                                    .unwrap_or(false);
+                                narrow_static_prop_is_a(
+                                    ctx,
+                                    &fqcn,
+                                    &prop,
+                                    &class_name,
+                                    allow_string,
+                                    db,
+                                    is_true,
+                                );
+                            }
                         }
                     }
                 } else if bare.eq_ignore_ascii_case("is_subclass_of") {
@@ -4148,6 +4174,62 @@ fn narrow_prop_instanceof(
     // returns empty.
     let mark_diverges = is_true || !ctx.get_var(obj_var).is_nullable();
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, mark_diverges);
+}
+
+/// Static-property counterpart of `narrow_prop_is_a`, for
+/// `is_a(self::$prop, X::class, ...)` (and `static::$prop`/`Class::$prop`).
+fn narrow_static_prop_is_a(
+    ctx: &mut FlowState,
+    fqcn: &str,
+    prop: &str,
+    class_name: &str,
+    allow_string: bool,
+    db: &dyn MirDatabase,
+    is_true: bool,
+) {
+    let current = resolve_static_prop_current_type(ctx, fqcn, prop, db);
+    if current.is_mixed_not_template() {
+        return;
+    }
+    if allow_string {
+        let narrowed = if is_true {
+            let (mut result, obj_part) = partition_is_a_string_like(&current, class_name, db);
+            if !obj_part.is_empty() || current.is_mixed() {
+                let obj_src = if obj_part.is_empty() {
+                    &current
+                } else {
+                    &obj_part
+                };
+                let obj_narrowed = narrow_instanceof_preserving_subtypes(
+                    obj_src,
+                    class_name,
+                    db,
+                    &ctx.template_param_names,
+                );
+                for atom in obj_narrowed.types.iter() {
+                    result.add_type(atom.clone());
+                }
+            }
+            result
+        } else {
+            filter_out_is_a_string_match(&current, class_name, db)
+        };
+        // Same rationale as the variable case: don't mark diverges when
+        // allow_string is set, since a class-string value may still pass.
+        apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, false);
+    } else {
+        let narrowed = if is_true {
+            narrow_instanceof_preserving_subtypes(
+                &current,
+                class_name,
+                db,
+                &ctx.template_param_names,
+            )
+        } else {
+            filter_out_instanceof_match(&current, class_name, db)
+        };
+        apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, true);
+    }
 }
 
 /// `is_a($obj->prop, ClassName::class)` / `is_a($obj->prop, ClassName::class, true)`
