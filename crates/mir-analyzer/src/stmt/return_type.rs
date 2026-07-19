@@ -155,9 +155,10 @@ pub(crate) fn named_object_return_compatible(
                     _ => &[],
                 };
                 if !actual_type_params.is_empty() || !declared_type_params.is_empty() {
-                    let class_tps = crate::db::class_template_params(db, &resolved_declared)
-                        .map(|tps| tps.to_vec())
-                        .unwrap_or_default();
+                    let class_tps =
+                        crate::db::effective_class_template_params(db, &resolved_declared)
+                            .map(|tps| tps.to_vec())
+                            .unwrap_or_default();
                     return return_type_params_compatible(
                         actual_type_params,
                         declared_type_params,
