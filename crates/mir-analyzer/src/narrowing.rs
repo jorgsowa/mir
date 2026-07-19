@@ -1475,14 +1475,27 @@ pub fn narrow_from_condition(
                                 }),
                             };
                             if needle_non_empty {
-                                if let Some(var_name) = extract_var_name(&haystack_arg.value) {
-                                    let current = ctx.get_var(&var_name);
-                                    if !current.is_mixed() {
-                                        let narrowed = narrow_string_to_non_empty(&current);
-                                        if narrowed != current {
-                                            ctx.set_var(&var_name, narrowed);
+                                match ScalarArgTarget::extract(&haystack_arg.value) {
+                                    Some(ScalarArgTarget::Var(var_name)) => {
+                                        let current = ctx.get_var(&var_name);
+                                        if !current.is_mixed() {
+                                            let narrowed = narrow_string_to_non_empty(&current);
+                                            if narrowed != current {
+                                                ctx.set_var(&var_name, narrowed);
+                                            }
                                         }
                                     }
+                                    Some(ScalarArgTarget::Prop(obj, prop)) => {
+                                        let current =
+                                            resolve_prop_current_type(ctx, &obj, &prop, db, file);
+                                        if !current.is_mixed() {
+                                            let narrowed = narrow_string_to_non_empty(&current);
+                                            apply_prop_narrowed(
+                                                ctx, &obj, &prop, current, narrowed, false,
+                                            );
+                                        }
+                                    }
+                                    None => {}
                                 }
                             }
                         }
