@@ -107,7 +107,7 @@ fn narrow_from_static_or_class_const_comparison(
         // `$this->prop === EnumName::CaseName` / `$obj->prop === ...`
         // — property-access counterpart of the plain-variable case
         // above, only reached once extract_var_name on the left fails.
-        else if let Some((obj_var, prop)) = extract_prop_access(&b.left) {
+        else if let Some((obj_var, prop)) = extract_any_prop_access(&b.left) {
             if let Some((enum_fqcn, case_name)) = extract_enum_case(
                 &b.right,
                 ctx.self_fqcn.as_deref(),
@@ -298,7 +298,7 @@ fn narrow_from_static_or_class_const_comparison(
         }
         // `EnumName::CaseName === $this->prop` — property-access
         // counterpart, symmetric with the left-side case above.
-        else if let Some((obj_var, prop)) = extract_prop_access(&b.right) {
+        else if let Some((obj_var, prop)) = extract_any_prop_access(&b.right) {
             if let Some((enum_fqcn, case_name)) = extract_enum_case(
                 &b.left,
                 ctx.self_fqcn.as_deref(),
@@ -574,7 +574,7 @@ pub fn narrow_from_condition(
             else if matches!(b.right.kind, ExprKind::Bool(true)) {
                 if let Some(name) = extract_var_name(&b.left) {
                     narrow_var_bool(ctx, &name, true, effective_true);
-                } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
+                } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
                     narrow_prop_bool(ctx, &obj, &prop, db, file, true, effective_true);
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                 } else {
@@ -589,7 +589,7 @@ pub fn narrow_from_condition(
             } else if matches!(b.right.kind, ExprKind::Bool(false)) {
                 if let Some(name) = extract_var_name(&b.left) {
                     narrow_var_bool(ctx, &name, false, effective_true);
-                } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
+                } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
                     narrow_prop_bool(ctx, &obj, &prop, db, file, false, effective_true);
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                 } else {
@@ -604,7 +604,7 @@ pub fn narrow_from_condition(
             else if matches!(b.left.kind, ExprKind::Bool(true)) {
                 if let Some(name) = extract_var_name(&b.right) {
                     narrow_var_bool(ctx, &name, true, effective_true);
-                } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
+                } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
                     narrow_prop_bool(ctx, &obj, &prop, db, file, true, effective_true);
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                 } else {
@@ -613,7 +613,7 @@ pub fn narrow_from_condition(
             } else if matches!(b.left.kind, ExprKind::Bool(false)) {
                 if let Some(name) = extract_var_name(&b.right) {
                     narrow_var_bool(ctx, &name, false, effective_true);
-                } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
+                } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
                     narrow_prop_bool(ctx, &obj, &prop, db, file, false, effective_true);
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                 } else {
@@ -677,7 +677,7 @@ pub fn narrow_from_condition(
                 } else if let Some(name) = extract_var_name(&b.left) {
                     // `$x === 'literal'`
                     narrow_var_literal_string(ctx, &name, class_name_str, effective_true);
-                } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
+                } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
                     // `$this->prop === 'literal'`
                     narrow_prop_literal_string(
                         ctx,
@@ -757,7 +757,7 @@ pub fn narrow_from_condition(
                 } else if let Some(name) = extract_var_name(&b.right) {
                     // `$x === 'literal'`
                     narrow_var_literal_string(ctx, &name, class_name_str, effective_true);
-                } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
+                } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
                     // `'literal' === $this->prop`
                     narrow_prop_literal_string(
                         ctx,
@@ -787,7 +787,7 @@ pub fn narrow_from_condition(
             else if let ExprKind::Int(n) = &b.right.kind {
                 if let Some(name) = extract_var_name(&b.left) {
                     narrow_var_literal_int(ctx, &name, *n, effective_true);
-                } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
+                } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
                     narrow_prop_literal_int(ctx, &obj, &prop, db, file, *n, effective_true);
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                 } else if let Some((fqcn, prop)) =
@@ -798,7 +798,7 @@ pub fn narrow_from_condition(
             } else if let ExprKind::Int(n) = &b.left.kind {
                 if let Some(name) = extract_var_name(&b.right) {
                     narrow_var_literal_int(ctx, &name, *n, effective_true);
-                } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
+                } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
                     narrow_prop_literal_int(ctx, &obj, &prop, db, file, *n, effective_true);
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                 } else if let Some((fqcn, prop)) =
@@ -832,7 +832,7 @@ pub fn narrow_from_condition(
                         if !narrowed.is_empty() && narrowed != current {
                             ctx.set_var(&var_name, narrowed);
                         }
-                    } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
+                    } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
                         narrow_prop_array_empty(ctx, &obj, &prop, db, file, effective_true);
                         narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                     }
@@ -849,7 +849,7 @@ pub fn narrow_from_condition(
                         if !narrowed.is_empty() && narrowed != current {
                             ctx.set_var(&var_name, narrowed);
                         }
-                    } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
+                    } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
                         narrow_prop_array_empty(ctx, &obj, &prop, db, file, effective_true);
                         narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                     }
@@ -878,11 +878,11 @@ pub fn narrow_from_condition(
                 if let Some(n) = extract_int_literal(&b.left) {
                     narrow_var_int_comparison(ctx, &var_name, flip_comparison_op(b.op), n, is_true);
                 }
-            } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
+            } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
                 if let Some(n) = extract_int_literal(&b.right) {
                     narrow_prop_int_comparison(ctx, &obj, &prop, db, file, b.op, n, is_true);
                 }
-            } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
+            } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
                 if let Some(n) = extract_int_literal(&b.left) {
                     narrow_prop_int_comparison(
                         ctx,
@@ -972,7 +972,7 @@ pub fn narrow_from_condition(
                         let current = ctx.get_var(&var_name);
                         ctx.set_var(&var_name, current.remove_null());
                     }
-                } else if let Some((obj, prop)) = extract_prop_access(&nc.left) {
+                } else if let Some((obj, prop)) = extract_any_prop_access(&nc.left) {
                     if !effective_true && same_literal(&nc.right, &b.right) {
                         let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
                         let narrowed = current.remove_null();
@@ -985,7 +985,7 @@ pub fn narrow_from_condition(
                         let current = ctx.get_var(&var_name);
                         ctx.set_var(&var_name, current.remove_null());
                     }
-                } else if let Some((obj, prop)) = extract_prop_access(&nc.left) {
+                } else if let Some((obj, prop)) = extract_any_prop_access(&nc.left) {
                     if !effective_true && same_literal(&nc.right, &b.left) {
                         let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
                         let narrowed = current.remove_null();
@@ -995,13 +995,13 @@ pub fn narrow_from_condition(
             } else if matches!(b.right.kind, ExprKind::Null) {
                 if let Some(name) = extract_var_name(&b.left) {
                     narrow_var_loose_null(ctx, &name, effective_true);
-                } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
+                } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
                     narrow_prop_loose_null(ctx, &obj, &prop, db, file, effective_true);
                 }
             } else if matches!(b.left.kind, ExprKind::Null) {
                 if let Some(name) = extract_var_name(&b.right) {
                     narrow_var_loose_null(ctx, &name, effective_true);
-                } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
+                } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
                     narrow_prop_loose_null(ctx, &obj, &prop, db, file, effective_true);
                 }
             }
@@ -1011,7 +1011,7 @@ pub fn narrow_from_condition(
             else if let ExprKind::Bool(value) = &b.right.kind {
                 if let Some(name) = extract_var_name(&b.left) {
                     narrow_var_loose_bool(ctx, &name, *value == effective_true);
-                } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
+                } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
                     narrow_prop_loose_bool(ctx, &obj, &prop, db, file, *value == effective_true);
                 } else {
                     if !value {
@@ -1028,7 +1028,7 @@ pub fn narrow_from_condition(
             } else if let ExprKind::Bool(value) = &b.left.kind {
                 if let Some(name) = extract_var_name(&b.right) {
                     narrow_var_loose_bool(ctx, &name, *value == effective_true);
-                } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
+                } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
                     narrow_prop_loose_bool(ctx, &obj, &prop, db, file, *value == effective_true);
                 } else {
                     if !value {
@@ -1051,7 +1051,7 @@ pub fn narrow_from_condition(
                         if !narrowed.is_empty() && narrowed != current {
                             ctx.set_var(&var_name, narrowed);
                         }
-                    } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
+                    } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
                         narrow_prop_array_empty(ctx, &obj, &prop, db, file, effective_true);
                         narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                     }
@@ -1068,7 +1068,7 @@ pub fn narrow_from_condition(
                         if !narrowed.is_empty() && narrowed != current {
                             ctx.set_var(&var_name, narrowed);
                         }
-                    } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
+                    } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
                         narrow_prop_array_empty(ctx, &obj, &prop, db, file, effective_true);
                         narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                     }
@@ -5376,6 +5376,15 @@ fn extract_nullsafe_prop_access(expr: &php_ast::owned::Expr) -> Option<(String, 
         ExprKind::Parenthesized(inner) => extract_nullsafe_prop_access(inner),
         _ => None,
     }
+}
+
+/// `extract_prop_access`, but also accepts the nullsafe (`?->`) form —
+/// for arms that don't need to distinguish the two operators (a plain
+/// `->` on a null receiver also evaluates to null in PHP 8, same as
+/// `?->`'s short-circuit, so most literal-comparison narrowing arms
+/// should treat both identically).
+fn extract_any_prop_access(expr: &php_ast::owned::Expr) -> Option<(String, String)> {
+    extract_nullsafe_prop_access(expr).or_else(|| extract_prop_access(expr))
 }
 
 /// Extract `(fqcn, prop_name)` from a `self::$prop` / `static::$prop` /
