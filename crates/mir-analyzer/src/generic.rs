@@ -490,8 +490,13 @@ fn is_template_atomic(a: &Atomic, template_names: &FxHashSet<Name>) -> bool {
 
 /// Conservative atomic-kind match for filtering arg atomics out of a residual.
 /// Returns true when an arg atomic is "covered" by a concrete param atomic so
-/// the template need not absorb it. Only matches the simple kinds we expect to
-/// see paired with templates in unions (null, bool, int, string, etc.).
+/// the template need not absorb it. Beyond the scalar kinds, also covers
+/// array-shaped, same-class named-object, and closure alternatives — e.g.
+/// `T|array` matched against an `array<string, int>` arg, or `T|Foo` matched
+/// against a `Foo` arg. A named-object match requires the exact same class:
+/// a subtype arg (e.g. `Bar extends Foo` against a `T|Foo` param) must still
+/// bind the template, since dropping it there would silently discard the
+/// subtype's extra specificity.
 fn atomics_match_for_filter(concrete: &Atomic, arg: &Atomic) -> bool {
     matches!(
         (concrete, arg),
@@ -507,7 +512,13 @@ fn atomics_match_for_filter(concrete: &Atomic, arg: &Atomic) -> bool {
             | (Atomic::TFloat, Atomic::TIntegralFloat)
             | (Atomic::TIntegralFloat, Atomic::TFloat)
             | (Atomic::TString, Atomic::TString)
-    )
+            | (Atomic::TClosure { .. }, Atomic::TClosure { .. })
+    ) || (concrete.is_array() && arg.is_array())
+        || matches!(
+            (concrete, arg),
+            (Atomic::TNamedObject { fqcn: cf, .. }, Atomic::TNamedObject { fqcn: af, .. })
+                if cf == af
+        )
 }
 
 fn infer_from_pair(
