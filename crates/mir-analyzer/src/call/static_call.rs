@@ -567,6 +567,29 @@ impl CallAnalyzer {
                         span,
                     );
                 }
+                // Only warn about template shadowing when the declaring class lives
+                // in the file under analysis — mirrors method.rs's instance-call
+                // check, which a static call (Foo::bar()) previously never got at
+                // all despite computing an equivalent class_bindings/method
+                // bindings pair right here.
+                let declared_here = crate::db::class_like_decl_file(
+                    ea.db,
+                    crate::db::Fqcn::from_str(ea.db, resolved.owner_fqcn.as_ref()),
+                )
+                .is_some_and(|f| f.as_ref() == ea.file.as_ref());
+                if declared_here {
+                    for key in bindings.keys() {
+                        if class_bindings.contains_key(key) {
+                            ea.emit(
+                                IssueKind::ShadowedTemplateParam {
+                                    name: key.to_string(),
+                                },
+                                Severity::Info,
+                                span,
+                            );
+                        }
+                    }
+                }
                 Some(bindings)
             } else {
                 None
