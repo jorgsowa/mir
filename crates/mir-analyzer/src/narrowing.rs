@@ -1531,18 +1531,8 @@ pub fn narrow_from_condition(
                         if let (Some(haystack_arg), Some(needle_arg)) =
                             (call.args.first(), call.args.get(1))
                         {
-                            let needle_non_empty = match &needle_arg.value.kind {
-                                ExprKind::String(s) => !s.is_empty(),
-                                // `$needle = 'x'; str_contains($h, $needle)` — resolve a
-                                // variable needle already narrowed to a single literal
-                                // string, same as an inline literal would be.
-                                _ => extract_var_name(&needle_arg.value).is_some_and(|name| {
-                                    matches!(
-                                        ctx.get_var(&name).types.as_slice(),
-                                        [Atomic::TLiteralString(s)] if !s.is_empty()
-                                    )
-                                }),
-                            };
+                            let needle_non_empty =
+                                expr_is_nonempty_string_literal(&needle_arg.value, ctx, db, file);
                             if needle_non_empty {
                                 match ScalarArgTarget::extract(&haystack_arg.value) {
                                     Some(ScalarArgTarget::Var(var_name)) => {
@@ -3371,6 +3361,34 @@ fn is_truthy_bool_literal(expr: &php_ast::owned::Expr) -> bool {
 /// is whether `expr === false` holds in this branch (so `!is_false` means
 /// the call proved a match — a substring was found, or the needle is
 /// present in the haystack).
+/// True when `expr` is a non-empty string literal, or a variable/property
+/// already narrowed to one — shared by `str_contains()`/`str_starts_with()`/
+/// `str_ends_with()` and the `strpos()`-family false-comparable narrowing,
+/// both of which only narrow their haystack when the needle is provably
+/// non-empty (an empty needle is trivially "found" at offset 0).
+fn expr_is_nonempty_string_literal(
+    expr: &php_ast::owned::Expr,
+    ctx: &FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> bool {
+    match &expr.kind {
+        ExprKind::String(s) => !s.is_empty(),
+        _ => match ScalarArgTarget::extract(expr) {
+            Some(ScalarArgTarget::Var(name)) => {
+                matches!(ctx.get_var(&name).types.as_slice(), [Atomic::TLiteralString(s)] if !s.is_empty())
+            }
+            Some(ScalarArgTarget::Prop(obj, prop)) => matches!(
+                resolve_prop_current_type(ctx, &obj, &prop, db, file)
+                    .types
+                    .as_slice(),
+                [Atomic::TLiteralString(s)] if !s.is_empty()
+            ),
+            None => false,
+        },
+    }
+}
+
 fn narrow_from_false_comparable_call(
     expr: &php_ast::owned::Expr,
     ctx: &mut FlowState,
@@ -3405,16 +3423,8 @@ fn narrow_from_false_comparable_call(
         // literal needle (an empty needle is "found" at offset 0 vacuously).
         if !is_false {
             if let (Some(haystack_arg), Some(needle_arg)) = (call.args.first(), call.args.get(1)) {
-                let needle_non_empty = match &needle_arg.value.kind {
-                    ExprKind::String(s) => !s.is_empty(),
-                    // `$needle = 'x'; strpos($haystack, $needle)` — resolve a variable
-                    // already narrowed to a single non-empty string literal, same as
-                    // an inline literal would be (mirrors array_key_exists's handling
-                    // of a variable-held literal key).
-                    _ => extract_var_name(&needle_arg.value).is_some_and(|name| {
-                        matches!(ctx.get_var(&name).types.as_slice(), [Atomic::TLiteralString(s)] if !s.is_empty())
-                    }),
-                };
+                let needle_non_empty =
+                    expr_is_nonempty_string_literal(&needle_arg.value, ctx, db, file);
                 if needle_non_empty {
                     match ScalarArgTarget::extract(&haystack_arg.value) {
                         Some(ScalarArgTarget::Var(var_name)) => {
