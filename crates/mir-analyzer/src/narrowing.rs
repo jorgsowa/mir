@@ -418,6 +418,27 @@ pub fn narrow_from_condition(
                             effective_true,
                         );
                         narrow_receiver_non_null_on_prop_match(ctx, &obj_var, effective_true);
+                    } else if let ExprKind::ClassConstAccess(cca) = &b.right.kind {
+                        // `$this->prop === Foo::class` — plain class-string
+                        // comparison, not an enum case; property counterpart of
+                        // the plain-variable `narrow_var_to_class_string` case.
+                        if let Some(fqcn) = extract_class_const_fqcn(
+                            cca,
+                            ctx.self_fqcn.as_deref(),
+                            ctx.parent_fqcn.as_deref(),
+                            db,
+                            file,
+                        ) {
+                            narrow_prop_to_class_string(
+                                ctx,
+                                &obj_var,
+                                &prop,
+                                &fqcn,
+                                effective_true,
+                                db,
+                                file,
+                            );
+                        }
                     }
                 }
                 // `get_class($x) === Foo::class` — the far more idiomatic
@@ -607,6 +628,26 @@ pub fn narrow_from_condition(
                             effective_true,
                         );
                         narrow_receiver_non_null_on_prop_match(ctx, &obj_var, effective_true);
+                    } else if let ExprKind::ClassConstAccess(cca) = &b.left.kind {
+                        // `Foo::class === $this->prop` — symmetric counterpart
+                        // of the plain class-string case above.
+                        if let Some(fqcn) = extract_class_const_fqcn(
+                            cca,
+                            ctx.self_fqcn.as_deref(),
+                            ctx.parent_fqcn.as_deref(),
+                            db,
+                            file,
+                        ) {
+                            narrow_prop_to_class_string(
+                                ctx,
+                                &obj_var,
+                                &prop,
+                                &fqcn,
+                                effective_true,
+                                db,
+                                file,
+                            );
+                        }
                     }
                 }
                 // `Foo::class === get_class($x)` — symmetric counterpart.
@@ -4705,6 +4746,29 @@ fn narrow_var_to_class_string(
         })
     };
     set_narrowed(ctx, name, &current, narrowed, true);
+}
+
+/// Property-access counterpart of `narrow_var_to_class_string`, for
+/// `$this->prop === Foo::class` (a plain class-string comparison, not the
+/// enum-case idiom `narrow_prop_to_literal_enum_case` already handles).
+fn narrow_prop_to_class_string(
+    ctx: &mut FlowState,
+    obj_var: &str,
+    prop: &str,
+    fqcn: &str,
+    is_class: bool,
+    db: &dyn MirDatabase,
+    file: &str,
+) {
+    let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
+    let narrowed = if is_class {
+        Type::single(Atomic::TClassString(Some(mir_types::Name::from(fqcn))))
+    } else {
+        current.filter(|t| {
+            !matches!(t, Atomic::TClassString(Some(f)) if f.as_ref() == fqcn && crate::db::is_final(db, fqcn))
+        })
+    };
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, true);
 }
 
 /// `get_class($x)`/`get_debug_type($x)`/`$x::class` compared to a literal —
