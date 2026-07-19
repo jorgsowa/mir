@@ -577,6 +577,10 @@ pub fn narrow_from_condition(
                 } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
                     narrow_prop_bool(ctx, &obj, &prop, db, file, true, effective_true);
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
+                } else if let Some((fqcn, prop)) =
+                    extract_static_prop_access(&b.left, ctx, db, file)
+                {
+                    narrow_static_prop_bool(ctx, &fqcn, &prop, db, true, effective_true);
                 } else {
                     // `is_string($x) === true` / `($x instanceof Y) === true` — the
                     // left side is guaranteed to be a real bool (not just truthy),
@@ -592,6 +596,10 @@ pub fn narrow_from_condition(
                 } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
                     narrow_prop_bool(ctx, &obj, &prop, db, file, false, effective_true);
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
+                } else if let Some((fqcn, prop)) =
+                    extract_static_prop_access(&b.left, ctx, db, file)
+                {
+                    narrow_static_prop_bool(ctx, &fqcn, &prop, db, false, effective_true);
                 } else {
                     // `strpos($h, $n) !== false` / `array_search($n, $h) === false`
                     narrow_from_false_comparable_call(&b.left, ctx, db, file, effective_true);
@@ -607,6 +615,10 @@ pub fn narrow_from_condition(
                 } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
                     narrow_prop_bool(ctx, &obj, &prop, db, file, true, effective_true);
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
+                } else if let Some((fqcn, prop)) =
+                    extract_static_prop_access(&b.right, ctx, db, file)
+                {
+                    narrow_static_prop_bool(ctx, &fqcn, &prop, db, true, effective_true);
                 } else {
                     narrow_from_condition(&b.right, ctx, effective_true, db, file);
                 }
@@ -616,6 +628,10 @@ pub fn narrow_from_condition(
                 } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
                     narrow_prop_bool(ctx, &obj, &prop, db, file, false, effective_true);
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
+                } else if let Some((fqcn, prop)) =
+                    extract_static_prop_access(&b.right, ctx, db, file)
+                {
+                    narrow_static_prop_bool(ctx, &fqcn, &prop, db, false, effective_true);
                 } else {
                     narrow_from_false_comparable_call(&b.right, ctx, db, file, effective_true);
                     narrow_from_condition(&b.right, ctx, !effective_true, db, file);
@@ -3858,6 +3874,26 @@ fn narrow_static_prop_literal_int(
     let narrowed = literal_int_narrow_type(&current, value, is_value);
     let mark_diverges = crate::contradiction::is_closed_precise(&current);
     apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, mark_diverges);
+}
+
+/// Static-property counterpart of `narrow_prop_bool`, for
+/// `self::$prop === true` / `static::$prop === false` / `Class::$prop === true`.
+fn narrow_static_prop_bool(
+    ctx: &mut FlowState,
+    fqcn: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    value: bool,
+    is_value: bool,
+) {
+    let current = resolve_static_prop_current_type(ctx, fqcn, prop, db);
+    if current.is_mixed() {
+        return;
+    }
+    let narrowed = bool_narrow_type(&current, value, is_value);
+    // mark_diverges=false: matches narrow_var_bool/narrow_prop_bool's rationale
+    // — a separate contradiction pass already owns flagging an always-true/false compare.
+    apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, false);
 }
 
 /// Narrow a static property's type when `self::$prop instanceof ClassName` /
