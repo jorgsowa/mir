@@ -534,6 +534,28 @@ impl CallAnalyzer {
             for (k, v) in crate::db::inherited_template_bindings(ea.db, &fqcn, &class_bindings) {
                 class_bindings.entry(k).or_insert(v);
             }
+            // A class-level `@template T of Bound` was previously only ever
+            // checked at `new Box(...)` construction sites — a receiver typed
+            // `Box<NotAnimal>` via a docblock/param annotation instead sailed
+            // through every static/self/parent call unchecked, regardless of
+            // whether the called method itself declares its own template params.
+            for (name, inferred, bound) in check_template_bounds_with_inheritance(
+                ea.db,
+                &class_bindings,
+                &class_tps,
+                &Default::default(),
+                Some(fqcn_arc.as_ref()),
+            ) {
+                ea.emit(
+                    IssueKind::InvalidTemplateParam {
+                        name: name.to_string(),
+                        expected_bound: format!("{bound}"),
+                        actual: format!("{inferred}"),
+                    },
+                    Severity::Error,
+                    span,
+                );
+            }
             let mut param_bindings = class_bindings.clone();
             for tp in resolved.template_params.iter() {
                 param_bindings.remove(&Name::from(tp.name.as_ref()));

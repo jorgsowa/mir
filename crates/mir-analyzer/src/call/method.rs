@@ -828,6 +828,29 @@ fn resolve_method_return<'a>(
             bindings.entry(k).or_insert(v);
         }
 
+        // A class-level `@template T of Bound` was previously only ever checked
+        // at `new Box(...)` construction sites — a receiver typed `Box<NotAnimal>`
+        // via a docblock/param annotation instead (no constructor call in sight)
+        // sailed through every method call unchecked, regardless of whether the
+        // called method itself declares any template params of its own.
+        for (name, inferred, bound) in check_template_bounds_with_inheritance(
+            ea.db,
+            &bindings,
+            &class_tps,
+            &Default::default(),
+            Some(fqcn.as_ref()),
+        ) {
+            ea.emit(
+                IssueKind::InvalidTemplateParam {
+                    name: name.to_string(),
+                    expected_bound: format!("{bound}"),
+                    actual: format!("{inferred}"),
+                },
+                Severity::Error,
+                span,
+            );
+        }
+
         // Substitute class bindings into param types so argument checking resolves T → int etc.
         // A method-level `@template T` SHADOWS a same-named class template: its
         // occurrences in param types must stay unbound here so `check_args` can
