@@ -145,13 +145,17 @@ fn can_equal(ty: &Type, lit: &Lit) -> bool {
 }
 
 /// Whether `ty` is a closed set precise enough that an out-of-set comparison is
-/// a genuine contradiction: a bounded int range (`int<5, max>`) or a union of
-/// at least two literals (`1|2|3`, `"a"|"b"`).
+/// a genuine contradiction: a bounded int range (`int<5, max>`), a union of
+/// at least two literals (`1|2|3`, `"a"|"b"`), or a single docblock-sourced
+/// literal (e.g. what's left of `"a"|"b"` after a `!== "a"` exclusion).
 ///
-/// A *lone* literal (`0`, `"x"`) is deliberately rejected: it is too often a
-/// loop-carried under-approximation — e.g. `$i = 0; while (…) { $r = $i++;
-/// if ($r > 3) … }` infers `$r` as `0` because loop-variable widening is not
-/// modelled, which would otherwise flag the live `$r > 3` as impossible.
+/// A *lone* literal that ISN'T docblock-sourced (`0`, `"x"`) is rejected: it
+/// is too often a loop-carried under-approximation — e.g. `$i = 0; while (…)
+/// { $r = $i++; if ($r > 3) … }` infers `$r` as `0` because loop-variable
+/// widening is not modelled, which would otherwise flag the live `$r > 3` as
+/// impossible. `from_docblock` reliably tells the two apart: it propagates
+/// through every narrowing call site that can shrink a union down to one
+/// member, but loop widening never sets it.
 pub(crate) fn is_closed_precise(ty: &Type) -> bool {
     if ty.types.is_empty() {
         return false;
@@ -174,7 +178,15 @@ pub(crate) fn is_closed_precise(ty: &Type) -> bool {
                 | Atomic::TNegativeInt
         )
     });
-    has_range || ty.types.len() >= 2
+    // A single remaining literal atom is still closed when it came from a
+    // docblock union (successive `!==`/`!=` exclusions can shrink a 2+-member
+    // docblock union down to one member) -- but NOT when it's the result of
+    // loop-widening under-approximation, which also produces a bare
+    // single-literal type without `from_docblock` set. `from_docblock`
+    // reliably distinguishes the two: it propagates through every narrowing
+    // call site that can shrink a union (`filter`/`literal_string_narrow_type`/
+    // `literal_int_narrow_type`), but loop widening never sets it.
+    has_range || ty.types.len() >= 2 || (ty.types.len() == 1 && ty.from_docblock)
 }
 
 /// Whether `$var op N` can never hold, given `$var`'s integer bounds.
