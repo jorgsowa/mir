@@ -4396,14 +4396,15 @@ fn type_fn_narrowed(
 /// Whether `t` is provably excluded from `is_iterable()`/`is_countable()`'s
 /// false branch: always true for the `array` atom (the one type both
 /// functions are unconditionally true for), and true for a named-object atom
-/// only when it's `final` (no subclass could add `implements $interface`
-/// later) AND its own hierarchy provably doesn't already extend/implement
-/// `$interface` — the same final-class soundness gate
-/// `narrow_var_to_specific_class`'s false branch uses for exact-class
-/// exclusion. A non-final or unresolvable class is left alone, matching this
-/// function's conservative behavior before this class-hierarchy check
-/// existed (stripping a non-final class here risks falsely excluding a
-/// legitimately Countable/Traversable subclass).
+/// that already provably extends/implements `$interface` — such an atom can
+/// never make `is_iterable()`/`is_countable()` false, so it can't survive
+/// into the false branch. A `final` class that provably does NOT
+/// extend/implement `$interface` is the opposite case (guaranteed to make
+/// the check false) and must be kept, not excluded. A non-final or
+/// unresolvable class is left alone (kept), matching this function's
+/// conservative behavior before this class-hierarchy check existed
+/// (stripping a non-final class here risks falsely excluding a legitimately
+/// Countable/Traversable subclass).
 fn atom_excluded_from_is_iterable_or_countable(
     t: &Atomic,
     interface: &str,
@@ -4413,8 +4414,7 @@ fn atom_excluded_from_is_iterable_or_countable(
         return true;
     }
     if let Atomic::TNamedObject { fqcn, .. } = t {
-        return crate::db::is_final(db, fqcn)
-            && !crate::db::extends_or_implements(db, fqcn, interface);
+        return crate::db::extends_or_implements(db, fqcn, interface);
     }
     false
 }
