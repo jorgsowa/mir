@@ -292,6 +292,20 @@ impl<'a> ClassAnalyzer<'a> {
                     }
                 }
             }
+            // Same generic-bound check as class `@implements`/`@extends` type
+            // args above (1c) — an interface's own `@template-extends
+            // Base<Unrelated>` type args were parsed and used for binding
+            // substitution elsewhere but never bound-checked here.
+            for (parent_iface_fqcn, args) in iface.extends_type_args.iter() {
+                if !args.is_empty() {
+                    self.check_generic_type_args(
+                        parent_iface_fqcn.as_ref(),
+                        args,
+                        location.as_ref(),
+                        &mut issues,
+                    );
+                }
+            }
             self.check_magic_method_casing(&iface_fqcn, &mut issues);
         }
 
