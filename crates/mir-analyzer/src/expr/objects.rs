@@ -1371,9 +1371,16 @@ impl<'a> ExpressionAnalyzer<'a> {
                         // chain walk used everywhere else for inherited bindings.
                         let ty = if type_params.is_empty() {
                             ty
-                        } else if let Some(class_tps) =
-                            crate::db::class_template_params(self.db, fqcn.as_ref())
-                        {
+                        } else {
+                            // `None` (no `@template`-declaring ancestor found, e.g. an
+                            // enum with no parent to walk up to) is equivalent to an
+                            // empty list here, NOT an abort — `own_bindings` staying
+                            // empty still lets `inherited_template_bindings` below
+                            // resolve the class's own `@implements Iface<T>` literal
+                            // type args.
+                            let class_tps =
+                                crate::db::effective_class_template_params(self.db, fqcn.as_ref())
+                                    .unwrap_or_default();
                             let own_bindings: rustc_hash::FxHashMap<mir_types::Name, Type> =
                                 class_tps
                                     .iter()
@@ -1387,8 +1394,6 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 &own_bindings,
                             ));
                             ty.substitute_templates(&substitution)
-                        } else {
-                            ty
                         };
                         self.record_ref(Arc::from(format!("prop:{}::{}", owner, prop_name)), span);
                         *declaring_class = Some(owner);
