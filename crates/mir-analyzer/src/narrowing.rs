@@ -5293,6 +5293,14 @@ fn narrow_shape_path_key_exists(
                             prop.ty = deeper;
                             changed = true;
                         }
+                        // Reaching here at all proves `head` is a real array
+                        // (array_key_exists's second argument), so it's no
+                        // longer optional — regardless of whether the deeper
+                        // key-presence narrowing itself changed anything.
+                        if prop.optional {
+                            prop.optional = false;
+                            changed = true;
+                        }
                     }
                     result.add_type(Atomic::TKeyedArray {
                         properties: new_props,
