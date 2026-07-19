@@ -997,12 +997,20 @@ pub fn narrow_from_condition(
                     narrow_var_loose_null(ctx, &name, effective_true);
                 } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
                     narrow_prop_loose_null(ctx, &obj, &prop, db, file, effective_true);
+                } else if let Some((fqcn, prop)) =
+                    extract_static_prop_access(&b.left, ctx, db, file)
+                {
+                    narrow_static_prop_loose_null(ctx, &fqcn, &prop, db, effective_true);
                 }
             } else if matches!(b.left.kind, ExprKind::Null) {
                 if let Some(name) = extract_var_name(&b.right) {
                     narrow_var_loose_null(ctx, &name, effective_true);
                 } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
                     narrow_prop_loose_null(ctx, &obj, &prop, db, file, effective_true);
+                } else if let Some((fqcn, prop)) =
+                    extract_static_prop_access(&b.right, ctx, db, file)
+                {
+                    narrow_static_prop_loose_null(ctx, &fqcn, &prop, db, effective_true);
                 }
             }
             // `$x == true` / `$x == false` (and negated forms) — PHP defines loose
@@ -3763,6 +3771,31 @@ fn narrow_static_prop_null(
     }
     let narrowed = if is_null {
         current.narrow_to_null()
+    } else {
+        current.remove_null()
+    };
+    apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, true);
+}
+
+/// Loose-null counterpart of `narrow_static_prop_null`, for
+/// `self::$prop == null` / `!= null` (and `static::$prop`/`Class::$prop`).
+/// Loose semantics differ from strict: `== null` is also true for any other
+/// falsy value (not just `null` itself), so the true direction only narrows
+/// to falsy — same reasoning as `narrow_var_loose_null`/`narrow_prop_loose_null`.
+/// The false direction stays exactly as sound as the strict form.
+fn narrow_static_prop_loose_null(
+    ctx: &mut FlowState,
+    fqcn: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    is_null: bool,
+) {
+    let current = resolve_static_prop_current_type(ctx, fqcn, prop, db);
+    if current.is_mixed() {
+        return;
+    }
+    let narrowed = if is_null {
+        current.narrow_to_falsy()
     } else {
         current.remove_null()
     };
