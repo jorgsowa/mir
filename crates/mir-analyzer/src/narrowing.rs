@@ -1188,7 +1188,9 @@ pub fn narrow_from_condition(
                 }
             }
             // count($arr) op N  /  N op count($arr) — normalize so count call is on left.
-            let (count_expr, count_cmp_op, count_lit) = if extract_count_arg(&b.left).is_some() {
+            let count_call_on_left = extract_count_arg(&b.left).is_some()
+                || extract_count_static_prop_arg(&b.left, ctx, db, file).is_some();
+            let (count_expr, count_cmp_op, count_lit) = if count_call_on_left {
                 (&b.left, b.op, &b.right)
             } else {
                 (&b.right, flip_comparison_op(b.op), &b.left)
@@ -1212,10 +1214,24 @@ pub fn narrow_from_condition(
                         is_true,
                     ),
                 }
+            } else if let (Some((fqcn, prop)), Some(n)) = (
+                extract_count_static_prop_arg(count_expr, ctx, db, file),
+                extract_int_literal(count_lit),
+            ) {
+                narrow_static_prop_array_count_comparison(
+                    ctx,
+                    &fqcn,
+                    &prop,
+                    db,
+                    count_cmp_op,
+                    n,
+                    is_true,
+                );
             }
             // strlen($str) op N  /  N op strlen($str) — same normalization.
-            let (strlen_expr, strlen_cmp_op, strlen_lit) = if extract_strlen_arg(&b.left).is_some()
-            {
+            let strlen_call_on_left = extract_strlen_arg(&b.left).is_some()
+                || extract_strlen_static_prop_arg(&b.left, ctx, db, file).is_some();
+            let (strlen_expr, strlen_cmp_op, strlen_lit) = if strlen_call_on_left {
                 (&b.left, b.op, &b.right)
             } else {
                 (&b.right, flip_comparison_op(b.op), &b.left)
@@ -1239,6 +1255,19 @@ pub fn narrow_from_condition(
                         is_true,
                     ),
                 }
+            } else if let (Some((fqcn, prop)), Some(n)) = (
+                extract_strlen_static_prop_arg(strlen_expr, ctx, db, file),
+                extract_int_literal(strlen_lit),
+            ) {
+                narrow_static_prop_string_strlen_comparison(
+                    ctx,
+                    &fqcn,
+                    &prop,
+                    db,
+                    strlen_cmp_op,
+                    n,
+                    is_true,
+                );
             }
         }
 
@@ -7429,6 +7458,33 @@ fn extract_count_arg(expr: &php_ast::owned::Expr) -> Option<ScalarArgTarget> {
     None
 }
 
+/// Static-property counterpart of `extract_count_arg` — see
+/// `extract_gettype_static_prop_arg` for why this is a separate,
+/// call-site-local extractor rather than a `ScalarArgTarget` variant.
+fn extract_count_static_prop_arg(
+    expr: &php_ast::owned::Expr,
+    ctx: &FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<(std::sync::Arc<str>, String)> {
+    if let ExprKind::FunctionCall(call) = &expr.kind {
+        let name = match &call.name.kind {
+            ExprKind::Identifier(n) => n.as_ref(),
+            _ => return None,
+        };
+        let bare = name.trim_start_matches('\\');
+        if bare.eq_ignore_ascii_case("count")
+            || bare.eq_ignore_ascii_case("sizeof")
+            || bare.eq_ignore_ascii_case("iterator_count")
+        {
+            if let Some(arg) = call.args.first() {
+                return extract_static_prop_access(&arg.value, ctx, db, file);
+            }
+        }
+    }
+    None
+}
+
 /// Extract the variable/property target from `array_key_first($var)` /
 /// `array_key_last($var)`.
 fn extract_array_key_first_or_last_arg(expr: &php_ast::owned::Expr) -> Option<ScalarArgTarget> {
@@ -7513,6 +7569,31 @@ fn extract_strlen_arg(expr: &php_ast::owned::Expr) -> Option<ScalarArgTarget> {
     None
 }
 
+/// Static-property counterpart of `extract_strlen_arg`.
+fn extract_strlen_static_prop_arg(
+    expr: &php_ast::owned::Expr,
+    ctx: &FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<(std::sync::Arc<str>, String)> {
+    if let ExprKind::FunctionCall(call) = &expr.kind {
+        let name = match &call.name.kind {
+            ExprKind::Identifier(n) => n.as_ref(),
+            _ => return None,
+        };
+        let bare = name.trim_start_matches('\\');
+        if bare.eq_ignore_ascii_case("strlen")
+            || bare.eq_ignore_ascii_case("mb_strlen")
+            || bare.eq_ignore_ascii_case("iconv_strlen")
+        {
+            if let Some(arg) = call.args.first() {
+                return extract_static_prop_access(&arg.value, ctx, db, file);
+            }
+        }
+    }
+    None
+}
+
 /// `count($arr) op N` / `strlen($str) op N` for the equality operators
 /// (`===`, `!==`, `==`, `!=`) — the `<`/`<=`/`>`/`>=` forms are normalized
 /// and handled inline where those operators are matched; equality is
@@ -7527,7 +7608,9 @@ fn narrow_count_or_strlen_equality(
     op: BinaryOp,
     is_true: bool,
 ) {
-    let (count_expr, count_lit) = if extract_count_arg(left).is_some() {
+    let count_on_left = extract_count_arg(left).is_some()
+        || extract_count_static_prop_arg(left, ctx, db, file).is_some();
+    let (count_expr, count_lit) = if count_on_left {
         (left, right)
     } else {
         (right, left)
@@ -7545,8 +7628,16 @@ fn narrow_count_or_strlen_equality(
             }
         }
         return;
+    } else if let (Some((fqcn, prop)), Some(n)) = (
+        extract_count_static_prop_arg(count_expr, ctx, db, file),
+        extract_int_literal(count_lit),
+    ) {
+        narrow_static_prop_array_count_comparison(ctx, &fqcn, &prop, db, op, n, is_true);
+        return;
     }
-    let (strlen_expr, strlen_lit) = if extract_strlen_arg(left).is_some() {
+    let strlen_on_left = extract_strlen_arg(left).is_some()
+        || extract_strlen_static_prop_arg(left, ctx, db, file).is_some();
+    let (strlen_expr, strlen_lit) = if strlen_on_left {
         (left, right)
     } else {
         (right, left)
@@ -7563,6 +7654,11 @@ fn narrow_count_or_strlen_equality(
                 narrow_prop_string_strlen_comparison(ctx, &obj, &prop, db, file, op, n, is_true)
             }
         }
+    } else if let (Some((fqcn, prop)), Some(n)) = (
+        extract_strlen_static_prop_arg(strlen_expr, ctx, db, file),
+        extract_int_literal(strlen_lit),
+    ) {
+        narrow_static_prop_string_strlen_comparison(ctx, &fqcn, &prop, db, op, n, is_true);
     }
 }
 
@@ -7719,6 +7815,58 @@ fn narrow_prop_string_strlen_comparison(
     if non_empty {
         narrow_receiver_non_null_on_prop_match(ctx, obj_var, true);
     }
+}
+
+/// Static-property counterpart of `narrow_prop_array_count_comparison`.
+/// There's no nullable receiver variable for a static property, so no
+/// receiver-non-null propagation is needed.
+fn narrow_static_prop_array_count_comparison(
+    ctx: &mut FlowState,
+    fqcn: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    op: BinaryOp,
+    n: i64,
+    is_true: bool,
+) {
+    let Some(non_empty) = count_or_strlen_emptiness(op, n, is_true) else {
+        return;
+    };
+    let current = resolve_static_prop_current_type(ctx, fqcn, prop, db);
+    if current.is_mixed() {
+        return;
+    }
+    let narrowed = if non_empty {
+        current.narrow_to_non_empty_collection()
+    } else {
+        current.narrow_to_empty_collection()
+    };
+    apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, false);
+}
+
+/// Static-property counterpart of `narrow_prop_string_strlen_comparison`.
+fn narrow_static_prop_string_strlen_comparison(
+    ctx: &mut FlowState,
+    fqcn: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    op: BinaryOp,
+    n: i64,
+    is_true: bool,
+) {
+    let Some(non_empty) = count_or_strlen_emptiness(op, n, is_true) else {
+        return;
+    };
+    let current = resolve_static_prop_current_type(ctx, fqcn, prop, db);
+    if current.is_mixed() {
+        return;
+    }
+    let narrowed = if non_empty {
+        narrow_string_to_non_empty(&current)
+    } else {
+        narrow_string_to_empty(&current)
+    };
+    apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, false);
 }
 
 /// Shared by the `Variable` and property-access arms of `extract_haystack_type`:
