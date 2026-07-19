@@ -4605,8 +4605,13 @@ fn narrow_prop_from_type_fn(
     // (same reasoning as `narrow_prop_instanceof`'s false-branch gate).
     let is_null_check = crate::util::php_ident_lowercase(fn_name) == "is_null";
     let receiver_nullable = ctx.get_var(obj_var).is_nullable();
-    let mark_diverges = !receiver_nullable || (is_true != is_null_check);
+    // Proves the property's own value isn't null (`is_true != is_null_check`,
+    // same condition as mark_diverges above) — which, on a nullable receiver,
+    // also proves the receiver itself wasn't null (see the comment above).
+    let proved_prop_non_null = is_true != is_null_check;
+    let mark_diverges = !receiver_nullable || proved_prop_non_null;
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, mark_diverges);
+    narrow_receiver_non_null_on_prop_match(ctx, obj_var, proved_prop_non_null);
 }
 
 /// Core `is_*`/`ctype_*`/`array_is_list`/`method_exists`/`property_exists`
