@@ -689,6 +689,18 @@ pub fn narrow_from_condition(
                         effective_true,
                     );
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
+                } else if let Some((fqcn, prop)) =
+                    extract_static_prop_access(&b.left, ctx, db, file)
+                {
+                    // `self::$prop === 'literal'`
+                    narrow_static_prop_literal_string(
+                        ctx,
+                        &fqcn,
+                        &prop,
+                        db,
+                        class_name_str,
+                        effective_true,
+                    );
                 }
             } else if let ExprKind::String(class_name_str) = &b.left.kind {
                 if let Some(target) = extract_get_class_arg(&b.right) {
@@ -757,6 +769,18 @@ pub fn narrow_from_condition(
                         effective_true,
                     );
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
+                } else if let Some((fqcn, prop)) =
+                    extract_static_prop_access(&b.right, ctx, db, file)
+                {
+                    // `'literal' === self::$prop`
+                    narrow_static_prop_literal_string(
+                        ctx,
+                        &fqcn,
+                        &prop,
+                        db,
+                        class_name_str,
+                        effective_true,
+                    );
                 }
             }
             // `$x === 42`
@@ -766,6 +790,10 @@ pub fn narrow_from_condition(
                 } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
                     narrow_prop_literal_int(ctx, &obj, &prop, db, file, *n, effective_true);
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
+                } else if let Some((fqcn, prop)) =
+                    extract_static_prop_access(&b.left, ctx, db, file)
+                {
+                    narrow_static_prop_literal_int(ctx, &fqcn, &prop, db, *n, effective_true);
                 }
             } else if let ExprKind::Int(n) = &b.left.kind {
                 if let Some(name) = extract_var_name(&b.right) {
@@ -773,6 +801,10 @@ pub fn narrow_from_condition(
                 } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
                     narrow_prop_literal_int(ctx, &obj, &prop, db, file, *n, effective_true);
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
+                } else if let Some((fqcn, prop)) =
+                    extract_static_prop_access(&b.right, ctx, db, file)
+                {
+                    narrow_static_prop_literal_int(ctx, &fqcn, &prop, db, *n, effective_true);
                 }
             }
             // `$x === EnumName::CaseName` / get_class()/get_debug_type()/
@@ -3644,6 +3676,25 @@ fn narrow_nullsafe_prop_null(
 /// Narrow a static property access `self::$prop`/`Class::$prop` by a null
 /// check. `prop_refined` is keyed by FQCN here instead of a receiver
 /// variable name — a FQCN string can never collide with a real PHP variable.
+/// Resolve the current type of `self::$prop`/`static::$prop`/`Class::$prop`:
+/// an existing flow-state refinement if one is already tracked, else the
+/// declared type looked up through the class hierarchy. Static-property
+/// counterpart of `resolve_prop_current_type`.
+fn resolve_static_prop_current_type(
+    ctx: &FlowState,
+    fqcn: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+) -> Type {
+    if let Some(refined) = ctx.get_prop_refined(fqcn, prop) {
+        return refined.clone();
+    }
+    let here = crate::db::Fqcn::from_str(db, fqcn);
+    crate::db::find_property_in_chain(db, here, prop)
+        .and_then(|(_, p)| p.ty.as_deref().cloned())
+        .unwrap_or_else(mir_types::Type::mixed)
+}
+
 fn narrow_static_prop_null(
     ctx: &mut FlowState,
     fqcn: &str,
@@ -3651,14 +3702,7 @@ fn narrow_static_prop_null(
     db: &dyn MirDatabase,
     is_null: bool,
 ) {
-    let current = if let Some(refined) = ctx.get_prop_refined(fqcn, prop) {
-        refined.clone()
-    } else {
-        let here = crate::db::Fqcn::from_str(db, fqcn);
-        crate::db::find_property_in_chain(db, here, prop)
-            .and_then(|(_, p)| p.ty.as_deref().cloned())
-            .unwrap_or_else(mir_types::Type::mixed)
-    };
+    let current = resolve_static_prop_current_type(ctx, fqcn, prop, db);
 
     if current.is_mixed() {
         return;
@@ -3669,6 +3713,44 @@ fn narrow_static_prop_null(
         current.remove_null()
     };
     apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, true);
+}
+
+/// Static-property counterpart of `narrow_prop_literal_string`, for
+/// `self::$prop === 'literal'` / `static::$prop === 'literal'` /
+/// `Class::$prop === 'literal'`.
+fn narrow_static_prop_literal_string(
+    ctx: &mut FlowState,
+    fqcn: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    value: &str,
+    is_value: bool,
+) {
+    let current = resolve_static_prop_current_type(ctx, fqcn, prop, db);
+    if current.is_mixed() {
+        return;
+    }
+    let narrowed = literal_string_narrow_type(&current, value, is_value);
+    apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, false);
+}
+
+/// Static-property counterpart of `narrow_prop_literal_int`, for
+/// `self::$prop === 42` / `static::$prop === 42` / `Class::$prop === 42`.
+fn narrow_static_prop_literal_int(
+    ctx: &mut FlowState,
+    fqcn: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    value: i64,
+    is_value: bool,
+) {
+    let current = resolve_static_prop_current_type(ctx, fqcn, prop, db);
+    if current.is_mixed() {
+        return;
+    }
+    let narrowed = literal_int_narrow_type(&current, value, is_value);
+    let mark_diverges = crate::contradiction::is_closed_precise(&current);
+    apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, mark_diverges);
 }
 
 /// Narrow a static property's type when `self::$prop instanceof ClassName` /
