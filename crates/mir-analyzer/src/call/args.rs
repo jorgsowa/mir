@@ -516,19 +516,42 @@ fn param_contains_template_or_unknown(
             // Check if this is an unknown type
             !inner.contains('\\') && !crate::db::class_exists(ea.db, inner.as_ref())
         }
-        Atomic::TArray { key: _, value }
-        | Atomic::TList { value }
-        | Atomic::TNonEmptyArray { key: _, value }
-        | Atomic::TNonEmptyList { value } => value.types.iter().any(|v| match v {
-            Atomic::TTemplateParam { .. } => true,
-            Atomic::TNamedObject { fqcn, .. } => {
-                if !fqcn.contains('\\') && template_names.contains(fqcn.as_ref()) {
-                    return true;
-                }
-                !fqcn.contains('\\') && !crate::db::class_exists(ea.db, fqcn.as_ref())
+        Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value } => {
+            fn contains_template_or_unknown(
+                t: &Type,
+                ea: &ExpressionAnalyzer<'_>,
+                template_names: &rustc_hash::FxHashSet<&str>,
+            ) -> bool {
+                t.types.iter().any(|v| match v {
+                    Atomic::TTemplateParam { .. } => true,
+                    Atomic::TNamedObject { fqcn, .. } => {
+                        if !fqcn.contains('\\') && template_names.contains(fqcn.as_ref()) {
+                            return true;
+                        }
+                        !fqcn.contains('\\') && !crate::db::class_exists(ea.db, fqcn.as_ref())
+                    }
+                    _ => false,
+                })
             }
-            _ => false,
-        }),
+            // A templated/unknown array KEY (e.g. `@template TKey of array-key`
+            // in `array<TKey, TValue>`) must also be forgiven — previously only
+            // the value type was checked, so a key-only template left this arm
+            // returning false and a legitimate arg risked a false InvalidArgument.
+            contains_template_or_unknown(key, ea, &template_names)
+                || contains_template_or_unknown(value, ea, &template_names)
+        }
+        Atomic::TList { value } | Atomic::TNonEmptyList { value } => {
+            value.types.iter().any(|v| match v {
+                Atomic::TTemplateParam { .. } => true,
+                Atomic::TNamedObject { fqcn, .. } => {
+                    if !fqcn.contains('\\') && template_names.contains(fqcn.as_ref()) {
+                        return true;
+                    }
+                    !fqcn.contains('\\') && !crate::db::class_exists(ea.db, fqcn.as_ref())
+                }
+                _ => false,
+            })
+        }
         // For A&B intersections containing a template, only suppress the
         // InvalidArgument if the arg satisfies all the concrete (non-template)
         // parts. If a concrete part is violated (e.g. arg doesn't implement
