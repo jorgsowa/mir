@@ -15,7 +15,8 @@ use rustc_hash::FxHashMap;
 use mir_types::{Atomic, Name, Type, Variance};
 
 use crate::db::{
-    class_template_params, extends_or_implements, inherited_template_bindings, MirDatabase,
+    effective_class_template_params, extends_or_implements, inherited_template_bindings,
+    MirDatabase,
 };
 
 /// A supertype type-parameter that's effectively wildcarded — an unbound
@@ -44,9 +45,21 @@ fn variance_compatible(
     if sub_params.len() != sup_params.len() {
         return false;
     }
-    let Some(tps) = class_template_params(db, fqcn) else {
+    // A bare subclass that doesn't redeclare `@template` (`class IntBox
+    // extends Box {}`) still carries its type args positioned against the
+    // nearest ancestor that actually declares them — walk up to that
+    // ancestor via `effective_class_template_params` instead of finding zero
+    // templates on `fqcn` itself. An empty result here (no template-declaring
+    // ancestor at all) can't vacuously pass a caller-supplied non-empty
+    // `sub_params`/`sup_params` pair (already known to differ, since the
+    // `sub_params == sup_params` fast path in `is_subtype` would have short-
+    // circuited otherwise) — there's no variance info to justify treating
+    // them as compatible, so this must return false, not the previous
+    // `tps.iter().zip(..)` vacuous-empty-iterator `true`.
+    let tps = effective_class_template_params(db, fqcn).unwrap_or_default();
+    if tps.len() != sub_params.len() {
         return false;
-    };
+    }
     tps.iter()
         .zip(sub_params)
         .zip(sup_params)
@@ -77,16 +90,21 @@ fn variance_compatible_across_hierarchy(
     if sub_fqcn == sup_fqcn {
         return false;
     }
-    let Some(sub_tps) = class_template_params(db, sub_fqcn) else {
-        return false;
-    };
-    // A concrete, non-generic class (`sub_tps` empty, so `sub_params` is too)
-    // has no OWN bindings to contribute, but it can still fix an ancestor's
-    // template argument via `@implements Collection<int>` —
+    // A bare subclass that doesn't redeclare `@template` (`class IntBox
+    // extends Box {}`) still carries its type args positioned against the
+    // nearest ancestor that actually declares them — walk up to that
+    // ancestor instead of finding zero templates on `sub_fqcn` itself and
+    // discarding every bound type param (see `variance_compatible` above for
+    // the same fix, and `call/method.rs`/`call/static_call.rs`/
+    // `expr/objects.rs` for the established pattern elsewhere). `None`/empty
+    // (no template-declaring ancestor at all — a genuinely concrete,
+    // non-generic class) has no OWN bindings to contribute, but it can still
+    // fix an ancestor's template argument via `@implements Collection<int>` —
     // `inherited_template_bindings` below resolves that directly from the
     // `@implements` clause, so an empty `own_bindings` is fine. Only bail
     // when the sub class DOES declare templates but the caller supplied a
     // mismatched arity — a malformed receiver, not "nothing to check".
+    let sub_tps = effective_class_template_params(db, sub_fqcn).unwrap_or_default();
     if !sub_tps.is_empty() && sub_tps.len() != sub_params.len() {
         return false;
     }
@@ -96,9 +114,7 @@ fn variance_compatible_across_hierarchy(
         .map(|(tp, ty)| (tp.name, ty.clone()))
         .collect();
     let ancestor_bindings = inherited_template_bindings(db, sub_fqcn, &own_bindings);
-    let Some(sup_tps) = class_template_params(db, sup_fqcn) else {
-        return false;
-    };
+    let sup_tps = effective_class_template_params(db, sup_fqcn).unwrap_or_default();
     let resolved_sup_params: Vec<Type> = sup_tps
         .iter()
         .map(|tp| {
