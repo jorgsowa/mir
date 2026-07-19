@@ -4282,12 +4282,30 @@ fn int_comparison_bounds(
     }
 }
 
+/// Whether `$x <op> n` resolving to `is_true` proves `$x` isn't `null`,
+/// independent of `n`'s value. PHP's ordering-comparison table converts a
+/// `null` operand to `bool` (`false`) and the int literal to `bool` (`n !=
+/// 0`) — `null > n` and `null <= n` (its negation) always compare
+/// `false <op> bool(n)` in a way that can never hold `null`'s side true
+/// regardless of `n`, so those two directions exclude `null` unconditionally.
+/// `>=`/`<` are the opposite: whether `null` survives depends on whether
+/// `n == 0`, so those stay untouched here (deferred, `n`-dependent).
+fn int_comparison_excludes_null(op: BinaryOp, is_true: bool) -> bool {
+    matches!(
+        (op, is_true),
+        (BinaryOp::Greater, true) | (BinaryOp::LessOrEqual, false)
+    )
+}
+
 fn narrow_var_int_comparison(ctx: &mut FlowState, name: &str, op: BinaryOp, n: i64, is_true: bool) {
     let Some((min, max)) = int_comparison_bounds(op, n, is_true) else {
         return;
     };
     let current = ctx.get_var(name);
-    let narrowed = narrow_type_to_int_range(&current, min, max);
+    let mut narrowed = narrow_type_to_int_range(&current, min, max);
+    if int_comparison_excludes_null(op, is_true) {
+        narrowed = narrowed.remove_null();
+    }
     // Mark the branch unreachable only when the current type is "closed precise"
     // (a bounded int range, named int subtype, or literal union) — these only arise
     // from docblocks/inference, so an empty intersection is a real contradiction.
@@ -4316,7 +4334,10 @@ fn narrow_prop_int_comparison(
     if current.is_mixed() {
         return;
     }
-    let narrowed = narrow_type_to_int_range(&current, min, max);
+    let mut narrowed = narrow_type_to_int_range(&current, min, max);
+    if int_comparison_excludes_null(op, is_true) {
+        narrowed = narrowed.remove_null();
+    }
     // A nullable $obj means the comparison can also be satisfied by the
     // receiver itself being null: PHP's ordering-comparison table converts a
     // null operand and the int literal to bool and compares those (`false`
