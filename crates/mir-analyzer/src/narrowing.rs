@@ -1393,11 +1393,12 @@ pub fn narrow_from_condition(
                                     // Nested container, e.g. array_key_exists('b', $arr['a']) —
                                     // walk down to the ['a'] shape and prove 'b' present there,
                                     // same as the single-level var/prop cases above.
-                                    let current = ctx.get_var(&base);
+                                    let current =
+                                        resolve_shape_base_current_type(ctx, &base, db, file);
                                     if let Some(narrowed) =
                                         narrow_shape_path_key_exists(&current, &path, &key)
                                     {
-                                        ctx.set_var(&base, narrowed);
+                                        set_shape_base_narrowed(ctx, &base, current, narrowed);
                                     }
                                 } else if let (
                                     mir_types::atomic::ArrayKey::String(iface_name),
@@ -1455,11 +1456,12 @@ pub fn narrow_from_condition(
                                     // array_key_exists('b', $arr['a']) proven
                                     // false — same as the single-level
                                     // var/prop cases above.
-                                    let current = ctx.get_var(&base);
+                                    let current =
+                                        resolve_shape_base_current_type(ctx, &base, db, file);
                                     if let Some(narrowed) =
                                         narrow_shape_path_key_exists_false(&current, &path, &key)
                                     {
-                                        ctx.set_var(&base, narrowed);
+                                        set_shape_base_narrowed(ctx, &base, current, narrowed);
                                     }
                                 } else if let (
                                     mir_types::atomic::ArrayKey::String(iface_name),
@@ -1797,7 +1799,7 @@ pub fn narrow_from_condition(
                     // and mark it no longer optional, so a later `$arr['key']`
                     // read inside the guard isn't reported as possibly-null (the
                     // isset check just proved the key is present and non-null).
-                    narrow_isset_shape_key(var_expr, ctx);
+                    narrow_isset_shape_key(var_expr, ctx, db, file);
                     // `isset($this->prop)` implies the property is non-null too
                     // — the property-receiver counterpart of the bare-variable
                     // case above, since `isset()` is false for both an unset
@@ -1839,7 +1841,7 @@ pub fn narrow_from_condition(
                 // For a single-level `empty($arr['key'])` on a shape-typed base,
                 // also narrow that key's OWN value type by truthiness, mirroring
                 // narrow_isset_shape_key.
-                narrow_empty_shape_key(var_expr, ctx, is_true);
+                narrow_empty_shape_key(var_expr, ctx, is_true, db, file);
             }
         }
 
@@ -5308,23 +5310,29 @@ fn array_access_base_var(expr: &php_ast::owned::Expr) -> Option<String> {
 /// value type and mark it no longer optional, recursing into the key's own
 /// value type for the next path segment. `isset($a['b']['c'])` proves both
 /// `$a['b']` and `$a['b']['c']` present, not just the outermost key.
-fn narrow_isset_shape_key(var_expr: &php_ast::owned::Expr, ctx: &mut FlowState) {
+fn narrow_isset_shape_key(
+    var_expr: &php_ast::owned::Expr,
+    ctx: &mut FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) {
     let Some((base, path)) = collect_array_access_path(var_expr) else {
         return;
     };
-    let current = ctx.get_var(&base);
+    let current = resolve_shape_base_current_type(ctx, &base, db, file);
     if let Some(narrowed) = narrow_shape_path(&current, &path) {
-        ctx.set_var(&base, narrowed);
+        set_shape_base_narrowed(ctx, &base, current, narrowed);
     }
 }
 
-/// Collect `(base_var, [key1, key2, ...])` from a chain of literal-keyed
-/// `ArrayAccess` nodes, outermost-to-innermost (`$a['x']['y']` -> `("a",
-/// [x, y])`). Returns `None` as soon as a non-literal key or non-variable
-/// root is found — those cases are left unnarrowed.
+/// Collect `(base, [key1, key2, ...])` from a chain of literal-keyed
+/// `ArrayAccess` nodes, outermost-to-innermost (`$a['x']['y']` -> `(Var("a"),
+/// [x, y])`, `$this->data['x']` -> `(Prop("this", "data"), [x])`). Returns
+/// `None` as soon as a non-literal key or non-var/prop root is found — those
+/// cases are left unnarrowed.
 fn collect_array_access_path(
     expr: &php_ast::owned::Expr,
-) -> Option<(String, Vec<mir_types::atomic::ArrayKey>)> {
+) -> Option<(ScalarArgTarget, Vec<mir_types::atomic::ArrayKey>)> {
     let ExprKind::ArrayAccess(aa) = &expr.kind else {
         return None;
     };
@@ -5336,12 +5344,41 @@ fn collect_array_access_path(
         ExprKind::Int(i) => mir_types::atomic::ArrayKey::Int(*i),
         _ => return None,
     };
-    if let Some(base) = extract_var_name(&aa.array) {
+    if let Some(base) = ScalarArgTarget::extract(&aa.array) {
         Some((base, vec![key]))
     } else {
         let (base, mut path) = collect_array_access_path(&aa.array)?;
         path.push(key);
         Some((base, path))
+    }
+}
+
+/// Read the current type of a `collect_array_access_path` base, whichever
+/// receiver shape it is.
+fn resolve_shape_base_current_type(
+    ctx: &mut FlowState,
+    base: &ScalarArgTarget,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Type {
+    match base {
+        ScalarArgTarget::Var(name) => ctx.get_var(name),
+        ScalarArgTarget::Prop(obj, prop) => resolve_prop_current_type(ctx, obj, prop, db, file),
+    }
+}
+
+/// Apply a narrowed type back to a `collect_array_access_path` base.
+fn set_shape_base_narrowed(
+    ctx: &mut FlowState,
+    base: &ScalarArgTarget,
+    current: Type,
+    narrowed: Type,
+) {
+    match base {
+        ScalarArgTarget::Var(name) => ctx.set_var(name, narrowed),
+        ScalarArgTarget::Prop(obj, prop) => {
+            apply_prop_narrowed(ctx, obj, prop, current, narrowed, false)
+        }
     }
 }
 
@@ -5535,37 +5572,31 @@ fn narrow_shape_path_key_exists_false(
 /// `empty(...)` being true doesn't pin down which level was missing/falsy,
 /// so nested paths are left unnarrowed there (single-level `empty()` still
 /// narrows as before).
-fn narrow_empty_shape_key(var_expr: &php_ast::owned::Expr, ctx: &mut FlowState, is_true: bool) {
-    if let Some((base, path)) = collect_array_access_path(var_expr) {
-        if path.len() > 1 {
-            if !is_true {
-                let current = ctx.get_var(&base);
-                if let Some(narrowed) = narrow_not_empty_shape_path(&current, &path) {
-                    ctx.set_var(&base, narrowed);
-                }
+fn narrow_empty_shape_key(
+    var_expr: &php_ast::owned::Expr,
+    ctx: &mut FlowState,
+    is_true: bool,
+    db: &dyn MirDatabase,
+    file: &str,
+) {
+    let Some((base, path)) = collect_array_access_path(var_expr) else {
+        return;
+    };
+    if path.len() > 1 {
+        if !is_true {
+            let current = resolve_shape_base_current_type(ctx, &base, db, file);
+            if let Some(narrowed) = narrow_not_empty_shape_path(&current, &path) {
+                set_shape_base_narrowed(ctx, &base, current, narrowed);
             }
-            return;
         }
+        return;
     }
+    let key = path
+        .into_iter()
+        .next()
+        .expect("path.len() == 1 checked above");
 
-    let ExprKind::ArrayAccess(aa) = &var_expr.kind else {
-        return;
-    };
-    let Some(base) = extract_var_name(&aa.array) else {
-        return;
-    };
-    let Some(idx) = &aa.index else {
-        return;
-    };
-    let key = match &idx.kind {
-        ExprKind::String(s) => {
-            mir_types::atomic::ArrayKey::String(std::sync::Arc::from(s.as_ref()))
-        }
-        ExprKind::Int(i) => mir_types::atomic::ArrayKey::Int(*i),
-        _ => return,
-    };
-
-    let current = ctx.get_var(&base);
+    let current = resolve_shape_base_current_type(ctx, &base, db, file);
     let mut changed = false;
     let mut result = Type::empty();
     for atomic in &current.types {
@@ -5617,7 +5648,7 @@ fn narrow_empty_shape_key(var_expr: &php_ast::owned::Expr, ctx: &mut FlowState, 
         }
     }
     if changed && !result.types.is_empty() {
-        ctx.set_var(&base, result);
+        set_shape_base_narrowed(ctx, &base, current, result);
     }
 }
 
