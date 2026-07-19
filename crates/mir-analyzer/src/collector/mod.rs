@@ -1761,7 +1761,7 @@ impl<'a> DefinitionCollector<'a> {
                         // param contravariance) can tell a `@param` refinement apart
                         // from a native type hint.
                         doc_ty.from_docblock = true;
-                        doc_ty
+                        Self::fill_self_static_parent(doc_ty, class_fqcn)
                     })
                 })
                 .or(native_ty);
@@ -1788,7 +1788,7 @@ impl<'a> DefinitionCollector<'a> {
                     class_fqcn,
                 );
                 resolved.from_docblock = true;
-                resolved
+                Self::fill_self_static_parent(resolved, class_fqcn)
             });
             params.push(DeclaredParam {
                 name: Name::new(param_name),
