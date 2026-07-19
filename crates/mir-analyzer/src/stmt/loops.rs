@@ -186,7 +186,7 @@ fn resolve_iterator_item_types(
     }
 
     let class = crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, bare))?;
-    let class_tps = crate::db::class_template_params(db, bare).unwrap_or_default();
+    let class_tps = crate::db::effective_class_template_params(db, bare).unwrap_or_default();
     let bindings = crate::generic::build_class_bindings(&class_tps, type_params);
 
     // Prefer an explicit `@implements Iterator<TKey, TValue>` (or
@@ -209,12 +209,10 @@ fn resolve_iterator_item_types(
         }
     }
 
-    let implements = |name: &str| {
-        class
-            .interfaces()
-            .iter()
-            .any(|i| i.trim_start_matches('\\').eq_ignore_ascii_case(name))
-    };
+    // Hierarchy-aware, not `class.interfaces()` (own-declared-only): a bare
+    // subclass (`class IntBag extends Bag {}`) inherits `Bag implements
+    // Iterator` without redeclaring it, but still iterates as one.
+    let implements = |name: &str| crate::db::extends_or_implements(db, bare, name);
     let method_return_ty = |method: &str| -> Option<Type> {
         let (_, def) =
             crate::db::find_method_in_chain(db, crate::db::Fqcn::from_str(db, bare), method)?;
