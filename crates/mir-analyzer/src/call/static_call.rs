@@ -761,6 +761,45 @@ impl CallAnalyzer {
                     }
                 }
             }
+            // `@if-this-is X<Y>` on a method reached through self::/static::/
+            // parent:: — mirrors the instance-call-syntax handling in
+            // `resolve_method_return`, which `analyze_static_method_call` never
+            // invoked at all, so this idiom silently never fired for the
+            // (more common) self::/static:: call syntax, only `$this->method()`.
+            if is_self_parent_call {
+                if let Some(constraint) = resolved.if_this_is.clone() {
+                    let receiver_type_params =
+                        extract_receiver_type_params(&ctx.get_var("this"), &fqcn_arc);
+                    let constraint_has_params = constraint.types.iter().any(|a| {
+                        matches!(a, Atomic::TNamedObject { type_params, .. } if !type_params.is_empty())
+                    });
+                    let receiver_has_unresolved_template = receiver_type_params.iter().any(|t| {
+                        t.types
+                            .iter()
+                            .any(|a| matches!(a, Atomic::TTemplateParam { .. }))
+                    });
+                    if !receiver_has_unresolved_template
+                        && (!receiver_type_params.is_empty() || !constraint_has_params)
+                    {
+                        let receiver = Type::single(Atomic::TNamedObject {
+                            fqcn: Name::new(fqcn_arc.as_ref()),
+                            type_params: receiver_type_params.to_vec().into(),
+                        });
+                        if !crate::subtype::is_subtype(ea.db, &receiver, &constraint) {
+                            ea.emit(
+                                IssueKind::IfThisIsMismatch {
+                                    class: fqcn.clone(),
+                                    method: method_name.to_string(),
+                                    expected: format!("{constraint}"),
+                                    actual: format!("{receiver}"),
+                                },
+                                Severity::Info,
+                                span,
+                            );
+                        }
+                    }
+                }
+            }
             // `@psalm-self-out Type` on a method reached through self::/static::/
             // parent:: retypes the implicit `$this` receiver, mirroring the
             // instance-call-syntax handling in `analyze_method_call`. A plain
