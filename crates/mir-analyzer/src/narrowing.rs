@@ -994,6 +994,22 @@ pub fn narrow_from_condition(
                         is_true,
                     );
                 }
+            } else if let Some((fqcn, prop)) = extract_static_prop_access(&b.left, ctx, db, file) {
+                if let Some(n) = extract_int_literal(&b.right) {
+                    narrow_static_prop_int_comparison(ctx, &fqcn, &prop, db, b.op, n, is_true);
+                }
+            } else if let Some((fqcn, prop)) = extract_static_prop_access(&b.right, ctx, db, file) {
+                if let Some(n) = extract_int_literal(&b.left) {
+                    narrow_static_prop_int_comparison(
+                        ctx,
+                        &fqcn,
+                        &prop,
+                        db,
+                        flip_comparison_op(b.op),
+                        n,
+                        is_true,
+                    );
+                }
             }
             // count($arr) op N  /  N op count($arr) — normalize so count call is on left.
             let (count_expr, count_cmp_op, count_lit) = if extract_count_arg(&b.left).is_some() {
@@ -4745,6 +4761,36 @@ fn narrow_prop_int_comparison(
     let mark_diverges =
         crate::contradiction::is_closed_precise(&current) && !ctx.get_var(obj_var).is_nullable();
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, mark_diverges);
+}
+
+/// Static-property counterpart of `narrow_prop_int_comparison`, for
+/// `self::$prop < N` (or `static::$prop`/`Class::$prop`). Unlike the
+/// instance-property case, a static property has no separate receiver
+/// variable whose nullability could also satisfy the comparison —
+/// `self::`/`static::` is never itself null — so mark_diverges only
+/// depends on `is_closed_precise`, matching the plain-variable case.
+fn narrow_static_prop_int_comparison(
+    ctx: &mut FlowState,
+    fqcn: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    op: BinaryOp,
+    n: i64,
+    is_true: bool,
+) {
+    let Some((min, max)) = int_comparison_bounds(op, n, is_true) else {
+        return;
+    };
+    let current = resolve_static_prop_current_type(ctx, fqcn, prop, db);
+    if current.is_mixed() {
+        return;
+    }
+    let mut narrowed = narrow_type_to_int_range(&current, min, max);
+    if int_comparison_excludes_null(op, is_true) {
+        narrowed = narrowed.remove_null();
+    }
+    let mark_diverges = crate::contradiction::is_closed_precise(&current);
+    apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, mark_diverges);
 }
 
 /// Apply integer bounds `[min, max]` to all integer components of a type.
