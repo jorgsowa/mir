@@ -1893,7 +1893,7 @@ pub fn narrow_from_condition(
                     {
                         if let Some(var_name) = extract_var_name(&needle_arg.value) {
                             if let Some(haystack_ty) =
-                                extract_haystack_type(&haystack_arg.value, ctx)
+                                extract_haystack_type(&haystack_arg.value, ctx, db, file)
                             {
                                 let current = ctx.get_var(&var_name);
                                 let loose_safe = strict
@@ -1928,7 +1928,7 @@ pub fn narrow_from_condition(
                             // Property-access counterpart of the plain-variable case
                             // above, e.g. `in_array($this->status, ['a', 'b'])`.
                             if let Some(haystack_ty) =
-                                extract_haystack_type(&haystack_arg.value, ctx)
+                                extract_haystack_type(&haystack_arg.value, ctx, db, file)
                             {
                                 let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
                                 let loose_safe = strict
@@ -3925,7 +3925,8 @@ fn narrow_from_false_comparable_call(
             .unwrap_or(false);
         if let (Some(needle_arg), Some(haystack_arg)) = (call.args.first(), call.args.get(1)) {
             if let Some(target) = ScalarArgTarget::extract(&needle_arg.value) {
-                if let Some(haystack_ty) = extract_haystack_type(&haystack_arg.value, ctx) {
+                if let Some(haystack_ty) = extract_haystack_type(&haystack_arg.value, ctx, db, file)
+                {
                     let current = match &target {
                         ScalarArgTarget::Var(name) => ctx.get_var(name),
                         ScalarArgTarget::Prop(obj, prop) => {
@@ -7377,12 +7378,49 @@ fn narrow_prop_string_strlen_comparison(
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, false);
 }
 
+/// Shared by the `Variable` and property-access arms of `extract_haystack_type`:
+/// collect the TLiteralString/TLiteralInt values inside a resolved array
+/// type's `TKeyedArray` properties, bailing out on any non-literal value.
+fn haystack_type_from_array_type(var_ty: &Type) -> Option<Type> {
+    if var_ty.is_mixed() || var_ty.is_empty() {
+        return None;
+    }
+    let mut ty = Type::empty();
+    for atomic in &var_ty.types {
+        match atomic {
+            Atomic::TKeyedArray { properties, .. } => {
+                for prop in properties.values() {
+                    match &prop.ty.types[..] {
+                        [Atomic::TLiteralString(_)] | [Atomic::TLiteralInt(_)] => {
+                            for a in &prop.ty.types {
+                                ty.add_type(a.clone());
+                            }
+                        }
+                        _ => return None, // non-literal value
+                    }
+                }
+            }
+            _ => return None,
+        }
+    }
+    if ty.is_empty() {
+        None
+    } else {
+        Some(ty)
+    }
+}
+
 /// Extract a union Type from an `in_array` haystack argument.
 /// Supports:
 /// - Literal arrays: `['a', 'b', 1]` → union of `TLiteralString` / `TLiteralInt`
-/// - Variables: look up from ctx and collect the TLiteralString/TLiteralInt values
-///   inside the TKeyedArray's properties.
-fn extract_haystack_type(expr: &php_ast::owned::Expr, ctx: &FlowState) -> Option<Type> {
+/// - Variables/property accesses: resolve the current type and collect the
+///   TLiteralString/TLiteralInt values inside the TKeyedArray's properties.
+fn extract_haystack_type(
+    expr: &php_ast::owned::Expr,
+    ctx: &FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<Type> {
     match &expr.kind {
         ExprKind::Array(elements) => {
             let mut ty = Type::empty();
@@ -7403,35 +7441,13 @@ fn extract_haystack_type(expr: &php_ast::owned::Expr, ctx: &FlowState) -> Option
         }
         ExprKind::Variable(name) => {
             let var_name = name.trim_start_matches('$');
-            let var_ty = ctx.get_var(var_name);
-            if var_ty.is_mixed() || var_ty.is_empty() {
-                return None;
-            }
-            let mut ty = Type::empty();
-            for atomic in &var_ty.types {
-                match atomic {
-                    Atomic::TKeyedArray { properties, .. } => {
-                        for prop in properties.values() {
-                            match &prop.ty.types[..] {
-                                [Atomic::TLiteralString(_)] | [Atomic::TLiteralInt(_)] => {
-                                    for a in &prop.ty.types {
-                                        ty.add_type(a.clone());
-                                    }
-                                }
-                                _ => return None, // non-literal value
-                            }
-                        }
-                    }
-                    _ => return None,
-                }
-            }
-            if ty.is_empty() {
-                None
-            } else {
-                Some(ty)
-            }
+            haystack_type_from_array_type(&ctx.get_var(var_name))
         }
-        ExprKind::Parenthesized(inner) => extract_haystack_type(inner, ctx),
+        ExprKind::PropertyAccess(_) | ExprKind::NullsafePropertyAccess(_) => {
+            let (obj, prop) = extract_prop_access(expr)?;
+            haystack_type_from_array_type(&resolve_prop_current_type(ctx, &obj, &prop, db, file))
+        }
+        ExprKind::Parenthesized(inner) => extract_haystack_type(inner, ctx, db, file),
         _ => None,
     }
 }
