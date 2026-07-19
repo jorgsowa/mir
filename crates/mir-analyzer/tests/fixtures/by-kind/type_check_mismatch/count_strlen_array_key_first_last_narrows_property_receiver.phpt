@@ -33,16 +33,19 @@ final class Holder {
         }
     }
 
+    // `numeric-string` can never be "" (is_numeric('') is false in PHP), so
+    // this branch is unreachable for either atom; the type stays unchanged
+    // rather than asserting an impossible narrower type.
     public function strlenEquality(): void {
         if (strlen($this->str) === 0) {
-            /** @mir-check $this->str is numeric-string */
+            /** @mir-check $this->str is non-empty-string|numeric-string */
             $_ = 1;
         }
     }
 
     public function strlenRelational(): void {
         if (strlen($this->str) < 1) {
-            /** @mir-check $this->str is numeric-string */
+            /** @mir-check $this->str is non-empty-string|numeric-string */
             $_ = 1;
         }
     }

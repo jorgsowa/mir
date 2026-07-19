@@ -4958,24 +4958,36 @@ fn intersect_int_range_into(
     });
 }
 
-/// Narrow all `TString` atoms to `TNonEmptyString`, preserving other atoms.
-/// Used when a condition proves the string is non-empty.
+/// Narrow all `TString` atoms to `TNonEmptyString`, preserving other atoms —
+/// except the empty-string literal, which a proven non-empty result rules
+/// out entirely (unlike `TString`, a literal can't be "tightened", only
+/// kept or dropped). Used when a condition proves the string is non-empty.
 fn narrow_string_to_non_empty(ty: &Type) -> Type {
     let mut result = Type::empty();
     result.from_docblock = ty.from_docblock;
     for t in &ty.types {
         match t {
             Atomic::TString => result.add_type(Atomic::TNonEmptyString),
+            Atomic::TLiteralString(s) if s.as_ref().is_empty() => {}
             _ => result.add_type(t.clone()),
         }
     }
     result
 }
 
-/// Drop the `non-empty-string` variant when a length check proves the string
-/// is exactly empty (mirrors `Type::narrow_to_empty_collection` for arrays).
+/// Drop every atom a length check proves impossible once the string is known
+/// to be exactly empty: `non-empty-string` and any atom that can never be
+/// `""` at all (a numeric/class/callable string, or a non-empty literal) —
+/// mirrors `Type::narrow_to_empty_collection` for arrays.
 fn narrow_string_to_empty(ty: &Type) -> Type {
-    ty.filter(|t| !matches!(t, Atomic::TNonEmptyString))
+    ty.filter(|t| match t {
+        Atomic::TNonEmptyString
+        | Atomic::TNumericString
+        | Atomic::TClassString(_)
+        | Atomic::TCallableString => false,
+        Atomic::TLiteralString(s) => s.as_ref().is_empty(),
+        _ => true,
+    })
 }
 
 fn narrow_var_null(ctx: &mut FlowState, name: &str, is_null: bool) {
@@ -7146,7 +7158,8 @@ fn narrow_prop_array_key_first_or_last_null(
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, false);
 }
 
-/// Extract the variable/property target from `strlen($var)` / `mb_strlen($var, ...)`.
+/// Extract the variable/property target from `strlen($var)` /
+/// `mb_strlen($var, ...)` / `iconv_strlen($var, ...)`.
 fn extract_strlen_arg(expr: &php_ast::owned::Expr) -> Option<ScalarArgTarget> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
         let name = match &call.name.kind {
@@ -7154,7 +7167,10 @@ fn extract_strlen_arg(expr: &php_ast::owned::Expr) -> Option<ScalarArgTarget> {
             _ => return None,
         };
         let bare = name.trim_start_matches('\\');
-        if bare.eq_ignore_ascii_case("strlen") || bare.eq_ignore_ascii_case("mb_strlen") {
+        if bare.eq_ignore_ascii_case("strlen")
+            || bare.eq_ignore_ascii_case("mb_strlen")
+            || bare.eq_ignore_ascii_case("iconv_strlen")
+        {
             if let Some(arg) = call.args.first() {
                 return ScalarArgTarget::extract(&arg.value);
             }

@@ -63,10 +63,14 @@ function test_count_not_identical_positive_false_branch_narrows(array $arr): voi
     $_ = $arr;
 }
 
+// `numeric-string` can never be "" (is_numeric('') is false in PHP), so this
+// branch is actually unreachable for either atom -- neither can be tightened
+// to an empty value, and the "don't collapse to an empty union" guard leaves
+// the type unchanged rather than asserting an impossible narrower type.
 /** @param non-empty-string|numeric-string $s */
 function test_strlen_identical_zero_narrows(string $s): void {
     if (strlen($s) === 0) {
-        /** @mir-check $s is numeric-string */
+        /** @mir-check $s is non-empty-string|numeric-string */
         $_ = $s;
     }
 }
@@ -74,7 +78,7 @@ function test_strlen_identical_zero_narrows(string $s): void {
 /** @param non-empty-string|numeric-string $s */
 function test_strlen_less_than_one_narrows(string $s): void {
     if (strlen($s) < 1) {
-        /** @mir-check $s is numeric-string */
+        /** @mir-check $s is non-empty-string|numeric-string */
         $_ = $s;
     }
 }
