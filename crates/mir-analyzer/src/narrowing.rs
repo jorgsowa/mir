@@ -2960,13 +2960,21 @@ pub(crate) fn narrow_prop_type_fn_disjuncts(
 /// direct `$x instanceof A` or a recognized `is_TYPE($x)` call — without
 /// applying any narrowing. Used to check every condition in a disjunct list
 /// targets the same variable before [`narrow_mixed_disjuncts`] mixes the two
-/// kinds together; does not recurse into nested `||`/parens the way
-/// [`collect_instanceof`] does; a nested chain is left for the pure
-/// instanceof/type-fn paths (tried first) to handle instead.
+/// kinds together. Recurses into nested `||`/parens (like [`collect_instanceof`])
+/// so a 3-way-or-more chain mixing instanceof and is_TYPE() leaves — e.g. `$x
+/// instanceof A || is_string($x) || $x instanceof B` — still resolves to a
+/// shared variable name here; [`narrow_mixed_disjuncts`] then narrows each
+/// top-level condition via `narrow_from_condition`, which re-dispatches into
+/// this same machinery for any nested disjunct.
 fn single_leaf_disjunct_var(expr: &php_ast::owned::Expr) -> Option<String> {
     let expr = peel_parens(expr);
     match &expr.kind {
         ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => extract_var_name(&b.left),
+        ExprKind::Binary(b) if b.op == BinaryOp::BooleanOr || b.op == BinaryOp::LogicalOr => {
+            let l = single_leaf_disjunct_var(&b.left)?;
+            let r = single_leaf_disjunct_var(&b.right)?;
+            (l == r).then_some(l)
+        }
         _ => extract_type_fn_check(expr).map(|(_, vn)| vn),
     }
 }
