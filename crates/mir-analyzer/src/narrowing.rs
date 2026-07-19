@@ -4294,10 +4294,11 @@ fn literal_string_narrow_type(current: &Type, value: &str, is_value: bool) -> Ty
                 Atomic::TLiteralString(s) if s.as_ref() == value => {
                     result.add_type(t.clone());
                 }
-                // Generic/wide string types: keep as-is (we can't narrow further without
-                // knowing the literal's place in a union)
+                // Generic/wide string types: the literal could satisfy them — narrow
+                // to the literal exactly like every narrower sibling atom below does
+                // (TNonEmptyString, TNumericString, TCallableString, ...).
                 Atomic::TString | Atomic::TScalar | Atomic::TMixed => {
-                    result.add_type(t.clone());
+                    result.add_type(Atomic::TLiteralString(lit.clone()));
                 }
                 // String subtypes: the literal could satisfy them — narrow to the literal.
                 Atomic::TNonEmptyString if !value.is_empty() => {
@@ -4363,8 +4364,11 @@ fn literal_int_narrow_type(current: &Type, value: i64, is_value: bool) -> Type {
                 Atomic::TLiteralInt(n) if *n == value => {
                     result.add_type(t.clone());
                 }
+                // Generic/wide int types: the literal could satisfy them — narrow to
+                // the literal exactly like every narrower sibling atom below does
+                // (TIntRange, TPositiveInt, TNonNegativeInt, TNegativeInt).
                 Atomic::TInt | Atomic::TScalar | Atomic::TNumeric | Atomic::TMixed => {
-                    result.add_type(t.clone());
+                    result.add_type(Atomic::TLiteralInt(value));
                 }
                 Atomic::TIntRange { min, max } if int_contains(*min, *max) => {
                     result.add_type(Atomic::TLiteralInt(value));
