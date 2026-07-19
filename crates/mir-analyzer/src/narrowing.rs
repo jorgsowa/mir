@@ -2217,6 +2217,16 @@ pub fn narrow_from_condition(
                         // isset() is only true when the receiver was non-null too
                         // (a null receiver's ->/?-> access is itself unset/null).
                         narrow_receiver_non_null_on_prop_match(ctx, &obj_var, true);
+                    } else if let Some((fqcn, prop)) =
+                        extract_static_prop_access(var_expr, ctx, db, file)
+                    {
+                        // `isset(self::$prop)` — static-property counterpart of the
+                        // instance-property case above.
+                        let current = resolve_static_prop_current_type(ctx, &fqcn, &prop, db);
+                        if !current.is_mixed() {
+                            let narrowed = current.remove_null();
+                            apply_prop_narrowed(ctx, &fqcn, &prop, current, narrowed, true);
+                        }
                     }
                 }
             }
@@ -2258,6 +2268,12 @@ pub fn narrow_from_condition(
                     // receiver was non-null too — a null receiver's ->/?->
                     // access is itself falsy, so `empty()` would be true.
                     narrow_receiver_non_null_on_prop_match(ctx, &obj_var, !is_true);
+                } else if let Some((fqcn, prop)) =
+                    extract_static_prop_access(var_expr, ctx, db, file)
+                {
+                    // `empty(self::$prop)` — static-property counterpart of the
+                    // instance-property case above.
+                    narrow_static_prop_loose_bool(ctx, &fqcn, &prop, db, !is_true);
                 }
             }
         }
@@ -2332,6 +2348,10 @@ pub fn narrow_from_condition(
                 // Truthy also proves the receiver was non-null (a null
                 // receiver's ->/?-> access is itself falsy).
                 narrow_receiver_non_null_on_prop_match(ctx, &obj_var, is_true);
+            } else if let Some((fqcn, prop)) = extract_static_prop_access(expr, ctx, db, file) {
+                // `if (self::$prop)` — static-property counterpart of the
+                // instance-property case above.
+                narrow_static_prop_loose_bool(ctx, &fqcn, &prop, db, is_true);
             }
         }
     }
@@ -4232,6 +4252,29 @@ fn narrow_static_prop_bool(
     let narrowed = bool_narrow_type(&current, value, is_value);
     // mark_diverges=false: matches narrow_var_bool/narrow_prop_bool's rationale
     // — a separate contradiction pass already owns flagging an always-true/false compare.
+    apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, false);
+}
+
+/// Static-property counterpart of `narrow_prop_loose_bool`, for
+/// `self::$prop == true` / `false` (or `static::$prop`/`Class::$prop`).
+fn narrow_static_prop_loose_bool(
+    ctx: &mut FlowState,
+    fqcn: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    want_truthy: bool,
+) {
+    let current = resolve_static_prop_current_type(ctx, fqcn, prop, db);
+    if current.is_mixed() {
+        return;
+    }
+    let narrowed = if want_truthy {
+        current.narrow_to_truthy()
+    } else {
+        current.narrow_to_falsy()
+    };
+    // mark_diverges=false: matches narrow_prop_loose_bool's rationale — a
+    // separate contradiction pass already owns flagging an always-true/false compare.
     apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, false);
 }
 
