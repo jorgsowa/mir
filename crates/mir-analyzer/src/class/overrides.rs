@@ -901,6 +901,9 @@ impl<'a> ClassAnalyzer<'a> {
             Atomic::TList { value } | Atomic::TNonEmptyList { value } => {
                 self.return_type_has_template(value)
             }
+            Atomic::TIntersection { parts } => {
+                parts.iter().any(|p| self.return_type_has_template(p))
+            }
             _ => false,
         })
     }
@@ -919,6 +922,7 @@ impl<'a> ClassAnalyzer<'a> {
             Atomic::TList { value } | Atomic::TNonEmptyList { value } => {
                 Self::type_has_named_objects(value)
             }
+            Atomic::TIntersection { parts } => parts.iter().any(Self::type_has_named_objects),
             _ => false,
         })
     }
