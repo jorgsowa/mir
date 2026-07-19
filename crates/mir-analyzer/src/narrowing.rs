@@ -4400,9 +4400,20 @@ fn literal_int_narrow_type(current: &Type, value: i64, is_value: bool) -> Type {
         // at the lower or upper edge.
         let tighten = |min: Option<i64>, max: Option<i64>| {
             let (new_min, new_max) = if min == Some(value) {
-                (value.checked_add(1), max)
+                match value.checked_add(1) {
+                    Some(v) => (Some(v), max),
+                    // value was i64::MAX — no larger value exists, so excluding it
+                    // leaves the range empty. An inverted (lo > hi) range is the
+                    // existing empty-range encoding the TIntRange caller below
+                    // already detects and skips; `None` here would wrongly read as
+                    // "unbounded" instead.
+                    None => (Some(i64::MAX), Some(i64::MIN)),
+                }
             } else if max == Some(value) {
-                (min, value.checked_sub(1))
+                match value.checked_sub(1) {
+                    Some(v) => (min, Some(v)),
+                    None => (Some(i64::MAX), Some(i64::MIN)),
+                }
             } else {
                 return None; // excluded value is not on an edge — keep as-is
             };
