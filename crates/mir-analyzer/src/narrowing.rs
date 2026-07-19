@@ -4440,7 +4440,16 @@ fn narrow_prop_from_type_fn(
     let Some(narrowed) = type_fn_narrowed(&current, fn_name, db, is_true) else {
         return;
     };
-    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, true);
+    // A nullable receiver makes `$obj->prop` itself evaluate to `null` (PHP 8
+    // warning, not fatal), which is an extra value the property's own declared
+    // type doesn't account for. That extra `null` only satisfies `is_null()`'s
+    // true branch — every other `is_*`/`ctype_*` check returns false on null,
+    // so it's their false branch that gains a reachable-despite-empty case
+    // (same reasoning as `narrow_prop_instanceof`'s false-branch gate).
+    let is_null_check = crate::util::php_ident_lowercase(fn_name) == "is_null";
+    let receiver_nullable = ctx.get_var(obj_var).is_nullable();
+    let mark_diverges = !receiver_nullable || (is_true != is_null_check);
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, mark_diverges);
 }
 
 /// Core `is_*`/`ctype_*`/`array_is_list`/`method_exists`/`property_exists`
