@@ -1522,6 +1522,10 @@ pub fn narrow_from_condition(
                             narrow_from_type_fn(ctx, bare, &var_name, db, is_true);
                         } else if let Some((obj, prop)) = extract_prop_access(&arg_expr.value) {
                             narrow_prop_from_type_fn(ctx, bare, &obj, &prop, db, file, is_true);
+                        } else if let Some((fqcn, prop)) =
+                            extract_static_prop_access(&arg_expr.value, ctx, db, file)
+                        {
+                            narrow_static_prop_from_type_fn(ctx, bare, &fqcn, &prop, db, is_true);
                         }
                         if is_true && bare.eq_ignore_ascii_case("method_exists") {
                             if let Some(expr_key) =
@@ -2025,6 +2029,10 @@ pub fn narrow_from_condition(
                         narrow_from_type_fn(ctx, bare, &var_name, db, is_true);
                     } else if let Some((obj, prop)) = extract_prop_access(&arg_expr.value) {
                         narrow_prop_from_type_fn(ctx, bare, &obj, &prop, db, file, is_true);
+                    } else if let Some((fqcn, prop)) =
+                        extract_static_prop_access(&arg_expr.value, ctx, db, file)
+                    {
+                        narrow_static_prop_from_type_fn(ctx, bare, &fqcn, &prop, db, is_true);
                     }
                 }
             }
@@ -4978,6 +4986,30 @@ fn narrow_prop_from_type_fn(
     let mark_diverges = !receiver_nullable || proved_prop_non_null;
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, mark_diverges);
     narrow_receiver_non_null_on_prop_match(ctx, obj_var, proved_prop_non_null);
+}
+
+/// Static-property counterpart of `narrow_prop_from_type_fn`, for
+/// `is_string(self::$prop)`, `ctype_digit(static::$prop)`, etc. Unlike the
+/// instance-property case, a static property has no separate "receiver
+/// variable" whose own nullability could add an extra unaccounted-for
+/// `null` — `self::`/`static::` is never itself null — so mark_diverges is
+/// unconditional, matching the plain-variable case.
+fn narrow_static_prop_from_type_fn(
+    ctx: &mut FlowState,
+    fn_name: &str,
+    fqcn: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    is_true: bool,
+) {
+    let current = resolve_static_prop_current_type(ctx, fqcn, prop, db);
+    if current.is_mixed() {
+        return;
+    }
+    let Some(narrowed) = type_fn_narrowed(&current, fn_name, db, is_true) else {
+        return;
+    };
+    apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, true);
 }
 
 /// Core `is_*`/`ctype_*`/`array_is_list`/`method_exists`/`property_exists`
