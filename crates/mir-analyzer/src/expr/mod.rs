@@ -679,9 +679,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                         // types before building the callable — otherwise a
                         // first-class-callable on a generic method loses the
                         // binding that the direct-call path already applies.
-                        let class_tps = crate::db::class_template_params(self.db, &fqcn_arc)
-                            .map(|tps| tps.to_vec())
-                            .unwrap_or_default();
+                        let class_tps =
+                            crate::db::effective_class_template_params(self.db, &fqcn_arc)
+                                .map(|tps| tps.to_vec())
+                                .unwrap_or_default();
                         let mut bindings =
                             crate::generic::build_class_bindings(&class_tps, &receiver_type_params);
                         for (k, v) in
@@ -853,7 +854,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     );
                     // Same reasoning as the instance-method FCC case above: substitute
                     // the receiver's own bound type params before building the callable.
-                    let class_tps = crate::db::class_template_params(self.db, &fqcn_arc)
+                    let class_tps = crate::db::effective_class_template_params(self.db, &fqcn_arc)
                         .map(|tps| tps.to_vec())
                         .unwrap_or_default();
                     let mut bindings =
