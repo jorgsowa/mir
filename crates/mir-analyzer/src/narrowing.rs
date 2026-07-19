@@ -4838,6 +4838,11 @@ fn narrow_prop_int_comparison(
     let mark_diverges =
         crate::contradiction::is_closed_precise(&current) && !ctx.get_var(obj_var).is_nullable();
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, mark_diverges);
+    narrow_receiver_non_null_on_prop_match(
+        ctx,
+        obj_var,
+        int_comparison_excludes_null(op, n, is_true),
+    );
 }
 
 /// Static-property counterpart of `narrow_prop_int_comparison`, for
