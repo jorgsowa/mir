@@ -1544,6 +1544,38 @@ impl<'a> ExpressionAnalyzer<'a> {
                         }
                     }
                 }
+                Atomic::TSelf { fqcn }
+                | Atomic::TStaticObject { fqcn }
+                | Atomic::TParent { fqcn } => {
+                    // A variable/param holding a self/static/parent-typed value
+                    // (not just `$this`, which is injected as a plain
+                    // TNamedObject) — resolve the property the same way, minus
+                    // template substitution (these atoms carry no type params
+                    // of their own). Falls through to the loop's final
+                    // `Type::mixed()` on a miss, matching prior silent behavior.
+                    let prop_result = crate::db::find_property_in_chain(
+                        self.db,
+                        crate::db::Fqcn::new(self.db, *fqcn),
+                        prop_name,
+                    );
+                    if let Some((owner, p)) = prop_result {
+                        if let Some(msg) = &p.deprecated {
+                            self.emit(
+                                IssueKind::DeprecatedProperty {
+                                    class: fqcn.to_string(),
+                                    property: prop_name.to_string(),
+                                    message: Some(msg.clone()).filter(|m| !m.is_empty()),
+                                },
+                                Severity::Info,
+                                span,
+                            );
+                        }
+                        let ty = p.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
+                        self.record_ref(Arc::from(format!("prop:{}::{}", owner, prop_name)), span);
+                        *declaring_class = Some(owner);
+                        return ty;
+                    }
+                }
                 Atomic::TIntersection { parts } => {
                     for part in parts.iter() {
                         for inner_atomic in &part.types {
