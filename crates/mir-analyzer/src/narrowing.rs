@@ -5503,7 +5503,11 @@ fn atom_excluded_from_is_iterable_or_countable(
     if t.is_array() {
         return true;
     }
-    if let Atomic::TNamedObject { fqcn, .. } = t {
+    if let Atomic::TNamedObject { fqcn, .. }
+    | Atomic::TSelf { fqcn }
+    | Atomic::TStaticObject { fqcn }
+    | Atomic::TParent { fqcn } = t
+    {
         return crate::db::extends_or_implements(db, fqcn, interface);
     }
     false
@@ -5933,7 +5937,10 @@ fn narrow_var_to_specific_class(
         })
     } else {
         current.filter(|t| match t {
-            Atomic::TNamedObject { fqcn: obj_fqcn, .. } => {
+            Atomic::TNamedObject { fqcn: obj_fqcn, .. }
+            | Atomic::TSelf { fqcn: obj_fqcn }
+            | Atomic::TStaticObject { fqcn: obj_fqcn }
+            | Atomic::TParent { fqcn: obj_fqcn } => {
                 obj_fqcn.as_ref() != fqcn || !crate::db::is_final(db, fqcn)
             }
             _ => true,
@@ -5962,7 +5969,10 @@ fn narrow_prop_to_specific_class(
         })
     } else {
         current.filter(|t| match t {
-            Atomic::TNamedObject { fqcn: obj_fqcn, .. } => {
+            Atomic::TNamedObject { fqcn: obj_fqcn, .. }
+            | Atomic::TSelf { fqcn: obj_fqcn }
+            | Atomic::TStaticObject { fqcn: obj_fqcn }
+            | Atomic::TParent { fqcn: obj_fqcn } => {
                 obj_fqcn.as_ref() != fqcn || !crate::db::is_final(db, fqcn)
             }
             _ => true,
