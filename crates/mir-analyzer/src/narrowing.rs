@@ -4000,7 +4000,8 @@ pub(crate) fn resolve_prop_current_type(
                 }
             }
         } else if let mir_types::Atomic::TSelf { fqcn }
-        | mir_types::Atomic::TStaticObject { fqcn } = atomic
+        | mir_types::Atomic::TStaticObject { fqcn }
+        | mir_types::Atomic::TParent { fqcn } = atomic
         {
             let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
             if let Some((_, p_def)) = crate::db::find_property_in_chain(db, here, prop) {
@@ -4542,38 +4543,7 @@ fn narrow_prop_array_key_exists(
     db: &dyn MirDatabase,
     file: &str,
 ) {
-    let current = if let Some(refined) = ctx.get_prop_refined(obj_var, prop) {
-        refined.clone()
-    } else {
-        let obj_ty = ctx.get_var(obj_var);
-        let mut prop_ty = mir_types::Type::mixed();
-        'outer: for atomic in &obj_ty.types {
-            if let mir_types::Atomic::TNamedObject { fqcn, .. }
-            | mir_types::Atomic::TSelf { fqcn }
-            | mir_types::Atomic::TStaticObject { fqcn } = atomic
-            {
-                let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
-                if let Some((_, p_def)) = crate::db::find_property_in_chain(db, here, prop) {
-                    if let Some(ty) = p_def.ty.as_deref() {
-                        prop_ty = ty.clone();
-                        break 'outer;
-                    }
-                }
-            }
-        }
-        if prop_ty.is_mixed() && obj_var == "this" {
-            if let Some(fqcn) = ctx.self_fqcn.as_ref() {
-                let resolved = crate::db::resolve_name(db, file, fqcn.as_ref());
-                let here = crate::db::Fqcn::from_str(db, &resolved);
-                if let Some((_, p_def)) = crate::db::find_property_in_chain(db, here, prop) {
-                    if let Some(ty) = p_def.ty.as_deref() {
-                        prop_ty = ty.clone();
-                    }
-                }
-            }
-        }
-        prop_ty
-    };
+    let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
     if current.is_mixed() {
         return;
     }
