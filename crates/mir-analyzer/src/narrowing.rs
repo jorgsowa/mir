@@ -438,6 +438,7 @@ pub fn narrow_from_condition(
                                 db,
                                 file,
                             );
+                            narrow_receiver_non_null_on_prop_match(ctx, &obj_var, effective_true);
                         }
                     }
                 }
@@ -647,6 +648,7 @@ pub fn narrow_from_condition(
                                 db,
                                 file,
                             );
+                            narrow_receiver_non_null_on_prop_match(ctx, &obj_var, effective_true);
                         }
                     }
                 }
