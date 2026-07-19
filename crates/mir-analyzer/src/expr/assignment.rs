@@ -563,7 +563,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                         // Collect all template param names in scope: class-level
                                         // (from the receiver's class) and method-level.
                                         let class_tp_names: FxHashSet<mir_types::Name> =
-                                            crate::db::class_template_params(
+                                            crate::db::effective_class_template_params(
                                                 self.db,
                                                 fqcn.as_ref(),
                                             )
@@ -767,7 +767,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                         && !ty.is_mixed_not_template()
                                     {
                                         let class_tp_names: FxHashSet<mir_types::Name> =
-                                            crate::db::class_template_params(
+                                            crate::db::effective_class_template_params(
                                                 self.db,
                                                 fqcn.as_ref(),
                                             )
