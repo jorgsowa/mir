@@ -34,14 +34,14 @@ fn narrow_from_static_or_class_const_comparison(
     file: &str,
 ) {
     if let ExprKind::StaticPropertyAccess(_) = &b.right.kind {
-        if let Some(var_name) = extract_var_name(&b.left) {
-            if let Some((enum_fqcn, case_name)) = extract_enum_case(
-                &b.right,
-                ctx.self_fqcn.as_deref(),
-                ctx.parent_fqcn.as_deref(),
-                db,
-                file,
-            ) {
+        if let Some((enum_fqcn, case_name)) = extract_enum_case(
+            &b.right,
+            ctx.self_fqcn.as_deref(),
+            ctx.parent_fqcn.as_deref(),
+            db,
+            file,
+        ) {
+            if let Some(var_name) = extract_var_name(&b.left) {
                 narrow_var_to_literal_enum_case(
                     db,
                     ctx,
@@ -52,8 +52,11 @@ fn narrow_from_static_or_class_const_comparison(
                 );
             }
         }
-    } else if let ExprKind::StaticPropertyAccess(_) = &b.left.kind {
-        if let Some(var_name) = extract_var_name(&b.right) {
+        // `b.right` structurally matched `StaticPropertyAccess` but wasn't a
+        // declared enum case above — it's a genuine `self::$prop`/
+        // `static::$prop` receiver being compared against `b.left`
+        // (`EnumName::CaseName === self::$prop` / `Foo::class === self::$prop`).
+        else if let Some((fqcn, prop)) = extract_static_prop_access(&b.right, ctx, db, file) {
             if let Some((enum_fqcn, case_name)) = extract_enum_case(
                 &b.left,
                 ctx.self_fqcn.as_deref(),
@@ -61,6 +64,42 @@ fn narrow_from_static_or_class_const_comparison(
                 db,
                 file,
             ) {
+                narrow_static_prop_to_literal_enum_case(
+                    db,
+                    ctx,
+                    &fqcn,
+                    &prop,
+                    (&enum_fqcn, &case_name),
+                    effective_true,
+                );
+            } else if let ExprKind::ClassConstAccess(cca) = &b.left.kind {
+                if let Some(class_fqcn) = extract_class_const_fqcn(
+                    cca,
+                    ctx.self_fqcn.as_deref(),
+                    ctx.parent_fqcn.as_deref(),
+                    db,
+                    file,
+                ) {
+                    narrow_static_prop_to_class_string(
+                        ctx,
+                        &fqcn,
+                        &prop,
+                        &class_fqcn,
+                        effective_true,
+                        db,
+                    );
+                }
+            }
+        }
+    } else if let ExprKind::StaticPropertyAccess(_) = &b.left.kind {
+        if let Some((enum_fqcn, case_name)) = extract_enum_case(
+            &b.left,
+            ctx.self_fqcn.as_deref(),
+            ctx.parent_fqcn.as_deref(),
+            db,
+            file,
+        ) {
+            if let Some(var_name) = extract_var_name(&b.right) {
                 narrow_var_to_literal_enum_case(
                     db,
                     ctx,
@@ -69,6 +108,44 @@ fn narrow_from_static_or_class_const_comparison(
                     &case_name,
                     effective_true,
                 );
+            }
+        }
+        // Symmetric fallback: `b.left` is a genuine static-property receiver
+        // being compared against `b.right` (`self::$prop === EnumName::CaseName`
+        // / `self::$prop === Foo::class`).
+        else if let Some((fqcn, prop)) = extract_static_prop_access(&b.left, ctx, db, file) {
+            if let Some((enum_fqcn, case_name)) = extract_enum_case(
+                &b.right,
+                ctx.self_fqcn.as_deref(),
+                ctx.parent_fqcn.as_deref(),
+                db,
+                file,
+            ) {
+                narrow_static_prop_to_literal_enum_case(
+                    db,
+                    ctx,
+                    &fqcn,
+                    &prop,
+                    (&enum_fqcn, &case_name),
+                    effective_true,
+                );
+            } else if let ExprKind::ClassConstAccess(cca) = &b.right.kind {
+                if let Some(class_fqcn) = extract_class_const_fqcn(
+                    cca,
+                    ctx.self_fqcn.as_deref(),
+                    ctx.parent_fqcn.as_deref(),
+                    db,
+                    file,
+                ) {
+                    narrow_static_prop_to_class_string(
+                        ctx,
+                        &fqcn,
+                        &prop,
+                        &class_fqcn,
+                        effective_true,
+                        db,
+                    );
+                }
             }
         }
     }
@@ -5714,6 +5791,54 @@ fn narrow_prop_to_literal_enum_case(
     // contradiction — same reasoning as `narrow_prop_to_specific_class`.
     let mark_diverges = is_case || !ctx.get_var(obj_var).is_nullable();
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, mark_diverges);
+}
+
+/// Static-property counterpart of `narrow_prop_to_literal_enum_case`, for
+/// `self::$prop === EnumName::CaseName` (and `static::$prop`/`Class::$prop`).
+fn narrow_static_prop_to_literal_enum_case(
+    db: &dyn MirDatabase,
+    ctx: &mut FlowState,
+    fqcn: &str,
+    prop: &str,
+    (enum_fqcn, case_name): (&str, &str),
+    is_case: bool,
+) {
+    let current = resolve_static_prop_current_type(ctx, fqcn, prop, db);
+    let narrowed = if is_case {
+        Type::single(Atomic::TLiteralEnumCase {
+            enum_fqcn: enum_fqcn.into(),
+            case_name: case_name.into(),
+        })
+    } else {
+        expand_enum_to_cases(db, &current, enum_fqcn).filter(|t| {
+            !matches!(t, Atomic::TLiteralEnumCase { enum_fqcn: fqcn, case_name: c }
+                if fqcn.as_ref() == enum_fqcn && c.as_ref() == case_name)
+        })
+    };
+    // No separate receiver-nullability concern for a static property —
+    // self::/static:: is never itself null, unlike an instance receiver.
+    apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, true);
+}
+
+/// Static-property counterpart of `narrow_prop_to_class_string`, for
+/// `self::$prop === Foo::class` (and `static::$prop`/`Class::$prop`).
+fn narrow_static_prop_to_class_string(
+    ctx: &mut FlowState,
+    fqcn_key: &str,
+    prop: &str,
+    fqcn: &str,
+    is_class: bool,
+    db: &dyn MirDatabase,
+) {
+    let current = resolve_static_prop_current_type(ctx, fqcn_key, prop, db);
+    let narrowed = if is_class {
+        Type::single(Atomic::TClassString(Some(mir_types::Name::from(fqcn))))
+    } else {
+        current.filter(|t| {
+            !matches!(t, Atomic::TClassString(Some(f)) if f.as_ref() == fqcn && crate::db::is_final(db, fqcn))
+        })
+    };
+    apply_prop_narrowed(ctx, fqcn_key, prop, current, narrowed, true);
 }
 
 /// `$cls === Foo::class` / `!== Foo::class` narrowing. Unlike `instanceof`/
