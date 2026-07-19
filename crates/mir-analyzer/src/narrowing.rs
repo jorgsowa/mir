@@ -4125,7 +4125,14 @@ fn narrow_prop_int_comparison(
         return;
     }
     let narrowed = narrow_type_to_int_range(&current, min, max);
-    let mark_diverges = crate::contradiction::is_closed_precise(&current);
+    // A nullable $obj means the comparison can also be satisfied by the
+    // receiver itself being null: PHP's ordering-comparison table converts a
+    // null operand and the int literal to bool and compares those (`false`
+    // for null, `N != 0` for the literal), which can make `<`/`<=`/`>`/`>=`
+    // true regardless of the property's own (precise, out-of-range) type —
+    // same reasoning as narrow_prop_instanceof/narrow_prop_is_a's gate.
+    let mark_diverges =
+        crate::contradiction::is_closed_precise(&current) && !ctx.get_var(obj_var).is_nullable();
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, mark_diverges);
 }
 
@@ -5113,7 +5120,13 @@ fn narrow_prop_to_specific_class(
             _ => true,
         })
     };
-    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, true);
+    // The exclusion branch (`get_debug_type($obj->prop) !== 'Foo'`) is also
+    // satisfied whenever $obj itself is null: get_debug_type(null) returns
+    // the string 'null', which is never equal to a real class name — so a
+    // nullable receiver means an empty narrowed-out result here isn't a real
+    // contradiction. The is_exact_class branch is unaffected (never empty).
+    let mark_diverges = is_exact_class || !ctx.get_var(obj_var).is_nullable();
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, mark_diverges);
 }
 
 /// Extract a fully-qualified class name from the first argument of
