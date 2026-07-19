@@ -294,18 +294,46 @@ fn resolve_static_in_bound(bound: Type, receiver_fqcn: Option<&str>) -> Type {
     let types: Vec<Atomic> = bound
         .types
         .into_iter()
-        .map(|a| match a {
-            Atomic::TStaticObject { .. } => Atomic::TNamedObject {
-                fqcn: Name::from(fqcn),
-                type_params: empty_type_params(),
-            },
-            other => other,
-        })
+        .map(|a| resolve_static_in_bound_atomic(a, fqcn))
         .collect();
     let mut result = Type::from_vec(types);
     result.from_docblock = from_docblock;
     result.possibly_undefined = possibly_undefined;
     result
+}
+
+/// Recurse into a container atomic's own type args when replacing `static` —
+/// a bound like `@template U of Collection<static>` carries the placeholder
+/// one level down inside `Collection`'s type_params, not at the top level,
+/// so a shallow top-level-only replacement never reaches it.
+fn resolve_static_in_bound_atomic(a: Atomic, fqcn: &str) -> Atomic {
+    match a {
+        Atomic::TStaticObject { .. } => Atomic::TNamedObject {
+            fqcn: Name::from(fqcn),
+            type_params: empty_type_params(),
+        },
+        Atomic::TNamedObject {
+            fqcn: obj_fqcn,
+            type_params,
+        } => Atomic::TNamedObject {
+            fqcn: obj_fqcn,
+            type_params: type_params
+                .iter()
+                .cloned()
+                .map(|t| resolve_static_in_bound(t, Some(fqcn)))
+                .collect::<Vec<_>>()
+                .into(),
+        },
+        Atomic::TIntersection { parts } => Atomic::TIntersection {
+            parts: parts
+                .iter()
+                .cloned()
+                .map(|t| resolve_static_in_bound(t, Some(fqcn)))
+                .collect::<Vec<_>>()
+                .into(),
+        },
+        other => other,
+    }
 }
 
 /// Shallow variant of the unresolved-placeholder check for nested type params
