@@ -1756,6 +1756,7 @@ pub fn narrow_from_condition(
                                             narrow_prop_instanceof(
                                                 ctx, obj, prop, &fqcn, db, file, true,
                                             );
+                                            narrow_receiver_non_null_on_prop_match(ctx, obj, true);
                                         }
                                     }
                                 }
