@@ -3664,7 +3664,14 @@ fn narrow_prop_instanceof(
     } else {
         filter_out_instanceof_match(&current, class_name, db)
     };
-    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, true);
+    // `!($obj->prop instanceof X)` is also true whenever $obj itself is null
+    // (`null instanceof X` is always false), so a nullable receiver means an
+    // empty false-branch narrowing isn't a real contradiction — same
+    // reasoning as `narrow_prop_null`'s nullable-receiver gate. The true
+    // branch is unaffected: `narrow_instanceof_preserving_subtypes` never
+    // returns empty.
+    let mark_diverges = is_true || !ctx.get_var(obj_var).is_nullable();
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, mark_diverges);
 }
 
 /// `is_a($obj->prop, ClassName::class)` / `is_a($obj->prop, ClassName::class, true)`
@@ -3724,7 +3731,11 @@ fn narrow_prop_is_a(
         } else {
             filter_out_instanceof_match(&current, class_name, db)
         };
-        apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, true);
+        // Same nullable-receiver gate as `narrow_prop_instanceof`'s false
+        // branch: `is_a($obj->prop, X)` false is also true whenever $obj
+        // itself is null.
+        let mark_diverges = is_true || !ctx.get_var(obj_var).is_nullable();
+        apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, mark_diverges);
     }
 }
 
