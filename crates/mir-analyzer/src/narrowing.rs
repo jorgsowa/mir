@@ -2284,6 +2284,7 @@ fn narrow_or_instanceof_true(
     if narrow_instanceof_disjuncts(&[left, right], ctx, db, file).is_none()
         && narrow_type_fn_disjuncts(&[left, right], ctx, db).is_none()
         && !narrow_prop_instanceof_disjuncts(&[left, right], ctx, db, file)
+        && narrow_prop_type_fn_disjuncts(&[left, right], ctx, db, file).is_none()
     {
         narrow_mixed_disjuncts(&[left, right], ctx, db, file);
     }
