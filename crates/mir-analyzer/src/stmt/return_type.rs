@@ -169,10 +169,41 @@ pub(crate) fn named_object_return_compatible(
             }
 
             // Inheritance check
-            extends_or_implements(db, actual_fqcn.as_ref(), &resolved_declared)
+            let inherits = extends_or_implements(db, actual_fqcn.as_ref(), &resolved_declared)
                 || extends_or_implements(db, actual_fqcn.as_ref(), declared_fqcn.as_ref())
                 || extends_or_implements(db, &resolved_actual, &resolved_declared)
-                || extends_or_implements(db, &resolved_actual, declared_fqcn.as_ref())
+                || extends_or_implements(db, &resolved_actual, declared_fqcn.as_ref());
+            if !inherits {
+                return false;
+            }
+
+            // A different-but-related generic class (e.g. an override returning
+            // `Box<Cat>` against a declared `Box<Animal>` where SubBox extends
+            // Box) still needs its own type params checked for variance —
+            // is_same_class above only covers the same-class case.
+            let actual_type_params = match actual_atom {
+                Atomic::TNamedObject { type_params, .. } => &type_params[..],
+                _ => &[],
+            };
+            let declared_type_params = match declared_atom {
+                Atomic::TNamedObject { type_params, .. } => &type_params[..],
+                _ => &[],
+            };
+            if actual_type_params.is_empty()
+                || declared_type_params.is_empty()
+                || actual_type_params.len() != declared_type_params.len()
+            {
+                return true;
+            }
+            let actual_single = Type::single(Atomic::TNamedObject {
+                fqcn: Name::from(resolved_actual),
+                type_params: actual_type_params.to_vec().into(),
+            });
+            let declared_single = Type::single(Atomic::TNamedObject {
+                fqcn: Name::from(resolved_declared),
+                type_params: declared_type_params.to_vec().into(),
+            });
+            crate::subtype::is_subtype(db, &actual_single, &declared_single)
         })
     })
 }
