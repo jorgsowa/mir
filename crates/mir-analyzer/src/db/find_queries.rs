@@ -264,10 +264,11 @@ impl ClassLike {
         }
     }
 
-    /// `@implements Iface<T1, T2>` type args (class only).
+    /// `@implements Iface<T1, T2>` type args (class or enum).
     pub fn implements_type_args(&self) -> &[(Arc<str>, Vec<mir_types::Type>)] {
         match self {
             ClassLike::Class(c) => &c.implements_type_args,
+            ClassLike::Enum(e) => &e.implements_type_args,
             _ => &[],
         }
     }

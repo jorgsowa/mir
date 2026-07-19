@@ -242,6 +242,39 @@ impl DefinitionCollector<'_> {
             }
         }
 
+        // `@implements Interface<T1, T2>` — enums have no `@template` of their
+        // own, so there's nothing to substitute into the type args (unlike
+        // class.rs's `implements_type_args`, which resolves them against the
+        // class's own template params); just FQN-qualify the names.
+        let implements_type_args: Vec<(Arc<str>, Vec<Type>)> = enum_doc
+            .implements
+            .iter()
+            .filter_map(|ty| {
+                if let Some(mir_types::Atomic::TNamedObject {
+                    fqcn: iface,
+                    type_params,
+                }) = ty.types.first()
+                {
+                    Some((
+                        self.resolve_type_name(iface.as_str(), true).into(),
+                        type_params
+                            .iter()
+                            .map(|tp| {
+                                self.resolve_union_doc_with_templates(
+                                    tp.clone(),
+                                    &rustc_hash::FxHashSet::default(),
+                                    &fqcn,
+                                    &[],
+                                )
+                            })
+                            .collect(),
+                    ))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
         let type_aliases = self.build_type_aliases(&enum_doc);
         let mut dummy_properties = mir_codebase::definitions::MemberMap::default();
         self.add_docblock_members(
@@ -262,6 +295,7 @@ impl DefinitionCollector<'_> {
                 short_name: Arc::from(enum_name.as_str()),
                 scalar_type,
                 interfaces,
+                implements_type_args,
                 cases,
                 own_methods,
                 own_constants,

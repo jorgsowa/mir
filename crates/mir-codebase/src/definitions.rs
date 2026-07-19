@@ -740,6 +740,9 @@ pub struct EnumDef {
     pub short_name: Arc<str>,
     pub scalar_type: Option<Type>,
     pub interfaces: Vec<Arc<str>>,
+    /// Type arguments from `@implements Interface<T1, T2>`.
+    #[serde(default)]
+    pub implements_type_args: Vec<(Arc<str>, Vec<Type>)>,
     pub cases: MemberMap<EnumCaseDef>,
     pub own_methods: MemberMap<Arc<MethodDef>>,
     pub own_constants: MemberMap<ConstantDef>,
