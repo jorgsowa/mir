@@ -1013,6 +1013,10 @@ pub fn narrow_from_condition(
                     narrow_var_loose_bool(ctx, &name, *value == effective_true);
                 } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
                     narrow_prop_loose_bool(ctx, &obj, &prop, db, file, *value == effective_true);
+                    // `null == true` is false, so a true match against the
+                    // literal `true` also proves the receiver wasn't null —
+                    // same reasoning as the strict `===` sibling arm above.
+                    narrow_receiver_non_null_on_prop_match(ctx, &obj, *value == effective_true);
                 } else {
                     if !value {
                         // `strpos($h, $n) == false` / `!= false` — same
@@ -1030,6 +1034,7 @@ pub fn narrow_from_condition(
                     narrow_var_loose_bool(ctx, &name, *value == effective_true);
                 } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
                     narrow_prop_loose_bool(ctx, &obj, &prop, db, file, *value == effective_true);
+                    narrow_receiver_non_null_on_prop_match(ctx, &obj, *value == effective_true);
                 } else {
                     if !value {
                         narrow_from_false_comparable_call(&b.right, ctx, db, file, effective_true);
