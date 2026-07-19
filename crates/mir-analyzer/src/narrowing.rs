@@ -1799,6 +1799,19 @@ pub fn narrow_from_condition(
                 } else if !current.is_empty() && !current.is_mixed() {
                     ctx.diverges = true;
                 }
+            } else if let Some((obj_var, prop)) = extract_prop_access(&a.target) {
+                // `if ($this->prop = expr)` — property-access counterpart of
+                // the plain-variable case above.
+                let current = resolve_prop_current_type(ctx, &obj_var, &prop, db, file);
+                let mut narrowed = if is_true {
+                    current.narrow_to_truthy()
+                } else {
+                    current.narrow_to_falsy()
+                };
+                if is_true {
+                    narrowed.possibly_undefined = false;
+                }
+                apply_prop_narrowed(ctx, &obj_var, &prop, current, narrowed, true);
             }
         }
 
