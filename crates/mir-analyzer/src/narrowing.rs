@@ -3887,7 +3887,8 @@ fn narrow_static_prop_literal_string(
         return;
     }
     let narrowed = literal_string_narrow_type(&current, value, is_value);
-    apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, false);
+    let mark_diverges = crate::contradiction::is_closed_precise(&current);
+    apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, mark_diverges);
 }
 
 /// Static-property counterpart of `narrow_prop_literal_int`, for
@@ -5034,7 +5035,11 @@ fn atom_excluded_from_is_iterable_or_countable(
 fn narrow_var_literal_string(ctx: &mut FlowState, name: &str, value: &str, is_value: bool) {
     let current = ctx.get_var(name);
     let narrowed = literal_string_narrow_type(&current, value, is_value);
-    set_narrowed(ctx, name, &current, narrowed, false);
+    // For closed-precise types (literal-string unions, ...), an empty result
+    // means the exclusion is a genuine contradiction — mark divergence, same
+    // as narrow_var_literal_int below.
+    let mark_diverges = crate::contradiction::is_closed_precise(&current);
+    set_narrowed(ctx, name, &current, narrowed, mark_diverges);
 }
 
 /// Property-access counterpart of `narrow_var_literal_string`, for
@@ -5050,7 +5055,8 @@ fn narrow_prop_literal_string(
 ) {
     let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
     let narrowed = literal_string_narrow_type(&current, value, is_value);
-    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, false);
+    let mark_diverges = crate::contradiction::is_closed_precise(&current);
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, mark_diverges);
 }
 
 fn literal_string_narrow_type(current: &Type, value: &str, is_value: bool) -> Type {
