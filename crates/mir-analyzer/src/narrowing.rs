@@ -1913,7 +1913,26 @@ fn apply_docblock_assertions(
         .filter(|a| a.kind == expected_kind || (is_true && a.kind == AssertionKind::Assert))
     {
         if let Some(index) = params.iter().position(|p| p.name == assertion.param) {
-            if let Some(arg) = arg_for_param_index(params, &call.args, index) {
+            // A variadic param's assertion applies to every trailing positional
+            // arg it swallows (`assertVariadic(...$values)` asserted over each
+            // of `assertVariadic($a, $b, $c)`), not just the first one —
+            // `arg_for_param_index` only ever resolves a single positional arg.
+            let variadic_args: Vec<&php_ast::owned::Arg>;
+            let args_to_check: &[&php_ast::owned::Arg] = if params[index].is_variadic {
+                variadic_args = call
+                    .args
+                    .iter()
+                    .filter(|a| a.name.is_none())
+                    .skip(index)
+                    .collect();
+                &variadic_args
+            } else {
+                variadic_args = arg_for_param_index(params, &call.args, index)
+                    .into_iter()
+                    .collect();
+                &variadic_args
+            };
+            for arg in args_to_check {
                 if let Some(var_name) = extract_var_name(&arg.value) {
                     let ty = match &template_bindings {
                         Some(b) => assertion.ty.substitute_templates(b),
@@ -1992,6 +2011,9 @@ fn assertion_arg_type(
 ) -> Type {
     if let Some(var_name) = extract_var_name(expr) {
         return ctx.get_var(&var_name);
+    }
+    if let Some((obj_var, prop)) = extract_prop_access(expr) {
+        return resolve_prop_current_type(ctx, &obj_var, &prop, db, file);
     }
     if let Some(fqcn) = extract_class_fqcn_from_expr(expr, db, file) {
         return Type::single(Atomic::TClassString(Some(mir_types::Name::from(
