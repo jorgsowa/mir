@@ -1917,12 +1917,15 @@ pub fn narrow_from_condition(
                     // — the property-receiver counterpart of the bare-variable
                     // case above, since `isset()` is false for both an unset
                     // and a null-valued property.
-                    if let Some((obj_var, prop)) = extract_prop_access(var_expr) {
+                    if let Some((obj_var, prop)) = extract_any_prop_access(var_expr) {
                         let current = resolve_prop_current_type(ctx, &obj_var, &prop, db, file);
                         if !current.is_mixed() {
                             let narrowed = current.remove_null();
                             apply_prop_narrowed(ctx, &obj_var, &prop, current, narrowed, true);
                         }
+                        // isset() is only true when the receiver was non-null too
+                        // (a null receiver's ->/?-> access is itself unset/null).
+                        narrow_receiver_non_null_on_prop_match(ctx, &obj_var, true);
                     }
                 }
             }
@@ -1958,8 +1961,12 @@ pub fn narrow_from_condition(
                 // bare-variable truthy/falsy case, mirroring the `if ($this->prop)`
                 // arm below (narrow_prop_loose_bool). `empty()` inverts truthiness:
                 // is_true means the property is falsy.
-                if let Some((obj_var, prop)) = extract_prop_access(var_expr) {
+                if let Some((obj_var, prop)) = extract_any_prop_access(var_expr) {
                     narrow_prop_loose_bool(ctx, &obj_var, &prop, db, file, !is_true);
+                    // `empty()` is false (the property is truthy) only when the
+                    // receiver was non-null too — a null receiver's ->/?->
+                    // access is itself falsy, so `empty()` would be true.
+                    narrow_receiver_non_null_on_prop_match(ctx, &obj_var, !is_true);
                 }
             }
         }
@@ -2023,10 +2030,13 @@ pub fn narrow_from_condition(
                     // reachable at runtime.
                     ctx.diverges = true;
                 }
-            } else if let Some((obj_var, prop)) = extract_prop_access(expr) {
+            } else if let Some((obj_var, prop)) = extract_any_prop_access(expr) {
                 // `if ($this->prop)` — property-receiver counterpart of the
                 // bare-variable truthy/falsy case above.
                 narrow_prop_loose_bool(ctx, &obj_var, &prop, db, file, is_true);
+                // Truthy also proves the receiver was non-null (a null
+                // receiver's ->/?-> access is itself falsy).
+                narrow_receiver_non_null_on_prop_match(ctx, &obj_var, is_true);
             }
         }
     }
