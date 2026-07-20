@@ -219,12 +219,29 @@ pub fn inherited_template_bindings(
             }
         }
 
+        // A used trait's own `@template` params have no binding source yet —
+        // `@use TraitName<T>` explicit type-argument syntax isn't parsed (a
+        // known, separate limitation) — but they must still get an entry
+        // here (bound to `mixed`, the same fallback un-bound templates get
+        // elsewhere) rather than staying absent: an absent entry would let
+        // the RECEIVER's own same-named template letter silently leak into
+        // the trait's property/method types wherever this function's result
+        // is merged with a caller's own bindings via `entry().or_insert()`.
+        for trait_fqcn in class.class_traits() {
+            if let Some(trait_tps) = declared_template_params(db, trait_fqcn.as_ref()) {
+                for tp in trait_tps.iter() {
+                    bindings.entry(tp.name).or_insert_with(Type::mixed);
+                }
+            }
+        }
+
         // Keep walking every ancestor edge — typed or not — so a base
-        // interface/class that itself parameterizes a further generic
-        // ancestor still gets picked up even when the edge leading to it
-        // carried no type args of its own.
+        // interface/class/trait that itself parameterizes (or uses) a
+        // further generic ancestor still gets picked up even when the edge
+        // leading to it carried no type args of its own.
         worklist.extend(class.interfaces().iter().cloned());
         worklist.extend(class.extends().iter().cloned());
+        worklist.extend(class.class_traits().iter().cloned());
         if let Some(parent) = class.parent() {
             worklist.push(parent.clone());
         }
