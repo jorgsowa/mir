@@ -187,14 +187,18 @@ fn resolve_iterator_item_types(
 
     let class = crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, bare))?;
     let class_tps = crate::db::class_template_params(db, bare).unwrap_or_default();
-    let mut bindings = crate::generic::build_class_bindings(&class_tps, type_params);
-    for (k, v) in crate::db::inherited_template_bindings(db, bare, &bindings) {
-        bindings.entry(k).or_insert(v);
+    let own_bindings = crate::generic::build_class_bindings(&class_tps, type_params);
+    let mut annotation_bindings = own_bindings.clone();
+    for (k, v) in crate::db::inherited_template_bindings(db, bare, &annotation_bindings) {
+        annotation_bindings.entry(k).or_insert(v);
     }
 
     // Prefer an explicit `@implements Iterator<TKey, TValue>` (or
     // `IteratorAggregate<TKey, TValue>`) annotation: it directly states the
-    // item types without needing to chase `current()`/`getIterator()`.
+    // item types without needing to chase `current()`/`getIterator()`. This
+    // annotation is always declared directly on `bare` itself (own-declared,
+    // not inherited — `class.implements_type_args()`), so own-bindings-wins
+    // is always correct here.
     let annotated = class
         .implements_type_args()
         .iter()
@@ -206,8 +210,8 @@ fn resolve_iterator_item_types(
         });
     if let Some(args) = annotated {
         if args.len() >= 2 {
-            let key = args[0].substitute_templates(&bindings);
-            let value = args[1].substitute_templates(&bindings);
+            let key = args[0].substitute_templates(&annotation_bindings);
+            let value = args[1].substitute_templates(&annotation_bindings);
             return Some((key, value));
         }
     }
@@ -216,10 +220,25 @@ fn resolve_iterator_item_types(
     // subclass (`class IntBag extends Bag {}`) inherits `Bag implements
     // Iterator` without redeclaring it, but still iterates as one.
     let implements = |name: &str| crate::db::extends_or_implements(db, bare, name);
+    // `current()`/`key()`/`getIterator()` may be declared directly on `bare`
+    // or inherited from an ancestor — each is resolved independently, so the
+    // own-vs-inherited merge direction is decided per method using its own
+    // owner, not once for the whole function (a same-named template letter
+    // reused by both `bare` and a `@extends`-fixed ancestor must resolve
+    // differently depending on which of them actually declares the method).
     let method_return_ty = |method: &str| -> Option<Type> {
-        let (_, def) =
+        let (owner, def) =
             crate::db::find_method_in_chain(db, crate::db::Fqcn::from_str(db, bare), method)?;
         let ty = def.return_type.as_deref().cloned()?;
+        let mut bindings = own_bindings.clone();
+        let inherited = crate::db::inherited_template_bindings(db, bare, &own_bindings);
+        if owner.as_ref() == bare {
+            for (k, v) in inherited {
+                bindings.entry(k).or_insert(v);
+            }
+        } else {
+            bindings.extend(inherited);
+        }
         Some(ty.substitute_templates(&bindings))
     };
 
