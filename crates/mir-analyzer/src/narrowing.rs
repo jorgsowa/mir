@@ -3038,14 +3038,14 @@ fn collect_prop_instanceof(
 /// for a property-access receiver. Returns `true` if it matched and applied
 /// narrowing. See `collect_prop_instanceof`'s doc comment for why this is a
 /// separate function rather than an extension of the shared one.
-fn narrow_prop_instanceof_disjuncts(
+pub(crate) fn narrow_prop_instanceof_disjuncts(
     conditions: &[&php_ast::owned::Expr],
     ctx: &mut FlowState,
     db: &dyn MirDatabase,
     file: &str,
-) -> bool {
+) -> Option<(String, String)> {
     if conditions.len() < 2 {
-        return false;
+        return None;
     }
     let self_fqcn = ctx.self_fqcn.as_deref();
     let parent_fqcn = ctx.parent_fqcn.as_deref();
@@ -3065,11 +3065,9 @@ fn narrow_prop_instanceof_disjuncts(
     });
 
     if !all_ok || class_names.len() < 2 {
-        return false;
+        return None;
     }
-    let Some((obj_var, prop)) = receiver else {
-        return false;
-    };
+    let (obj_var, prop) = receiver?;
 
     let current = resolve_prop_current_type(ctx, &obj_var, &prop, db, file);
     let narrowed =
@@ -3079,7 +3077,7 @@ fn narrow_prop_instanceof_disjuncts(
     // always false, so proving any one of them proves the receiver wasn't
     // null.
     narrow_receiver_non_null_on_prop_match(ctx, &obj_var, true);
-    true
+    Some((obj_var, prop))
 }
 
 /// Recognized single-argument type-check functions whose truthy narrowing
@@ -3423,7 +3421,7 @@ fn narrow_or_instanceof_true(
 ) {
     if narrow_instanceof_disjuncts(&[left, right], ctx, db, file).is_none()
         && narrow_type_fn_disjuncts(&[left, right], ctx, db).is_none()
-        && !narrow_prop_instanceof_disjuncts(&[left, right], ctx, db, file)
+        && narrow_prop_instanceof_disjuncts(&[left, right], ctx, db, file).is_none()
         && narrow_prop_type_fn_disjuncts(&[left, right], ctx, db, file).is_none()
         && narrow_mixed_disjuncts(&[left, right], ctx, db, file).is_none()
     {

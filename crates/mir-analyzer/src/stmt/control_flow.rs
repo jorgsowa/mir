@@ -628,19 +628,43 @@ impl<'a> StatementsAnalyzer<'a> {
                                 case_ctx.set_var(&vn, union_ctx.get_var(&vn));
                             } else {
                                 let mut union_ctx = pre_ctx.branch();
-                                if let Some((obj, prop)) =
-                                    crate::narrowing::narrow_prop_type_fn_disjuncts(
+                                let prop_result =
+                                    crate::narrowing::narrow_prop_instanceof_disjuncts(
                                         &pending_conditions,
                                         &mut union_ctx,
                                         self.db,
                                         &self.file,
                                     )
-                                {
+                                    .or_else(|| {
+                                        union_ctx = pre_ctx.branch();
+                                        crate::narrowing::narrow_prop_type_fn_disjuncts(
+                                            &pending_conditions,
+                                            &mut union_ctx,
+                                            self.db,
+                                            &self.file,
+                                        )
+                                    })
+                                    .or_else(|| {
+                                        union_ctx = pre_ctx.branch();
+                                        crate::narrowing::narrow_mixed_prop_disjuncts(
+                                            &pending_conditions,
+                                            &mut union_ctx,
+                                            self.db,
+                                            &self.file,
+                                        )
+                                    });
+                                if let Some((obj, prop)) = prop_result {
                                     if let Some(refined) =
                                         union_ctx.get_prop_refined(&obj, &prop).cloned()
                                     {
                                         case_ctx.set_prop_refined(&obj, &prop, refined);
                                     }
+                                    // The disjunct mergers also prove the receiver
+                                    // non-null (see each merger's own doc comment for
+                                    // the per-leaf-kind exclusions) — copy that fact
+                                    // back too, not just the refined property, so it
+                                    // survives into the fallthrough body.
+                                    case_ctx.set_var(&obj, union_ctx.get_var(&obj));
                                 }
                             }
                         }
