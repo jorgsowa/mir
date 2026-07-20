@@ -1464,12 +1464,28 @@ impl<'a> ExpressionAnalyzer<'a> {
                             .zip(type_params.iter())
                             .map(|(tp, t)| (tp.name, t.clone()))
                             .collect();
-                        let mut substitution = own_bindings.clone();
-                        substitution.extend(crate::db::inherited_template_bindings(
+                        let inherited = crate::db::inherited_template_bindings(
                             self.db,
                             fqcn.as_ref(),
                             &own_bindings,
-                        ));
+                        );
+                        let mut substitution = own_bindings.clone();
+                        if owner.as_ref() == fqcn.as_ref() {
+                            // `prop_name` is declared directly on the receiver's own
+                            // class — a bare template name in its docblock is the
+                            // receiver's OWN template, so it must win over a
+                            // same-named but unrelated ancestor template (only fill
+                            // in names own_bindings doesn't have).
+                            for (k, v) in inherited {
+                                substitution.entry(k).or_insert(v);
+                            }
+                        } else {
+                            // `prop_name` is inherited from `owner` — a bare template
+                            // name in ITS docblock is scoped to `owner`'s own
+                            // declaration, which the ancestor-chain walk resolves; it
+                            // must win over a same-named receiver-own template.
+                            substitution.extend(inherited);
+                        }
                         let ty = ty.substitute_templates(&substitution);
                         self.record_ref(Arc::from(format!("prop:{}::{}", owner, prop_name)), span);
                         *declaring_class = Some(owner);

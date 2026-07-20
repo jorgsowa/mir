@@ -824,8 +824,22 @@ fn resolve_method_return<'a>(
             .map(|tps| tps.to_vec())
             .unwrap_or_default();
         let mut bindings = build_class_bindings(&class_tps, receiver_type_params);
-        for (k, v) in crate::db::inherited_template_bindings(ea.db, fqcn, &bindings) {
-            bindings.entry(k).or_insert(v);
+        let inherited_bindings = crate::db::inherited_template_bindings(ea.db, fqcn, &bindings);
+        if resolved.owner_fqcn.as_ref() == fqcn.as_ref() {
+            // The called method is declared directly on the receiver's own
+            // class — a bare template name in its signature is the
+            // receiver's OWN template, so it must win over a same-named but
+            // unrelated ancestor template (only fill in names `bindings`
+            // doesn't already have).
+            for (k, v) in inherited_bindings {
+                bindings.entry(k).or_insert(v);
+            }
+        } else {
+            // The method is inherited from `resolved.owner_fqcn` — a bare
+            // template name in ITS signature is scoped to that owner's own
+            // declaration, which the ancestor-chain walk resolves; it must
+            // win over a same-named receiver-own template.
+            bindings.extend(inherited_bindings);
         }
 
         // A class-level `@template T of Bound` was previously only ever checked
