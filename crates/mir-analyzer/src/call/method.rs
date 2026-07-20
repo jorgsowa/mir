@@ -956,7 +956,7 @@ fn resolve_method_return<'a>(
             let (method_bindings, unchecked) = infer_template_bindings(
                 ea.db,
                 &resolved.template_params,
-                &resolved.params,
+                effective_params,
                 arg_types,
                 &arg_names,
             );
