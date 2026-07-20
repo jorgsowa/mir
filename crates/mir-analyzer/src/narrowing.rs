@@ -3602,16 +3602,39 @@ pub(crate) fn narrow_static_prop_type_fn_disjuncts(
     Some((fqcn, prop))
 }
 
+/// Whether `expr` is an `is_a(...)`/`is_subclass_of(...)` call, returning its
+/// first (receiver) argument expression. `narrow_from_condition` already
+/// fully narrows both functions for every receiver shape (var/prop/
+/// static-prop) — this only lets the `single_leaf_disjunct_*` family
+/// recognize them as a single-receiver leaf instead of bailing out of the
+/// whole OR-disjunct union machinery, which previously fell back to a
+/// sequential AND-compose that collapses the result to the last disjunct
+/// (the same bug class `collect_instanceof`'s doc comment describes).
+fn is_a_or_subclass_of_call_receiver(expr: &php_ast::owned::Expr) -> Option<&php_ast::owned::Expr> {
+    let ExprKind::FunctionCall(call) = &expr.kind else {
+        return None;
+    };
+    let ExprKind::Identifier(name) = &call.name.kind else {
+        return None;
+    };
+    let bare = name.as_ref().trim_start_matches('\\');
+    if !(bare.eq_ignore_ascii_case("is_a") || bare.eq_ignore_ascii_case("is_subclass_of")) {
+        return None;
+    }
+    Some(&call.args.first()?.value)
+}
+
 /// Extract the single variable a leaf disjunct condition narrows — either a
-/// direct `$x instanceof A` or a recognized `is_TYPE($x)` call — without
-/// applying any narrowing. Used to check every condition in a disjunct list
-/// targets the same variable before [`narrow_mixed_disjuncts`] mixes the two
-/// kinds together. Recurses into nested `||`/parens (like [`collect_instanceof`])
-/// so a 3-way-or-more chain mixing instanceof and is_TYPE() leaves — e.g. `$x
-/// instanceof A || is_string($x) || $x instanceof B` — still resolves to a
-/// shared variable name here; [`narrow_mixed_disjuncts`] then narrows each
-/// top-level condition via `narrow_from_condition`, which re-dispatches into
-/// this same machinery for any nested disjunct.
+/// direct `$x instanceof A` or a recognized `is_TYPE($x)`/`is_a($x, ...)`/
+/// `is_subclass_of($x, ...)` call — without applying any narrowing. Used to
+/// check every condition in a disjunct list targets the same variable before
+/// [`narrow_mixed_disjuncts`] mixes the two kinds together. Recurses into
+/// nested `||`/parens (like [`collect_instanceof`]) so a 3-way-or-more chain
+/// mixing instanceof and is_TYPE() leaves — e.g. `$x instanceof A ||
+/// is_string($x) || $x instanceof B` — still resolves to a shared variable
+/// name here; [`narrow_mixed_disjuncts`] then narrows each top-level
+/// condition via `narrow_from_condition`, which re-dispatches into this same
+/// machinery for any nested disjunct.
 fn single_leaf_disjunct_var(expr: &php_ast::owned::Expr) -> Option<String> {
     let expr = peel_parens(expr);
     match &expr.kind {
@@ -3621,7 +3644,9 @@ fn single_leaf_disjunct_var(expr: &php_ast::owned::Expr) -> Option<String> {
             let r = single_leaf_disjunct_var(&b.right)?;
             (l == r).then_some(l)
         }
-        _ => extract_type_fn_check(expr).map(|(_, vn)| vn),
+        _ => extract_type_fn_check(expr)
+            .map(|(_, vn)| vn)
+            .or_else(|| extract_var_name(is_a_or_subclass_of_call_receiver(expr)?)),
     }
 }
 
@@ -3680,7 +3705,9 @@ fn single_leaf_disjunct_prop(expr: &php_ast::owned::Expr) -> Option<(String, Str
             let r = single_leaf_disjunct_prop(&b.right)?;
             (l == r).then_some(l)
         }
-        _ => extract_type_fn_check_prop(expr).map(|(_, obj, prop)| (obj, prop)),
+        _ => extract_type_fn_check_prop(expr)
+            .map(|(_, obj, prop)| (obj, prop))
+            .or_else(|| extract_prop_access(is_a_or_subclass_of_call_receiver(expr)?)),
     }
 }
 
@@ -3785,7 +3812,17 @@ fn single_leaf_disjunct_static_prop(
             (l == r).then_some(l)
         }
         _ => extract_type_fn_check_static_prop(expr, db, file, self_fqcn, static_fqcn, parent_fqcn)
-            .map(|(_, fqcn, prop)| (fqcn, prop)),
+            .map(|(_, fqcn, prop)| (fqcn, prop))
+            .or_else(|| {
+                extract_static_prop_access_parts(
+                    is_a_or_subclass_of_call_receiver(expr)?,
+                    db,
+                    file,
+                    self_fqcn,
+                    static_fqcn,
+                    parent_fqcn,
+                )
+            }),
     }
 }
 
