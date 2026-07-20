@@ -3022,6 +3022,10 @@ fn narrow_prop_instanceof_disjuncts(
     let narrowed =
         narrow_or_instanceof_union(&current, &class_names, db, &ctx.template_param_names);
     apply_prop_narrowed(ctx, &obj_var, &prop, current, narrowed, true);
+    // Every disjunct is an instanceof check, and `null instanceof X` is
+    // always false, so proving any one of them proves the receiver wasn't
+    // null.
+    narrow_receiver_non_null_on_prop_match(ctx, &obj_var, true);
     true
 }
 
@@ -3194,6 +3198,12 @@ pub(crate) fn narrow_prop_type_fn_disjuncts(
     }
     if !union_ty.is_empty() {
         apply_prop_narrowed(ctx, &obj_var, &prop, original, union_ty, true);
+        // An `is_null($this->prop)`-true disjunct doesn't prove the
+        // receiver non-null (a null receiver's ->prop read is itself null,
+        // satisfying is_null()) — every other recognized leaf kind does.
+        if !fn_names.iter().any(|f| f.eq_ignore_ascii_case("is_null")) {
+            narrow_receiver_non_null_on_prop_match(ctx, &obj_var, true);
+        }
     }
     Some((obj_var, prop))
 }
@@ -3280,6 +3290,23 @@ fn single_leaf_disjunct_prop(expr: &php_ast::owned::Expr) -> Option<(String, Str
     }
 }
 
+/// Whether any leaf disjunct in `expr` is `is_null($this->prop)` — such a
+/// disjunct doesn't prove the receiver non-null (a null receiver's ->prop
+/// read is itself null, satisfying is_null()), unlike every other leaf kind
+/// [`single_leaf_disjunct_prop`] recognizes. Mirrors its recursion through
+/// nested `||`/parens.
+fn disjunct_contains_is_null_prop_leaf(expr: &php_ast::owned::Expr) -> bool {
+    let expr = peel_parens(expr);
+    match &expr.kind {
+        ExprKind::Binary(b) if b.op == BinaryOp::BooleanOr || b.op == BinaryOp::LogicalOr => {
+            disjunct_contains_is_null_prop_leaf(&b.left)
+                || disjunct_contains_is_null_prop_leaf(&b.right)
+        }
+        _ => extract_type_fn_check_prop(expr)
+            .is_some_and(|(fn_name, ..)| fn_name.eq_ignore_ascii_case("is_null")),
+    }
+}
+
 /// Property-access counterpart of `narrow_mixed_disjuncts`, for a mixed
 /// `instanceof`/`is_TYPE()` OR-chain on `$this->prop` (e.g. `$this->prop
 /// instanceof Foo || is_string($this->prop)`) — the property side has a
@@ -3318,6 +3345,12 @@ pub(crate) fn narrow_mixed_prop_disjuncts(
     }
     if !union_ty.is_empty() {
         apply_prop_narrowed(ctx, &obj_var, &prop, original, union_ty, true);
+        if !conditions
+            .iter()
+            .any(|c| disjunct_contains_is_null_prop_leaf(c))
+        {
+            narrow_receiver_non_null_on_prop_match(ctx, &obj_var, true);
+        }
     }
     Some((obj_var, prop))
 }
