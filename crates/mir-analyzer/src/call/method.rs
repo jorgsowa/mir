@@ -5,7 +5,9 @@ use php_ast::Span;
 
 use crate::narrowing::extract_expr_guard_key;
 use crate::taint::{classify_method_sink, is_expr_tainted, SinkKind};
-use mir_codebase::definitions::{DeclaredParam, TemplateParam, Visibility};
+use mir_codebase::definitions::{
+    Assertion, AssertionKind, DeclaredParam, TemplateParam, Visibility,
+};
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Name, Type};
 
@@ -57,6 +59,7 @@ pub(crate) struct ResolvedMethod {
     pub(crate) taint_sink_params: Vec<(Arc<str>, Arc<str>)>,
     pub(crate) if_this_is: Option<Arc<Type>>,
     pub(crate) self_out: Option<Arc<Type>>,
+    pub(crate) assertions: Vec<Assertion>,
 }
 
 /// Resolve a method via the Salsa db, walking the class ancestor chain.
@@ -171,6 +174,14 @@ pub(crate) fn resolve_method_from_db(
             .self_out
             .clone()
             .or_else(|| parent.as_ref().and_then(|p| p.self_out.clone()));
+        let assertions = if storage.assertions.is_empty() {
+            parent
+                .as_ref()
+                .map(|p| p.assertions.clone())
+                .unwrap_or_default()
+        } else {
+            storage.assertions.clone()
+        };
 
         return Some(ResolvedMethod {
             owner_fqcn,
@@ -190,6 +201,7 @@ pub(crate) fn resolve_method_from_db(
             taint_sink_params: storage.taint_sink_params.clone(),
             if_this_is,
             self_out,
+            assertions,
         });
     }
 
@@ -1096,6 +1108,78 @@ fn resolve_method_return<'a>(
                 self_out_ty
             };
             *self_out_out = Some(self_out_ty);
+        }
+
+        // Bare-statement `@psalm-assert` — the method-call counterpart of
+        // `call/function.rs`'s unconditional-assert block, which free
+        // functions already have. `bindings` is the fully merged class +
+        // method template scope computed above, so a class-level `T` or a
+        // method-level `T` in the assertion's type both substitute
+        // correctly.
+        for assertion in resolved
+            .assertions
+            .iter()
+            .filter(|a| a.kind == AssertionKind::Assert)
+        {
+            if let Some(index) = resolved
+                .params
+                .iter()
+                .position(|p| p.name == assertion.param)
+            {
+                if let Some(arg) = call.args.get(index) {
+                    if let ExprKind::Variable(name) = &arg.value.kind {
+                        let var_name = name.as_ref().trim_start_matches('$');
+                        let asserted_ty = assertion.ty.substitute_templates(&bindings);
+                        let asserted_ty = if assertion.negated {
+                            crate::narrowing::negate_assertion_type(
+                                &ctx.get_var(var_name),
+                                &asserted_ty,
+                                ea.db,
+                            )
+                        } else {
+                            asserted_ty
+                        };
+                        ctx.set_var(var_name, asserted_ty);
+                    } else if let Some((obj, prop)) =
+                        crate::narrowing::extract_prop_access(&arg.value)
+                    {
+                        let asserted_ty = assertion.ty.substitute_templates(&bindings);
+                        let asserted_ty = if assertion.negated {
+                            let current = crate::narrowing::resolve_prop_current_type(
+                                ctx, &obj, &prop, ea.db, &ea.file,
+                            );
+                            crate::narrowing::negate_assertion_type(&current, &asserted_ty, ea.db)
+                        } else {
+                            asserted_ty
+                        };
+                        let proved_prop_non_null = !asserted_ty.is_nullable();
+                        ctx.set_prop_refined(&obj, &prop, asserted_ty);
+                        crate::narrowing::narrow_receiver_non_null_on_prop_match(
+                            ctx,
+                            &obj,
+                            proved_prop_non_null,
+                        );
+                    } else if let Some((static_fqcn, prop)) =
+                        crate::narrowing::extract_static_prop_access(
+                            &arg.value, ctx, ea.db, &ea.file,
+                        )
+                    {
+                        let asserted_ty = assertion.ty.substitute_templates(&bindings);
+                        let asserted_ty = if assertion.negated {
+                            let current = crate::narrowing::resolve_static_prop_current_type(
+                                ctx,
+                                &static_fqcn,
+                                &prop,
+                                ea.db,
+                            );
+                            crate::narrowing::negate_assertion_type(&current, &asserted_ty, ea.db)
+                        } else {
+                            asserted_ty
+                        };
+                        ctx.set_prop_refined(&static_fqcn, &prop, asserted_ty);
+                    }
+                }
+            }
         }
 
         let return_ty = if !bindings.is_empty() {

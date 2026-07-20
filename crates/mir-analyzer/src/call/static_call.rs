@@ -6,7 +6,7 @@ use php_ast::Span;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Type};
 
-use mir_codebase::definitions::DeclaredParam;
+use mir_codebase::definitions::{AssertionKind, DeclaredParam};
 use mir_types::Name;
 use rustc_hash::FxHashMap;
 
@@ -773,6 +773,85 @@ impl CallAnalyzer {
                     }
                 }
             }
+
+            // Bare-statement `@psalm-assert` — the static-call counterpart of
+            // `call/function.rs`'s unconditional-assert block and
+            // `call/method.rs`'s instance-call one. `out_bindings` is the
+            // fully merged class + method template scope computed above.
+            for assertion in resolved
+                .assertions
+                .iter()
+                .filter(|a| a.kind == AssertionKind::Assert)
+            {
+                if let Some(index) = resolved
+                    .params
+                    .iter()
+                    .position(|p| p.name == assertion.param)
+                {
+                    if let Some(arg) = call.args.get(index) {
+                        if let ExprKind::Variable(name) = &arg.value.kind {
+                            let var_name = name.as_ref().trim_start_matches('$');
+                            let asserted_ty = assertion.ty.substitute_templates(&out_bindings);
+                            let asserted_ty = if assertion.negated {
+                                crate::narrowing::negate_assertion_type(
+                                    &ctx.get_var(var_name),
+                                    &asserted_ty,
+                                    ea.db,
+                                )
+                            } else {
+                                asserted_ty
+                            };
+                            ctx.set_var(var_name, asserted_ty);
+                        } else if let Some((obj, prop)) =
+                            crate::narrowing::extract_prop_access(&arg.value)
+                        {
+                            let asserted_ty = assertion.ty.substitute_templates(&out_bindings);
+                            let asserted_ty = if assertion.negated {
+                                let current = crate::narrowing::resolve_prop_current_type(
+                                    ctx, &obj, &prop, ea.db, &ea.file,
+                                );
+                                crate::narrowing::negate_assertion_type(
+                                    &current,
+                                    &asserted_ty,
+                                    ea.db,
+                                )
+                            } else {
+                                asserted_ty
+                            };
+                            let proved_prop_non_null = !asserted_ty.is_nullable();
+                            ctx.set_prop_refined(&obj, &prop, asserted_ty);
+                            crate::narrowing::narrow_receiver_non_null_on_prop_match(
+                                ctx,
+                                &obj,
+                                proved_prop_non_null,
+                            );
+                        } else if let Some((static_fqcn, prop)) =
+                            crate::narrowing::extract_static_prop_access(
+                                &arg.value, ctx, ea.db, &ea.file,
+                            )
+                        {
+                            let asserted_ty = assertion.ty.substitute_templates(&out_bindings);
+                            let asserted_ty = if assertion.negated {
+                                let current = crate::narrowing::resolve_static_prop_current_type(
+                                    ctx,
+                                    &static_fqcn,
+                                    &prop,
+                                    ea.db,
+                                );
+                                crate::narrowing::negate_assertion_type(
+                                    &current,
+                                    &asserted_ty,
+                                    ea.db,
+                                )
+                            } else {
+                                asserted_ty
+                            };
+                            ctx.set_prop_refined(&static_fqcn, &prop, asserted_ty);
+                        }
+                    }
+                }
+            }
+
             // `@if-this-is X<Y>` on a method reached through self::/static::/
             // parent:: — mirrors the instance-call-syntax handling in
             // `resolve_method_return`, which `analyze_static_method_call` never
