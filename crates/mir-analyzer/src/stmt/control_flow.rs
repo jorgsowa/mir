@@ -665,6 +665,44 @@ impl<'a> StatementsAnalyzer<'a> {
                                     // back too, not just the refined property, so it
                                     // survives into the fallthrough body.
                                     case_ctx.set_var(&obj, union_ctx.get_var(&obj));
+                                } else {
+                                    let mut union_ctx = pre_ctx.branch();
+                                    let static_prop_result =
+                                        crate::narrowing::narrow_static_prop_instanceof_disjuncts(
+                                            &pending_conditions,
+                                            &mut union_ctx,
+                                            self.db,
+                                            &self.file,
+                                        )
+                                        .or_else(|| {
+                                            union_ctx = pre_ctx.branch();
+                                            crate::narrowing::narrow_static_prop_type_fn_disjuncts(
+                                                &pending_conditions,
+                                                &mut union_ctx,
+                                                self.db,
+                                                &self.file,
+                                            )
+                                        })
+                                        .or_else(|| {
+                                            union_ctx = pre_ctx.branch();
+                                            crate::narrowing::narrow_mixed_static_prop_disjuncts(
+                                                &pending_conditions,
+                                                &mut union_ctx,
+                                                self.db,
+                                                &self.file,
+                                            )
+                                        });
+                                    // No receiver-var copy needed here: a static
+                                    // property's "receiver" is the FQCN itself,
+                                    // which is never null (unlike an instance
+                                    // property's object receiver above).
+                                    if let Some((fqcn, prop)) = static_prop_result {
+                                        if let Some(refined) =
+                                            union_ctx.get_prop_refined(&fqcn, &prop).cloned()
+                                        {
+                                            case_ctx.set_prop_refined(&fqcn, &prop, refined);
+                                        }
+                                    }
                                 }
                             }
                         }

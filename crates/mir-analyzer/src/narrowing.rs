@@ -3211,6 +3211,136 @@ pub(crate) fn narrow_prop_instanceof_disjuncts(
     Some((obj_var, prop))
 }
 
+/// Static-property counterpart of `collect_prop_instanceof`, for
+/// `self::$prop instanceof A || self::$prop instanceof B` (also
+/// `static::$prop`/`Class::$prop`). A static property has no separate
+/// "receiver variable" — the map key is the resolved FQCN itself — so unlike
+/// the instance-property collector this needs `static_fqcn` too, to resolve
+/// a bare `self`/`static`/`parent` keyword the same way
+/// `extract_static_prop_access` does.
+#[allow(clippy::too_many_arguments)]
+fn collect_static_prop_instanceof(
+    expr: &php_ast::owned::Expr,
+    receiver: &mut Option<(std::sync::Arc<str>, String)>,
+    class_names: &mut Vec<String>,
+    db: &dyn MirDatabase,
+    file: &str,
+    self_fqcn: Option<&str>,
+    static_fqcn: Option<&str>,
+    parent_fqcn: Option<&str>,
+) -> bool {
+    match &expr.kind {
+        ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => {
+            if let (Some((fqcn, prop)), Some(cn)) = (
+                extract_static_prop_access_parts(
+                    &b.left,
+                    db,
+                    file,
+                    self_fqcn,
+                    static_fqcn,
+                    parent_fqcn,
+                ),
+                extract_class_name(&b.right, self_fqcn, parent_fqcn),
+            ) {
+                let resolved = crate::db::resolve_name(db, file, &cn);
+                match receiver {
+                    None => {
+                        *receiver = Some((fqcn, prop));
+                        class_names.push(resolved);
+                        true
+                    }
+                    Some((existing_fqcn, existing_prop))
+                        if *existing_fqcn == fqcn && *existing_prop == prop =>
+                    {
+                        class_names.push(resolved);
+                        true
+                    }
+                    _ => false, // different receiver — bail out
+                }
+            } else {
+                false
+            }
+        }
+        ExprKind::Binary(b) if b.op == BinaryOp::BooleanOr || b.op == BinaryOp::LogicalOr => {
+            collect_static_prop_instanceof(
+                &b.left,
+                receiver,
+                class_names,
+                db,
+                file,
+                self_fqcn,
+                static_fqcn,
+                parent_fqcn,
+            ) && collect_static_prop_instanceof(
+                &b.right,
+                receiver,
+                class_names,
+                db,
+                file,
+                self_fqcn,
+                static_fqcn,
+                parent_fqcn,
+            )
+        }
+        ExprKind::Parenthesized(inner) => collect_static_prop_instanceof(
+            inner,
+            receiver,
+            class_names,
+            db,
+            file,
+            self_fqcn,
+            static_fqcn,
+            parent_fqcn,
+        ),
+        _ => false,
+    }
+}
+
+/// Static-property counterpart of `narrow_prop_instanceof_disjuncts`, for
+/// `self::$prop instanceof A || self::$prop instanceof B` (true branch, also
+/// `static::$prop`/`Class::$prop`). See `collect_static_prop_instanceof`'s
+/// doc comment for why this needs a third, static-prop-specific leg rather
+/// than reusing the instance-property collector.
+pub(crate) fn narrow_static_prop_instanceof_disjuncts(
+    conditions: &[&php_ast::owned::Expr],
+    ctx: &mut FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<(std::sync::Arc<str>, String)> {
+    if conditions.len() < 2 {
+        return None;
+    }
+    let self_fqcn = ctx.self_fqcn.as_deref();
+    let static_fqcn = ctx.static_fqcn.as_deref();
+    let parent_fqcn = ctx.parent_fqcn.as_deref();
+
+    let mut receiver: Option<(std::sync::Arc<str>, String)> = None;
+    let mut class_names: Vec<String> = vec![];
+    let all_ok = conditions.iter().all(|cond| {
+        collect_static_prop_instanceof(
+            cond,
+            &mut receiver,
+            &mut class_names,
+            db,
+            file,
+            self_fqcn,
+            static_fqcn,
+            parent_fqcn,
+        )
+    });
+
+    if !all_ok || class_names.len() < 2 {
+        return None;
+    }
+    let (fqcn, prop) = receiver?;
+
+    let current = resolve_static_prop_current_type(ctx, &fqcn, &prop, db);
+    let narrowed =
+        narrow_or_instanceof_union(&current, &class_names, db, &ctx.template_param_names);
+    apply_prop_narrowed(ctx, &fqcn, &prop, current, narrowed, true);
+    Some((fqcn, prop))
+}
+
 /// Recognized single-argument type-check functions whose truthy narrowing
 /// `narrow_from_type_fn` implements. Matches its match arms (excluding
 /// `method_exists`/`property_exists`, which take two arguments and are
@@ -3390,6 +3520,88 @@ pub(crate) fn narrow_prop_type_fn_disjuncts(
     Some((obj_var, prop))
 }
 
+/// Static-property counterpart of `extract_type_fn_check_prop`, for
+/// `is_int(self::$prop)` (also `static::$prop`/`Class::$prop`) — returns
+/// `(fn_name, fqcn, prop)`.
+fn extract_type_fn_check_static_prop(
+    expr: &php_ast::owned::Expr,
+    db: &dyn MirDatabase,
+    file: &str,
+    self_fqcn: Option<&str>,
+    static_fqcn: Option<&str>,
+    parent_fqcn: Option<&str>,
+) -> Option<(&'static str, std::sync::Arc<str>, String)> {
+    let ExprKind::FunctionCall(call) = &expr.kind else {
+        return None;
+    };
+    let ExprKind::Identifier(name) = &call.name.kind else {
+        return None;
+    };
+    let bare = name.as_ref().trim_start_matches('\\');
+    let canonical = NARROWING_TYPE_FNS
+        .iter()
+        .find(|f| f.eq_ignore_ascii_case(bare))?;
+    if call.args.len() != 1 {
+        return None;
+    }
+    let (fqcn, prop) = extract_static_prop_access_parts(
+        &call.args[0].value,
+        db,
+        file,
+        self_fqcn,
+        static_fqcn,
+        parent_fqcn,
+    )?;
+    Some((canonical, fqcn, prop))
+}
+
+/// Static-property counterpart of `narrow_prop_type_fn_disjuncts`, for the
+/// `match(true)`/`switch(true)` fallthrough shape applied to `self::$prop`
+/// (e.g. `is_int(self::$prop), is_string(self::$prop)`).
+pub(crate) fn narrow_static_prop_type_fn_disjuncts(
+    conditions: &[&php_ast::owned::Expr],
+    ctx: &mut FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<(std::sync::Arc<str>, String)> {
+    if conditions.len() < 2 {
+        return None;
+    }
+    let self_fqcn = ctx.self_fqcn.as_deref();
+    let static_fqcn = ctx.static_fqcn.as_deref();
+    let parent_fqcn = ctx.parent_fqcn.as_deref();
+
+    let mut receiver: Option<(std::sync::Arc<str>, String)> = None;
+    let mut fn_names: Vec<&str> = Vec::with_capacity(conditions.len());
+    for cond in conditions {
+        let (fn_name, fqcn, prop) =
+            extract_type_fn_check_static_prop(cond, db, file, self_fqcn, static_fqcn, parent_fqcn)?;
+        match &receiver {
+            None => receiver = Some((fqcn, prop)),
+            Some((existing_fqcn, existing_prop))
+                if *existing_fqcn == fqcn && *existing_prop == prop => {}
+            _ => return None, // different receiver — bail out
+        }
+        fn_names.push(fn_name);
+    }
+    let (fqcn, prop) = receiver?;
+
+    let original = resolve_static_prop_current_type(ctx, &fqcn, &prop, db);
+    let mut union_ty = Type::empty();
+    for fn_name in &fn_names {
+        let mut scratch = ctx.branch();
+        scratch.set_prop_refined(&fqcn, &prop, original.clone());
+        narrow_static_prop_from_type_fn(&mut scratch, fn_name, &fqcn, &prop, db, true);
+        union_ty.merge_with(&resolve_static_prop_current_type(
+            &scratch, &fqcn, &prop, db,
+        ));
+    }
+    if !union_ty.is_empty() {
+        apply_prop_narrowed(ctx, &fqcn, &prop, original, union_ty, true);
+    }
+    Some((fqcn, prop))
+}
+
 /// Extract the single variable a leaf disjunct condition narrows — either a
 /// direct `$x instanceof A` or a recognized `is_TYPE($x)` call — without
 /// applying any narrowing. Used to check every condition in a disjunct list
@@ -3537,6 +3749,93 @@ pub(crate) fn narrow_mixed_prop_disjuncts(
     Some((obj_var, prop))
 }
 
+/// Static-property counterpart of `single_leaf_disjunct_prop`, for
+/// `self::$prop instanceof A` / `is_TYPE(self::$prop)` leaf disjuncts.
+#[allow(clippy::too_many_arguments)]
+fn single_leaf_disjunct_static_prop(
+    expr: &php_ast::owned::Expr,
+    db: &dyn MirDatabase,
+    file: &str,
+    self_fqcn: Option<&str>,
+    static_fqcn: Option<&str>,
+    parent_fqcn: Option<&str>,
+) -> Option<(std::sync::Arc<str>, String)> {
+    let expr = peel_parens(expr);
+    match &expr.kind {
+        ExprKind::Binary(b) if b.op == BinaryOp::Instanceof => {
+            extract_static_prop_access_parts(&b.left, db, file, self_fqcn, static_fqcn, parent_fqcn)
+        }
+        ExprKind::Binary(b) if b.op == BinaryOp::BooleanOr || b.op == BinaryOp::LogicalOr => {
+            let l = single_leaf_disjunct_static_prop(
+                &b.left,
+                db,
+                file,
+                self_fqcn,
+                static_fqcn,
+                parent_fqcn,
+            )?;
+            let r = single_leaf_disjunct_static_prop(
+                &b.right,
+                db,
+                file,
+                self_fqcn,
+                static_fqcn,
+                parent_fqcn,
+            )?;
+            (l == r).then_some(l)
+        }
+        _ => extract_type_fn_check_static_prop(expr, db, file, self_fqcn, static_fqcn, parent_fqcn)
+            .map(|(_, fqcn, prop)| (fqcn, prop)),
+    }
+}
+
+/// Static-property counterpart of `narrow_mixed_prop_disjuncts`, for a mixed
+/// `instanceof`/`is_TYPE()` OR-chain on `self::$prop` (also
+/// `static::$prop`/`Class::$prop`). Unlike the instance-property version,
+/// there's no separate receiver variable whose non-nullness a proved match
+/// could additionally establish (`self::`/`static::` is never itself null),
+/// so this never calls `narrow_receiver_non_null_on_prop_match`.
+pub(crate) fn narrow_mixed_static_prop_disjuncts(
+    conditions: &[&php_ast::owned::Expr],
+    ctx: &mut FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<(std::sync::Arc<str>, String)> {
+    if conditions.len() < 2 {
+        return None;
+    }
+    let self_fqcn = ctx.self_fqcn.as_deref();
+    let static_fqcn = ctx.static_fqcn.as_deref();
+    let parent_fqcn = ctx.parent_fqcn.as_deref();
+
+    let mut receiver: Option<(std::sync::Arc<str>, String)> = None;
+    for cond in conditions {
+        let (fqcn, prop) =
+            single_leaf_disjunct_static_prop(cond, db, file, self_fqcn, static_fqcn, parent_fqcn)?;
+        match &receiver {
+            None => receiver = Some((fqcn, prop)),
+            Some((existing_fqcn, existing_prop))
+                if *existing_fqcn == fqcn && *existing_prop == prop => {}
+            _ => return None, // different receiver — bail out
+        }
+    }
+    let (fqcn, prop) = receiver?;
+    let original = resolve_static_prop_current_type(ctx, &fqcn, &prop, db);
+    let mut union_ty = Type::empty();
+    for cond in conditions {
+        let mut scratch = ctx.branch();
+        scratch.set_prop_refined(&fqcn, &prop, original.clone());
+        narrow_from_condition(cond, &mut scratch, true, db, file);
+        union_ty.merge_with(&resolve_static_prop_current_type(
+            &scratch, &fqcn, &prop, db,
+        ));
+    }
+    if !union_ty.is_empty() {
+        apply_prop_narrowed(ctx, &fqcn, &prop, original, union_ty, true);
+    }
+    Some((fqcn, prop))
+}
+
 /// For `$x instanceof A || $x instanceof B` (true branch): narrow $x to A|B.
 /// Handles OR chains recursively, e.g. `$x instanceof A || $x instanceof B || $x instanceof C`.
 /// Also handles the scalar-type-check counterpart (`is_int($x) || is_string($x)`)
@@ -3554,9 +3853,12 @@ fn narrow_or_instanceof_true(
         && narrow_type_fn_disjuncts(&[left, right], ctx, db).is_none()
         && narrow_prop_instanceof_disjuncts(&[left, right], ctx, db, file).is_none()
         && narrow_prop_type_fn_disjuncts(&[left, right], ctx, db, file).is_none()
+        && narrow_static_prop_instanceof_disjuncts(&[left, right], ctx, db, file).is_none()
+        && narrow_static_prop_type_fn_disjuncts(&[left, right], ctx, db, file).is_none()
         && narrow_mixed_disjuncts(&[left, right], ctx, db, file).is_none()
+        && narrow_mixed_prop_disjuncts(&[left, right], ctx, db, file).is_none()
     {
-        narrow_mixed_prop_disjuncts(&[left, right], ctx, db, file);
+        narrow_mixed_static_prop_disjuncts(&[left, right], ctx, db, file);
     }
 }
 
@@ -6786,6 +7088,30 @@ fn extract_static_prop_access(
     db: &dyn MirDatabase,
     file: &str,
 ) -> Option<(std::sync::Arc<str>, String)> {
+    extract_static_prop_access_parts(
+        expr,
+        db,
+        file,
+        ctx.self_fqcn.as_deref(),
+        ctx.static_fqcn.as_deref(),
+        ctx.parent_fqcn.as_deref(),
+    )
+}
+
+/// Same resolution logic as `extract_static_prop_access`, parameterized on
+/// the three relative-keyword FQCNs directly instead of a full `FlowState`
+/// borrow — used by the OR-disjunct collector helpers (`collect_static_prop_instanceof`,
+/// `extract_type_fn_check_static_prop`), which precompute these once before
+/// looping so they don't need to hold a `FlowState` reference alongside a
+/// later `&mut FlowState` use in the same function.
+fn extract_static_prop_access_parts(
+    expr: &php_ast::owned::Expr,
+    db: &dyn MirDatabase,
+    file: &str,
+    self_fqcn: Option<&str>,
+    static_fqcn: Option<&str>,
+    parent_fqcn: Option<&str>,
+) -> Option<(std::sync::Arc<str>, String)> {
     match &expr.kind {
         ExprKind::StaticPropertyAccess(spa) => {
             let id = match &spa.class.kind {
@@ -6794,8 +7120,8 @@ fn extract_static_prop_access(
             };
             let resolved = crate::db::resolve_name(db, file, id.as_ref());
             let fqcn = match resolved.as_str() {
-                "self" | "static" => ctx.self_fqcn.clone().or_else(|| ctx.static_fqcn.clone())?,
-                "parent" => ctx.parent_fqcn.clone()?,
+                "self" | "static" => std::sync::Arc::from(self_fqcn.or(static_fqcn)?),
+                "parent" => std::sync::Arc::from(parent_fqcn?),
                 s => std::sync::Arc::from(s),
             };
             let prop = match &spa.member.kind {
@@ -6806,7 +7132,9 @@ fn extract_static_prop_access(
             };
             Some((fqcn, prop))
         }
-        ExprKind::Parenthesized(inner) => extract_static_prop_access(inner, ctx, db, file),
+        ExprKind::Parenthesized(inner) => {
+            extract_static_prop_access_parts(inner, db, file, self_fqcn, static_fqcn, parent_fqcn)
+        }
         _ => None,
     }
 }

@@ -220,7 +220,42 @@ impl<'a> ExpressionAnalyzer<'a> {
                         &self.file,
                     )
                     .is_some()
+                    || crate::narrowing::narrow_prop_instanceof_disjuncts(
+                        &refs,
+                        &mut arm_ctx,
+                        self.db,
+                        &self.file,
+                    )
+                    .is_some()
                     || crate::narrowing::narrow_prop_type_fn_disjuncts(
+                        &refs,
+                        &mut arm_ctx,
+                        self.db,
+                        &self.file,
+                    )
+                    .is_some()
+                    || crate::narrowing::narrow_mixed_prop_disjuncts(
+                        &refs,
+                        &mut arm_ctx,
+                        self.db,
+                        &self.file,
+                    )
+                    .is_some()
+                    || crate::narrowing::narrow_static_prop_instanceof_disjuncts(
+                        &refs,
+                        &mut arm_ctx,
+                        self.db,
+                        &self.file,
+                    )
+                    .is_some()
+                    || crate::narrowing::narrow_static_prop_type_fn_disjuncts(
+                        &refs,
+                        &mut arm_ctx,
+                        self.db,
+                        &self.file,
+                    )
+                    .is_some()
+                    || crate::narrowing::narrow_mixed_static_prop_disjuncts(
                         &refs,
                         &mut arm_ctx,
                         self.db,
