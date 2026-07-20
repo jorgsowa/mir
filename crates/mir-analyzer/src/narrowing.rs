@@ -2398,6 +2398,11 @@ pub fn narrow_from_condition(
                         ctx.set_var(&var_name, current.remove_null());
                         std::sync::Arc::make_mut(&mut ctx.assigned_vars)
                             .insert(mir_types::Name::from(var_name.as_str()));
+                    } else if ctx.var_is_defined(&var_name) {
+                        // isset($x) is false and $x is always assigned (e.g. a
+                        // parameter) → the only other way isset() can be false is
+                        // $x being null.
+                        narrow_var_null(ctx, &var_name, true);
                     }
                 } else if is_true {
                     // `isset($base[$k])` implies `$base` is a non-null, indexable
