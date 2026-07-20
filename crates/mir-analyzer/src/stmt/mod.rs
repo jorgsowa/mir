@@ -255,7 +255,7 @@ impl<'a> StatementsAnalyzer<'a> {
             // otherwise record it as a `cls:` reference so a class named only
             // via a local `@var` assertion isn't falsely flagged UnusedClass.
             for atomic in &ann.ty.types {
-                if let Atomic::TNamedObject { fqcn, .. } = atomic {
+                if let Atomic::TNamedObject { fqcn, type_params } = atomic {
                     if crate::diagnostics::is_pseudo_type(fqcn.as_ref()) {
                         continue;
                     }
@@ -275,16 +275,49 @@ impl<'a> StatementsAnalyzer<'a> {
                                 ),
                             },
                         ));
-                    } else if self.mode == AnalysisMode::Full {
-                        self.db.record_reference_location(crate::db::RefLoc {
-                            symbol_key: Arc::from(format!("cls:{fqcn}")),
-                            file: self.file.clone(),
-                            line,
-                            col_start,
-                            col_end: crate::diagnostics::clamp_col_end(
-                                line, line_end, col_start, col_end,
-                            ),
-                        });
+                    } else {
+                        if self.mode == AnalysisMode::Full {
+                            self.db.record_reference_location(crate::db::RefLoc {
+                                symbol_key: Arc::from(format!("cls:{fqcn}")),
+                                file: self.file.clone(),
+                                line,
+                                col_start,
+                                col_end: crate::diagnostics::clamp_col_end(
+                                    line, line_end, col_start, col_end,
+                                ),
+                            });
+                        }
+                        // Arity mismatch: `@var TypedMap<string>` against a
+                        // class declaring 2 template params. A caller
+                        // supplying NO type args at all (`@var TypedMap`) is
+                        // the legitimate bare-generic-reference shorthand and
+                        // deliberately not flagged here — only a supplied,
+                        // wrong-length argument list is an error.
+                        if !type_params.is_empty() {
+                            let declared_count =
+                                crate::db::class_template_params(self.db, fqcn.as_ref())
+                                    .map(|tps| tps.len())
+                                    .unwrap_or(0);
+                            if declared_count != type_params.len() {
+                                self.issues.add(Issue::new(
+                                    IssueKind::InvalidDocblock {
+                                        message: format!(
+                                            "{fqcn} expects {declared_count} template argument(s), got {}",
+                                            type_params.len()
+                                        ),
+                                    },
+                                    Location {
+                                        file: self.file.clone(),
+                                        line,
+                                        line_end,
+                                        col_start,
+                                        col_end: crate::diagnostics::clamp_col_end(
+                                            line, line_end, col_start, col_end,
+                                        ),
+                                    },
+                                ));
+                            }
+                        }
                     }
                 }
             }
