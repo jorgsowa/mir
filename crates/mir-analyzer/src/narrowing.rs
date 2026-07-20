@@ -1755,6 +1755,21 @@ pub fn narrow_from_condition(
                     }
                 }
             }
+            // `$x == 42` / `$x != 42` — sound only when every current atom is
+            // already int-like (no string/float/bool atom could loosely equal
+            // the same numeric value differently than strict comparison
+            // would), reusing the strict `===` arm's literal_int_narrow_type
+            // once that holds. Var-only: property/static-property receivers
+            // are a larger slice, left for a future pass (W5).
+            else if let ExprKind::Int(n) = &b.right.kind {
+                if let Some(name) = extract_var_name(&b.left) {
+                    narrow_var_loose_int(ctx, &name, *n, effective_true);
+                }
+            } else if let ExprKind::Int(n) = &b.left.kind {
+                if let Some(name) = extract_var_name(&b.right) {
+                    narrow_var_loose_int(ctx, &name, *n, effective_true);
+                }
+            }
             // `$x == EnumName::CaseName` / `get_class($x) == Foo::class` etc. —
             // the `Foo::class`/enum-case counterpart of the string-literal arms
             // above, reusing the same logic the strict `===` arm uses (sound for
@@ -6133,6 +6148,20 @@ fn narrow_var_literal_int(ctx: &mut FlowState, name: &str, value: i64, is_value:
     let narrowed = literal_int_narrow_type(&current, value, is_value);
     // For closed-precise types (bounded ranges, named int subtypes, literal unions),
     // an empty result means the exclusion is a genuine contradiction — mark divergence.
+    let mark_diverges = crate::contradiction::is_closed_precise(&current);
+    set_narrowed(ctx, name, &current, narrowed, mark_diverges);
+}
+
+/// Loose-equality counterpart of `narrow_var_literal_int`, for `$x == 42` /
+/// `$x != 42`. Sound only when every current atom is already int-like — a
+/// string/float/bool atom could loosely equal the same numeric value in a
+/// way strict comparison wouldn't, so those cases are left unnarrowed.
+fn narrow_var_loose_int(ctx: &mut FlowState, name: &str, value: i64, is_value: bool) {
+    let current = ctx.get_var(name);
+    if current.types.is_empty() || !current.types.iter().all(|a| a.is_int()) {
+        return;
+    }
+    let narrowed = literal_int_narrow_type(&current, value, is_value);
     let mark_diverges = crate::contradiction::is_closed_precise(&current);
     set_narrowed(ctx, name, &current, narrowed, mark_diverges);
 }
