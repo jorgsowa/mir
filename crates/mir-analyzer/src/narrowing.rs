@@ -4901,7 +4901,18 @@ fn expr_is_nonempty_string_literal(
                     .as_slice(),
                 [Atomic::TLiteralString(s)] if !s.is_empty()
             ),
-            None => false,
+            // ScalarArgTarget has no static-property variant (tracked as
+            // S19) — extract it call-site-locally instead, mirroring the
+            // haystack side's existing static-prop arm right below.
+            None => match extract_static_prop_access(expr, ctx, db, file) {
+                Some((fqcn, prop)) => matches!(
+                    resolve_static_prop_current_type(ctx, &fqcn, &prop, db)
+                        .types
+                        .as_slice(),
+                    [Atomic::TLiteralString(s)] if !s.is_empty()
+                ),
+                None => false,
+            },
         },
     }
 }
