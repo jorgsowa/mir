@@ -582,22 +582,41 @@ fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -
             }
         }
 
+        // Only `TNamedObject` carries type args in this representation —
+        // `TSelf`/`TStaticObject`/`TParent` (the other arms `arg_fqcn` above
+        // can bind from) never do, so an empty slice is correct for them.
+        let arg_params: &[Type] = match a_atomic {
+            Atomic::TNamedObject { type_params, .. } => type_params,
+            _ => &[],
+        };
+
         param.types.iter().any(|p_atomic| {
             // Handle intersection bounds: arg must satisfy every part
             if let Atomic::TIntersection { parts } = p_atomic {
                 return parts.iter().all(|part| {
                     part.types.iter().any(|part_atomic| {
-                        let part_fqcn = match part_atomic {
-                            Atomic::TNamedObject { fqcn, .. } => fqcn,
+                        let (part_fqcn, part_params) = match part_atomic {
+                            Atomic::TNamedObject { fqcn, type_params } => (fqcn, type_params),
                             _ => return false,
                         };
                         let resolved_part =
                             crate::db::resolve_name(ea.db, &ea.file, part_fqcn.as_ref());
-                        crate::db::extends_or_implements(ea.db, arg_fqcn.as_ref(), &resolved_part)
-                            || crate::db::extends_or_implements(
+                        let extends = crate::db::extends_or_implements(
+                            ea.db,
+                            arg_fqcn.as_ref(),
+                            &resolved_part,
+                        ) || crate::db::extends_or_implements(
+                            ea.db,
+                            arg_fqcn.as_ref(),
+                            part_fqcn.as_ref(),
+                        );
+                        extends
+                            && crate::subtype::named_object_type_params_ok(
                                 ea.db,
-                                arg_fqcn.as_ref(),
-                                part_fqcn.as_ref(),
+                                arg_fqcn,
+                                arg_params,
+                                part_fqcn,
+                                part_params,
                             )
                     })
                 });

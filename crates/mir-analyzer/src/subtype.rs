@@ -21,7 +21,7 @@ use crate::db::{
 /// A supertype type-parameter that's effectively wildcarded — an unbound
 /// template var or `mixed`. When the supertype's params are all free, we
 /// treat the supertype as "any instantiation" for subtype matching.
-fn sup_param_is_free(ty: &Type) -> bool {
+pub(crate) fn sup_param_is_free(ty: &Type) -> bool {
     ty.is_mixed()
         || ty
             .types
@@ -35,7 +35,7 @@ fn sup_param_is_free(ty: &Type) -> bool {
 /// exactly (the `sub_params == sup_params` fast path in `is_subtype` already
 /// covers the all-invariant case, so a mismatch here only survives when at
 /// least one param is variant).
-fn variance_compatible(
+pub(crate) fn variance_compatible(
     db: &dyn MirDatabase,
     fqcn: &str,
     sub_params: &[Type],
@@ -79,7 +79,7 @@ fn variance_compatible(
 /// SAME class, so e.g. `TypedList<Dog> implements Collection<T>` could never
 /// satisfy a `Collection<Animal>` parameter even though `Collection`'s `T` is
 /// `@template-covariant`.
-fn variance_compatible_across_hierarchy(
+pub(crate) fn variance_compatible_across_hierarchy(
     db: &dyn MirDatabase,
     sub_fqcn: &str,
     sub_params: &[Type],
@@ -126,6 +126,41 @@ fn variance_compatible_across_hierarchy(
     variance_compatible(db, sup_fqcn, &resolved_sup_params, sup_params)
 }
 
+/// Whether `sub_fqcn<sub_params>`'s type arguments are compatible with a
+/// required `sup_fqcn<sup_params>` — shared by the `(TNamedObject,
+/// TNamedObject)` and `(TNamedObject, TIntersection)` arms of `is_subtype`
+/// (an intersection part is itself just a named-object requirement). Does
+/// NOT check `sub_fqcn`/`sup_fqcn`'s class-hierarchy relationship — callers
+/// combine this with their own `extends_or_implements` check.
+pub(crate) fn named_object_type_params_ok(
+    db: &dyn MirDatabase,
+    sub_fqcn: &Name,
+    sub_params: &[Type],
+    sup_fqcn: &Name,
+    sup_params: &[Type],
+) -> bool {
+    // For parameterized classes we can only reason about the hierarchy when
+    // the supertype is bare (no `<...>`), the supertype's params are all
+    // unbound template vars (e.g. `Base<K, V>` where `K`/`V` are free), both
+    // sides match exactly, or the sub's params are free:
+    // - `mixed` explicitly opts out of type-param checking (mirrors
+    //   Psalm/PHPStan behaviour for `mixed` args)
+    // - `never` is the bottom type and a subtype of every type
+    sup_params.is_empty()
+        || sub_params == sup_params
+        || sup_params.iter().all(sup_param_is_free)
+        || (!sub_params.is_empty() && sub_params.iter().all(|p| p.is_mixed() || p.is_never()))
+        || (sub_fqcn == sup_fqcn
+            && variance_compatible(db, sub_fqcn.as_ref(), sub_params, sup_params))
+        || variance_compatible_across_hierarchy(
+            db,
+            sub_fqcn.as_ref(),
+            sub_params,
+            sup_fqcn.as_ref(),
+            sup_params,
+        )
+}
+
 /// Returns true if `sub` is a subtype of `sup`, considering the codebase's
 /// class-hierarchy graph (`extends` / `implements`) on top of structural
 /// matches.
@@ -169,37 +204,40 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
                         type_params: sup_params,
                     },
                 ) => {
-                    // For parameterized classes we can only reason about the
-                    // hierarchy when the supertype is bare (no `<...>`), the
-                    // supertype's params are all unbound template vars (e.g.
-                    // `Base<K, V>` where `K`/`V` are free), both sides match
-                    // exactly, or the sub's params are free:
-                    // - `mixed` explicitly opts out of type-param checking
-                    //   (mirrors Psalm/PHPStan behaviour for `mixed` args)
-                    // - `never` is the bottom type and a subtype of every type
-                    let params_ok = sup_params.is_empty()
-                        || sub_params == sup_params
-                        || sup_params.iter().all(sup_param_is_free)
-                        || (!sub_params.is_empty()
-                            && sub_params.iter().all(|p| p.is_mixed() || p.is_never()))
-                        || (sub_fqcn == sup_fqcn
-                            && variance_compatible(db, sub_fqcn.as_ref(), sub_params, sup_params))
-                        || variance_compatible_across_hierarchy(
-                            db,
-                            sub_fqcn.as_ref(),
-                            sub_params,
-                            sup_fqcn.as_ref(),
-                            sup_params,
-                        );
-                    params_ok && extends_or_implements(db, sub_fqcn.as_ref(), sup_fqcn.as_ref())
+                    named_object_type_params_ok(db, sub_fqcn, sub_params, sup_fqcn, sup_params)
+                        && extends_or_implements(db, sub_fqcn.as_ref(), sup_fqcn.as_ref())
                 }
-                (Atomic::TNamedObject { fqcn: sub_fqcn, .. }, Atomic::TIntersection { parts }) => {
-                    // sub satisfies intersection bound iff it satisfies every part
+                (
+                    Atomic::TNamedObject {
+                        fqcn: sub_fqcn,
+                        type_params: sub_params,
+                    },
+                    Atomic::TIntersection { parts },
+                ) => {
+                    // sub satisfies intersection bound iff it satisfies every part —
+                    // same type-param variance check as the plain (TNamedObject,
+                    // TNamedObject) arm above, applied per intersection part instead
+                    // of dropped: `Collection<int>&Countable` must reject a
+                    // `Collection<string>&Countable` sub just as strictly as a bare
+                    // `Collection<int>` supertype would.
                     parts.iter().all(|part| {
                         part.types.iter().any(|part_atomic| match part_atomic {
                             Atomic::TNamedObject {
-                                fqcn: part_fqcn, ..
-                            } => extends_or_implements(db, sub_fqcn.as_ref(), part_fqcn.as_ref()),
+                                fqcn: part_fqcn,
+                                type_params: part_params,
+                            } => {
+                                named_object_type_params_ok(
+                                    db,
+                                    sub_fqcn,
+                                    sub_params,
+                                    part_fqcn,
+                                    part_params,
+                                ) && extends_or_implements(
+                                    db,
+                                    sub_fqcn.as_ref(),
+                                    part_fqcn.as_ref(),
+                                )
+                            }
                             _ => false,
                         })
                     })
