@@ -563,6 +563,7 @@ impl<'a> ClassAnalyzer<'a> {
                     // As with return types: substitute this class's own inherited bindings
                     // before giving up on a still-templated param type, so a concretely
                     // bound generic contract (`@extends Box<int>`) is still checked.
+                    let parent_had_template = self.return_type_has_template(parent_ty_raw);
                     let parent_ty = parent_ty_raw.substitute_templates(&inherited_bindings);
                     let child_ty = child_ty_raw.substitute_templates(&inherited_bindings);
                     let parent_ty = &parent_ty;
@@ -591,9 +592,16 @@ impl<'a> ClassAnalyzer<'a> {
                         // Parameter contravariance is a native-signature concept: PHP only
                         // enforces it on declared type hints. A docblock `@param` that
                         // narrows to subclasses (native hint unchanged) is an intentional
-                        // refinement, not an LSP violation — so only compare native hints.
-                        if !parent_ty.from_docblock
-                            && !child_ty.from_docblock
+                        // refinement, not an LSP violation — so ordinarily only compare
+                        // native hints. But when the parent's own type is a generic
+                        // contract (`@param T`), this class's `@extends`/`@implements`
+                        // fixed T to a concrete type, not something the child author
+                        // discretionarily narrowed — so the child's concrete type (however
+                        // it's declared) must still honor it, mirroring the return-type
+                        // covariance carve-out above.
+                        let checkable = parent_had_template
+                            || (!parent_ty.from_docblock && !child_ty.from_docblock);
+                        if checkable
                             && self.all_object_classes_known(parent_ty)
                             && self.all_object_classes_known(child_ty)
                         {
