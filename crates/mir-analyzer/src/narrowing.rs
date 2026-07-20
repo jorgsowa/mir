@@ -2006,6 +2006,22 @@ pub fn narrow_from_condition(
                                     };
                                     apply_prop_narrowed(ctx, &obj, &prop, current, narrowed, true);
                                 }
+                            } else if let Some((fqcn_recv, prop)) =
+                                extract_static_prop_access(&arg_expr.value, ctx, db, file)
+                            {
+                                let current =
+                                    resolve_static_prop_current_type(ctx, &fqcn_recv, &prop, db);
+                                if !current.is_mixed() {
+                                    let narrowed = if bare.eq_ignore_ascii_case("interface_exists")
+                                    {
+                                        current.narrow_to_interface_string()
+                                    } else {
+                                        current.narrow_to_class_string()
+                                    };
+                                    apply_prop_narrowed(
+                                        ctx, &fqcn_recv, &prop, current, narrowed, true,
+                                    );
+                                }
                             }
                         }
                     }
