@@ -4384,9 +4384,6 @@ fn narrow_static_prop_literal_string(
     is_value: bool,
 ) {
     let current = resolve_static_prop_current_type(ctx, fqcn, prop, db);
-    if current.is_mixed() {
-        return;
-    }
     let narrowed = literal_string_narrow_type(&current, value, is_value);
     let mark_diverges = crate::contradiction::is_closed_precise(&current);
     apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, mark_diverges);
@@ -4403,9 +4400,6 @@ fn narrow_static_prop_literal_int(
     is_value: bool,
 ) {
     let current = resolve_static_prop_current_type(ctx, fqcn, prop, db);
-    if current.is_mixed() {
-        return;
-    }
     let narrowed = literal_int_narrow_type(&current, value, is_value);
     let mark_diverges = crate::contradiction::is_closed_precise(&current);
     apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, mark_diverges);
@@ -5445,9 +5439,6 @@ fn narrow_static_prop_from_type_fn(
     is_true: bool,
 ) {
     let current = resolve_static_prop_current_type(ctx, fqcn, prop, db);
-    if current.is_mixed() {
-        return;
-    }
     let Some(narrowed) = type_fn_narrowed(&current, fn_name, db, is_true) else {
         return;
     };
