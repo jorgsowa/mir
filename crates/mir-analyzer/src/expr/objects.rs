@@ -105,13 +105,34 @@ impl<'a> ExpressionAnalyzer<'a> {
         // call would falsely substitute the param to the bound and reject valid
         // args (e.g. `@template T of Base`, `__construct(int $id)` → `new Repo(5)`
         // must be bare `Repo`, never `Repo<Base>`).
-        let (bindings, unchecked) = crate::generic::infer_arg_template_bindings(
+        let (mut bindings, unchecked) = crate::generic::infer_arg_template_bindings(
             self.db,
             &class_tps,
             ctor_params,
             arg_types,
             arg_names,
         );
+        // A bare subclass that declares no `@template` of its own but fixes
+        // a generic ancestor via `@extends Box<int>` already determines
+        // T=int for every instance of this class, regardless of what this
+        // particular constructor call's arguments would otherwise infer —
+        // an inherited fixed binding takes priority so a mismatched
+        // constructor argument shows up as an arg-type mismatch
+        // (check_constructor_args, substituted the same way) rather than
+        // silently rebinding T to the bad argument's type and corrupting
+        // every later `@return T` on this receiver. Skipped when `fqcn`
+        // declares its own `@template` (still genuinely generic itself,
+        // e.g. `class TypedList { @template T; @implements Collection<T> }`)
+        // — there, T is exactly what this constructor call is inferring, and
+        // walking the ancestor chain with no known binding for T yet would
+        // corrupt it into a self-referential `TypedList<T>`-shaped type.
+        if crate::db::declared_template_params(self.db, fqcn).is_none_or(|tps| tps.is_empty()) {
+            for (name, ty) in
+                crate::db::inherited_template_bindings(self.db, fqcn, &Default::default())
+            {
+                bindings.insert(name, ty);
+            }
+        }
 
         // A class-level `@template T of Bound` was previously enforced only at
         // method-call sites (against a method's OWN template params), never
@@ -339,12 +360,75 @@ impl<'a> ExpressionAnalyzer<'a> {
                         &ctor_params_and_templates
                     {
                         if !trait_relative_new {
+                            // A bare subclass of a generic ancestor fixed via
+                            // `@extends Box<int>` already determines T=int for
+                            // this exact `new` — substitute it into the
+                            // constructor's own param types before arg-checking,
+                            // mirroring how every other template-consuming call
+                            // site (method/static calls, property read/write,
+                            // array-access, foreach) substitutes
+                            // `inherited_template_bindings` before using a
+                            // class's template params. A constructor-level
+                            // `@template T` shadowing the class-level one keeps
+                            // its own occurrences unbound so arg inference still
+                            // runs for it.
+                            let class_tps = crate::db::class_template_params(self.db, &fqcn)
+                                .map(|tps| tps.to_vec())
+                                .unwrap_or_default();
+                            let mut bindings: rustc_hash::FxHashMap<mir_types::Name, Type> =
+                                Default::default();
+                            // Skipped when `fqcn` declares its own `@template`
+                            // (still genuinely generic itself, e.g. a class
+                            // implementing a covariant interface with its own
+                            // template forwarded to it) — there, the class's
+                            // own template is exactly what constructor-arg
+                            // inference is meant to bind, and walking the
+                            // ancestor chain with no known binding yet would
+                            // corrupt it into a self-referential type.
+                            if crate::db::declared_template_params(self.db, &fqcn)
+                                .is_none_or(|tps| tps.is_empty())
+                            {
+                                for (k, v) in crate::db::inherited_template_bindings(
+                                    self.db,
+                                    &fqcn,
+                                    &Default::default(),
+                                ) {
+                                    bindings.insert(k, v);
+                                }
+                            }
+                            for tp in ctor_templates.iter() {
+                                bindings.remove(&mir_types::Name::from(tp.name.as_ref()));
+                            }
+                            let substituted_ctor_params: Vec<
+                                mir_codebase::definitions::DeclaredParam,
+                            >;
+                            let effective_ctor_params: &[mir_codebase::definitions::DeclaredParam] =
+                                if bindings.is_empty() || class_tps.is_empty() {
+                                    ctor_params
+                                } else {
+                                    substituted_ctor_params = ctor_params
+                                        .iter()
+                                        .map(|p| mir_codebase::definitions::DeclaredParam {
+                                            ty: mir_codebase::wrap_param_type(
+                                                p.ty.as_ref()
+                                                    .map(|t| t.substitute_templates(&bindings)),
+                                            ),
+                                            out_ty: mir_codebase::wrap_param_type(
+                                                p.out_ty
+                                                    .as_ref()
+                                                    .map(|t| t.substitute_templates(&bindings)),
+                                            ),
+                                            ..p.clone()
+                                        })
+                                        .collect();
+                                    &substituted_ctor_params
+                                };
                             crate::call::check_constructor_args(
                                 self,
                                 &fqcn,
                                 crate::call::CheckArgsParams {
                                     fn_name: "__construct",
-                                    params: ctor_params,
+                                    params: effective_ctor_params,
                                     arg_types: &arg_types,
                                     arg_spans: &arg_spans,
                                     arg_names: &arg_names,
