@@ -2038,7 +2038,28 @@ pub fn narrow_from_condition(
                                         // receiver's coerced-to-"" property.
                                         narrow_receiver_non_null_on_prop_match(ctx, &obj, true);
                                     }
-                                    None => {}
+                                    None => {
+                                        // ScalarArgTarget has no static-property
+                                        // variant (tracked as S19) — extract it
+                                        // call-site-locally instead, mirroring
+                                        // gettype()/count()/strlen() on a static prop.
+                                        if let Some((fqcn, prop)) = extract_static_prop_access(
+                                            &haystack_arg.value,
+                                            ctx,
+                                            db,
+                                            file,
+                                        ) {
+                                            let current = resolve_static_prop_current_type(
+                                                ctx, &fqcn, &prop, db,
+                                            );
+                                            if !current.is_mixed() {
+                                                let narrowed = narrow_string_to_non_empty(&current);
+                                                apply_prop_narrowed(
+                                                    ctx, &fqcn, &prop, current, narrowed, false,
+                                                );
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
