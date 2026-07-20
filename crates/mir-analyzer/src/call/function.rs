@@ -128,7 +128,7 @@ impl CallAnalyzer {
                         if call.args.len() == 1 {
                             sole_spread_ty = Some(ty.clone());
                         }
-                        inner_arg_types.push(spread_element_type(&ty));
+                        inner_arg_types.push(spread_element_type(ea.db, &ty));
                     } else {
                         inner_arg_types.push(ty);
                     }
@@ -352,7 +352,7 @@ impl CallAnalyzer {
                 if call.args.len() == 1 {
                     sole_spread_ty = Some(ty.clone());
                 }
-                arg_types.push(spread_element_type(&ty));
+                arg_types.push(spread_element_type(ea.db, &ty));
             } else {
                 arg_types.push(ty);
             }

@@ -8,7 +8,7 @@ use std::sync::Arc;
 /// For a spread (`...`) element in an array literal, return the union of key types
 /// across all array atomics. Mirrors [`crate::call::spread_element_type`], which does
 /// the same for value types. E.g. `array<string, int>` → `string`, `list<int>` → `int`.
-fn spread_key_type(arr_ty: &Type) -> Type {
+fn spread_key_type(db: &dyn crate::db::MirDatabase, arr_ty: &Type) -> Type {
     use mir_types::atomic::ArrayKey;
 
     let mut result = Type::empty();
@@ -30,10 +30,21 @@ fn spread_key_type(arr_ty: &Type) -> Type {
                     }
                 }
             }
-            // Traversable<K, V>, Iterator<K, V>, Generator<K, V, ...> — key is param[0].
-            Atomic::TNamedObject { type_params, .. } if type_params.len() >= 2 => {
-                for t in type_params[0].types.iter() {
-                    result.add_type(t.clone());
+            // Traversable<TKey, TValue>/Iterator/IteratorAggregate/Generator — resolve
+            // the real item types via the class's own `@implements`
+            // annotation (or `current()`/`key()`/`getIterator()` chain), not
+            // a naive `type_params[0]` positional guess — a spreadable
+            // object's own declared template list isn't necessarily
+            // exactly `[TKey, TValue]` in that order.
+            Atomic::TNamedObject { fqcn, type_params } => {
+                if let Some((key, _value)) =
+                    crate::stmt::resolve_iterator_item_types(db, fqcn, type_params, 4)
+                {
+                    for t in key.types.iter() {
+                        result.add_type(t.clone());
+                    }
+                } else {
+                    return Type::mixed();
                 }
             }
             _ => return Type::mixed(),
@@ -248,8 +259,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // giving up on the whole literal — `[...$x, ...$y]` should
                 // type as the union of $x's and $y's key/value types, not
                 // unconditionally collapse to `array<mixed, mixed>`.
-                all_value_types.merge_with(&crate::call::spread_element_type(&value_ty));
-                key_union.merge_with(&spread_key_type(&value_ty));
+                all_value_types.merge_with(&crate::call::spread_element_type(self.db, &value_ty));
+                key_union.merge_with(&spread_key_type(self.db, &value_ty));
             } else {
                 all_value_types.merge_with(&value_ty);
                 if let Some(key_expr) = &elem.key {

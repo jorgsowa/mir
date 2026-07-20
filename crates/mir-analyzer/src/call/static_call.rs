@@ -277,7 +277,7 @@ impl CallAnalyzer {
                     if call.args.len() == 1 {
                         sole_spread_ty = Some(ty.clone());
                     }
-                    spread_element_type(&ty)
+                    spread_element_type(ea.db, &ty)
                 } else {
                     ty
                 }

@@ -162,7 +162,7 @@ fn generator_item_types(type_params: &[Type]) -> (Type, Type) {
 /// doesn't implement `Iterator`/`IteratorAggregate` (or the info needed to
 /// resolve it further just isn't available) — the caller then falls back to
 /// treating the object as non-iterable-typed (`mixed`/`mixed`).
-fn resolve_iterator_item_types(
+pub(crate) fn resolve_iterator_item_types(
     db: &dyn MirDatabase,
     fqcn: &Name,
     type_params: &[Type],

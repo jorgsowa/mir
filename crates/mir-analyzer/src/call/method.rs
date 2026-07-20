@@ -283,7 +283,7 @@ impl CallAnalyzer {
             let ty = ea.analyze(&arg.value, ctx);
             super::consume_arg_assignment(&arg.value, ctx);
             arg_types.push(if arg.unpack {
-                spread_element_type(&ty)
+                spread_element_type(ea.db, &ty)
             } else {
                 ty
             });

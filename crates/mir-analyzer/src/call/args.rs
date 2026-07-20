@@ -66,7 +66,7 @@ pub fn check_constructor_args(
 
 /// For a spread (`...`) argument, return the union of value types across all array atomics.
 /// E.g. `array<int, int>` → `int`, `list<string>` → `string`, `mixed` → `mixed`.
-pub fn spread_element_type(arr_ty: &Type) -> Type {
+pub fn spread_element_type(db: &dyn crate::db::MirDatabase, arr_ty: &Type) -> Type {
     let mut result = Type::empty();
     for atomic in arr_ty.types.iter() {
         match atomic {
@@ -85,23 +85,19 @@ pub fn spread_element_type(arr_ty: &Type) -> Type {
                     }
                 }
             }
-            // Traversable<K, V>, Iterator<K, V>, Generator<K, V, ...> — value is param[1].
-            // Only extract when the key type is int-compatible; float/other keys
-            // produce undefined positional semantics so we skip (let result stay empty).
-            Atomic::TNamedObject { type_params, .. } if type_params.len() >= 2 => {
-                let key_is_int_compat = type_params[0].types.iter().all(|k| {
-                    matches!(
-                        k,
-                        Atomic::TInt
-                            | Atomic::TPositiveInt
-                            | Atomic::TIntRange { .. }
-                            | Atomic::TMixed
-                    )
-                });
-                if key_is_int_compat {
-                    for t in type_params[1].types.iter() {
+            // Traversable<TKey, TValue>/Iterator/IteratorAggregate/Generator — resolve
+            // the real item types via the class's own `@implements` annotation
+            // (or `current()`/`key()`/`getIterator()` chain), not a naive
+            // `type_params[1]` positional guess.
+            Atomic::TNamedObject { fqcn, type_params } => {
+                if let Some((_key, value)) =
+                    crate::stmt::resolve_iterator_item_types(db, fqcn, type_params, 4)
+                {
+                    for t in value.types.iter() {
                         result.add_type(t.clone());
                     }
+                } else {
+                    return Type::mixed();
                 }
             }
             _ => return Type::mixed(),

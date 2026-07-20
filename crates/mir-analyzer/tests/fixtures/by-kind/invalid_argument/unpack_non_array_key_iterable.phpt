@@ -1,5 +1,7 @@
 ===description===
-Unpack non array key iterable
+Unpacking an `Iterator<float, string>` (a non-int key type) now resolves
+its real value type (`string`) via the interface's own type args instead
+of bailing to `mixed` on a naive int-key-only heuristic — G4.
 ===file===
 <?php
 /** @suppress UnusedParam */
@@ -10,4 +12,3 @@ $test = null;
 foo(...$test);
 
 ===expect===
-MixedArgument@7:4-7:12: Argument $args of foo() is mixed
