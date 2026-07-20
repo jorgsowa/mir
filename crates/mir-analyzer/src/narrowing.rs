@@ -3812,8 +3812,33 @@ fn narrow_instanceof_preserving_subtypes(
                 if already_covered {
                     result.add_type(atomic.clone());
                 } else {
+                    // Same reasoning as the non-intersection `!type_params.is_empty()`
+                    // arm below: if a part is a generic `TNamedObject` that
+                    // `class_name` is a subtype of, project its type params onto
+                    // `class_name` instead of appending a raw, empty-type-params atom.
+                    let projected_atom = parts.iter().find_map(|p| {
+                        p.types.iter().find_map(|a| match a {
+                            Atomic::TNamedObject { fqcn, type_params }
+                                if !type_params.is_empty()
+                                    && named_object_matches_instanceof(class_name, fqcn, db) =>
+                            {
+                                Some(Atomic::TNamedObject {
+                                    fqcn: class_name.into(),
+                                    type_params: project_type_params_onto_subclass(
+                                        db,
+                                        fqcn,
+                                        type_params,
+                                        class_name,
+                                    ),
+                                })
+                            }
+                            _ => None,
+                        })
+                    });
                     let mut new_parts: Vec<Type> = parts.iter().cloned().collect();
-                    new_parts.push(Type::single(narrowed_ty.clone()));
+                    new_parts.push(Type::single(
+                        projected_atom.unwrap_or_else(|| narrowed_ty.clone()),
+                    ));
                     result.add_type(Atomic::TIntersection {
                         parts: std::sync::Arc::from(new_parts),
                     });
@@ -3986,7 +4011,30 @@ fn narrow_or_instanceof_union(
                         })
                     });
                     if !already_covered {
-                        remaining.add_type(class_atom(cn));
+                        // Same reasoning as the non-intersection `!type_params.is_empty()`
+                        // arm below: if a part is a generic `TNamedObject` that `cn`
+                        // is a subtype of, project its type params onto `cn` instead
+                        // of a raw, empty-type-params atom.
+                        let projected_atom = parts.iter().find_map(|p| {
+                            p.types.iter().find_map(|a| match a {
+                                Atomic::TNamedObject { fqcn, type_params }
+                                    if !type_params.is_empty()
+                                        && named_object_matches_instanceof(cn, fqcn, db) =>
+                                {
+                                    Some(Atomic::TNamedObject {
+                                        fqcn: cn.as_str().into(),
+                                        type_params: project_type_params_onto_subclass(
+                                            db,
+                                            fqcn,
+                                            type_params,
+                                            cn,
+                                        ),
+                                    })
+                                }
+                                _ => None,
+                            })
+                        });
+                        remaining.add_type(projected_atom.unwrap_or_else(|| class_atom(cn)));
                     }
                 }
                 if remaining.is_empty() {
