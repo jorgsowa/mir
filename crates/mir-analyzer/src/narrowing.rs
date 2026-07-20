@@ -5042,6 +5042,14 @@ fn narrow_prop_int_comparison(
     let Some((min, max)) = int_comparison_bounds(op, n, is_true) else {
         return;
     };
+    // Whether the comparison excludes null is a fact about op/n/is_true alone,
+    // independent of the property's own (possibly mixed) type — apply it even
+    // when the value-narrowing below bails out on a mixed property.
+    narrow_receiver_non_null_on_prop_match(
+        ctx,
+        obj_var,
+        int_comparison_excludes_null(op, n, is_true),
+    );
     let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
     if current.is_mixed() {
         return;
@@ -5059,11 +5067,6 @@ fn narrow_prop_int_comparison(
     let mark_diverges =
         crate::contradiction::is_closed_precise(&current) && !ctx.get_var(obj_var).is_nullable();
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, mark_diverges);
-    narrow_receiver_non_null_on_prop_match(
-        ctx,
-        obj_var,
-        int_comparison_excludes_null(op, n, is_true),
-    );
 }
 
 /// Static-property counterpart of `narrow_prop_int_comparison`, for
@@ -7765,6 +7768,11 @@ fn narrow_prop_array_count_comparison(
     let Some(non_empty) = count_or_strlen_emptiness(op, n, is_true) else {
         return;
     };
+    // count() on a non-Countable (including null) is a TypeError in PHP 8, so
+    // reaching either comparison result at all proves $obj->prop — and thus
+    // $obj — was non-null, regardless of which direction was proven or of
+    // the property's own (possibly mixed) type.
+    narrow_receiver_non_null_on_prop_match(ctx, obj_var, true);
     let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
     if current.is_mixed() {
         return;
@@ -7775,10 +7783,6 @@ fn narrow_prop_array_count_comparison(
         current.narrow_to_empty_collection()
     };
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, false);
-    // count() on a non-Countable (including null) is a TypeError in PHP 8, so
-    // reaching either comparison result at all proves $obj->prop — and thus
-    // $obj — was non-null, regardless of which direction was proven.
-    narrow_receiver_non_null_on_prop_match(ctx, obj_var, true);
 }
 
 /// Property-access counterpart of `narrow_string_strlen_comparison`.
@@ -7796,6 +7800,13 @@ fn narrow_prop_string_strlen_comparison(
     let Some(non_empty) = count_or_strlen_emptiness(op, n, is_true) else {
         return;
     };
+    // strlen(null) returns 0 (no TypeError), so only a proven-non-empty
+    // result excludes a null receiver — the empty direction is also
+    // satisfiable by $obj being null. Independent of the property's own
+    // (possibly mixed) type, so apply it before the mixed bail below.
+    if non_empty {
+        narrow_receiver_non_null_on_prop_match(ctx, obj_var, true);
+    }
     let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
     if current.is_mixed() {
         return;
@@ -7806,12 +7817,6 @@ fn narrow_prop_string_strlen_comparison(
         narrow_string_to_empty(&current)
     };
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, false);
-    // strlen(null) returns 0 (no TypeError), so only a proven-non-empty
-    // result excludes a null receiver — the empty direction is also
-    // satisfiable by $obj being null.
-    if non_empty {
-        narrow_receiver_non_null_on_prop_match(ctx, obj_var, true);
-    }
 }
 
 /// Static-property counterpart of `narrow_prop_array_count_comparison`.
