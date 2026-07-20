@@ -112,24 +112,33 @@ impl<'a> ExpressionAnalyzer<'a> {
             arg_types,
             arg_names,
         );
-        // A bare subclass that declares no `@template` of its own but fixes
-        // a generic ancestor via `@extends Box<int>` already determines
-        // T=int for every instance of this class, regardless of what this
-        // particular constructor call's arguments would otherwise infer —
-        // an inherited fixed binding takes priority so a mismatched
-        // constructor argument shows up as an arg-type mismatch
-        // (check_constructor_args, substituted the same way) rather than
-        // silently rebinding T to the bad argument's type and corrupting
-        // every later `@return T` on this receiver. Skipped when `fqcn`
-        // declares its own `@template` (still genuinely generic itself,
-        // e.g. `class TypedList { @template T; @implements Collection<T> }`)
-        // — there, T is exactly what this constructor call is inferring, and
-        // walking the ancestor chain with no known binding for T yet would
-        // corrupt it into a self-referential `TypedList<T>`-shaped type.
-        if crate::db::declared_template_params(self.db, fqcn).is_none_or(|tps| tps.is_empty()) {
-            for (name, ty) in
-                crate::db::inherited_template_bindings(self.db, fqcn, &Default::default())
-            {
+        // A subclass that fixes a generic ancestor via `@extends Box<int>`
+        // already determines T=int for every instance of this class,
+        // regardless of what this particular constructor call's arguments
+        // would otherwise infer — an inherited fixed binding takes priority
+        // so a mismatched constructor argument shows up as an arg-type
+        // mismatch (check_constructor_args, substituted the same way) rather
+        // than silently rebinding T to the bad argument's type and
+        // corrupting every later `@return T` on this receiver. This applies
+        // even when `fqcn` ALSO declares its own, separate `@template`
+        // (`class Mid<U> extends Base<int>` — U is still freshly inferred
+        // below, T is independently fixed) — only skipped per-entry when the
+        // inherited binding's value is itself self-referential, pointing
+        // back at one of `fqcn`'s OWN template params (e.g. `class
+        // TypedList { @template T; @implements Collection<T> }`, where T is
+        // exactly what THIS constructor call is inferring — merging it here
+        // would corrupt it into a self-referential `TypedList<T>`-shaped
+        // type before inference even runs).
+        let own_template_names: std::collections::HashSet<mir_types::Name> = class_tps
+            .iter()
+            .map(|tp| mir_types::Name::from(tp.name.as_ref()))
+            .collect();
+        for (name, ty) in crate::db::inherited_template_bindings(self.db, fqcn, &Default::default())
+        {
+            let self_referential = ty.contains(
+                |a| matches!(a, Atomic::TTemplateParam { name, .. } if own_template_names.contains(name)),
+            );
+            if !self_referential {
                 bindings.insert(name, ty);
             }
         }
@@ -377,22 +386,33 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 .unwrap_or_default();
                             let mut bindings: rustc_hash::FxHashMap<mir_types::Name, Type> =
                                 Default::default();
-                            // Skipped when `fqcn` declares its own `@template`
-                            // (still genuinely generic itself, e.g. a class
+                            // Merged even when `fqcn` ALSO declares its own,
+                            // separate `@template` (`class Mid<U> extends
+                            // Base<int>` — U is still freshly inferred below,
+                            // T is independently fixed) — only skipped
+                            // per-entry when the inherited binding's value is
+                            // itself self-referential, pointing back at one of
+                            // `fqcn`'s OWN template params (e.g. a class
                             // implementing a covariant interface with its own
-                            // template forwarded to it) — there, the class's
-                            // own template is exactly what constructor-arg
-                            // inference is meant to bind, and walking the
-                            // ancestor chain with no known binding yet would
-                            // corrupt it into a self-referential type.
-                            if crate::db::declared_template_params(self.db, &fqcn)
-                                .is_none_or(|tps| tps.is_empty())
-                            {
-                                for (k, v) in crate::db::inherited_template_bindings(
-                                    self.db,
-                                    &fqcn,
-                                    &Default::default(),
-                                ) {
+                            // template forwarded to it, `@implements
+                            // Collection<T>`) — there, T is exactly what THIS
+                            // constructor-arg inference is meant to bind, and
+                            // merging it here would corrupt it into a
+                            // self-referential type before inference runs.
+                            let own_template_names: std::collections::HashSet<mir_types::Name> =
+                                class_tps
+                                    .iter()
+                                    .map(|tp| mir_types::Name::from(tp.name.as_ref()))
+                                    .collect();
+                            for (k, v) in crate::db::inherited_template_bindings(
+                                self.db,
+                                &fqcn,
+                                &Default::default(),
+                            ) {
+                                let self_referential = v.contains(|a| {
+                                    matches!(a, Atomic::TTemplateParam { name, .. } if own_template_names.contains(name))
+                                });
+                                if !self_referential {
                                     bindings.insert(k, v);
                                 }
                             }
