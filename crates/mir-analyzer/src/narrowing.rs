@@ -2974,6 +2974,21 @@ fn apply_docblock_assertions(
                     };
                     ctx.set_prop_refined(&obj, &prop, ty);
                     applied = true;
+                } else if let Some((fqcn, prop)) =
+                    extract_static_prop_access(&arg.value, ctx, db, file)
+                {
+                    let ty = match &template_bindings {
+                        Some(b) => assertion.ty.substitute_templates(b),
+                        None => assertion.ty.clone(),
+                    };
+                    let ty = if assertion.negated {
+                        let current = resolve_static_prop_current_type(ctx, &fqcn, &prop, db);
+                        negate_assertion_type(&current, &ty, db)
+                    } else {
+                        ty
+                    };
+                    ctx.set_prop_refined(&fqcn, &prop, ty);
+                    applied = true;
                 }
             }
         }
