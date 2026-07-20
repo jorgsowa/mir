@@ -716,6 +716,16 @@ pub fn narrow_from_condition(
                             )
                         }
                     }
+                } else if let Some((fqcn, prop)) =
+                    extract_array_key_first_or_last_static_prop_arg(&b.left, ctx, db, file)
+                {
+                    narrow_static_prop_array_key_first_or_last_null(
+                        ctx,
+                        &fqcn,
+                        &prop,
+                        db,
+                        effective_true,
+                    );
                 } else if let Some(name) = extract_var_name(&b.left) {
                     narrow_var_null(ctx, &name, effective_true);
                 } else if let Some((obj, prop)) = extract_nullsafe_prop_access(&b.left) {
@@ -744,6 +754,16 @@ pub fn narrow_from_condition(
                             )
                         }
                     }
+                } else if let Some((fqcn, prop)) =
+                    extract_array_key_first_or_last_static_prop_arg(&b.right, ctx, db, file)
+                {
+                    narrow_static_prop_array_key_first_or_last_null(
+                        ctx,
+                        &fqcn,
+                        &prop,
+                        db,
+                        effective_true,
+                    );
                 } else if let Some(name) = extract_var_name(&b.right) {
                     narrow_var_null(ctx, &name, effective_true);
                 } else if let Some((obj, prop)) = extract_nullsafe_prop_access(&b.right) {
@@ -7674,6 +7694,33 @@ fn extract_array_key_first_or_last_arg(expr: &php_ast::owned::Expr) -> Option<Sc
     None
 }
 
+/// Static-property counterpart of `extract_array_key_first_or_last_arg` —
+/// `ScalarArgTarget` has no static-property variant (tracked as S19), so
+/// extract it call-site-locally instead, mirroring the str_contains-family
+/// recipe.
+fn extract_array_key_first_or_last_static_prop_arg(
+    expr: &php_ast::owned::Expr,
+    ctx: &FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<(std::sync::Arc<str>, String)> {
+    if let ExprKind::FunctionCall(call) = &expr.kind {
+        let name = match &call.name.kind {
+            ExprKind::Identifier(n) => n.as_ref(),
+            _ => return None,
+        };
+        let bare = name.trim_start_matches('\\');
+        if bare.eq_ignore_ascii_case("array_key_first")
+            || bare.eq_ignore_ascii_case("array_key_last")
+        {
+            if let Some(arg) = call.args.first() {
+                return extract_static_prop_access(&arg.value, ctx, db, file);
+            }
+        }
+    }
+    None
+}
+
 /// `array_key_first($arr) !== null` / `array_key_last($arr) !== null` — a common
 /// non-empty-array idiom, equivalent to `count($arr) > 0`. Both functions return
 /// `null` only when the array is empty, so `!== null` proves it's non-empty and
@@ -7719,6 +7766,28 @@ fn narrow_prop_array_key_first_or_last_null(
         current.narrow_to_non_empty_collection()
     };
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, false);
+}
+
+/// Static-property counterpart of `narrow_array_key_first_or_last_null`.
+fn narrow_static_prop_array_key_first_or_last_null(
+    ctx: &mut FlowState,
+    fqcn: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    is_null: bool,
+) {
+    let current = resolve_static_prop_current_type(ctx, fqcn, prop, db);
+    if current.is_mixed() {
+        return;
+    }
+    let narrowed = if is_null {
+        current.narrow_to_empty_collection()
+    } else {
+        current.narrow_to_non_empty_collection()
+    };
+    if !narrowed.is_empty() && narrowed != current {
+        apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, false);
+    }
 }
 
 /// Extract the variable/property target from `strlen($var)` /
