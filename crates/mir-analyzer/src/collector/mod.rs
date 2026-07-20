@@ -788,6 +788,26 @@ impl<'a> DefinitionCollector<'a> {
                         )),
                     });
                 }
+                mir_types::Atomic::TKeyedArray {
+                    properties,
+                    is_open,
+                    is_list,
+                } => {
+                    let mut new_props = properties.clone();
+                    for prop in new_props.values_mut() {
+                        prop.ty = self.resolve_union_doc_with_templates(
+                            prop.ty.clone(),
+                            template_names,
+                            defining_entity,
+                            template_params,
+                        );
+                    }
+                    result.add_type(mir_types::Atomic::TKeyedArray {
+                        properties: new_props,
+                        is_open: *is_open,
+                        is_list: *is_list,
+                    });
+                }
                 // Conditional return type: recurse into subject and both branches with the
                 // same template context so class names and template references inside them
                 // are resolved correctly.
@@ -1007,6 +1027,36 @@ impl<'a> DefinitionCollector<'a> {
                             template_params,
                             defining_entity,
                         )),
+                    });
+                }
+                mir_types::Atomic::TNonEmptyList { value } => {
+                    result.add_type(mir_types::Atomic::TNonEmptyList {
+                        value: Box::new(self.substitute_template_params(
+                            *value.clone(),
+                            template_names,
+                            template_params,
+                            defining_entity,
+                        )),
+                    });
+                }
+                mir_types::Atomic::TKeyedArray {
+                    properties,
+                    is_open,
+                    is_list,
+                } => {
+                    let mut new_props = properties.clone();
+                    for prop in new_props.values_mut() {
+                        prop.ty = self.substitute_template_params(
+                            prop.ty.clone(),
+                            template_names,
+                            template_params,
+                            defining_entity,
+                        );
+                    }
+                    result.add_type(mir_types::Atomic::TKeyedArray {
+                        properties: new_props,
+                        is_open: *is_open,
+                        is_list: *is_list,
                     });
                 }
                 mir_types::Atomic::TClosure { data } => {

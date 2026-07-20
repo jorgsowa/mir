@@ -807,6 +807,37 @@ fn infer_from_pair(
                 }
             }
 
+            // array{0: T, 1: U} matched key-by-key against a same-shaped
+            // argument (e.g. a literal array `[1, "x"]`) — infers each
+            // template position independently from its corresponding key.
+            // A key present in the param shape but absent from the argument's
+            // has nothing to infer from and is skipped.
+            Atomic::TKeyedArray {
+                properties: p_props,
+                ..
+            } => {
+                for a_atomic in &arg_ty.types {
+                    if let Atomic::TKeyedArray {
+                        properties: a_props,
+                        ..
+                    } = a_atomic
+                    {
+                        for (key, p_prop) in p_props.iter() {
+                            if let Some(a_prop) = a_props.get(key) {
+                                infer_from_pair(
+                                    db,
+                                    &p_prop.ty,
+                                    &a_prop.ty,
+                                    template_names,
+                                    bindings,
+                                    risky,
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+
             // ClassName<T> matched against ClassName<t_ty> — or, if the bare
             // name is itself a declared template, bind it to arg_ty.
             Atomic::TNamedObject {
