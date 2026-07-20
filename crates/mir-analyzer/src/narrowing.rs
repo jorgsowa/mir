@@ -4190,6 +4190,10 @@ fn narrow_from_false_comparable_call(
                             }
                         }
                         Some(ScalarArgTarget::Prop(obj, prop)) => {
+                            // Found proves the haystack read wasn't null-derived (PHP
+                            // coerces null to "", and a non-empty needle can't match at
+                            // any offset in ""), which proves the receiver was non-null.
+                            narrow_receiver_non_null_on_prop_match(ctx, &obj, true);
                             let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
                             if !current.is_mixed() {
                                 let narrowed = narrow_string_to_non_empty(&current);
@@ -4214,6 +4218,21 @@ fn narrow_from_false_comparable_call(
             if let Some(target) = ScalarArgTarget::extract(&needle_arg.value) {
                 if let Some(haystack_ty) = extract_haystack_type(&haystack_arg.value, ctx, db, file)
                 {
+                    if !is_false {
+                        if let ScalarArgTarget::Prop(obj, _) = &target {
+                            // array_search(null, $haystack) only matches loosely when the
+                            // haystack contains a falsy literal (0, "", "0"); mirrors
+                            // in_array()'s identical reasoning.
+                            let haystack_admits_null_loosely =
+                                haystack_ty.types.iter().any(|a| {
+                                    matches!(a, Atomic::TLiteralInt(0))
+                                        || matches!(a, Atomic::TLiteralString(s) if s.as_ref() == "" || s.as_ref() == "0")
+                                });
+                            if strict || !haystack_admits_null_loosely {
+                                narrow_receiver_non_null_on_prop_match(ctx, obj, true);
+                            }
+                        }
+                    }
                     let current = match &target {
                         ScalarArgTarget::Var(name) => ctx.get_var(name),
                         ScalarArgTarget::Prop(obj, prop) => {
