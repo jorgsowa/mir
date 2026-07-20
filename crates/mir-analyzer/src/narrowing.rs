@@ -2433,6 +2433,50 @@ pub fn narrow_from_condition(
                                     }
                                 }
                             }
+                        } else if let Some((fqcn, prop)) =
+                            extract_static_prop_access(&needle_arg.value, ctx, db, file)
+                        {
+                            // Static-property counterpart of the instance-property
+                            // case above, e.g. `in_array(self::$status, ['a', 'b'])`.
+                            if let Some(haystack_ty) =
+                                extract_haystack_type(&haystack_arg.value, ctx, db, file)
+                            {
+                                // No receiver-non-null propagation here, unlike the
+                                // instance-property case above: a static property
+                                // has no separate receiver variable whose
+                                // nullability this could establish (`self::`/
+                                // `static::` is never itself null).
+                                let current =
+                                    resolve_static_prop_current_type(ctx, &fqcn, &prop, db);
+                                let loose_safe = strict
+                                    || in_array_loose_narrowing_is_safe(&current, &haystack_ty);
+                                if !current.is_mixed() && is_true && loose_safe {
+                                    let narrowed =
+                                        narrow_to_haystack_values(&current, &haystack_ty);
+                                    if !narrowed.is_empty() {
+                                        apply_prop_narrowed(
+                                            ctx, &fqcn, &prop, current, narrowed, false,
+                                        );
+                                    }
+                                } else if !current.is_mixed() && !is_true && loose_safe {
+                                    let all_literals = !current.types.is_empty()
+                                        && current.types.iter().all(|a| {
+                                            matches!(
+                                                a,
+                                                Atomic::TLiteralString(_) | Atomic::TLiteralInt(_)
+                                            )
+                                        });
+                                    if all_literals {
+                                        let narrowed = current
+                                            .filter(|a| !haystack_ty.types.iter().any(|h| h == a));
+                                        if !narrowed.is_empty() {
+                                            apply_prop_narrowed(
+                                                ctx, &fqcn, &prop, current, narrowed, false,
+                                            );
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 } else if bare.eq_ignore_ascii_case("is_a") {
