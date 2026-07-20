@@ -3035,7 +3035,12 @@ fn apply_docblock_assertions(
                     } else {
                         ty
                     };
+                    // `$obj->prop` on a null `$obj` reads as null, so proving
+                    // the property itself is non-nullable also proves `$obj`
+                    // wasn't null.
+                    let proved_prop_non_null = !ty.is_nullable();
                     ctx.set_prop_refined(&obj, &prop, ty);
+                    narrow_receiver_non_null_on_prop_match(ctx, &obj, proved_prop_non_null);
                     applied = true;
                 } else if let Some((fqcn, prop)) =
                     extract_static_prop_access(&arg.value, ctx, db, file)
