@@ -867,10 +867,18 @@ impl<'a> ExpressionAnalyzer<'a> {
                         .unwrap_or_default();
                     let mut bindings =
                         crate::generic::build_class_bindings(&class_tps, &receiver_type_params);
-                    for (k, v) in
-                        crate::db::inherited_template_bindings(self.db, &fqcn_arc, &bindings)
-                    {
-                        bindings.entry(k).or_insert(v);
+                    let inherited_bindings =
+                        crate::db::inherited_template_bindings(self.db, &fqcn_arc, &bindings);
+                    // Own-bindings-wins only when the receiver's own class
+                    // declares the method (`resolved.owner_fqcn`); otherwise
+                    // the ancestor that actually declares it wins — same
+                    // collision guard as the instance-method FCC case above.
+                    if resolved.owner_fqcn.as_ref() == fqcn_arc.as_ref() {
+                        for (k, v) in inherited_bindings {
+                            bindings.entry(k).or_insert(v);
+                        }
+                    } else {
+                        bindings.extend(inherited_bindings);
                     }
                     return Type::single(Self::build_closure_from_resolved_params(
                         &resolved.params,
