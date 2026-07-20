@@ -592,12 +592,26 @@ impl<'a> ExpressionAnalyzer<'a> {
                                             &class_tps,
                                             type_params,
                                         );
-                                        for (k, v) in crate::db::inherited_template_bindings(
-                                            self.db,
-                                            fqcn.as_ref(),
-                                            &bindings,
-                                        ) {
-                                            bindings.entry(k).or_insert(v);
+                                        let inherited_bindings =
+                                            crate::db::inherited_template_bindings(
+                                                self.db,
+                                                fqcn.as_ref(),
+                                                &bindings,
+                                            );
+                                        // Own-bindings-wins only when the
+                                        // property is declared directly on
+                                        // the receiver's own class
+                                        // (`prop_owner`); otherwise the
+                                        // ancestor that actually declares it
+                                        // wins — same collision guard as the
+                                        // read-side property access already
+                                        // applies.
+                                        if prop_owner.as_ref() == fqcn.as_ref() {
+                                            for (k, v) in inherited_bindings {
+                                                bindings.entry(k).or_insert(v);
+                                            }
+                                        } else {
+                                            bindings.extend(inherited_bindings);
                                         }
                                         let resolved_prop_ty = if bindings.is_empty() {
                                             prop_ty.clone()
