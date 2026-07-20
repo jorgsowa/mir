@@ -4018,6 +4018,26 @@ fn narrow_strict_subclass_of(
                     });
                 }
             }
+            // A named object unrelated to `class_name` by inheritance in either
+            // direction must not be silently discarded when it could still
+            // coexist with class_name (at least one side is an interface, so a
+            // single object can implement both) — mirrors
+            // narrow_instanceof_preserving_subtypes's TIntersection handling.
+            // Two unrelated concrete classes remain mutually exclusive under
+            // PHP's single inheritance and are correctly dropped by the `_` arm.
+            Atomic::TNamedObject { fqcn, .. }
+            | Atomic::TSelf { fqcn }
+            | Atomic::TStaticObject { fqcn }
+            | Atomic::TParent { fqcn }
+                if classes_can_coexist(fqcn, class_name, db) =>
+            {
+                result.add_type(Atomic::TIntersection {
+                    parts: std::sync::Arc::from(vec![
+                        Type::single(atomic.clone()),
+                        Type::single(narrowed_ty.clone()),
+                    ]),
+                });
+            }
             _ => {}
         }
     }
