@@ -2005,6 +2005,9 @@ pub fn narrow_from_condition(
                                         current.narrow_to_class_string()
                                     };
                                     apply_prop_narrowed(ctx, &obj, &prop, current, narrowed, true);
+                                    // `class_exists(null)` etc. can never be true, so a
+                                    // true result also proves `$obj` itself wasn't null.
+                                    narrow_receiver_non_null_on_prop_match(ctx, &obj, true);
                                 }
                             } else if let Some((fqcn_recv, prop)) =
                                 extract_static_prop_access(&arg_expr.value, ctx, db, file)
