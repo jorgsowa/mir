@@ -7247,7 +7247,9 @@ fn narrow_from_get_parent_class_literal(
         }
         ScalarArgTarget::Prop(obj, prop) => {
             narrow_prop_is_subclass_of(ctx, obj, prop, fqcn, db, file, is_true);
-            narrow_receiver_non_null_on_prop_match(ctx, obj, is_true);
+            // get_parent_class(null) throws a TypeError, so reaching either
+            // comparison result at all proves the receiver was non-null.
+            narrow_receiver_non_null_on_prop_match(ctx, obj, true);
         }
     }
 }
