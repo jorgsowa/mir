@@ -4271,7 +4271,23 @@ fn narrow_from_false_comparable_call(
                                 apply_prop_narrowed(ctx, &obj, &prop, current, narrowed, false);
                             }
                         }
-                        None => {}
+                        None => {
+                            // ScalarArgTarget has no static-property variant (tracked
+                            // as S19) — extract it call-site-locally instead, mirroring
+                            // the str_contains-family recipe.
+                            if let Some((fqcn, prop)) =
+                                extract_static_prop_access(&haystack_arg.value, ctx, db, file)
+                            {
+                                let current =
+                                    resolve_static_prop_current_type(ctx, &fqcn, &prop, db);
+                                if !current.is_mixed() {
+                                    let narrowed = narrow_string_to_non_empty(&current);
+                                    apply_prop_narrowed(
+                                        ctx, &fqcn, &prop, current, narrowed, false,
+                                    );
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -4337,6 +4353,37 @@ fn narrow_from_false_comparable_call(
                                     apply_prop_narrowed(ctx, &obj, &prop, current, narrowed, false)
                                 }
                             }
+                        }
+                    }
+                }
+            } else if let Some((fqcn, prop)) =
+                extract_static_prop_access(&needle_arg.value, ctx, db, file)
+            {
+                // ScalarArgTarget has no static-property variant (tracked as S19) —
+                // extract it call-site-locally instead, mirroring the
+                // str_contains-family recipe (no receiver to narrow non-null).
+                if let Some(haystack_ty) = extract_haystack_type(&haystack_arg.value, ctx, db, file)
+                {
+                    let current = resolve_static_prop_current_type(ctx, &fqcn, &prop, db);
+                    let loose_safe =
+                        strict || in_array_loose_narrowing_is_safe(&current, &haystack_ty);
+                    if !current.is_mixed() && loose_safe {
+                        let narrowed = if !is_false {
+                            let narrowed = narrow_to_haystack_values(&current, &haystack_ty);
+                            (!narrowed.is_empty() && narrowed != current).then_some(narrowed)
+                        } else {
+                            let all_literals = !current.types.is_empty()
+                                && current.types.iter().all(|a| {
+                                    matches!(a, Atomic::TLiteralString(_) | Atomic::TLiteralInt(_))
+                                });
+                            all_literals
+                                .then(|| {
+                                    current.filter(|a| !haystack_ty.types.iter().any(|h| h == a))
+                                })
+                                .filter(|narrowed| !narrowed.is_empty() && *narrowed != current)
+                        };
+                        if let Some(narrowed) = narrowed {
+                            apply_prop_narrowed(ctx, &fqcn, &prop, current, narrowed, false);
                         }
                     }
                 }
