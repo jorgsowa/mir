@@ -9007,6 +9007,10 @@ fn extract_haystack_type(
             let (obj, prop) = extract_prop_access(expr)?;
             haystack_type_from_array_type(&resolve_prop_current_type(ctx, &obj, &prop, db, file))
         }
+        ExprKind::StaticPropertyAccess(_) => {
+            let (fqcn, prop) = extract_static_prop_access(expr, ctx, db, file)?;
+            haystack_type_from_array_type(&resolve_static_prop_current_type(ctx, &fqcn, &prop, db))
+        }
         ExprKind::Parenthesized(inner) => extract_haystack_type(inner, ctx, db, file),
         _ => None,
     }
