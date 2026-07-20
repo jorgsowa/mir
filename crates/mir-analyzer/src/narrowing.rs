@@ -259,6 +259,30 @@ fn narrow_from_static_or_class_const_comparison(
                 }
             }
         }
+        // `get_class(self::$prop) === Foo::class` — static-property
+        // counterpart of the block above.
+        else if let Some((fqcn_recv, prop)) =
+            extract_get_class_static_prop_arg(&b.left, ctx, db, file)
+        {
+            if let ExprKind::ClassConstAccess(cca) = &b.right.kind {
+                if let Some(fqcn) = extract_class_const_fqcn(
+                    cca,
+                    ctx.self_fqcn.as_deref(),
+                    ctx.parent_fqcn.as_deref(),
+                    db,
+                    file,
+                ) {
+                    narrow_static_prop_to_specific_class(
+                        ctx,
+                        &fqcn_recv,
+                        &prop,
+                        &fqcn,
+                        effective_true,
+                        db,
+                    );
+                }
+            }
+        }
         // `get_debug_type($x) === Foo::class` — same idiom as
         // `get_class($x) === Foo::class` above, PHP 8's replacement for get_class().
         else if let Some(target) = extract_get_debug_type_arg(&b.left) {
@@ -527,6 +551,29 @@ fn narrow_from_static_or_class_const_comparison(
                             narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                         }
                     }
+                }
+            }
+        }
+        // `Foo::class === get_class(self::$prop)` — symmetric counterpart.
+        else if let Some((fqcn_recv, prop)) =
+            extract_get_class_static_prop_arg(&b.right, ctx, db, file)
+        {
+            if let ExprKind::ClassConstAccess(cca) = &b.left.kind {
+                if let Some(fqcn) = extract_class_const_fqcn(
+                    cca,
+                    ctx.self_fqcn.as_deref(),
+                    ctx.parent_fqcn.as_deref(),
+                    db,
+                    file,
+                ) {
+                    narrow_static_prop_to_specific_class(
+                        ctx,
+                        &fqcn_recv,
+                        &prop,
+                        &fqcn,
+                        effective_true,
+                        db,
+                    );
                 }
             }
         }
@@ -912,6 +959,19 @@ pub fn narrow_from_condition(
                             narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                         }
                     }
+                } else if let Some((fqcn_recv, prop)) =
+                    extract_get_class_static_prop_arg(&b.left, ctx, db, file)
+                {
+                    // `get_class(self::$prop) === 'ClassName'`
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    narrow_static_prop_to_specific_class(
+                        ctx,
+                        &fqcn_recv,
+                        &prop,
+                        &fqcn,
+                        effective_true,
+                        db,
+                    );
                 } else if let Some(target) = extract_gettype_arg(&b.left) {
                     narrow_from_gettype_literal(
                         ctx,
@@ -1043,6 +1103,19 @@ pub fn narrow_from_condition(
                             narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                         }
                     }
+                } else if let Some((fqcn_recv, prop)) =
+                    extract_get_class_static_prop_arg(&b.right, ctx, db, file)
+                {
+                    // `'ClassName' === get_class(self::$prop)`
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    narrow_static_prop_to_specific_class(
+                        ctx,
+                        &fqcn_recv,
+                        &prop,
+                        &fqcn,
+                        effective_true,
+                        db,
+                    );
                 } else if let Some(target) = extract_gettype_arg(&b.right) {
                     narrow_from_gettype_literal(
                         ctx,
@@ -1568,6 +1641,19 @@ pub fn narrow_from_condition(
                             narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                         }
                     }
+                } else if let Some((fqcn_recv, prop)) =
+                    extract_get_class_static_prop_arg(&b.left, ctx, db, file)
+                {
+                    // `get_class(self::$prop) == 'ClassName'`
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    narrow_static_prop_to_specific_class(
+                        ctx,
+                        &fqcn_recv,
+                        &prop,
+                        &fqcn,
+                        effective_true,
+                        db,
+                    );
                 } else if let Some(target) = extract_gettype_arg(&b.left) {
                     narrow_from_gettype_literal(
                         ctx,
@@ -1671,6 +1757,19 @@ pub fn narrow_from_condition(
                             narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                         }
                     }
+                } else if let Some((fqcn_recv, prop)) =
+                    extract_get_class_static_prop_arg(&b.right, ctx, db, file)
+                {
+                    // `'ClassName' == get_class(self::$prop)`
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    narrow_static_prop_to_specific_class(
+                        ctx,
+                        &fqcn_recv,
+                        &prop,
+                        &fqcn,
+                        effective_true,
+                        db,
+                    );
                 } else if let Some(target) = extract_gettype_arg(&b.right) {
                     narrow_from_gettype_literal(
                         ctx,
@@ -7888,6 +7987,31 @@ fn extract_get_class_arg(expr: &php_ast::owned::Expr) -> Option<ScalarArgTarget>
             {
                 if let Some(arg) = call.args.first() {
                     return ScalarArgTarget::extract(&arg.value);
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Static-property counterpart of `extract_get_class_arg`, mirroring
+/// `extract_get_debug_type_static_prop_arg` (see its doc comment for why
+/// this is a separate, call-site-local extractor rather than a
+/// `ScalarArgTarget` variant).
+fn extract_get_class_static_prop_arg(
+    expr: &php_ast::owned::Expr,
+    ctx: &FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<(std::sync::Arc<str>, String)> {
+    if let ExprKind::FunctionCall(call) = &expr.kind {
+        if let ExprKind::Identifier(name) = &call.name.kind {
+            if name
+                .trim_start_matches('\\')
+                .eq_ignore_ascii_case("get_class")
+            {
+                if let Some(arg) = call.args.first() {
+                    return extract_static_prop_access(&arg.value, ctx, db, file);
                 }
             }
         }
