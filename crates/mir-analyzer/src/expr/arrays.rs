@@ -76,11 +76,15 @@ fn resolve_array_access_value_type(
     let bare = fqcn.as_ref().trim_start_matches('\\');
     let class = crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, bare))?;
     let class_tps = crate::db::class_template_params(db, bare).unwrap_or_default();
-    let mut bindings = crate::generic::build_class_bindings(&class_tps, type_params);
-    for (k, v) in crate::db::inherited_template_bindings(db, bare, &bindings) {
-        bindings.entry(k).or_insert(v);
-    }
+    let own_bindings = crate::generic::build_class_bindings(&class_tps, type_params);
 
+    // The `@implements ArrayAccess<TKey, TValue>` annotation is always
+    // declared directly on `bare` itself (own-declared, not inherited), so
+    // own-bindings-wins is always correct for this branch.
+    let mut annotation_bindings = own_bindings.clone();
+    for (k, v) in crate::db::inherited_template_bindings(db, bare, &annotation_bindings) {
+        annotation_bindings.entry(k).or_insert(v);
+    }
     let annotated = class
         .implements_type_args()
         .iter()
@@ -92,17 +96,30 @@ fn resolve_array_access_value_type(
         });
     if let Some(args) = annotated {
         if args.len() >= 2 {
-            return Some(args[1].substitute_templates(&bindings));
+            return Some(args[1].substitute_templates(&annotation_bindings));
         }
     }
 
-    let (_, def) =
+    // `offsetGet()` may be declared directly on `bare` or inherited from an
+    // ancestor — the merge direction depends on which one actually declares
+    // it (a same-named template letter reused by both must resolve to the
+    // declaring class's own binding, not the receiver's).
+    let (owner, def) =
         crate::db::find_method_in_chain(db, crate::db::Fqcn::from_str(db, bare), "offsetget")?;
     let ty = def
         .return_type
         .as_deref()
         .cloned()
         .unwrap_or_else(Type::mixed);
+    let mut bindings = own_bindings.clone();
+    let inherited = crate::db::inherited_template_bindings(db, bare, &own_bindings);
+    if owner.as_ref() == bare {
+        for (k, v) in inherited {
+            bindings.entry(k).or_insert(v);
+        }
+    } else {
+        bindings.extend(inherited);
+    }
     Some(ty.substitute_templates(&bindings))
 }
 
