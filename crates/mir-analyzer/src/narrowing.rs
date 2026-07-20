@@ -7530,6 +7530,10 @@ fn narrow_prop_array_key_first_or_last_null(
     is_null: bool,
 ) {
     let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
+    // array_key_first()/array_key_last() on null is a TypeError, so reaching
+    // either comparison result at all proves $obj->prop — and thus $obj —
+    // was non-null, regardless of which direction was proven.
+    narrow_receiver_non_null_on_prop_match(ctx, obj_var, true);
     if current.is_mixed() {
         return;
     }
