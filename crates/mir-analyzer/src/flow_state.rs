@@ -455,13 +455,22 @@ impl FlowState {
             // Variadic params like `Type ...$name` are accessed as `list<Type>` in the body.
             // If the docblock already provides a list/array collection type, don't double-wrap.
             let ty = if p.is_variadic {
+                // A string-only key (`@param array<string,int> ...$maps`) means
+                // each argument IS a whole string-keyed array, not a bare V —
+                // same distinction `crate::generic::variadic_element_type`
+                // already draws for call-site argument checking. Without this
+                // guard, `$maps` itself bound to the flat aggregate type
+                // instead of `list<array<string,int>>`, corrupting every
+                // per-argument use (e.g. a `foreach` over `$maps`).
                 let already_collection = elem_ty.types.iter().any(|a| {
                     matches!(
                         a,
-                        mir_types::Atomic::TList { .. }
-                            | mir_types::Atomic::TNonEmptyList { .. }
-                            | mir_types::Atomic::TArray { .. }
-                            | mir_types::Atomic::TNonEmptyArray { .. }
+                        mir_types::Atomic::TList { .. } | mir_types::Atomic::TNonEmptyList { .. }
+                    ) || matches!(
+                        a,
+                        mir_types::Atomic::TArray { key, .. }
+                            | mir_types::Atomic::TNonEmptyArray { key, .. }
+                            if crate::generic::key_admits_int_variadic_index(key)
                     )
                 });
                 if already_collection {

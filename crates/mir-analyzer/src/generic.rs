@@ -193,7 +193,7 @@ pub(crate) fn variadic_element_type(ty: &Type) -> &Type {
 /// key type that's definitely string-only (`@param array<string, int>
 /// ...$maps`) means each argument literally IS a string-keyed array, not a
 /// bare `V`, so it must NOT be unwrapped.
-fn key_admits_int_variadic_index(key: &Type) -> bool {
+pub(crate) fn key_admits_int_variadic_index(key: &Type) -> bool {
     key.is_empty() || key.types.iter().any(|a| a.is_int())
 }
 
