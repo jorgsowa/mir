@@ -2223,6 +2223,29 @@ pub fn narrow_from_condition(
                                             narrow_receiver_non_null_on_prop_match(ctx, obj, true);
                                         }
                                     }
+                                } else if let (
+                                    mir_types::atomic::ArrayKey::String(iface_name),
+                                    Some((static_fqcn, prop)),
+                                ) = (
+                                    &key,
+                                    extract_class_implements_or_parents_static_prop_arg(
+                                        &arr_arg.value,
+                                        ctx,
+                                        db,
+                                        file,
+                                    ),
+                                ) {
+                                    // array_key_exists('Iface', class_implements(self::$prop)) —
+                                    // static-property counterpart of the var/prop arm above.
+                                    let fqcn = crate::db::resolve_name(db, file, iface_name);
+                                    narrow_static_prop_instanceof(
+                                        ctx,
+                                        &static_fqcn,
+                                        &prop,
+                                        &fqcn,
+                                        db,
+                                        true,
+                                    );
                                 }
                             } else {
                                 // False branch: exclude shape members that
@@ -2293,6 +2316,29 @@ pub fn narrow_from_condition(
                                             );
                                         }
                                     }
+                                } else if let (
+                                    mir_types::atomic::ArrayKey::String(iface_name),
+                                    Some((static_fqcn, prop)),
+                                ) = (
+                                    &key,
+                                    extract_class_implements_or_parents_static_prop_arg(
+                                        &arr_arg.value,
+                                        ctx,
+                                        db,
+                                        file,
+                                    ),
+                                ) {
+                                    // !array_key_exists('Iface', class_implements(self::$prop)) —
+                                    // static-property counterpart of the var/prop arm above.
+                                    let fqcn = crate::db::resolve_name(db, file, iface_name);
+                                    narrow_static_prop_instanceof(
+                                        ctx,
+                                        &static_fqcn,
+                                        &prop,
+                                        &fqcn,
+                                        db,
+                                        false,
+                                    );
                                 }
                             }
                         }
@@ -8352,6 +8398,32 @@ fn extract_class_implements_or_parents_arg(expr: &php_ast::owned::Expr) -> Optio
             {
                 if let Some(arg) = call.args.first() {
                     return ScalarArgTarget::extract(&arg.value);
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Static-property counterpart of `extract_class_implements_or_parents_arg` —
+/// `ScalarArgTarget` has no static-property variant (tracked as S19), so a
+/// `class_implements(self::$prop)`/`class_parents(self::$prop)` receiver is
+/// extracted call-site-locally instead, mirroring
+/// `extract_get_class_static_prop_arg`.
+fn extract_class_implements_or_parents_static_prop_arg(
+    expr: &php_ast::owned::Expr,
+    ctx: &FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<(std::sync::Arc<str>, String)> {
+    if let ExprKind::FunctionCall(call) = &expr.kind {
+        if let ExprKind::Identifier(name) = &call.name.kind {
+            let bare = name.trim_start_matches('\\');
+            if bare.eq_ignore_ascii_case("class_implements")
+                || bare.eq_ignore_ascii_case("class_parents")
+            {
+                if let Some(arg) = call.args.first() {
+                    return extract_static_prop_access(&arg.value, ctx, db, file);
                 }
             }
         }
