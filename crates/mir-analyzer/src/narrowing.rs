@@ -1858,15 +1858,28 @@ pub fn narrow_from_condition(
             // already int-like (no string/float/bool atom could loosely equal
             // the same numeric value differently than strict comparison
             // would), reusing the strict `===` arm's literal_int_narrow_type
-            // once that holds. Var-only: property/static-property receivers
-            // are a larger slice, left for a future pass (W5).
+            // once that holds.
             else if let ExprKind::Int(n) = &b.right.kind {
                 if let Some(name) = extract_var_name(&b.left) {
                     narrow_var_loose_int(ctx, &name, *n, effective_true);
+                } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
+                    narrow_prop_loose_int(ctx, &obj, &prop, db, file, *n, effective_true);
+                    narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
+                } else if let Some((fqcn, prop)) =
+                    extract_static_prop_access(&b.left, ctx, db, file)
+                {
+                    narrow_static_prop_loose_int(ctx, &fqcn, &prop, db, *n, effective_true);
                 }
             } else if let ExprKind::Int(n) = &b.left.kind {
                 if let Some(name) = extract_var_name(&b.right) {
                     narrow_var_loose_int(ctx, &name, *n, effective_true);
+                } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
+                    narrow_prop_loose_int(ctx, &obj, &prop, db, file, *n, effective_true);
+                    narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
+                } else if let Some((fqcn, prop)) =
+                    extract_static_prop_access(&b.right, ctx, db, file)
+                {
+                    narrow_static_prop_loose_int(ctx, &fqcn, &prop, db, *n, effective_true);
                 }
             }
             // `$x == EnumName::CaseName` / `get_class($x) == Foo::class` etc. —
@@ -5313,6 +5326,31 @@ fn narrow_static_prop_literal_int(
     apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, mark_diverges);
 }
 
+/// Loose-equality counterpart of `narrow_static_prop_literal_int`, for
+/// `self::$prop == 42` / `static::$prop != 42` / `Class::$prop == 42` —
+/// static-property sibling of `narrow_var_loose_int`, same safety gate.
+fn narrow_static_prop_loose_int(
+    ctx: &mut FlowState,
+    fqcn: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    value: i64,
+    is_value: bool,
+) {
+    let current = resolve_static_prop_current_type(ctx, fqcn, prop, db);
+    if current.types.is_empty()
+        || !current
+            .types
+            .iter()
+            .all(|a| atom_safe_for_loose_int_narrowing(a, value))
+    {
+        return;
+    }
+    let narrowed = literal_int_narrow_type(&current, value, is_value);
+    let mark_diverges = crate::contradiction::is_closed_precise(&current);
+    apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, mark_diverges);
+}
+
 /// Static-property counterpart of `narrow_prop_bool`, for
 /// `self::$prop === true` / `static::$prop === false` / `Class::$prop === true`.
 fn narrow_static_prop_bool(
@@ -6729,13 +6767,28 @@ fn narrow_var_literal_int(ctx: &mut FlowState, name: &str, value: i64, is_value:
     set_narrowed(ctx, name, &current, narrowed, mark_diverges);
 }
 
+/// Whether `a` can safely participate in a loose `== value`/`!= value` int
+/// narrowing: either already int-like, or `TNull` where `value != 0` (`null
+/// == 0` is PHP's one surprising loose-equality case; `null` compared
+/// loosely against any other int literal behaves exactly like the strict
+/// comparison already does, so `literal_int_narrow_type`'s int-only atoms
+/// handle it correctly once let through). Any other atom (string/float/bool)
+/// could loosely equal the same numeric value in a way strict comparison
+/// wouldn't, so those cases are left unnarrowed.
+fn atom_safe_for_loose_int_narrowing(a: &Atomic, value: i64) -> bool {
+    a.is_int() || (matches!(a, Atomic::TNull) && value != 0)
+}
+
 /// Loose-equality counterpart of `narrow_var_literal_int`, for `$x == 42` /
-/// `$x != 42`. Sound only when every current atom is already int-like — a
-/// string/float/bool atom could loosely equal the same numeric value in a
-/// way strict comparison wouldn't, so those cases are left unnarrowed.
+/// `$x != 42`.
 fn narrow_var_loose_int(ctx: &mut FlowState, name: &str, value: i64, is_value: bool) {
     let current = ctx.get_var(name);
-    if current.types.is_empty() || !current.types.iter().all(|a| a.is_int()) {
+    if current.types.is_empty()
+        || !current
+            .types
+            .iter()
+            .all(|a| atom_safe_for_loose_int_narrowing(a, value))
+    {
         return;
     }
     let narrowed = literal_int_narrow_type(&current, value, is_value);
@@ -6755,6 +6808,32 @@ fn narrow_prop_literal_int(
     is_value: bool,
 ) {
     let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
+    let narrowed = literal_int_narrow_type(&current, value, is_value);
+    let mark_diverges = crate::contradiction::is_closed_precise(&current);
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, mark_diverges);
+}
+
+/// Loose-equality counterpart of `narrow_prop_literal_int`, for
+/// `$this->prop == 42` / `$obj->prop != 42` — property-access sibling of
+/// `narrow_var_loose_int`, same safety gate.
+fn narrow_prop_loose_int(
+    ctx: &mut FlowState,
+    obj_var: &str,
+    prop: &str,
+    db: &dyn MirDatabase,
+    file: &str,
+    value: i64,
+    is_value: bool,
+) {
+    let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
+    if current.types.is_empty()
+        || !current
+            .types
+            .iter()
+            .all(|a| atom_safe_for_loose_int_narrowing(a, value))
+    {
+        return;
+    }
     let narrowed = literal_int_narrow_type(&current, value, is_value);
     let mark_diverges = crate::contradiction::is_closed_precise(&current);
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, mark_diverges);
