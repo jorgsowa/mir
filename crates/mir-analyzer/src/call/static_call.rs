@@ -530,8 +530,21 @@ impl CallAnalyzer {
             // bound on the receiver resolves instead of leaking through raw.
             let class_tps = crate::db::class_template_params(ea.db, &fqcn).unwrap_or_default();
             let mut class_bindings = build_class_bindings(&class_tps, &receiver_type_params);
-            for (k, v) in crate::db::inherited_template_bindings(ea.db, &fqcn, &class_bindings) {
-                class_bindings.entry(k).or_insert(v);
+            let inherited_class_bindings =
+                crate::db::inherited_template_bindings(ea.db, &fqcn, &class_bindings);
+            // The resolved method's params/return/out-types are declared on
+            // `resolved.owner_fqcn` — a bare template name in its signature
+            // is the RECEIVER's own template only when the receiver itself
+            // declares the method; otherwise it's scoped to the ancestor
+            // that actually declares it (same collision the property-access/
+            // instance-method-call/foreach/array-access sites already guard
+            // against).
+            if resolved.owner_fqcn.as_ref() == fqcn.as_str() {
+                for (k, v) in inherited_class_bindings {
+                    class_bindings.entry(k).or_insert(v);
+                }
+            } else {
+                class_bindings.extend(inherited_class_bindings);
             }
             // A class-level `@template T of Bound` was previously only ever
             // checked at `new Box(...)` construction sites — a receiver typed
