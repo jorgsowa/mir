@@ -2530,6 +2530,20 @@ pub fn narrow_from_condition(
                     narrowed.possibly_undefined = false;
                 }
                 apply_prop_narrowed(ctx, &obj_var, &prop, current, narrowed, true);
+            } else if let Some((fqcn, prop)) = extract_static_prop_access(&a.target, ctx, db, file)
+            {
+                // `if (self::$prop = expr)` — static-property counterpart of
+                // the instance-property case above (no receiver to narrow).
+                let current = resolve_static_prop_current_type(ctx, &fqcn, &prop, db);
+                let mut narrowed = if is_true {
+                    current.narrow_to_truthy()
+                } else {
+                    current.narrow_to_falsy()
+                };
+                if is_true {
+                    narrowed.possibly_undefined = false;
+                }
+                apply_prop_narrowed(ctx, &fqcn, &prop, current, narrowed, true);
             }
         }
 
