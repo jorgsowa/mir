@@ -2101,6 +2101,23 @@ pub fn narrow_from_condition(
                             if let Some(haystack_ty) =
                                 extract_haystack_type(&haystack_arg.value, ctx, db, file)
                             {
+                                if is_true {
+                                    // in_array(null, $haystack) only matches loosely
+                                    // when the haystack contains a falsy literal (0,
+                                    // "", "0"); a strict comparison can never match
+                                    // null at all, since our haystack extraction never
+                                    // includes a literal null element. So a true match
+                                    // proves the receiver wasn't null, except in that
+                                    // one loose-comparison edge case.
+                                    let haystack_admits_null_loosely =
+                                        haystack_ty.types.iter().any(|a| {
+                                            matches!(a, Atomic::TLiteralInt(0))
+                                                || matches!(a, Atomic::TLiteralString(s) if s.as_ref() == "" || s.as_ref() == "0")
+                                        });
+                                    if strict || !haystack_admits_null_loosely {
+                                        narrow_receiver_non_null_on_prop_match(ctx, &obj, true);
+                                    }
+                                }
                                 let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
                                 let loose_safe = strict
                                     || in_array_loose_narrowing_is_safe(&current, &haystack_ty);
