@@ -5458,7 +5458,19 @@ fn bool_narrow_type(current: &Type, value: bool, is_value: bool) -> Type {
             }
             Atomic::TTrue => is_value == value,
             Atomic::TFalse => is_value != value,
-            Atomic::TMixed => true,
+            Atomic::TMixed | Atomic::TScalar => {
+                // On a match, substitute the specific literal being tested (mirrors
+                // literal_string_narrow_type/literal_int_narrow_type); on a non-match,
+                // keep the atom unchanged — excluding one bool value doesn't narrow a
+                // type that can also hold non-bool values.
+                if is_value {
+                    let lit = if value { Atomic::TTrue } else { Atomic::TFalse };
+                    narrowed.add_type(lit);
+                } else {
+                    narrowed.add_type(t.clone());
+                }
+                false // handled above — don't fall through
+            }
             _ => !is_value, // non-bool atoms: keep only when narrowing away
         };
         if keep {
