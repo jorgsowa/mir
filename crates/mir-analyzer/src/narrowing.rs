@@ -5220,7 +5220,7 @@ fn narrow_nullsafe_prop_null(
 /// an existing flow-state refinement if one is already tracked, else the
 /// declared type looked up through the class hierarchy. Static-property
 /// counterpart of `resolve_prop_current_type`.
-fn resolve_static_prop_current_type(
+pub(crate) fn resolve_static_prop_current_type(
     ctx: &FlowState,
     fqcn: &str,
     prop: &str,
@@ -6181,7 +6181,11 @@ fn narrow_prop_loose_null(
 /// (`proved_match`), the receiver itself must also be non-null: PHP 8 reads
 /// `$obj->prop` on a null `$obj` as a warning, still evaluating to `null`
 /// (same ambiguity as `narrow_nullsafe_prop_null`).
-fn narrow_receiver_non_null_on_prop_match(ctx: &mut FlowState, obj_var: &str, proved_match: bool) {
+pub(crate) fn narrow_receiver_non_null_on_prop_match(
+    ctx: &mut FlowState,
+    obj_var: &str,
+    proved_match: bool,
+) {
     if proved_match {
         narrow_var_null(ctx, obj_var, false);
     }
@@ -7301,7 +7305,7 @@ fn extract_any_prop_access(expr: &php_ast::owned::Expr) -> Option<(String, Strin
 /// Extract `(fqcn, prop_name)` from a `self::$prop` / `static::$prop` /
 /// `parent::$prop` / `ClassName::$prop` expression, resolving relative
 /// keywords through the current `FlowState`.
-fn extract_static_prop_access(
+pub(crate) fn extract_static_prop_access(
     expr: &php_ast::owned::Expr,
     ctx: &FlowState,
     db: &dyn MirDatabase,

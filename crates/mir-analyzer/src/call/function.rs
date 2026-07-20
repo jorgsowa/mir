@@ -679,7 +679,38 @@ impl CallAnalyzer {
                             } else {
                                 asserted_ty
                             };
+                            // `$obj->prop` on a null `$obj` reads as null, so
+                            // proving the property itself is non-nullable
+                            // also proves `$obj` wasn't null.
+                            let proved_prop_non_null = !asserted_ty.is_nullable();
                             ctx.set_prop_refined(&obj, &prop, asserted_ty);
+                            crate::narrowing::narrow_receiver_non_null_on_prop_match(
+                                ctx,
+                                &obj,
+                                proved_prop_non_null,
+                            );
+                        } else if let Some((fqcn, prop)) =
+                            crate::narrowing::extract_static_prop_access(
+                                &arg.value, ctx, ea.db, &ea.file,
+                            )
+                        {
+                            let asserted_ty = match &template_bindings {
+                                Some(b) => assertion.ty.substitute_templates(b),
+                                None => assertion.ty.clone(),
+                            };
+                            let asserted_ty = if assertion.negated {
+                                let current = crate::narrowing::resolve_static_prop_current_type(
+                                    ctx, &fqcn, &prop, ea.db,
+                                );
+                                crate::narrowing::negate_assertion_type(
+                                    &current,
+                                    &asserted_ty,
+                                    ea.db,
+                                )
+                            } else {
+                                asserted_ty
+                            };
+                            ctx.set_prop_refined(&fqcn, &prop, asserted_ty);
                         }
                     }
                 }
