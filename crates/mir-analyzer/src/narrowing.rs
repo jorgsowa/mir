@@ -6500,6 +6500,34 @@ fn narrow_prop_to_class_string(
 /// `get_class($x)`/`get_debug_type($x)`/`$x::class` compared to a literal —
 /// see `narrow_var_to_class_string`'s doc comment for why the false branch
 /// can only drop a matching `TNamedObject` atom when the class is `final`.
+/// For an exact-class narrowing (`get_class($x) === Foo::class`), find a
+/// concrete type_params list to attach to the narrowed `Foo` atom by
+/// reusing/projecting from any object atom already in `current` that `Foo`
+/// is a subtype of (or equal to) — mirrors how
+/// `narrow_instanceof_preserving_subtypes` preserves/projects type params
+/// instead of discarding them, so `get_class($x) === Foo::class` on a
+/// `Box<int>`-typed `$x` narrows to `Foo<int>`, not a raw `Foo`.
+fn type_params_for_exact_class(
+    current: &Type,
+    target_fqcn: &str,
+    db: &dyn MirDatabase,
+) -> std::sync::Arc<[Type]> {
+    for t in &current.types {
+        if let Atomic::TNamedObject { fqcn, type_params } = t {
+            if type_params.is_empty() {
+                continue;
+            }
+            if fqcn.as_ref() == target_fqcn {
+                return type_params.clone();
+            }
+            if named_object_matches_instanceof(target_fqcn, fqcn, db) {
+                return project_type_params_onto_subclass(db, fqcn, type_params, target_fqcn);
+            }
+        }
+    }
+    mir_types::union::empty_type_params()
+}
+
 fn narrow_var_to_specific_class(
     ctx: &mut FlowState,
     name: &str,
@@ -6511,7 +6539,7 @@ fn narrow_var_to_specific_class(
     let narrowed = if is_exact_class {
         Type::single(Atomic::TNamedObject {
             fqcn: fqcn.into(),
-            type_params: mir_types::union::empty_type_params(),
+            type_params: type_params_for_exact_class(&current, fqcn, db),
         })
     } else {
         current.filter(|t| match t {
@@ -6543,7 +6571,7 @@ fn narrow_prop_to_specific_class(
     let narrowed = if is_exact_class {
         Type::single(Atomic::TNamedObject {
             fqcn: fqcn.into(),
-            type_params: mir_types::union::empty_type_params(),
+            type_params: type_params_for_exact_class(&current, fqcn, db),
         })
     } else {
         current.filter(|t| match t {
@@ -6580,7 +6608,7 @@ fn narrow_static_prop_to_specific_class(
     let narrowed = if is_exact_class {
         Type::single(Atomic::TNamedObject {
             fqcn: fqcn.into(),
-            type_params: mir_types::union::empty_type_params(),
+            type_params: type_params_for_exact_class(&current, fqcn, db),
         })
     } else {
         current.filter(|t| match t {
