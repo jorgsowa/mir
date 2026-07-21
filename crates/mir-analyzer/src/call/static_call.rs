@@ -914,12 +914,20 @@ impl CallAnalyzer {
             // for this call to have narrowed, so it's left alone.
             if is_self_parent_call {
                 if let Some(self_out_raw) = resolved.self_out.clone() {
-                    let self_out_ty =
-                        substitute_static_in_return((*self_out_raw).clone(), &fqcn_arc, &[]);
-                    let self_out_ty = if class_bindings.is_empty() {
+                    // Mirrors the plain-return-type computation above: `static<T>`
+                    // in `@psalm-self-out` needs the same receiver type params
+                    // (own template args inferred from this call's arguments,
+                    // merged with any `@extends`/`@implements`-declared binding)
+                    // or the class's own type argument is erased entirely.
+                    let self_out_ty = substitute_static_in_return(
+                        (*self_out_raw).clone(),
+                        &fqcn_arc,
+                        &own_type_params,
+                    );
+                    let self_out_ty = if return_class_bindings.is_empty() {
                         self_out_ty
                     } else {
-                        self_out_ty.substitute_templates(&class_bindings)
+                        self_out_ty.substitute_templates(&return_class_bindings)
                     };
                     let self_out_ty = if !resolved.template_params.is_empty() {
                         let (mut method_bindings, _unchecked) = infer_template_bindings(
