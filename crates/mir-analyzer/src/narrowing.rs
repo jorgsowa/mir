@@ -2245,15 +2245,24 @@ pub fn narrow_from_condition(
                             )),
                             ExprKind::Int(i) => Some(mir_types::atomic::ArrayKey::Int(*i)),
                             // `$key = 'name'; array_key_exists($key, $arr)` — resolve a
-                            // variable OR property-access key already narrowed to a
-                            // single literal, same as an inline literal would be.
+                            // variable, property-access, or static-property key already
+                            // narrowed to a single literal, same as an inline literal
+                            // would be.
                             _ => {
                                 let key_ty = if let Some(name) = extract_var_name(&key_arg.value) {
                                     Some(ctx.get_var(&name))
+                                } else if let Some((obj, prop)) =
+                                    extract_prop_access(&key_arg.value)
+                                {
+                                    Some(resolve_prop_current_type(ctx, &obj, &prop, db, file))
                                 } else {
-                                    extract_prop_access(&key_arg.value).map(|(obj, prop)| {
-                                        resolve_prop_current_type(ctx, &obj, &prop, db, file)
-                                    })
+                                    extract_static_prop_access(&key_arg.value, ctx, db, file).map(
+                                        |(fqcn, prop)| {
+                                            resolve_static_prop_current_type(
+                                                ctx, &fqcn, &prop, db,
+                                            )
+                                        },
+                                    )
                                 };
                                 key_ty.and_then(|ty| match ty.types.as_slice() {
                                     [Atomic::TLiteralString(s)] => {
