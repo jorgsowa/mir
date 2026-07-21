@@ -1385,3 +1385,76 @@ fn enum_class_const_attribute_records_class_reference() {
     );
 }
 
+#[test]
+fn property_hook_attribute_records_class_reference() {
+    // PHP 8.4 property hooks (`get`/`set`) were never visited by any of the
+    // attribute-checking functions, so `new Foo()` inside a hook's own
+    // attribute args was never recorded as a reference to Foo.
+    let dir = create_temp_dir("test");
+    let src = "<?php\nclass Foo {}\n#[Attribute]\nclass Route {\n    public function __construct(public $v = null) {}\n}\nclass Widget {\n    public string $name {\n        #[Route(new Foo())]\n        get => $this->name;\n    }\n}\n";
+    let file = write_file(&dir, "a.php", src);
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let locs: Vec<_> = analyzer
+        .reference_locations("cls:Foo")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert!(
+        !locs.is_empty(),
+        "new Foo() inside a property hook's attribute args should record a reference to Foo"
+    );
+}
+
+#[test]
+fn property_hook_parameter_attribute_records_class_reference() {
+    // The `set` hook's own parameter can carry attributes (e.g. `set(#[Route]
+    // string $value) {...}`); those were unreachable too since nothing ever
+    // walked a hook's params.
+    let dir = create_temp_dir("test");
+    let src = "<?php\nclass Bar {}\n#[Attribute]\nclass Route {\n    public function __construct(public $v = null) {}\n}\nclass Widget {\n    private string $raw;\n    public string $name {\n        set(#[Route(new Bar())] string $value) {\n            $this->raw = $value;\n        }\n    }\n}\n";
+    let file = write_file(&dir, "a.php", src);
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let locs: Vec<_> = analyzer
+        .reference_locations("cls:Bar")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert!(
+        !locs.is_empty(),
+        "new Bar() inside a set-hook parameter's attribute args should record a reference to Bar"
+    );
+}
+
+#[test]
+fn trait_property_hook_attribute_records_class_reference() {
+    // Traits can declare properties with hooks too; check_trait_attributes
+    // needed the same hook-walking as check_class_attributes.
+    let dir = create_temp_dir("test");
+    let src = "<?php\nclass Foo {}\n#[Attribute]\nclass Route {\n    public function __construct(public $v = null) {}\n}\ntrait HasName {\n    public string $name {\n        #[Route(new Foo())]\n        get => $this->name;\n    }\n}\n";
+    let file = write_file(&dir, "a.php", src);
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let locs: Vec<_> = analyzer
+        .reference_locations("cls:Foo")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert!(
+        !locs.is_empty(),
+        "new Foo() inside a trait property hook's attribute args should record a reference to Foo"
+    );
+}

@@ -19,7 +19,7 @@ use std::sync::Arc;
 use mir_issues::{Issue, IssueKind, Location};
 use php_ast::owned::{
     Attribute, ClassDecl, ClassMemberKind, EnumDecl, EnumMemberKind, Expr, ExprKind, FunctionDecl,
-    InterfaceDecl, TraitDecl,
+    InterfaceDecl, PropertyHook, TraitDecl,
 };
 use php_rs_parser::source_map::SourceMap;
 
@@ -404,6 +404,16 @@ pub(crate) fn check_class_attributes(
                     record_refs,
                     all_symbols.as_deref_mut(),
                 );
+                check_property_hook_attributes(
+                    &prop.hooks,
+                    db,
+                    file,
+                    source,
+                    source_map,
+                    issues,
+                    record_refs,
+                    all_symbols.as_deref_mut(),
+                );
                 // `#[Attribute]` on a property is invalid
                 for attr in prop.attributes.iter() {
                     if is_attribute_class_annotation(attr) {
@@ -581,6 +591,16 @@ pub(crate) fn check_trait_attributes(
                     record_refs,
                     all_symbols.as_deref_mut(),
                 );
+                check_property_hook_attributes(
+                    &prop.hooks,
+                    db,
+                    file,
+                    source,
+                    source_map,
+                    issues,
+                    record_refs,
+                    all_symbols.as_deref_mut(),
+                );
             }
             _ => {}
         }
@@ -675,6 +695,50 @@ pub(crate) fn check_enum_attributes(
                 );
             }
             _ => {}
+        }
+    }
+}
+
+/// Validate attributes on a property's PHP 8.4 hooks (`get`/`set`) and each
+/// hook's own parameters. PHP reflects hooks as methods (`ReflectionProperty::
+/// getHooks()` returns `ReflectionMethod`s), so a hook's own attributes are
+/// validated against `TARGET_METHOD` and a hook parameter's against
+/// `TARGET_PARAMETER`, matching every other method/parameter attribute site.
+#[allow(clippy::too_many_arguments)]
+fn check_property_hook_attributes(
+    hooks: &[PropertyHook],
+    db: &dyn MirDatabase,
+    file: &Arc<str>,
+    source: &str,
+    source_map: &SourceMap,
+    issues: &mut Vec<Issue>,
+    record_refs: bool,
+    mut all_symbols: Option<&mut Vec<crate::symbol::ResolvedSymbol>>,
+) {
+    for hook in hooks.iter() {
+        check_attribute_list(
+            &hook.attributes,
+            TARGET_METHOD,
+            db,
+            file,
+            source,
+            source_map,
+            issues,
+            record_refs,
+            all_symbols.as_deref_mut(),
+        );
+        for param in hook.params.iter() {
+            check_attribute_list(
+                &param.attributes,
+                TARGET_PARAMETER,
+                db,
+                file,
+                source,
+                source_map,
+                issues,
+                record_refs,
+                all_symbols.as_deref_mut(),
+            );
         }
     }
 }
