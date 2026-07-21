@@ -157,6 +157,28 @@ fn generator_item_types(type_params: &[Type]) -> (Type, Type) {
     }
 }
 
+/// Replace a bare `static`/`self` atom in `ty` with the concrete receiver
+/// class, mirroring `call::args::substitute_static_atom`'s treatment of the
+/// two atoms as equivalent — needed so a `getIterator(): static` return type
+/// is recognized as a `TNamedObject` (an object the caller can chase further)
+/// instead of a `TStaticObject`/`TSelf` sentinel it never matches.
+fn rebind_static_self(ty: Type, fqcn: &str, own_type_params: &[Type]) -> Type {
+    let mut out = Type::empty();
+    out.from_docblock = ty.from_docblock;
+    out.possibly_undefined = ty.possibly_undefined;
+    for atomic in ty.types {
+        let rebound = match atomic {
+            Atomic::TStaticObject { .. } | Atomic::TSelf { .. } => Atomic::TNamedObject {
+                fqcn: Name::from(fqcn),
+                type_params: mir_types::union::vec_to_type_params(own_type_params.to_vec()),
+            },
+            other => other,
+        };
+        out.add_type(rebound);
+    }
+    out
+}
+
 /// Resolve the key/value item types `foreach` produces for an instance of
 /// `fqcn<type_params>`. Returns `None` when `fqcn` isn't `Generator` and
 /// doesn't implement `Iterator`/`IteratorAggregate` (or the info needed to
@@ -244,6 +266,23 @@ pub(crate) fn resolve_iterator_item_types(
 
     if implements("IteratorAggregate") {
         let ret_ty = method_return_ty("getiterator")?;
+        // `getIterator(): static { return $this; }` is a common self-iterating
+        // pattern — `static`/`self` is a `TStaticObject`/`TSelf` atom, not a
+        // `TNamedObject`, so the recursive call below would never match it and
+        // fall back to `mixed`. Go straight to the class's own `Iterator`
+        // implementation (the standard idiom this pattern is written for)
+        // instead of rebinding and recursing, which would just rediscover the
+        // same `getIterator(): static` and loop until `depth` bottoms out.
+        let returns_self_or_static = ret_ty
+            .types
+            .iter()
+            .any(|a| matches!(a, Atomic::TStaticObject { .. } | Atomic::TSelf { .. }));
+        if returns_self_or_static && implements("Iterator") {
+            let value = method_return_ty("current").unwrap_or_else(Type::mixed);
+            let key = method_return_ty("key").unwrap_or_else(Type::mixed);
+            return Some((key, value));
+        }
+        let ret_ty = rebind_static_self(ret_ty, bare, type_params);
         return Some(infer_foreach_types_with_db_depth(db, &ret_ty, depth - 1));
     }
     if implements("Iterator") {
