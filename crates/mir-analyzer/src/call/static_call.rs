@@ -262,7 +262,7 @@ impl CallAnalyzer {
         // the arguments, so passing an undefined variable to an out-param (e.g.
         // `Registry::build($items, $out)` where `$out` is `@param-out`) does
         // not produce a false UndefinedVariable.
-        if let Some(pre_resolved) = resolve_method_from_db(ea, &fqcn_arc, &method_name_lower) {
+        if let Some(pre_resolved) = resolve_method_from_db(ea.db, &fqcn_arc, &method_name_lower) {
             super::premark_byref_arg_vars(&pre_resolved.params, &call.args, ctx);
         }
 
@@ -343,7 +343,7 @@ impl CallAnalyzer {
             }
         }
 
-        let resolved = resolve_method_from_db(ea, &fqcn_arc, &method_name_lower);
+        let resolved = resolve_method_from_db(ea.db, &fqcn_arc, &method_name_lower);
 
         if let Some(resolved) = resolved {
             ea.record_ref(

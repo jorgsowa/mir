@@ -653,7 +653,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     let fqcn_resolved = crate::db::resolve_name(self.db, self.file.as_ref(), fqcn);
                     let fqcn_arc: Arc<str> = Arc::from(fqcn_resolved.as_str());
                     if let Some(resolved) = crate::call::method::resolve_method_from_db(
-                        self,
+                        self.db,
                         &fqcn_arc,
                         &method_name_lower,
                     ) {
@@ -840,9 +840,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if is_named_class {
                     self.record_ref(Arc::from(format!("cls:{fqcn_arc}")), class.span);
                 }
-                if let Some(resolved) =
-                    crate::call::method::resolve_method_from_db(self, &fqcn_arc, &method_name_lower)
-                {
+                if let Some(resolved) = crate::call::method::resolve_method_from_db(
+                    self.db,
+                    &fqcn_arc,
+                    &method_name_lower,
+                ) {
                     self.record_ref(
                         Arc::from(format!(
                             "meth:{}::{}",

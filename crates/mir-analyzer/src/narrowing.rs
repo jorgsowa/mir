@@ -2917,6 +2917,41 @@ pub fn narrow_from_condition(
             }
         }
 
+        // $obj->isFoo($x) with @psalm-assert-if-true/-if-false on isFoo() —
+        // method-call counterpart of the FunctionCall arm above (which only
+        // ever resolved a free function via `find_function`).
+        ExprKind::MethodCall(mc) => {
+            if let Some(fqcn) = method_call_receiver_fqcn(&mc.object, ctx) {
+                if let ExprKind::Identifier(name) = &mc.method.kind {
+                    let method_name_lower = crate::util::php_ident_lowercase(name);
+                    if let Some(resolved) =
+                        crate::call::method::resolve_method_from_db(db, &fqcn, &method_name_lower)
+                    {
+                        apply_method_docblock_assertions(
+                            &mc.args, &resolved, ctx, is_true, db, file,
+                        );
+                    }
+                }
+            }
+        }
+
+        // Foo::isFoo($x) / self::isFoo($x) with @psalm-assert-if-true/-if-false
+        // — static-call counterpart of the FunctionCall arm above.
+        ExprKind::StaticMethodCall(smc) => {
+            if let Some(fqcn) = resolve_static_call_class_fqcn(&smc.class, ctx, db, file) {
+                if let ExprKind::Identifier(name) = &smc.method.kind {
+                    let method_name_lower = crate::util::php_ident_lowercase(name);
+                    if let Some(resolved) =
+                        crate::call::method::resolve_method_from_db(db, &fqcn, &method_name_lower)
+                    {
+                        apply_method_docblock_assertions(
+                            &smc.args, &resolved, ctx, is_true, db, file,
+                        );
+                    }
+                }
+            }
+        }
+
         // isset($x)
         ExprKind::Isset(vars) => {
             for var_expr in vars.iter() {
@@ -3149,37 +3184,87 @@ fn apply_docblock_assertions(
     let Some(f) = crate::db::find_function(db, here) else {
         return false;
     };
+    apply_assertions(
+        &f.assertions,
+        &f.params,
+        &f.template_params,
+        &call.args,
+        ctx,
+        is_true,
+        db,
+        file,
+    )
+}
+
+/// Method-call counterpart of `apply_docblock_assertions` — the callee is
+/// already resolved (via `resolve_method_from_db`, shared with both instance
+/// and static method-call resolution) instead of looked up by free-function
+/// name here.
+fn apply_method_docblock_assertions(
+    call_args: &[php_ast::owned::Arg],
+    resolved: &crate::call::method::ResolvedMethod,
+    ctx: &mut FlowState,
+    is_true: bool,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> bool {
+    if resolved.assertions.is_empty() {
+        return false;
+    }
+    apply_assertions(
+        &resolved.assertions,
+        &resolved.params,
+        &resolved.template_params,
+        call_args,
+        ctx,
+        is_true,
+        db,
+        file,
+    )
+}
+
+/// Shared assertion-application logic for both `@psalm-assert-if-true`/
+/// `-if-false` docblock forms, used by both free functions
+/// (`apply_docblock_assertions`) and methods/static methods
+/// (`apply_method_docblock_assertions`) — narrows whichever argument each
+/// matching assertion names to var/prop/static-prop.
+#[allow(clippy::too_many_arguments)]
+fn apply_assertions(
+    assertions: &[mir_codebase::definitions::Assertion],
+    params: &[mir_codebase::definitions::DeclaredParam],
+    template_params: &[mir_codebase::definitions::TemplateParam],
+    call_args: &[php_ast::owned::Arg],
+    ctx: &mut FlowState,
+    is_true: bool,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> bool {
     let expected_kind = if is_true {
         AssertionKind::AssertIfTrue
     } else {
         AssertionKind::AssertIfFalse
     };
 
-    let assertions = &f.assertions;
-    let params = &f.params;
-
-    // An assertion type written in terms of the function's own `@template`s
+    // An assertion type written in terms of the callee's own `@template`s
     // (e.g. `@psalm-assert-if-true T $value` alongside `@param
     // class-string<T> $class`) must resolve T from this call's actual
     // arguments before narrowing — otherwise the variable narrows to the
     // bare, unresolved template atom instead of the concrete type.
-    let template_bindings = if f.template_params.is_empty() {
+    let template_bindings = if template_params.is_empty() {
         None
     } else {
-        let arg_types: Vec<Type> = call
-            .args
+        let arg_types: Vec<Type> = call_args
             .iter()
             .map(|arg| assertion_arg_type(&arg.value, ctx, db, file))
             .collect();
-        let arg_names: Vec<Option<String>> = call
-            .args
+        let arg_names: Vec<Option<String>> = call_args
             .iter()
             .map(|arg| arg.name.as_ref().map(crate::parser::name_to_string_owned))
             .collect();
         Some(
             crate::generic::infer_template_bindings(
                 db,
-                &f.template_params,
+                template_params,
                 params,
                 &arg_types,
                 &arg_names,
@@ -3200,15 +3285,14 @@ fn apply_docblock_assertions(
             // `arg_for_param_index` only ever resolves a single positional arg.
             let variadic_args: Vec<&php_ast::owned::Arg>;
             let args_to_check: &[&php_ast::owned::Arg] = if params[index].is_variadic {
-                variadic_args = call
-                    .args
+                variadic_args = call_args
                     .iter()
                     .filter(|a| a.name.is_none())
                     .skip(index)
                     .collect();
                 &variadic_args
             } else {
-                variadic_args = arg_for_param_index(params, &call.args, index)
+                variadic_args = arg_for_param_index(params, call_args, index)
                     .into_iter()
                     .collect();
                 &variadic_args
@@ -3265,6 +3349,58 @@ fn apply_docblock_assertions(
     }
 
     applied
+}
+
+/// Resolve a method-call receiver's exact class FQCN for dispatching a
+/// `@psalm-assert-if-true`/`-if-false` docblock assertion — only handles a
+/// receiver resolved to a single concrete class atom (mirroring
+/// `narrow_nullsafe_method_call_null`'s same conservative scope; a union of
+/// multiple classes could resolve the same method name to different
+/// signatures).
+fn method_call_receiver_fqcn(
+    object: &php_ast::owned::Expr,
+    ctx: &FlowState,
+) -> Option<std::sync::Arc<str>> {
+    let obj_var = extract_var_name(object)?;
+    let obj_ty = ctx.get_var(&obj_var);
+    let non_null_atoms: Vec<&Atomic> = obj_ty
+        .types
+        .iter()
+        .filter(|t| !matches!(t, Atomic::TNull))
+        .collect();
+    match non_null_atoms.as_slice() {
+        [Atomic::TNamedObject { fqcn, .. }]
+        | [Atomic::TSelf { fqcn }]
+        | [Atomic::TStaticObject { fqcn }]
+        | [Atomic::TParent { fqcn }] => Some(std::sync::Arc::from(fqcn.as_ref())),
+        _ => None,
+    }
+}
+
+/// Resolve a static-method call's class-name expression (`Foo::bar()`,
+/// `self::bar()`, `static::bar()`, `parent::bar()`) to a FQCN — the bare-
+/// identifier counterpart of `extract_static_prop_access_parts`'s class
+/// resolution (that one matches a `StaticPropertyAccess`'s `.class` field;
+/// this one matches a `StaticMethodCall`'s). `extract_class_fqcn_from_expr`
+/// is the wrong tool here: it resolves `Foo::class`/a string literal, not a
+/// bare class-name identifier used directly as a call target.
+fn resolve_static_call_class_fqcn(
+    class_expr: &php_ast::owned::Expr,
+    ctx: &FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<std::sync::Arc<str>> {
+    let ExprKind::Identifier(id) = &class_expr.kind else {
+        return None;
+    };
+    let resolved = crate::db::resolve_name(db, file, id.as_ref());
+    match resolved.as_str() {
+        "self" | "static" => Some(std::sync::Arc::from(
+            ctx.self_fqcn.as_deref().or(ctx.static_fqcn.as_deref())?,
+        )),
+        "parent" => Some(std::sync::Arc::from(ctx.parent_fqcn.as_deref()?)),
+        s => Some(std::sync::Arc::from(s)),
+    }
 }
 
 /// Compute the narrowed type for a negated assertion (`@psalm-assert !Type

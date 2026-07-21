@@ -345,7 +345,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
         let method_name_lower = crate::util::php_ident_lowercase(method_name);
         if let Some(resolved) =
-            crate::call::method::resolve_method_from_db(self, &fqcn, &method_name_lower)
+            crate::call::method::resolve_method_from_db(self.db, &fqcn, &method_name_lower)
         {
             self.record_ref(
                 Arc::from(format!(

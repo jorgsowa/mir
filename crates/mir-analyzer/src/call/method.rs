@@ -64,12 +64,10 @@ pub(crate) struct ResolvedMethod {
 
 /// Resolve a method via the Salsa db, walking the class ancestor chain.
 pub(crate) fn resolve_method_from_db(
-    ea: &ExpressionAnalyzer<'_>,
+    db: &dyn crate::db::MirDatabase,
     fqcn: &Arc<str>,
     method_name_lower: &str,
 ) -> Option<ResolvedMethod> {
-    let db = ea.db;
-
     if let Some((owner_fqcn, storage)) = crate::db::find_method_respecting_precedence(
         db,
         crate::db::Fqcn::from_str(db, fqcn.as_ref()),
@@ -276,7 +274,7 @@ impl CallAnalyzer {
             let fqcn_resolved = crate::db::resolve_name(ea.db, &ea.file, fqcn);
             let fqcn_arc: Arc<str> = Arc::from(fqcn_resolved.as_str());
             if let Some(resolved) = resolve_method_from_db(
-                ea,
+                ea.db,
                 &fqcn_arc,
                 &crate::util::php_ident_lowercase(method_name),
             ) {
@@ -660,7 +658,7 @@ fn resolve_method_return<'a>(
     self_out_out: &mut Option<Type>,
 ) -> Type {
     let method_name_lower = crate::util::php_ident_lowercase(method_name);
-    let resolved = resolve_method_from_db(ea, fqcn, &method_name_lower);
+    let resolved = resolve_method_from_db(ea.db, fqcn, &method_name_lower);
 
     if let Some(resolved) = resolved {
         if declaring_class.is_none() {
