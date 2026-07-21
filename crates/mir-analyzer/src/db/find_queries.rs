@@ -275,6 +275,17 @@ impl ClassLike {
         }
     }
 
+    /// `@use TraitName<T1, T2>` type args (class, trait, or enum — anything
+    /// that can `use` a trait).
+    pub fn trait_use_type_args(&self) -> &[(Arc<str>, Vec<mir_types::Type>)] {
+        match self {
+            ClassLike::Class(c) => &c.trait_use_type_args,
+            ClassLike::Trait(t) => &t.trait_use_type_args,
+            ClassLike::Enum(e) => &e.trait_use_type_args,
+            _ => &[],
+        }
+    }
+
     /// `@extends BaseIface<T1, T2>` type args, keyed by base interface FQCN
     /// (interface only — unlike a class's single-parent `extends_type_args`,
     /// an interface's native `extends A, B` clause may name several bases).

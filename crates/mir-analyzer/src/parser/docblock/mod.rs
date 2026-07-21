@@ -185,6 +185,15 @@ impl DocblockParser {
                         result.implements.push(parse_type_string(trimmed));
                     }
                 }
+                "use" | "template-use" | "psalm-use" | "phpstan-use" => {
+                    if let Some(body_str) = body_text(&tag.body) {
+                        let trimmed = body_str.trim();
+                        if let Some(msg) = validate_type_str(trimmed, "use") {
+                            result.invalid_annotations.push(msg);
+                        }
+                        result.uses.push(parse_type_string(trimmed));
+                    }
+                }
                 "assert" | "psalm-assert" | "phpstan-assert" => {
                     if let Some(body_str) = body_text(&tag.body) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
@@ -541,6 +550,9 @@ pub struct ParsedDocblock {
     pub extends: Vec<Type>,
     /// `@implements InterfaceName<T>`
     pub implements: Vec<Type>,
+    /// `@use TraitName<T>` — explicit type argument(s) for a `use`d trait's
+    /// own `@template`, mirroring `@implements` for interfaces.
+    pub uses: Vec<Type>,
     /// `@throws ClassName`
     pub throws: Vec<String>,
     /// `@psalm-assert Type $var` — the `bool` is true for the `!Type` negated form.

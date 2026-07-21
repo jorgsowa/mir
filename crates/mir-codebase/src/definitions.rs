@@ -590,6 +590,11 @@ pub struct ClassDef {
     /// Type arguments from `@implements Interface<T1, T2>`.
     #[serde(default)]
     pub implements_type_args: Vec<(Arc<str>, Vec<Type>)>,
+    /// Type arguments from `@use TraitName<T1, T2>`, keyed by the used
+    /// trait's FQCN — a class's `use` clause (unlike `@extends`) may name
+    /// several traits at once.
+    #[serde(default)]
+    pub trait_use_type_args: Vec<(Arc<str>, Vec<Type>)>,
     pub is_abstract: bool,
     pub is_final: bool,
     pub is_readonly: bool,
@@ -706,6 +711,10 @@ pub struct TraitDef {
     /// to empty.
     #[serde(default)]
     pub trait_use_locations: Vec<(Arc<str>, Location)>,
+    /// Type arguments from `@use OtherTrait<T1, T2>` (a trait may itself
+    /// `use` a generic trait).
+    #[serde(default)]
+    pub trait_use_type_args: Vec<(Arc<str>, Vec<Type>)>,
     /// `@psalm-require-extends` / `@phpstan-require-extends` — FQCNs that using classes must extend.
     #[serde(default)]
     pub require_extends: Vec<Arc<str>>,
@@ -752,6 +761,9 @@ pub struct EnumDef {
     pub traits: Vec<Arc<str>>,
     #[serde(default)]
     pub trait_use_locations: Vec<(Arc<str>, Location)>,
+    /// Type arguments from `@use SomeTrait<T1, T2>`.
+    #[serde(default)]
+    pub trait_use_type_args: Vec<(Arc<str>, Vec<Type>)>,
     pub location: Option<Location>,
     /// `@deprecated` docblock annotation (or `#[Deprecated]` attribute), if present.
     #[serde(default)]

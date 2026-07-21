@@ -219,18 +219,32 @@ pub fn inherited_template_bindings(
             }
         }
 
-        // A used trait's own `@template` params have no binding source yet —
-        // `@use TraitName<T>` explicit type-argument syntax isn't parsed (a
-        // known, separate limitation) — but they must still get an entry
-        // here (bound to `mixed`, the same fallback un-bound templates get
-        // elsewhere) rather than staying absent: an absent entry would let
+        // A used trait's own `@template` params are bound from an explicit
+        // `@use TraitName<T>` type-argument list when the using class/trait
+        // supplies one, substituting any of ITS OWN templates already bound
+        // above/by the caller (`@use Collection<self>`-style forwarding);
+        // otherwise (or for an arg position past the supplied list) they
+        // fall back to `mixed` — the same fallback un-bound templates get
+        // elsewhere — rather than staying absent: an absent entry would let
         // the RECEIVER's own same-named template letter silently leak into
         // the trait's property/method types wherever this function's result
         // is merged with a caller's own bindings via `entry().or_insert()`.
         for trait_fqcn in class.class_traits() {
             if let Some(trait_tps) = declared_template_params(db, trait_fqcn.as_ref()) {
-                for tp in trait_tps.iter() {
-                    bindings.entry(tp.name).or_insert_with(Type::mixed);
+                let explicit_args = class
+                    .trait_use_type_args()
+                    .iter()
+                    .find(|(t, _)| t == trait_fqcn)
+                    .map(|(_, args)| args.as_slice());
+                for (i, tp) in trait_tps.iter().enumerate() {
+                    let resolved = explicit_args
+                        .and_then(|args| args.get(i))
+                        .map(|ty| ty.substitute_templates(&substitution))
+                        .unwrap_or_else(Type::mixed);
+                    substitution
+                        .entry(tp.name)
+                        .or_insert_with(|| resolved.clone());
+                    bindings.entry(tp.name).or_insert(resolved);
                 }
             }
         }

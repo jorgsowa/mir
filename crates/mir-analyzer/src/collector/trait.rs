@@ -292,6 +292,35 @@ impl<'a> DefinitionCollector<'a> {
             .map(|s| self.resolve_type_name(s.as_str(), true).into())
             .collect();
 
+        let trait_use_type_args: Vec<(Arc<str>, Vec<mir_types::Type>)> = trait_doc
+            .uses
+            .iter()
+            .filter_map(|ty| {
+                if let mir_types::Atomic::TNamedObject {
+                    fqcn: used_trait,
+                    type_params,
+                } = ty.types.first()?
+                {
+                    Some((
+                        self.resolve_type_name(used_trait.as_str(), true).into(),
+                        type_params
+                            .iter()
+                            .map(|tp| {
+                                self.resolve_union_doc_with_templates(
+                                    tp.clone(),
+                                    &trait_template_names,
+                                    &fqcn,
+                                    &trait_template_params,
+                                )
+                            })
+                            .collect(),
+                    ))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
         self.slice.traits.push(std::sync::Arc::new(TraitDef {
             fqcn: fqcn.into(),
             short_name: Arc::from(trait_name.as_str()),
@@ -302,6 +331,7 @@ impl<'a> DefinitionCollector<'a> {
             traits: trait_uses,
             location: Some(self.location(stmt_span.start, stmt_span.end)),
             trait_use_locations,
+            trait_use_type_args,
             require_extends,
             require_implements,
             deprecated: Self::deprecated_from_doc_or_attrs(

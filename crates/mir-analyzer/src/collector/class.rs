@@ -505,6 +505,35 @@ impl<'a> DefinitionCollector<'a> {
             })
             .collect();
 
+        let trait_use_type_args: Vec<(Arc<str>, Vec<mir_types::Type>)> = class_doc
+            .uses
+            .iter()
+            .filter_map(|ty| {
+                if let Some(Atomic::TNamedObject {
+                    fqcn: used_trait,
+                    type_params,
+                }) = ty.types.first()
+                {
+                    Some((
+                        self.resolve_type_name(used_trait.as_str(), true).into(),
+                        type_params
+                            .iter()
+                            .map(|tp| {
+                                self.resolve_union_doc_with_templates(
+                                    tp.clone(),
+                                    &class_template_names,
+                                    &fqcn,
+                                    &template_params,
+                                )
+                            })
+                            .collect(),
+                    ))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
         let storage = ClassDef {
             fqcn: fqcn.clone().into(),
             short_name: short_name.into(),
@@ -512,6 +541,7 @@ impl<'a> DefinitionCollector<'a> {
             interfaces,
             traits: trait_uses,
             trait_use_locations,
+            trait_use_type_args,
             own_methods,
             own_properties,
             own_constants,

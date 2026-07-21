@@ -275,6 +275,35 @@ impl DefinitionCollector<'_> {
             })
             .collect();
 
+        let trait_use_type_args: Vec<(Arc<str>, Vec<mir_types::Type>)> = enum_doc
+            .uses
+            .iter()
+            .filter_map(|ty| {
+                if let Some(mir_types::Atomic::TNamedObject {
+                    fqcn: used_trait,
+                    type_params,
+                }) = ty.types.first()
+                {
+                    Some((
+                        self.resolve_type_name(used_trait.as_str(), true).into(),
+                        type_params
+                            .iter()
+                            .map(|tp| {
+                                self.resolve_union_doc_with_templates(
+                                    tp.clone(),
+                                    &rustc_hash::FxHashSet::default(),
+                                    &fqcn,
+                                    &[],
+                                )
+                            })
+                            .collect(),
+                    ))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
         let type_aliases = self.build_type_aliases(&enum_doc);
         let mut own_properties = mir_codebase::definitions::MemberMap::default();
         self.add_docblock_members(
@@ -301,6 +330,7 @@ impl DefinitionCollector<'_> {
                 own_constants,
                 traits,
                 trait_use_locations,
+                trait_use_type_args,
                 location: Some(self.location(stmt_span.start, stmt_span.end)),
                 deprecated: Self::deprecated_from_doc_or_attrs(
                     enum_doc.deprecated.as_deref(),
