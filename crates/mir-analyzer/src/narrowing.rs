@@ -2281,7 +2281,7 @@ pub fn narrow_from_condition(
                                         ctx, &fqcn, &prop, &key, db,
                                     );
                                 } else if let Some((base, path)) =
-                                    collect_array_access_path(&arr_arg.value)
+                                    collect_array_access_path(&arr_arg.value, ctx, db, file)
                                 {
                                     // Nested container, e.g. array_key_exists('b', $arr['a']) —
                                     // walk down to the ['a'] shape and prove 'b' present there,
@@ -2379,7 +2379,7 @@ pub fn narrow_from_condition(
                                         );
                                     }
                                 } else if let Some((base, path)) =
-                                    collect_array_access_path(&arr_arg.value)
+                                    collect_array_access_path(&arr_arg.value, ctx, db, file)
                                 {
                                     // Nested container, false branch, e.g.
                                     // array_key_exists('b', $arr['a']) proven
@@ -2894,7 +2894,7 @@ pub fn narrow_from_condition(
                     // value — remove null/false from the base (variable or
                     // property receiver) so a guarded access (`preg_split()`
                     // returns array|false) does not report PossiblyInvalidArrayAccess.
-                    if let Some(target) = array_access_base_target(var_expr) {
+                    if let Some(target) = array_access_base_target(var_expr, ctx, db, file) {
                         narrow_container_non_null_non_false(ctx, &target, db, file);
                     }
                     // For a single-level `isset($arr['key'])` on a shape-typed
@@ -2949,7 +2949,7 @@ pub fn narrow_from_condition(
                 if !is_true {
                     // `!empty($base[$k])` implies `$base` is a non-null, indexable
                     // value, same as the `isset($base[$k])` case above.
-                    if let Some(target) = array_access_base_target(var_expr) {
+                    if let Some(target) = array_access_base_target(var_expr, ctx, db, file) {
                         narrow_container_non_null_non_false(ctx, &target, db, file);
                     }
                 }
@@ -7655,40 +7655,83 @@ pub(crate) fn extract_expr_guard_key(
     }
 }
 
-/// The base (variable or property receiver) of a (possibly nested)
-/// array-access expression: `$a[1][2]` → `Var("a")`, `$this->data[1]` →
-/// `Prop("this", "data")`. Unlike `collect_array_access_path`, doesn't
+/// The base of an `isset()`/`empty()`/`array_key_exists()` array-shape
+/// access, widened with a static-property variant alongside the plain
+/// `ScalarArgTarget` shapes — kept as its own local type rather than a new
+/// `ScalarArgTarget::Static` variant, since that enum is matched
+/// exhaustively at ~25 unrelated call sites across this file (each already
+/// has its own call-site-local static-prop arm, per this file's established
+/// convention — see the `ScalarArgTarget` doc comment).
+enum ShapeBase {
+    Var(String),
+    Prop(String, String),
+    Static(std::sync::Arc<str>, String),
+}
+
+impl ShapeBase {
+    fn extract(
+        expr: &php_ast::owned::Expr,
+        ctx: &FlowState,
+        db: &dyn MirDatabase,
+        file: &str,
+    ) -> Option<Self> {
+        match ScalarArgTarget::extract(expr) {
+            Some(ScalarArgTarget::Var(name)) => Some(ShapeBase::Var(name)),
+            Some(ScalarArgTarget::Prop(obj, prop)) => Some(ShapeBase::Prop(obj, prop)),
+            None => extract_static_prop_access(expr, ctx, db, file)
+                .map(|(fqcn, prop)| ShapeBase::Static(fqcn, prop)),
+        }
+    }
+}
+
+/// The base (variable, property, or static-property receiver) of a
+/// (possibly nested) array-access expression: `$a[1][2]` → `Var("a")`,
+/// `$this->data[1]` → `Prop("this", "data")`, `self::$data[1]` →
+/// `Static(fqcn, "data")`. Unlike `collect_array_access_path`, doesn't
 /// require every key along the way to be a literal — stripping null/false
 /// from the container itself doesn't depend on the key being statically
 /// known.
-fn array_access_base_target(expr: &php_ast::owned::Expr) -> Option<ScalarArgTarget> {
+fn array_access_base_target(
+    expr: &php_ast::owned::Expr,
+    ctx: &FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<ShapeBase> {
     match &expr.kind {
-        ExprKind::ArrayAccess(aa) => array_access_base_target(&aa.array),
-        ExprKind::Parenthesized(inner) => array_access_base_target(inner),
-        _ => ScalarArgTarget::extract(expr),
+        ExprKind::ArrayAccess(aa) => array_access_base_target(&aa.array, ctx, db, file),
+        ExprKind::Parenthesized(inner) => array_access_base_target(inner, ctx, db, file),
+        _ => ShapeBase::extract(expr, ctx, db, file),
     }
 }
 
 /// Remove `null`/`false` from an `isset($base[...])`/`!empty($base[...])`
-/// container, whichever receiver shape `base` is — the property-receiver
-/// counterpart of the plain-variable case, since `->` access on a nullable
-/// property is just as valid an `isset()`/`empty()` target as a variable.
+/// container, whichever receiver shape `base` is — the property/static-
+/// property counterpart of the plain-variable case, since `->`/`::` access
+/// on a nullable property is just as valid an `isset()`/`empty()` target as
+/// a variable.
 fn narrow_container_non_null_non_false(
     ctx: &mut FlowState,
-    target: &ScalarArgTarget,
+    target: &ShapeBase,
     db: &dyn MirDatabase,
     file: &str,
 ) {
     match target {
-        ScalarArgTarget::Var(name) => {
+        ShapeBase::Var(name) => {
             let current = ctx.get_var(name);
             ctx.set_var(name, current.remove_null().remove_false());
         }
-        ScalarArgTarget::Prop(obj, prop) => {
+        ShapeBase::Prop(obj, prop) => {
             let current = resolve_prop_current_type(ctx, obj, prop, db, file);
             if !current.is_mixed() {
                 let narrowed = current.remove_null().remove_false();
                 apply_prop_narrowed(ctx, obj, prop, current, narrowed, true);
+            }
+        }
+        ShapeBase::Static(fqcn, prop) => {
+            let current = resolve_static_prop_current_type(ctx, fqcn, prop, db);
+            if !current.is_mixed() {
+                let narrowed = current.remove_null().remove_false();
+                apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, true);
             }
         }
     }
@@ -7705,7 +7748,7 @@ fn narrow_isset_shape_key(
     db: &dyn MirDatabase,
     file: &str,
 ) {
-    let Some((base, path)) = collect_array_access_path(var_expr) else {
+    let Some((base, path)) = collect_array_access_path(var_expr, ctx, db, file) else {
         return;
     };
     let current = resolve_shape_base_current_type(ctx, &base, db, file);
@@ -7716,12 +7759,16 @@ fn narrow_isset_shape_key(
 
 /// Collect `(base, [key1, key2, ...])` from a chain of literal-keyed
 /// `ArrayAccess` nodes, outermost-to-innermost (`$a['x']['y']` -> `(Var("a"),
-/// [x, y])`, `$this->data['x']` -> `(Prop("this", "data"), [x])`). Returns
-/// `None` as soon as a non-literal key or non-var/prop root is found — those
-/// cases are left unnarrowed.
+/// [x, y])`, `$this->data['x']` -> `(Prop("this", "data"), [x])`,
+/// `self::$data['x']` -> `(Static(fqcn, "data"), [x])`). Returns `None` as
+/// soon as a non-literal key or non-var/prop/static-prop root is found —
+/// those cases are left unnarrowed.
 fn collect_array_access_path(
     expr: &php_ast::owned::Expr,
-) -> Option<(ScalarArgTarget, Vec<mir_types::atomic::ArrayKey>)> {
+    ctx: &FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<(ShapeBase, Vec<mir_types::atomic::ArrayKey>)> {
     let ExprKind::ArrayAccess(aa) = &expr.kind else {
         return None;
     };
@@ -7733,10 +7780,10 @@ fn collect_array_access_path(
         ExprKind::Int(i) => mir_types::atomic::ArrayKey::Int(*i),
         _ => return None,
     };
-    if let Some(base) = ScalarArgTarget::extract(&aa.array) {
+    if let Some(base) = ShapeBase::extract(&aa.array, ctx, db, file) {
         Some((base, vec![key]))
     } else {
-        let (base, mut path) = collect_array_access_path(&aa.array)?;
+        let (base, mut path) = collect_array_access_path(&aa.array, ctx, db, file)?;
         path.push(key);
         Some((base, path))
     }
@@ -7746,27 +7793,24 @@ fn collect_array_access_path(
 /// receiver shape it is.
 fn resolve_shape_base_current_type(
     ctx: &mut FlowState,
-    base: &ScalarArgTarget,
+    base: &ShapeBase,
     db: &dyn MirDatabase,
     file: &str,
 ) -> Type {
     match base {
-        ScalarArgTarget::Var(name) => ctx.get_var(name),
-        ScalarArgTarget::Prop(obj, prop) => resolve_prop_current_type(ctx, obj, prop, db, file),
+        ShapeBase::Var(name) => ctx.get_var(name),
+        ShapeBase::Prop(obj, prop) => resolve_prop_current_type(ctx, obj, prop, db, file),
+        ShapeBase::Static(fqcn, prop) => resolve_static_prop_current_type(ctx, fqcn, prop, db),
     }
 }
 
 /// Apply a narrowed type back to a `collect_array_access_path` base.
-fn set_shape_base_narrowed(
-    ctx: &mut FlowState,
-    base: &ScalarArgTarget,
-    current: Type,
-    narrowed: Type,
-) {
+fn set_shape_base_narrowed(ctx: &mut FlowState, base: &ShapeBase, current: Type, narrowed: Type) {
     match base {
-        ScalarArgTarget::Var(name) => ctx.set_var(name, narrowed),
-        ScalarArgTarget::Prop(obj, prop) => {
-            apply_prop_narrowed(ctx, obj, prop, current, narrowed, false)
+        ShapeBase::Var(name) => ctx.set_var(name, narrowed),
+        ShapeBase::Prop(obj, prop) => apply_prop_narrowed(ctx, obj, prop, current, narrowed, false),
+        ShapeBase::Static(fqcn, prop) => {
+            apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, false)
         }
     }
 }
@@ -7975,7 +8019,7 @@ fn narrow_empty_shape_key(
     db: &dyn MirDatabase,
     file: &str,
 ) {
-    let Some((base, path)) = collect_array_access_path(var_expr) else {
+    let Some((base, path)) = collect_array_access_path(var_expr, ctx, db, file) else {
         return;
     };
     if path.len() > 1 {
