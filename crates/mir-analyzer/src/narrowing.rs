@@ -2258,9 +2258,7 @@ pub fn narrow_from_condition(
                                 } else {
                                     extract_static_prop_access(&key_arg.value, ctx, db, file).map(
                                         |(fqcn, prop)| {
-                                            resolve_static_prop_current_type(
-                                                ctx, &fqcn, &prop, db,
-                                            )
+                                            resolve_static_prop_current_type(ctx, &fqcn, &prop, db)
                                         },
                                     )
                                 };
@@ -9149,10 +9147,14 @@ fn narrow_array_key_first_or_last_null(ctx: &mut FlowState, arr_var: &str, is_nu
     if current.is_mixed() {
         return;
     }
+    // array_key_first()/array_key_last() throw a TypeError for a null
+    // argument, so reaching either result already proves the array wasn't
+    // null.
+    let non_null = current.remove_null();
     let narrowed = if is_null {
-        current.narrow_to_empty_collection()
+        non_null.narrow_to_empty_collection()
     } else {
-        current.narrow_to_non_empty_collection()
+        non_null.narrow_to_non_empty_collection()
     };
     // `narrow_to_empty_collection` can filter every atom away when `current` is
     // already known to be exclusively non-empty (a provably-dead branch); leave
@@ -9179,10 +9181,12 @@ fn narrow_prop_array_key_first_or_last_null(
     if current.is_mixed() {
         return;
     }
+    // The property's own value can't be null either, for the same reason.
+    let non_null = current.remove_null();
     let narrowed = if is_null {
-        current.narrow_to_empty_collection()
+        non_null.narrow_to_empty_collection()
     } else {
-        current.narrow_to_non_empty_collection()
+        non_null.narrow_to_non_empty_collection()
     };
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, false);
 }
@@ -9199,10 +9203,11 @@ fn narrow_static_prop_array_key_first_or_last_null(
     if current.is_mixed() {
         return;
     }
+    let non_null = current.remove_null();
     let narrowed = if is_null {
-        current.narrow_to_empty_collection()
+        non_null.narrow_to_empty_collection()
     } else {
-        current.narrow_to_non_empty_collection()
+        non_null.narrow_to_non_empty_collection()
     };
     if !narrowed.is_empty() && narrowed != current {
         apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, false);
@@ -9366,17 +9371,19 @@ fn narrow_array_count_comparison(
     n: i64,
     is_true: bool,
 ) {
-    let Some(non_empty) = count_or_strlen_emptiness(op, n, is_true) else {
-        return;
-    };
     let current = ctx.get_var(arr_var);
     if current.is_mixed() {
         return;
     }
-    let narrowed = if non_empty {
-        current.narrow_to_non_empty_collection()
-    } else {
-        current.narrow_to_empty_collection()
+    // count()/sizeof()/iterator_count() throw a TypeError for a null
+    // argument, so reaching ANY comparison result already proves the array
+    // wasn't null — independent of whether this specific comparison also
+    // proves emptiness.
+    let non_null = current.remove_null();
+    let narrowed = match count_or_strlen_emptiness(op, n, is_true) {
+        Some(true) => non_null.narrow_to_non_empty_collection(),
+        Some(false) => non_null.narrow_to_empty_collection(),
+        None => non_null,
     };
     // `narrow_to_empty_collection` can filter every atom away when `current` is
     // already known to be exclusively non-empty (a provably-dead branch); leave
@@ -9403,10 +9410,18 @@ fn narrow_string_strlen_comparison(
     if current.is_mixed() {
         return;
     }
-    let narrowed = if non_empty {
-        narrow_string_to_non_empty(&current)
+    // strlen(null) doesn't throw (returns 0, deprecation notice only), so
+    // only a proven-non-empty result excludes a null value — the empty
+    // direction is also satisfiable by the string being null.
+    let base = if non_empty {
+        current.remove_null()
     } else {
-        narrow_string_to_empty(&current)
+        current.clone()
+    };
+    let narrowed = if non_empty {
+        narrow_string_to_non_empty(&base)
+    } else {
+        narrow_string_to_empty(&base)
     };
     // Same rationale as the array case above: don't collapse to an empty union.
     if !narrowed.is_empty() && narrowed != current {
@@ -9426,9 +9441,6 @@ fn narrow_prop_array_count_comparison(
     n: i64,
     is_true: bool,
 ) {
-    let Some(non_empty) = count_or_strlen_emptiness(op, n, is_true) else {
-        return;
-    };
     // count() on a non-Countable (including null) is a TypeError in PHP 8, so
     // reaching either comparison result at all proves $obj->prop — and thus
     // $obj — was non-null, regardless of which direction was proven or of
@@ -9438,10 +9450,12 @@ fn narrow_prop_array_count_comparison(
     if current.is_mixed() {
         return;
     }
-    let narrowed = if non_empty {
-        current.narrow_to_non_empty_collection()
-    } else {
-        current.narrow_to_empty_collection()
+    // The property's own value can't be null either, for the same reason.
+    let non_null = current.remove_null();
+    let narrowed = match count_or_strlen_emptiness(op, n, is_true) {
+        Some(true) => non_null.narrow_to_non_empty_collection(),
+        Some(false) => non_null.narrow_to_empty_collection(),
+        None => non_null,
     };
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, false);
 }
@@ -9472,10 +9486,17 @@ fn narrow_prop_string_strlen_comparison(
     if current.is_mixed() {
         return;
     }
-    let narrowed = if non_empty {
-        narrow_string_to_non_empty(&current)
+    // Same reasoning as the receiver above: only the non-empty direction
+    // proves the property's own value wasn't null.
+    let base = if non_empty {
+        current.remove_null()
     } else {
-        narrow_string_to_empty(&current)
+        current.clone()
+    };
+    let narrowed = if non_empty {
+        narrow_string_to_non_empty(&base)
+    } else {
+        narrow_string_to_empty(&base)
     };
     apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, false);
 }
@@ -9492,17 +9513,18 @@ fn narrow_static_prop_array_count_comparison(
     n: i64,
     is_true: bool,
 ) {
-    let Some(non_empty) = count_or_strlen_emptiness(op, n, is_true) else {
-        return;
-    };
     let current = resolve_static_prop_current_type(ctx, fqcn, prop, db);
     if current.is_mixed() {
         return;
     }
-    let narrowed = if non_empty {
-        current.narrow_to_non_empty_collection()
-    } else {
-        current.narrow_to_empty_collection()
+    // count()/sizeof()/iterator_count() throw a TypeError for a null
+    // argument, so reaching ANY comparison result already proves the
+    // property wasn't null.
+    let non_null = current.remove_null();
+    let narrowed = match count_or_strlen_emptiness(op, n, is_true) {
+        Some(true) => non_null.narrow_to_non_empty_collection(),
+        Some(false) => non_null.narrow_to_empty_collection(),
+        None => non_null,
     };
     apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, false);
 }
@@ -9524,10 +9546,16 @@ fn narrow_static_prop_string_strlen_comparison(
     if current.is_mixed() {
         return;
     }
-    let narrowed = if non_empty {
-        narrow_string_to_non_empty(&current)
+    // Only the non-empty direction proves the property's own value wasn't null.
+    let base = if non_empty {
+        current.remove_null()
     } else {
-        narrow_string_to_empty(&current)
+        current.clone()
+    };
+    let narrowed = if non_empty {
+        narrow_string_to_non_empty(&base)
+    } else {
+        narrow_string_to_empty(&base)
     };
     apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, false);
 }
