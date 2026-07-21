@@ -2111,7 +2111,9 @@ pub fn narrow_from_condition(
                                     current.narrow_to_class_string()
                                 };
                                 set_narrowed(ctx, &var_name, &current, narrowed, true);
-                            } else if let Some((obj, prop)) = extract_prop_access(&arg_expr.value) {
+                            } else if let Some((obj, prop)) =
+                                extract_any_prop_access(&arg_expr.value)
+                            {
                                 let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
                                 if !current.is_mixed() {
                                     let narrowed = if bare.eq_ignore_ascii_case("interface_exists")
@@ -2207,7 +2209,7 @@ pub fn narrow_from_condition(
                     if let Some(arg_expr) = call.args.first() {
                         if let Some(var_name) = extract_var_name(&arg_expr.value) {
                             narrow_from_type_fn(ctx, bare, &var_name, db, is_true);
-                        } else if let Some((obj, prop)) = extract_prop_access(&arg_expr.value) {
+                        } else if let Some((obj, prop)) = extract_any_prop_access(&arg_expr.value) {
                             narrow_prop_from_type_fn(ctx, bare, &obj, &prop, db, file, is_true);
                         } else if let Some((fqcn, prop)) =
                             extract_static_prop_access(&arg_expr.value, ctx, db, file)
@@ -2252,7 +2254,7 @@ pub fn narrow_from_condition(
                                 let key_ty = if let Some(name) = extract_var_name(&key_arg.value) {
                                     Some(ctx.get_var(&name))
                                 } else if let Some((obj, prop)) =
-                                    extract_prop_access(&key_arg.value)
+                                    extract_any_prop_access(&key_arg.value)
                                 {
                                     Some(resolve_prop_current_type(ctx, &obj, &prop, db, file))
                                 } else {
@@ -2282,7 +2284,7 @@ pub fn narrow_from_condition(
                                         ctx.set_var(&var_name, narrowed);
                                     }
                                 } else if let Some((obj, prop)) =
-                                    extract_prop_access(&arr_arg.value)
+                                    extract_any_prop_access(&arr_arg.value)
                                 {
                                     narrow_prop_array_key_exists(ctx, &obj, &prop, &key, db, file);
                                 } else if let Some((fqcn, prop)) =
@@ -2395,7 +2397,7 @@ pub fn narrow_from_condition(
                                     let narrowed = remove_key_from_sealed_shapes(&current, &key);
                                     set_narrowed(ctx, &var_name, &current, narrowed, true);
                                 } else if let Some((obj, prop)) =
-                                    extract_prop_access(&arr_arg.value)
+                                    extract_any_prop_access(&arr_arg.value)
                                 {
                                     let current =
                                         resolve_prop_current_type(ctx, &obj, &prop, db, file);
@@ -2608,7 +2610,8 @@ pub fn narrow_from_condition(
                                     }
                                 }
                             }
-                        } else if let Some((obj, prop)) = extract_prop_access(&needle_arg.value) {
+                        } else if let Some((obj, prop)) = extract_any_prop_access(&needle_arg.value)
+                        {
                             // Property-access counterpart of the plain-variable case
                             // above, e.g. `in_array($this->status, ['a', 'b'])`.
                             if let Some(haystack_ty) =
@@ -2780,7 +2783,7 @@ pub fn narrow_from_condition(
                                     set_narrowed(ctx, &var_name, &current, narrowed, true);
                                 }
                             }
-                        } else if let Some((obj, prop)) = extract_prop_access(&obj_arg.value) {
+                        } else if let Some((obj, prop)) = extract_any_prop_access(&obj_arg.value) {
                             if let Some(class_name) = extract_class_fqcn_from_expr(
                                 &class_arg.value,
                                 ctx.self_fqcn.as_deref(),
@@ -2866,7 +2869,7 @@ pub fn narrow_from_condition(
                                 }
                                 // False branch: leave current type unchanged.
                             }
-                        } else if let Some((obj, prop)) = extract_prop_access(&obj_arg.value) {
+                        } else if let Some((obj, prop)) = extract_any_prop_access(&obj_arg.value) {
                             if let Some(class_name) = extract_class_fqcn_from_expr(
                                 &class_arg.value,
                                 ctx.self_fqcn.as_deref(),
@@ -2913,7 +2916,7 @@ pub fn narrow_from_condition(
                 } else if let Some(arg_expr) = call.args.first() {
                     if let Some(var_name) = extract_var_name(&arg_expr.value) {
                         narrow_from_type_fn(ctx, bare, &var_name, db, is_true);
-                    } else if let Some((obj, prop)) = extract_prop_access(&arg_expr.value) {
+                    } else if let Some((obj, prop)) = extract_any_prop_access(&arg_expr.value) {
                         narrow_prop_from_type_fn(ctx, bare, &obj, &prop, db, file, is_true);
                     } else if let Some((fqcn, prop)) =
                         extract_static_prop_access(&arg_expr.value, ctx, db, file)
