@@ -6985,30 +6985,27 @@ fn type_fn_narrowed(
         // TScalar excludes object entirely though, so it can only narrow to TString,
         // never TObject (bool|int|float|string can never be an object instance).
         "method_exists" | "property_exists" => {
-            if is_true {
-                // A receiver that's neither object-like, string-like, mixed, nor
-                // scalar (e.g. plain int/bool/array) can never satisfy
-                // method_exists()/property_exists() — PHP 8 throws a TypeError
-                // for such an argument, so this branch is provably unreachable.
-                // Let the result go empty like every sibling is_*() arm (the
-                // caller's set_narrowed/apply_prop_narrowed already marks
-                // divergence on empty), instead of silently reverting to the
-                // unnarrowed current type.
-                let mut result = Type::empty();
-                result.from_docblock = current.from_docblock;
-                for t in &current.types {
-                    if t.is_object() || t.is_string() {
-                        result.add_type(t.clone());
-                    } else if matches!(t, Atomic::TMixed) {
-                        result.add_type(Atomic::TObject);
-                    } else if matches!(t, Atomic::TScalar) {
-                        result.add_type(Atomic::TString);
-                    }
+            // A receiver that's neither object-like, string-like, mixed, nor
+            // scalar (e.g. plain int/bool/array) can never be passed to
+            // method_exists()/property_exists() — PHP 8 throws a TypeError for
+            // such an argument regardless of which boolean the call returns,
+            // so reaching EITHER branch already proves it was object|string.
+            // Let the result go empty like every sibling is_*() arm (the
+            // caller's set_narrowed/apply_prop_narrowed already marks
+            // divergence on empty), instead of silently reverting to the
+            // unnarrowed current type.
+            let mut result = Type::empty();
+            result.from_docblock = current.from_docblock;
+            for t in &current.types {
+                if t.is_object() || t.is_string() {
+                    result.add_type(t.clone());
+                } else if matches!(t, Atomic::TMixed) {
+                    result.add_type(Atomic::TObject);
+                } else if matches!(t, Atomic::TScalar) {
+                    result.add_type(Atomic::TString);
                 }
-                result
-            } else {
-                current.clone()
             }
+            result
         }
         _ => return None,
     })
