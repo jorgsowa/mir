@@ -387,8 +387,14 @@ impl<'a> ClassAnalyzer<'a> {
                         // Both sides involve objects: named_object_return_compatible now
                         // splits mixed object+scalar unions per atom (G5), so it covers
                         // `string|Cat` vs `string|Animal` directly — not just purely-object
-                        // unions as before.
+                        // unions as before. An array-of-named-object return
+                        // (`array<int, T>`) falls through named_object_return_compatible's
+                        // structural catch-all (no class-hierarchy awareness for arrays),
+                        // so also try the codebase-aware array check the ordinary
+                        // return-statement checker already uses for exactly this shape.
                         crate::stmt::named_object_return_compatible(
+                            child_ret, parent_ret, self.db, child_file,
+                        ) || crate::stmt::return_arrays_compatible(
                             child_ret, parent_ret, self.db, child_file,
                         )
                     } else if child_has_object || parent_has_object {

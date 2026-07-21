@@ -459,7 +459,7 @@ fn scalar_array_element_compatible(av: &Atomic, dec_val: &Type) -> bool {
 
 /// Returns true if both actual and declared are array/list types whose value types are
 /// compatible with FQCN resolution (to avoid short-name vs FQCN mismatches in return types).
-pub(super) fn return_arrays_compatible(
+pub(crate) fn return_arrays_compatible(
     actual: &Type,
     declared: &Type,
     db: &dyn MirDatabase,

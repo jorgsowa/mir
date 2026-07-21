@@ -12,6 +12,7 @@ pub(crate) use loops::resolve_iterator_item_types;
 use loops::{vars_stabilized, widen_unstable};
 pub(crate) use return_type::named_object_return_compatible;
 pub(crate) use return_type::resolve_union_for_file;
+pub(crate) use return_type::return_arrays_compatible;
 
 use std::sync::Arc;
 
