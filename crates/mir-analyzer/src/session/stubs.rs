@@ -167,7 +167,9 @@ impl AnalysisSession {
             .collect();
         if !sources.is_empty() {
             let cancel = crate::IndexCancel::new();
-            self.index_batch(&sources, crate::IndexParallelism::Sequential, &cancel);
+            // Rayon: when this is the first `index_batch` call it seeds the
+            // symbol index from every registered file, not just this chunk.
+            self.index_batch(&sources, crate::IndexParallelism::Rayon, &cancel);
         }
     }
 
