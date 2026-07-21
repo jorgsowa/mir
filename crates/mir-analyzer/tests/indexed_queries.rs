@@ -393,41 +393,67 @@ fn method_implementations_trait_shared_by_siblings_dedups_to_one_entry() {
 }
 
 #[test]
-fn static_call_name_fallback_on_unresolved_class() {
+fn static_call_on_unresolved_class_scopes_to_that_class() {
+    // `UnknownClass` is a concrete (if unresolved/external) name, so the call
+    // is scoped to it directly instead of falling into the class-agnostic
+    // `methname:` bucket — querying by the concrete class must find it...
     let files = [(
         "caller.php",
         "<?php\nfunction c(): void { UnknownClass::doThing(); }\n",
     )];
     let session = session_with(&files);
     let refs = session
-        .indexed_references_to(&Name::method("", "doThing"), &paths(&files), false, &|| {
-            false
-        })
+        .indexed_references_to(
+            &Name::method("UnknownClass", "doThing"),
+            &paths(&files),
+            false,
+            &|| false,
+        )
         .expect("not cancelled");
     assert_eq!(
         refs.len(),
         1,
-        "UnknownClass::doThing() must record a methname: fallback: {refs:?}"
+        "UnknownClass::doThing() must be recorded scoped to UnknownClass: {refs:?}"
     );
     assert_eq!(refs[0].0.as_ref(), "caller.php");
+
+    // ...and, since the class was knowable, this call must NOT leak into the
+    // class-agnostic bucket — that bucket is now reserved for the rare case
+    // where a call keyword (`self`/`static`/`parent`) never resolved to any
+    // concrete name at all (see `static_call_bare_fallback_when_self_unresolved`).
+    let bare = session
+        .indexed_references_to(&Name::method("", "doThing"), &paths(&files), false, &|| {
+            false
+        })
+        .expect("not cancelled");
+    assert!(
+        bare.is_empty(),
+        "a call on a nameable (even if unresolved) class must not populate the bare bucket: {bare:?}"
+    );
 }
 
 #[test]
-fn static_call_name_fallback_on_undefined_method() {
+fn static_call_on_undefined_method_scopes_to_the_class() {
+    // `Known` fully resolves but declares no `doThing` — the call is scoped
+    // to `Known` directly rather than the class-agnostic `methname:` bucket,
+    // so it can never collide with an unrelated class's own `doThing`.
     let files = [(
         "caller.php",
         "<?php\nclass Known {}\nfunction c(): void { Known::doThing(); }\n",
     )];
     let session = session_with(&files);
     let refs = session
-        .indexed_references_to(&Name::method("", "doThing"), &paths(&files), false, &|| {
-            false
-        })
+        .indexed_references_to(
+            &Name::method("Known", "doThing"),
+            &paths(&files),
+            false,
+            &|| false,
+        )
         .expect("not cancelled");
     assert_eq!(
         refs.len(),
         1,
-        "Known::doThing() with no such method must still record a methname: fallback: {refs:?}"
+        "Known::doThing() with no such method must be recorded scoped to Known: {refs:?}"
     );
     assert_eq!(refs[0].0.as_ref(), "caller.php");
 }
@@ -775,4 +801,79 @@ fn gated_file_participates_after_edit_introduces_mention() {
         .expect("not cancelled");
     assert_eq!(refs.len(), 1, "{refs:?}");
     assert_eq!(refs[0].0.as_ref(), "idle.php");
+}
+
+#[test]
+fn static_call_bare_fallback_when_self_unresolved() {
+    // `self::` used where there is no enclosing class never resolves to a
+    // concrete name at all (`resolve_static_class` leaves it as the literal
+    // string "self") — this is the one remaining genuinely un-nameable case,
+    // so it still falls back to the class-agnostic bucket.
+    let files = [(
+        "caller.php",
+        "<?php\nfunction c(): void { self::doThing(); }\n",
+    )];
+    let session = session_with(&files);
+    let refs = session
+        .indexed_references_to(&Name::method("", "doThing"), &paths(&files), false, &|| {
+            false
+        })
+        .expect("not cancelled");
+    assert_eq!(
+        refs.len(),
+        1,
+        "self::doThing() with no enclosing class must still use the methname: fallback: {refs:?}"
+    );
+    assert_eq!(refs[0].0.as_ref(), "caller.php");
+}
+
+#[test]
+fn static_call_on_unresolved_ancestor_does_not_collide_with_unrelated_class() {
+    // Pinned regression for the false-positive this fix targets: `Foo` and
+    // `Child` are two entirely unrelated classes. `Child` extends an
+    // external/unresolved `BaseThing` and calls `parent::__construct()` —
+    // before this fix that call landed in the same class-agnostic
+    // `methname:__construct` bucket that `Foo::__construct`'s own
+    // (empty-hierarchy) lookup fell back to, so it wrongly showed up as a
+    // reference to `Foo::__construct`.
+    let files = [
+        (
+            "foo.php",
+            "<?php\nclass Foo { function __construct() {} }\n",
+        ),
+        (
+            "child.php",
+            "<?php\nclass Child extends BaseThing { function __construct() { parent::__construct(); } }\n",
+        ),
+    ];
+    let session = session_with(&files);
+    let refs = session
+        .indexed_references_to(
+            &Name::method("Foo", "__construct"),
+            &paths(&files),
+            false,
+            &|| false,
+        )
+        .expect("not cancelled");
+    assert!(
+        refs.is_empty(),
+        "Child's parent::__construct() call (an unresolved BaseThing) must not show up as a reference to Foo::__construct: {refs:?}"
+    );
+
+    // The call is still findable — scoped to the concrete (if unresolved)
+    // class it actually names.
+    let base_thing_refs = session
+        .indexed_references_to(
+            &Name::method("BaseThing", "__construct"),
+            &paths(&files),
+            false,
+            &|| false,
+        )
+        .expect("not cancelled");
+    assert_eq!(
+        base_thing_refs.len(),
+        1,
+        "parent::__construct() must be scoped to BaseThing::__construct: {base_thing_refs:?}"
+    );
+    assert_eq!(base_thing_refs[0].0.as_ref(), "child.php");
 }

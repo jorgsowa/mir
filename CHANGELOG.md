@@ -22,6 +22,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   case-insensitive class/function/method name semantics — `extends bar` is
   no longer invisible to a cold subtype scan for `Bar`.
 
+### Fixed
+
+- **Static-call reference fallback:** a static/`parent::`/`self::` call whose
+  receiver class can't be resolved (e.g. an external/vendor symbol) no longer
+  falls back to a class-agnostic `methname:` posting — it now scopes to the
+  concrete (if unresolved) receiver FQN. Previously this collided with any
+  unrelated class's same-named method: `parent::__construct()` through an
+  unresolved base class could wrongly show up as a reference to a completely
+  different class's constructor.
+- **`indexed_references_to` gate needles:** constructor (`__construct`)
+  queries no longer include the bare method name as a gate needle, only the
+  owner class's short name. `__construct` appears in nearly every real-world
+  file, so OR-ing it in admitted almost the entire workspace as "must
+  re-analyze" on a cold query, defeating the gate's purpose for constructors
+  specifically. Every real constructor call site already names the class
+  textually, so this loses no true positives.
+- **`indexed_references_to` Phase 1 cancellation:** the serial warm-up loop
+  now catches `salsa::Cancelled` and retries just the interrupted file,
+  instead of letting the panic unwind and force the whole query — including
+  the freshness pass and every already-warmed file — to restart from scratch.
+
 ## [0.60.0] - 2026-07-19
 
 ### Added
