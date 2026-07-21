@@ -80,7 +80,14 @@ pub fn infer_arg_template_bindings(
     arg_names: &[Option<String>],
 ) -> (FxHashMap<Name, Type>, FxHashSet<Name>) {
     let mut bindings: FxHashMap<Name, Type> = FxHashMap::default();
-    let mut unchecked: FxHashSet<Name> = FxHashSet::default();
+    // Contributions from a `TemplateResidual::FullyExplainedByAlternative`
+    // match (e.g. the `null` in `T|null` matched against a bare `null` arg)
+    // land here instead of directly in `bindings` — such a contribution
+    // proves nothing about what the template actually is, so it must never
+    // be allowed to merge into (and contaminate) a DIFFERENT parameter's
+    // real binding for the same template name. Used only as a last-resort
+    // fallback once every parameter has been processed, below.
+    let mut risky_fallback: FxHashMap<Name, Type> = FxHashMap::default();
     let template_names: FxHashSet<Name> = template_params
         .iter()
         .map(|tp| Name::from(tp.name.as_ref()))
@@ -99,7 +106,7 @@ pub fn infer_arg_template_bindings(
                     arg_ty,
                     &template_names,
                     &mut bindings,
-                    &mut unchecked,
+                    &mut risky_fallback,
                 );
             } else {
                 infer_from_pair(
@@ -108,9 +115,23 @@ pub fn infer_arg_template_bindings(
                     arg_ty,
                     &template_names,
                     &mut bindings,
-                    &mut unchecked,
+                    &mut risky_fallback,
                 );
             }
+        }
+    }
+
+    // Use a risky contribution only where NO real parameter ever bound this
+    // template name for real — `unchecked` is computed from exactly those
+    // fallback uses, so a name a different parameter legitimately bound
+    // stays fully checked (this is what previously leaked: a risky
+    // contribution merged directly into `bindings`, unconditionally
+    // poisoning `unchecked` for the name regardless of what else bound it).
+    let mut unchecked: FxHashSet<Name> = FxHashSet::default();
+    for (name, val) in risky_fallback {
+        if let std::collections::hash_map::Entry::Vacant(e) = bindings.entry(name) {
+            e.insert(val);
+            unchecked.insert(name);
         }
     }
 
@@ -624,7 +645,7 @@ fn infer_from_pair(
     arg_ty: &Type,
     template_names: &FxHashSet<Name>,
     bindings: &mut FxHashMap<Name, Type>,
-    risky: &mut FxHashSet<Name>,
+    risky_fallback: &mut FxHashMap<Name, Type>,
 ) {
     // When the parameter is a union mixing template placeholders with concrete
     // atomics (e.g. `T|null` against `Bar|null`), the template should bind to
@@ -653,11 +674,22 @@ fn infer_from_pair(
                     // for the bare template to bind.
                     continue;
                 }
-                let entry = bindings.entry(*name).or_insert_with(Type::empty);
-                entry.merge_with(bind);
-                if template_residual.is_risky() {
-                    risky.insert(*name);
-                }
+                // A risky (fully-explained-by-a-sibling-alternative) match
+                // must not merge into `bindings` — a DIFFERENT parameter's
+                // real binding for the same name lives in that same map
+                // slot, and merging a risky value into it would contaminate
+                // that real binding too. Route it to the fallback map
+                // instead; `infer_arg_template_bindings` only consults it
+                // for names nothing else ever bound.
+                let target = if template_residual.is_risky() {
+                    &mut *risky_fallback
+                } else {
+                    &mut *bindings
+                };
+                target
+                    .entry(*name)
+                    .or_insert_with(Type::empty)
+                    .merge_with(bind);
             }
 
             // non-empty-array<K, V> matched against array<k_ty, v_ty>, array{...}
@@ -668,8 +700,8 @@ fn infer_from_pair(
                     match a_atomic {
                         Atomic::TArray { key: ak, value: av }
                         | Atomic::TNonEmptyArray { key: ak, value: av } => {
-                            infer_from_pair(db, pk, ak, template_names, bindings, risky);
-                            infer_from_pair(db, pv, av, template_names, bindings, risky);
+                            infer_from_pair(db, pk, ak, template_names, bindings, risky_fallback);
+                            infer_from_pair(db, pv, av, template_names, bindings, risky_fallback);
                         }
                         Atomic::TList { value: av } | Atomic::TNonEmptyList { value: av } => {
                             infer_from_pair(
@@ -678,9 +710,9 @@ fn infer_from_pair(
                                 &Type::single(Atomic::TInt),
                                 template_names,
                                 bindings,
-                                risky,
+                                risky_fallback,
                             );
-                            infer_from_pair(db, pv, av, template_names, bindings, risky);
+                            infer_from_pair(db, pv, av, template_names, bindings, risky_fallback);
                         }
                         Atomic::TKeyedArray { properties, .. } => {
                             let mut key_union = Type::empty();
@@ -700,7 +732,7 @@ fn infer_from_pair(
                                     &key_union,
                                     template_names,
                                     bindings,
-                                    risky,
+                                    risky_fallback,
                                 );
                                 infer_from_pair(
                                     db,
@@ -708,7 +740,7 @@ fn infer_from_pair(
                                     &val_union,
                                     template_names,
                                     bindings,
-                                    risky,
+                                    risky_fallback,
                                 );
                             }
                         }
@@ -724,8 +756,8 @@ fn infer_from_pair(
                     match a_atomic {
                         Atomic::TArray { key: ak, value: av }
                         | Atomic::TNonEmptyArray { key: ak, value: av } => {
-                            infer_from_pair(db, pk, ak, template_names, bindings, risky);
-                            infer_from_pair(db, pv, av, template_names, bindings, risky);
+                            infer_from_pair(db, pk, ak, template_names, bindings, risky_fallback);
+                            infer_from_pair(db, pv, av, template_names, bindings, risky_fallback);
                         }
                         Atomic::TList { value: av } | Atomic::TNonEmptyList { value: av } => {
                             infer_from_pair(
@@ -734,9 +766,9 @@ fn infer_from_pair(
                                 &Type::single(Atomic::TInt),
                                 template_names,
                                 bindings,
-                                risky,
+                                risky_fallback,
                             );
-                            infer_from_pair(db, pv, av, template_names, bindings, risky);
+                            infer_from_pair(db, pv, av, template_names, bindings, risky_fallback);
                         }
                         Atomic::TKeyedArray { properties, .. } => {
                             let mut key_union = Type::empty();
@@ -756,7 +788,7 @@ fn infer_from_pair(
                                     &key_union,
                                     template_names,
                                     bindings,
-                                    risky,
+                                    risky_fallback,
                                 );
                                 infer_from_pair(
                                     db,
@@ -764,7 +796,7 @@ fn infer_from_pair(
                                     &val_union,
                                     template_names,
                                     bindings,
-                                    risky,
+                                    risky_fallback,
                                 );
                             }
                         }
@@ -780,7 +812,7 @@ fn infer_from_pair(
                 for a_atomic in &arg_ty.types {
                     match a_atomic {
                         Atomic::TList { value: av } | Atomic::TNonEmptyList { value: av } => {
-                            infer_from_pair(db, pv, av, template_names, bindings, risky);
+                            infer_from_pair(db, pv, av, template_names, bindings, risky_fallback);
                         }
                         Atomic::TKeyedArray {
                             properties,
@@ -798,7 +830,7 @@ fn infer_from_pair(
                                     &val_union,
                                     template_names,
                                     bindings,
-                                    risky,
+                                    risky_fallback,
                                 );
                             }
                         }
@@ -830,7 +862,7 @@ fn infer_from_pair(
                                     &a_prop.ty,
                                     template_names,
                                     bindings,
-                                    risky,
+                                    risky_fallback,
                                 );
                             }
                         }
@@ -849,11 +881,17 @@ fn infer_from_pair(
                     if bind.types.is_empty() {
                         continue; // see TTemplateParam arm above
                     }
-                    let entry = bindings.entry(*pfqcn).or_insert_with(Type::empty);
-                    entry.merge_with(bind);
-                    if template_residual.is_risky() {
-                        risky.insert(*pfqcn);
-                    }
+                    // See the TTemplateParam arm above for why a risky match
+                    // routes to the fallback map instead of `bindings`.
+                    let target = if template_residual.is_risky() {
+                        &mut *risky_fallback
+                    } else {
+                        &mut *bindings
+                    };
+                    target
+                        .entry(*pfqcn)
+                        .or_insert_with(Type::empty)
+                        .merge_with(bind);
                     continue;
                 }
                 for a_atomic in &arg_ty.types {
@@ -870,7 +908,7 @@ fn infer_from_pair(
                                     a_param,
                                     template_names,
                                     bindings,
-                                    risky,
+                                    risky_fallback,
                                 );
                             }
                         } else if !pp.is_empty() {
@@ -888,7 +926,7 @@ fn infer_from_pair(
                                 ap,
                                 template_names,
                                 bindings,
-                                risky,
+                                risky_fallback,
                             );
                         }
                     }
@@ -910,11 +948,18 @@ fn infer_from_pair(
                                         &at.to_union(),
                                         template_names,
                                         bindings,
-                                        risky,
+                                        risky_fallback,
                                     );
                                 }
                             }
-                            infer_from_pair(db, p_ret, a_ret, template_names, bindings, risky);
+                            infer_from_pair(
+                                db,
+                                p_ret,
+                                a_ret,
+                                template_names,
+                                bindings,
+                                risky_fallback,
+                            );
                         }
                         Atomic::TCallable {
                             params: Some(a_params),
@@ -928,11 +973,18 @@ fn infer_from_pair(
                                         &at.to_union(),
                                         template_names,
                                         bindings,
-                                        risky,
+                                        risky_fallback,
                                     );
                                 }
                             }
-                            infer_from_pair(db, p_ret, a_ret, template_names, bindings, risky);
+                            infer_from_pair(
+                                db,
+                                p_ret,
+                                a_ret,
+                                template_names,
+                                bindings,
+                                risky_fallback,
+                            );
                         }
                         _ => {}
                     }
@@ -958,11 +1010,18 @@ fn infer_from_pair(
                                         &at.to_union(),
                                         template_names,
                                         bindings,
-                                        risky,
+                                        risky_fallback,
                                     );
                                 }
                             }
-                            infer_from_pair(db, p_ret, a_ret, template_names, bindings, risky);
+                            infer_from_pair(
+                                db,
+                                p_ret,
+                                a_ret,
+                                template_names,
+                                bindings,
+                                risky_fallback,
+                            );
                         }
                         Atomic::TClosure { data: a_data } => {
                             let (a_params, a_ret) = (&a_data.params, &a_data.return_type);
@@ -974,11 +1033,18 @@ fn infer_from_pair(
                                         &at.to_union(),
                                         template_names,
                                         bindings,
-                                        risky,
+                                        risky_fallback,
                                     );
                                 }
                             }
-                            infer_from_pair(db, p_ret, a_ret, template_names, bindings, risky);
+                            infer_from_pair(
+                                db,
+                                p_ret,
+                                a_ret,
+                                template_names,
+                                bindings,
+                                risky_fallback,
+                            );
                         }
                         _ => {}
                     }
@@ -994,25 +1060,38 @@ fn infer_from_pair(
                 if arg.types.is_empty() {
                     continue;
                 }
-                for part in parts.iter() {
-                    infer_from_pair(db, part, arg, template_names, bindings, risky);
-                }
                 // The outer union's residual already determined this whole
                 // intersection alternative was only explained by a sibling
                 // (e.g. the `null` in `(T&Countable)|null`) — that risk doesn't
-                // carry through the recursive infer_from_pair calls above (each
-                // recomputes its own residual against just the intersection
-                // part, unaware of the sibling), so propagate it explicitly onto
-                // any template bound from inside this intersection.
+                // carry through a recursive infer_from_pair call the normal
+                // way (each recomputes its own residual against just the
+                // intersection part, unaware of the sibling, so on its own
+                // it would merge straight into `bindings` as if legitimate).
+                // Recurse into a scratch map instead and fold the result into
+                // the fallback map, so it's available as a last resort
+                // without ever contaminating a real sibling-parameter
+                // binding for the same name.
                 if template_residual.is_risky() {
+                    let mut scratch: FxHashMap<Name, Type> = FxHashMap::default();
                     for part in parts.iter() {
-                        for pa in &part.types {
-                            if let Atomic::TTemplateParam { name, .. } = pa {
-                                if template_names.contains(name) {
-                                    risky.insert(*name);
-                                }
-                            }
-                        }
+                        infer_from_pair(
+                            db,
+                            part,
+                            arg,
+                            template_names,
+                            &mut scratch,
+                            risky_fallback,
+                        );
+                    }
+                    for (name, val) in scratch {
+                        risky_fallback
+                            .entry(name)
+                            .or_insert_with(Type::empty)
+                            .merge_with(&val);
+                    }
+                } else {
+                    for part in parts.iter() {
+                        infer_from_pair(db, part, arg, template_names, bindings, risky_fallback);
                     }
                 }
             }
@@ -1100,7 +1179,7 @@ fn infer_from_generic_ancestor(
     ap: &[Type],
     template_names: &FxHashSet<Name>,
     bindings: &mut FxHashMap<Name, Type>,
-    risky: &mut FxHashSet<Name>,
+    risky_fallback: &mut FxHashMap<Name, Type>,
 ) {
     // A bare subclass that doesn't redeclare `@template` (`class IntBox
     // extends Box {}`) still carries its type args positioned against the
@@ -1129,6 +1208,13 @@ fn infer_from_generic_ancestor(
         let Some(resolved) = ancestor_bindings.get(&tp.name) else {
             continue;
         };
-        infer_from_pair(db, p_param, resolved, template_names, bindings, risky);
+        infer_from_pair(
+            db,
+            p_param,
+            resolved,
+            template_names,
+            bindings,
+            risky_fallback,
+        );
     }
 }
