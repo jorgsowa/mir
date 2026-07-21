@@ -3,7 +3,7 @@ use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
 use crate::symbol::ReferenceKind;
 use mir_issues::{IssueKind, Severity};
-use mir_types::{Atomic, Type};
+use mir_types::{Atomic, Name, Type};
 use php_ast::owned::{Expr, ExprKind, NewExpr, PropertyAccessExpr, StaticAccessExpr};
 use std::sync::Arc;
 
@@ -26,6 +26,66 @@ fn widen_type_param(ty: &Type) -> Type {
             other => other.clone(),
         };
         out.add_type(widened);
+    }
+    out
+}
+
+/// Rebind a top-level `self`/`static`/`parent` atom in a property's declared
+/// type to the concrete class that atom refers to — these atoms carry no
+/// `type_params` of their own (there's nowhere on `TSelf`/`TStaticObject`/
+/// `TParent` to put them), so a bare `@var self|null` on a generic class
+/// read off a concrete receiver (`Box<int>`) would otherwise stay an
+/// unbound `self()` instead of resolving to `Box<int>`. `self`/`static` are
+/// treated identically (both resolve to `owner_fqcn`), matching this
+/// codebase's existing self/static conflation elsewhere (e.g.
+/// `call::args::substitute_static_atom`).
+pub(super) fn rebind_self_static_parent(
+    ty: Type,
+    owner_fqcn: &str,
+    owner_type_params: &[Type],
+) -> Type {
+    let mut out = Type::empty();
+    out.from_docblock = ty.from_docblock;
+    out.possibly_undefined = ty.possibly_undefined;
+    for atomic in ty.types {
+        let rebound = match atomic {
+            Atomic::TSelf { .. } | Atomic::TStaticObject { .. } | Atomic::TParent { .. } => {
+                Atomic::TNamedObject {
+                    fqcn: Name::from(owner_fqcn),
+                    type_params: mir_types::union::vec_to_type_params(owner_type_params.to_vec()),
+                }
+            }
+            other => other,
+        };
+        out.add_type(rebound);
+    }
+    out
+}
+
+/// Rebind every top-level `self`/`static`/`parent` atom to a `TNamedObject`
+/// using that atom's OWN carried `fqcn` (already resolved to a concrete
+/// class by the collector) — for a property-write receiver typed as
+/// self/static/parent (e.g. a `self $x` parameter), not a nested reference
+/// inside a property's own declared type (see [`rebind_self_static_parent`]
+/// for that case, which needs an externally-supplied owner/type-params
+/// instead). No template substitution: these atoms carry no type params of
+/// their own and there's no additional context here to resolve them from,
+/// matching this file's existing `TSelf`/`TStaticObject`/`TParent` read arm.
+pub(super) fn rebind_self_static_parent_atom_only(ty: Type) -> Type {
+    let mut out = Type::empty();
+    out.from_docblock = ty.from_docblock;
+    out.possibly_undefined = ty.possibly_undefined;
+    for atomic in ty.types {
+        let rebound = match atomic {
+            Atomic::TSelf { fqcn } | Atomic::TStaticObject { fqcn } | Atomic::TParent { fqcn } => {
+                Atomic::TNamedObject {
+                    fqcn,
+                    type_params: Default::default(),
+                }
+            }
+            other => other,
+        };
+        out.add_type(rebound);
     }
     out
 }
@@ -1540,6 +1600,27 @@ impl<'a> ExpressionAnalyzer<'a> {
                             // must win over a same-named receiver-own template.
                             substitution.extend(inherited);
                         }
+                        // A bare `self`/`static`/`parent` in the property's OWN
+                        // declared type (e.g. `@var self|null`) refers to `owner`
+                        // itself, not a template placeholder — substitute_templates
+                        // never touches it, so resolve it separately first using
+                        // owner's own concrete type args (the receiver's, when the
+                        // property is declared directly on the receiver's class).
+                        let owner_type_params: Vec<Type> = if owner.as_ref() == fqcn.as_ref() {
+                            type_params.to_vec()
+                        } else {
+                            crate::db::class_template_params(self.db, owner.as_ref())
+                                .unwrap_or_default()
+                                .iter()
+                                .map(|tp| {
+                                    substitution
+                                        .get(&tp.name)
+                                        .cloned()
+                                        .unwrap_or_else(Type::mixed)
+                                })
+                                .collect()
+                        };
+                        let ty = rebind_self_static_parent(ty, owner.as_ref(), &owner_type_params);
                         let ty = ty.substitute_templates(&substitution);
                         self.record_ref(Arc::from(format!("prop:{}::{}", owner, prop_name)), span);
                         *declaring_class = Some(owner);

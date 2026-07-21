@@ -421,6 +421,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                 }
                 let obj_ty = self.analyze(&pa.object, ctx);
+                // A self/static/parent-typed receiver (e.g. a `self $x` param)
+                // previously matched no arm at all below (only TNamedObject),
+                // so a write through it got zero property-type/readonly
+                // checking. Rebind to a plain TNamedObject using the atom's
+                // own already-resolved fqcn so the existing checks apply.
+                let obj_ty = crate::expr::objects::rebind_self_static_parent_atom_only(obj_ty);
                 let prop_name_opt = extract_string_from_expr(&pa.property);
                 if prop_name_opt.is_none() {
                     self.analyze(&pa.property, ctx);
