@@ -768,8 +768,10 @@ impl AnalysisSession {
     }
 
     /// Concrete implementations of `class_fqn::method` across its transitive
-    /// subtypes: the same-named non-abstract method declared by each subtype,
-    /// as `(subtype fqcn, file, name range)`.
+    /// subtypes: the same-named non-abstract method available to each subtype
+    /// (its own declaration, or one inherited/composed from a parent, trait,
+    /// or mixin), as `(subtype fqcn, file, name range)`. Subtypes resolving to
+    /// the same declaring location collapse to a single entry.
     pub fn indexed_method_implementations(
         &self,
         class_fqn: &str,
@@ -787,7 +789,7 @@ impl AnalysisSession {
                 let mut out: Vec<(Arc<str>, Arc<str>, crate::Range)> = Vec::new();
                 for sub in &subs {
                     let here = crate::db::Fqcn::from_str(&db, sub.fqcn.as_ref());
-                    let Some(m) = crate::db::find_method_in_class(&db, here, method) else {
+                    let Some((_, m)) = crate::db::find_method_in_chain(&db, here, method) else {
                         continue;
                     };
                     if m.is_abstract {

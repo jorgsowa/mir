@@ -296,6 +296,103 @@ fn method_implementations_across_subtypes() {
 }
 
 #[test]
+fn method_implementations_trait_composed_are_found() {
+    // Circle implements Shape::area() only via a `use`d trait — the method is
+    // never literally declared in Circle's own body. find_method_in_class
+    // (own-declarations-only) misses this entirely; find_method_in_chain
+    // walks into the trait and finds it.
+    let files = [
+        (
+            "shape.php",
+            "<?php\ninterface Shape { public function area(): float; }\n",
+        ),
+        (
+            "area_trait.php",
+            "<?php\ntrait AreaFromRadius { public function area(): float { return 3.14159 * $this->radius ** 2; } }\n",
+        ),
+        (
+            "circle.php",
+            "<?php\nclass Circle implements Shape {\n    use AreaFromRadius;\n    public function __construct(public float $radius) {}\n}\n",
+        ),
+    ];
+    let session = session_with(&files);
+    let impls = session.indexed_method_implementations("Shape", "area", &paths(&files));
+    assert_eq!(
+        impls.len(),
+        1,
+        "Circle's trait-composed area() must be found: {impls:?}"
+    );
+    assert_eq!(impls[0].0.as_ref(), "Circle");
+    assert_eq!(impls[0].1.as_ref(), "area_trait.php");
+    // Range must point at the method name token inside the trait, not Circle.
+    assert_eq!(impls[0].2.start.line, 2);
+}
+
+#[test]
+fn method_implementations_multilevel_inheritance_dedups_to_declaring_site() {
+    // Square inherits ConcreteBox::area() without overriding it. It's a real
+    // concrete subtype of Shape and must not be silently dropped — but it
+    // resolves to the same declaring location as ConcreteBox, so it collapses
+    // into a single deduped entry rather than producing a visible duplicate.
+    let files = [
+        (
+            "shape.php",
+            "<?php\ninterface Shape { public function area(): float; }\n",
+        ),
+        (
+            "box.php",
+            "<?php\nabstract class Box implements Shape { abstract public function area(): float; }\n",
+        ),
+        (
+            "concretebox.php",
+            "<?php\nclass ConcreteBox extends Box { public function area(): float { return 1.0; } }\n",
+        ),
+        ("square.php", "<?php\nclass Square extends ConcreteBox {}\n"),
+    ];
+    let session = session_with(&files);
+    let impls = session.indexed_method_implementations("Shape", "area", &paths(&files));
+    assert_eq!(
+        impls.len(),
+        1,
+        "Square inherits ConcreteBox::area(); both resolve to the same site and must collapse: {impls:?}"
+    );
+    assert_eq!(impls[0].1.as_ref(), "concretebox.php");
+}
+
+#[test]
+fn method_implementations_trait_shared_by_siblings_dedups_to_one_entry() {
+    // Two sibling classes composing the same trait both resolve to the same
+    // trait method location and must collapse to a single entry, exactly
+    // like the plain-inheritance dedup case above.
+    let files = [
+        (
+            "shape.php",
+            "<?php\ninterface Shape { public function area(): float; }\n",
+        ),
+        (
+            "area_trait.php",
+            "<?php\ntrait AreaFromSide { public function area(): float { return $this->side ** 2; } }\n",
+        ),
+        (
+            "smallsquare.php",
+            "<?php\nclass SmallSquare implements Shape {\n    use AreaFromSide;\n    public function __construct(public float $side = 1.0) {}\n}\n",
+        ),
+        (
+            "bigsquare.php",
+            "<?php\nclass BigSquare implements Shape {\n    use AreaFromSide;\n    public function __construct(public float $side = 10.0) {}\n}\n",
+        ),
+    ];
+    let session = session_with(&files);
+    let impls = session.indexed_method_implementations("Shape", "area", &paths(&files));
+    assert_eq!(
+        impls.len(),
+        1,
+        "both siblings resolve to the same trait method and must collapse: {impls:?}"
+    );
+    assert_eq!(impls[0].1.as_ref(), "area_trait.php");
+}
+
+#[test]
 fn static_call_name_fallback_on_unresolved_class() {
     let files = [(
         "caller.php",
