@@ -32,6 +32,77 @@ pub(super) fn collect_named_object_fqcns(ty: &mir_types::Type, out: &mut Vec<mir
     }
 }
 
+/// Same recursive walk as [`collect_named_object_fqcns`], but also carries
+/// each occurrence's supplied type-argument count — used to check a
+/// generic class reference's arity (`TypedMap<string>` against a class
+/// declaring 2 template params), which the bare-name list loses entirely.
+pub(super) fn collect_named_object_fqcns_with_arity(
+    ty: &mir_types::Type,
+    out: &mut Vec<(mir_types::Name, usize)>,
+) {
+    for atomic in &ty.types {
+        match atomic {
+            mir_types::Atomic::TNamedObject { fqcn, type_params } => {
+                out.push((*fqcn, type_params.len()));
+                for tp in type_params.iter() {
+                    collect_named_object_fqcns_with_arity(tp, out);
+                }
+            }
+            mir_types::Atomic::TArray { key, value } => {
+                collect_named_object_fqcns_with_arity(key, out);
+                collect_named_object_fqcns_with_arity(value, out);
+            }
+            mir_types::Atomic::TList { value } => {
+                collect_named_object_fqcns_with_arity(value, out);
+            }
+            mir_types::Atomic::TIntersection { parts } => {
+                for part in parts.iter() {
+                    collect_named_object_fqcns_with_arity(part, out);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Shared arity check for a generic class reference found inside a
+/// docblock type (`@var`/`@param`/`@return`): a supplied type-argument
+/// count of 0 is the bare-generic-reference shorthand (deliberately not
+/// flagged — mirrors the existing `@var` check in `stmt/mod.rs`); a
+/// non-zero count that doesn't match the class's own declared template
+/// arity is a real error.
+pub(super) fn check_generic_arity(
+    db: &dyn crate::db::MirDatabase,
+    fqcn: &mir_types::Name,
+    supplied_count: usize,
+) -> Option<String> {
+    if supplied_count == 0 {
+        return None;
+    }
+    // `Generator`/`Iterator`/`IteratorAggregate`/`Traversable` all have an
+    // established 1-or-2-arg shorthand (`Generator<TValue>`,
+    // `Iterator<TKey, TValue>`, ...) distinct from their full declared
+    // template arity — already recognized elsewhere by
+    // `stmt::loops::resolve_iterator_item_types`/`generator_item_types`, not
+    // a real arity error.
+    let bare = fqcn.as_ref().trim_start_matches('\\');
+    if matches!(
+        bare.to_ascii_lowercase().as_str(),
+        "generator" | "iterator" | "iteratoraggregate" | "traversable"
+    ) {
+        return None;
+    }
+    let declared_count = crate::db::class_template_params(db, fqcn.as_ref())
+        .map(|tps| tps.len())
+        .unwrap_or(0);
+    if declared_count == supplied_count {
+        return None;
+    }
+    Some(format!(
+        "{fqcn} expects {declared_count} template argument(s), got {supplied_count}"
+    ))
+}
+
 impl<'a> BodyAnalyzer<'a> {
     #[allow(clippy::too_many_arguments)]
     /// Property-member checks shared by the class and trait paths: type-hint

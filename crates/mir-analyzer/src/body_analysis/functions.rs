@@ -325,8 +325,8 @@ impl<'a> BodyAnalyzer<'a> {
             // `array<int, Foo>`, `list<Foo>`, and `Foo&Bar` all get their
             // member classes existence-checked and reference-recorded too.
             let mut fqcns = Vec::new();
-            super::classes::collect_named_object_fqcns(doc_ty, &mut fqcns);
-            for fqcn in &fqcns {
+            super::classes::collect_named_object_fqcns_with_arity(doc_ty, &mut fqcns);
+            for (fqcn, arity) in &fqcns {
                 if template_names.iter().any(|t| *t == fqcn.as_ref()) {
                     continue;
                 }
@@ -345,16 +345,34 @@ impl<'a> BodyAnalyzer<'a> {
                             ),
                         },
                     ));
-                } else if self.mode == AnalysisMode::Full {
-                    self.db.record_reference_location(crate::db::RefLoc {
-                        symbol_key: Arc::from(format!("cls:{fqcn}")),
-                        file: file.clone(),
-                        line,
-                        col_start,
-                        col_end: crate::diagnostics::clamp_col_end(
-                            line, line_end, col_start, col_end,
-                        ),
-                    });
+                } else {
+                    if self.mode == AnalysisMode::Full {
+                        self.db.record_reference_location(crate::db::RefLoc {
+                            symbol_key: Arc::from(format!("cls:{fqcn}")),
+                            file: file.clone(),
+                            line,
+                            col_start,
+                            col_end: crate::diagnostics::clamp_col_end(
+                                line, line_end, col_start, col_end,
+                            ),
+                        });
+                    }
+                    if let Some(message) =
+                        super::classes::check_generic_arity(self.db, fqcn, *arity)
+                    {
+                        issues.push(mir_issues::Issue::new(
+                            mir_issues::IssueKind::InvalidDocblock { message },
+                            mir_issues::Location {
+                                file: file.clone(),
+                                line,
+                                line_end,
+                                col_start,
+                                col_end: crate::diagnostics::clamp_col_end(
+                                    line, line_end, col_start, col_end,
+                                ),
+                            },
+                        ));
+                    }
                 }
             }
         }
@@ -454,8 +472,8 @@ impl<'a> BodyAnalyzer<'a> {
                 // `Foo[]`, `array<int, Foo>`, `list<Foo>`, and `Foo&Bar` all get
                 // their member classes existence-checked and reference-recorded.
                 let mut fqcns = Vec::new();
-                super::classes::collect_named_object_fqcns(&doc_ty, &mut fqcns);
-                for fqcn in &fqcns {
+                super::classes::collect_named_object_fqcns_with_arity(&doc_ty, &mut fqcns);
+                for (fqcn, arity) in &fqcns {
                     // Skip pseudo-types (non-falsy-string), callables (pure-callable(…)),
                     // class-constants (Ns\C::A), float-literals (0.3), and namespace-resolved
                     // template params (App\T where T is a declared template).
@@ -491,7 +509,9 @@ impl<'a> BodyAnalyzer<'a> {
                                 ),
                             },
                         ));
-                    } else if self.mode == AnalysisMode::Full {
+                        continue;
+                    }
+                    if self.mode == AnalysisMode::Full {
                         self.db.record_reference_location(crate::db::RefLoc {
                             symbol_key: Arc::from(format!("cls:{fqcn}")),
                             file: file.clone(),
@@ -504,6 +524,25 @@ impl<'a> BodyAnalyzer<'a> {
                                 fn_col_end,
                             ),
                         });
+                    }
+                    if let Some(message) =
+                        super::classes::check_generic_arity(self.db, fqcn, *arity)
+                    {
+                        issues.push(mir_issues::Issue::new(
+                            mir_issues::IssueKind::InvalidDocblock { message },
+                            mir_issues::Location {
+                                file: file.clone(),
+                                line: fn_line,
+                                line_end: fn_line_end,
+                                col_start: fn_col_start,
+                                col_end: crate::diagnostics::clamp_col_end(
+                                    fn_line,
+                                    fn_line_end,
+                                    fn_col_start,
+                                    fn_col_end,
+                                ),
+                            },
+                        ));
                     }
                 }
             }
