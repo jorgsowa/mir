@@ -873,10 +873,19 @@ impl CallAnalyzer {
             // `resolve_method_return`, which `analyze_static_method_call` never
             // invoked at all, so this idiom silently never fired for the
             // (more common) self::/static:: call syntax, only `$this->method()`.
-            if is_self_parent_call {
+            // Also applies to `$var::staticMethod()` through an object-typed
+            // variable (the `_` catch-all match arm above, which already
+            // extracted `fqcn`/`receiver_type_params` from the receiver's own
+            // concrete type for return-type substitution) — previously only
+            // self/static/parent/`$this` calls were checked at all.
+            let is_object_var_call = !matches!(&call.class.kind, ExprKind::Identifier(_));
+            if is_self_parent_call || is_object_var_call {
                 if let Some(constraint) = resolved.if_this_is.clone() {
-                    let receiver_type_params =
-                        extract_receiver_type_params(&ctx.get_var("this"), &fqcn_arc);
+                    let receiver_type_params = if is_self_parent_call {
+                        extract_receiver_type_params(&ctx.get_var("this"), &fqcn_arc)
+                    } else {
+                        receiver_type_params.clone()
+                    };
                     let constraint_has_params = constraint.types.iter().any(|a| {
                         matches!(a, Atomic::TNamedObject { type_params, .. } if !type_params.is_empty())
                     });
