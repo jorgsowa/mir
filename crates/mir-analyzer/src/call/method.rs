@@ -19,8 +19,9 @@ use crate::generic::{
 use crate::symbol::ReferenceKind;
 
 use super::args::{
-    check_args, check_method_visibility, expr_can_be_passed_by_reference_owned,
-    spread_element_type, substitute_static_in_return, CheckArgsParams,
+    check_args, check_method_visibility, distinct_spans_for_expansion, expand_sole_spread_arg,
+    expr_can_be_passed_by_reference_owned, spread_element_type, substitute_static_in_return,
+    CheckArgsParams,
 };
 use super::CallAnalyzer;
 
@@ -289,9 +290,18 @@ impl CallAnalyzer {
             .with(|b| b.borrow_mut().take())
             .unwrap_or_default();
         arg_types.clear();
+        // A sole spread arg over a literal, sequentially-keyed shape (e.g.
+        // `$obj->make(...['x', 42])`) can be expanded into one binding per
+        // element — captured here (before `spread_element_type` collapses it
+        // into a single unioned entry) and expanded inside
+        // `resolve_method_return`, mirroring `static_call.rs`/`function.rs`.
+        let mut sole_spread_ty: Option<Type> = None;
         for arg in call.args.iter() {
             let ty = ea.analyze(&arg.value, ctx);
             super::consume_arg_assignment(&arg.value, ctx);
+            if arg.unpack && call.args.len() == 1 {
+                sole_spread_ty = Some(ty.clone());
+            }
             arg_types.push(if arg.unpack {
                 spread_element_type(ea.db, &ty)
             } else {
@@ -410,6 +420,7 @@ impl CallAnalyzer {
                         &receiver_type_params[..],
                         &arg_types,
                         &arg_spans,
+                        sole_spread_ty.clone(),
                         &mut declaring,
                         &mut this_self_out,
                     ));
@@ -442,6 +453,7 @@ impl CallAnalyzer {
                         &[],
                         &arg_types,
                         &arg_spans,
+                        sole_spread_ty.clone(),
                         &mut None,
                         &mut this_self_out,
                     ));
@@ -478,6 +490,7 @@ impl CallAnalyzer {
                                         &receiver_type_params[..],
                                         &arg_types,
                                         &arg_spans,
+                                        sole_spread_ty.clone(),
                                         &mut None,
                                         &mut None,
                                     ));
@@ -549,6 +562,7 @@ impl CallAnalyzer {
                                 &[],
                                 &arg_types,
                                 &arg_spans,
+                                sole_spread_ty.clone(),
                                 &mut None,
                                 &mut None,
                             ));
@@ -654,6 +668,7 @@ fn resolve_method_return<'a>(
     receiver_type_params: &[Type],
     arg_types: &[Type],
     arg_spans: &[Span],
+    sole_spread_ty: Option<Type>,
     declaring_class: &mut Option<Arc<str>>,
     self_out_out: &mut Option<Type>,
 ) -> Type {
@@ -813,16 +828,42 @@ fn resolve_method_return<'a>(
             span,
         );
 
-        let arg_names: Vec<Option<String>> = call
+        let mut arg_names: Vec<Option<String>> = call
             .args
             .iter()
             .map(|a| a.name.as_ref().map(crate::parser::name_to_string_owned))
             .collect();
-        let arg_can_be_byref: Vec<bool> = call
+        let mut arg_can_be_byref: Vec<bool> = call
             .args
             .iter()
             .map(|a| expr_can_be_passed_by_reference_owned(&a.value))
             .collect();
+        // `effective_arg_types`/`effective_arg_spans` are kept distinct from
+        // the `arg_types`/`arg_spans` parameters (rather than shadowing them)
+        // because those are still used below in their original, unexpanded
+        // form for plugin hooks and conditional-return resolution, which key
+        // off the original per-argument positions.
+        let mut effective_arg_types = arg_types.to_vec();
+        let mut effective_arg_spans = arg_spans.to_vec();
+        let mut has_spread = call.args.iter().any(|a| a.unpack);
+        // A sole spread arg over a literal, sequentially-keyed shape can be
+        // expanded into one binding per element so each parameter (and
+        // template-binding inference below) is checked individually instead
+        // of only the first (see expand_sole_spread_arg) — mirrors
+        // static_call.rs/function.rs, which already do this for their own
+        // call forms. `arity_unknown` stays true even after expansion — PHP
+        // allows extra/spread positional args, so a concretely-known count
+        // still shouldn't trigger TooFew/TooManyArguments.
+        let mut arity_unknown = has_spread;
+        if let Some(expanded) = sole_spread_ty.and_then(|t| expand_sole_spread_arg(&t)) {
+            effective_arg_spans =
+                distinct_spans_for_expansion(effective_arg_spans[0], expanded.len());
+            arg_names = vec![None; expanded.len()];
+            arg_can_be_byref = vec![false; expanded.len()];
+            effective_arg_types = expanded;
+            has_spread = false;
+            arity_unknown = true;
+        }
         // Build class-level template bindings before arg-checking so we can substitute
         // template params (e.g. T → int from Box<int>) into param types. A plain
         // subclass that doesn't redeclare `@template` (`class IntBox extends
@@ -912,13 +953,13 @@ fn resolve_method_return<'a>(
             CheckArgsParams {
                 fn_name: method_name,
                 params: effective_params,
-                arg_types,
-                arg_spans,
+                arg_types: &effective_arg_types,
+                arg_spans: &effective_arg_spans,
                 arg_names: &arg_names,
                 arg_can_be_byref: &arg_can_be_byref,
                 call_span: span,
-                has_spread: call.args.iter().any(|a| a.unpack),
-                arity_unknown: call.args.iter().any(|a| a.unpack),
+                has_spread,
+                arity_unknown,
                 template_params: &resolved.template_params,
                 no_named_arguments: resolved.no_named_arguments,
             },
@@ -981,7 +1022,7 @@ fn resolve_method_return<'a>(
                 ea.db,
                 &resolved.template_params,
                 effective_params,
-                arg_types,
+                &effective_arg_types,
                 &arg_names,
             );
             // Only warn about template shadowing when the declaring class lives
