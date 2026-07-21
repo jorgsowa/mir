@@ -988,13 +988,18 @@ impl CallAnalyzer {
                     ))
                 })
                 .unwrap_or(false);
-            // The method didn't resolve on an otherwise-known class — keep a
-            // name-only fallback so find-references on any `X::name` can
-            // still surface this call, mirroring the instance-call path in
-            // call/method.rs.
+            // The method didn't resolve, but the class itself is real
+            // (`class_exists` above) — scope the posting to it directly
+            // rather than the class-agnostic `methname:` bucket. The bare
+            // bucket is reserved for genuinely un-nameable dynamic dispatch
+            // (`analyze_static_dyn_method_call`'s `dyn:`/mixed-receiver
+            // fallback); using it here let an `UndefinedMethod` call on this
+            // class collide with an unrelated same-named method anywhere else
+            // in the workspace — both a find-references false positive and,
+            // on a common name like `__construct`, a bucket-size blowup.
             ea.record_ref(
                 Arc::from(format!(
-                    "methname:{}",
+                    "meth:{fqcn}::{}",
                     crate::util::php_ident_lowercase(method_name)
                 )),
                 call.method.span,
@@ -1029,11 +1034,16 @@ impl CallAnalyzer {
             && !matches!(fqcn.as_str(), "self" | "static" | "parent")
             && !ctx.is_class_guarded(fqcn.as_str())
         {
-            // The class itself couldn't be resolved — same name-only fallback
-            // as the known-class-unresolved-method branch above.
+            // The class itself couldn't be resolved, but `fqcn` is still a
+            // concrete name (e.g. an external/vendor FQCN we just have no
+            // source for) — scope the posting to it, same reasoning as the
+            // known-class-unresolved-method branch above. This is what keeps
+            // e.g. `parent::__construct()` through an unresolved external
+            // base class from colliding with an unrelated `Foo::__construct`
+            // in the bare `methname:__construct` bucket.
             ea.record_ref(
                 Arc::from(format!(
-                    "methname:{}",
+                    "meth:{fqcn}::{}",
                     crate::util::php_ident_lowercase(method_name)
                 )),
                 call.method.span,
@@ -1045,13 +1055,21 @@ impl CallAnalyzer {
             );
             Type::mixed()
         } else {
-            ea.record_ref(
-                Arc::from(format!(
-                    "methname:{}",
+            // Reached when: the class exists but has an unresolved ancestor
+            // (method resolution can't be fully verified), the class doesn't
+            // exist but is guarded by a `class_exists()`/`extension_loaded()`
+            // check, or `self`/`static`/`parent` itself never resolved to a
+            // concrete class (e.g. used outside a class body). Only the last
+            // case has no real class name to scope the posting to.
+            let key = if matches!(fqcn.as_str(), "self" | "static" | "parent") {
+                format!("methname:{}", crate::util::php_ident_lowercase(method_name))
+            } else {
+                format!(
+                    "meth:{fqcn}::{}",
                     crate::util::php_ident_lowercase(method_name)
-                )),
-                call.method.span,
-            );
+                )
+            };
+            ea.record_ref(Arc::from(key), call.method.span);
             Type::mixed()
         }
     }

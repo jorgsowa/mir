@@ -352,13 +352,54 @@ impl AnalysisSession {
 
         if !stale.is_empty() {
             // Phase 1 (serial, no live snapshot held): warm up stale
-            // candidates. See `references_to_in_files_cancellable` for why
-            // this must be serial and snapshot-free.
+            // candidates. `prepare_file_for_analysis` mutates salsa inputs
+            // (via `load_class`), so a concurrent writer — the background
+            // warm sweep, or another request — can raise `salsa::Cancelled`
+            // partway through a file. Catch and retry the SAME file here
+            // rather than letting the panic escape: uncaught, it would force
+            // the caller's outer retry loop (`indexed_references`) to
+            // re-enter from scratch, redoing the freshness pass and
+            // re-walking every already-warmed file in `stale` (cheap no-ops
+            // via the `prepared_files` cache, but not free) before it even
+            // gets back to the file that was interrupted. This doesn't
+            // change how many times a write is ultimately attempted (the
+            // outer loop already retries indefinitely on `Cancelled`); it
+            // only narrows what a single cancellation discards from "the
+            // whole query so far" to "the one file that was mid-flight".
+            //
+            // Tried and reverted: running this loop itself in parallel
+            // (rayon, both per-file and whole-batch retry variants). Each
+            // file's warm-up is individually safe under concurrent access
+            // (every shared registry it touches — `prepared_files`,
+            // `unresolvable_fqcns`, `pending_eager_function_files`, the
+            // salsa db via `with_db_mut` — is lock-protected), but under the
+            // `concurrent_reference_cancel` stress test (sustained
+            // multi-thread writers + a background indexer, both hammering
+            // the same db while several readers each run this phase
+            // concurrently) both parallel variants deadlocked: CPU usage
+            // dropped to ~0 while wall time kept climbing, the signature of
+            // several OS threads parked on a lock rather than making
+            // progress — most likely the fixed-size rayon pool getting
+            // saturated with workers blocked on `with_db_mut`'s `RwLock`
+            // write lock (an OS-level block, invisible to rayon's
+            // cooperative scheduler) while the thread that would release it
+            // is itself queued waiting for a free pool worker. Serial
+            // execution never contends for the pool this way, so it stays
+            // the safe choice here even though it forgoes the extra
+            // wall-clock parallelism a large stale set could otherwise use.
             for path in &stale {
-                if should_cancel() {
-                    return None;
+                loop {
+                    if should_cancel() {
+                        return None;
+                    }
+                    match salsa::Cancelled::catch(AssertUnwindSafe(|| {
+                        self.prepare_file_for_analysis(path)
+                    })) {
+                        Ok(()) => break,
+                        Err(_) if should_cancel() => return None,
+                        Err(_) => {}
+                    }
                 }
-                self.prepare_file_for_analysis(path);
             }
 
             // Phase 2 (parallel, pure) under a cancellation retry loop, then
@@ -1194,6 +1235,26 @@ fn reference_gate_needles(symbol: &crate::Name) -> Vec<String> {
         crate::Name::Class(f) | crate::Name::Function(f) | crate::Name::GlobalConstant(f) => {
             vec![short(f).to_string()]
         }
+        // `__construct` is invoked only as `new Cls(...)`, `parent::__construct()`,
+        // or `self::__construct()`/`static::__construct()` from inside a
+        // subclass — every real call site textually names the class itself
+        // (directly, or via the enclosing subclass's own `extends`/`use`),
+        // never the bare word `__construct`. Gating on the class's short name
+        // alone is exact (no lost call sites) and, unlike the general member
+        // case, dropping the method-name needle here doesn't reintroduce a
+        // false negative. This matters: `__construct` is one of the most
+        // common tokens in any real codebase, so OR-ing it in as a needle
+        // admits nearly every file as a "must re-analyze" candidate on a
+        // cold query, defeating the gate's entire purpose for constructors.
+        crate::Name::Method { class, name } if name.as_ref() == "__construct" => {
+            if class.is_empty() {
+                // No class to scope to (owner unknown) — fall back to gating
+                // on the bare name, same as the general member case below.
+                vec![name.to_string()]
+            } else {
+                vec![short(class).to_string()]
+            }
+        }
         crate::Name::Method { class, name }
         | crate::Name::Property { class, name }
         | crate::Name::ClassConstant { class, name } => {
@@ -1231,12 +1292,27 @@ mod tests {
 
     #[test]
     fn gate_needles_cover_member_and_owner_class() {
-        let n = reference_gate_needles(&crate::Name::method("App\\Job", "__construct"));
-        assert!(n.contains(&"__construct".to_string()) && n.contains(&"Job".to_string()));
+        // A regular member (non-constructor) gates on both the member name
+        // and the owner's short name — a call site may name only one.
+        let n = reference_gate_needles(&crate::Name::method("App\\Job", "run"));
+        assert!(n.contains(&"run".to_string()) && n.contains(&"Job".to_string()));
         let n = reference_gate_needles(&crate::Name::class("App\\Ui\\Color"));
         assert_eq!(n, vec!["Color".to_string()]);
         // Unknown-owner member symbols still gate on the member name alone.
         let n = reference_gate_needles(&crate::Name::method("", "run"));
         assert_eq!(n, vec!["run".to_string()]);
+    }
+
+    #[test]
+    fn gate_needles_for_constructor_scope_to_owner_class_only() {
+        // `__construct` is only ever spelled at `new Cls(`/`parent::__construct()`
+        // sites, which always name the class — the bare method-name needle is
+        // dropped so a cold constructor query doesn't admit nearly every file
+        // in the workspace (every class defines *some* `__construct`).
+        let n = reference_gate_needles(&crate::Name::method("App\\Job", "__construct"));
+        assert_eq!(n, vec!["Job".to_string()]);
+        // Unknown owner: nothing to scope to, fall back to the bare name.
+        let n = reference_gate_needles(&crate::Name::method("", "__construct"));
+        assert_eq!(n, vec!["__construct".to_string()]);
     }
 }
