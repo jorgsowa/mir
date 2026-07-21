@@ -872,6 +872,8 @@ pub fn narrow_from_condition(
                     narrow_var_null(ctx, &name, effective_true);
                 } else if let Some((obj, prop)) = extract_nullsafe_prop_access(&b.left) {
                     narrow_nullsafe_prop_null(ctx, &obj, &prop, db, file, effective_true);
+                } else if let ExprKind::NullsafeMethodCall(mc) = &b.left.kind {
+                    narrow_nullsafe_method_call_null(ctx, mc, db, effective_true);
                 } else if let Some((obj, prop)) = extract_prop_access(&b.left) {
                     narrow_prop_null(ctx, &obj, &prop, db, file, effective_true);
                 } else if let Some((fqcn, prop)) =
@@ -910,6 +912,8 @@ pub fn narrow_from_condition(
                     narrow_var_null(ctx, &name, effective_true);
                 } else if let Some((obj, prop)) = extract_nullsafe_prop_access(&b.right) {
                     narrow_nullsafe_prop_null(ctx, &obj, &prop, db, file, effective_true);
+                } else if let ExprKind::NullsafeMethodCall(mc) = &b.right.kind {
+                    narrow_nullsafe_method_call_null(ctx, mc, db, effective_true);
                 } else if let Some((obj, prop)) = extract_prop_access(&b.right) {
                     narrow_prop_null(ctx, &obj, &prop, db, file, effective_true);
                 } else if let Some((fqcn, prop)) =
@@ -5380,6 +5384,59 @@ fn narrow_nullsafe_prop_null(
     if !is_null {
         narrow_var_null(ctx, obj_var, false);
     }
+}
+
+/// Narrow a nullsafe METHOD call (`$obj?->method()`) by a null check on its
+/// result. Unlike a nullsafe property access, a method call result has no
+/// standalone target to narrow later — the only provable fact is the
+/// receiver's own nullability, and only when the method's declared return
+/// type provably excludes null (a return type that could itself be null
+/// carries the same receiver-vs-own-value ambiguity `narrow_nullsafe_prop_null`
+/// documents for properties, so bail out then). When it does exclude null,
+/// the deduction is actually stronger than the property case: since the
+/// method can never contribute a null itself, `$obj?->method() === null`
+/// holds if and only if `$obj` was null — both directions narrow `$obj`, not
+/// just the non-null direction. Only handles a receiver resolved to a single
+/// concrete class and a non-generic return type; anything else is left
+/// unnarrowed rather than risk an unsound deduction.
+fn narrow_nullsafe_method_call_null(
+    ctx: &mut FlowState,
+    mc: &php_ast::owned::MethodCallExpr,
+    db: &dyn MirDatabase,
+    is_null: bool,
+) {
+    let Some(obj_var) = extract_var_name(&mc.object) else {
+        return;
+    };
+    let ExprKind::Identifier(method_name) = &mc.method.kind else {
+        return;
+    };
+    let obj_ty = ctx.get_var(&obj_var);
+    // Only the receiver's non-null atoms matter here — `?Bar $bar` has
+    // `Bar|null`, and the whole point is deducing $bar's nullability, not
+    // requiring it to already be known non-null.
+    let non_null_atoms: Vec<&Atomic> = obj_ty
+        .types
+        .iter()
+        .filter(|t| !matches!(t, Atomic::TNull))
+        .collect();
+    let fqcn = match non_null_atoms.as_slice() {
+        [Atomic::TNamedObject { fqcn, .. }] => *fqcn,
+        _ => return,
+    };
+    let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
+    let Some((_, method)) = crate::db::find_method_in_chain(db, here, method_name.as_ref()) else {
+        return;
+    };
+    let Some(return_ty) = method.return_type.as_deref() else {
+        return;
+    };
+    if return_ty.is_mixed()
+        || return_ty.contains(|t| matches!(t, Atomic::TNull | Atomic::TTemplateParam { .. }))
+    {
+        return;
+    }
+    narrow_var_null(ctx, &obj_var, is_null);
 }
 
 /// Narrow a static property access `self::$prop`/`Class::$prop` by a null
