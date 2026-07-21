@@ -270,6 +270,27 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
                     },
                     Atomic::TList { value: lv },
                 ) => *is_list && properties.values().all(|p| is_subtype(db, &p.ty, lv)),
+                // array<K1,V1>/non-empty-array<K1,V1> satisfies array<K2,V2> when the key
+                // and value types do (codebase-aware, so array<int,Cat> satisfies
+                // array<int,Animal>) — mir_types::union::atomic_subtype's structural
+                // check has no class-hierarchy awareness for these pairs at all.
+                (
+                    Atomic::TArray { key: sk, value: sv }
+                    | Atomic::TNonEmptyArray { key: sk, value: sv },
+                    Atomic::TArray { key: dk, value: dv },
+                ) => is_subtype(db, sk, dk) && is_subtype(db, sv, dv),
+                (
+                    Atomic::TNonEmptyArray { key: sk, value: sv },
+                    Atomic::TNonEmptyArray { key: dk, value: dv },
+                ) => is_subtype(db, sk, dk) && is_subtype(db, sv, dv),
+                // list<V1>/non-empty-list<V1> satisfies list<V2> the same way.
+                (
+                    Atomic::TList { value: sv } | Atomic::TNonEmptyList { value: sv },
+                    Atomic::TList { value: dv },
+                ) => is_subtype(db, sv, dv),
+                (Atomic::TNonEmptyList { value: sv }, Atomic::TNonEmptyList { value: dv }) => {
+                    is_subtype(db, sv, dv)
+                }
                 // PHP implicitly coerces int to float in all numeric contexts.
                 (
                     Atomic::TInt
