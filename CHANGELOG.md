@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.61.0] - 2026-07-21
+
+### Changed
+
+- **`indexed_references_to`:** never-committed candidate files are now gated
+  on their raw text mentioning the symbol's name (whole-identifier,
+  ASCII-case-insensitive; member symbols also admit the owner class's short
+  name for `new Cls(` constructor sites) before any analysis runs — the same
+  discipline the defs index already used. Hosts can pass the whole workspace
+  as the candidate scope and drop their own text prefilters; a cold query on
+  a common name no longer analyzes files that cannot reference the symbol.
+  The freshness pass now also runs in parallel.
+- **`mentions_identifier`:** the completeness-pass text gate (also used by
+  `indexed_subtype_classes`) is now ASCII-case-insensitive, matching PHP's
+  case-insensitive class/function/method name semantics — `extends bar` is
+  no longer invisible to a cold subtype scan for `Bar`.
+
 ## [0.60.0] - 2026-07-19
 
 ### Added

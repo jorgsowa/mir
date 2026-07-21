@@ -715,3 +715,64 @@ fn use_import_postings_recorded_for_unresolvable_targets() {
         "unresolvable const import must still be indexed: {const_use:?}"
     );
 }
+
+/// `__construct` postings live at `new Cls(` sites, which never spell the
+/// member name — the gate must therefore also admit files mentioning the
+/// owner class's short name, or a cold constructor-references query would
+/// skip every instantiation site.
+#[test]
+fn cold_constructor_query_admits_files_naming_only_the_class() {
+    let files = [
+        (
+            "job.php",
+            "<?php\nnamespace App;\nclass Job { public function __construct() {} }\n",
+        ),
+        (
+            "spawn.php",
+            "<?php\nnamespace App;\nfunction spawn(): Job { return new Job(); }\n",
+        ),
+    ];
+    let session = session_with(&files);
+    let refs = session
+        .indexed_references_to(
+            &Name::method("App\\Job", "__construct"),
+            &paths(&files),
+            false,
+            &|| false,
+        )
+        .expect("not cancelled");
+    assert_eq!(refs.len(), 1, "{refs:?}");
+    assert_eq!(refs[0].0.as_ref(), "spawn.php");
+}
+
+/// A gated-out file (cold, never mentions the symbol) must stay invisible to
+/// the query result, and a later edit that *adds* a mention must be picked
+/// up — the gate skips analysis, it must not freeze the file's state.
+#[test]
+fn gated_file_participates_after_edit_introduces_mention() {
+    let files = [
+        (
+            "svc.php",
+            "<?php\nnamespace App;\nclass Service { public function run(): void {} }\n",
+        ),
+        ("idle.php", "<?php\nnamespace App;\nclass Idle {}\n"),
+    ];
+    let session = session_with(&files);
+    let sym = Name::method("App\\Service", "run");
+    let refs = session
+        .indexed_references_to(&sym, &paths(&files), false, &|| false)
+        .expect("not cancelled");
+    assert!(refs.is_empty(), "{refs:?}");
+
+    session.set_file_text(
+        Arc::from("idle.php"),
+        Arc::from(
+            "<?php\nnamespace App;\nclass Idle { public function go(Service $s): void { $s->run(); } }\n",
+        ),
+    );
+    let refs = session
+        .indexed_references_to(&sym, &paths(&files), false, &|| false)
+        .expect("not cancelled");
+    assert_eq!(refs.len(), 1, "{refs:?}");
+    assert_eq!(refs[0].0.as_ref(), "idle.php");
+}

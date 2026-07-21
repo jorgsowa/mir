@@ -340,6 +340,12 @@ impl AnalysisSession {
         self.defs_committed.read().keys().cloned().collect()
     }
 
+    /// Every file with a reference commit on record, regardless of
+    /// staleness. Files absent here have no reference postings at all.
+    pub(crate) fn ref_committed_keys(&self) -> Vec<Arc<str>> {
+        self.ref_committed.read().keys().cloned().collect()
+    }
+
     /// Swap in a custom [`crate::SourceProvider`]. LSPs install a VFS-backed
     /// provider here so the analyzer reads from unsaved editor buffers
     /// instead of disk.

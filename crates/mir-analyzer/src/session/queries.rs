@@ -269,15 +269,19 @@ impl AnalysisSession {
     }
 
     /// Inverted-index find-references: posting-list lookup plus an on-demand
-    /// freshness/completeness pass over `files` (the host's text-prefiltered
-    /// candidate scope).
+    /// freshness/completeness pass over `files` (the host's candidate scope
+    /// — passing the whole workspace is fine; see the gate below).
     ///
     /// A candidate whose postings were committed from its current input text
     /// (Arc identity) is answered from the index with no salsa work at all.
     /// Stale or never-committed candidates are analyzed via the memoized
     /// `analyze_file` query and committed, so each file pays that cost once
     /// per text change — after a background warm sweep the steady state is a
-    /// pure lookup, O(results) instead of O(candidates).
+    /// pure lookup, O(results) instead of O(candidates). Never-committed
+    /// candidates are additionally gated on their raw text mentioning the
+    /// symbol's name (whole-identifier, ASCII-case-insensitive), so hosts
+    /// need no text prefilter of their own — and must not use one, since a
+    /// host-side filter cannot know these matching semantics.
     ///
     /// Results are filtered to `files` (the host controls scope — e.g.
     /// workspace files only, excluding stubs/vendor). With
@@ -302,23 +306,41 @@ impl AnalysisSession {
 
         // Freshness pass: candidates whose postings are not exact for their
         // current text. Files not registered as `SourceFile` inputs are
-        // skipped (the caller's text pre-filter already scoped the set).
+        // skipped. Never-committed files — no commit mark, hence no postings
+        // at all (every mark drop accompanies a posting clear) — are further
+        // gated on their text mentioning the symbol's name: such a file can
+        // neither hold stale postings nor produce new ones, so a cold query
+        // on a common name skips the bulk of the workspace instead of
+        // analyzing it. Stale (previously committed) files re-analyze
+        // unconditionally — their existing postings must be replaced. Same
+        // discipline as `commit_defs_for_matching` on the defs index.
+        let needles = reference_gate_needles(symbol);
+        let committed_any: rustc_hash::FxHashSet<Arc<str>> =
+            self.ref_committed_keys().into_iter().collect();
         let stale: Vec<Arc<str>> = loop {
             if should_cancel() {
                 return None;
             }
             let attempt = salsa::Cancelled::catch(AssertUnwindSafe(|| {
                 let current_gen = self.index_generation();
-                let db = self.snapshot_db();
+                let db_main = self.snapshot_db();
                 files
-                    .iter()
-                    .filter(|f| {
-                        db.lookup_source_file(f.as_ref()).is_some_and(|sf| {
-                            let text = sf.text(&db as &dyn MirDatabase);
-                            !self.is_ref_committed(f.as_ref(), text, current_gen)
-                        })
+                    .par_iter()
+                    .map_with(db_main, |db, f| {
+                        let sf = db.lookup_source_file(f.as_ref())?;
+                        let text = sf.text(&*db as &dyn MirDatabase);
+                        if self.is_ref_committed(f.as_ref(), text, current_gen) {
+                            return None;
+                        }
+                        if !committed_any.contains(f.as_ref())
+                            && !needles.is_empty()
+                            && !needles.iter().any(|n| mentions_identifier(text, n))
+                        {
+                            return None;
+                        }
+                        Some(f.clone())
                     })
-                    .cloned()
+                    .flatten()
                     .collect::<Vec<_>>()
             }));
             match attempt {
@@ -1133,31 +1155,88 @@ fn identifier_char_col(
 }
 
 /// Whether `hay` mentions `needle` as a whole identifier (ASCII word
-/// boundaries; conservative near multibyte text). Mirrors the host-side
-/// candidate prefilter so the completeness pass never analyzes files that
-/// cannot name the symbol.
+/// boundaries; conservative near multibyte text). ASCII-case-insensitive:
+/// PHP class, function, and method names are case-insensitive, so `new
+/// COLOR()` must count as mentioning `Color`; for the case-sensitive kinds
+/// (constants, properties) folding only widens the candidate superset.
+/// Gates the completeness passes so they never analyze files that cannot
+/// name the symbol.
 fn mentions_identifier(hay: &str, needle: &str) -> bool {
-    if needle.is_empty() {
+    let hay = hay.as_bytes();
+    let needle = needle.as_bytes();
+    let n = needle.len();
+    if n == 0 || hay.len() < n {
         return false;
     }
-    let hay_b = hay.as_bytes();
     let is_ident = |b: u8| b.is_ascii_alphanumeric() || b == b'_';
-    let mut from = 0;
-    while let Some(rel) = hay[from..].find(needle) {
-        let idx = from + rel;
-        let before_ok = idx == 0 || !is_ident(hay_b[idx - 1]);
-        let end = idx + needle.len();
-        let after_ok = end >= hay_b.len() || !is_ident(hay_b[end]);
-        if before_ok && after_ok {
-            return true;
+    let first = needle[0].to_ascii_lowercase();
+    for i in 0..=(hay.len() - n) {
+        if hay[i].to_ascii_lowercase() != first || !hay[i..i + n].eq_ignore_ascii_case(needle) {
+            continue;
         }
-        // Step to the next char boundary, not just the next byte: PHP allows
-        // non-ASCII bytes in identifiers, so `idx + 1` can land mid-codepoint
-        // and panic the next `hay[from..]` slice.
-        from = idx + 1;
-        while from < hay_b.len() && (hay_b[from] & 0xC0) == 0x80 {
-            from += 1;
+        if (i == 0 || !is_ident(hay[i - 1])) && (i + n == hay.len() || !is_ident(hay[i + n])) {
+            return true;
         }
     }
     false
+}
+
+/// Identifier words whose whole-word presence in a file's text is necessary
+/// for the file to hold any posting [`AnalysisSession::indexed_references_to`]
+/// can return for `symbol`. Member symbols include the owner class's short
+/// name alongside the member name: `__construct` postings are recorded at
+/// `new Cls(` sites, which never spell the member name.
+fn reference_gate_needles(symbol: &crate::Name) -> Vec<String> {
+    fn short(fqn: &str) -> &str {
+        fqn.rsplit('\\').next().unwrap_or(fqn)
+    }
+    let mut needles = match symbol {
+        crate::Name::Class(f) | crate::Name::Function(f) | crate::Name::GlobalConstant(f) => {
+            vec![short(f).to_string()]
+        }
+        crate::Name::Method { class, name }
+        | crate::Name::Property { class, name }
+        | crate::Name::ClassConstant { class, name } => {
+            let mut v = vec![name.to_string()];
+            if !class.is_empty() {
+                v.push(short(class).to_string());
+            }
+            v
+        }
+    };
+    // An empty needle can never match; dropping it keeps the "empty needle
+    // set disables the gate" contract at the call site conservative.
+    needles.retain(|n| !n.is_empty());
+    needles
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mentions_identifier_is_case_insensitive_and_word_bounded() {
+        assert!(mentions_identifier("$this->save();", "save"));
+        assert!(mentions_identifier("new COLOR()", "Color"));
+        assert!(mentions_identifier("use App\\Color as Paint;", "color"));
+        assert!(!mentions_identifier("$this->saveAll();", "save"));
+        assert!(!mentions_identifier("return $unsaved;", "save"));
+        assert!(!mentions_identifier("no occurrence", "save"));
+        assert!(!mentions_identifier("anything", ""));
+        // Multibyte neighbors are conservatively treated as boundaries, and
+        // substring scans must not split codepoints.
+        assert!(!mentions_identifier("function xÉclairFoo() {}", "Éclair"));
+        assert!(mentions_identifier("implements Éclair {}", "Éclair"));
+    }
+
+    #[test]
+    fn gate_needles_cover_member_and_owner_class() {
+        let n = reference_gate_needles(&crate::Name::method("App\\Job", "__construct"));
+        assert!(n.contains(&"__construct".to_string()) && n.contains(&"Job".to_string()));
+        let n = reference_gate_needles(&crate::Name::class("App\\Ui\\Color"));
+        assert_eq!(n, vec!["Color".to_string()]);
+        // Unknown-owner member symbols still gate on the member name alone.
+        let n = reference_gate_needles(&crate::Name::method("", "run"));
+        assert_eq!(n, vec!["run".to_string()]);
+    }
 }
