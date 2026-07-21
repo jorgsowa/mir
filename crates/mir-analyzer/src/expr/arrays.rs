@@ -61,7 +61,10 @@ fn spread_key_type(db: &dyn crate::db::MirDatabase, arr_ty: &Type) -> Type {
 /// class/interface — `$obj[$idx]` on such a receiver is governed by the
 /// class's own `offsetGet`/`offsetSet`/`offsetExists` signatures, not the
 /// plain-PHP-array "offset must be an array-key" rule.
-fn implements_array_access(db: &dyn crate::db::MirDatabase, fqcn: &mir_types::Name) -> bool {
+pub(super) fn implements_array_access(
+    db: &dyn crate::db::MirDatabase,
+    fqcn: &mir_types::Name,
+) -> bool {
     let bare = fqcn.as_ref().trim_start_matches('\\');
     crate::db::class_ancestors_by_fqcn(db, crate::db::Fqcn::from_str(db, bare))
         .iter()
@@ -132,6 +135,114 @@ fn resolve_array_access_value_type(
         bindings.extend(inherited);
     }
     Some(ty.substitute_templates(&bindings))
+}
+
+/// Write-side counterpart of [`resolve_array_access_value_type`]: the value
+/// type `$obj[$idx] = $value` must satisfy for an `ArrayAccess`-implementing
+/// receiver. Prefers the same `@implements ArrayAccess<TKey, TValue>`
+/// annotation (annotation applies to both directions), falling back to
+/// `offsetSet()`'s second parameter's declared type. `None` means `fqcn`
+/// doesn't implement `ArrayAccess`, or `offsetSet` has no declared value
+/// param type to check against.
+pub(super) fn resolve_array_access_offset_set_value_type(
+    db: &dyn crate::db::MirDatabase,
+    fqcn: &mir_types::Name,
+    type_params: &[Type],
+) -> Option<Type> {
+    if !implements_array_access(db, fqcn) {
+        return None;
+    }
+    let bare = fqcn.as_ref().trim_start_matches('\\');
+    let class = crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, bare))?;
+    let class_tps = crate::db::class_template_params(db, bare).unwrap_or_default();
+    let own_bindings = crate::generic::build_class_bindings(&class_tps, type_params);
+
+    let mut annotation_bindings = own_bindings.clone();
+    for (k, v) in crate::db::inherited_template_bindings(db, bare, &annotation_bindings) {
+        annotation_bindings.entry(k).or_insert(v);
+    }
+    let annotated = class
+        .implements_type_args()
+        .iter()
+        .find_map(|(iface, args)| {
+            (iface
+                .trim_start_matches('\\')
+                .eq_ignore_ascii_case("ArrayAccess"))
+            .then_some(args)
+        });
+    if let Some(args) = annotated {
+        if args.len() >= 2 {
+            return Some(args[1].substitute_templates(&annotation_bindings));
+        }
+    }
+
+    let (owner, def) =
+        crate::db::find_method_in_chain(db, crate::db::Fqcn::from_str(db, bare), "offsetset")?;
+    let param_ty = def.params.get(1)?.ty.as_deref().cloned()?;
+    let mut bindings = own_bindings.clone();
+    let inherited = crate::db::inherited_template_bindings(db, bare, &own_bindings);
+    if owner.as_ref() == bare {
+        for (k, v) in inherited {
+            bindings.entry(k).or_insert(v);
+        }
+    } else {
+        bindings.extend(inherited);
+    }
+    Some(param_ty.substitute_templates(&bindings))
+}
+
+/// The offset (key) type `$obj[$idx]`/`$obj[$idx] = $v` expects for an
+/// `ArrayAccess`-implementing receiver — the `TKey` counterpart of
+/// [`resolve_array_access_value_type`]. Prefers the `@implements
+/// ArrayAccess<TKey, TValue>` annotation, falling back to `offsetGet()`'s
+/// own `$offset` parameter type (declaring `offsetSet`'s first param would
+/// be equally valid; `offsetGet` is used since a class implementing
+/// `ArrayAccess` always declares it, unlike a write-only collection).
+pub(super) fn resolve_array_access_key_type(
+    db: &dyn crate::db::MirDatabase,
+    fqcn: &mir_types::Name,
+    type_params: &[Type],
+) -> Option<Type> {
+    if !implements_array_access(db, fqcn) {
+        return None;
+    }
+    let bare = fqcn.as_ref().trim_start_matches('\\');
+    let class = crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, bare))?;
+    let class_tps = crate::db::class_template_params(db, bare).unwrap_or_default();
+    let own_bindings = crate::generic::build_class_bindings(&class_tps, type_params);
+
+    let mut annotation_bindings = own_bindings.clone();
+    for (k, v) in crate::db::inherited_template_bindings(db, bare, &annotation_bindings) {
+        annotation_bindings.entry(k).or_insert(v);
+    }
+    let annotated = class
+        .implements_type_args()
+        .iter()
+        .find_map(|(iface, args)| {
+            (iface
+                .trim_start_matches('\\')
+                .eq_ignore_ascii_case("ArrayAccess"))
+            .then_some(args)
+        });
+    if let Some(args) = annotated {
+        if !args.is_empty() {
+            return Some(args[0].substitute_templates(&annotation_bindings));
+        }
+    }
+
+    let (owner, def) =
+        crate::db::find_method_in_chain(db, crate::db::Fqcn::from_str(db, bare), "offsetget")?;
+    let param_ty = def.params.first()?.ty.as_deref().cloned()?;
+    let mut bindings = own_bindings.clone();
+    let inherited = crate::db::inherited_template_bindings(db, bare, &own_bindings);
+    if owner.as_ref() == bare {
+        for (k, v) in inherited {
+            bindings.entry(k).or_insert(v);
+        }
+    } else {
+        bindings.extend(inherited);
+    }
+    Some(param_ty.substitute_templates(&bindings))
 }
 
 impl<'a> ExpressionAnalyzer<'a> {
@@ -394,7 +505,38 @@ impl<'a> ExpressionAnalyzer<'a> {
         if let Some(idx) = &aa.index {
             let idx_ty = self.analyze(idx, ctx);
             if receiver_is_array_access {
-                // The array-key rule below is plain-PHP-array-only; skip it.
+                // The array-key rule below is plain-PHP-array-only; skip it —
+                // but the offset must still satisfy the receiver's own
+                // declared TKey (from an @implements ArrayAccess<TKey,TValue>
+                // annotation, or offsetGet()'s own $offset param type).
+                if !idx_ty.is_mixed() {
+                    for a in &arr_ty.types {
+                        if let Atomic::TNamedObject { fqcn, type_params } = a {
+                            if let Some(expected_key) =
+                                resolve_array_access_key_type(self.db, fqcn, type_params)
+                            {
+                                if !expected_key.is_mixed()
+                                    && !super::helpers::property_assign_compatible(
+                                        &idx_ty,
+                                        &expected_key,
+                                        self.db,
+                                    )
+                                {
+                                    self.emit(
+                                        IssueKind::InvalidArgument {
+                                            param: "offset".to_string(),
+                                            fn_name: "offsetGet".to_string(),
+                                            expected: expected_key.to_string(),
+                                            actual: idx_ty.to_string(),
+                                        },
+                                        Severity::Error,
+                                        idx.span,
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
             } else if idx_ty.contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..))) {
                 // Float keys are silently truncated to int in PHP
                 self.emit(

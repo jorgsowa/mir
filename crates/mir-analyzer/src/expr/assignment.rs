@@ -980,6 +980,48 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 );
                             } else {
                                 let current = ctx.get_var(name_str);
+                                // `$obj[$k] = $v` on an ArrayAccess-implementing receiver
+                                // calls offsetSet($k, $v) — the object's own tracked type
+                                // doesn't change (unlike a plain array widening), and the
+                                // assigned value must satisfy offsetSet's own declared
+                                // parameter type instead of falling into the plain-PHP-
+                                // array shape-widening logic below, which doesn't apply
+                                // to it at all.
+                                let array_access_only = !current.is_mixed()
+                                    && !current.types.is_empty()
+                                    && current.types.iter().all(|a| {
+                                        matches!(a, Atomic::TNamedObject { fqcn, .. }
+                                            if crate::expr::arrays::implements_array_access(self.db, fqcn))
+                                    });
+                                if array_access_only && key_chain.len() == 1 {
+                                    for atomic in &current.types {
+                                        if let Atomic::TNamedObject { fqcn, type_params } = atomic {
+                                            if let Some(expected) =
+                                                crate::expr::arrays::resolve_array_access_offset_set_value_type(
+                                                    self.db, fqcn, type_params,
+                                                )
+                                            {
+                                                if !expected.is_mixed()
+                                                    && !property_assign_compatible(
+                                                        &ty, &expected, self.db,
+                                                    )
+                                                {
+                                                    self.emit(
+                                                        IssueKind::InvalidArgument {
+                                                            param: "value".to_string(),
+                                                            fn_name: "offsetSet".to_string(),
+                                                            expected: expected.to_string(),
+                                                            actual: ty.to_string(),
+                                                        },
+                                                        Severity::Error,
+                                                        span,
+                                                    );
+                                                }
+                                            }
+                                        }
+                                    }
+                                    break;
+                                }
                                 // Check if assigning to array offset of a non-array scalar
                                 if !current.is_mixed()
                                     && !current.types.is_empty()
