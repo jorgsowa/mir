@@ -5588,7 +5588,7 @@ fn narrow_static_prop_instanceof(
 
 /// Applies a narrowed property type computed from `current`, mirroring
 /// `set_narrowed`'s variable-side semantics for the property-refinement store.
-fn apply_prop_narrowed(
+pub(crate) fn apply_prop_narrowed(
     ctx: &mut FlowState,
     obj_var: &str,
     prop: &str,
@@ -7681,6 +7681,35 @@ impl ShapeBase {
             None => extract_static_prop_access(expr, ctx, db, file)
                 .map(|(fqcn, prop)| ShapeBase::Static(fqcn, prop)),
         }
+    }
+}
+
+/// The subject of a `match`/`switch` statement, whichever receiver shape it
+/// is — used to narrow each arm's context by intersecting the subject's
+/// type with that arm's condition type, same as a plain variable subject
+/// already did (a property/static-property subject is just as valid a
+/// narrowing target).
+pub(crate) enum MatchSubject {
+    Var(String),
+    Prop(String, String),
+    Static(std::sync::Arc<str>, String),
+}
+
+impl MatchSubject {
+    pub(crate) fn extract(
+        expr: &php_ast::owned::Expr,
+        ctx: &FlowState,
+        db: &dyn MirDatabase,
+        file: &str,
+    ) -> Option<Self> {
+        if let Some(name) = extract_var_name(expr) {
+            return Some(MatchSubject::Var(name));
+        }
+        if let Some((obj, prop)) = extract_prop_access(expr) {
+            return Some(MatchSubject::Prop(obj, prop));
+        }
+        extract_static_prop_access(expr, ctx, db, file)
+            .map(|(fqcn, prop)| MatchSubject::Static(fqcn, prop))
     }
 }
 

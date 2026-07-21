@@ -149,10 +149,8 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
         }
 
-        let subject_var = match &m.subject.kind {
-            ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),
-            _ => None,
-        };
+        let subject_target =
+            crate::narrowing::MatchSubject::extract(&m.subject, ctx, self.db, &self.file);
 
         let pre_ctx = ctx.clone();
         let mut result = Type::empty();
@@ -170,8 +168,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                     arm_ty.merge_with(&cond_ty);
                 }
             }
-            // Use type narrowing if the subject is a variable
-            if let Some(var) = &subject_var {
+            // Use type narrowing if the subject is a variable, property, or
+            // static property.
+            if let Some(target) = &subject_target {
                 if !arm_ty.is_empty() && !arm_ty.is_mixed() {
                     let narrowed = subject_ty.intersect_with(&arm_ty);
                     if !subject_ty.is_mixed()
@@ -193,7 +192,31 @@ impl<'a> ExpressionAnalyzer<'a> {
                         }
                     }
                     if !narrowed.is_empty() {
-                        arm_ctx.set_var(var, narrowed);
+                        match target {
+                            crate::narrowing::MatchSubject::Var(name) => {
+                                arm_ctx.set_var(name, narrowed)
+                            }
+                            crate::narrowing::MatchSubject::Prop(obj, prop) => {
+                                crate::narrowing::apply_prop_narrowed(
+                                    &mut arm_ctx,
+                                    obj,
+                                    prop,
+                                    subject_ty.clone(),
+                                    narrowed,
+                                    false,
+                                )
+                            }
+                            crate::narrowing::MatchSubject::Static(fqcn, prop) => {
+                                crate::narrowing::apply_prop_narrowed(
+                                    &mut arm_ctx,
+                                    fqcn,
+                                    prop,
+                                    subject_ty.clone(),
+                                    narrowed,
+                                    false,
+                                )
+                            }
+                        }
                     }
                 }
             }

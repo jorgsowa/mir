@@ -477,10 +477,8 @@ impl<'a> StatementsAnalyzer<'a> {
     pub(super) fn analyze_switch_stmt(&mut self, sw: &SwitchStmt, ctx: &mut FlowState) {
         self.check_duplicate_case_values(sw);
         let subject_ty = self.expr_analyzer(ctx).analyze(&sw.expr, ctx);
-        let subject_var: Option<String> = match &sw.expr.kind {
-            ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),
-            _ => None,
-        };
+        let subject_target =
+            crate::narrowing::MatchSubject::extract(&sw.expr, ctx, self.db, &self.file);
         let switch_on_true = matches!(&sw.expr.kind, ExprKind::Bool(true));
 
         // `switch (gettype($x))`: a `case` whose string `gettype()` can never
@@ -546,7 +544,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 pending_conditions.push(val);
                 if switch_on_true {
                     narrow_from_condition(val, &mut case_ctx, true, self.db, &self.file);
-                } else if let Some(ref var_name) = subject_var {
+                } else if let Some(target) = &subject_target {
                     let narrow_ty = match &val.kind {
                         ExprKind::Int(n) => Some(Type::single(Atomic::TLiteralInt(*n))),
                         ExprKind::String(s) => {
@@ -586,7 +584,37 @@ impl<'a> StatementsAnalyzer<'a> {
                                 ),
                             );
                         }
-                        case_ctx.set_var(var_name, narrowed.clone());
+                        match target {
+                            crate::narrowing::MatchSubject::Var(name) => {
+                                case_ctx.set_var(name, narrowed.clone())
+                            }
+                            crate::narrowing::MatchSubject::Prop(obj, prop) => {
+                                let current = crate::narrowing::resolve_prop_current_type(
+                                    &case_ctx, obj, prop, self.db, &self.file,
+                                );
+                                crate::narrowing::apply_prop_narrowed(
+                                    &mut case_ctx,
+                                    obj,
+                                    prop,
+                                    current,
+                                    narrowed.clone(),
+                                    false,
+                                );
+                            }
+                            crate::narrowing::MatchSubject::Static(fqcn, prop) => {
+                                let current = crate::narrowing::resolve_static_prop_current_type(
+                                    &case_ctx, fqcn, prop, self.db,
+                                );
+                                crate::narrowing::apply_prop_narrowed(
+                                    &mut case_ctx,
+                                    fqcn,
+                                    prop,
+                                    current,
+                                    narrowed.clone(),
+                                    false,
+                                );
+                            }
+                        }
                     }
                 }
                 self.expr_analyzer(&case_ctx).analyze(val, &mut case_ctx);
@@ -707,7 +735,7 @@ impl<'a> StatementsAnalyzer<'a> {
                             }
                         }
                     }
-                } else if let Some(ref var_name) = subject_var {
+                } else if let Some(target) = &subject_target {
                     let mut union_ty = Type::empty();
                     let all_literal = pending_conditions.iter().all(|cond| {
                         let atom = match &cond.kind {
@@ -728,7 +756,37 @@ impl<'a> StatementsAnalyzer<'a> {
                         }
                     });
                     if all_literal && !union_ty.is_empty() {
-                        case_ctx.set_var(var_name, union_ty);
+                        match target {
+                            crate::narrowing::MatchSubject::Var(name) => {
+                                case_ctx.set_var(name, union_ty)
+                            }
+                            crate::narrowing::MatchSubject::Prop(obj, prop) => {
+                                let current = crate::narrowing::resolve_prop_current_type(
+                                    &case_ctx, obj, prop, self.db, &self.file,
+                                );
+                                crate::narrowing::apply_prop_narrowed(
+                                    &mut case_ctx,
+                                    obj,
+                                    prop,
+                                    current,
+                                    union_ty,
+                                    false,
+                                );
+                            }
+                            crate::narrowing::MatchSubject::Static(fqcn, prop) => {
+                                let current = crate::narrowing::resolve_static_prop_current_type(
+                                    &case_ctx, fqcn, prop, self.db,
+                                );
+                                crate::narrowing::apply_prop_narrowed(
+                                    &mut case_ctx,
+                                    fqcn,
+                                    prop,
+                                    current,
+                                    union_ty,
+                                    false,
+                                );
+                            }
+                        }
                     }
                 }
             }
