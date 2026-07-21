@@ -1610,7 +1610,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     self.record_ref(Arc::from(format!("traituse:{fqcn}::{prop_name}")), span);
                     return Type::mixed();
                 }
-                Atomic::TNamedObject { fqcn, .. }
+                Atomic::TNamedObject { fqcn, type_params }
                     if crate::db::class_kind(self.db, fqcn.as_ref())
                         .is_some_and(|k| k.is_interface) =>
                 {
@@ -1641,7 +1641,22 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 span,
                             );
                             *declaring_class = Some((*fqcn).into());
-                            return p.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
+                            let ty = p.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
+                            // Substitute the receiver's own concrete type params
+                            // into a `@property T $x` the same way the class
+                            // branch above does — `own_properties` only ever
+                            // returns THIS interface's own declaration, so there's
+                            // no ancestor-vs-own distinction to make here.
+                            let class_tps =
+                                crate::db::class_template_params(self.db, fqcn.as_ref())
+                                    .unwrap_or_default();
+                            let own_bindings: rustc_hash::FxHashMap<mir_types::Name, Type> =
+                                class_tps
+                                    .iter()
+                                    .zip(type_params.iter())
+                                    .map(|(tp, t)| (tp.name, t.clone()))
+                                    .collect();
+                            return ty.substitute_templates(&own_bindings);
                         }
                     }
                     return Type::mixed();
