@@ -794,7 +794,24 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 crate::db::find_property_in_chain(self.db, here, prop_name)
                             {
                                 owner = prop_owner;
-                                result_ty = p.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
+                                let ty = p.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
+                                // A static access has no receiver instance to carry
+                                // type args, but an `@extends Box<int>` clause on the
+                                // accessed class itself still statically binds the
+                                // declaring class's template param — resolve that,
+                                // mirroring the write-side substitution in
+                                // assignment.rs (otherwise a generic static property
+                                // stays an unresolved bare template / mixed).
+                                let bindings = crate::db::inherited_template_bindings(
+                                    self.db,
+                                    fqcn.as_ref(),
+                                    &rustc_hash::FxHashMap::default(),
+                                );
+                                result_ty = if bindings.is_empty() {
+                                    ty
+                                } else {
+                                    ty.substitute_templates(&bindings)
+                                };
                             }
                         }
                         self.record_ref(
@@ -918,7 +935,24 @@ impl<'a> ExpressionAnalyzer<'a> {
                             member_expr.span,
                         );
                     }
-                    result_ty = p.1.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
+                    let ty = p.1.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
+                    // Static-property counterpart of the same substitution
+                    // `analyze_static_property_access`'s self/static/parent
+                    // branch and the write-side (assignment.rs) both apply —
+                    // a static access has no receiver instance to carry type
+                    // args, but an `@extends Box<int>` clause on `resolved`
+                    // itself still statically binds the declaring class's
+                    // template param.
+                    let bindings = crate::db::inherited_template_bindings(
+                        self.db,
+                        resolved.as_ref(),
+                        &rustc_hash::FxHashMap::default(),
+                    );
+                    result_ty = if bindings.is_empty() {
+                        ty
+                    } else {
+                        ty.substitute_templates(&bindings)
+                    };
                 }
             }
             self.record_ref(
