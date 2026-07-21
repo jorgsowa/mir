@@ -207,7 +207,23 @@ impl CallAnalyzer {
             ea.emit(IssueKind::ParentNotFound, Severity::Error, call.class.span);
         }
 
+        // A `@template T of static` bound reflects the actual late-static-bound
+        // receiver at this call site, which is identical for `self::`/
+        // `static::`/`parent::` — it's whatever `static::` would resolve to
+        // here, regardless of which keyword was used to reach the method.
+        // `$var::method()`/`$this::method()` calls (the `_` catch-all in
+        // `resolve_static_class`) already carry their own concrete receiver
+        // class in `fqcn` at this point, which is already correct.
+        let is_self_static_or_parent_keyword = matches!(
+            crate::util::php_ident_lowercase(&fqcn).as_str(),
+            "self" | "static" | "parent"
+        );
         let fqcn = resolve_static_class(&fqcn, ctx);
+        let bound_receiver_fqcn: String = if is_self_static_or_parent_keyword {
+            resolve_static_class("static", ctx)
+        } else {
+            fqcn.clone()
+        };
 
         if matches!(&call.class.kind, ExprKind::Identifier(_)) {
             ea.record_ref(Arc::from(format!("cls:{fqcn}")), call.class.span);
@@ -556,7 +572,7 @@ impl CallAnalyzer {
                 &class_bindings,
                 &class_tps,
                 &Default::default(),
-                Some(fqcn_arc.as_ref()),
+                Some(bound_receiver_fqcn.as_str()),
             ) {
                 ea.emit(
                     IssueKind::InvalidTemplateParam {
@@ -624,7 +640,7 @@ impl CallAnalyzer {
                     &bindings,
                     &resolved.template_params,
                     &unchecked,
-                    Some(fqcn_arc.as_ref()),
+                    Some(bound_receiver_fqcn.as_str()),
                 ) {
                     ea.emit(
                         IssueKind::InvalidTemplateParam {
