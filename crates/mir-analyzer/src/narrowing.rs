@@ -4423,12 +4423,13 @@ fn narrow_or_instanceof_true(
 ///
 /// Handles the PHP idiom: `!isset($x) || use($x)`
 ///
-/// When the || operator's RHS is evaluated:
-/// - If LHS is `!isset($x)`, then isset($x) must be TRUE in RHS
-///   (because short-circuit: RHS only executes when LHS is false)
-///
-/// The narrowing is scoped to RHS analysis only and is restored afterward.
-/// This ensures the if-body context isn't incorrectly narrowed.
+/// `!isset($x) || RHS` being true means either `$x` isn't set (RHS never
+/// runs) or `$x` is set AND RHS is true — the merged true-branch state is
+/// the union of those two paths, not "nothing narrowed" (a plain union
+/// with an unnarrowed path does NOT generally collapse back to the
+/// pre-condition state, e.g. `$x` itself is null on one path and
+/// non-null-and-`instanceof`-narrowed on the other, which merges to a
+/// strictly narrower type than the original).
 fn narrow_or_isset_true(
     left: &php_ast::owned::Expr,
     right: &php_ast::owned::Expr,
@@ -4437,61 +4438,23 @@ fn narrow_or_isset_true(
     file: &str,
 ) {
     // Pattern: !isset($x) || RHS
-    // When RHS is evaluated via short-circuit, !isset($x) is false, so isset($x) is true
     if let ExprKind::UnaryPrefix(u) = &left.kind {
         if u.op == UnaryPrefixOp::BooleanNot {
-            if let ExprKind::Isset(vars) = &u.operand.kind {
-                // `!isset($x) || RHS` is true either because `$x` isn't set (RHS never
-                // runs, nothing is narrowed) or because `$x` is set AND RHS is true.
-                // The merged true-branch state is the union of those two paths, and a
-                // union with the "nothing narrowed" path always collapses back to the
-                // pre-condition state — so *every* narrowing effect of evaluating RHS
-                // (not just to the isset()-checked vars) must be undone afterward, or
-                // an unrelated variable RHS happens to narrow (e.g. `$y instanceof Foo`
-                // in `!isset($x) || $y instanceof Foo`) would incorrectly leak into the
-                // if-body on the path where `$x` was simply never set.
-                let saved_vars = ctx.vars.clone();
-                let saved_assigned = ctx.assigned_vars.clone();
-                let saved_possibly_assigned = ctx.possibly_assigned_vars.clone();
-                let saved_prop_refined = ctx.prop_refined.clone();
-                let saved_diverges = ctx.diverges;
-                let saved_class_exists_guards = ctx.class_exists_guards.clone();
-                let saved_defined_guards = ctx.defined_guards.clone();
-                let saved_function_exists_guards = ctx.function_exists_guards.clone();
-                let saved_method_exists_guards = ctx.method_exists_guards.clone();
-                let saved_extension_loaded_guards = ctx.extension_loaded_guards.clone();
+            if let ExprKind::Isset(_) = &u.operand.kind {
+                let pre = ctx.branch();
 
-                // Apply isset narrowing: remove null and mark as definitely assigned,
-                // so RHS's own narrowing logic can see $x as set while it's analyzed.
-                for var_expr in vars.iter() {
-                    if let Some(var_name) = extract_var_name(var_expr) {
-                        let current = ctx.get_var(&var_name);
-                        ctx.set_var(&var_name, current.remove_null());
-                        std::sync::Arc::make_mut(&mut ctx.assigned_vars)
-                            .insert(mir_types::Name::from(var_name.as_str()));
-                    }
+                // Path A: $x (or whichever operands) is/are not set; RHS never runs.
+                let mut not_set_branch = ctx.branch();
+                narrow_from_condition(left, &mut not_set_branch, true, db, file);
+
+                // Path B: $x is set, and RHS was true.
+                let mut set_branch = ctx.branch();
+                narrow_from_condition(left, &mut set_branch, false, db, file);
+                if !set_branch.diverges {
+                    narrow_from_condition(right, &mut set_branch, true, db, file);
                 }
 
-                // Evaluate RHS with narrowed context
-                narrow_from_condition(right, ctx, true, db, file);
-
-                // Discard every narrowing effect of the above — RHS's narrowing (of $x
-                // or any other variable/property) only holds on the path where $x was
-                // set, not on the merged true-branch as a whole. This includes
-                // `diverges`: a contradiction found while analyzing RHS in isolation
-                // (e.g. an unrelated `instanceof` that can never hold) does not make
-                // the whole condition unreachable, since the "$x unset" path is still
-                // live.
-                ctx.vars = saved_vars;
-                ctx.assigned_vars = saved_assigned;
-                ctx.possibly_assigned_vars = saved_possibly_assigned;
-                ctx.prop_refined = saved_prop_refined;
-                ctx.diverges = saved_diverges;
-                ctx.class_exists_guards = saved_class_exists_guards;
-                ctx.defined_guards = saved_defined_guards;
-                ctx.function_exists_guards = saved_function_exists_guards;
-                ctx.method_exists_guards = saved_method_exists_guards;
-                ctx.extension_loaded_guards = saved_extension_loaded_guards;
+                *ctx = FlowState::merge_branches(&pre, set_branch, Some(not_set_branch));
             }
         }
     }

@@ -1,7 +1,8 @@
 ===description===
-`!isset($x) || RHS` must discard RHS's `diverges` along with its narrowed
-vars — a contradiction found while analyzing RHS alone must not make the
-whole condition look unreachable.
+`!isset($x) || RHS` merges two paths ($x unset; $x set and RHS true) rather
+than discarding RHS's `diverges` — a contradiction found while analyzing RHS
+alone (the "$x set" path) must not make the whole condition look
+unreachable, since the "$x unset" path is still live.
 ===config===
 ===file===
 <?php
@@ -15,12 +16,13 @@ function reachable(?string $x, int $y): void {
     }
 }
 
-// Negative control: $x must still be treated as nullable inside the body —
-// the fix must not over-correct into skipping narrowing checks entirely.
-function still_nullable(?string $x, int $y): void {
+// The RHS's contradiction (int is never instanceof Marker) proves the
+// "$x set" path is dead, so the only surviving path is "$x unset" — $x is
+// definitely (not just possibly) null here.
+function definitely_null(?string $x, int $y): void {
     if (!isset($x) || $y instanceof Marker) {
         echo strlen($x);
     }
 }
 ===expect===
-PossiblyNullArgument@16:20-16:22: Argument $string of strlen() might be null
+NullArgument@17:20-17:22: Argument $string of strlen() cannot be null
