@@ -924,7 +924,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             .unwrap_or((false, false, false));
         let has_call_magic = crate::db::has_method_in_chain(self.db, fqcn, "__call");
         let guarded_by_method_exists =
-            crate::narrowing::extract_expr_guard_key(object, self.db, &self.file)
+            crate::narrowing::extract_expr_guard_key(object, ctx, self.db, &self.file)
                 .map(|key| {
                     ctx.method_exists_guards
                         .contains(&(key, Arc::from(method_name_lower)))

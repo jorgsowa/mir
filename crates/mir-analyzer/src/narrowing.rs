@@ -2212,7 +2212,7 @@ pub fn narrow_from_condition(
                         }
                         if is_true && bare.eq_ignore_ascii_case("method_exists") {
                             if let Some(expr_key) =
-                                extract_expr_guard_key(&arg_expr.value, db, file)
+                                extract_expr_guard_key(&arg_expr.value, ctx, db, file)
                             {
                                 if let Some(method_arg) = call.args.get(1) {
                                     if let ExprKind::String(method_name) = &method_arg.value.kind {
@@ -7616,12 +7616,13 @@ fn extract_var_name(expr: &php_ast::owned::Expr) -> Option<String> {
 /// risk false-positive suppression.
 pub(crate) fn extract_expr_guard_key(
     expr: &php_ast::owned::Expr,
+    ctx: &FlowState,
     db: &dyn MirDatabase,
     file: &str,
 ) -> Option<std::sync::Arc<str>> {
     match &expr.kind {
         ExprKind::Variable(name) => Some(std::sync::Arc::from(name.trim_start_matches('$'))),
-        ExprKind::Parenthesized(inner) => extract_expr_guard_key(inner, db, file),
+        ExprKind::Parenthesized(inner) => extract_expr_guard_key(inner, ctx, db, file),
         ExprKind::PropertyAccess(pa) => {
             let base = extract_var_name(&pa.object)?;
             let prop = match &pa.property.kind {
@@ -7630,6 +7631,12 @@ pub(crate) fn extract_expr_guard_key(
                 _ => return None,
             };
             Some(std::sync::Arc::from(format!("{base}->{prop}").as_str()))
+        }
+        ExprKind::StaticPropertyAccess(_) => {
+            let (fqcn, prop) = extract_static_prop_access(expr, ctx, db, file)?;
+            Some(std::sync::Arc::from(
+                format!("static:{fqcn}::{prop}").as_str(),
+            ))
         }
         ExprKind::ClassConstAccess(cca) => {
             let ExprKind::Identifier(member) = &cca.member.kind else {

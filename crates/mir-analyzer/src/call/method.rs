@@ -1215,7 +1215,7 @@ fn resolve_method_return<'a>(
         // A trait body's $this is the future consuming class — the method may
         // be provided by the consumer, so an unresolved call is not undefined.
         // Also suppress when caller guarded with `method_exists($obj, 'method')`.
-        let guarded_by_method_exists = extract_expr_guard_key(&call.object, ea.db, &ea.file)
+        let guarded_by_method_exists = extract_expr_guard_key(&call.object, ctx, ea.db, &ea.file)
             .map(|key| {
                 ctx.method_exists_guards.contains(&(
                     key,

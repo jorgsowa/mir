@@ -945,7 +945,7 @@ impl CallAnalyzer {
             // `method_exists($cls, 'method')` (dynamic class-string variable).
             let guard_key: Option<Arc<str>> = match &call.class.kind {
                 ExprKind::Identifier(_) => Some(Arc::from(format!("cls:{fqcn}").as_str())),
-                _ => extract_expr_guard_key(&call.class, ea.db, &ea.file),
+                _ => extract_expr_guard_key(&call.class, ctx, ea.db, &ea.file),
             };
             let guarded_by_method_exists = guard_key
                 .map(|key| {
