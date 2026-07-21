@@ -420,6 +420,30 @@ fn narrow_from_static_or_class_const_comparison(
                 }
             }
         }
+        // `self::$prop::class === Foo::class` — static-property counterpart
+        // of the block above.
+        else if let Some((fqcn_recv, prop)) =
+            extract_dynamic_class_const_static_prop_var(&b.left, ctx, db, file)
+        {
+            if let ExprKind::ClassConstAccess(cca) = &b.right.kind {
+                if let Some(fqcn) = extract_class_const_fqcn(
+                    cca,
+                    ctx.self_fqcn.as_deref(),
+                    ctx.parent_fqcn.as_deref(),
+                    db,
+                    file,
+                ) {
+                    narrow_static_prop_to_specific_class(
+                        ctx,
+                        &fqcn_recv,
+                        &prop,
+                        &fqcn,
+                        effective_true,
+                        db,
+                    );
+                }
+            }
+        }
         // `Foo::class === $obj::class` — reached here (rather than the
         // `b.left is ClassConstAccess` arm below) because `$obj::class`
         // also parses as ClassConstAccess, matching this arm's guard first.
@@ -449,6 +473,29 @@ fn narrow_from_static_or_class_const_comparison(
                             narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                         }
                     }
+                }
+            }
+        }
+        // `Foo::class === self::$prop::class` — static-property counterpart.
+        else if let Some((fqcn_recv, prop)) =
+            extract_dynamic_class_const_static_prop_var(&b.right, ctx, db, file)
+        {
+            if let ExprKind::ClassConstAccess(cca) = &b.left.kind {
+                if let Some(fqcn) = extract_class_const_fqcn(
+                    cca,
+                    ctx.self_fqcn.as_deref(),
+                    ctx.parent_fqcn.as_deref(),
+                    db,
+                    file,
+                ) {
+                    narrow_static_prop_to_specific_class(
+                        ctx,
+                        &fqcn_recv,
+                        &prop,
+                        &fqcn,
+                        effective_true,
+                        db,
+                    );
                 }
             }
         }
@@ -1055,6 +1102,19 @@ pub fn narrow_from_condition(
                             narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                         }
                     }
+                } else if let Some((fqcn_recv, prop)) =
+                    extract_dynamic_class_const_static_prop_var(&b.left, ctx, db, file)
+                {
+                    // `self::$prop::class === 'ClassName'`
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    narrow_static_prop_to_specific_class(
+                        ctx,
+                        &fqcn_recv,
+                        &prop,
+                        &fqcn,
+                        effective_true,
+                        db,
+                    );
                 } else if let Some(name) = extract_var_name(&b.left) {
                     // `$x === 'literal'`
                     narrow_var_literal_string(ctx, &name, class_name_str, effective_true);
@@ -1199,6 +1259,19 @@ pub fn narrow_from_condition(
                             narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                         }
                     }
+                } else if let Some((fqcn_recv, prop)) =
+                    extract_dynamic_class_const_static_prop_var(&b.right, ctx, db, file)
+                {
+                    // `'ClassName' === self::$prop::class`
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    narrow_static_prop_to_specific_class(
+                        ctx,
+                        &fqcn_recv,
+                        &prop,
+                        &fqcn,
+                        effective_true,
+                        db,
+                    );
                 } else if let Some(name) = extract_var_name(&b.right) {
                     // `$x === 'literal'`
                     narrow_var_literal_string(ctx, &name, class_name_str, effective_true);
@@ -1736,6 +1809,19 @@ pub fn narrow_from_condition(
                             narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                         }
                     }
+                } else if let Some((fqcn_recv, prop)) =
+                    extract_dynamic_class_const_static_prop_var(&b.left, ctx, db, file)
+                {
+                    // `self::$prop::class == 'ClassName'`
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    narrow_static_prop_to_specific_class(
+                        ctx,
+                        &fqcn_recv,
+                        &prop,
+                        &fqcn,
+                        effective_true,
+                        db,
+                    );
                 }
             } else if let ExprKind::String(class_name_str) = &b.left.kind {
                 if let Some(target) = extract_get_class_arg(&b.right) {
@@ -1852,6 +1938,19 @@ pub fn narrow_from_condition(
                             narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
                         }
                     }
+                } else if let Some((fqcn_recv, prop)) =
+                    extract_dynamic_class_const_static_prop_var(&b.right, ctx, db, file)
+                {
+                    // `'ClassName' == self::$prop::class`
+                    let fqcn = crate::db::resolve_name(db, file, class_name_str.as_ref());
+                    narrow_static_prop_to_specific_class(
+                        ctx,
+                        &fqcn_recv,
+                        &prop,
+                        &fqcn,
+                        effective_true,
+                        db,
+                    );
                 }
             }
             // `$x == 42` / `$x != 42` — sound only when every current atom is
@@ -8473,6 +8572,23 @@ fn extract_dynamic_class_const_var(expr: &php_ast::owned::Expr) -> Option<Scalar
     if let ExprKind::ClassConstAccess(cca) = &expr.kind {
         if matches!(&cca.member.kind, ExprKind::Identifier(n) if n.as_ref() == "class") {
             return ScalarArgTarget::extract(&cca.class);
+        }
+    }
+    None
+}
+
+/// Static-property counterpart of `extract_dynamic_class_const_var`, for
+/// `self::$prop::class` / `Foo::$prop::class` — mirrors
+/// `extract_get_class_static_prop_arg`.
+fn extract_dynamic_class_const_static_prop_var(
+    expr: &php_ast::owned::Expr,
+    ctx: &FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<(std::sync::Arc<str>, String)> {
+    if let ExprKind::ClassConstAccess(cca) = &expr.kind {
+        if matches!(&cca.member.kind, ExprKind::Identifier(n) if n.as_ref() == "class") {
+            return extract_static_prop_access(&cca.class, ctx, db, file);
         }
     }
     None
