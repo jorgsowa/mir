@@ -147,7 +147,11 @@ impl AnalysisSession {
         // Generation before the snapshot: a file add racing the sweep leaves
         // the commits stale (self-healing), never wrongly fresh.
         let commit_gen = self.index_generation();
-        let db_main = self.snapshot_db();
+        // Freeze on the pass-scoped snapshot: warm-up (2a) completed every
+        // lazy load, and a concurrent index write cancels the pass, so the
+        // frozen view is never stale. Same discipline as the batch body pass.
+        let mut db_main = self.snapshot_db();
+        db_main.freeze_workspace_index();
         type Analyzed = (
             Arc<str>,
             Arc<str>,

@@ -413,7 +413,13 @@ impl AnalysisSession {
                 // next query), never wrongly fresh.
                 let gen = self.index_generation();
                 let attempt = salsa::Cancelled::catch(AssertUnwindSafe(|| {
-                    let db_main = self.snapshot_db();
+                    // Freeze on the pass-scoped snapshot (borrow-only symbol
+                    // lookups + pass-shared subtype cache): all lazy-loading
+                    // finished in Phase 1, and a concurrent index write
+                    // cancels this attempt, so the frozen view is never
+                    // stale. Same discipline as the batch body pass.
+                    let mut db_main = self.snapshot_db();
+                    db_main.freeze_workspace_index();
                     stale
                         .par_iter()
                         .map_with(db_main, |db, path| {
