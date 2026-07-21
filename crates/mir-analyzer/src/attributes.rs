@@ -474,22 +474,50 @@ pub(crate) fn check_interface_attributes(
         let loc = span_to_location(file, source, source_map, attr.span.start, attr.span.end);
         issues.push(invalid_attr("Interfaces cannot be attribute classes", loc));
     }
-    // Also check method attributes inside the interface
+    // Also check method, method-parameter, and constant attributes inside the interface.
     for member in decl.body.members.iter() {
-        let ClassMemberKind::Method(method) = &member.kind else {
-            continue;
-        };
-        check_attribute_list(
-            &method.attributes,
-            TARGET_METHOD,
-            db,
-            file,
-            source,
-            source_map,
-            issues,
-            record_refs,
-            all_symbols.as_deref_mut(),
-        );
+        match &member.kind {
+            ClassMemberKind::Method(method) => {
+                check_attribute_list(
+                    &method.attributes,
+                    TARGET_METHOD,
+                    db,
+                    file,
+                    source,
+                    source_map,
+                    issues,
+                    record_refs,
+                    all_symbols.as_deref_mut(),
+                );
+                for param in method.params.iter() {
+                    check_attribute_list(
+                        &param.attributes,
+                        TARGET_PARAMETER,
+                        db,
+                        file,
+                        source,
+                        source_map,
+                        issues,
+                        record_refs,
+                        all_symbols.as_deref_mut(),
+                    );
+                }
+            }
+            ClassMemberKind::ClassConst(c) => {
+                check_attribute_list(
+                    &c.attributes,
+                    TARGET_CLASS_CONSTANT,
+                    db,
+                    file,
+                    source,
+                    source_map,
+                    issues,
+                    record_refs,
+                    all_symbols.as_deref_mut(),
+                );
+            }
+            _ => {}
+        }
     }
 }
 
@@ -527,6 +555,19 @@ pub(crate) fn check_trait_attributes(
                     record_refs,
                     all_symbols.as_deref_mut(),
                 );
+                for param in method.params.iter() {
+                    check_attribute_list(
+                        &param.attributes,
+                        TARGET_PARAMETER,
+                        db,
+                        file,
+                        source,
+                        source_map,
+                        issues,
+                        record_refs,
+                        all_symbols.as_deref_mut(),
+                    );
+                }
             }
             ClassMemberKind::Property(prop) => {
                 check_attribute_list(
@@ -593,10 +634,36 @@ pub(crate) fn check_enum_attributes(
                     record_refs,
                     all_symbols.as_deref_mut(),
                 );
+                for param in method.params.iter() {
+                    check_attribute_list(
+                        &param.attributes,
+                        TARGET_PARAMETER,
+                        db,
+                        file,
+                        source,
+                        source_map,
+                        issues,
+                        record_refs,
+                        all_symbols.as_deref_mut(),
+                    );
+                }
             }
             EnumMemberKind::Case(case) => {
                 check_attribute_list(
                     &case.attributes,
+                    TARGET_CLASS_CONSTANT,
+                    db,
+                    file,
+                    source,
+                    source_map,
+                    issues,
+                    record_refs,
+                    all_symbols.as_deref_mut(),
+                );
+            }
+            EnumMemberKind::ClassConst(c) => {
+                check_attribute_list(
+                    &c.attributes,
                     TARGET_CLASS_CONSTANT,
                     db,
                     file,

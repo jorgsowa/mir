@@ -1263,3 +1263,125 @@ fn trait_composing_trait_records_reference_at_use_site() {
         "reference should point at the real `use Greets;` line/column, not the line-1/col-0 fallback"
     );
 }
+
+#[test]
+fn trait_method_parameter_attribute_records_class_reference() {
+    // check_trait_attributes only walked method attributes, not each method's
+    // own parameter attributes, so `new Foo()` inside a trait method param's
+    // attribute args was never recorded as a reference to Foo.
+    let dir = create_temp_dir("test");
+    let src = "<?php\nclass Foo {}\n#[Attribute]\nclass Route {\n    public function __construct(public $v) {}\n}\ntrait Handles {\n    public function handle(#[Route(new Foo())] $x): void {}\n}\n";
+    let file = write_file(&dir, "a.php", src);
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let locs: Vec<_> = analyzer
+        .reference_locations("cls:Foo")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert!(
+        !locs.is_empty(),
+        "new Foo() inside a trait method parameter's attribute args should record a reference to Foo"
+    );
+}
+
+#[test]
+fn interface_method_parameter_attribute_records_class_reference() {
+    // check_interface_attributes only walked method attributes, not each
+    // method's own parameter attributes.
+    let dir = create_temp_dir("test");
+    let src = "<?php\nclass Foo {}\n#[Attribute]\nclass Route {\n    public function __construct(public $v) {}\n}\ninterface Handles {\n    public function handle(#[Route(new Foo())] $x): void;\n}\n";
+    let file = write_file(&dir, "a.php", src);
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let locs: Vec<_> = analyzer
+        .reference_locations("cls:Foo")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert!(
+        !locs.is_empty(),
+        "new Foo() inside an interface method parameter's attribute args should record a reference to Foo"
+    );
+}
+
+#[test]
+fn interface_class_const_attribute_records_class_reference() {
+    // check_interface_attributes never matched ClassMemberKind::ClassConst at
+    // all, so an interface constant's attributes were skipped entirely.
+    let dir = create_temp_dir("test");
+    let src = "<?php\nclass Foo {}\n#[Attribute]\nclass Route {\n    public function __construct(public $v) {}\n}\ninterface HasDefault {\n    #[Route(Foo::class)]\n    const DEFAULT = 1;\n}\n";
+    let file = write_file(&dir, "a.php", src);
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let locs: Vec<_> = analyzer
+        .reference_locations("cls:Foo")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert!(
+        !locs.is_empty(),
+        "Foo::class inside an interface constant's attribute args should record a reference to Foo"
+    );
+}
+
+#[test]
+fn enum_method_parameter_attribute_records_class_reference() {
+    // check_enum_attributes only walked method attributes, not each method's
+    // own parameter attributes.
+    let dir = create_temp_dir("test");
+    let src = "<?php\nclass Foo {}\n#[Attribute]\nclass Route {\n    public function __construct(public $v) {}\n}\nenum Status {\n    case Active;\n    public function handle(#[Route(new Foo())] $x): void {}\n}\n";
+    let file = write_file(&dir, "a.php", src);
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let locs: Vec<_> = analyzer
+        .reference_locations("cls:Foo")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert!(
+        !locs.is_empty(),
+        "new Foo() inside an enum method parameter's attribute args should record a reference to Foo"
+    );
+}
+
+#[test]
+fn enum_class_const_attribute_records_class_reference() {
+    // check_enum_attributes never matched EnumMemberKind::ClassConst, so an
+    // enum constant's attributes were skipped entirely.
+    let dir = create_temp_dir("test");
+    let src = "<?php\nclass Foo {}\n#[Attribute]\nclass Route {\n    public function __construct(public $v) {}\n}\nenum Status {\n    case Active;\n    #[Route(Foo::class)]\n    const DEFAULT = 1;\n}\n";
+    let file = write_file(&dir, "a.php", src);
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let locs: Vec<_> = analyzer
+        .reference_locations("cls:Foo")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert!(
+        !locs.is_empty(),
+        "Foo::class inside an enum constant's attribute args should record a reference to Foo"
+    );
+}
+

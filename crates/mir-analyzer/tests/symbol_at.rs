@@ -1429,6 +1429,33 @@ fn symbol_at_attribute_class_name_resolves_to_class_reference() {
 }
 
 #[test]
+fn symbol_at_interface_method_attribute_class_name_resolves_to_class_reference() {
+    // check_interface_attributes passed `None` for all_symbols instead of
+    // Some(&mut *all_symbols), so hovering an attribute class name on an
+    // interface method (unlike the identical position on a class method)
+    // never resolved.
+    let dir = create_temp_dir(
+        "symbol_at_interface_method_attribute_class_name_resolves_to_class_reference",
+    );
+    let src = "<?php\n#[Attribute]\nclass MyAttr {}\ninterface Handles {\n    #[MyAttr]\n    public function handle(): void;\n}\n";
+    let file = write_file(&dir, "a.php", src);
+    let file_str = path_to_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let offset = src.rfind("MyAttr").unwrap() as u32;
+    let sym = result
+        .symbol_at(file_str, offset)
+        .expect("symbol_at must find ClassReference on an interface method's attribute class name");
+    assert!(
+        matches!(&sym.kind, ReferenceKind::ClassReference(n) if n.as_ref() == "MyAttr"),
+        "expected ClassReference(MyAttr), got {:?}",
+        sym.kind
+    );
+}
+
+#[test]
 fn symbol_at_use_import_name_resolves_to_class_reference() {
     // Hovering the class name in its own `use App\Models\Bar;` import
     // statement must resolve — a developer would reasonably expect to jump

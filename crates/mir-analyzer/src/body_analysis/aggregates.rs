@@ -421,7 +421,7 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
             all_issues,
             self.mode == AnalysisMode::Full,
-            None,
+            Some(&mut *all_symbols),
         );
         let iface_name = decl.name.as_deref().unwrap_or("<anonymous>");
         let iface_fqcn = resolve_name(self.db, file.as_ref(), iface_name);
