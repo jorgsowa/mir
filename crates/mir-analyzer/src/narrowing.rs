@@ -2299,36 +2299,54 @@ pub fn narrow_from_condition(
                                     }
                                 } else if let (
                                     mir_types::atomic::ArrayKey::String(iface_name),
-                                    Some(target),
+                                    Some((target, is_parents)),
                                 ) = (
                                     &key,
                                     extract_class_implements_or_parents_arg(&arr_arg.value),
                                 ) {
-                                    // array_key_exists('Iface', class_implements($x)) /
-                                    // ('Ancestor', class_parents($x)) — same relationship
-                                    // `$x instanceof Iface`/`instanceof Ancestor` proves.
+                                    // array_key_exists('Iface', class_implements($x)) —
+                                    // same relationship `$x instanceof Iface` proves.
+                                    // array_key_exists('Ancestor', class_parents($x)) is
+                                    // STRICTER: class_parents() excludes $x's own exact
+                                    // class, the same relationship `is_subclass_of($x,
+                                    // Ancestor)` proves — reuse that narrowing instead.
                                     let fqcn = crate::db::resolve_name(db, file, iface_name);
                                     match &target {
                                         ScalarArgTarget::Var(var_name) => {
                                             let current = ctx.get_var(var_name);
-                                            let narrowed = narrow_instanceof_preserving_subtypes(
-                                                &current,
-                                                &fqcn,
-                                                db,
-                                                &ctx.template_param_names,
-                                            );
+                                            let narrowed = if is_parents {
+                                                narrow_strict_subclass_of(
+                                                    &current,
+                                                    &fqcn,
+                                                    db,
+                                                    &ctx.template_param_names,
+                                                )
+                                            } else {
+                                                narrow_instanceof_preserving_subtypes(
+                                                    &current,
+                                                    &fqcn,
+                                                    db,
+                                                    &ctx.template_param_names,
+                                                )
+                                            };
                                             set_narrowed(ctx, var_name, &current, narrowed, true);
                                         }
                                         ScalarArgTarget::Prop(obj, prop) => {
-                                            narrow_prop_instanceof(
-                                                ctx, obj, prop, &fqcn, db, file, true,
-                                            );
+                                            if is_parents {
+                                                narrow_prop_is_subclass_of(
+                                                    ctx, obj, prop, &fqcn, db, file, true,
+                                                );
+                                            } else {
+                                                narrow_prop_instanceof(
+                                                    ctx, obj, prop, &fqcn, db, file, true,
+                                                );
+                                            }
                                             narrow_receiver_non_null_on_prop_match(ctx, obj, true);
                                         }
                                     }
                                 } else if let (
                                     mir_types::atomic::ArrayKey::String(iface_name),
-                                    Some((static_fqcn, prop)),
+                                    Some(((static_fqcn, prop), is_parents)),
                                 ) = (
                                     &key,
                                     extract_class_implements_or_parents_static_prop_arg(
@@ -2341,14 +2359,25 @@ pub fn narrow_from_condition(
                                     // array_key_exists('Iface', class_implements(self::$prop)) —
                                     // static-property counterpart of the var/prop arm above.
                                     let fqcn = crate::db::resolve_name(db, file, iface_name);
-                                    narrow_static_prop_instanceof(
-                                        ctx,
-                                        &static_fqcn,
-                                        &prop,
-                                        &fqcn,
-                                        db,
-                                        true,
-                                    );
+                                    if is_parents {
+                                        narrow_static_prop_is_subclass_of(
+                                            ctx,
+                                            &static_fqcn,
+                                            &prop,
+                                            &fqcn,
+                                            db,
+                                            true,
+                                        );
+                                    } else {
+                                        narrow_static_prop_instanceof(
+                                            ctx,
+                                            &static_fqcn,
+                                            &prop,
+                                            &fqcn,
+                                            db,
+                                            true,
+                                        );
+                                    }
                                 }
                             } else {
                                 // False branch: exclude shape members that
@@ -2398,30 +2427,39 @@ pub fn narrow_from_condition(
                                     }
                                 } else if let (
                                     mir_types::atomic::ArrayKey::String(iface_name),
-                                    Some(target),
+                                    Some((target, is_parents)),
                                 ) = (
                                     &key,
                                     extract_class_implements_or_parents_arg(&arr_arg.value),
                                 ) {
                                     // !array_key_exists('Iface', class_implements($x)) —
                                     // exclude Iface, same as `!($x instanceof Iface)`.
-                                    let fqcn = crate::db::resolve_name(db, file, iface_name);
-                                    match &target {
-                                        ScalarArgTarget::Var(var_name) => {
-                                            let current = ctx.get_var(var_name);
-                                            let narrowed =
-                                                filter_out_instanceof_match(&current, &fqcn, db);
-                                            set_narrowed(ctx, var_name, &current, narrowed, true);
-                                        }
-                                        ScalarArgTarget::Prop(obj, prop) => {
-                                            narrow_prop_instanceof(
-                                                ctx, obj, prop, &fqcn, db, file, false,
-                                            );
+                                    // class_parents(), by contrast, never narrows on the
+                                    // false branch — mirrors `is_subclass_of()`'s own
+                                    // convention: a parent-name mismatch doesn't rule out
+                                    // the receiver being exactly that class.
+                                    if !is_parents {
+                                        let fqcn = crate::db::resolve_name(db, file, iface_name);
+                                        match &target {
+                                            ScalarArgTarget::Var(var_name) => {
+                                                let current = ctx.get_var(var_name);
+                                                let narrowed = filter_out_instanceof_match(
+                                                    &current, &fqcn, db,
+                                                );
+                                                set_narrowed(
+                                                    ctx, var_name, &current, narrowed, true,
+                                                );
+                                            }
+                                            ScalarArgTarget::Prop(obj, prop) => {
+                                                narrow_prop_instanceof(
+                                                    ctx, obj, prop, &fqcn, db, file, false,
+                                                );
+                                            }
                                         }
                                     }
                                 } else if let (
                                     mir_types::atomic::ArrayKey::String(iface_name),
-                                    Some((static_fqcn, prop)),
+                                    Some(((static_fqcn, prop), is_parents)),
                                 ) = (
                                     &key,
                                     extract_class_implements_or_parents_static_prop_arg(
@@ -2433,15 +2471,17 @@ pub fn narrow_from_condition(
                                 ) {
                                     // !array_key_exists('Iface', class_implements(self::$prop)) —
                                     // static-property counterpart of the var/prop arm above.
-                                    let fqcn = crate::db::resolve_name(db, file, iface_name);
-                                    narrow_static_prop_instanceof(
-                                        ctx,
-                                        &static_fqcn,
-                                        &prop,
-                                        &fqcn,
-                                        db,
-                                        false,
-                                    );
+                                    if !is_parents {
+                                        let fqcn = crate::db::resolve_name(db, file, iface_name);
+                                        narrow_static_prop_instanceof(
+                                            ctx,
+                                            &static_fqcn,
+                                            &prop,
+                                            &fqcn,
+                                            db,
+                                            false,
+                                        );
+                                    }
                                 }
                             }
                         }
@@ -8620,20 +8660,25 @@ fn extract_get_parent_class_static_prop_arg(
     None
 }
 
-/// Extract the receiver from `class_implements($x)`/`class_parents($x)` —
-/// both return an array keyed (and valued) by interface/ancestor-class name,
-/// so `array_key_exists('IfaceOrAncestor', class_implements($x))` proves `$x`
-/// an instance of that interface/ancestor, the same relationship
-/// `$x instanceof IfaceOrAncestor` proves.
-fn extract_class_implements_or_parents_arg(expr: &php_ast::owned::Expr) -> Option<ScalarArgTarget> {
+/// Extract the receiver from `class_implements($x)`/`class_parents($x)`,
+/// along with which of the two builtins matched (`true` for
+/// `class_parents`) — both return an array keyed (and valued) by
+/// interface/ancestor-class name, but the relationship each proves is NOT
+/// the same: `class_implements()` matches `instanceof` semantics (a class
+/// satisfies its own implemented interfaces), while `class_parents()`
+/// excludes the receiver's own exact class (it's a STRICT-ancestor list,
+/// like `is_subclass_of()`) — callers must dispatch on the returned flag
+/// rather than treating both as instanceof-style.
+fn extract_class_implements_or_parents_arg(
+    expr: &php_ast::owned::Expr,
+) -> Option<(ScalarArgTarget, bool)> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
         if let ExprKind::Identifier(name) = &call.name.kind {
             let bare = name.trim_start_matches('\\');
-            if bare.eq_ignore_ascii_case("class_implements")
-                || bare.eq_ignore_ascii_case("class_parents")
-            {
+            let is_parents = bare.eq_ignore_ascii_case("class_parents");
+            if is_parents || bare.eq_ignore_ascii_case("class_implements") {
                 if let Some(arg) = call.args.first() {
-                    return ScalarArgTarget::extract(&arg.value);
+                    return ScalarArgTarget::extract(&arg.value).map(|t| (t, is_parents));
                 }
             }
         }
@@ -8645,21 +8690,22 @@ fn extract_class_implements_or_parents_arg(expr: &php_ast::owned::Expr) -> Optio
 /// `ScalarArgTarget` has no static-property variant (tracked as S19), so a
 /// `class_implements(self::$prop)`/`class_parents(self::$prop)` receiver is
 /// extracted call-site-locally instead, mirroring
-/// `extract_get_class_static_prop_arg`.
+/// `extract_get_class_static_prop_arg`. Also reports which builtin matched,
+/// same as the var/prop counterpart above.
 fn extract_class_implements_or_parents_static_prop_arg(
     expr: &php_ast::owned::Expr,
     ctx: &FlowState,
     db: &dyn MirDatabase,
     file: &str,
-) -> Option<(std::sync::Arc<str>, String)> {
+) -> Option<((std::sync::Arc<str>, String), bool)> {
     if let ExprKind::FunctionCall(call) = &expr.kind {
         if let ExprKind::Identifier(name) = &call.name.kind {
             let bare = name.trim_start_matches('\\');
-            if bare.eq_ignore_ascii_case("class_implements")
-                || bare.eq_ignore_ascii_case("class_parents")
-            {
+            let is_parents = bare.eq_ignore_ascii_case("class_parents");
+            if is_parents || bare.eq_ignore_ascii_case("class_implements") {
                 if let Some(arg) = call.args.first() {
-                    return extract_static_prop_access(&arg.value, ctx, db, file);
+                    return extract_static_prop_access(&arg.value, ctx, db, file)
+                        .map(|t| (t, is_parents));
                 }
             }
         }
