@@ -12,6 +12,7 @@ use super::super::core::{
     narrow_receiver_non_null_on_prop_match, resolve_prop_current_type,
     resolve_static_prop_current_type, ScalarArgTarget,
 };
+use super::super::literals::{extract_int_literal, flip_comparison_op};
 
 /// Extract the variable/property target from `count($var)` / `sizeof($var)` /
 /// `iterator_count($var)` — all three return an int length and narrow
@@ -281,4 +282,53 @@ pub(crate) fn narrow_static_prop_array_count_comparison(
         None => non_null,
     };
     apply_prop_narrowed(ctx, fqcn, prop, current, narrowed, false);
+}
+
+/// Condition-matching glue for `narrow_from_condition`'s relational
+/// (`<`/`<=`/`>`/`>=`) comparison arm: recognizes `count($arr) op N` /
+/// `N op count($arr)` (for a var, prop, or static-prop receiver) and
+/// dispatches to the narrowing helpers above. A no-op when neither side is
+/// a `count()`/`sizeof()`/`iterator_count()` call.
+pub(crate) fn narrow_array_count_condition(
+    ctx: &mut FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+    left: &php_ast::owned::Expr,
+    right: &php_ast::owned::Expr,
+    op: BinaryOp,
+    is_true: bool,
+) {
+    // count($arr) op N  /  N op count($arr) — normalize so count call is on left.
+    let count_call_on_left = extract_count_arg(left).is_some()
+        || extract_count_static_prop_arg(left, ctx, db, file).is_some();
+    let (count_expr, count_cmp_op, count_lit) = if count_call_on_left {
+        (left, op, right)
+    } else {
+        (right, flip_comparison_op(op), left)
+    };
+    if let (Some(target), Some(n)) = (
+        extract_count_arg(count_expr),
+        extract_int_literal(count_lit),
+    ) {
+        match target {
+            ScalarArgTarget::Var(arr_var) => {
+                narrow_array_count_comparison(ctx, &arr_var, count_cmp_op, n, is_true)
+            }
+            ScalarArgTarget::Prop(obj, prop) => narrow_prop_array_count_comparison(
+                ctx,
+                &obj,
+                &prop,
+                db,
+                file,
+                count_cmp_op,
+                n,
+                is_true,
+            ),
+        }
+    } else if let (Some((fqcn, prop)), Some(n)) = (
+        extract_count_static_prop_arg(count_expr, ctx, db, file),
+        extract_int_literal(count_lit),
+    ) {
+        narrow_static_prop_array_count_comparison(ctx, &fqcn, &prop, db, count_cmp_op, n, is_true);
+    }
 }

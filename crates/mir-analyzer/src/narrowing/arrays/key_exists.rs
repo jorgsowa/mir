@@ -1,12 +1,30 @@
 //! `array_key_exists()`/`key_exists()` narrowing for property and
 //! static-property receivers, plus the sealed-shape key-presence helpers
 //! shared with the variable case and with `shapes`'s nested-path variants.
+use php_ast::owned::{ExprKind, FunctionCallExpr};
+
 use mir_types::Atomic;
 
 use crate::db::MirDatabase;
 use crate::flow_state::FlowState;
 
-use super::super::core::{resolve_prop_current_type, resolve_static_prop_current_type};
+use super::super::class_introspection::{
+    extract_class_implements_or_parents_arg, extract_class_implements_or_parents_static_prop_arg,
+};
+use super::super::core::{
+    apply_prop_narrowed, extract_any_prop_access, extract_static_prop_access, extract_var_name,
+    narrow_receiver_non_null_on_prop_match, resolve_prop_current_type,
+    resolve_static_prop_current_type, set_narrowed, ScalarArgTarget,
+};
+use super::super::instanceof_core::{
+    filter_out_instanceof_match, narrow_instanceof_preserving_subtypes, narrow_prop_instanceof,
+    narrow_prop_is_subclass_of, narrow_static_prop_instanceof, narrow_static_prop_is_subclass_of,
+    narrow_strict_subclass_of,
+};
+use super::shapes::{
+    collect_array_access_path, narrow_shape_path_key_exists, narrow_shape_path_key_exists_false,
+    resolve_shape_base_current_type, set_shape_base_narrowed,
+};
 
 /// Static-property counterpart of `narrow_prop_array_key_exists`, for
 /// `array_key_exists('k', self::$prop)` (and `static::$prop`/`Class::$prop`).
@@ -181,4 +199,238 @@ pub(crate) fn remove_key_from_sealed_shapes(
     }
     result.from_docblock = ty.from_docblock;
     result
+}
+
+/// Condition-matching glue for `narrow_from_condition`'s `FunctionCall` arm:
+/// handles `array_key_exists('k', $arr)` / `key_exists('k', $arr)` (and the
+/// `class_implements()`/`class_parents()`-haystack special cases), dispatching
+/// to the var/prop/static-prop/nested-shape narrowing helpers above. Callers
+/// are expected to have already checked that the function name is
+/// `array_key_exists`/`key_exists` before calling this.
+pub(crate) fn narrow_array_key_exists_condition(
+    ctx: &mut FlowState,
+    call: &FunctionCallExpr,
+    is_true: bool,
+    db: &dyn MirDatabase,
+    file: &str,
+) {
+    // array_key_exists('k', $arr) in true-branch: prove the key
+    // exists in the array's sealed shape so that $arr['k'] does
+    // not trigger NonExistentArrayOffset afterwards.
+    // `key_exists()` is a built-in alias of `array_key_exists()`
+    // with identical semantics.
+    if let (Some(key_arg), Some(arr_arg)) = (call.args.first(), call.args.get(1)) {
+        let literal_key = match &key_arg.value.kind {
+            ExprKind::String(s) => Some(mir_types::atomic::ArrayKey::String(std::sync::Arc::from(
+                s.as_ref(),
+            ))),
+            ExprKind::Int(i) => Some(mir_types::atomic::ArrayKey::Int(*i)),
+            // `$key = 'name'; array_key_exists($key, $arr)` — resolve a
+            // variable, property-access, or static-property key already
+            // narrowed to a single literal, same as an inline literal
+            // would be.
+            _ => {
+                let key_ty = if let Some(name) = extract_var_name(&key_arg.value) {
+                    Some(ctx.get_var(&name))
+                } else if let Some((obj, prop)) = extract_any_prop_access(&key_arg.value) {
+                    Some(resolve_prop_current_type(ctx, &obj, &prop, db, file))
+                } else {
+                    extract_static_prop_access(&key_arg.value, ctx, db, file)
+                        .map(|(fqcn, prop)| resolve_static_prop_current_type(ctx, &fqcn, &prop, db))
+                };
+                key_ty.and_then(|ty| match ty.types.as_slice() {
+                    [Atomic::TLiteralString(s)] => {
+                        Some(mir_types::atomic::ArrayKey::String(s.clone()))
+                    }
+                    [Atomic::TLiteralInt(i)] => Some(mir_types::atomic::ArrayKey::Int(*i)),
+                    _ => None,
+                })
+            }
+        };
+        if let Some(key) = literal_key {
+            if is_true {
+                if let Some(var_name) = extract_var_name(&arr_arg.value) {
+                    let current = ctx.get_var(&var_name);
+                    let narrowed = add_key_to_sealed_shapes(&current, &key);
+                    if narrowed != current {
+                        ctx.set_var(&var_name, narrowed);
+                    }
+                } else if let Some((obj, prop)) = extract_any_prop_access(&arr_arg.value) {
+                    narrow_prop_array_key_exists(ctx, &obj, &prop, &key, db, file);
+                    // array_key_exists() throws TypeError on a null 2nd
+                    // arg, so reaching the true branch already proves
+                    // $obj->prop (and thus $obj) was non-null.
+                    narrow_receiver_non_null_on_prop_match(ctx, &obj, true);
+                } else if let Some((fqcn, prop)) =
+                    extract_static_prop_access(&arr_arg.value, ctx, db, file)
+                {
+                    narrow_static_prop_array_key_exists(ctx, &fqcn, &prop, &key, db);
+                } else if let Some((base, path)) =
+                    collect_array_access_path(&arr_arg.value, ctx, db, file)
+                {
+                    // Nested container, e.g. array_key_exists('b', $arr['a']) —
+                    // walk down to the ['a'] shape and prove 'b' present there,
+                    // same as the single-level var/prop cases above.
+                    let current = resolve_shape_base_current_type(ctx, &base, db, file);
+                    if let Some(narrowed) = narrow_shape_path_key_exists(&current, &path, &key) {
+                        set_shape_base_narrowed(ctx, &base, current, narrowed);
+                    }
+                } else if let (
+                    mir_types::atomic::ArrayKey::String(iface_name),
+                    Some((target, is_parents)),
+                ) = (
+                    &key,
+                    extract_class_implements_or_parents_arg(&arr_arg.value),
+                ) {
+                    // array_key_exists('Iface', class_implements($x)) —
+                    // same relationship `$x instanceof Iface` proves.
+                    // array_key_exists('Ancestor', class_parents($x)) is
+                    // STRICTER: class_parents() excludes $x's own exact
+                    // class, the same relationship `is_subclass_of($x,
+                    // Ancestor)` proves — reuse that narrowing instead.
+                    let fqcn = crate::db::resolve_name(db, file, iface_name);
+                    match &target {
+                        ScalarArgTarget::Var(var_name) => {
+                            let current = ctx.get_var(var_name);
+                            let narrowed = if is_parents {
+                                narrow_strict_subclass_of(
+                                    &current,
+                                    &fqcn,
+                                    db,
+                                    &ctx.template_param_names,
+                                )
+                            } else {
+                                narrow_instanceof_preserving_subtypes(
+                                    &current,
+                                    &fqcn,
+                                    db,
+                                    &ctx.template_param_names,
+                                )
+                            };
+                            set_narrowed(ctx, var_name, &current, narrowed, true);
+                        }
+                        ScalarArgTarget::Prop(obj, prop) => {
+                            if is_parents {
+                                narrow_prop_is_subclass_of(ctx, obj, prop, &fqcn, db, file, true);
+                            } else {
+                                narrow_prop_instanceof(ctx, obj, prop, &fqcn, db, file, true);
+                            }
+                            narrow_receiver_non_null_on_prop_match(ctx, obj, true);
+                        }
+                    }
+                } else if let (
+                    mir_types::atomic::ArrayKey::String(iface_name),
+                    Some(((static_fqcn, prop), is_parents)),
+                ) = (
+                    &key,
+                    extract_class_implements_or_parents_static_prop_arg(
+                        &arr_arg.value,
+                        ctx,
+                        db,
+                        file,
+                    ),
+                ) {
+                    // array_key_exists('Iface', class_implements(self::$prop)) —
+                    // static-property counterpart of the var/prop arm above.
+                    let fqcn = crate::db::resolve_name(db, file, iface_name);
+                    if is_parents {
+                        narrow_static_prop_is_subclass_of(
+                            ctx,
+                            &static_fqcn,
+                            &prop,
+                            &fqcn,
+                            db,
+                            true,
+                        );
+                    } else {
+                        narrow_static_prop_instanceof(ctx, &static_fqcn, &prop, &fqcn, db, true);
+                    }
+                }
+            } else {
+                // False branch: exclude shape members that
+                // guarantee the key's presence — see
+                // `remove_key_from_sealed_shapes`.
+                if let Some(var_name) = extract_var_name(&arr_arg.value) {
+                    let current = ctx.get_var(&var_name);
+                    let narrowed = remove_key_from_sealed_shapes(&current, &key);
+                    set_narrowed(ctx, &var_name, &current, narrowed, true);
+                } else if let Some((obj, prop)) = extract_any_prop_access(&arr_arg.value) {
+                    let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
+                    if !current.is_mixed() {
+                        let narrowed = remove_key_from_sealed_shapes(&current, &key);
+                        apply_prop_narrowed(ctx, &obj, &prop, current, narrowed, true);
+                    }
+                    // array_key_exists() throws TypeError on a null 2nd
+                    // arg, so reaching the false branch also proves
+                    // $obj->prop (and thus $obj) was non-null.
+                    narrow_receiver_non_null_on_prop_match(ctx, &obj, true);
+                } else if let Some((fqcn, prop)) =
+                    extract_static_prop_access(&arr_arg.value, ctx, db, file)
+                {
+                    let current = resolve_static_prop_current_type(ctx, &fqcn, &prop, db);
+                    if !current.is_mixed() {
+                        let narrowed = remove_key_from_sealed_shapes(&current, &key);
+                        apply_prop_narrowed(ctx, &fqcn, &prop, current, narrowed, true);
+                    }
+                } else if let Some((base, path)) =
+                    collect_array_access_path(&arr_arg.value, ctx, db, file)
+                {
+                    // Nested container, false branch, e.g.
+                    // array_key_exists('b', $arr['a']) proven
+                    // false — same as the single-level
+                    // var/prop cases above.
+                    let current = resolve_shape_base_current_type(ctx, &base, db, file);
+                    if let Some(narrowed) =
+                        narrow_shape_path_key_exists_false(&current, &path, &key)
+                    {
+                        set_shape_base_narrowed(ctx, &base, current, narrowed);
+                    }
+                } else if let (
+                    mir_types::atomic::ArrayKey::String(iface_name),
+                    Some((target, is_parents)),
+                ) = (
+                    &key,
+                    extract_class_implements_or_parents_arg(&arr_arg.value),
+                ) {
+                    // !array_key_exists('Iface', class_implements($x)) —
+                    // exclude Iface, same as `!($x instanceof Iface)`.
+                    // class_parents(), by contrast, never narrows on the
+                    // false branch — mirrors `is_subclass_of()`'s own
+                    // convention: a parent-name mismatch doesn't rule out
+                    // the receiver being exactly that class.
+                    if !is_parents {
+                        let fqcn = crate::db::resolve_name(db, file, iface_name);
+                        match &target {
+                            ScalarArgTarget::Var(var_name) => {
+                                let current = ctx.get_var(var_name);
+                                let narrowed = filter_out_instanceof_match(&current, &fqcn, db);
+                                set_narrowed(ctx, var_name, &current, narrowed, true);
+                            }
+                            ScalarArgTarget::Prop(obj, prop) => {
+                                narrow_prop_instanceof(ctx, obj, prop, &fqcn, db, file, false);
+                            }
+                        }
+                    }
+                } else if let (
+                    mir_types::atomic::ArrayKey::String(iface_name),
+                    Some(((static_fqcn, prop), is_parents)),
+                ) = (
+                    &key,
+                    extract_class_implements_or_parents_static_prop_arg(
+                        &arr_arg.value,
+                        ctx,
+                        db,
+                        file,
+                    ),
+                ) {
+                    // !array_key_exists('Iface', class_implements(self::$prop)) —
+                    // static-property counterpart of the var/prop arm above.
+                    if !is_parents {
+                        let fqcn = crate::db::resolve_name(db, file, iface_name);
+                        narrow_static_prop_instanceof(ctx, &static_fqcn, &prop, &fqcn, db, false);
+                    }
+                }
+            }
+        }
+    }
 }
