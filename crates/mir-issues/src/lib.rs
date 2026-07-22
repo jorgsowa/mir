@@ -677,6 +677,18 @@ pub enum IssueKind {
     /// Emitted when a class with non-nullable uninitialized properties has no constructor.
     /// Fixtures: `tests/fixtures/by-kind/missing_constructor/`.
     MissingConstructor { class: String },
+    /// Emitted when the constructor has a reachable exit path that doesn't
+    /// assign a native-typed, non-nullable, default-less property declared
+    /// directly on the class — reading it afterward throws PHP's "must not
+    /// be accessed before initialization". Scoped to the class's own
+    /// properties only (a property inherited from a parent class is that
+    /// parent's own constructor's concern) and abstains entirely if the
+    /// constructor calls out to any method/function that could have
+    /// initialized the property on its behalf, to avoid flagging common
+    /// delegating-init patterns it can't see into.
+    /// Emitted by `mir-analyzer/src/body_analysis/classes.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/property_possibly_uninitialized/`.
+    PropertyPossiblyUninitialized { class: String, property: String },
     /// Emitted by `mir-analyzer/src/call/function.rs` when a dynamic call target is mixed.
     /// Fixtures: `tests/fixtures/by-kind/mixed_function_call/`.
     MixedFunctionCall,
@@ -869,7 +881,8 @@ impl IssueKind {
             | IssueKind::ImpossibleIdenticalComparison { .. }
             | IssueKind::ImpossibleLooseComparison { .. }
             | IssueKind::DuplicateArrayKey { .. }
-            | IssueKind::ForbiddenCode { .. } => Severity::Warning,
+            | IssueKind::ForbiddenCode { .. }
+            | IssueKind::PropertyPossiblyUninitialized { .. } => Severity::Warning,
 
             // PossiblyUndefined: shown at default error level (same as Warning)
             IssueKind::PossiblyUndefinedVariable { .. } => Severity::Warning,
@@ -1085,6 +1098,7 @@ impl IssueKind {
             IssueKind::NoInterfaceProperties { .. } => "MIR1504",
             IssueKind::UndefinedDocblockClass { .. } => "MIR1505",
             IssueKind::MissingConstructor { .. } => "MIR1507",
+            IssueKind::PropertyPossiblyUninitialized { .. } => "MIR1510",
             IssueKind::MixedFunctionCall => "MIR1211",
             IssueKind::MixedReturnStatement { .. } => "MIR1212",
 
@@ -1209,7 +1223,7 @@ impl IssueKind {
             | "MIR0300" | "MIR0301" | "MIR0302" | "MIR0303" | "MIR0404" | "MIR0405" | "MIR0408"
             | "MIR0500" | "MIR0506" | "MIR0703" | "MIR0710" | "MIR1301" | "MIR1501" | "MIR1502"
             | "MIR1700" | "MIR1701" | "MIR1702" | "MIR1703" | "MIR1704" | "MIR1705" | "MIR1706"
-            | "MIR1506" => Some(Severity::Warning),
+            | "MIR1506" | "MIR1510" => Some(Severity::Warning),
 
             // Info
             "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207" | "MIR0209"
@@ -1318,6 +1332,7 @@ impl IssueKind {
             IssueKind::NoInterfaceProperties { .. } => "NoInterfaceProperties",
             IssueKind::UndefinedDocblockClass { .. } => "UndefinedDocblockClass",
             IssueKind::MissingConstructor { .. } => "MissingConstructor",
+            IssueKind::PropertyPossiblyUninitialized { .. } => "PropertyPossiblyUninitialized",
             IssueKind::MixedFunctionCall => "MixedFunctionCall",
             IssueKind::MixedReturnStatement { .. } => "MixedReturnStatement",
             IssueKind::UnimplementedAbstractMethod { .. } => "UnimplementedAbstractMethod",
@@ -1988,6 +2003,11 @@ impl IssueKind {
             IssueKind::MissingConstructor { class } => {
                 format!("Class {class} has uninitialized properties but no constructor")
             }
+            IssueKind::PropertyPossiblyUninitialized { class, property } => {
+                format!(
+                    "Property {class}::${property} may be left uninitialized by the constructor"
+                )
+            }
             IssueKind::MixedFunctionCall => "Cannot call mixed type as a function".to_string(),
             IssueKind::MixedReturnStatement { declared } => {
                 format!("Cannot return a mixed type from function with declared return type '{declared}'")
@@ -2571,6 +2591,10 @@ mod code_tests {
             IssueKind::NoInterfaceProperties { property: s() },
             IssueKind::UndefinedDocblockClass { name: s() },
             IssueKind::MissingConstructor { class: s() },
+            IssueKind::PropertyPossiblyUninitialized {
+                class: s(),
+                property: s(),
+            },
             IssueKind::MixedFunctionCall,
             IssueKind::MixedReturnStatement { declared: s() },
             IssueKind::MixedPropertyFetch { property: s() },
@@ -2672,6 +2696,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 154);
+        assert_eq!(one_of_each().len(), 155);
     }
 }

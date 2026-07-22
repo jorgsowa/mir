@@ -255,6 +255,25 @@ pub struct FlowState {
     /// written on only one of two branches isn't *definitely* initialized
     /// afterward, so a later write there isn't certainly a re-init.
     pub readonly_initialized: Arc<FxHashSet<(Name, Name)>>,
+
+    /// `$this->prop = value` (plain assignment only) property names
+    /// definitely written on every path reaching this point in the current
+    /// constructor. Used by the constructor definite-assignment check (a
+    /// native-typed, non-nullable, default-less own property must be
+    /// assigned before the constructor can exit) — merged by intersection
+    /// like `readonly_initialized`, for the same reason: a write on only one
+    /// branch isn't certain on every path.
+    pub assigned_this_props: Arc<FxHashSet<Name>>,
+
+    /// Set once `$this` is passed to, or a call is made through, something
+    /// whose body isn't analyzed here (a method/function call on or passing
+    /// `$this`, a static forwarding call, a closure invocation) — such a
+    /// call might initialize a property on `$this`'s behalf. Monotonic, like
+    /// `has_dynamic_var_def`: once true it stays true across merges. The
+    /// constructor definite-assignment check abstains entirely when this is
+    /// set, rather than risk flagging a property actually initialized by a
+    /// delegating helper call it can't see into.
+    pub this_escaped_to_call: bool,
 }
 
 /// Pre-built superglobal initial state, shared across all FlowState instances.
@@ -340,6 +359,8 @@ impl FlowState {
             extension_loaded_guards: FxHashSet::default(),
             prop_refined: Arc::new(FxHashMap::default()),
             readonly_initialized: Arc::new(FxHashSet::default()),
+            assigned_this_props: Arc::new(FxHashSet::default()),
+            this_escaped_to_call: false,
         }
     }
 
@@ -640,13 +661,37 @@ impl FlowState {
         }
     }
 
+    /// Record that `$this->prop` has been definitely assigned on this path
+    /// (constructor definite-assignment tracking).
+    pub fn mark_this_prop_assigned(&mut self, prop: &str) {
+        let key = Name::from(prop);
+        if !self.assigned_this_props.contains(&key) {
+            Arc::make_mut(&mut self.assigned_this_props).insert(key);
+        }
+    }
+
+    /// Mark that `$this` may have escaped to an unanalyzed call on this path
+    /// (see `this_escaped_to_call`).
+    pub fn mark_this_escaped_to_call(&mut self) {
+        self.this_escaped_to_call = true;
+    }
+
     /// Discard every narrowed property type recorded for one receiver (e.g.
     /// `"this"`, another object variable, or a static-fqcn key). Call this
     /// after a call we can't prove pure/mutation-free where `receiver` names
     /// the object: the callee's `$this` is that object, so it may reassign
     /// any of its own properties, making prior narrowing stale.
     pub fn invalidate_prop_refined_receiver(&mut self, receiver: &str) {
-        let receiver = Name::from(receiver.trim_start_matches('$'));
+        let stripped = receiver.trim_start_matches('$');
+        // Every call site that invalidates `$this`'s own narrowing this way
+        // is, by construction, also a call/argument the analyzer can't see
+        // into — exactly the signal `this_escaped_to_call` needs (see its
+        // doc comment), so piggyback here instead of duplicating this check
+        // at every one of those call sites.
+        if stripped == "this" {
+            self.mark_this_escaped_to_call();
+        }
+        let receiver = Name::from(stripped);
         if self.prop_refined.keys().any(|(obj, _)| *obj == receiver) {
             Arc::make_mut(&mut self.prop_refined).retain(|(obj, _), _| *obj != receiver);
         }
@@ -814,6 +859,12 @@ impl FlowState {
         let dynamic_var_read = pre.has_dynamic_var_read
             || if_ctx.has_dynamic_var_read
             || else_ctx.has_dynamic_var_read;
+        // `this_escaped_to_call` is sticky the same way: once `$this` may
+        // have reached an unanalyzed call on any path, the constructor
+        // definite-assignment check must abstain on every path afterward.
+        let this_escaped = pre.this_escaped_to_call
+            || if_ctx.this_escaped_to_call
+            || else_ctx.this_escaped_to_call;
 
         // If the then-branch always diverges, the code after the if runs only
         // in the else-branch — use that as the result directly.
@@ -850,6 +901,7 @@ impl FlowState {
                 result.catch_var_names.insert(*name);
             }
             result.has_dynamic_var_def = dynamic_var_def;
+            result.this_escaped_to_call = this_escaped;
             result.has_dynamic_var_read = dynamic_var_read;
             return result;
         }
@@ -884,6 +936,7 @@ impl FlowState {
                 result.catch_var_names.insert(*name);
             }
             result.has_dynamic_var_def = dynamic_var_def;
+            result.this_escaped_to_call = this_escaped;
             result.has_dynamic_var_read = dynamic_var_read;
             return result;
         }
@@ -928,6 +981,7 @@ impl FlowState {
                 result.catch_var_names.insert(*name);
             }
             result.has_dynamic_var_def = dynamic_var_def;
+            result.this_escaped_to_call = this_escaped;
             result.has_dynamic_var_read = dynamic_var_read;
             return result;
         }
@@ -1071,6 +1125,17 @@ impl FlowState {
                 .collect(),
         );
 
+        // Same reasoning again for constructor definite-assignment: a
+        // property assigned on only one branch isn't definitely assigned on
+        // every path reaching the merge point.
+        result.assigned_this_props = Arc::new(
+            if_ctx
+                .assigned_this_props
+                .intersection(&else_ctx.assigned_this_props)
+                .cloned()
+                .collect(),
+        );
+
         // Property refinements: keep only keys present in BOTH branches with the
         // union of their types.  A refinement present in only one branch cannot
         // be relied upon after the merge (the other path didn't narrow it).
@@ -1115,6 +1180,7 @@ impl FlowState {
         }
 
         result.has_dynamic_var_def = dynamic_var_def;
+        result.this_escaped_to_call = this_escaped;
 
         // Foreach value var names: union — if either branch marks a var as a foreach value, keep it
         for name in if_ctx

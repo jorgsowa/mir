@@ -737,6 +737,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // Skip refinement on invalid assignments to avoid masking later errors.
                 if let ExprKind::Variable(obj_var) = &pa.object.kind {
                     if let Some(prop_name) = extract_string_from_expr(&pa.property) {
+                        // Constructor definite-assignment tracking: a plain
+                        // `$this->prop = value` counts as initializing the
+                        // property regardless of whether the assigned type is
+                        // itself valid (an incompatible assignment is already
+                        // flagged separately above; it still runs at runtime).
+                        if ctx.inside_constructor && obj_var.as_ref() == "this" {
+                            ctx.mark_this_prop_assigned(&prop_name);
+                        }
                         let obj_ty = ctx.get_var(obj_var.as_ref());
                         let declared_opt: Option<std::sync::Arc<mir_types::Type>> =
                             obj_ty.types.iter().find_map(|a| {
