@@ -75,18 +75,6 @@ impl AnalysisSession {
         f(&guard)
     }
 
-    /// Commit a batch of reference locations from a db snapshot into the
-    /// session's shared maps.  Called by [`crate::FileAnalyzer`] and
-    /// [`crate::BatchFileAnalyzer`] after parallel body analysis to flush the pending
-    /// buffers that accumulate in worker db clones.
-    pub(crate) fn commit_ref_locs_batch(&self, locs: Vec<RefLoc>) {
-        if locs.is_empty() {
-            return;
-        }
-        let guard = self.db.salsa.read();
-        guard.commit_reference_locations_batch(locs);
-    }
-
     /// Replace `file`'s reference postings with `locs` (its complete set from
     /// a fresh single-file analysis) and mark freshness against `text` and
     /// `generation` — both captured before the analysis, so a concurrent

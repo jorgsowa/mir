@@ -12,10 +12,7 @@ mod common;
 use std::fs;
 use std::sync::Arc;
 
-use mir_analyzer::{
-    AnalysisSession, BatchFileAnalyzer, FileAnalyzer, IndexCancel, IndexParallelism, ParsedFile,
-    PhpVersion,
-};
+use mir_analyzer::{AnalysisSession, FileAnalyzer, IndexCancel, IndexParallelism, PhpVersion};
 
 use self::common::create_temp_dir;
 
@@ -165,43 +162,6 @@ fn file_analyzer_no_psr4_does_not_panic() {
         result.issues.is_empty(),
         "no issues expected for trivial PHP; got: {:?}",
         result.issues
-    );
-}
-
-// ---------------------------------------------------------------------------
-// BatchFileAnalyzer path
-// ---------------------------------------------------------------------------
-
-/// Batch analysis must also lazy-load vendor eager files before the parallel
-/// pass.  `BatchFileAnalyzer::analyze_batch` calls `ensure_vendor_eager_functions`
-/// in its sequential first pass.
-#[test]
-fn batch_analyzer_lazy_loads_vendor_autoload_files_functions() {
-    let root = create_temp_dir("autoload_lazy_batch");
-    write_vendor_autoload_files(
-        root.path(),
-        "<?php\nfunction batch_helper(int $n): int { return $n * 2; }\n",
-    );
-    write_composer_json(root.path());
-
-    let psr4 =
-        mir_analyzer::composer::Psr4Map::from_composer(root.path()).expect("psr4 from composer");
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
-
-    let src = Arc::from("<?php\nbatch_helper(3);\n");
-    let path: Arc<str> = Arc::from("batch_consumer.php");
-    let parsed = php_rs_parser::parse(&src);
-    let file = ParsedFile::new(path, src.clone(), parsed.program, parsed.source_map);
-
-    let results = BatchFileAnalyzer::new(&session).analyze_batch(vec![file]);
-    assert_eq!(results.len(), 1);
-    let (_, analysis) = &results[0];
-    assert_eq!(
-        undefined_function_count(&analysis.issues),
-        0,
-        "batch_helper() must be found without a manual indexing call; \
-         got issues: {:?}",
-        analysis.issues
     );
 }
 

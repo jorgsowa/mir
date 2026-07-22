@@ -44,7 +44,7 @@ pub(crate) mod util;
 pub use batch::{
     analyze_source, dead_code_issue_kinds, discover_files, AnalysisResult, BatchOptions,
 };
-pub use file_analyzer::{BatchFileAnalyzer, FileAnalysis, FileAnalyzer, ParsedFile};
+pub use file_analyzer::{FileAnalysis, FileAnalyzer};
 pub use indexing::{IndexBatchOutcome, IndexCancel, IndexParallelism};
 pub use parser::type_from_hint::type_from_hint;
 pub use parser::{DocblockParser, ParsedDocblock};
