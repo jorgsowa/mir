@@ -817,6 +817,32 @@ impl CallAnalyzer {
                     "array_unique" => {
                         super::array_builtins::array_unique_return(&arg_types).unwrap_or(return_ty)
                     }
+                    // array_diff/array_intersect (and their _key/_assoc/u*/uassoc variants)
+                    // always return a subset of the first argument's own entries, so the
+                    // result's key/value types are exactly the first argument's.
+                    "array_diff"
+                    | "array_diff_key"
+                    | "array_diff_ukey"
+                    | "array_udiff"
+                    | "array_diff_assoc"
+                    | "array_udiff_assoc"
+                    | "array_diff_uassoc"
+                    | "array_udiff_uassoc"
+                    | "array_intersect"
+                    | "array_intersect_key"
+                    | "array_intersect_ukey"
+                    | "array_uintersect"
+                    | "array_intersect_assoc"
+                    | "array_uintersect_assoc"
+                    | "array_intersect_uassoc"
+                    | "array_uintersect_uassoc" => {
+                        super::array_builtins::array_diff_intersect_like_return_type(&arg_types)
+                            .unwrap_or(return_ty)
+                    }
+                    // array_combine pairs $keys's values (as keys) with $values's values,
+                    // positionally; non-empty $keys guarantees a non-empty result.
+                    "array_combine" => super::array_builtins::array_combine_return_type(&arg_types)
+                        .unwrap_or(return_ty),
                     // range($start, $end) with integer bounds returns non-empty-list<int<min,max>>.
                     "range" => super::callable::range_return_type(&arg_types).unwrap_or(return_ty),
                     // array_key_first/array_key_last: non-null for non-empty input; int for lists.
