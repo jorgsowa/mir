@@ -1407,11 +1407,18 @@ pub(crate) fn array_slice_return_type(arg_types: &[Type]) -> Option<Type> {
     }
 
     // When the source is a list and preserve_keys is false (default), the
-    // result is also a list (integer keys are re-indexed from 0).
-    let is_source_list = source
-        .types
-        .iter()
-        .all(|a| matches!(a, Atomic::TList { .. } | Atomic::TNonEmptyList { .. }));
+    // result is also a list (integer keys are re-indexed from 0). A literal
+    // array (`[1, 2, 3]`) is a `TKeyedArray` with `is_list: true`, not a
+    // `TList`/`TNonEmptyList` — without that arm, slicing a literal list lost
+    // its list-ness and fell back to a generic `array<K, V>`.
+    let is_source_list = source.types.iter().all(|a| {
+        matches!(
+            a,
+            Atomic::TList { .. }
+                | Atomic::TNonEmptyList { .. }
+                | Atomic::TKeyedArray { is_list: true, .. }
+        )
+    });
 
     if is_source_list && !preserve_keys {
         return Some(Type::single(Atomic::TList {
@@ -1467,12 +1474,20 @@ pub(crate) fn infer_array_merge_return(arg_types: &[Type]) -> Option<Type> {
     if arg_types.is_empty() {
         return None;
     }
-    // All args must be list types for us to produce a list result.
+    // All args must be list types for us to produce a list result. A literal
+    // array (`[1, 2, 3]`) is a `TKeyedArray` with `is_list: true`, not a
+    // `TList`/`TNonEmptyList` — without that arm, merging a literal list
+    // argument lost its list-ness and fell back to a generic `array<K, V>`.
     let all_lists = arg_types.iter().all(|t| {
         !t.types.is_empty()
-            && t.types
-                .iter()
-                .all(|a| matches!(a, Atomic::TList { .. } | Atomic::TNonEmptyList { .. }))
+            && t.types.iter().all(|a| {
+                matches!(
+                    a,
+                    Atomic::TList { .. }
+                        | Atomic::TNonEmptyList { .. }
+                        | Atomic::TKeyedArray { is_list: true, .. }
+                )
+            })
     });
     if !all_lists {
         return None;
@@ -2256,11 +2271,19 @@ pub(crate) fn array_push_unshift_byref_type(
     if value.is_empty() || value.is_mixed() {
         return arr.clone();
     }
+    // A literal array (`[1, 2, 3]`) is a `TKeyedArray` with `is_list: true`,
+    // not a `TList`/`TNonEmptyList` — without that arm, pushing/unshifting
+    // onto a literal list lost its list-ness and fell back to a generic
+    // `array<K, V>`.
     let is_src_list = !arr.types.is_empty()
-        && arr
-            .types
-            .iter()
-            .all(|a| matches!(a, Atomic::TList { .. } | Atomic::TNonEmptyList { .. }));
+        && arr.types.iter().all(|a| {
+            matches!(
+                a,
+                Atomic::TList { .. }
+                    | Atomic::TNonEmptyList { .. }
+                    | Atomic::TKeyedArray { is_list: true, .. }
+            )
+        });
     if is_src_list {
         return Type::single(Atomic::TNonEmptyList {
             value: Box::new(value),
