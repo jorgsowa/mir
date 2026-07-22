@@ -223,7 +223,7 @@ pub(crate) fn check_one(
         // `[$obj, 'method']` / `['Class', 'method']` is a valid callable, even
         // though it types as a 2-element list shape.
         && !(param_ty.contains(|t| matches!(t, Atomic::TCallable { .. } | Atomic::TClosure { .. }))
-            && super::super::callable::is_callable_array_pair(arg_ty))
+            && super::super::array_builtins::is_callable_array_pair(arg_ty))
     {
         // For union arg types, check if any individual atomic fits the param.
         // If some atomics fit and some don't → PossiblyInvalidArgument; otherwise → InvalidArgument.
