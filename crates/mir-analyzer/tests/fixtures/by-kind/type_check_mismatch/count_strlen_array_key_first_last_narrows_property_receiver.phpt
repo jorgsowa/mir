@@ -14,7 +14,7 @@ final class Holder {
 
     public function countEquality(): void {
         if (count($this->arr) === 0) {
-            /** @mir-check $this->arr is list<int> */
+            /** @mir-check $this->arr is array{} */
             $_ = 1;
         }
     }
@@ -28,7 +28,7 @@ final class Holder {
 
     public function reversedCountRelational(): void {
         if (0 === count($this->arr)) {
-            /** @mir-check $this->arr is list<int> */
+            /** @mir-check $this->arr is array{} */
             $_ = 1;
         }
     }
@@ -52,14 +52,14 @@ final class Holder {
 
     public function arrayKeyFirstNull(): void {
         if (array_key_first($this->arr) === null) {
-            /** @mir-check $this->arr is list<int> */
+            /** @mir-check $this->arr is array{} */
             $_ = 1;
         }
     }
 
     public function arrayKeyLastNullReversed(): void {
         if (null === array_key_last($this->arr)) {
-            /** @mir-check $this->arr is list<int> */
+            /** @mir-check $this->arr is array{} */
             $_ = 1;
         }
     }

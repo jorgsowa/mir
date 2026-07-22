@@ -33,7 +33,7 @@ function test_zero_not_identical_iterator_count(array $arr): void {
 /** @param list<string> $arr */
 function test_iterator_count_identical_zero(array $arr): void {
     if (iterator_count($arr) === 0) {
-        /** @mir-check $arr is list<string> */
+        /** @mir-check $arr is array{} */
         $_ = $arr;
     }
 }

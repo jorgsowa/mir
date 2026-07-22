@@ -18,7 +18,7 @@ final class Bag {
 
     public function strictEmpty(): void {
         if ($this->items === []) {
-            /** @mir-check $this->items is array<int, string> */
+            /** @mir-check $this->items is array{} */
             $_ = 1;
         }
     }

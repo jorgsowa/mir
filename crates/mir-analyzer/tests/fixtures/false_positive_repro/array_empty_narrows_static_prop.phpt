@@ -15,7 +15,7 @@ class Bag {
 
     public static function useStrict(): void {
         if (self::$items === []) {
-            /** @mir-check self::$items is array<int|string, int> */
+            /** @mir-check self::$items is array{} */
             $_ = 1;
         } else {
             /** @mir-check self::$items is non-empty-array<int> */
@@ -25,7 +25,7 @@ class Bag {
 
     public static function useLoose(): void {
         if (self::$items == []) {
-            /** @mir-check self::$items is array<int|string, int> */
+            /** @mir-check self::$items is array{} */
             $_ = 1;
         }
     }

@@ -27,7 +27,7 @@ function test_equal_else_narrows(array $arr): void {
 /** @param list<int>|non-empty-array<string, int> $arr */
 function test_equal_narrows(array $arr): void {
     if ($arr === []) {
-        /** @mir-check $arr is list<int> */
+        /** @mir-check $arr is array{} */
         $_ = $arr;
     }
 }

@@ -9,7 +9,7 @@ suppress=UnusedVariable,UnusedParam
 /** @param list<int>|non-empty-array<string, int> $arr */
 function test_count_identical_zero_narrows(array $arr): void {
     if (count($arr) === 0) {
-        /** @mir-check $arr is list<int> */
+        /** @mir-check $arr is array{} */
         $_ = $arr;
     }
 }
@@ -17,7 +17,7 @@ function test_count_identical_zero_narrows(array $arr): void {
 /** @param list<int>|non-empty-array<string, int> $arr */
 function test_count_less_than_one_narrows(array $arr): void {
     if (count($arr) < 1) {
-        /** @mir-check $arr is list<int> */
+        /** @mir-check $arr is array{} */
         $_ = $arr;
     }
 }
@@ -25,7 +25,7 @@ function test_count_less_than_one_narrows(array $arr): void {
 /** @param list<int>|non-empty-array<string, int> $arr */
 function test_count_less_or_equal_zero_narrows(array $arr): void {
     if (count($arr) <= 0) {
-        /** @mir-check $arr is list<int> */
+        /** @mir-check $arr is array{} */
         $_ = $arr;
     }
 }
@@ -33,7 +33,7 @@ function test_count_less_or_equal_zero_narrows(array $arr): void {
 /** @param list<int>|non-empty-array<string, int> $arr */
 function test_count_not_greater_than_zero_narrows(array $arr): void {
     if (!(count($arr) > 0)) {
-        /** @mir-check $arr is list<int> */
+        /** @mir-check $arr is array{} */
         $_ = $arr;
     }
 }
@@ -41,7 +41,7 @@ function test_count_not_greater_than_zero_narrows(array $arr): void {
 /** @param list<int>|non-empty-array<string, int> $arr */
 function test_count_not_greater_or_equal_one_narrows(array $arr): void {
     if (!(count($arr) >= 1)) {
-        /** @mir-check $arr is list<int> */
+        /** @mir-check $arr is array{} */
         $_ = $arr;
     }
 }
@@ -49,7 +49,7 @@ function test_count_not_greater_or_equal_one_narrows(array $arr): void {
 /** @param list<int>|non-empty-array<string, int> $arr */
 function test_zero_identical_count_narrows(array $arr): void {
     if (0 === count($arr)) {
-        /** @mir-check $arr is list<int> */
+        /** @mir-check $arr is array{} */
         $_ = $arr;
     }
 }
