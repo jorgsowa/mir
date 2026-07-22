@@ -649,15 +649,10 @@ impl<'a> ExpressionAnalyzer<'a> {
             );
         }
 
-        let literal_key: Option<mir_types::atomic::ArrayKey> =
-            aa.index.as_ref().and_then(|idx| match &idx.kind {
-                ExprKind::String(s) => Some(match super::helpers::canonical_int_array_key(s) {
-                    Some(i) => mir_types::atomic::ArrayKey::Int(i),
-                    None => mir_types::atomic::ArrayKey::String(Arc::from(s.as_ref())),
-                }),
-                ExprKind::Int(i) => Some(mir_types::atomic::ArrayKey::Int(*i)),
-                _ => None,
-            });
+        let literal_key: Option<mir_types::atomic::ArrayKey> = aa
+            .index
+            .as_ref()
+            .and_then(|idx| super::helpers::literal_array_key_of_kind(&idx.kind));
 
         let idx_span = aa.index.as_ref().map(|i| i.span).unwrap_or(expr.span);
 
