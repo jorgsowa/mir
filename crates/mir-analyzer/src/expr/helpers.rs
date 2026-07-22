@@ -111,6 +111,32 @@ pub fn coerce_array_key_type(ty: &Type) -> Type {
     out
 }
 
+/// The base scalar type a canonical `ArrayKey` widens to when it becomes
+/// part of a generalized array's key domain instead of a shape's own known
+/// property key.
+fn widen_key_to_base(key: &ArrayKey) -> Atomic {
+    match key {
+        ArrayKey::String(_) => Atomic::TString,
+        ArrayKey::Int(_) => Atomic::TInt,
+    }
+}
+
+/// Widen every `TLiteralString`/`TLiteralInt` atom in a key type to its base
+/// scalar type. See [`widen_key_to_base`] — same widening, for a `Type`
+/// (e.g. a freshly-written key) rather than a single already-canonical
+/// `ArrayKey`.
+fn widen_key_type(ty: &Type) -> Type {
+    let mut out = Type::empty();
+    for a in &ty.types {
+        match a {
+            Atomic::TLiteralString(_) => out.add_type(Atomic::TString),
+            Atomic::TLiteralInt(_) => out.add_type(Atomic::TInt),
+            other => out.add_type(other.clone()),
+        }
+    }
+    out
+}
+
 /// Update a nested shape write (`$arr['a']['b'] = $v`) by walking into the
 /// matching per-key property at each level instead of widening the whole
 /// outer shape into a generic array. `path` is ordered innermost-first (the
@@ -452,16 +478,17 @@ pub fn widen_array_with_value_and_key(
         match atomic {
             Atomic::TKeyedArray { properties, .. } => {
                 let mut all_values = new_value.clone();
-                let mut all_keys = new_key.clone();
+                // A generalized array's key domain is widened to its base
+                // scalar type rather than kept as each property's own
+                // literal key — otherwise a shape generalizing past its size
+                // cap keeps accumulating one literal per key, producing a
+                // swelling union like `"a"|"b"|"c"|...` instead of `string`.
+                let mut all_keys = widen_key_type(new_key);
                 for prop in properties.values() {
                     all_values.merge_with(&prop.ty);
                 }
                 for k in properties.keys() {
-                    let key_atomic = match k {
-                        mir_types::ArrayKey::String(s) => Atomic::TLiteralString(s.clone()),
-                        mir_types::ArrayKey::Int(i) => Atomic::TLiteralInt(*i),
-                    };
-                    all_keys.merge_with(&Type::single(key_atomic));
+                    all_keys.add_type(widen_key_to_base(k));
                 }
                 fold_into(&mut acc_key, all_keys);
                 fold_into(&mut acc_value, all_values);

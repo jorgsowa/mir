@@ -12,7 +12,7 @@ suppress=UnusedVariable
  */
 function test(array $x, array $y): void {
     $z = [...$x, ...$y];
-    /** @mir-check $z is array<"a"|"b", int|string> */
+    /** @mir-check $z is array<string, int|string> */
     echo 1;
 }
 ===expect===
