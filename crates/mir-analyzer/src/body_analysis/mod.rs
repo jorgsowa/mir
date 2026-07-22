@@ -800,6 +800,31 @@ fn docblock_conflicts_with_hint(
     use docblock_hint_compat as fc;
     use mir_types::Atomic;
 
+    // A nullable native hint (`?T`) not reflected in the docblock is itself a
+    // contradiction, the mirror image of the family check below: the hint
+    // (PHP's enforced ground truth) allows null, but the docblock promises a
+    // value that never is — e.g. `@param string $x` on a `?string $x`
+    // parameter. Checked before the mask/family logic, which only catches a
+    // docblock claiming something the hint DISALLOWS, not the hint allowing
+    // MORE than the docblock promises.
+    //
+    // Skipped when the docblock side has an unresolvable named-object atom
+    // (the same "unknown refinement" case the family check below stays
+    // silent on) — a `@psalm-type` alias name like `MaybeUser` isn't
+    // expanded here, so it may already include `null` internally even
+    // though the raw atom doesn't literally contain `TNull`.
+    let doc_has_unresolved_object = doc_ty.types.iter().any(|a| {
+        fc::fam(a) == fc::OBJECT
+            && matches!(a, Atomic::TNamedObject { fqcn, .. }
+                if crate::db::find_class_like(db, crate::db::Fqcn::new(db, *fqcn)).is_none())
+    });
+    if hint_ty.types.iter().any(|a| matches!(a, Atomic::TNull))
+        && !doc_ty.types.iter().any(|a| matches!(a, Atomic::TNull))
+        && !doc_has_unresolved_object
+    {
+        return true;
+    }
+
     let mask = fc::hint_accepts_mask(hint_ty);
     if doc_ty.types.iter().any(|a| {
         let fa = fc::fam(a);
