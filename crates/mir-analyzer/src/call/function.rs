@@ -247,6 +247,18 @@ impl CallAnalyzer {
                     }
                 }
 
+                // Invoking a closure/callable value (`$fn(...)`, `$obj(...)`)
+                // carries no purity metadata to consult — the callee's body
+                // is opaque here, and a bound closure can freely mutate the
+                // `$this` it captured. Conservatively assume it may mutate
+                // `$this` and any object passed as an argument.
+                ctx.invalidate_prop_refined_receiver("this");
+                for arg in call.args.iter() {
+                    if let ExprKind::Variable(name) = &arg.value.kind {
+                        ctx.invalidate_prop_refined_receiver(name);
+                    }
+                }
+
                 for atomic in &callee_ty.types {
                     match atomic {
                         Atomic::TClosure { data } => return data.return_type.clone(),
@@ -511,6 +523,20 @@ impl CallAnalyzer {
                     Severity::Warning,
                     span,
                 );
+            }
+
+            // A free function has no receiver, but an object passed as an
+            // argument may have its own properties reassigned inside a
+            // callee that isn't proven pure — e.g. `save($this)` mutating
+            // `$this`. Free functions carry no separate "doesn't mutate its
+            // arguments" signal (unlike methods' `@psalm-external-mutation-
+            // free`), so `is_pure` is the only safe "touches nothing" check.
+            if !is_pure {
+                for arg in call.args.iter() {
+                    if let ExprKind::Variable(name) = &arg.value.kind {
+                        ctx.invalidate_prop_refined_receiver(name);
+                    }
+                }
             }
 
             if let Some(msg) = deprecated {

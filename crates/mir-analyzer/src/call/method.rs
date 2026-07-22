@@ -52,6 +52,7 @@ pub(crate) struct ResolvedMethod {
     pub(crate) is_abstract: bool,
     pub(crate) is_pure: bool,
     pub(crate) is_mutation_free: bool,
+    pub(crate) is_external_mutation_free: bool,
     pub(crate) params: Vec<DeclaredParam>,
     pub(crate) template_params: Vec<TemplateParam>,
     pub(crate) return_ty_raw: Type,
@@ -192,6 +193,7 @@ pub(crate) fn resolve_method_from_db(
             is_abstract: storage.is_abstract,
             is_pure: storage.is_pure,
             is_mutation_free: storage.is_mutation_free,
+            is_external_mutation_free: storage.is_external_mutation_free,
             params,
             template_params,
             return_ty_raw,
@@ -964,6 +966,28 @@ fn resolve_method_return<'a>(
                 no_named_arguments: resolved.no_named_arguments,
             },
         );
+
+        // A call we can't prove pure/mutation-free may reassign the
+        // receiver's own properties from inside the callee (its `$this` IS
+        // this receiver), staling any narrowing recorded before the call —
+        // e.g. `$this->user = $u; $this->reset(); $this->user->getId();`
+        // must not still see `$this->user` as non-null after `reset()`.
+        if !resolved.is_static && !resolved.is_pure && !resolved.is_mutation_free {
+            if let ExprKind::Variable(recv_name) = &call.object.kind {
+                ctx.invalidate_prop_refined_receiver(recv_name);
+            }
+        }
+        // Similarly, an object passed as an argument to a call that isn't
+        // proven pure/external-mutation-free may have its own properties
+        // reassigned inside the callee, regardless of which object receives
+        // the call itself (e.g. `$this->save($logger)` mutating `$logger`).
+        if !resolved.is_pure && !resolved.is_external_mutation_free {
+            for arg in call.args.iter() {
+                if let ExprKind::Variable(name) = &arg.value.kind {
+                    ctx.invalidate_prop_refined_receiver(name);
+                }
+            }
+        }
 
         // Taint sink check: emit TaintedLlmPrompt when a tainted value reaches a
         // @taint-sink annotated parameter.
