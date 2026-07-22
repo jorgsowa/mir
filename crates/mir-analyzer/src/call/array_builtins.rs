@@ -1175,6 +1175,137 @@ pub(crate) fn array_splice_return_type(arg_types: &[Type]) -> Option<Type> {
     }))
 }
 
+/// Infer the return type of `array_pad(array $array, int $length, mixed $value)`.
+///
+/// SCOPED to a pure-list source (only sequential int keys `0..n-1`, matching
+/// `TList`/`TNonEmptyList`/`TKeyedArray{is_list: true}`): padding a list to
+/// `abs($length)` elements always renumbers int keys, on either side, so the
+/// result is a fresh list regardless of pad direction. A source with any
+/// string key would need to keep those keys unrenumbered while still
+/// left/right-padding the int ones — genuinely ambiguous to model generically
+/// here, so falls back to the generic stub instead of guessing.
+pub(crate) fn array_pad_return_type(arg_types: &[Type]) -> Option<Type> {
+    let source = arg_types.first()?;
+    if source.is_mixed() {
+        return None;
+    }
+    let is_source_list = !source.types.is_empty()
+        && source.types.iter().all(|a| {
+            matches!(
+                a,
+                Atomic::TList { .. }
+                    | Atomic::TNonEmptyList { .. }
+                    | Atomic::TKeyedArray { is_list: true, .. }
+            )
+        });
+    if !is_source_list {
+        return None;
+    }
+    let (_, source_value) = crate::stmt::infer_foreach_types(source);
+    if source_value.is_mixed() {
+        return None;
+    }
+    let pad_value = arg_types.get(2)?.clone();
+    let mut value = source_value;
+    value.merge_with(&pad_value);
+
+    // Non-empty either because the source already is, or because a known
+    // non-zero literal $length guarantees at least one element is padded in.
+    let length_forces_non_empty = arg_types
+        .get(1)
+        .is_some_and(|t| matches!(t.types.as_slice(), [Atomic::TLiteralInt(n)] if *n != 0));
+    let non_empty = super::callable::is_non_empty_collection(source) || length_forces_non_empty;
+
+    let atomic = if non_empty {
+        Atomic::TNonEmptyList {
+            value: Box::new(value),
+        }
+    } else {
+        Atomic::TList {
+            value: Box::new(value),
+        }
+    };
+    Some(Type::single(atomic))
+}
+
+/// Infer the return type of `array_column($array, $column_key, $index_key = null)`.
+///
+/// SCOPED to a single resolvable row shape and a literal `string`/`int`
+/// `$column_key`: `infer_foreach_types` must yield exactly one `TKeyedArray`
+/// atom (a union of row shapes, or non-shape rows, isn't modeled). The
+/// whole-rows form (`$column_key === null`) is out of scope entirely and
+/// falls back to the generic stub. A row missing `$column_key` is silently
+/// excluded at runtime rather than included as null — reflected here by only
+/// treating the result as non-empty when the column property isn't optional.
+pub(crate) fn array_column_return_type(arg_types: &[Type]) -> Option<Type> {
+    let source = arg_types.first()?;
+    if source.is_mixed() {
+        return None;
+    }
+    let (_, row) = crate::stmt::infer_foreach_types(source);
+    if row.types.len() != 1 {
+        return None;
+    }
+    let Atomic::TKeyedArray { properties, .. } = &row.types[0] else {
+        return None;
+    };
+
+    let column_key_ty = arg_types.get(1)?;
+    let column_key = match column_key_ty.types.as_slice() {
+        [Atomic::TLiteralString(s)] => ArrayKey::String(s.clone()),
+        [Atomic::TLiteralInt(i)] => ArrayKey::Int(*i),
+        _ => return None,
+    };
+    let column_prop = properties.get(&column_key)?;
+    let value = column_prop.ty.clone();
+
+    // Omitted or an explicit literal `null` both mean "no $index_key": a
+    // fresh 0-indexed list result.
+    let index_arg = arg_types.get(2);
+    let is_no_index = match index_arg {
+        None => true,
+        Some(t) => matches!(t.types.as_slice(), [Atomic::TNull]),
+    };
+    if is_no_index {
+        let non_empty = super::callable::is_non_empty_collection(source) && !column_prop.optional;
+        let atomic = if non_empty {
+            Atomic::TNonEmptyList {
+                value: Box::new(value),
+            }
+        } else {
+            Atomic::TList {
+                value: Box::new(value),
+            }
+        };
+        return Some(Type::single(atomic));
+    }
+
+    let index_key_ty = index_arg?;
+    let index_key = match index_key_ty.types.as_slice() {
+        [Atomic::TLiteralString(s)] => ArrayKey::String(s.clone()),
+        [Atomic::TLiteralInt(i)] => ArrayKey::Int(*i),
+        _ => return None,
+    };
+    let index_prop = properties.get(&index_key)?;
+    let key = crate::expr::helpers::coerce_array_key_type(&index_prop.ty);
+
+    let non_empty = super::callable::is_non_empty_collection(source)
+        && !column_prop.optional
+        && !index_prop.optional;
+    let atomic = if non_empty {
+        Atomic::TNonEmptyArray {
+            key: Box::new(key),
+            value: Box::new(value),
+        }
+    } else {
+        Atomic::TArray {
+            key: Box::new(key),
+            value: Box::new(value),
+        }
+    };
+    Some(Type::single(atomic))
+}
+
 /// Helper: extract a readable function name from union for diagnostic output.
 fn callback_name_for_diagnostic(callback_ty: &Type) -> String {
     if let Some(Atomic::TLiteralString(fn_name)) = callback_ty.types.first() {

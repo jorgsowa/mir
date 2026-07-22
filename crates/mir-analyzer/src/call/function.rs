@@ -866,6 +866,15 @@ impl CallAnalyzer {
                     // preserve_keys=false path, int keys are always renumbered from 0.
                     "array_splice" => super::array_builtins::array_splice_return_type(&arg_types)
                         .unwrap_or(return_ty),
+                    // array_pad: a pure-list source always renumbers to a fresh list
+                    // regardless of pad direction; string-keyed sources aren't modeled.
+                    "array_pad" => super::array_builtins::array_pad_return_type(&arg_types)
+                        .unwrap_or(return_ty),
+                    // array_column: pulls one column out of each row of a single
+                    // resolvable shape; the whole-rows ($column_key === null) form
+                    // isn't modeled.
+                    "array_column" => super::array_builtins::array_column_return_type(&arg_types)
+                        .unwrap_or(return_ty),
                     // range($start, $end) with integer bounds returns non-empty-list<int<min,max>>.
                     "range" => super::callable::range_return_type(&arg_types).unwrap_or(return_ty),
                     // array_key_first/array_key_last: non-null for non-empty input; int for lists.
