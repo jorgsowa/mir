@@ -1144,8 +1144,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                             break;
                         }
                         ExprKind::ArrayAccess(inner) => {
-                            let inner_key: Option<Type> =
-                                inner.index.as_ref().map(|idx| self.analyze(idx, ctx));
+                            // Coerce to PHP's canonical array-key form (bool ->
+                            // 0/1, float truncates, null -> ""), same as
+                            // `outer_key` above — otherwise a nested write whose
+                            // OUTER index is dynamic falls through to this raw,
+                            // uncoerced type for every key but the innermost.
+                            let inner_key: Option<Type> = inner.index.as_ref().map(|idx| {
+                                super::helpers::coerce_array_key_type(&self.analyze(idx, ctx))
+                            });
                             literal_key_chain.push(inner.index.as_ref().and_then(|idx| {
                                 super::helpers::literal_array_key_of_kind(&idx.kind)
                             }));
