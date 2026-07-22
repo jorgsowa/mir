@@ -5,18 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Removed
-
-- **`BatchFileAnalyzer` / `ParsedFile`:** removed. The API had no consumers —
-  interactive hosts get memoized, cancellable bulk analysis from the session
-  sweeps (`reanalyze_files_cancellable`, `indexed_references_to`), and the CLI
-  has its own batch pipeline with lazy-load rounds and disk caching.
-  `analyze_batch` offered neither (unmemoized, uncancellable, no per-file
-  PSR-4 priority preload), so every caller was better served elsewhere.
-
-## [0.61.0] - 2026-07-21
+## [0.61.0] - 2026-07-22
 
 ### Changed
 
@@ -32,6 +21,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `indexed_subtype_classes`) is now ASCII-case-insensitive, matching PHP's
   case-insensitive class/function/method name semantics — `extends bar` is
   no longer invisible to a cold subtype scan for `Bar`.
+
+### Removed
+
+- **`BatchFileAnalyzer` / `ParsedFile`:** removed. The API had no consumers —
+  interactive hosts get memoized, cancellable bulk analysis from the session
+  sweeps (`reanalyze_files_cancellable`, `indexed_references_to`), and the CLI
+  has its own batch pipeline with lazy-load rounds and disk caching.
+  `analyze_batch` offered neither (unmemoized, uncancellable, no per-file
+  PSR-4 priority preload), so every caller was better served elsewhere.
 
 ### Fixed
 
