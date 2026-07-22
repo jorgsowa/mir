@@ -7423,7 +7423,7 @@ fn extract_enum_value_case(
         let is_match = case
             .value
             .as_ref()
-            .is_some_and(|v| v.types.iter().any(|a| *a == literal));
+            .is_some_and(|v| v.types.contains(&literal));
         if is_match {
             if matched.is_some() {
                 return None;
