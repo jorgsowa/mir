@@ -242,6 +242,19 @@ pub struct FlowState {
     /// Set by property assignments and null-guard narrowing; read by
     /// `analyze_property_access` before falling back to the declared type.
     pub prop_refined: Arc<FxHashMap<(Name, Name), Arc<Type>>>,
+
+    /// Readonly properties (native or `@readonly`) definitely assigned at
+    /// least once on every path reaching this point, keyed like
+    /// `prop_refined`. Populated only for writes inside the scope PHP allows
+    /// to initialize a readonly property (the declaring class's constructor,
+    /// or — for native `readonly` — any method of the declaring class).
+    /// Consulted before recording a further write to the same property, to
+    /// catch PHP's "cannot modify readonly property once initialized" at
+    /// analysis time (e.g. two assignments to the same property in one
+    /// constructor). Merged by intersection across branches: a property
+    /// written on only one of two branches isn't *definitely* initialized
+    /// afterward, so a later write there isn't certainly a re-init.
+    pub readonly_initialized: Arc<FxHashSet<(Name, Name)>>,
 }
 
 /// Pre-built superglobal initial state, shared across all FlowState instances.
@@ -326,6 +339,7 @@ impl FlowState {
             method_exists_guards: FxHashSet::default(),
             extension_loaded_guards: FxHashSet::default(),
             prop_refined: Arc::new(FxHashMap::default()),
+            readonly_initialized: Arc::new(FxHashSet::default()),
         }
     }
 
@@ -601,6 +615,28 @@ impl FlowState {
         );
         if self.prop_refined.contains_key(&key) {
             Arc::make_mut(&mut self.prop_refined).remove(&key);
+        }
+    }
+
+    /// Returns true if `obj_var`'s readonly property `prop` is definitely
+    /// already initialized on every path reaching this point.
+    pub fn is_readonly_initialized(&self, obj_var: &str, prop: &str) -> bool {
+        let key = (
+            Name::from(obj_var.trim_start_matches('$')),
+            Name::from(prop),
+        );
+        self.readonly_initialized.contains(&key)
+    }
+
+    /// Record that `obj_var`'s readonly property `prop` has now been
+    /// assigned on this path.
+    pub fn mark_readonly_initialized(&mut self, obj_var: &str, prop: &str) {
+        let key = (
+            Name::from(obj_var.trim_start_matches('$')),
+            Name::from(prop),
+        );
+        if !self.readonly_initialized.contains(&key) {
+            Arc::make_mut(&mut self.readonly_initialized).insert(key);
         }
     }
 
@@ -1022,6 +1058,18 @@ impl FlowState {
             .intersection(&else_ctx.extension_loaded_guards)
             .cloned()
             .collect();
+
+        // Readonly-initialized: intersection, same reasoning as the guard
+        // sets above — a property written on only one branch was NOT
+        // definitely written on every path reaching the merge point, so it
+        // must not be treated as certainly initialized afterward.
+        result.readonly_initialized = Arc::new(
+            if_ctx
+                .readonly_initialized
+                .intersection(&else_ctx.readonly_initialized)
+                .cloned()
+                .collect(),
+        );
 
         // Property refinements: keep only keys present in BOTH branches with the
         // union of their types.  A refinement present in only one branch cannot

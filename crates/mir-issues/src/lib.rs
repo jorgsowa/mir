@@ -403,6 +403,13 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/expr/assignment.rs`.
     /// Fixtures: `tests/fixtures/by-kind/readonly_property_assignment/`.
     ReadonlyPropertyAssignment { class: String, property: String },
+    /// A second write to a readonly property in a scope where writes are
+    /// otherwise allowed (the declaring constructor, or any method for a
+    /// native `readonly` property) — PHP throws `Error: Cannot modify
+    /// readonly property ... once initialized` on the second write.
+    /// Emitted by `mir-analyzer/src/expr/assignment.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/readonly_property_already_initialized/`.
+    ReadonlyPropertyAlreadyInitialized { class: String, property: String },
 
     // --- Inheritance --------------------------------------------------------
     /// Emitted by `mir-analyzer/src/class/mod.rs`.
@@ -802,6 +809,7 @@ impl IssueKind {
             | IssueKind::InvalidOverride { .. }
             | IssueKind::InvalidTemplateParam { .. }
             | IssueKind::ReadonlyPropertyAssignment { .. }
+            | IssueKind::ReadonlyPropertyAlreadyInitialized { .. }
             | IssueKind::ParseError { .. }
             | IssueKind::TaintedInput { .. }
             | IssueKind::TaintedHtml
@@ -1082,6 +1090,7 @@ impl IssueKind {
 
             // Readonly (0600-0699)
             IssueKind::ReadonlyPropertyAssignment { .. } => "MIR0600",
+            IssueKind::ReadonlyPropertyAlreadyInitialized { .. } => "MIR0601",
 
             // Inheritance (0700-0799)
             IssueKind::UnimplementedAbstractMethod { .. } => "MIR0700",
@@ -1187,12 +1196,12 @@ impl IssueKind {
             "MIR0001" | "MIR0002" | "MIR0003" | "MIR0004" | "MIR0005" | "MIR0007" | "MIR0009"
             | "MIR0010" | "MIR0011" | "MIR0012" | "MIR0013" | "MIR0200" | "MIR0201" | "MIR0202"
             | "MIR0203" | "MIR0204" | "MIR0205" | "MIR0212" | "MIR0215" | "MIR0216" | "MIR0217"
-            | "MIR0224" | "MIR0600" | "MIR0700" | "MIR0701" | "MIR0702" | "MIR0704" | "MIR0705"
-            | "MIR0706" | "MIR0707" | "MIR0708" | "MIR0709" | "MIR0711" | "MIR0712" | "MIR0713"
-            | "MIR0714" | "MIR0715" | "MIR0716" | "MIR0717" | "MIR0228" | "MIR0229" | "MIR0800"
-            | "MIR0801" | "MIR0802" | "MIR0803" | "MIR0804" | "MIR0900" | "MIR1205" | "MIR1207"
-            | "MIR1300" | "MIR1400" | "MIR1500" | "MIR1503" | "MIR1602" | "MIR1603" | "MIR1604"
-            | "MIR1605" | "MIR1606" => Some(Severity::Error),
+            | "MIR0224" | "MIR0600" | "MIR0601" | "MIR0700" | "MIR0701" | "MIR0702" | "MIR0704"
+            | "MIR0705" | "MIR0706" | "MIR0707" | "MIR0708" | "MIR0709" | "MIR0711" | "MIR0712"
+            | "MIR0713" | "MIR0714" | "MIR0715" | "MIR0716" | "MIR0717" | "MIR0228" | "MIR0229"
+            | "MIR0800" | "MIR0801" | "MIR0802" | "MIR0803" | "MIR0804" | "MIR0900" | "MIR1205"
+            | "MIR1207" | "MIR1300" | "MIR1400" | "MIR1500" | "MIR1503" | "MIR1602" | "MIR1603"
+            | "MIR1604" | "MIR1605" | "MIR1606" => Some(Severity::Error),
 
             // Warnings
             "MIR0006" | "MIR0008" | "MIR0100" | "MIR0101" | "MIR0102" | "MIR0103" | "MIR0109"
@@ -1337,6 +1346,9 @@ impl IssueKind {
             IssueKind::InterfaceInstantiation { .. } => "InterfaceInstantiation",
             IssueKind::InvalidOverride { .. } => "InvalidOverride",
             IssueKind::ReadonlyPropertyAssignment { .. } => "ReadonlyPropertyAssignment",
+            IssueKind::ReadonlyPropertyAlreadyInitialized { .. } => {
+                "ReadonlyPropertyAlreadyInitialized"
+            }
             IssueKind::InvalidTemplateParam { .. } => "InvalidTemplateParam",
             IssueKind::ShadowedTemplateParam { .. } => "ShadowedTemplateParam",
             IssueKind::TaintedInput { .. } => "TaintedInput",
@@ -1814,6 +1826,11 @@ impl IssueKind {
             IssueKind::ReadonlyPropertyAssignment { class, property } => {
                 format!(
                     "Cannot assign to readonly property {class}::${property} outside of constructor"
+                )
+            }
+            IssueKind::ReadonlyPropertyAlreadyInitialized { class, property } => {
+                format!(
+                    "Cannot modify readonly property {class}::${property} — already initialized"
                 )
             }
             IssueKind::InvalidExtendClass { parent, child } => {
@@ -2401,6 +2418,10 @@ mod code_tests {
                 class: s(),
                 property: s(),
             },
+            IssueKind::ReadonlyPropertyAlreadyInitialized {
+                class: s(),
+                property: s(),
+            },
             IssueKind::UnimplementedAbstractMethod {
                 class: s(),
                 method: s(),
@@ -2651,6 +2672,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 153);
+        assert_eq!(one_of_each().len(), 154);
     }
 }
