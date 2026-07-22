@@ -909,6 +909,11 @@ impl<'a> StatementsAnalyzer<'a> {
             let issues_mark = self.issues.issue_count();
 
             let mut iter = current.clone();
+            // `next` below is built from `pre.clone()` (merge_branches' else-path
+            // default), which resets `inside_loop` to whatever it was *before*
+            // this loop — so `current = next` loses it again after pass 1
+            // unless it's restored on every pass, not just the first.
+            iter.inside_loop = true;
             body(self, &mut iter);
 
             let mut next = FlowState::merge_branches(pre, iter.clone(), None);
@@ -976,6 +981,11 @@ impl<'a> StatementsAnalyzer<'a> {
         for bctx in break_ctxs {
             current = FlowState::merge_branches(pre, current, Some(bctx));
         }
+
+        // Code after the loop is only "inside a loop" if an outer loop already
+        // put it there — restore `pre`'s value rather than leaving the `true`
+        // forced at loop entry.
+        current.inside_loop = pre.inside_loop;
 
         current
     }

@@ -146,11 +146,130 @@ pub fn remove_key_from_shapes(ty: &Type, key: &ArrayKey) -> Type {
     result
 }
 
+/// Cap on how many properties a `TKeyedArray` shape can accumulate from
+/// straight-line literal writes before a further write generalizes the whole
+/// atom to a plain `array<K, V>`/`list<T>`. Keeps property maps (and their
+/// per-write clones) small, and bounds how large a printed shape can get.
+const MAX_SHAPE_KEYS: usize = 8;
+
+/// Try to extend every `TKeyedArray` atom in `current` with a brand-new
+/// `key: new_value` property in place, instead of collapsing the shape to a
+/// generic array. `None` means the caller should fall back to the generic
+/// accumulator: some atom isn't a shape, already has `key`, or is already at
+/// [`MAX_SHAPE_KEYS`].
+fn try_insert_new_shape_key(current: &Type, key: &ArrayKey, new_value: &Type) -> Option<Type> {
+    if current.types.is_empty() {
+        return None;
+    }
+    let all_growable = current.types.iter().all(|a| {
+        matches!(a, Atomic::TKeyedArray { properties, .. }
+            if !properties.contains_key(key) && properties.len() < MAX_SHAPE_KEYS)
+    });
+    if !all_growable {
+        return None;
+    }
+    let mut result = Type::empty();
+    result.possibly_undefined = current.possibly_undefined;
+    result.from_docblock = current.from_docblock;
+    for atomic in &current.types {
+        let Atomic::TKeyedArray {
+            properties,
+            is_open,
+            is_list,
+        } = atomic
+        else {
+            unreachable!("filtered to growable TKeyedArray above")
+        };
+        // A list stays a list only if the new key continues the 0, 1, 2, …
+        // sequence; any other key (a string, or an int that skips ahead)
+        // makes it a plain keyed shape from here on.
+        let next_is_list =
+            *is_list && matches!(key, ArrayKey::Int(i) if *i == properties.len() as i64);
+        let mut new_properties = properties.clone();
+        new_properties.insert(
+            key.clone(),
+            mir_types::atomic::KeyedProperty {
+                ty: new_value.clone(),
+                optional: false,
+            },
+        );
+        result.add_type(Atomic::TKeyedArray {
+            properties: new_properties,
+            is_open: *is_open,
+            is_list: next_is_list,
+        });
+    }
+    Some(result)
+}
+
+/// Like [`try_insert_new_shape_key`], but for push notation (`$arr[] = v`):
+/// the new key is always the next sequential integer index, so this only
+/// applies to atoms that are still list-shaped (an assoc shape can't be
+/// pushed onto without knowing what key PHP would assign it).
+fn try_push_new_shape_key(current: &Type, new_value: &Type) -> Option<Type> {
+    if current.types.is_empty() {
+        return None;
+    }
+    let all_growable = current.types.iter().all(|a| {
+        matches!(a, Atomic::TKeyedArray { properties, is_list, .. }
+            if *is_list && properties.len() < MAX_SHAPE_KEYS)
+    });
+    if !all_growable {
+        return None;
+    }
+    let mut result = Type::empty();
+    result.possibly_undefined = current.possibly_undefined;
+    result.from_docblock = current.from_docblock;
+    for atomic in &current.types {
+        let Atomic::TKeyedArray {
+            properties,
+            is_open,
+            ..
+        } = atomic
+        else {
+            unreachable!("filtered to growable TKeyedArray above")
+        };
+        let mut new_properties = properties.clone();
+        new_properties.insert(
+            ArrayKey::Int(properties.len() as i64),
+            mir_types::atomic::KeyedProperty {
+                ty: new_value.clone(),
+                optional: false,
+            },
+        );
+        result.add_type(Atomic::TKeyedArray {
+            properties: new_properties,
+            is_open: *is_open,
+            is_list: true,
+        });
+    }
+    Some(result)
+}
+
+/// Pull the key/value type out of `declared`'s array-like atom, if any. Used
+/// so a generalization fallback never ends up narrower than the variable's
+/// own declared type — otherwise a handful of same-typed literal writes seen
+/// so far could generalize to e.g. `array<string, int>` even though the
+/// declared type promises `array<string, int|string>`.
+fn declared_array_key_value(declared: Option<&Type>) -> Option<(Type, Type)> {
+    declared?.types.iter().find_map(|a| match a {
+        Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value } => {
+            Some(((**key).clone(), (**value).clone()))
+        }
+        Atomic::TList { value } | Atomic::TNonEmptyList { value } => {
+            Some((Type::single(Atomic::TInt), (**value).clone()))
+        }
+        _ => None,
+    })
+}
+
 pub fn widen_array_with_value_and_key(
     current: &Type,
     new_value: &Type,
     new_key: &Type,
     literal_key: Option<&mir_types::ArrayKey>,
+    inside_loop: bool,
+    declared_ceiling: Option<&Type>,
 ) -> Type {
     // Overwriting an EXISTING literal key on a shape (`$arr['a'] = 2;` where
     // 'a' is already a known property) updates just that one property,
@@ -193,6 +312,16 @@ pub fn widen_array_with_value_and_key(
                 });
             }
             return result;
+        }
+
+        // A brand-new key on a shape: grow it in place rather than
+        // generalizing, as long as we're not inside a loop (where the shape
+        // would otherwise grow a fresh property every fixed-point pass and
+        // never converge).
+        if !inside_loop {
+            if let Some(grown) = try_insert_new_shape_key(current, key, new_value) {
+                return grown;
+            }
         }
     }
 
@@ -247,7 +376,11 @@ pub fn widen_array_with_value_and_key(
             }
         }
     }
-    if let (Some(key), Some(value)) = (acc_key, acc_value) {
+    if let (Some(mut key), Some(mut value)) = (acc_key, acc_value) {
+        if let Some((declared_key, declared_value)) = declared_array_key_value(declared_ceiling) {
+            key.merge_with(&declared_key);
+            value.merge_with(&declared_value);
+        }
         result.add_type(Atomic::TArray {
             key: Box::new(key),
             value: Box::new(value),
@@ -263,9 +396,23 @@ pub fn widen_array_with_value_and_key(
 }
 
 /// Widen an existing array-like type by appending `new_value` via push notation (`[]`).
-/// Always produces `TList { merged_value }`, regardless of the current key type,
-/// because push notation in PHP assigns the next integer index.
-pub fn widen_array_as_list(current: &Type, new_value: &Type) -> Type {
+/// Produces `TList { merged_value }` in the general case, regardless of the
+/// current key type, because push notation in PHP assigns the next integer
+/// index — except when the current type is a still-growable list shape and
+/// we're not inside a loop, in which case the shape simply gains one more
+/// property (see [`try_push_new_shape_key`]).
+pub fn widen_array_as_list(
+    current: &Type,
+    new_value: &Type,
+    inside_loop: bool,
+    declared_ceiling: Option<&Type>,
+) -> Type {
+    if !inside_loop {
+        if let Some(grown) = try_push_new_shape_key(current, new_value) {
+            return grown;
+        }
+    }
+
     let mut result = Type::empty();
     result.possibly_undefined = current.possibly_undefined;
     result.from_docblock = current.from_docblock;
@@ -293,7 +440,10 @@ pub fn widen_array_as_list(current: &Type, new_value: &Type) -> Type {
     if !found_array {
         return current.clone();
     }
-    if let Some(v) = acc {
+    if let Some(mut v) = acc {
+        if let Some((_, declared_value)) = declared_array_key_value(declared_ceiling) {
+            v.merge_with(&declared_value);
+        }
         result.add_type(Atomic::TList { value: Box::new(v) });
     }
     result

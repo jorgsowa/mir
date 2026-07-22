@@ -134,6 +134,13 @@ pub struct FlowState {
     /// Arc-shared — set once at context construction, never mutated during analysis.
     pub byref_param_names: Arc<FxHashSet<Name>>,
 
+    /// Each parameter's declared (docblock-merged) type, stripped of `$`.
+    /// Unlike `vars`, this is never updated by narrowing — it's the original
+    /// contract, used as a generalization ceiling when a narrowed array type
+    /// widens back out (e.g. after a shape grows past its size cap).
+    /// Arc-shared — set once at context construction, never mutated during analysis.
+    pub declared_var_types: Arc<FxHashMap<Name, Type>>,
+
     /// Whether every execution path through this context has diverged
     /// (returned, thrown, or exited). Used to detect "all catch branches
     /// return" so that variables assigned only in the try body are
@@ -302,6 +309,7 @@ impl FlowState {
             read_vars: FxHashSet::default(),
             param_names: Arc::new(FxHashSet::default()),
             byref_param_names: Arc::new(FxHashSet::default()),
+            declared_var_types: Arc::new(FxHashMap::default()),
             diverges: false,
             var_locations: FxHashMap::default(),
             last_write_locs: FxHashMap::default(),
@@ -409,6 +417,7 @@ impl FlowState {
         let mut template_typed_params: FxHashSet<Name> = FxHashSet::default();
         let mut param_names: FxHashSet<Name> = FxHashSet::default();
         let mut byref_param_names: FxHashSet<Name> = FxHashSet::default();
+        let mut declared_var_types: FxHashMap<Name, Type> = FxHashMap::default();
 
         // Build a map of template names to their bounds for parameter type resolution
         let mut template_bounds_map: FxHashMap<Name, Type> = FxHashMap::default();
@@ -484,6 +493,7 @@ impl FlowState {
                 elem_ty
             };
             let name = Name::from(p.name.as_ref().trim_start_matches('$'));
+            declared_var_types.insert(name, ty.clone());
             Arc::make_mut(&mut ctx.vars).insert(name, mir_codebase::definitions::wrap_var_type(ty));
             Arc::make_mut(&mut ctx.assigned_vars).insert(name);
             param_names.insert(name);
@@ -514,6 +524,7 @@ impl FlowState {
 
         ctx.param_names = Arc::new(param_names);
         ctx.byref_param_names = Arc::new(byref_param_names);
+        ctx.declared_var_types = Arc::new(declared_var_types);
         ctx.template_param_names = Arc::new(template_param_names);
         ctx.template_typed_params = Arc::new(template_typed_params);
 
