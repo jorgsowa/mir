@@ -1,13 +1,11 @@
 use std::path::PathBuf;
 use std::process;
 
-use owo_colors::OwoColorize;
-
 use mir_issues::{Issue, Severity};
 
 use crate::config::{Baseline, Config, ErrorLevel};
 use crate::format::{format_issue, format_junit, format_sarif};
-use crate::{Cli, OutputFormat};
+use crate::{color, Cli, OutputFormat};
 
 /// Load baseline from `--baseline` flag or auto-discover `psalm-baseline.xml`.
 ///
@@ -227,13 +225,13 @@ pub fn run_output(
             .count();
         eprintln!(
             "\n{} Analyzed {} files in {:.2}s  |  {} {}  {} {}",
-            "mir".bold().green(),
+            color::banner(),
             files.len(),
             elapsed.as_secs_f64(),
-            errors.to_string().red().bold(),
-            "errors".red(),
-            warnings.to_string().yellow().bold(),
-            "warnings".yellow(),
+            color::error_count(errors),
+            color::error_word(),
+            color::warning_count(warnings),
+            color::warning_word(),
         );
     }
 

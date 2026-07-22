@@ -4,7 +4,6 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use indicatif::{ProgressBar, ProgressStyle};
-use owo_colors::OwoColorize;
 
 use mir_analyzer::{
     dead_code_issue_kinds, discover_files, AnalysisResult, AnalysisSession, BatchOptions,
@@ -12,7 +11,7 @@ use mir_analyzer::{
 };
 
 use crate::config::Config;
-use crate::{Cli, OutputFormat};
+use crate::{color, Cli, OutputFormat};
 
 // ---------------------------------------------------------------------------
 // Public entry points — one per project type
@@ -81,7 +80,7 @@ pub fn run_composer_flow(
     if !cli.quiet {
         eprintln!(
             "{} Analyzing {} file{} (from composer.json)...",
-            "mir".bold().green(),
+            color::banner(),
             files.len(),
             if files.len() == 1 { "" } else { "s" },
         );
@@ -177,7 +176,7 @@ pub fn run_plain_flow(
     if !cli.quiet {
         eprintln!(
             "{} Analyzing {} file{}{}...",
-            "mir".bold().green(),
+            color::banner(),
             files.len(),
             if files.len() == 1 { "" } else { "s" },
             cli.php_version

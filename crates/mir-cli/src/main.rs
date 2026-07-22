@@ -11,12 +11,14 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 use clap::{Parser, ValueEnum};
 
 mod analyze;
+mod color;
 mod composer;
 mod config;
 mod format;
 mod plugins;
 mod report;
 
+use color::ColorChoice;
 use config::Config;
 
 // ---------------------------------------------------------------------------
@@ -102,6 +104,10 @@ struct Cli {
     /// Run dead code detection (UnusedMethod, UnusedProperty, UnusedFunction)
     #[arg(long)]
     find_dead_code: bool,
+
+    /// Colorize output [default: auto-detect NO_COLOR/CLICOLOR/tty]
+    #[arg(long, value_enum, default_value = "auto")]
+    color: ColorChoice,
 }
 
 #[derive(Copy, Clone, Debug, ValueEnum)]
@@ -119,6 +125,7 @@ enum OutputFormat {
 
 fn main() {
     let cli = Cli::parse();
+    color::apply(cli.color);
 
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
