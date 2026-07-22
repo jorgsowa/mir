@@ -51,7 +51,7 @@ bincode    = "1"
 # CLI
 clap        = { version = "4", features = ["derive"] }
 indicatif   = "0.18"
-owo-colors  = "4"
+owo-colors  = { version = "4", features = ["supports-colors"] }
 
 # Error handling
 thiserror = "2"

@@ -1,21 +1,21 @@
-use owo_colors::OwoColorize;
-
 use mir_issues::{Issue, Severity};
+
+use crate::color;
 
 /// Renders an issue the way `mir`'s default text output prints it, e.g.
 /// `src/foo.php:3:1 error[MIR0002] UndefinedVariable: ...`.
 pub fn format_issue(issue: &Issue) -> String {
     let sev = match issue.severity {
-        Severity::Error => "error".red().to_string(),
-        Severity::Warning => "warning".yellow().to_string(),
-        Severity::Info => "info".blue().to_string(),
+        Severity::Error => color::error_label("error"),
+        Severity::Warning => color::warning_label("warning"),
+        Severity::Info => color::info_label("info"),
     };
     format!(
         "{} {}[{}] {}: {}",
-        issue.location.bright_black(),
+        color::dim(&issue.location),
         sev,
-        issue.kind.code().bright_black(),
-        issue.kind.display_name().bold(),
+        color::dim(issue.kind.code()),
+        color::bold(issue.kind.display_name()),
         issue.kind.message()
     )
 }
