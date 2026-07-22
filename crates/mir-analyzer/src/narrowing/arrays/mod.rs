@@ -28,4 +28,5 @@ pub(super) use key_exists::narrow_array_key_exists_condition;
 pub(super) use shapes::{
     array_access_base_target, narrow_array_emptiness_condition,
     narrow_container_non_null_non_false, narrow_empty_shape_key, narrow_isset_shape_key,
+    narrow_isset_shape_key_false,
 };

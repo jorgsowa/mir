@@ -29,8 +29,8 @@ use arrays::{
     narrow_array_emptiness_condition, narrow_array_key_exists_condition,
     narrow_array_key_first_or_last_null, narrow_container_non_null_non_false,
     narrow_empty_shape_key, narrow_in_array_condition, narrow_isset_shape_key,
-    narrow_prop_array_key_first_or_last_null, narrow_static_prop_array_key_first_or_last_null,
-    narrow_to_haystack_values,
+    narrow_isset_shape_key_false, narrow_prop_array_key_first_or_last_null,
+    narrow_static_prop_array_key_first_or_last_null, narrow_to_haystack_values,
 };
 pub(crate) use assertions::negate_assertion_type;
 use assertions::{
@@ -1890,6 +1890,11 @@ pub fn narrow_from_condition(
                             apply_prop_narrowed(ctx, &fqcn, &prop, current, narrowed, true);
                         }
                     }
+                } else if !is_true {
+                    // `!isset($base['key'])` on a single-level shape-typed base:
+                    // exclude union members where the key is provably present
+                    // and non-null (isset() would have been true there).
+                    narrow_isset_shape_key_false(var_expr, ctx, db, file);
                 }
             }
         }

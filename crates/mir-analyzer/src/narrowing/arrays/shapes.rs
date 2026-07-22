@@ -279,6 +279,53 @@ fn narrow_shape_path(ty: &Type, path: &[mir_types::atomic::ArrayKey]) -> Option<
     }
 }
 
+/// False-branch counterpart of `narrow_isset_shape_key`, for
+/// `!isset($base['key'])`. Weaker than `array_key_exists`'s false branch
+/// (`narrow_shape_path_key_exists_false`/`remove_key_from_sealed_shapes`):
+/// `!isset(...)` is true when the key is either absent OR present-but-null,
+/// so the only sound exclusion is a union member where the key is present,
+/// not optional, and its declared type doesn't include `null` — that member
+/// would have made `isset()` true, contradicting the false branch.
+///
+/// Scoped to single-level access only (`path.len() == 1`): a nested false
+/// branch doesn't pin down which level failed, mirroring
+/// `narrow_empty_shape_key`'s identical scoping decision for `empty()`.
+pub(crate) fn narrow_isset_shape_key_false(
+    var_expr: &php_ast::owned::Expr,
+    ctx: &mut FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) {
+    let Some((base, path)) = collect_array_access_path(var_expr, ctx, db, file) else {
+        return;
+    };
+    if path.len() != 1 {
+        return;
+    }
+    let key = &path[0];
+    let current = resolve_shape_base_current_type(ctx, &base, db, file);
+    let mut changed = false;
+    let mut result = Type::empty();
+    for atomic in &current.types {
+        if let Atomic::TKeyedArray { properties, .. } = atomic {
+            if let Some(prop) = properties.get(key) {
+                let definitely_present_non_null =
+                    !prop.optional && !prop.ty.types.iter().any(|a| matches!(a, Atomic::TNull));
+                if definitely_present_non_null {
+                    // isset() would necessarily be true for this member —
+                    // impossible under the false branch, so exclude it.
+                    changed = true;
+                    continue;
+                }
+            }
+        }
+        result.add_type(atomic.clone());
+    }
+    if changed && !result.types.is_empty() {
+        set_shape_base_narrowed(ctx, &base, current, result);
+    }
+}
+
 /// For `array_key_exists('key', $base['a']['b']...)` where the array
 /// argument is itself a nested shape-key access: walk down `path` to the
 /// container shape, then apply `array_key_exists`'s own key-presence
