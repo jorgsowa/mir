@@ -560,11 +560,15 @@ pub fn collect_file_definitions(db: &dyn MirDatabase, file: SourceFile) -> FileD
 // File-level inferred-type Salsa query
 
 type MethodInferMap = FxHashMap<(Arc<str>, Arc<str>), Arc<Type>>;
+// Property names are case-sensitive in PHP (unlike method names), so unlike
+// `MethodInferMap` this is keyed by the name as written, not lowercased.
+type PropertyInferMap = FxHashMap<(Arc<str>, Arc<str>), Arc<Type>>;
 
 #[derive(Clone, Debug)]
 pub struct InferredFileTypes {
     pub functions: Arc<FxHashMap<Arc<str>, Arc<Type>>>,
     pub methods: Arc<MethodInferMap>,
+    pub properties: Arc<PropertyInferMap>,
 }
 
 impl InferredFileTypes {
@@ -572,6 +576,7 @@ impl InferredFileTypes {
         Self {
             functions: Arc::new(FxHashMap::default()),
             methods: Arc::new(MethodInferMap::default()),
+            properties: Arc::new(PropertyInferMap::default()),
         }
     }
 }
@@ -580,11 +585,13 @@ impl PartialEq for InferredFileTypes {
     fn eq(&self, other: &Self) -> bool {
         if Arc::ptr_eq(&self.functions, &other.functions)
             && Arc::ptr_eq(&self.methods, &other.methods)
+            && Arc::ptr_eq(&self.properties, &other.properties)
         {
             return true;
         }
         if self.functions.len() != other.functions.len()
             || self.methods.len() != other.methods.len()
+            || self.properties.len() != other.properties.len()
         {
             return false;
         }
@@ -595,6 +602,11 @@ impl PartialEq for InferredFileTypes {
         }
         for (k, v) in self.methods.iter() {
             if other.methods.get(k).is_none_or(|ov| *ov != *v) {
+                return false;
+            }
+        }
+        for (k, v) in self.properties.iter() {
+            if other.properties.get(k).is_none_or(|ov| *ov != *v) {
                 return false;
             }
         }
@@ -674,9 +686,26 @@ pub fn infer_file_return_types(db: &dyn MirDatabase, file: SourceFile) -> Inferr
         );
     }
 
+    let mut properties: FxHashMap<(Arc<str>, Arc<str>), Arc<Type>> =
+        FxHashMap::with_capacity_and_hasher(inferred.properties.len(), Default::default());
+    for (fqcn, name, ty) in inferred.properties {
+        // Multiple constructor assignment sites for the same property merge
+        // via union, same reasoning as `merge_return_types` for return
+        // statements — any of them could be the runtime value.
+        properties
+            .entry((fqcn, name))
+            .and_modify(|existing: &mut Arc<Type>| {
+                let mut merged = (**existing).clone();
+                merged.merge_with(&ty);
+                *existing = mir_codebase::definitions::wrap_var_type(merged);
+            })
+            .or_insert_with(|| mir_codebase::definitions::wrap_var_type(ty));
+    }
+
     InferredFileTypes {
         functions: Arc::new(functions),
         methods: Arc::new(methods),
+        properties: Arc::new(properties),
     }
 }
 

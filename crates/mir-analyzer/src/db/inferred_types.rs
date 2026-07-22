@@ -87,3 +87,41 @@ pub fn inferred_method_return_type_demand(
         .get(&(Arc::<str>::from(fqcn), Arc::<str>::from(method_name_lower)))
         .cloned()
 }
+
+/// Demand-driven inferred property type lookup, for a property with no
+/// native type hint and no `@var` docblock (see `PropertyDef::ty`).
+///
+/// Locates the file that declares `fqcn` via the workspace symbol index,
+/// then calls [`crate::db::infer_file_return_types`] on that file — the same
+/// inference-only body-analysis pass also collects the union of types
+/// directly assigned to the property in `fqcn`'s own constructor. `fqcn`
+/// must be the property's DECLARING class (e.g. `find_property_in_chain`'s
+/// owner), and `name` is case-sensitive (PHP property names are). Returns
+/// `None` when the class is unknown or nothing was inferred for it.
+pub fn inferred_property_type_demand(
+    db: &dyn MirDatabase,
+    fqcn: &str,
+    name: &str,
+) -> Option<Arc<Type>> {
+    let idx = crate::db::workspace_index(db);
+    let key = mir_types::Name::new(fqcn).ascii_lowercase();
+    let sf = match idx.class_like.get(&key)? {
+        SymbolLoc::Class { file, .. }
+        | SymbolLoc::Interface { file, .. }
+        | SymbolLoc::Trait { file, .. }
+        | SymbolLoc::Enum { file, .. } => *file,
+        _ => return None,
+    };
+    let path = sf.path(db).clone();
+    let already_active = INFER_IN_PROGRESS.with(|s| s.borrow().contains(&path));
+    if already_active {
+        return None;
+    }
+    INFER_IN_PROGRESS.with(|s| s.borrow_mut().insert(path.clone()));
+    let _guard = InferGuard(path);
+    let inferred = crate::db::infer_file_return_types(db, sf);
+    inferred
+        .properties
+        .get(&(Arc::<str>::from(fqcn), Arc::<str>::from(name)))
+        .cloned()
+}

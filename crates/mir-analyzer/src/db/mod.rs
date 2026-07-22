@@ -191,6 +191,7 @@ pub use self::find_queries::{
 };
 pub use self::inferred_types::{
     inferred_function_return_type_demand, inferred_method_return_type_demand,
+    inferred_property_type_demand,
 };
 #[allow(unused_imports)]
 pub use self::mirdb::MirDbStorage;
