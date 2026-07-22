@@ -121,6 +121,9 @@ pub(crate) enum AnalysisMode {
 pub(crate) struct InferredTypes {
     pub(crate) functions: Vec<(Arc<str>, Type)>,
     pub(crate) methods: Vec<(Arc<str>, Arc<str>, Type)>,
+    /// `(declaring_fqcn, property_name, inferred_type)` — see
+    /// `BodyAnalyzer::record_property_inference`.
+    pub(crate) properties: Vec<(Arc<str>, Arc<str>, Type)>,
 }
 
 /// Look up `(params, return_ty, template_params, throws)` for a method via
@@ -474,6 +477,7 @@ impl<'a> BodyAnalyzer<'a> {
             inferred_types: Arc::new(Mutex::new(InferredTypes {
                 functions: Vec::new(),
                 methods: Vec::new(),
+                properties: Vec::new(),
             })),
         }
     }
@@ -487,6 +491,7 @@ impl<'a> BodyAnalyzer<'a> {
             inferred_types: Arc::new(Mutex::new(InferredTypes {
                 functions: Vec::new(),
                 methods: Vec::new(),
+                properties: Vec::new(),
             })),
         }
     }
@@ -510,6 +515,22 @@ impl<'a> BodyAnalyzer<'a> {
             let mut types = self.inferred_types.lock();
             types
                 .methods
+                .push((Arc::from(fqcn), Arc::from(name), inferred.clone()));
+        }
+    }
+
+    /// Records an inferred type for a property with no native/docblock type
+    /// (see `PropertyDef::ty`/`has_native_type`) — the union of what its
+    /// declaring constructor directly assigned to it, read out of
+    /// `FlowState::prop_refined` after the constructor body is analyzed.
+    /// `fqcn` is the DECLARING class (from `find_property_in_chain`'s
+    /// owner), not necessarily the class whose constructor was analyzed —
+    /// same property-name convention as `find_property_in_chain` itself.
+    pub(crate) fn record_property_inference(&self, fqcn: &str, name: &str, inferred: &Type) {
+        if self.mode == AnalysisMode::InferenceOnly {
+            let mut types = self.inferred_types.lock();
+            types
+                .properties
                 .push((Arc::from(fqcn), Arc::from(name), inferred.clone()));
         }
     }

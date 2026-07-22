@@ -1527,6 +1527,25 @@ impl<'a> ExpressionAnalyzer<'a> {
         const_ty
     }
 
+    /// `p.ty`, falling back to a type inferred from what the declaring
+    /// constructor directly assigned this property, when it has no native
+    /// type hint and no `@var` docblock at all (`p.ty` is `None` only in
+    /// that case — see `PropertyDef::ty`). `owner` must be the property's
+    /// DECLARING class (`find_property_in_chain`'s owner), matching how
+    /// `record_property_inference` keyed it.
+    fn effective_property_ty(
+        &self,
+        owner: &Arc<str>,
+        prop_name: &str,
+        p: &mir_codebase::definitions::PropertyDef,
+    ) -> Type {
+        p.ty.as_deref().cloned().unwrap_or_else(|| {
+            crate::db::inferred_property_type_demand(self.db, owner.as_ref(), prop_name)
+                .map(|t| (*t).clone())
+                .unwrap_or_else(Type::mixed)
+        })
+    }
+
     /// `declaring_class` is set to the FQCN of the class that declares the
     /// property when the inheritance-chain lookup resolves it — reused by the
     /// callers for symbol recording so the chain is only walked once.
@@ -1560,7 +1579,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 span,
                             );
                         }
-                        let ty = p.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
+                        let ty = self.effective_property_ty(&owner, prop_name, &p);
                         // Substitute the receiver's own concrete type params (e.g.
                         // `Box<int>`'s `T → int`) into a property declared with a
                         // bare `@var T` — plus, when the property is inherited from
@@ -1679,7 +1698,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         prop_name,
                     );
                     if let Some((owner, p)) = prop_result {
-                        let ty = p.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
+                        let ty = self.effective_property_ty(&owner, prop_name, &p);
                         self.record_ref(Arc::from(format!("prop:{}::{}", owner, prop_name)), span);
                         *declaring_class = Some(owner);
                         return ty;
@@ -1820,7 +1839,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 span,
                             );
                         }
-                        let ty = p.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
+                        let ty = self.effective_property_ty(&owner, prop_name, &p);
                         self.record_ref(Arc::from(format!("prop:{}::{}", owner, prop_name)), span);
                         *declaring_class = Some(owner);
                         return ty;
@@ -1840,8 +1859,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                                         Arc::from(format!("prop:{}::{}", owner, prop_name)),
                                         span,
                                     );
+                                    let ty = self.effective_property_ty(&owner, prop_name, &p);
                                     *declaring_class = Some(owner);
-                                    return p.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
+                                    return ty;
                                 }
                             }
                         }

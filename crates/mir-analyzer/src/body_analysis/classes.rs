@@ -889,6 +889,33 @@ impl<'a> BodyAnalyzer<'a> {
         };
         let body_diverges = ctx.diverges;
 
+        // Infer a type for properties with no native type hint and no `@var`
+        // docblock from what the constructor directly assigned them — reuses
+        // `prop_refined`'s already-resolved RHS type rather than
+        // re-inferring it. Only the (InferenceOnly-mode) declaring analysis
+        // records this; `record_property_inference` itself gates on mode.
+        // Like `prop_refined`, a property assigned only on some branches may
+        // be absent here (merge_branches drops a refinement not present on
+        // every path) — that's fine, it just means no signal to record.
+        if is_ctor {
+            let this_sym = mir_types::Name::from("this");
+            for ((obj, prop_sym), refined_ty) in ctx.prop_refined.iter() {
+                if *obj != this_sym {
+                    continue;
+                }
+                let prop_name = prop_sym.as_str();
+                if let Some((owner, p)) = crate::db::find_property_in_chain(
+                    self.db,
+                    crate::db::Fqcn::from_str(self.db, fqcn),
+                    prop_name,
+                ) {
+                    if p.ty.is_none() {
+                        self.record_property_inference(owner.as_ref(), prop_name, refined_ty);
+                    }
+                }
+            }
+        }
+
         // Constructor definite-assignment: a native-typed, non-nullable,
         // default-less property declared directly on this class must be
         // assigned on every reachable exit path, or a read afterward throws
