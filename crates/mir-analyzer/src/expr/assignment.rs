@@ -1,8 +1,8 @@
 use super::helpers::{
-    as_concat_str, extract_simple_var, extract_string_from_expr, infer_arithmetic, infer_div,
-    infer_int_range_arithmetic, is_non_empty_when_concat, is_property_type_coercion,
-    property_assign_compatible, type_refs_any_template, widen_array_as_list,
-    widen_array_with_value_and_key,
+    as_concat_str, definite_key_state, extract_simple_var, extract_string_from_expr,
+    infer_arithmetic, infer_div, infer_int_range_arithmetic, is_non_empty_when_concat,
+    is_property_type_coercion, literal_array_key_of_kind, property_assign_compatible,
+    type_refs_any_template, widen_array_as_list, widen_array_with_value_and_key, DefiniteKeyState,
 };
 use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
@@ -197,9 +197,30 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // produce.
                 let is_undefined_var =
                     extract_simple_var(&a.target).is_some_and(|name| !ctx.var_is_defined(&name));
+                // `$arr['a'] ??= 'y'` on a single-level literal array offset: if the
+                // array's shape proves the key is definitely absent (or definitely
+                // present with a non-null value), we know for certain whether the
+                // right-hand side runs — no need to fall back to a plain union of
+                // "maybe the old value, maybe the new one".
+                let literal_offset_state = match &a.target.kind {
+                    ExprKind::ArrayAccess(aa) => match (&aa.array.kind, aa.index.as_deref()) {
+                        (ExprKind::Variable(name), Some(idx)) => {
+                            literal_array_key_of_kind(&idx.kind).and_then(|key| {
+                                let base = ctx.get_var(name.trim_start_matches('$'));
+                                definite_key_state(&base, &key)
+                            })
+                        }
+                        _ => None,
+                    },
+                    _ => None,
+                };
                 let lhs_ty = self.with_existence_check(|ea| ea.analyze(&a.target, ctx));
-                let merged = if is_undefined_var {
+                let merged = if is_undefined_var
+                    || matches!(literal_offset_state, Some(DefiniteKeyState::Absent))
+                {
                     rhs_ty.clone()
+                } else if let Some(DefiniteKeyState::Present(ty)) = literal_offset_state {
+                    ty
                 } else {
                     Type::merge(&lhs_ty.remove_null(), &rhs_ty)
                 };

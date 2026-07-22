@@ -2182,7 +2182,8 @@ pub(crate) fn array_push_unshift_byref_type(
             if pushed.is_mixed() {
                 return arr.clone();
             }
-            current = crate::expr::helpers::widen_array_as_list(&current, pushed, inside_loop, None);
+            current =
+                crate::expr::helpers::widen_array_as_list(&current, pushed, inside_loop, None);
         }
         return current;
     }
