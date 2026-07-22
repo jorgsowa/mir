@@ -690,10 +690,13 @@ pub(crate) fn str_repeat_return_type(arg_types: &[Type]) -> Option<Type> {
 
 /// Infer the return type of `array_fill($start_index, $count, $value)`.
 ///
-/// When the count argument is provably >= 1, the result is `non-empty-list<T>`
-/// where T is the type of `$value`. Falls through to `None` otherwise so the
-/// stub's generic `array` is used.
+/// When the count argument is provably >= 1, the result is
+/// `non-empty-list<T>` if `$start_index` is provably `0`, or
+/// `non-empty-array<int, T>` if it's provably nonzero (T is the type of
+/// `$value`). Falls through to `None` otherwise so the stub's generic
+/// `array` is used.
 pub(crate) fn array_fill_return_type(arg_types: &[Type]) -> Option<Type> {
+    let start = arg_types.first()?;
     let count = arg_types.get(1)?;
     let value = arg_types.get(2)?;
     let count_is_positive = !count.types.is_empty()
@@ -703,13 +706,36 @@ pub(crate) fn array_fill_return_type(arg_types: &[Type]) -> Option<Type> {
             Atomic::TIntRange { min, .. } => min.is_some_and(|m| m >= 1),
             _ => false,
         });
-    if count_is_positive {
-        Some(Type::single(Atomic::TNonEmptyList {
-            value: Box::new(value.clone()),
-        }))
-    } else {
-        None
+    if !count_is_positive {
+        return None;
     }
+    // A list (keys 0..count-1) only when $start_index is provably exactly
+    // 0 — any other start makes the result a non-list int-keyed array (PHP
+    // also special-cases a NEGATIVE start_index: only the first key keeps
+    // it, the rest restart from 0 — still never a list, so it's covered by
+    // the same "not zero" fallback below rather than needing its own arm).
+    let start_is_zero = matches!(start.types.as_slice(), [Atomic::TLiteralInt(0)]);
+    if start_is_zero {
+        return Some(Type::single(Atomic::TNonEmptyList {
+            value: Box::new(value.clone()),
+        }));
+    }
+    let start_is_known_non_zero = !start.types.is_empty()
+        && start.types.iter().all(|a| match a {
+            Atomic::TLiteralInt(n) => *n != 0,
+            Atomic::TPositiveInt | Atomic::TNegativeInt => true,
+            Atomic::TIntRange { min, max } => {
+                min.is_some_and(|m| m > 0) || max.is_some_and(|m| m < 0)
+            }
+            _ => false,
+        });
+    if start_is_known_non_zero {
+        return Some(Type::single(Atomic::TNonEmptyArray {
+            key: Box::new(Type::single(Atomic::TInt)),
+            value: Box::new(value.clone()),
+        }));
+    }
+    None
 }
 
 /// Infer the return type of `implode($separator, $array)` / `join($separator, $array)`.
