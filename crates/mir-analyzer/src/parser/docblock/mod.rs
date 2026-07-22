@@ -36,7 +36,7 @@ impl DocblockParser {
                         }
                     }
                 }
-                "param" | "psalm-param" | "phpstan-param" => {
+                "param" | "psalm-param" | "phpstan-param" | "phan-param" => {
                     if let Some(body_str) = body_text(&tag.body) {
                         if let Some((ty_s, name)) = parse_param_line(&body_str) {
                             // Check if the parsed type is valid
