@@ -801,16 +801,48 @@ pub(crate) fn array_reverse_return_type(arg_types: &[Type]) -> Option<Type> {
     if arr.is_mixed() {
         return None;
     }
-    let (_, value) = crate::stmt::infer_foreach_types(arr);
+    let (key, value) = crate::stmt::infer_foreach_types(arr);
     if value.is_mixed() {
         return None;
     }
+    // `array_reverse` always preserves string keys; `$preserve_keys` (2nd
+    // arg) only controls whether INT keys are renumbered from 0 (false,
+    // the default) or kept as-is (true). Only an int-keyed-only source with
+    // preserve_keys false/absent becomes a re-indexed list — everything
+    // else keeps its original key type (values just get reordered).
+    let preserve_keys = arg_types.get(1).is_some_and(|t| {
+        t.types
+            .iter()
+            .any(|a| matches!(a, Atomic::TTrue | Atomic::TBool))
+            && !t
+                .types
+                .iter()
+                .any(|a| matches!(a, Atomic::TFalse | Atomic::TNull))
+    });
+    let key_is_int_only = !key.is_mixed() && key.types.iter().all(Atomic::is_int);
+    if key_is_int_only && !preserve_keys {
+        let atomic = if is_non_empty_collection(arr) {
+            Atomic::TNonEmptyList {
+                value: Box::new(value),
+            }
+        } else {
+            Atomic::TList {
+                value: Box::new(value),
+            }
+        };
+        return Some(Type::single(atomic));
+    }
+    if key.is_mixed() {
+        return None;
+    }
     let atomic = if is_non_empty_collection(arr) {
-        Atomic::TNonEmptyList {
+        Atomic::TNonEmptyArray {
+            key: Box::new(key),
             value: Box::new(value),
         }
     } else {
-        Atomic::TList {
+        Atomic::TArray {
+            key: Box::new(key),
             value: Box::new(value),
         }
     };
