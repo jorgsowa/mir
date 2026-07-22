@@ -854,6 +854,19 @@ impl<'a> BodyAnalyzer<'a> {
         seed_param_locations(&mut ctx, &method.params, source, source_map);
         record_param_symbols(all_symbols, file, source, &method.params, &ctx);
 
+        // Promoted constructor properties are implicitly assigned on every
+        // call — seed them as definitely-assigned before the body runs so
+        // the definite-assignment check below never flags them.
+        if is_ctor {
+            for param in method.params.iter() {
+                if param.visibility.is_some() {
+                    if let Some(name) = param.name.as_deref() {
+                        ctx.mark_this_prop_assigned(name);
+                    }
+                }
+            }
+        }
+
         let mut buf = IssueBuffer::new();
         let mut sa = StatementsAnalyzer::new(
             self.db,
@@ -875,6 +888,67 @@ impl<'a> BodyAnalyzer<'a> {
             build_generator_return_type(&sa.yielded_types, inferred)
         };
         let body_diverges = ctx.diverges;
+
+        // Constructor definite-assignment: a native-typed, non-nullable,
+        // default-less property declared directly on this class must be
+        // assigned on every reachable exit path, or a read afterward throws
+        // PHP's "must not be accessed before initialization". Skipped
+        // entirely if the body never reaches its end (every path already
+        // returns/throws) or if `$this` may have reached a call this
+        // analysis can't see into (a delegating init helper it can't verify
+        // actually assigns the property). Only the class's OWN properties
+        // are checked — an inherited property is the declaring ancestor's
+        // constructor's concern, not this one's.
+        if is_ctor && self.mode == AnalysisMode::Full && !body_diverges && !ctx.this_escaped_to_call
+        {
+            if let Some(class) =
+                crate::db::find_class_like(self.db, crate::db::Fqcn::from_str(self.db, fqcn))
+            {
+                if let Some(props) = class.own_properties() {
+                    for (prop_name, p) in props.iter() {
+                        let requires_init = p.has_native_type
+                            && p.default.is_none()
+                            && p.ty.as_deref().is_some_and(|ty| !ty.is_nullable());
+                        if !requires_init {
+                            continue;
+                        }
+                        if ctx
+                            .assigned_this_props
+                            .contains(&mir_types::Name::from(prop_name.as_ref()))
+                        {
+                            continue;
+                        }
+                        let name_span = method_header_name_span(source, method);
+                        let (line, col_start) = crate::diagnostics::offset_to_line_col(
+                            source,
+                            name_span.start,
+                            source_map,
+                        );
+                        let (line_end, col_end) = crate::diagnostics::offset_to_line_col(
+                            source,
+                            name_span.end,
+                            source_map,
+                        );
+                        all_issues.push(mir_issues::Issue::new(
+                            mir_issues::IssueKind::PropertyPossiblyUninitialized {
+                                class: fqcn.to_string(),
+                                property: prop_name.to_string(),
+                            },
+                            mir_issues::Location {
+                                file: file.clone(),
+                                line,
+                                line_end,
+                                col_start,
+                                col_end: crate::diagnostics::clamp_col_end(
+                                    line, line_end, col_start, col_end,
+                                ),
+                            },
+                        ));
+                    }
+                }
+            }
+        }
+
         drop(sa);
 
         if let Some(type_envs) = type_envs {
