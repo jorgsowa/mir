@@ -17,9 +17,9 @@ use super::core::{
     resolve_prop_current_type, resolve_static_prop_current_type, set_narrowed,
 };
 use super::instanceof_core::narrow_or_instanceof_union;
-use super::{
-    narrow_from_condition, narrow_from_type_fn, narrow_prop_from_type_fn,
-    narrow_static_prop_from_type_fn,
+use super::narrow_from_condition;
+use super::type_fn::{
+    narrow_from_type_fn, narrow_prop_from_type_fn, narrow_static_prop_from_type_fn,
 };
 
 /// Collect class names from `instanceof` checks on the SAME variable across
