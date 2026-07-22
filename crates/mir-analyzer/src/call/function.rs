@@ -964,6 +964,7 @@ impl CallAnalyzer {
                         let new_type = super::callable::array_push_unshift_byref_type(
                             original_arr,
                             &push_types,
+                            ctx.inside_loop,
                         );
                         ctx.set_var(var_name, new_type);
                     }

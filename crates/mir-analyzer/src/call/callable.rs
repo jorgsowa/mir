@@ -2155,9 +2155,36 @@ fn preg_match_leaf(flags: i64) -> Type {
     }
 }
 
-pub(crate) fn array_push_unshift_byref_type(arr: &Type, push_types: &[Type]) -> Type {
+pub(crate) fn array_push_unshift_byref_type(
+    arr: &Type,
+    push_types: &[Type],
+    inside_loop: bool,
+) -> Type {
     if arr.is_mixed() || push_types.is_empty() {
         return arr.clone();
+    }
+    // A genuinely empty source (`$arr = []` before the call, or the closed
+    // `array{}` a proven-empty narrow produces) carries no per-property info
+    // for `infer_foreach_types` to fold, so it falls back to `mixed` there and
+    // this function would otherwise bail out to `arr.clone()` — leaving the
+    // variable typed as still-empty even though it definitely isn't anymore.
+    // Prepending onto nothing is identical to appending onto nothing (both
+    // just produce the pushed values in order, 0-indexed), so route through
+    // the same shape-preserving growth `$arr[] = …` uses for both functions.
+    if !arr.types.is_empty()
+        && arr
+            .types
+            .iter()
+            .all(|a| matches!(a, Atomic::TKeyedArray { properties, .. } if properties.is_empty()))
+    {
+        let mut current = arr.clone();
+        for pushed in push_types {
+            if pushed.is_mixed() {
+                return arr.clone();
+            }
+            current = crate::expr::helpers::widen_array_as_list(&current, pushed, inside_loop, None);
+        }
+        return current;
     }
     let (_, src_value) = crate::stmt::infer_foreach_types(arr);
     let mut value = src_value;
