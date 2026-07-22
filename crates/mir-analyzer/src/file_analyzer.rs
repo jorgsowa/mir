@@ -204,7 +204,11 @@ impl<'a> BatchFileAnalyzer<'a> {
 
         // Second pass: analyze files in parallel.
         // Each rayon worker gets its own database clone (Salsa is Send but !Sync).
-        let db = self.session.snapshot_db();
+        // Freeze on the pass-scoped snapshot: all index mutation (stubs,
+        // vendor eager files) completed above, and a concurrent index write
+        // cancels the pass, so the frozen view is never observed stale.
+        let mut db = self.session.snapshot_db();
+        db.freeze_workspace_index();
         let results: Vec<(Arc<str>, FileAnalysis, Vec<crate::db::RefLoc>)> = files
             .into_par_iter()
             .map_with(db, |db, file| {
