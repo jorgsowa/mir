@@ -621,6 +621,36 @@ impl CallAnalyzer {
                     no_named_arguments: resolved.no_named_arguments,
                 },
             );
+            // `self::`/`static::`/`parent::`/`$this::` forwarding a
+            // non-static method call still runs against the current `$this`
+            // — a call we can't prove pure/mutation-free may reassign its
+            // properties, staling narrowing recorded before the call.
+            if is_self_parent_call
+                && !resolved.is_static
+                && !resolved.is_pure
+                && !resolved.is_mutation_free
+            {
+                ctx.invalidate_prop_refined_receiver("this");
+            }
+            // A genuinely static call (`Foo::bar()`) has no receiver object,
+            // but may still mutate `fqcn`'s own static properties — only
+            // `is_pure` (not `is_mutation_free`, which is documented as
+            // scoped to `$this`) is a trustworthy "touches nothing" signal
+            // here, mirroring the `is_in_pure_fn` check above.
+            if resolved.is_static && !resolved.is_pure {
+                ctx.invalidate_prop_refined_receiver(&fqcn);
+            }
+            // An object passed as an argument may have its own properties
+            // reassigned inside a callee that isn't proven pure/external-
+            // mutation-free, regardless of what's being called on.
+            if !resolved.is_pure && !resolved.is_external_mutation_free {
+                for arg in call.args.iter() {
+                    if let ExprKind::Variable(name) = &arg.value.kind {
+                        ctx.invalidate_prop_refined_receiver(name);
+                    }
+                }
+            }
+
             let owner_fqcn = resolved.owner_fqcn.clone();
             let ret_raw = resolved.return_ty_raw;
 
@@ -1096,6 +1126,19 @@ impl CallAnalyzer {
         for arg in call.args.iter() {
             ea.analyze(&arg.value, ctx);
             super::consume_arg_assignment(&arg.value, ctx);
+            if let ExprKind::Variable(name) = &arg.value.kind {
+                ctx.invalidate_prop_refined_receiver(name);
+            }
+        }
+        // The called method's name is unknown, so its purity can't be
+        // checked — conservatively assume it may mutate `$this` (a
+        // self::/static::/parent:: forward) and, when the target class is
+        // known, that class's own static properties.
+        ctx.invalidate_prop_refined_receiver("this");
+        if let ExprKind::Identifier(name) = &call.class.kind {
+            let resolved = crate::db::resolve_name(ea.db, &ea.file, name.as_ref());
+            let fqcn = resolve_static_class(&resolved, ctx);
+            ctx.invalidate_prop_refined_receiver(&fqcn);
         }
         Type::mixed()
     }

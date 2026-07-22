@@ -604,6 +604,18 @@ impl FlowState {
         }
     }
 
+    /// Discard every narrowed property type recorded for one receiver (e.g.
+    /// `"this"`, another object variable, or a static-fqcn key). Call this
+    /// after a call we can't prove pure/mutation-free where `receiver` names
+    /// the object: the callee's `$this` is that object, so it may reassign
+    /// any of its own properties, making prior narrowing stale.
+    pub fn invalidate_prop_refined_receiver(&mut self, receiver: &str) {
+        let receiver = Name::from(receiver.trim_start_matches('$'));
+        if self.prop_refined.keys().any(|(obj, _)| *obj == receiver) {
+            Arc::make_mut(&mut self.prop_refined).retain(|(obj, _), _| *obj != receiver);
+        }
+    }
+
     /// Mark a variable as carrying tainted (user-controlled) data.
     pub fn taint_var(&mut self, name: &str) {
         let name = Name::from(name.trim_start_matches('$'));
