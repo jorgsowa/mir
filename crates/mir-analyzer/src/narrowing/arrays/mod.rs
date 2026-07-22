@@ -16,20 +16,16 @@ mod shapes;
 pub(super) use count::{
     extract_array_key_first_or_last_arg, extract_array_key_first_or_last_static_prop_arg,
     extract_count_arg, extract_count_static_prop_arg, narrow_array_count_comparison,
-    narrow_array_key_first_or_last_null, narrow_prop_array_count_comparison,
-    narrow_prop_array_key_first_or_last_null, narrow_static_prop_array_count_comparison,
-    narrow_static_prop_array_key_first_or_last_null,
+    narrow_array_count_condition, narrow_array_key_first_or_last_null,
+    narrow_prop_array_count_comparison, narrow_prop_array_key_first_or_last_null,
+    narrow_static_prop_array_count_comparison, narrow_static_prop_array_key_first_or_last_null,
 };
 pub(super) use in_array::{
-    extract_haystack_type, in_array_loose_narrowing_is_safe, narrow_to_haystack_values,
+    extract_haystack_type, in_array_loose_narrowing_is_safe, narrow_in_array_condition,
+    narrow_to_haystack_values,
 };
-pub(super) use key_exists::{
-    add_key_to_sealed_shapes, narrow_prop_array_key_exists, narrow_static_prop_array_key_exists,
-    remove_key_from_sealed_shapes,
-};
+pub(super) use key_exists::narrow_array_key_exists_condition;
 pub(super) use shapes::{
-    array_access_base_target, collect_array_access_path, narrow_container_non_null_non_false,
-    narrow_empty_shape_key, narrow_isset_shape_key, narrow_prop_array_empty,
-    narrow_shape_path_key_exists, narrow_shape_path_key_exists_false,
-    narrow_static_prop_array_empty, resolve_shape_base_current_type, set_shape_base_narrowed,
+    array_access_base_target, narrow_array_emptiness_condition,
+    narrow_container_non_null_non_false, narrow_empty_shape_key, narrow_isset_shape_key,
 };

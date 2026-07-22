@@ -9,7 +9,8 @@ use crate::db::MirDatabase;
 use crate::flow_state::FlowState;
 
 use super::super::core::{
-    apply_prop_narrowed, extract_static_prop_access, resolve_prop_current_type,
+    apply_prop_narrowed, extract_any_prop_access, extract_static_prop_access, extract_var_name,
+    narrow_receiver_non_null_on_prop_match, resolve_prop_current_type,
     resolve_static_prop_current_type, ScalarArgTarget,
 };
 use super::key_exists::{add_key_to_sealed_shapes, remove_key_from_sealed_shapes};
@@ -401,6 +402,69 @@ pub(crate) fn narrow_shape_path_key_exists_false(
         Some(result)
     } else {
         None
+    }
+}
+
+/// Condition-matching glue for `narrow_from_condition`'s `===`/`!==` and
+/// `==`/`!=` arms: recognizes `$arr === []` / `$arr !== []` (and the loose
+/// `==`/`!=` equivalents, equally sound since loose array equality requires
+/// identical key/value pairs) for a var, prop, or static-prop receiver on
+/// either side of the comparison, dispatching to `narrow_prop_array_empty`/
+/// `narrow_static_prop_array_empty` above (the plain-variable case is
+/// narrowed inline, mirroring those two). Returns whether an empty-array-
+/// literal side was found at all — regardless of whether narrowing actually
+/// changed anything — since callers rely on this to short-circuit their own
+/// `else if` chain exactly as the inlined form did.
+pub(crate) fn narrow_array_emptiness_condition(
+    ctx: &mut FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+    left: &php_ast::owned::Expr,
+    right: &php_ast::owned::Expr,
+    effective_true: bool,
+) -> bool {
+    if let ExprKind::Array(elems) = &right.kind {
+        if elems.is_empty() {
+            if let Some(var_name) = extract_var_name(left) {
+                let current = ctx.get_var(&var_name);
+                let narrowed = if effective_true {
+                    current.narrow_to_empty_collection()
+                } else {
+                    current.narrow_to_non_empty_collection()
+                };
+                if !narrowed.is_empty() && narrowed != current {
+                    ctx.set_var(&var_name, narrowed);
+                }
+            } else if let Some((obj, prop)) = extract_any_prop_access(left) {
+                narrow_prop_array_empty(ctx, &obj, &prop, db, file, effective_true);
+                narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
+            } else if let Some((fqcn, prop)) = extract_static_prop_access(left, ctx, db, file) {
+                narrow_static_prop_array_empty(ctx, &fqcn, &prop, db, effective_true);
+            }
+        }
+        true
+    } else if let ExprKind::Array(elems) = &left.kind {
+        if elems.is_empty() {
+            if let Some(var_name) = extract_var_name(right) {
+                let current = ctx.get_var(&var_name);
+                let narrowed = if effective_true {
+                    current.narrow_to_empty_collection()
+                } else {
+                    current.narrow_to_non_empty_collection()
+                };
+                if !narrowed.is_empty() && narrowed != current {
+                    ctx.set_var(&var_name, narrowed);
+                }
+            } else if let Some((obj, prop)) = extract_any_prop_access(right) {
+                narrow_prop_array_empty(ctx, &obj, &prop, db, file, effective_true);
+                narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
+            } else if let Some((fqcn, prop)) = extract_static_prop_access(right, ctx, db, file) {
+                narrow_static_prop_array_empty(ctx, &fqcn, &prop, db, effective_true);
+            }
+        }
+        true
+    } else {
+        false
     }
 }
 

@@ -23,18 +23,14 @@ mod strings;
 mod type_fn;
 
 use arrays::{
-    add_key_to_sealed_shapes, array_access_base_target, collect_array_access_path,
-    extract_array_key_first_or_last_arg, extract_array_key_first_or_last_static_prop_arg,
-    extract_count_arg, extract_count_static_prop_arg, extract_haystack_type,
-    in_array_loose_narrowing_is_safe, narrow_array_count_comparison,
+    array_access_base_target, extract_array_key_first_or_last_arg,
+    extract_array_key_first_or_last_static_prop_arg, extract_haystack_type,
+    in_array_loose_narrowing_is_safe, narrow_array_count_condition,
+    narrow_array_emptiness_condition, narrow_array_key_exists_condition,
     narrow_array_key_first_or_last_null, narrow_container_non_null_non_false,
-    narrow_empty_shape_key, narrow_isset_shape_key, narrow_prop_array_count_comparison,
-    narrow_prop_array_empty, narrow_prop_array_key_exists,
-    narrow_prop_array_key_first_or_last_null, narrow_shape_path_key_exists,
-    narrow_shape_path_key_exists_false, narrow_static_prop_array_count_comparison,
-    narrow_static_prop_array_empty, narrow_static_prop_array_key_exists,
-    narrow_static_prop_array_key_first_or_last_null, narrow_to_haystack_values,
-    remove_key_from_sealed_shapes, resolve_shape_base_current_type, set_shape_base_narrowed,
+    narrow_empty_shape_key, narrow_in_array_condition, narrow_isset_shape_key,
+    narrow_prop_array_key_first_or_last_null, narrow_static_prop_array_key_first_or_last_null,
+    narrow_to_haystack_values,
 };
 pub(crate) use assertions::negate_assertion_type;
 use assertions::{
@@ -43,7 +39,6 @@ use assertions::{
 };
 use class_const_compare::narrow_from_static_or_class_const_comparison;
 use class_introspection::{
-    extract_class_implements_or_parents_arg, extract_class_implements_or_parents_static_prop_arg,
     extract_dynamic_class_const_static_prop_var, extract_dynamic_class_const_var,
     extract_get_class_arg, extract_get_class_static_prop_arg, extract_get_debug_type_arg,
     extract_get_debug_type_static_prop_arg, extract_get_parent_class_arg,
@@ -728,48 +723,14 @@ pub fn narrow_from_condition(
             // "either side is a StaticPropertyAccess" condition and be
             // silently swallowed (that function only handles enum-case/
             // get_class-family comparisons, not array-emptiness).
-            else if let ExprKind::Array(elems) = &b.right.kind {
-                if elems.is_empty() {
-                    if let Some(var_name) = extract_var_name(&b.left) {
-                        let current = ctx.get_var(&var_name);
-                        let narrowed = if effective_true {
-                            current.narrow_to_empty_collection()
-                        } else {
-                            current.narrow_to_non_empty_collection()
-                        };
-                        if !narrowed.is_empty() && narrowed != current {
-                            ctx.set_var(&var_name, narrowed);
-                        }
-                    } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
-                        narrow_prop_array_empty(ctx, &obj, &prop, db, file, effective_true);
-                        narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
-                    } else if let Some((fqcn, prop)) =
-                        extract_static_prop_access(&b.left, ctx, db, file)
-                    {
-                        narrow_static_prop_array_empty(ctx, &fqcn, &prop, db, effective_true);
-                    }
-                }
-            } else if let ExprKind::Array(elems) = &b.left.kind {
-                if elems.is_empty() {
-                    if let Some(var_name) = extract_var_name(&b.right) {
-                        let current = ctx.get_var(&var_name);
-                        let narrowed = if effective_true {
-                            current.narrow_to_empty_collection()
-                        } else {
-                            current.narrow_to_non_empty_collection()
-                        };
-                        if !narrowed.is_empty() && narrowed != current {
-                            ctx.set_var(&var_name, narrowed);
-                        }
-                    } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
-                        narrow_prop_array_empty(ctx, &obj, &prop, db, file, effective_true);
-                        narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
-                    } else if let Some((fqcn, prop)) =
-                        extract_static_prop_access(&b.right, ctx, db, file)
-                    {
-                        narrow_static_prop_array_empty(ctx, &fqcn, &prop, db, effective_true);
-                    }
-                }
+            else if narrow_array_emptiness_condition(
+                ctx,
+                db,
+                file,
+                &b.left,
+                &b.right,
+                effective_true,
+            ) {
             }
             // `$x === EnumName::CaseName` / get_class()/get_debug_type()/
             // get_parent_class()/$obj::class compared against `Foo::class` —
@@ -840,47 +801,8 @@ pub fn narrow_from_condition(
                     );
                 }
             }
-            // count($arr) op N  /  N op count($arr) — normalize so count call is on left.
-            let count_call_on_left = extract_count_arg(&b.left).is_some()
-                || extract_count_static_prop_arg(&b.left, ctx, db, file).is_some();
-            let (count_expr, count_cmp_op, count_lit) = if count_call_on_left {
-                (&b.left, b.op, &b.right)
-            } else {
-                (&b.right, flip_comparison_op(b.op), &b.left)
-            };
-            if let (Some(target), Some(n)) = (
-                extract_count_arg(count_expr),
-                extract_int_literal(count_lit),
-            ) {
-                match target {
-                    ScalarArgTarget::Var(arr_var) => {
-                        narrow_array_count_comparison(ctx, &arr_var, count_cmp_op, n, is_true)
-                    }
-                    ScalarArgTarget::Prop(obj, prop) => narrow_prop_array_count_comparison(
-                        ctx,
-                        &obj,
-                        &prop,
-                        db,
-                        file,
-                        count_cmp_op,
-                        n,
-                        is_true,
-                    ),
-                }
-            } else if let (Some((fqcn, prop)), Some(n)) = (
-                extract_count_static_prop_arg(count_expr, ctx, db, file),
-                extract_int_literal(count_lit),
-            ) {
-                narrow_static_prop_array_count_comparison(
-                    ctx,
-                    &fqcn,
-                    &prop,
-                    db,
-                    count_cmp_op,
-                    n,
-                    is_true,
-                );
-            }
+            // count($arr) op N  /  N op count($arr)
+            narrow_array_count_condition(ctx, db, file, &b.left, &b.right, b.op, is_true);
             // strlen($str) op N  /  N op strlen($str) — same normalization.
             let strlen_call_on_left = extract_strlen_arg(&b.left).is_some()
                 || extract_strlen_static_prop_arg(&b.left, ctx, db, file).is_some();
@@ -1043,48 +965,14 @@ pub fn narrow_from_condition(
             }
             // `$arr == []` / `$arr != []` — loose array equality requires identical
             // key/value pairs, so this is exactly as sound as the strict `===` case.
-            else if let ExprKind::Array(elems) = &b.right.kind {
-                if elems.is_empty() {
-                    if let Some(var_name) = extract_var_name(&b.left) {
-                        let current = ctx.get_var(&var_name);
-                        let narrowed = if effective_true {
-                            current.narrow_to_empty_collection()
-                        } else {
-                            current.narrow_to_non_empty_collection()
-                        };
-                        if !narrowed.is_empty() && narrowed != current {
-                            ctx.set_var(&var_name, narrowed);
-                        }
-                    } else if let Some((obj, prop)) = extract_any_prop_access(&b.left) {
-                        narrow_prop_array_empty(ctx, &obj, &prop, db, file, effective_true);
-                        narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
-                    } else if let Some((fqcn, prop)) =
-                        extract_static_prop_access(&b.left, ctx, db, file)
-                    {
-                        narrow_static_prop_array_empty(ctx, &fqcn, &prop, db, effective_true);
-                    }
-                }
-            } else if let ExprKind::Array(elems) = &b.left.kind {
-                if elems.is_empty() {
-                    if let Some(var_name) = extract_var_name(&b.right) {
-                        let current = ctx.get_var(&var_name);
-                        let narrowed = if effective_true {
-                            current.narrow_to_empty_collection()
-                        } else {
-                            current.narrow_to_non_empty_collection()
-                        };
-                        if !narrowed.is_empty() && narrowed != current {
-                            ctx.set_var(&var_name, narrowed);
-                        }
-                    } else if let Some((obj, prop)) = extract_any_prop_access(&b.right) {
-                        narrow_prop_array_empty(ctx, &obj, &prop, db, file, effective_true);
-                        narrow_receiver_non_null_on_prop_match(ctx, &obj, effective_true);
-                    } else if let Some((fqcn, prop)) =
-                        extract_static_prop_access(&b.right, ctx, db, file)
-                    {
-                        narrow_static_prop_array_empty(ctx, &fqcn, &prop, db, effective_true);
-                    }
-                }
+            else if narrow_array_emptiness_condition(
+                ctx,
+                db,
+                file,
+                &b.left,
+                &b.right,
+                effective_true,
+            ) {
             }
             // `get_class($x) == 'ClassName'` / `get_debug_type($x) == 'ClassName'` /
             // `gettype($x) == 'ClassName'` / `$x::class == 'ClassName'` — loose `==`
@@ -1628,274 +1516,9 @@ pub fn narrow_from_condition(
                     bare.to_ascii_lowercase().as_str(),
                     "array_key_exists" | "key_exists"
                 ) {
-                    // array_key_exists('k', $arr) in true-branch: prove the key
-                    // exists in the array's sealed shape so that $arr['k'] does
-                    // not trigger NonExistentArrayOffset afterwards.
                     // `key_exists()` is a built-in alias of `array_key_exists()`
                     // with identical semantics.
-                    if let (Some(key_arg), Some(arr_arg)) = (call.args.first(), call.args.get(1)) {
-                        let literal_key = match &key_arg.value.kind {
-                            ExprKind::String(s) => Some(mir_types::atomic::ArrayKey::String(
-                                std::sync::Arc::from(s.as_ref()),
-                            )),
-                            ExprKind::Int(i) => Some(mir_types::atomic::ArrayKey::Int(*i)),
-                            // `$key = 'name'; array_key_exists($key, $arr)` — resolve a
-                            // variable, property-access, or static-property key already
-                            // narrowed to a single literal, same as an inline literal
-                            // would be.
-                            _ => {
-                                let key_ty = if let Some(name) = extract_var_name(&key_arg.value) {
-                                    Some(ctx.get_var(&name))
-                                } else if let Some((obj, prop)) =
-                                    extract_any_prop_access(&key_arg.value)
-                                {
-                                    Some(resolve_prop_current_type(ctx, &obj, &prop, db, file))
-                                } else {
-                                    extract_static_prop_access(&key_arg.value, ctx, db, file).map(
-                                        |(fqcn, prop)| {
-                                            resolve_static_prop_current_type(ctx, &fqcn, &prop, db)
-                                        },
-                                    )
-                                };
-                                key_ty.and_then(|ty| match ty.types.as_slice() {
-                                    [Atomic::TLiteralString(s)] => {
-                                        Some(mir_types::atomic::ArrayKey::String(s.clone()))
-                                    }
-                                    [Atomic::TLiteralInt(i)] => {
-                                        Some(mir_types::atomic::ArrayKey::Int(*i))
-                                    }
-                                    _ => None,
-                                })
-                            }
-                        };
-                        if let Some(key) = literal_key {
-                            if is_true {
-                                if let Some(var_name) = extract_var_name(&arr_arg.value) {
-                                    let current = ctx.get_var(&var_name);
-                                    let narrowed = add_key_to_sealed_shapes(&current, &key);
-                                    if narrowed != current {
-                                        ctx.set_var(&var_name, narrowed);
-                                    }
-                                } else if let Some((obj, prop)) =
-                                    extract_any_prop_access(&arr_arg.value)
-                                {
-                                    narrow_prop_array_key_exists(ctx, &obj, &prop, &key, db, file);
-                                    // array_key_exists() throws TypeError on a null 2nd
-                                    // arg, so reaching the true branch already proves
-                                    // $obj->prop (and thus $obj) was non-null.
-                                    narrow_receiver_non_null_on_prop_match(ctx, &obj, true);
-                                } else if let Some((fqcn, prop)) =
-                                    extract_static_prop_access(&arr_arg.value, ctx, db, file)
-                                {
-                                    narrow_static_prop_array_key_exists(
-                                        ctx, &fqcn, &prop, &key, db,
-                                    );
-                                } else if let Some((base, path)) =
-                                    collect_array_access_path(&arr_arg.value, ctx, db, file)
-                                {
-                                    // Nested container, e.g. array_key_exists('b', $arr['a']) —
-                                    // walk down to the ['a'] shape and prove 'b' present there,
-                                    // same as the single-level var/prop cases above.
-                                    let current =
-                                        resolve_shape_base_current_type(ctx, &base, db, file);
-                                    if let Some(narrowed) =
-                                        narrow_shape_path_key_exists(&current, &path, &key)
-                                    {
-                                        set_shape_base_narrowed(ctx, &base, current, narrowed);
-                                    }
-                                } else if let (
-                                    mir_types::atomic::ArrayKey::String(iface_name),
-                                    Some((target, is_parents)),
-                                ) = (
-                                    &key,
-                                    extract_class_implements_or_parents_arg(&arr_arg.value),
-                                ) {
-                                    // array_key_exists('Iface', class_implements($x)) —
-                                    // same relationship `$x instanceof Iface` proves.
-                                    // array_key_exists('Ancestor', class_parents($x)) is
-                                    // STRICTER: class_parents() excludes $x's own exact
-                                    // class, the same relationship `is_subclass_of($x,
-                                    // Ancestor)` proves — reuse that narrowing instead.
-                                    let fqcn = crate::db::resolve_name(db, file, iface_name);
-                                    match &target {
-                                        ScalarArgTarget::Var(var_name) => {
-                                            let current = ctx.get_var(var_name);
-                                            let narrowed = if is_parents {
-                                                narrow_strict_subclass_of(
-                                                    &current,
-                                                    &fqcn,
-                                                    db,
-                                                    &ctx.template_param_names,
-                                                )
-                                            } else {
-                                                narrow_instanceof_preserving_subtypes(
-                                                    &current,
-                                                    &fqcn,
-                                                    db,
-                                                    &ctx.template_param_names,
-                                                )
-                                            };
-                                            set_narrowed(ctx, var_name, &current, narrowed, true);
-                                        }
-                                        ScalarArgTarget::Prop(obj, prop) => {
-                                            if is_parents {
-                                                narrow_prop_is_subclass_of(
-                                                    ctx, obj, prop, &fqcn, db, file, true,
-                                                );
-                                            } else {
-                                                narrow_prop_instanceof(
-                                                    ctx, obj, prop, &fqcn, db, file, true,
-                                                );
-                                            }
-                                            narrow_receiver_non_null_on_prop_match(ctx, obj, true);
-                                        }
-                                    }
-                                } else if let (
-                                    mir_types::atomic::ArrayKey::String(iface_name),
-                                    Some(((static_fqcn, prop), is_parents)),
-                                ) = (
-                                    &key,
-                                    extract_class_implements_or_parents_static_prop_arg(
-                                        &arr_arg.value,
-                                        ctx,
-                                        db,
-                                        file,
-                                    ),
-                                ) {
-                                    // array_key_exists('Iface', class_implements(self::$prop)) —
-                                    // static-property counterpart of the var/prop arm above.
-                                    let fqcn = crate::db::resolve_name(db, file, iface_name);
-                                    if is_parents {
-                                        narrow_static_prop_is_subclass_of(
-                                            ctx,
-                                            &static_fqcn,
-                                            &prop,
-                                            &fqcn,
-                                            db,
-                                            true,
-                                        );
-                                    } else {
-                                        narrow_static_prop_instanceof(
-                                            ctx,
-                                            &static_fqcn,
-                                            &prop,
-                                            &fqcn,
-                                            db,
-                                            true,
-                                        );
-                                    }
-                                }
-                            } else {
-                                // False branch: exclude shape members that
-                                // guarantee the key's presence — see
-                                // `remove_key_from_sealed_shapes`.
-                                if let Some(var_name) = extract_var_name(&arr_arg.value) {
-                                    let current = ctx.get_var(&var_name);
-                                    let narrowed = remove_key_from_sealed_shapes(&current, &key);
-                                    set_narrowed(ctx, &var_name, &current, narrowed, true);
-                                } else if let Some((obj, prop)) =
-                                    extract_any_prop_access(&arr_arg.value)
-                                {
-                                    let current =
-                                        resolve_prop_current_type(ctx, &obj, &prop, db, file);
-                                    if !current.is_mixed() {
-                                        let narrowed =
-                                            remove_key_from_sealed_shapes(&current, &key);
-                                        apply_prop_narrowed(
-                                            ctx, &obj, &prop, current, narrowed, true,
-                                        );
-                                    }
-                                    // array_key_exists() throws TypeError on a null 2nd
-                                    // arg, so reaching the false branch also proves
-                                    // $obj->prop (and thus $obj) was non-null.
-                                    narrow_receiver_non_null_on_prop_match(ctx, &obj, true);
-                                } else if let Some((fqcn, prop)) =
-                                    extract_static_prop_access(&arr_arg.value, ctx, db, file)
-                                {
-                                    let current =
-                                        resolve_static_prop_current_type(ctx, &fqcn, &prop, db);
-                                    if !current.is_mixed() {
-                                        let narrowed =
-                                            remove_key_from_sealed_shapes(&current, &key);
-                                        apply_prop_narrowed(
-                                            ctx, &fqcn, &prop, current, narrowed, true,
-                                        );
-                                    }
-                                } else if let Some((base, path)) =
-                                    collect_array_access_path(&arr_arg.value, ctx, db, file)
-                                {
-                                    // Nested container, false branch, e.g.
-                                    // array_key_exists('b', $arr['a']) proven
-                                    // false — same as the single-level
-                                    // var/prop cases above.
-                                    let current =
-                                        resolve_shape_base_current_type(ctx, &base, db, file);
-                                    if let Some(narrowed) =
-                                        narrow_shape_path_key_exists_false(&current, &path, &key)
-                                    {
-                                        set_shape_base_narrowed(ctx, &base, current, narrowed);
-                                    }
-                                } else if let (
-                                    mir_types::atomic::ArrayKey::String(iface_name),
-                                    Some((target, is_parents)),
-                                ) = (
-                                    &key,
-                                    extract_class_implements_or_parents_arg(&arr_arg.value),
-                                ) {
-                                    // !array_key_exists('Iface', class_implements($x)) —
-                                    // exclude Iface, same as `!($x instanceof Iface)`.
-                                    // class_parents(), by contrast, never narrows on the
-                                    // false branch — mirrors `is_subclass_of()`'s own
-                                    // convention: a parent-name mismatch doesn't rule out
-                                    // the receiver being exactly that class.
-                                    if !is_parents {
-                                        let fqcn = crate::db::resolve_name(db, file, iface_name);
-                                        match &target {
-                                            ScalarArgTarget::Var(var_name) => {
-                                                let current = ctx.get_var(var_name);
-                                                let narrowed = filter_out_instanceof_match(
-                                                    &current, &fqcn, db,
-                                                );
-                                                set_narrowed(
-                                                    ctx, var_name, &current, narrowed, true,
-                                                );
-                                            }
-                                            ScalarArgTarget::Prop(obj, prop) => {
-                                                narrow_prop_instanceof(
-                                                    ctx, obj, prop, &fqcn, db, file, false,
-                                                );
-                                            }
-                                        }
-                                    }
-                                } else if let (
-                                    mir_types::atomic::ArrayKey::String(iface_name),
-                                    Some(((static_fqcn, prop), is_parents)),
-                                ) = (
-                                    &key,
-                                    extract_class_implements_or_parents_static_prop_arg(
-                                        &arr_arg.value,
-                                        ctx,
-                                        db,
-                                        file,
-                                    ),
-                                ) {
-                                    // !array_key_exists('Iface', class_implements(self::$prop)) —
-                                    // static-property counterpart of the var/prop arm above.
-                                    if !is_parents {
-                                        let fqcn = crate::db::resolve_name(db, file, iface_name);
-                                        narrow_static_prop_instanceof(
-                                            ctx,
-                                            &static_fqcn,
-                                            &prop,
-                                            &fqcn,
-                                            db,
-                                            false,
-                                        );
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    narrow_array_key_exists_condition(ctx, call, is_true, db, file);
                 } else if matches!(
                     bare.to_ascii_lowercase().as_str(),
                     "str_contains" | "str_starts_with" | "str_ends_with"
@@ -1960,157 +1583,7 @@ pub fn narrow_from_condition(
                         }
                     }
                 } else if bare.eq_ignore_ascii_case("in_array") {
-                    // in_array($needle, ['a', 'b', 'c']) true →
-                    // narrow $needle to 'a'|'b'|'c'. Only safe when either the
-                    // 3rd (strict) argument is truthy, or $needle's current
-                    // type and the haystack are both exclusively string atoms
-                    // or both exclusively int atoms — for same-category
-                    // scalars, loose (==) comparison agrees with strict
-                    // (===). A mixed-category needle (e.g. int|string) can't
-                    // be narrowed under loose comparison: the string "1"
-                    // loosely equals the int 1, so a haystack of `[1, 2]`
-                    // doesn't rule out $needle being the string "1".
-                    let strict = call
-                        .args
-                        .get(2)
-                        .map(|a| is_truthy_bool_literal(&a.value))
-                        .unwrap_or(false);
-                    if let (Some(needle_arg), Some(haystack_arg)) =
-                        (call.args.first(), call.args.get(1))
-                    {
-                        if let Some(var_name) = extract_var_name(&needle_arg.value) {
-                            if let Some(haystack_ty) =
-                                extract_haystack_type(&haystack_arg.value, ctx, db, file)
-                            {
-                                let current = ctx.get_var(&var_name);
-                                let loose_safe = strict
-                                    || in_array_loose_narrowing_is_safe(&current, &haystack_ty);
-                                if !current.is_mixed() && is_true && loose_safe {
-                                    // intersect: keep only types that could match a haystack value
-                                    let narrowed =
-                                        narrow_to_haystack_values(&current, &haystack_ty);
-                                    if !narrowed.is_empty() && narrowed != current {
-                                        ctx.set_var(&var_name, narrowed);
-                                    }
-                                } else if !current.is_mixed() && !is_true && loose_safe {
-                                    // False branch: safe only when the current type is a
-                                    // finite literal union — remove the matched haystack values.
-                                    let all_literals = !current.types.is_empty()
-                                        && current.types.iter().all(|a| {
-                                            matches!(
-                                                a,
-                                                Atomic::TLiteralString(_) | Atomic::TLiteralInt(_)
-                                            )
-                                        });
-                                    if all_literals {
-                                        let narrowed = current
-                                            .filter(|a| !haystack_ty.types.iter().any(|h| h == a));
-                                        if !narrowed.is_empty() && narrowed != current {
-                                            ctx.set_var(&var_name, narrowed);
-                                        }
-                                    }
-                                }
-                            }
-                        } else if let Some((obj, prop)) = extract_any_prop_access(&needle_arg.value)
-                        {
-                            // Property-access counterpart of the plain-variable case
-                            // above, e.g. `in_array($this->status, ['a', 'b'])`.
-                            if let Some(haystack_ty) =
-                                extract_haystack_type(&haystack_arg.value, ctx, db, file)
-                            {
-                                if is_true {
-                                    // in_array(null, $haystack) only matches loosely
-                                    // when the haystack contains a falsy literal (0,
-                                    // "", "0"); a strict comparison can never match
-                                    // null at all, since our haystack extraction never
-                                    // includes a literal null element. So a true match
-                                    // proves the receiver wasn't null, except in that
-                                    // one loose-comparison edge case.
-                                    let haystack_admits_null_loosely =
-                                        haystack_ty.types.iter().any(|a| {
-                                            matches!(a, Atomic::TLiteralInt(0))
-                                                || matches!(a, Atomic::TLiteralString(s) if s.as_ref() == "" || s.as_ref() == "0")
-                                        });
-                                    if strict || !haystack_admits_null_loosely {
-                                        narrow_receiver_non_null_on_prop_match(ctx, &obj, true);
-                                    }
-                                }
-                                let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
-                                let loose_safe = strict
-                                    || in_array_loose_narrowing_is_safe(&current, &haystack_ty);
-                                if !current.is_mixed() && is_true && loose_safe {
-                                    let narrowed =
-                                        narrow_to_haystack_values(&current, &haystack_ty);
-                                    if !narrowed.is_empty() {
-                                        apply_prop_narrowed(
-                                            ctx, &obj, &prop, current, narrowed, false,
-                                        );
-                                    }
-                                } else if !current.is_mixed() && !is_true && loose_safe {
-                                    let all_literals = !current.types.is_empty()
-                                        && current.types.iter().all(|a| {
-                                            matches!(
-                                                a,
-                                                Atomic::TLiteralString(_) | Atomic::TLiteralInt(_)
-                                            )
-                                        });
-                                    if all_literals {
-                                        let narrowed = current
-                                            .filter(|a| !haystack_ty.types.iter().any(|h| h == a));
-                                        if !narrowed.is_empty() {
-                                            apply_prop_narrowed(
-                                                ctx, &obj, &prop, current, narrowed, false,
-                                            );
-                                        }
-                                    }
-                                }
-                            }
-                        } else if let Some((fqcn, prop)) =
-                            extract_static_prop_access(&needle_arg.value, ctx, db, file)
-                        {
-                            // Static-property counterpart of the instance-property
-                            // case above, e.g. `in_array(self::$status, ['a', 'b'])`.
-                            if let Some(haystack_ty) =
-                                extract_haystack_type(&haystack_arg.value, ctx, db, file)
-                            {
-                                // No receiver-non-null propagation here, unlike the
-                                // instance-property case above: a static property
-                                // has no separate receiver variable whose
-                                // nullability this could establish (`self::`/
-                                // `static::` is never itself null).
-                                let current =
-                                    resolve_static_prop_current_type(ctx, &fqcn, &prop, db);
-                                let loose_safe = strict
-                                    || in_array_loose_narrowing_is_safe(&current, &haystack_ty);
-                                if !current.is_mixed() && is_true && loose_safe {
-                                    let narrowed =
-                                        narrow_to_haystack_values(&current, &haystack_ty);
-                                    if !narrowed.is_empty() {
-                                        apply_prop_narrowed(
-                                            ctx, &fqcn, &prop, current, narrowed, false,
-                                        );
-                                    }
-                                } else if !current.is_mixed() && !is_true && loose_safe {
-                                    let all_literals = !current.types.is_empty()
-                                        && current.types.iter().all(|a| {
-                                            matches!(
-                                                a,
-                                                Atomic::TLiteralString(_) | Atomic::TLiteralInt(_)
-                                            )
-                                        });
-                                    if all_literals {
-                                        let narrowed = current
-                                            .filter(|a| !haystack_ty.types.iter().any(|h| h == a));
-                                        if !narrowed.is_empty() {
-                                            apply_prop_narrowed(
-                                                ctx, &fqcn, &prop, current, narrowed, false,
-                                            );
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    narrow_in_array_condition(ctx, call, is_true, db, file);
                 } else if bare.eq_ignore_ascii_case("is_a") {
                     // is_a($obj, 'ClassName') → instanceof semantics (includes exact class).
                     // When $allow_string (3rd arg) is truthy, the first arg may be a class-string
