@@ -266,11 +266,20 @@ impl<'a> ExpressionAnalyzer<'a> {
         let mut can_be_keyed = true;
         let mut next_int_key: i64 = 0;
 
+        // Accumulated in the same pass as the keyed-shape attempt above, so
+        // that a spread or a non-literal key partway through only falls back
+        // to the generic TArray shape below — it never re-analyzes any
+        // element's value/key expression a second time.
+        let mut all_value_types = Type::empty();
+        let mut key_union = Type::empty();
+
         for elem in elements.iter() {
             if elem.unpack {
-                self.analyze(&elem.value, ctx);
                 can_be_keyed = false;
-                break;
+                let value_ty = self.analyze(&elem.value, ctx);
+                all_value_types.merge_with(&crate::call::spread_element_type(self.db, &value_ty));
+                key_union.merge_with(&spread_key_type(self.db, &value_ty));
+                continue;
             }
             let value_ty = self.analyze(&elem.value, ctx);
             let array_key = if let Some(key_expr) = &elem.key {
@@ -294,22 +303,34 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // a bool/float/null key literal (or constant expression
                 // folded to one) casts the same way a real write would.
                 let key_ty = super::helpers::coerce_array_key_type(&key_ty);
+                key_union.merge_with(&key_ty);
                 match key_ty.types.as_slice() {
-                    [Atomic::TLiteralString(s)] => ArrayKey::String(s.clone()),
+                    [Atomic::TLiteralString(s)] => Some(ArrayKey::String(s.clone())),
                     [Atomic::TLiteralInt(i)] => {
                         next_int_key = *i + 1;
-                        ArrayKey::Int(*i)
+                        Some(ArrayKey::Int(*i))
                     }
                     _ => {
                         can_be_keyed = false;
-                        break;
+                        None
                     }
                 }
             } else {
                 let k = ArrayKey::Int(next_int_key);
                 next_int_key += 1;
-                k
+                key_union.add_type(Atomic::TInt);
+                Some(k)
             };
+            all_value_types.merge_with(&value_ty);
+
+            // Once a prior element already forced the generic-array fallback
+            // (a spread, or a key that didn't resolve to a single literal),
+            // there's no shape left to build — only the accumulators above
+            // still matter for the remaining elements.
+            if !can_be_keyed {
+                continue;
+            }
+            let array_key = array_key.expect("can_be_keyed is only true when a key was resolved");
             // A repeated key silently overwrites the earlier entry at runtime
             // (`['a' => 1, 'b' => 2, 'a' => 3]` evaluates to `['a' => 3, 'b' =>
             // 2]`) — almost always a copy-paste mistake, not intentional.
@@ -358,41 +379,10 @@ impl<'a> ExpressionAnalyzer<'a> {
             });
         }
 
-        // Fallback: generic TArray
-        let mut all_value_types = Type::empty();
-        let mut key_union = Type::empty();
-        for elem in elements.iter() {
-            let value_ty = self.analyze(&elem.value, ctx);
-            if elem.unpack {
-                // Merge the spread source's own key/value types instead of
-                // giving up on the whole literal — `[...$x, ...$y]` should
-                // type as the union of $x's and $y's key/value types, not
-                // unconditionally collapse to `array<mixed, mixed>`.
-                all_value_types.merge_with(&crate::call::spread_element_type(self.db, &value_ty));
-                key_union.merge_with(&spread_key_type(self.db, &value_ty));
-            } else {
-                all_value_types.merge_with(&value_ty);
-                if let Some(key_expr) = &elem.key {
-                    let key_ty = self.analyze(key_expr, ctx);
-                    // Float keys are silently truncated to int in PHP; TIntegralFloat is
-                    // always whole-valued so the truncation is lossless — no warning.
-                    if key_ty.contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..)))
-                        && !key_ty.contains(|t| matches!(t, Atomic::TIntegralFloat))
-                    {
-                        self.emit(
-                            IssueKind::ImplicitFloatToIntCast {
-                                from: key_ty.to_string(),
-                            },
-                            Severity::Warning,
-                            key_expr.span,
-                        );
-                    }
-                    key_union.merge_with(&super::helpers::coerce_array_key_type(&key_ty));
-                } else {
-                    key_union.add_type(Atomic::TInt);
-                }
-            }
-        }
+        // Fallback: generic TArray. `all_value_types`/`key_union` were already
+        // accumulated in the loop above — every element's value/key
+        // expression is analyzed exactly once regardless of which shape
+        // (keyed or generic) ends up being returned.
         if key_union.is_empty() {
             key_union.add_type(Atomic::TInt);
         }
