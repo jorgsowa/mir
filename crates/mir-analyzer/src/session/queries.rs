@@ -315,6 +315,7 @@ impl AnalysisSession {
         // unconditionally — their existing postings must be replaced. Same
         // discipline as `commit_defs_for_matching` on the defs index.
         let needles = reference_gate_needles(symbol);
+        let needle_matcher = IdentifierNeedles::new(&needles);
         let committed_any: rustc_hash::FxHashSet<Arc<str>> =
             self.ref_committed_keys().into_iter().collect();
         let stale: Vec<Arc<str>> = loop {
@@ -334,7 +335,7 @@ impl AnalysisSession {
                         }
                         if !committed_any.contains(f.as_ref())
                             && !needles.is_empty()
-                            && !needles.iter().any(|n| mentions_identifier(text, n))
+                            && !needle_matcher.matches(text)
                         {
                             return None;
                         }
@@ -892,6 +893,7 @@ impl AnalysisSession {
             let guard = self.defs_committed_keys();
             guard.into_iter().collect()
         };
+        let needles = IdentifierNeedles::new(shorts);
         let work = loop {
             let attempt = salsa::Cancelled::catch(AssertUnwindSafe(|| {
                 let db_main = self.snapshot_db();
@@ -906,9 +908,7 @@ impl AnalysisSession {
                         // Never-committed files must mention a frontier name;
                         // stale (previously committed) files recommit
                         // unconditionally — their classes may have re-parented.
-                        if !committed_any.contains(path.as_ref())
-                            && !shorts.iter().any(|s| mentions_identifier(&text, s))
-                        {
+                        if !committed_any.contains(path.as_ref()) && !needles.matches(&text) {
                             return None;
                         }
                         let defs =
@@ -1201,6 +1201,50 @@ fn identifier_char_col(
     None
 }
 
+/// Compiled multi-needle form of [`mentions_identifier`]: one SIMD-backed
+/// pass over the text for the whole needle set instead of one byte scan per
+/// needle. Identical semantics — whole-identifier, ASCII-case-insensitive.
+/// Build once per sweep and share across the rayon workers; matters when a
+/// subtype BFS round carries dozens of frontier names across an
+/// O(workspace) candidate scan.
+pub(crate) struct IdentifierNeedles {
+    /// `None` when the needle set is empty or the automaton failed to build
+    /// (pattern-set limits — unreachable for identifier words); the fallback
+    /// then rescans per needle so behavior never changes, only speed.
+    ac: Option<aho_corasick::AhoCorasick>,
+    needles: Vec<String>,
+}
+
+impl IdentifierNeedles {
+    pub(crate) fn new(needles: &[String]) -> Self {
+        let kept: Vec<String> = needles.iter().filter(|n| !n.is_empty()).cloned().collect();
+        let ac = if kept.is_empty() {
+            None
+        } else {
+            aho_corasick::AhoCorasick::builder()
+                .ascii_case_insensitive(true)
+                .build(&kept)
+                .ok()
+        };
+        Self { ac, needles: kept }
+    }
+
+    /// Whether `hay` mentions any needle as a whole identifier. Overlapping
+    /// iteration enumerates every occurrence of every needle, so the word-
+    /// boundary filter sees exactly the candidates the per-needle scans would.
+    pub(crate) fn matches(&self, hay: &str) -> bool {
+        let Some(ac) = &self.ac else {
+            return self.needles.iter().any(|n| mentions_identifier(hay, n));
+        };
+        let bytes = hay.as_bytes();
+        let is_ident = |b: u8| b.is_ascii_alphanumeric() || b == b'_';
+        ac.find_overlapping_iter(hay).any(|m| {
+            (m.start() == 0 || !is_ident(bytes[m.start() - 1]))
+                && (m.end() == bytes.len() || !is_ident(bytes[m.end()]))
+        })
+    }
+}
+
 /// Whether `hay` mentions `needle` as a whole identifier (ASCII word
 /// boundaries; conservative near multibyte text). ASCII-case-insensitive:
 /// PHP class, function, and method names are case-insensitive, so `new
@@ -1294,6 +1338,41 @@ mod tests {
         // substring scans must not split codepoints.
         assert!(!mentions_identifier("function xÉclairFoo() {}", "Éclair"));
         assert!(mentions_identifier("implements Éclair {}", "Éclair"));
+    }
+
+    #[test]
+    fn identifier_needles_match_per_needle_scans_exactly() {
+        let hays = [
+            "$this->save();",
+            "new COLOR()",
+            "use App\\Color as Paint;",
+            "$this->saveAll();",
+            "return $unsaved;",
+            "no occurrence",
+            "function xÉclairFoo() {}",
+            "implements Éclair {}",
+            "save",
+            "Color save",
+            "colorsave savecolor",
+            "",
+        ];
+        let needle_sets: [&[&str]; 4] = [
+            &["save"],
+            &["Color", "save"],
+            &["Éclair", "color", "occurrence"],
+            &[],
+        ];
+        for needles in needle_sets {
+            let owned: Vec<String> = needles.iter().map(|s| s.to_string()).collect();
+            let compiled = IdentifierNeedles::new(&owned);
+            for hay in hays {
+                assert_eq!(
+                    compiled.matches(hay),
+                    owned.iter().any(|n| mentions_identifier(hay, n)),
+                    "needles {owned:?} on {hay:?}"
+                );
+            }
+        }
     }
 
     #[test]

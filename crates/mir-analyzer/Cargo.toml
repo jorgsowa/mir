@@ -17,6 +17,7 @@ php-ast       = { workspace = true }
 php-rs-parser = { workspace = true }
 php-lexer     = { workspace = true }
 phpdoc-parser = { workspace = true }
+aho-corasick  = { workspace = true }
 dashmap       = { workspace = true }
 indexmap      = { workspace = true }
 rayon         = { workspace = true }
