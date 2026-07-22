@@ -23,10 +23,13 @@ fn spread_key_type(db: &dyn crate::db::MirDatabase, arr_ty: &Type) -> Type {
                 result.add_type(Atomic::TInt);
             }
             Atomic::TKeyedArray { properties, .. } => {
+                // Widen to the base scalar type, same as the `Int` arm just
+                // above — a spread's key domain is "any key this array has",
+                // not each individual key kept as its own literal.
                 for key in properties.keys() {
                     match key {
                         ArrayKey::Int(_) => result.add_type(Atomic::TInt),
-                        ArrayKey::String(s) => result.add_type(Atomic::TLiteralString(s.clone())),
+                        ArrayKey::String(_) => result.add_type(Atomic::TString),
                     }
                 }
             }

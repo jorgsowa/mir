@@ -25,7 +25,7 @@ function optionalKey(): void {
         $arr['a'] = 5;
     }
     $arr['a'] ??= 99;
-    /** @mir-check $arr is array<"a", 5|99> */
+    /** @mir-check $arr is array<string, 5|99> */
     $_ = $arr;
 }
 ===expect===
