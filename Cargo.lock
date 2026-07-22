@@ -741,6 +741,7 @@ dependencies = [
 name = "mir-analyzer"
 version = "0.61.0"
 dependencies = [
+ "aho-corasick",
  "bincode",
  "blake3",
  "criterion",

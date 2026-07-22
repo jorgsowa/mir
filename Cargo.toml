@@ -35,6 +35,7 @@ phpdoc-parser   = "0.18.2"
 # Data structures
 indexmap = { version = "2", features = ["serde"] }
 smallvec = { version = "1", features = ["union", "serde"] }
+aho-corasick = "1"
 
 # Concurrency
 rayon      = "1"

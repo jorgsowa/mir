@@ -119,4 +119,27 @@ fn main() {
         t2.elapsed().as_secs_f64(),
         dependents.len()
     );
+
+    // php-lsp's protected-member reference scoping path (`subtype_files`,
+    // via `method_reference_scope`): an O(workspace) completeness sweep per
+    // BFS round with no per-class cache. The repeat calls are the number
+    // that matters — every protected-member references query on the same
+    // hierarchy pays it again.
+    let t3 = Instant::now();
+    let subtypes = session.subtype_files("Illuminate\\Support\\ServiceProvider");
+    eprintln!(
+        "subtype_files(ServiceProvider) cold: {:.3}s, {} files",
+        t3.elapsed().as_secs_f64(),
+        subtypes.len()
+    );
+    let t4 = Instant::now();
+    let n = 5;
+    for _ in 0..n {
+        let repeat = session.subtype_files("Illuminate\\Support\\ServiceProvider");
+        assert_eq!(repeat.len(), subtypes.len());
+    }
+    eprintln!(
+        "subtype_files(ServiceProvider) repeat: {:.3}s avg over {n}",
+        t4.elapsed().as_secs_f64() / n as f64
+    );
 }
