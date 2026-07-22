@@ -920,7 +920,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // None means push notation (`[]`), which produces TList rather than TArray.
                 // The base variable's key is the innermost (last in vec), and
                 // intermediate indices are used to wrap the value type.
-                let outer_key: Option<Type> = aa.index.as_ref().map(|idx| self.analyze(idx, ctx));
+                let outer_key: Option<Type> = aa
+                    .index
+                    .as_ref()
+                    .map(|idx| super::helpers::coerce_array_key_type(&self.analyze(idx, ctx)));
                 let mut key_chain: Vec<Option<Type>> = vec![outer_key];
                 // Parallel chain of literal array keys (same order as key_chain),
                 // used to route a fully-literal nested write (`$arr['a']['b'] = $v`)
@@ -942,19 +945,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                             // nested chain) has a directly-known literal key —
                             // used to update just that one shape property
                             // in place instead of widening the whole shape.
+                            // Reuses the same `literal_array_key_of_kind` resolution
+                            // already computed for `literal_key_chain` above, rather
+                            // than re-deriving it here (a prior duplicate match only
+                            // handled string/int keys, missing bool/float/null).
                             let literal_key: Option<mir_types::ArrayKey> = if key_chain.len() == 1 {
-                                aa.index.as_ref().and_then(|idx| match &idx.kind {
-                                    ExprKind::String(s) => {
-                                        Some(match super::helpers::canonical_int_array_key(s) {
-                                            Some(i) => mir_types::ArrayKey::Int(i),
-                                            None => mir_types::ArrayKey::String(
-                                                std::sync::Arc::from(s.as_ref()),
-                                            ),
-                                        })
-                                    }
-                                    ExprKind::Int(i) => Some(mir_types::ArrayKey::Int(*i)),
-                                    _ => None,
-                                })
+                                literal_key_chain.last().cloned().flatten()
                             } else {
                                 None
                             };

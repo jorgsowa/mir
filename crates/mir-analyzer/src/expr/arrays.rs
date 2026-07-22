@@ -286,18 +286,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                         key_expr.span,
                     );
                 }
+                // Coerce to PHP's canonical array-key representation first —
+                // a numeric string canonicalizes to int ("0", "42", ...), and
+                // a bool/float/null key literal (or constant expression
+                // folded to one) casts the same way a real write would.
+                let key_ty = super::helpers::coerce_array_key_type(&key_ty);
                 match key_ty.types.as_slice() {
-                    // PHP canonicalizes a numeric string key ("0", "42", ...)
-                    // to an int key at runtime — without this, `['0' => 'x']`
-                    // and `$arr[0]` would be treated as different slots.
-                    [Atomic::TLiteralString(s)] => match super::helpers::canonical_int_array_key(s)
-                    {
-                        Some(i) => {
-                            next_int_key = i + 1;
-                            ArrayKey::Int(i)
-                        }
-                        None => ArrayKey::String(s.clone()),
-                    },
+                    [Atomic::TLiteralString(s)] => ArrayKey::String(s.clone()),
                     [Atomic::TLiteralInt(i)] => {
                         next_int_key = *i + 1;
                         ArrayKey::Int(*i)
@@ -389,7 +384,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             key_expr.span,
                         );
                     }
-                    key_union.merge_with(&key_ty);
+                    key_union.merge_with(&super::helpers::coerce_array_key_type(&key_ty));
                 } else {
                     key_union.add_type(Atomic::TInt);
                 }

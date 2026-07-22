@@ -37,9 +37,11 @@ pub fn canonical_int_array_key(s: &str) -> Option<i64> {
         .map(|v| if neg { -v } else { v })
 }
 
-/// Resolve an index expression to a literal array key, canonicalizing numeric
-/// string keys (`"0"` → `0`) the same way [`canonical_int_array_key`] does.
-/// Returns `None` for a dynamic (non-literal) index.
+/// Resolve an index expression to a literal array key, applying PHP's own
+/// array-key casting rules: numeric strings canonicalize to int (`"0"` → `0`,
+/// same as [`canonical_int_array_key`]), bools cast to `0`/`1`, floats
+/// truncate toward zero, and `null` casts to `""`. Returns `None` for a
+/// dynamic (non-literal) index.
 pub fn literal_array_key_of_kind(kind: &ExprKind) -> Option<ArrayKey> {
     match kind {
         ExprKind::String(s) => Some(match canonical_int_array_key(s) {
@@ -47,8 +49,66 @@ pub fn literal_array_key_of_kind(kind: &ExprKind) -> Option<ArrayKey> {
             None => ArrayKey::String(std::sync::Arc::from(s.as_ref())),
         }),
         ExprKind::Int(i) => Some(ArrayKey::Int(*i)),
+        ExprKind::Bool(b) => Some(ArrayKey::Int(if *b { 1 } else { 0 })),
+        ExprKind::Float(f) => Some(ArrayKey::Int(*f as i64)),
+        ExprKind::Null => Some(ArrayKey::String(std::sync::Arc::from(""))),
         _ => None,
     }
+}
+
+/// Coerce a general index-expression type to PHP's canonical array-key
+/// representation: bools cast to `0`/`1`, floats truncate toward zero, `null`
+/// casts to `""`, and a numeric string canonicalizes to int — mirroring
+/// [`literal_array_key_of_kind`] for callers that already have a `Type`
+/// (constant-folded expressions, a generic fallback path) rather than the
+/// raw index `ExprKind`. Atoms that aren't a legal-but-uncanonical key type
+/// pass through unchanged.
+pub fn coerce_array_key_type(ty: &Type) -> Type {
+    let mut changed = false;
+    let mut out = Type::empty();
+    for a in &ty.types {
+        match a {
+            Atomic::TTrue => {
+                changed = true;
+                out.add_type(Atomic::TLiteralInt(1));
+            }
+            Atomic::TFalse => {
+                changed = true;
+                out.add_type(Atomic::TLiteralInt(0));
+            }
+            Atomic::TBool => {
+                changed = true;
+                out.add_type(Atomic::TInt);
+            }
+            Atomic::TNull => {
+                changed = true;
+                out.add_type(Atomic::TLiteralString(std::sync::Arc::from("")));
+            }
+            Atomic::TFloat | Atomic::TIntegralFloat => {
+                changed = true;
+                out.add_type(Atomic::TInt);
+            }
+            Atomic::TLiteralFloat(hi, lo) => {
+                changed = true;
+                let bits = ((*hi as u64) << 32) | (*lo as u32 as u64);
+                out.add_type(Atomic::TLiteralInt(f64::from_bits(bits) as i64));
+            }
+            Atomic::TLiteralString(s) => match canonical_int_array_key(s) {
+                Some(i) => {
+                    changed = true;
+                    out.add_type(Atomic::TLiteralInt(i));
+                }
+                None => out.add_type(a.clone()),
+            },
+            _ => out.add_type(a.clone()),
+        }
+    }
+    if !changed {
+        return ty.clone();
+    }
+    out.possibly_undefined = ty.possibly_undefined;
+    out.from_docblock = ty.from_docblock;
+    out
 }
 
 /// Update a nested shape write (`$arr['a']['b'] = $v`) by walking into the
