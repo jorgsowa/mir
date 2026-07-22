@@ -1,9 +1,11 @@
 use std::sync::Arc;
 
+use indexmap::IndexMap;
 use php_ast::owned::{Expr, ExprKind};
 use php_ast::Span;
 
 use mir_issues::{IssueKind, Severity};
+use mir_types::atomic::ArrayKey;
 use mir_types::{Atomic, Type};
 
 use crate::expr::ExpressionAnalyzer;
@@ -744,6 +746,19 @@ pub(crate) fn infer_array_merge_return(arg_types: &[Type]) -> Option<Type> {
     Some(Type::single(atomic))
 }
 
+/// Infer the return type of `array_merge_recursive($arr1, $arr2, ...)`.
+///
+/// For int keys, `array_merge_recursive` behaves exactly like `array_merge`
+/// (int keys are always freshly appended/renumbered, regardless of the
+/// recursive string-key merging that gives this function its name — no
+/// int-key collision can ever occur). So when every argument is a list, the
+/// two functions produce identical results. The general string-keyed case is
+/// genuinely complex (colliding scalars get wrapped into a new array,
+/// colliding arrays deep-merge) and is intentionally not modeled here.
+pub(crate) fn array_merge_recursive_return_type(arg_types: &[Type]) -> Option<Type> {
+    infer_array_merge_return(arg_types)
+}
+
 /// Infer the return type of `array_unique($array)`.
 ///
 /// `array_unique` preserves keys and drops duplicates; a non-empty input always
@@ -1005,6 +1020,159 @@ pub(crate) fn array_combine_return_type(arg_types: &[Type]) -> Option<Type> {
         }
     };
     Some(Type::single(atomic))
+}
+
+/// Infer the return type of `array_count_values(array $array)`.
+///
+/// The result's keys are the distinct *values* of `$array` (a value→key role
+/// swap) — PHP restricts these to `int|string` and throws a `TypeError` for
+/// any other value type since PHP 8.0, so a source whose value type isn't
+/// entirely int/string is a runtime-error path, not worth modeling here.
+/// The result's values are always counts, i.e. `int<1, max>` for any key
+/// that's present at all.
+pub(crate) fn array_count_values_return_type(arg_types: &[Type]) -> Option<Type> {
+    let source = arg_types.first()?;
+    if source.is_mixed() {
+        return None;
+    }
+    let (_, value) = crate::stmt::infer_foreach_types(source);
+    if value.is_mixed() || value.types.is_empty() {
+        return None;
+    }
+    if !value.types.iter().all(|a| a.is_int() || a.is_string()) {
+        return None;
+    }
+    let key = crate::expr::helpers::coerce_array_key_type(&value);
+    let count = Type::single(Atomic::TIntRange {
+        min: Some(1),
+        max: None,
+    });
+    let atomic = if super::callable::is_non_empty_collection(source) {
+        Atomic::TNonEmptyArray {
+            key: Box::new(key),
+            value: Box::new(count),
+        }
+    } else {
+        Atomic::TArray {
+            key: Box::new(key),
+            value: Box::new(count),
+        }
+    };
+    Some(Type::single(atomic))
+}
+
+/// Infer the return type of `array_change_key_case(array $array, int $case = CASE_LOWER)`.
+///
+/// Only STRING keys are case-folded; int keys and all values pass through
+/// unchanged. For any source that isn't a `TKeyedArray` shape (a plain
+/// `array<K, V>`/`list<V>`/non-empty variant), case-folding a `string` key
+/// type doesn't change its *type* — so the source type itself is already the
+/// correct, unchanged result. For a `TKeyedArray` shape with at least one
+/// string key, the case is only rewritten when `$case` resolves to a known
+/// literal `CASE_LOWER` (0) or `CASE_UPPER` (1); anything else (a union of
+/// atoms, an unresolved `$case`) falls back to the generic stub.
+pub(crate) fn array_change_key_case_return_type(arg_types: &[Type]) -> Option<Type> {
+    let source = arg_types.first()?;
+    if source.is_mixed() {
+        return None;
+    }
+    let is_shape = source.types.len() == 1 && matches!(source.types[0], Atomic::TKeyedArray { .. });
+    if !is_shape {
+        // Generic array (or union of non-shape array atoms): folding a
+        // string key's TYPE is a no-op, and values are untouched.
+        if source.types.iter().all(|a| {
+            matches!(
+                a,
+                Atomic::TArray { .. }
+                    | Atomic::TList { .. }
+                    | Atomic::TNonEmptyArray { .. }
+                    | Atomic::TNonEmptyList { .. }
+            )
+        }) {
+            return Some(source.clone());
+        }
+        return None;
+    }
+    let Atomic::TKeyedArray {
+        properties,
+        is_open,
+        is_list,
+    } = &source.types[0]
+    else {
+        unreachable!("is_shape checked above");
+    };
+    let has_string_key = properties.keys().any(|k| matches!(k, ArrayKey::String(_)));
+    if !has_string_key {
+        return Some(source.clone());
+    }
+    let case_arg = arg_types.get(1);
+    let lower = match case_arg {
+        None => true,
+        Some(t) => match t.types.as_slice() {
+            [Atomic::TLiteralInt(0)] => true,
+            [Atomic::TLiteralInt(1)] => false,
+            _ => return None,
+        },
+    };
+    let mut new_properties = IndexMap::new();
+    for (k, prop) in properties.iter() {
+        let new_key = match k {
+            ArrayKey::String(s) => {
+                let folded: Arc<str> = if lower {
+                    s.to_lowercase().into()
+                } else {
+                    s.to_uppercase().into()
+                };
+                ArrayKey::String(folded)
+            }
+            ArrayKey::Int(_) => k.clone(),
+        };
+        new_properties.insert(new_key, prop.clone());
+    }
+    Some(Type::single(Atomic::TKeyedArray {
+        properties: Box::new(new_properties),
+        is_open: *is_open,
+        is_list: *is_list,
+    }))
+}
+
+/// Infer the return type of `array_splice(&$array, $offset, $length?, $replacement?)`.
+///
+/// Returns the array of REMOVED elements. Unlike `array_slice`, there is no
+/// `preserve_keys` parameter — `array_splice` always renumbers int keys from
+/// 0 in its return value (string keys pass through unchanged), i.e.
+/// structurally identical to `array_slice_return_type`'s `preserve_keys =
+/// false` path.
+pub(crate) fn array_splice_return_type(arg_types: &[Type]) -> Option<Type> {
+    let source = arg_types.first()?;
+    if source.is_mixed() {
+        return None;
+    }
+    let (_, value) = crate::stmt::infer_foreach_types(source);
+    if value.is_mixed() {
+        return None;
+    }
+    let is_source_list = source.types.iter().all(|a| {
+        matches!(
+            a,
+            Atomic::TList { .. }
+                | Atomic::TNonEmptyList { .. }
+                | Atomic::TKeyedArray { is_list: true, .. }
+        )
+    });
+    if is_source_list {
+        return Some(Type::single(Atomic::TList {
+            value: Box::new(value),
+        }));
+    }
+    let (key, _) = crate::stmt::infer_foreach_types(source);
+    if key.is_mixed() {
+        return None;
+    }
+    Some(Type::single(Atomic::TArray {
+        key: Box::new(key),
+        value: Box::new(value),
+    }))
 }
 
 /// Helper: extract a readable function name from union for diagnostic output.
