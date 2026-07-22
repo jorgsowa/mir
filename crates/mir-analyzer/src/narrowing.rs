@@ -989,6 +989,27 @@ pub fn narrow_from_condition(
                     narrow_from_condition(&b.right, ctx, !effective_true, db, file);
                 }
             }
+            // `$enum->value === 'H'` narrows $enum to the specific backed-enum
+            // case whose ->value equals the literal (and excludes exactly
+            // that case on the false branch) — sound because PHP requires
+            // distinct backing values across a backed enum's cases, so the
+            // value uniquely identifies the case. Checked before the bare
+            // literal-string/int arms below, which otherwise shadow it
+            // whenever the literal happens to be on the same side they key
+            // off of.
+            else if let Some((var_name, enum_fqcn, case_name)) =
+                extract_enum_value_case(&b.left, &b.right, ctx, db)
+                    .or_else(|| extract_enum_value_case(&b.right, &b.left, ctx, db))
+            {
+                narrow_var_to_literal_enum_case(
+                    db,
+                    ctx,
+                    &var_name,
+                    &enum_fqcn,
+                    &case_name,
+                    effective_true,
+                );
+            }
             // `get_class($x) === 'ClassName'` — check before literal strings so it takes precedence
             else if let ExprKind::String(class_name_str) = &b.right.kind {
                 if let Some(target) = extract_get_class_arg(&b.left) {
@@ -7351,6 +7372,58 @@ fn expand_enum_to_cases(db: &dyn MirDatabase, ty: &Type, enum_fqcn: &str) -> Typ
         }
     }
     result
+}
+
+/// `$var->value === 'H'` / `123 === $var->value` — when `prop_expr` is
+/// `$var->value` and `literal_expr` is a scalar literal, extract the
+/// receiver variable, its backed enum's FQCN, and the specific case name
+/// whose `->value` equals the literal. Returns `None` for anything else:
+/// a non-`value` property, a non-literal comparand, an unresolvable or
+/// non-backed enum, or a value matching zero or more than one case (the
+/// latter would mean a duplicate backing value, which PHP itself rejects
+/// at enum-declaration time, so it's treated as "can't happen" rather
+/// than guessed at).
+fn extract_enum_value_case(
+    prop_expr: &php_ast::owned::Expr,
+    literal_expr: &php_ast::owned::Expr,
+    ctx: &FlowState,
+    db: &dyn MirDatabase,
+) -> Option<(String, String, String)> {
+    let (var_name, prop) = extract_any_prop_access(prop_expr)?;
+    if prop != "value" {
+        return None;
+    }
+    let literal = match &literal_expr.kind {
+        ExprKind::String(s) => Atomic::TLiteralString(std::sync::Arc::from(s.as_ref())),
+        ExprKind::Int(n) => Atomic::TLiteralInt(*n),
+        _ => return None,
+    };
+    let current = ctx.get_var(&var_name);
+    let enum_fqcn = current.types.iter().find_map(|a| match a {
+        Atomic::TNamedObject { fqcn, .. } => Some(fqcn.as_ref().to_string()),
+        Atomic::TLiteralEnumCase { enum_fqcn, .. } => Some(enum_fqcn.to_string()),
+        _ => None,
+    })?;
+    let crate::db::ClassLike::Enum(e) =
+        crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, &enum_fqcn))?
+    else {
+        return None;
+    };
+    e.scalar_type.as_ref()?; // only a backed enum has a meaningful ->value
+    let mut matched: Option<String> = None;
+    for (name, case) in e.cases.iter() {
+        let is_match = case
+            .value
+            .as_ref()
+            .is_some_and(|v| v.types.iter().any(|a| *a == literal));
+        if is_match {
+            if matched.is_some() {
+                return None;
+            }
+            matched = Some(name.to_string());
+        }
+    }
+    matched.map(|case_name| (var_name, enum_fqcn, case_name))
 }
 
 fn narrow_var_to_literal_enum_case(
