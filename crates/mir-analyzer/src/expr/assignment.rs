@@ -336,18 +336,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let mut next_int_key: i64 = 0;
                 for elem in elements.iter() {
                     let key: Option<mir_types::atomic::ArrayKey> = match &elem.key {
-                        Some(k) => match &k.kind {
-                            ExprKind::String(s) => {
-                                Some(match super::helpers::canonical_int_array_key(s) {
-                                    Some(i) => mir_types::atomic::ArrayKey::Int(i),
-                                    None => mir_types::atomic::ArrayKey::String(
-                                        std::sync::Arc::from(s.as_ref()),
-                                    ),
-                                })
-                            }
-                            ExprKind::Int(i) => Some(mir_types::atomic::ArrayKey::Int(*i)),
-                            _ => None,
-                        },
+                        Some(k) => super::helpers::literal_array_key_of_kind(&k.kind),
                         None => Some(mir_types::atomic::ArrayKey::Int(next_int_key)),
                     };
                     if elem.key.is_none() {
