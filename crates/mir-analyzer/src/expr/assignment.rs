@@ -565,10 +565,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                                                 &prop_name,
                                             )
                                     });
-                                if is_readonly
-                                    && !(ctx.inside_constructor && in_declaring_scope)
-                                    && !(has_native_readonly && in_declaring_scope)
-                                {
+                                let in_allowed_readonly_scope = (has_native_readonly
+                                    || ctx.inside_constructor)
+                                    && in_declaring_scope;
+                                if is_readonly && !in_allowed_readonly_scope {
                                     self.emit(
                                         IssueKind::ReadonlyPropertyAssignment {
                                             class: prop_owner.to_string(),
@@ -577,6 +577,30 @@ impl<'a> ExpressionAnalyzer<'a> {
                                         Severity::Error,
                                         span,
                                     );
+                                } else if is_readonly && in_allowed_readonly_scope {
+                                    // A second write to the same readonly property within
+                                    // the scope PHP otherwise allows initializing it is
+                                    // still a runtime error ("cannot modify readonly
+                                    // property ... once initialized") — only the FIRST
+                                    // write in that scope is legal.
+                                    if let ExprKind::Variable(obj_var) = &pa.object.kind {
+                                        if ctx.is_readonly_initialized(obj_var.as_ref(), &prop_name)
+                                        {
+                                            self.emit(
+                                                IssueKind::ReadonlyPropertyAlreadyInitialized {
+                                                    class: prop_owner.to_string(),
+                                                    property: prop_name.clone(),
+                                                },
+                                                Severity::Error,
+                                                span,
+                                            );
+                                        } else {
+                                            ctx.mark_readonly_initialized(
+                                                obj_var.as_ref(),
+                                                &prop_name,
+                                            );
+                                        }
+                                    }
                                 }
                                 if let Some(prop_ty) = &prop_ty {
                                     // `is_mixed_not_template` (not `is_mixed`): a bare
