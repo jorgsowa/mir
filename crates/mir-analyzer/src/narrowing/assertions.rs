@@ -14,7 +14,7 @@ use super::core::{
     extract_var_name, narrow_receiver_non_null_on_prop_match, resolve_prop_current_type,
     resolve_static_prop_current_type,
 };
-use super::filter_out_instanceof_match;
+use super::instanceof_core::filter_out_instanceof_match;
 
 pub(super) fn apply_docblock_assertions(
     call: &php_ast::owned::FunctionCallExpr,
