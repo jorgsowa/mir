@@ -635,17 +635,32 @@ impl Type {
         out
     }
 
-    /// Narrow array/list types when proven empty (e.g. `array_key_first($x) === null`).
-    /// Drops the non-empty variants outright — they can never be empty — but
-    /// otherwise leaves atoms unchanged, since there's no atomic "provably
-    /// empty array" type to narrow a plain `array`/`list` down to.
+    /// Narrow array/list types when proven empty (e.g. `array_key_first($x) === null`,
+    /// `$arr === []`). Drops the non-empty variants outright — they can never
+    /// be empty — and narrows a plain `array`/`list` down to the same closed,
+    /// zero-property `TKeyedArray` an empty `[]` literal itself types as, so
+    /// e.g. `$values[0]` on a proven-empty branch is flagged as a
+    /// `NonExistentArrayOffset` instead of silently keeping the pre-narrow
+    /// element type. `TKeyedArray` atoms are left unchanged — narrowing an
+    /// already-shaped array to "empty" when it may declare required
+    /// properties is a separate, more nuanced case.
     pub fn narrow_to_empty_collection(&self) -> Type {
-        self.filter(|t| {
-            !matches!(
-                t,
-                Atomic::TNonEmptyArray { .. } | Atomic::TNonEmptyList { .. }
-            )
-        })
+        let mut out = Type::empty();
+        out.from_docblock = self.from_docblock;
+        for t in &self.types {
+            match t {
+                Atomic::TNonEmptyArray { .. } | Atomic::TNonEmptyList { .. } => {}
+                Atomic::TArray { .. } | Atomic::TList { .. } => {
+                    out.add_type(Atomic::TKeyedArray {
+                        properties: Box::default(),
+                        is_open: false,
+                        is_list: true,
+                    });
+                }
+                _ => out.add_type(t.clone()),
+            }
+        }
+        out
     }
 
     /// Narrow as if `array_is_list($x)` is true.

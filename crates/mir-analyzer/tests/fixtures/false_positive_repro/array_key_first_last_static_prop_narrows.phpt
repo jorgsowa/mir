@@ -26,7 +26,7 @@ function firstNotNullNarrowsNonEmpty(): void {
 
 function lastIsNullNarrowsEmpty(): void {
     if (array_key_last(Bag::$items) === null) {
-        /** @mir-check Bag::$items is array<string, int> */
+        /** @mir-check Bag::$items is array{} */
         $_ = 1;
     }
 }
