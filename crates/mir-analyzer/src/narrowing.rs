@@ -9714,7 +9714,7 @@ fn extract_haystack_type(
             haystack_type_from_array_type(&ctx.get_var(var_name))
         }
         ExprKind::PropertyAccess(_) | ExprKind::NullsafePropertyAccess(_) => {
-            let (obj, prop) = extract_prop_access(expr)?;
+            let (obj, prop) = extract_any_prop_access(expr)?;
             haystack_type_from_array_type(&resolve_prop_current_type(ctx, &obj, &prop, db, file))
         }
         ExprKind::StaticPropertyAccess(_) => {
