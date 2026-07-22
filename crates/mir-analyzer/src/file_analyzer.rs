@@ -9,15 +9,15 @@
 //! open file's *direct* references if the background walk hasn't reached them
 //! yet, keeping warm-up free of transient false positives.
 //!
-//! For batch multi-file analysis, use [`BatchFileAnalyzer::analyze_batch`]
-//! which parallelizes analysis across multiple pre-parsed files.
+//! For bulk multi-file work, use the session sweeps
+//! ([`AnalysisSession::reanalyze_files_cancellable`]) — memoized and
+//! cancellable — or the CLI batch pipeline.
 
 use std::sync::Arc;
 
 use mir_issues::Issue;
 use php_ast::owned::Program;
 use php_rs_parser::source_map::SourceMap;
-use rayon::prelude::*;
 
 use crate::body_analysis::BodyAnalyzer;
 use crate::db::MirDatabase;
@@ -143,94 +143,5 @@ impl<'a> FileAnalyzer<'a> {
             resolved,
         );
         FileAnalysis { issues, symbols }
-    }
-}
-
-/// Batch file analyzer for parallel multi-file analysis.
-///
-/// `BatchFileAnalyzer` processes pre-parsed files in parallel using rayon,
-/// making it efficient for analyzing many files at once (e.g., cold-start analysis).
-pub struct BatchFileAnalyzer<'a> {
-    session: &'a AnalysisSession,
-}
-
-/// A pre-parsed file ready for batch analysis.
-pub struct ParsedFile {
-    pub(crate) file: Arc<str>,
-    pub(crate) source: Arc<str>,
-    pub(crate) program: Program,
-    pub(crate) source_map: SourceMap,
-}
-
-impl ParsedFile {
-    /// File path this `ParsedFile` represents.
-    pub fn file(&self) -> &Arc<str> {
-        &self.file
-    }
-
-    /// Source text for this file.
-    pub fn source(&self) -> &Arc<str> {
-        &self.source
-    }
-
-    /// Create a `ParsedFile` from an owned program and source map.
-    pub fn new(file: Arc<str>, source: Arc<str>, program: Program, source_map: SourceMap) -> Self {
-        Self {
-            file,
-            source,
-            program,
-            source_map,
-        }
-    }
-}
-
-impl<'a> BatchFileAnalyzer<'a> {
-    pub fn new(session: &'a AnalysisSession) -> Self {
-        Self { session }
-    }
-
-    /// Analyze multiple pre-parsed files in parallel.
-    ///
-    /// Each rayon worker gets its own cloned database snapshot, so concurrent
-    /// analysis proceeds without lock contention on the session.
-    pub fn analyze_batch(&self, files: Vec<ParsedFile>) -> Vec<(Arc<str>, FileAnalysis)> {
-        // First pass: collect all ASTs and auto-discover stubs.
-        // Also lazy-load vendor autoload.files globals once so they are in the
-        // workspace index before the parallel analysis snapshot is taken.
-        self.session.ensure_vendor_eager_functions();
-        files.iter().for_each(|file| {
-            self.session.ensure_stubs_for_ast(&file.program);
-        });
-
-        // Second pass: analyze files in parallel.
-        // Each rayon worker gets its own database clone (Salsa is Send but !Sync).
-        // Freeze on the pass-scoped snapshot: all index mutation (stubs,
-        // vendor eager files) completed above, and a concurrent index write
-        // cancels the pass, so the frozen view is never observed stale.
-        let mut db = self.session.snapshot_db();
-        db.freeze_workspace_index();
-        let results: Vec<(Arc<str>, FileAnalysis, Vec<crate::db::RefLoc>)> = files
-            .into_par_iter()
-            .map_with(db, |db, file| {
-                let driver = BodyAnalyzer::new(db as &dyn MirDatabase, self.session.php_version());
-                let (issues, symbols) = driver.analyze_bodies(
-                    &file.program,
-                    file.file.clone(),
-                    &file.source,
-                    &file.source_map,
-                );
-                let pending = db.take_pending_ref_locs();
-                let analysis = FileAnalysis { issues, symbols };
-                (file.file, analysis, pending)
-            })
-            .collect();
-        let mut all_ref_locs = Vec::new();
-        let mut out = Vec::with_capacity(results.len());
-        for (file, analysis, ref_locs) in results {
-            all_ref_locs.extend(ref_locs);
-            out.push((file, analysis));
-        }
-        self.session.commit_ref_locs_batch(all_ref_locs);
-        out
     }
 }
