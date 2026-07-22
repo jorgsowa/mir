@@ -1772,18 +1772,11 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         // when all property KEYS are subtypes of K. Value compatibility is checked
         // structurally only for scalar types; named-object values are deferred to
         // class-hierarchy checks in return_arrays_compatible (mir-analyzer).
-        // Open shapes (is_open=true) may have extra unknown keys: keep permissive.
-        (
-            Atomic::TKeyedArray {
-                properties,
-                is_open,
-                ..
-            },
-            Atomic::TArray { key, value },
-        ) => {
-            if *is_open {
-                return true;
-            }
+        // Open shapes (is_open=true) may have extra unknown keys beyond `properties`:
+        // those stay unchecked (permissive), but every KNOWN property must still
+        // satisfy K/V regardless of openness — an open shape isn't a license to skip
+        // checking the keys it does declare.
+        (Atomic::TKeyedArray { properties, .. }, Atomic::TArray { key, value }) => {
             properties.iter().all(|(prop_key, prop)| {
                 let key_atomic = match prop_key {
                     crate::atomic::ArrayKey::String(s) => Atomic::TLiteralString(s.clone()),
@@ -1814,10 +1807,7 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
             },
             Atomic::TNonEmptyArray { key, value },
         ) => {
-            if *is_open {
-                return !properties.is_empty();
-            }
-            properties.iter().any(|(_, p)| !p.optional)
+            (*is_open || properties.iter().any(|(_, p)| !p.optional))
                 && properties.iter().all(|(prop_key, prop)| {
                     let key_atomic = match prop_key {
                         crate::atomic::ArrayKey::String(s) => Atomic::TLiteralString(s.clone()),

@@ -1118,25 +1118,24 @@ fn union_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>)
                         && union_compatible(value, pv_val, ea)
                 });
             }
-            // An open shape may carry additional keys of unknown type — stay
-            // permissive, matching atomic_subtype's treatment of open shapes.
-            // A closed shape is only array/list-compatible when every one of its
-            // property values fits the param's element type (checked per-property
-            // rather than as one merged union, so a mix of a compatible and an
-            // incompatible property value is correctly rejected). A TKeyedArray
-            // param atom (shape-to-shape) is left permissive: `atomic_subtype` has
-            // no shape-vs-shape arm at all, so this is the only path that currently
-            // accepts a structurally-fine shape argument (e.g. an int literal where
-            // the param property is `float`) — precise shape-vs-shape checking is
-            // a separate, larger gap than the scalar/array-param one this fixes.
+            // An open shape may carry additional keys of unknown type — those
+            // stay permissive, matching atomic_subtype's treatment of open
+            // shapes. But every KNOWN property must still fit the param's
+            // element type regardless of openness (checked per-property
+            // rather than as one merged union, so a mix of a compatible and
+            // an incompatible property value is correctly rejected) — `is_open`
+            // only excuses the keys it doesn't know about, not the ones it
+            // does. A TKeyedArray param atom (shape-to-shape) is left
+            // permissive: `atomic_subtype` has no shape-vs-shape arm at all,
+            // so this is the only path that currently accepts a structurally-
+            // fine shape argument (e.g. an int literal where the param
+            // property is `float`) — precise shape-vs-shape checking is a
+            // separate, larger gap than the scalar/array-param one this fixes.
             Atomic::TKeyedArray {
                 properties,
                 is_open,
                 ..
             } => {
-                if *is_open {
-                    return true;
-                }
                 return param_ty.types.iter().any(|pv| match pv {
                     Atomic::TArray { value, .. }
                     | Atomic::TNonEmptyArray { value, .. }
@@ -1145,7 +1144,7 @@ fn union_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>)
                         .values()
                         .all(|p| union_compatible(&p.ty, value, ea)),
                     Atomic::TKeyedArray { .. } => true,
-                    _ => false,
+                    _ => *is_open,
                 });
             }
             _ => return scalar_arg_fits_param(&Type::single(av.clone()), param_ty),
@@ -1175,53 +1174,59 @@ fn union_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>)
 
 fn array_list_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>) -> bool {
     arg_ty.types.iter().all(|a_atomic| {
-        let arg_value: &Type = match a_atomic {
-            Atomic::TArray { value, .. }
-            | Atomic::TNonEmptyArray { value, .. }
-            | Atomic::TList { value }
-            | Atomic::TNonEmptyList { value } => value,
-            // An open shape may carry additional keys of unknown type — stay
-            // permissive, matching atomic_subtype's treatment of open shapes.
-            // A closed shape is only array/list-compatible when every one of its
-            // property values fits the param's element type; a `non-empty-*`
-            // param additionally requires at least one property (an empty
-            // shape like `[]` is not a `non-empty-list`, even though `.all()`
-            // over its empty properties is vacuously true). A TKeyedArray
-            // param atom (shape-to-shape) requires every required param key
-            // to be present in the arg's own shape with a compatible value —
-            // an arg missing a required key (or with an incompatible value
-            // for a shared key) is not shape-compatible; extra arg keys
-            // beyond the param's declared set are still left permissive.
-            Atomic::TKeyedArray {
-                properties,
-                is_open,
-                ..
-            } => {
-                if *is_open {
-                    return true;
-                }
-                return param_ty.types.iter().any(|p_atomic| match p_atomic {
-                    Atomic::TArray { value, .. } | Atomic::TList { value } => properties
-                        .values()
-                        .all(|p| union_compatible(&p.ty, value, ea)),
-                    Atomic::TNonEmptyArray { value, .. } | Atomic::TNonEmptyList { value } => {
-                        !properties.is_empty()
-                            && properties.values().all(|p| union_compatible(&p.ty, value, ea))
-                    }
-                    Atomic::TKeyedArray {
-                        properties: param_properties,
-                        ..
-                    } => param_properties.iter().all(|(key, param_prop)| {
-                        match properties.get(key) {
-                            Some(arg_prop) => union_compatible(&arg_prop.ty, &param_prop.ty, ea),
-                            None => param_prop.optional,
+        let arg_value: &Type =
+            match a_atomic {
+                Atomic::TArray { value, .. }
+                | Atomic::TNonEmptyArray { value, .. }
+                | Atomic::TList { value }
+                | Atomic::TNonEmptyList { value } => value,
+                // An open shape may carry additional keys of unknown type — those
+                // stay permissive, matching atomic_subtype's treatment of open
+                // shapes. But every KNOWN property must still fit the param's
+                // element type regardless of openness; a `non-empty-*` param
+                // additionally requires at least one known property when the arg
+                // is closed (an empty shape like `[]` is not a `non-empty-list`,
+                // even though `.all()` over its empty properties is vacuously
+                // true — an open shape may still hide a first element, so it
+                // stays permissive there). A TKeyedArray param atom (shape-to-
+                // shape) requires every required param key to be present in the
+                // arg's own shape with a compatible value, unless the arg is open
+                // (an open arg's missing key might be one of its unknown ones) —
+                // an arg missing a required key on a CLOSED shape (or with an
+                // incompatible value for a shared key) is not shape-compatible;
+                // extra arg keys beyond the param's declared set are still left
+                // permissive.
+                Atomic::TKeyedArray {
+                    properties,
+                    is_open,
+                    ..
+                } => {
+                    return param_ty.types.iter().any(|p_atomic| match p_atomic {
+                        Atomic::TArray { value, .. } | Atomic::TList { value } => properties
+                            .values()
+                            .all(|p| union_compatible(&p.ty, value, ea)),
+                        Atomic::TNonEmptyArray { value, .. } | Atomic::TNonEmptyList { value } => {
+                            (*is_open || !properties.is_empty())
+                                && properties
+                                    .values()
+                                    .all(|p| union_compatible(&p.ty, value, ea))
                         }
-                    }),
-                    _ => false,
-                });
-            }
-            _ => return false,
-        };
+                        Atomic::TKeyedArray {
+                            properties: param_properties,
+                            ..
+                        } => param_properties.iter().all(|(key, param_prop)| {
+                            match properties.get(key) {
+                                Some(arg_prop) => {
+                                    union_compatible(&arg_prop.ty, &param_prop.ty, ea)
+                                }
+                                None => param_prop.optional || *is_open,
+                            }
+                        }),
+                        _ => *is_open,
+                    });
+                }
+                _ => return false,
+            };
         let arg_key = array_key_of(a_atomic).unwrap_or_else(Type::mixed);
 
         param_ty.types.iter().any(|p_atomic| {
