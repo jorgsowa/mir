@@ -210,11 +210,12 @@ impl DocblockParser {
                         }
                     }
                 }
-                "self-out" | "psalm-self-out" | "phpstan-self-out" => {
+                "self-out" | "psalm-self-out" | "phpstan-self-out" | "this-out"
+                | "psalm-this-out" | "phpstan-this-out" => {
                     if let Some(body_str) = body_text(&tag.body) {
                         let trimmed = body_str.trim();
                         if !trimmed.is_empty() {
-                            result.self_out = Some(parse_type_string(trimmed));
+                            result.self_out = Some(parse_self_out_type(trimmed));
                         }
                     }
                 }
@@ -477,6 +478,37 @@ impl DocblockParser {
 
         result
     }
+}
+
+/// `self<T>`/`static<T>`/`parent<T>`/`$this<T>` written in a self-out
+/// annotation (`@psalm-self-out`, `@phpstan-self-out`, `@psalm-this-out`)
+/// needs its `<T>` kept intact for method-level template substitution (e.g.
+/// `@psalm-self-out self<U>` on a method with its own `@template U`) —
+/// unlike an ordinary `@return self<T>`, where the shared type parser
+/// deliberately drops the args and reattaches the receiver's own params
+/// instead (see `parse_generic`'s `self`/`static`/`parent` arms). Parsed
+/// here as a `TNamedObject` sentinel whose `fqcn` is the literal keyword
+/// (never a real PHP class name), which `substitute_static_atom` recognizes
+/// and resolves to the actual receiver class at call time while keeping
+/// `type_params` intact for the caller's later template substitution.
+fn parse_self_out_type(trimmed: &str) -> Type {
+    for keyword in ["self", "static", "parent", "$this"] {
+        let Some(rest) = strip_ascii_ci_prefix(trimmed, keyword) else {
+            continue;
+        };
+        let rest = rest.trim_start();
+        if let Some(inner) = rest.strip_prefix('<').and_then(|s| s.strip_suffix('>')) {
+            let params: Vec<Type> = split_generics(inner)
+                .iter()
+                .map(|p| parse_type_string(p.trim()))
+                .collect();
+            return Type::single(Atomic::TNamedObject {
+                fqcn: mir_types::Name::from(keyword),
+                type_params: mir_types::union::vec_to_type_params(params),
+            });
+        }
+    }
+    parse_type_string(trimmed)
 }
 
 // ---------------------------------------------------------------------------

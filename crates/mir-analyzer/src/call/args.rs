@@ -240,6 +240,27 @@ fn substitute_static_atom(a: Atomic, fqcn: &Arc<str>, receiver_type_params: &[Ty
                 receiver_type_params,
             )),
         },
+        // `self<T>`/`static<T>`/`parent<T>`/`$this<T>` sentinel written in a
+        // self-out annotation (see `parse_self_out_type` in the docblock
+        // parser) — unlike a bare `TSelf`/`TStaticObject`, this carries the
+        // annotation's own `<T>` args (often a method-level template, e.g.
+        // `self<U>`), which must survive into the resolved receiver class so
+        // the caller's later `substitute_templates` can still replace `U`
+        // with this call's inferred binding, instead of being erased like
+        // the top-level `self`/`static` arms above.
+        Atomic::TNamedObject {
+            fqcn: obj_fqcn,
+            type_params,
+        } if matches!(obj_fqcn.as_ref(), "self" | "static" | "parent" | "$this") => {
+            let substituted: Vec<Type> = type_params
+                .iter()
+                .map(|t| substitute_static_in_type(t.clone(), fqcn, receiver_type_params))
+                .collect();
+            Atomic::TNamedObject {
+                fqcn: Name::from(fqcn.as_ref()),
+                type_params: mir_types::union::vec_to_type_params(substituted),
+            }
+        }
         // `static`/`self` nested in generic arguments (`Builder<static>`) must
         // resolve like the top-level forms, or the unresolved atom degrades
         // every downstream template binding on the returned object to mixed.
