@@ -1069,15 +1069,24 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 let nested_update = nested_path.and_then(|path| {
                                     super::helpers::set_nested_keyed_value(&current, &path, &ty)
                                 });
+                                let declared_ceiling =
+                                    ctx.declared_var_types.get(&mir_types::Name::from(name_str));
                                 let updated = match nested_update {
                                     Some(updated) => updated,
                                     None => match &key_chain.last().unwrap() {
-                                        None => widen_array_as_list(&current, &wrapped_value),
+                                        None => widen_array_as_list(
+                                            &current,
+                                            &wrapped_value,
+                                            ctx.inside_loop,
+                                            declared_ceiling,
+                                        ),
                                         Some(_) => widen_array_with_value_and_key(
                                             &current,
                                             &wrapped_value,
                                             &base_key,
                                             literal_key.as_ref(),
+                                            ctx.inside_loop,
+                                            declared_ceiling,
                                         ),
                                     },
                                 };
