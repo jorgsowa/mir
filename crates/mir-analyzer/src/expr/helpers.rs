@@ -146,6 +146,59 @@ pub fn remove_key_from_shapes(ty: &Type, key: &ArrayKey) -> Type {
     result
 }
 
+/// Whether a literal array key is definitely present (with a known,
+/// non-optional, non-null type) or definitely absent across an array type's
+/// whole union — used by `??=` to tell whether its right-hand side can ever
+/// actually run.
+pub enum DefiniteKeyState {
+    Absent,
+    Present(Type),
+}
+
+/// Resolve [`DefiniteKeyState`] for `key` on `current`. Returns `None` when
+/// neither state can be proven for the WHOLE union — a non-shape atom, an
+/// open shape (an undeclared key might still match), an optional property
+/// (may or may not be set), or a union where one branch has the key and
+/// another doesn't — so the caller should fall back to treating it as
+/// "maybe set".
+pub fn definite_key_state(current: &Type, key: &ArrayKey) -> Option<DefiniteKeyState> {
+    if current.types.is_empty() {
+        return None;
+    }
+    let mut any_absent = false;
+    let mut any_present = false;
+    let mut present_ty: Option<Type> = None;
+    for a in &current.types {
+        let Atomic::TKeyedArray {
+            properties,
+            is_open,
+            ..
+        } = a
+        else {
+            return None;
+        };
+        match properties.get(key) {
+            // Non-optional AND provably non-null: `??=` can never run, so the
+            // key's own type is the final answer. A non-optional property
+            // whose type still admits `null` is genuinely uncertain — the
+            // stored value could be null at runtime, in which case `??=`
+            // *would* run — so that falls through to the catch-all `None`.
+            Some(prop) if !prop.optional && !prop.ty.is_nullable() => {
+                any_present = true;
+                fold_into(&mut present_ty, prop.ty.clone());
+            }
+            Some(_) => return None,
+            None if !*is_open => any_absent = true,
+            None => return None,
+        }
+    }
+    match (any_absent, any_present) {
+        (true, false) => Some(DefiniteKeyState::Absent),
+        (false, true) => present_ty.map(DefiniteKeyState::Present),
+        _ => None,
+    }
+}
+
 /// Cap on how many properties a `TKeyedArray` shape can accumulate from
 /// straight-line literal writes before a further write generalizes the whole
 /// atom to a plain `array<K, V>`/`list<T>`. Keeps property maps (and their
