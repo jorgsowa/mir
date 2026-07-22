@@ -1183,12 +1183,15 @@ fn array_list_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer
             // An open shape may carry additional keys of unknown type — stay
             // permissive, matching atomic_subtype's treatment of open shapes.
             // A closed shape is only array/list-compatible when every one of its
-            // property values fits the param's element type. A TKeyedArray param
-            // atom (shape-to-shape) is left permissive: `atomic_subtype` has no
-            // shape-vs-shape arm at all, so this is the only path that currently
-            // accepts a structurally-fine shape argument (e.g. an int literal
-            // where the param property is `float`) — precise shape-vs-shape
-            // checking is a separate, larger gap than the one this fixes.
+            // property values fits the param's element type; a `non-empty-*`
+            // param additionally requires at least one property (an empty
+            // shape like `[]` is not a `non-empty-list`, even though `.all()`
+            // over its empty properties is vacuously true). A TKeyedArray
+            // param atom (shape-to-shape) requires every required param key
+            // to be present in the arg's own shape with a compatible value —
+            // an arg missing a required key (or with an incompatible value
+            // for a shared key) is not shape-compatible; extra arg keys
+            // beyond the param's declared set are still left permissive.
             Atomic::TKeyedArray {
                 properties,
                 is_open,
@@ -1198,13 +1201,22 @@ fn array_list_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer
                     return true;
                 }
                 return param_ty.types.iter().any(|p_atomic| match p_atomic {
-                    Atomic::TArray { value, .. }
-                    | Atomic::TNonEmptyArray { value, .. }
-                    | Atomic::TList { value }
-                    | Atomic::TNonEmptyList { value } => properties
+                    Atomic::TArray { value, .. } | Atomic::TList { value } => properties
                         .values()
                         .all(|p| union_compatible(&p.ty, value, ea)),
-                    Atomic::TKeyedArray { .. } => true,
+                    Atomic::TNonEmptyArray { value, .. } | Atomic::TNonEmptyList { value } => {
+                        !properties.is_empty()
+                            && properties.values().all(|p| union_compatible(&p.ty, value, ea))
+                    }
+                    Atomic::TKeyedArray {
+                        properties: param_properties,
+                        ..
+                    } => param_properties.iter().all(|(key, param_prop)| {
+                        match properties.get(key) {
+                            Some(arg_prop) => union_compatible(&arg_prop.ty, &param_prop.ty, ea),
+                            None => param_prop.optional,
+                        }
+                    }),
                     _ => false,
                 });
             }
