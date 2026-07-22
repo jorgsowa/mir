@@ -6,22 +6,24 @@ use php_ast::owned::ExprKind;
 use crate::db::MirDatabase;
 use crate::flow_state::FlowState;
 
+use super::class_introspection::{
+    extract_dynamic_class_const_static_prop_var, extract_dynamic_class_const_var,
+    extract_get_class_arg, extract_get_class_static_prop_arg, extract_get_debug_type_arg,
+    extract_get_debug_type_static_prop_arg, extract_get_parent_class_arg,
+    extract_get_parent_class_static_prop_arg, narrow_from_get_parent_class_literal,
+};
 use super::core::{
     extract_any_prop_access, extract_static_prop_access, extract_var_name,
     narrow_receiver_non_null_on_prop_match, ScalarArgTarget,
 };
-use super::instanceof_core::narrow_static_prop_is_subclass_of;
-use super::{
-    extract_class_const_fqcn, extract_dynamic_class_const_static_prop_var,
-    extract_dynamic_class_const_var, extract_enum_case, extract_get_class_arg,
-    extract_get_class_static_prop_arg, extract_get_debug_type_arg,
-    extract_get_debug_type_static_prop_arg, extract_get_parent_class_arg,
-    extract_get_parent_class_static_prop_arg, narrow_from_get_parent_class_literal,
-    narrow_prop_to_class_string, narrow_prop_to_literal_enum_case, narrow_prop_to_specific_class,
+use super::enum_class::{
+    extract_class_const_fqcn, extract_enum_case, narrow_prop_to_class_string,
+    narrow_prop_to_literal_enum_case, narrow_prop_to_specific_class,
     narrow_static_prop_to_class_string, narrow_static_prop_to_literal_enum_case,
     narrow_static_prop_to_specific_class, narrow_var_to_class_string,
     narrow_var_to_literal_enum_case, narrow_var_to_specific_class,
 };
+use super::instanceof_core::narrow_static_prop_is_subclass_of;
 
 /// Shared by the strict `===`/`!==` arm and the loose `==`/`!=` arm: narrows
 /// `$x`/`$this->prop` against an enum-case (`EnumName::CaseName`) or a

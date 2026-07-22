@@ -9,12 +9,14 @@ use mir_types::{Atomic, Type};
 use crate::db::MirDatabase;
 use crate::flow_state::FlowState;
 
+use super::literals::{extract_int_literal, narrow_var_null};
+use super::strings::{
+    extract_strlen_arg, extract_strlen_static_prop_arg, narrow_prop_string_strlen_comparison,
+    narrow_static_prop_string_strlen_comparison, narrow_string_strlen_comparison,
+};
 use super::{
-    extract_count_arg, extract_count_static_prop_arg, extract_int_literal, extract_strlen_arg,
-    extract_strlen_static_prop_arg, narrow_array_count_comparison,
-    narrow_prop_array_count_comparison, narrow_prop_string_strlen_comparison,
-    narrow_static_prop_array_count_comparison, narrow_static_prop_string_strlen_comparison,
-    narrow_string_strlen_comparison, narrow_var_null,
+    extract_count_arg, extract_count_static_prop_arg, narrow_array_count_comparison,
+    narrow_prop_array_count_comparison, narrow_static_prop_array_count_comparison,
 };
 
 /// Apply a pre-computed narrowed type to a variable.
