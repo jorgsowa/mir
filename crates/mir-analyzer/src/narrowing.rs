@@ -2308,6 +2308,10 @@ pub fn narrow_from_condition(
                                     extract_any_prop_access(&arr_arg.value)
                                 {
                                     narrow_prop_array_key_exists(ctx, &obj, &prop, &key, db, file);
+                                    // array_key_exists() throws TypeError on a null 2nd
+                                    // arg, so reaching the true branch already proves
+                                    // $obj->prop (and thus $obj) was non-null.
+                                    narrow_receiver_non_null_on_prop_match(ctx, &obj, true);
                                 } else if let Some((fqcn, prop)) =
                                     extract_static_prop_access(&arr_arg.value, ctx, db, file)
                                 {
@@ -2429,6 +2433,10 @@ pub fn narrow_from_condition(
                                             ctx, &obj, &prop, current, narrowed, true,
                                         );
                                     }
+                                    // array_key_exists() throws TypeError on a null 2nd
+                                    // arg, so reaching the false branch also proves
+                                    // $obj->prop (and thus $obj) was non-null.
+                                    narrow_receiver_non_null_on_prop_match(ctx, &obj, true);
                                 } else if let Some((fqcn, prop)) =
                                     extract_static_prop_access(&arr_arg.value, ctx, db, file)
                                 {
