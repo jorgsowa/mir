@@ -951,6 +951,62 @@ pub(crate) fn array_chunk_return_type(arg_types: &[Type]) -> Option<Type> {
     Some(Type::single(outer_atom))
 }
 
+/// Infer the return type of the `array_diff`/`array_intersect` function
+/// family (and their `_key`/`_assoc`/`u*`/`uassoc` variants).
+///
+/// Every member of this family filters `$array` (the first argument) down to
+/// a subset of its own entries — by value, key, or both, optionally via a
+/// user callback that only decides membership — never altering the surviving
+/// entries' keys or values. So the result's key/value types are exactly
+/// `$array`'s. The result can never be proven non-empty (every entry could be
+/// filtered out) and is never a list (the original — possibly
+/// non-sequential — int keys are preserved verbatim).
+pub(crate) fn array_diff_intersect_like_return_type(arg_types: &[Type]) -> Option<Type> {
+    let source = arg_types.first()?;
+    if source.is_mixed() {
+        return None;
+    }
+    let (key, value) = crate::stmt::infer_foreach_types(source);
+    if key.is_mixed() && value.is_mixed() {
+        return None;
+    }
+    Some(Type::single(Atomic::TArray {
+        key: Box::new(key),
+        value: Box::new(value),
+    }))
+}
+
+/// Infer the return type of `array_combine(array $keys, array $values)`.
+///
+/// PHP pairs each value of `$keys` (coerced to a legal array-key type) with
+/// the value at the same position in `$values`, positionally. Since PHP 8
+/// throws a `ValueError` when the counts differ, on the successful-return
+/// path a non-empty `$keys` guarantees a non-empty result. The result is
+/// never a list — its keys come from `$keys`'s arbitrary values, not
+/// sequential indices.
+pub(crate) fn array_combine_return_type(arg_types: &[Type]) -> Option<Type> {
+    let keys_arr = arg_types.first()?;
+    let values_arr = arg_types.get(1)?;
+    let (_, keys_values) = crate::stmt::infer_foreach_types(keys_arr);
+    let key = crate::expr::helpers::coerce_array_key_type(&keys_values);
+    let (_, value) = crate::stmt::infer_foreach_types(values_arr);
+    if key.is_mixed() && value.is_mixed() {
+        return None;
+    }
+    let atomic = if super::callable::is_non_empty_collection(keys_arr) {
+        Atomic::TNonEmptyArray {
+            key: Box::new(key),
+            value: Box::new(value),
+        }
+    } else {
+        Atomic::TArray {
+            key: Box::new(key),
+            value: Box::new(value),
+        }
+    };
+    Some(Type::single(atomic))
+}
+
 /// Helper: extract a readable function name from union for diagnostic output.
 fn callback_name_for_diagnostic(callback_ty: &Type) -> String {
     if let Some(Atomic::TLiteralString(fn_name)) = callback_ty.types.first() {
