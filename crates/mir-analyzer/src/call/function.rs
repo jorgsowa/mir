@@ -585,10 +585,10 @@ impl CallAnalyzer {
             // Functions with a fixed minimum arity are declared in callback_min_arity_spec.
             match resolved_fn_name.as_str() {
                 "array_map" => {
-                    super::callable::check_array_map_callback(ea, &arg_types, &arg_spans)
+                    super::array_builtins::check_array_map_callback(ea, &arg_types, &arg_spans)
                 }
                 "array_filter" => {
-                    super::callable::check_array_filter_callback(ea, &arg_types, &arg_spans)
+                    super::array_builtins::check_array_filter_callback(ea, &arg_types, &arg_spans)
                 }
                 fn_name => {
                     if let Some((cb_idx, min_arity)) =
@@ -759,215 +759,223 @@ impl CallAnalyzer {
             // `array`: refine the element type from the callback / source array
             // so binding sites (e.g. `foreach` over the result) get a usable
             // value type. Falls back to the stub return when inference is unsure.
-            let return_ty = match resolved_fn_name.as_str() {
-                "array_map" => {
-                    let callback_expr = call.args.first().map(|a| &a.value);
-                    super::callable::infer_array_map_return(ea, &arg_types, ctx, callback_expr)
+            let return_ty =
+                match resolved_fn_name.as_str() {
+                    "array_map" => {
+                        let callback_expr = call.args.first().map(|a| &a.value);
+                        super::array_builtins::infer_array_map_return(
+                            ea,
+                            &arg_types,
+                            ctx,
+                            callback_expr,
+                        )
                         .unwrap_or(return_ty)
-                }
-                "array_filter" => {
-                    super::callable::infer_array_filter_return(&arg_types).unwrap_or(return_ty)
-                }
-                "array_reduce" => {
-                    let callback_expr = call.args.get(1).map(|a| &a.value);
-                    super::callable::infer_array_reduce_return(ea, &arg_types, ctx, callback_expr)
-                        .unwrap_or(return_ty)
-                }
-                "array_values" => {
-                    super::callable::infer_array_values_return(&arg_types).unwrap_or(return_ty)
-                }
-                "array_merge" => {
-                    super::callable::infer_array_merge_return(&arg_types).unwrap_or(return_ty)
-                }
-                // array_fill with a positive count returns a non-empty list.
-                "array_fill" => {
-                    super::callable::array_fill_return_type(&arg_types).unwrap_or(return_ty)
-                }
-                // implode/join with a non-empty array of non-empty strings returns non-empty-string.
-                "implode" | "join" => {
-                    super::callable::implode_return_type(&arg_types).unwrap_or(return_ty)
-                }
-                // str_split with a non-empty string returns a non-empty list<non-empty-string>.
-                "str_split" => {
-                    super::callable::str_split_return_type(&arg_types).unwrap_or(return_ty)
-                }
-                // explode with a non-empty separator always returns non-empty-list<string>.
-                "explode" => super::callable::explode_return_type(&arg_types, &return_ty)
-                    .unwrap_or(return_ty),
-                // array_slice preserves the element type (and list structure when not
-                // preserving keys).
-                "array_slice" => {
-                    super::callable::array_slice_return_type(&arg_types).unwrap_or(return_ty)
-                }
-                // array_keys of a non-empty array returns a non-empty list (preserving the
-                // stub's key type from template resolution).
-                "array_keys" => super::callable::array_keys_return_type(&arg_types, &return_ty),
-                // array_reverse preserves the non-emptiness of the source array.
-                "array_reverse" => {
-                    super::callable::array_reverse_return_type(&arg_types).unwrap_or(return_ty)
-                }
-                // array_unique preserves key/value types and non-empty status.
-                "array_unique" => {
-                    super::callable::array_unique_return(&arg_types).unwrap_or(return_ty)
-                }
-                // range($start, $end) with integer bounds returns non-empty-list<int<min,max>>.
-                "range" => super::callable::range_return_type(&arg_types).unwrap_or(return_ty),
-                // array_key_first/array_key_last: non-null for non-empty input; int for lists.
-                "array_key_first" | "array_key_last" => {
-                    super::callable::array_key_first_last_return(&arg_types).unwrap_or(return_ty)
-                }
-                // array_pop/array_shift: return value type (not mixed) when source is typed.
-                "array_pop" | "array_shift" => {
-                    super::callable::array_pop_shift_return(&arg_types).unwrap_or(return_ty)
-                }
-                // Faithful integer-range returns: counts and lengths are
-                // non-negative (and counts of non-empty collections are `>= 1`).
-                "count" | "sizeof" => {
-                    super::callable::count_return_type(&arg_types).unwrap_or(return_ty)
-                }
-                "strlen" | "mb_strlen" => super::callable::strlen_return_type(&arg_types),
-                "abs" => super::callable::abs_return_type(&arg_types).unwrap_or(return_ty),
-                // floor() and ceil() always return a whole-valued float — represent as
-                // TIntegralFloat so passing the result to an int param doesn't emit a FP.
-                "floor" | "ceil" => Type::single(Atomic::TIntegralFloat),
-                // round() without a precision arg (or with precision=0) is also always integral.
-                "round" => {
-                    let precision_is_integral = arg_types
-                        .get(1)
-                        .is_none_or(|t| t.types.len() == 1 && t.types[0] == Atomic::TLiteralInt(0));
-                    if precision_is_integral {
-                        Type::single(Atomic::TIntegralFloat)
-                    } else {
-                        return_ty
                     }
-                }
-                "intdiv" => {
-                    // intdiv() throws the exact same DivisionByZeroError as `$a / 0` for
-                    // a literal-zero divisor — report it the same way BinaryOp::Div does,
-                    // rather than only narrowing the return type.
-                    if let Some(divisor_ty) = arg_types.get(1) {
-                        if crate::expr::operand_is_definitely_zero(divisor_ty) {
-                            ea.emit(
-                                IssueKind::DivisionByZero {
-                                    op: "intdiv".to_string(),
-                                },
-                                Severity::Error,
-                                arg_spans.get(1).copied().unwrap_or(span),
-                            );
+                    "array_filter" => super::array_builtins::infer_array_filter_return(&arg_types)
+                        .unwrap_or(return_ty),
+                    "array_reduce" => {
+                        let callback_expr = call.args.get(1).map(|a| &a.value);
+                        super::array_builtins::infer_array_reduce_return(
+                            ea,
+                            &arg_types,
+                            ctx,
+                            callback_expr,
+                        )
+                        .unwrap_or(return_ty)
+                    }
+                    "array_values" => super::array_builtins::infer_array_values_return(&arg_types)
+                        .unwrap_or(return_ty),
+                    "array_merge" => super::array_builtins::infer_array_merge_return(&arg_types)
+                        .unwrap_or(return_ty),
+                    // array_fill with a positive count returns a non-empty list.
+                    "array_fill" => super::array_builtins::array_fill_return_type(&arg_types)
+                        .unwrap_or(return_ty),
+                    // implode/join with a non-empty array of non-empty strings returns non-empty-string.
+                    "implode" | "join" => {
+                        super::callable::implode_return_type(&arg_types).unwrap_or(return_ty)
+                    }
+                    // str_split with a non-empty string returns a non-empty list<non-empty-string>.
+                    "str_split" => {
+                        super::callable::str_split_return_type(&arg_types).unwrap_or(return_ty)
+                    }
+                    // explode with a non-empty separator always returns non-empty-list<string>.
+                    "explode" => super::callable::explode_return_type(&arg_types, &return_ty)
+                        .unwrap_or(return_ty),
+                    // array_slice preserves the element type (and list structure when not
+                    // preserving keys).
+                    "array_slice" => super::array_builtins::array_slice_return_type(&arg_types)
+                        .unwrap_or(return_ty),
+                    // array_keys of a non-empty array returns a non-empty list (preserving the
+                    // stub's key type from template resolution).
+                    "array_keys" => {
+                        super::array_builtins::array_keys_return_type(&arg_types, &return_ty)
+                    }
+                    // array_reverse preserves the non-emptiness of the source array.
+                    "array_reverse" => super::array_builtins::array_reverse_return_type(&arg_types)
+                        .unwrap_or(return_ty),
+                    // array_unique preserves key/value types and non-empty status.
+                    "array_unique" => {
+                        super::array_builtins::array_unique_return(&arg_types).unwrap_or(return_ty)
+                    }
+                    // range($start, $end) with integer bounds returns non-empty-list<int<min,max>>.
+                    "range" => super::callable::range_return_type(&arg_types).unwrap_or(return_ty),
+                    // array_key_first/array_key_last: non-null for non-empty input; int for lists.
+                    "array_key_first" | "array_key_last" => {
+                        super::array_builtins::array_key_first_last_return(&arg_types)
+                            .unwrap_or(return_ty)
+                    }
+                    // array_pop/array_shift: return value type (not mixed) when source is typed.
+                    "array_pop" | "array_shift" => {
+                        super::array_builtins::array_pop_shift_return(&arg_types)
+                            .unwrap_or(return_ty)
+                    }
+                    // Faithful integer-range returns: counts and lengths are
+                    // non-negative (and counts of non-empty collections are `>= 1`).
+                    "count" | "sizeof" => {
+                        super::callable::count_return_type(&arg_types).unwrap_or(return_ty)
+                    }
+                    "strlen" | "mb_strlen" => super::callable::strlen_return_type(&arg_types),
+                    "abs" => super::callable::abs_return_type(&arg_types).unwrap_or(return_ty),
+                    // floor() and ceil() always return a whole-valued float — represent as
+                    // TIntegralFloat so passing the result to an int param doesn't emit a FP.
+                    "floor" | "ceil" => Type::single(Atomic::TIntegralFloat),
+                    // round() without a precision arg (or with precision=0) is also always integral.
+                    "round" => {
+                        let precision_is_integral = arg_types.get(1).is_none_or(|t| {
+                            t.types.len() == 1 && t.types[0] == Atomic::TLiteralInt(0)
+                        });
+                        if precision_is_integral {
+                            Type::single(Atomic::TIntegralFloat)
+                        } else {
+                            return_ty
                         }
                     }
-                    super::callable::intdiv_return_type(&arg_types).unwrap_or(return_ty)
-                }
-                "min" => super::callable::min_return_type(&arg_types).unwrap_or(return_ty),
-                "max" => super::callable::max_return_type(&arg_types).unwrap_or(return_ty),
-                "rand" | "mt_rand" | "random_int" => {
-                    super::callable::rand_return_type(&arg_types).unwrap_or(return_ty)
-                }
-                // preg_match returns 1 on match, 0 on no-match, false on error.
-                "preg_match" => {
-                    let mut ty = Type::single(Atomic::TIntRange {
-                        min: Some(0),
-                        max: Some(1),
-                    });
-                    ty.add_type(Atomic::TFalse);
-                    ty
-                }
-                // preg_match_all returns the count of matches (>= 0) or false on error.
-                "preg_match_all" => {
-                    let mut ty = Type::single(Atomic::TNonNegativeInt);
-                    ty.add_type(Atomic::TFalse);
-                    ty
-                }
-                // Case-folding, encoding, and similar string functions that preserve non-emptiness:
-                // a non-empty input always produces a non-empty output, and these functions
-                // always return string (not string|false).
-                "strtolower"
-                | "strtoupper"
-                | "mb_strtolower"
-                | "mb_strtoupper"
-                | "ucfirst"
-                | "lcfirst"
-                | "ucwords"
-                | "mb_convert_case"
-                | "mb_convert_kana"
-                | "htmlspecialchars"
-                | "htmlentities"
-                | "html_entity_decode"
-                | "htmlspecialchars_decode"
-                | "addslashes"
-                | "addcslashes"
-                | "nl2br"
-                | "urlencode"
-                | "urldecode"
-                | "rawurlencode"
-                | "rawurldecode"
-                | "base64_encode"
-                | "quoted_printable_encode"
-                | "quoted_printable_decode"
-                | "str_rot13"
-                | "str_pad"
-                | "chunk_split"
-                | "wordwrap" => {
-                    super::callable::string_preserve_non_empty(&arg_types).unwrap_or(return_ty)
-                }
-                // sprintf/vsprintf: non-empty when the format string guarantees it.
-                // vsprintf's args are passed as a single array, but the return-type
-                // inference only ever looks at arg_types[0] (the format string), so
-                // the same helper applies unchanged.
-                "sprintf" | "vsprintf" => {
-                    super::callable::sprintf_return_type(&arg_types).unwrap_or(return_ty)
-                }
-                // number_format() always returns a non-empty string.
-                "number_format" => super::callable::number_format_return_type(),
-                // str_repeat() with a non-empty string and positive count returns non-empty.
-                "str_repeat" => {
-                    super::callable::str_repeat_return_type(&arg_types).unwrap_or(return_ty)
-                }
-                // array_chunk splits an array into sub-arrays; outer list is non-empty when
-                // source is non-empty; chunks are list<T> by default (preserve_keys=false).
-                "array_chunk" => {
-                    super::callable::array_chunk_return_type(&arg_types).unwrap_or(return_ty)
-                }
-                // array_fill_keys uses the values of $keys as result keys and $value as each result value.
-                "array_fill_keys" => {
-                    super::callable::array_fill_keys_return_type(&arg_types).unwrap_or(return_ty)
-                }
-                // preg_split with default flags always returns at least one part.
-                "preg_split" => {
-                    super::callable::preg_split_return_type(&arg_types).unwrap_or(return_ty)
-                }
-                // array_search: narrow key type from haystack rather than returning string|int|false.
-                "array_search" => {
-                    super::callable::array_search_return_type(&arg_types).unwrap_or(return_ty)
-                }
-                // date/time formatting functions always return non-empty strings.
-                "date" | "gmdate" | "date_format" => Type::single(Atomic::TNonEmptyString),
-                // Encoding/conversion functions: strip |false from stubs — they only
-                // return false on bad input that PHP code never checks for in practice.
-                "mb_convert_encoding" => super::callable::string_preserve_non_empty(&arg_types)
-                    .or_else(|| super::callable::string_if_string_arg(&arg_types, 0))
-                    .unwrap_or(return_ty),
-                "iconv" => {
-                    // iconv($from_encoding, $to_encoding, $str) — $str is arg 2
-                    super::callable::string_if_string_arg(&arg_types, 2).unwrap_or(return_ty)
-                }
-                // preg_replace/preg_replace_callback: strip |null when subject is a string.
-                // The null case only fires on a regex error, which PHP code rarely handles.
-                "preg_replace" | "preg_replace_callback" => {
-                    // subject is arg 2
-                    super::callable::string_if_string_arg(&arg_types, 2).unwrap_or(return_ty)
-                }
-                // substr_replace: strip |array when $string is a scalar string.
-                "substr_replace" => {
-                    super::callable::string_if_string_arg(&arg_types, 0).unwrap_or(return_ty)
-                }
-                // filter_var: map a literal FILTER_VALIDATE_* $filter argument to its
-                // real result type instead of the stub's blanket `mixed`.
-                "filter_var" => {
-                    super::callable::filter_var_return_type(&arg_types).unwrap_or(return_ty)
-                }
-                _ => return_ty,
-            };
+                    "intdiv" => {
+                        // intdiv() throws the exact same DivisionByZeroError as `$a / 0` for
+                        // a literal-zero divisor — report it the same way BinaryOp::Div does,
+                        // rather than only narrowing the return type.
+                        if let Some(divisor_ty) = arg_types.get(1) {
+                            if crate::expr::operand_is_definitely_zero(divisor_ty) {
+                                ea.emit(
+                                    IssueKind::DivisionByZero {
+                                        op: "intdiv".to_string(),
+                                    },
+                                    Severity::Error,
+                                    arg_spans.get(1).copied().unwrap_or(span),
+                                );
+                            }
+                        }
+                        super::callable::intdiv_return_type(&arg_types).unwrap_or(return_ty)
+                    }
+                    "min" => super::callable::min_return_type(&arg_types).unwrap_or(return_ty),
+                    "max" => super::callable::max_return_type(&arg_types).unwrap_or(return_ty),
+                    "rand" | "mt_rand" | "random_int" => {
+                        super::callable::rand_return_type(&arg_types).unwrap_or(return_ty)
+                    }
+                    // preg_match returns 1 on match, 0 on no-match, false on error.
+                    "preg_match" => {
+                        let mut ty = Type::single(Atomic::TIntRange {
+                            min: Some(0),
+                            max: Some(1),
+                        });
+                        ty.add_type(Atomic::TFalse);
+                        ty
+                    }
+                    // preg_match_all returns the count of matches (>= 0) or false on error.
+                    "preg_match_all" => {
+                        let mut ty = Type::single(Atomic::TNonNegativeInt);
+                        ty.add_type(Atomic::TFalse);
+                        ty
+                    }
+                    // Case-folding, encoding, and similar string functions that preserve non-emptiness:
+                    // a non-empty input always produces a non-empty output, and these functions
+                    // always return string (not string|false).
+                    "strtolower"
+                    | "strtoupper"
+                    | "mb_strtolower"
+                    | "mb_strtoupper"
+                    | "ucfirst"
+                    | "lcfirst"
+                    | "ucwords"
+                    | "mb_convert_case"
+                    | "mb_convert_kana"
+                    | "htmlspecialchars"
+                    | "htmlentities"
+                    | "html_entity_decode"
+                    | "htmlspecialchars_decode"
+                    | "addslashes"
+                    | "addcslashes"
+                    | "nl2br"
+                    | "urlencode"
+                    | "urldecode"
+                    | "rawurlencode"
+                    | "rawurldecode"
+                    | "base64_encode"
+                    | "quoted_printable_encode"
+                    | "quoted_printable_decode"
+                    | "str_rot13"
+                    | "str_pad"
+                    | "chunk_split"
+                    | "wordwrap" => {
+                        super::callable::string_preserve_non_empty(&arg_types).unwrap_or(return_ty)
+                    }
+                    // sprintf/vsprintf: non-empty when the format string guarantees it.
+                    // vsprintf's args are passed as a single array, but the return-type
+                    // inference only ever looks at arg_types[0] (the format string), so
+                    // the same helper applies unchanged.
+                    "sprintf" | "vsprintf" => {
+                        super::callable::sprintf_return_type(&arg_types).unwrap_or(return_ty)
+                    }
+                    // number_format() always returns a non-empty string.
+                    "number_format" => super::callable::number_format_return_type(),
+                    // str_repeat() with a non-empty string and positive count returns non-empty.
+                    "str_repeat" => {
+                        super::callable::str_repeat_return_type(&arg_types).unwrap_or(return_ty)
+                    }
+                    // array_chunk splits an array into sub-arrays; outer list is non-empty when
+                    // source is non-empty; chunks are list<T> by default (preserve_keys=false).
+                    "array_chunk" => super::array_builtins::array_chunk_return_type(&arg_types)
+                        .unwrap_or(return_ty),
+                    // array_fill_keys uses the values of $keys as result keys and $value as each result value.
+                    "array_fill_keys" => {
+                        super::array_builtins::array_fill_keys_return_type(&arg_types)
+                            .unwrap_or(return_ty)
+                    }
+                    // preg_split with default flags always returns at least one part.
+                    "preg_split" => {
+                        super::callable::preg_split_return_type(&arg_types).unwrap_or(return_ty)
+                    }
+                    // array_search: narrow key type from haystack rather than returning string|int|false.
+                    "array_search" => super::array_builtins::array_search_return_type(&arg_types)
+                        .unwrap_or(return_ty),
+                    // date/time formatting functions always return non-empty strings.
+                    "date" | "gmdate" | "date_format" => Type::single(Atomic::TNonEmptyString),
+                    // Encoding/conversion functions: strip |false from stubs — they only
+                    // return false on bad input that PHP code never checks for in practice.
+                    "mb_convert_encoding" => super::callable::string_preserve_non_empty(&arg_types)
+                        .or_else(|| super::callable::string_if_string_arg(&arg_types, 0))
+                        .unwrap_or(return_ty),
+                    "iconv" => {
+                        // iconv($from_encoding, $to_encoding, $str) — $str is arg 2
+                        super::callable::string_if_string_arg(&arg_types, 2).unwrap_or(return_ty)
+                    }
+                    // preg_replace/preg_replace_callback: strip |null when subject is a string.
+                    // The null case only fires on a regex error, which PHP code rarely handles.
+                    "preg_replace" | "preg_replace_callback" => {
+                        // subject is arg 2
+                        super::callable::string_if_string_arg(&arg_types, 2).unwrap_or(return_ty)
+                    }
+                    // substr_replace: strip |array when $string is a scalar string.
+                    "substr_replace" => {
+                        super::callable::string_if_string_arg(&arg_types, 0).unwrap_or(return_ty)
+                    }
+                    // filter_var: map a literal FILTER_VALIDATE_* $filter argument to its
+                    // real result type instead of the stub's blanket `mixed`.
+                    "filter_var" => {
+                        super::callable::filter_var_return_type(&arg_types).unwrap_or(return_ty)
+                    }
+                    _ => return_ty,
+                };
 
             let mut return_ty = return_ty;
             ea.apply_function_call_plugins(
@@ -987,7 +995,7 @@ impl CallAnalyzer {
                     if let ExprKind::Variable(name) = &arr_arg.value.kind {
                         let var_name = name.as_ref().trim_start_matches('$');
                         let push_types: Vec<Type> = arg_types.iter().skip(1).cloned().collect();
-                        let new_type = super::callable::array_push_unshift_byref_type(
+                        let new_type = super::array_builtins::array_push_unshift_byref_type(
                             original_arr,
                             &push_types,
                             ctx.inside_loop,
@@ -1014,7 +1022,8 @@ impl CallAnalyzer {
                     {
                         if let ExprKind::Variable(name) = &arr_arg.value.kind {
                             let var_name = name.as_ref().trim_start_matches('$');
-                            let new_type = super::callable::sort_byref_type(original_arr, reindex);
+                            let new_type =
+                                super::array_builtins::sort_byref_type(original_arr, reindex);
                             ctx.set_var(var_name, new_type);
                         }
                     }
