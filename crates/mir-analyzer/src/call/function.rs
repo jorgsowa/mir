@@ -843,6 +843,29 @@ impl CallAnalyzer {
                     // positionally; non-empty $keys guarantees a non-empty result.
                     "array_combine" => super::array_builtins::array_combine_return_type(&arg_types)
                         .unwrap_or(return_ty),
+                    // array_merge_recursive: for the all-lists case (no possible int-key
+                    // collision) it's identical to array_merge; the general string-keyed
+                    // collision-merging case isn't modeled.
+                    "array_merge_recursive" => {
+                        super::array_builtins::array_merge_recursive_return_type(&arg_types)
+                            .unwrap_or(return_ty)
+                    }
+                    // array_count_values: keys are the source's distinct int|string values;
+                    // values are always counts (int<1, max>).
+                    "array_count_values" => {
+                        super::array_builtins::array_count_values_return_type(&arg_types)
+                            .unwrap_or(return_ty)
+                    }
+                    // array_change_key_case: string keys are case-folded (values untouched);
+                    // a plain array<K,V>'s key TYPE doesn't change, only shape keys rewrite.
+                    "array_change_key_case" => {
+                        super::array_builtins::array_change_key_case_return_type(&arg_types)
+                            .unwrap_or(return_ty)
+                    }
+                    // array_splice returns the removed elements; like array_slice's
+                    // preserve_keys=false path, int keys are always renumbered from 0.
+                    "array_splice" => super::array_builtins::array_splice_return_type(&arg_types)
+                        .unwrap_or(return_ty),
                     // range($start, $end) with integer bounds returns non-empty-list<int<min,max>>.
                     "range" => super::callable::range_return_type(&arg_types).unwrap_or(return_ty),
                     // array_key_first/array_key_last: non-null for non-empty input; int for lists.
