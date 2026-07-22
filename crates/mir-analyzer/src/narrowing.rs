@@ -8721,7 +8721,11 @@ impl ScalarArgTarget {
         if let Some(name) = extract_var_name(expr) {
             return Some(ScalarArgTarget::Var(name));
         }
-        extract_prop_access(expr).map(|(obj, prop)| ScalarArgTarget::Prop(obj, prop))
+        // `extract_any_prop_access` so a nullsafe receiver (`$x?->prop`) is
+        // recognized too — a plain `->` on a null receiver evaluates to null
+        // in PHP 8 same as `?->`, so every consumer here already narrows both
+        // identically once the target is extracted.
+        extract_any_prop_access(expr).map(|(obj, prop)| ScalarArgTarget::Prop(obj, prop))
     }
 }
 
