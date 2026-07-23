@@ -1805,8 +1805,11 @@ pub fn narrow_from_condition(
 
         // $obj->isFoo($x) with @psalm-assert-if-true/-if-false on isFoo() —
         // method-call counterpart of the FunctionCall arm above (which only
-        // ever resolved a free function via `find_function`).
-        ExprKind::MethodCall(mc) => {
+        // ever resolved a free function via `find_function`). Paired with
+        // `NullsafeMethodCall` (`$obj?->isFoo($x)`) the same way taint.rs's
+        // taint-source check already pairs both — a nullsafe call site was
+        // previously silently skipped here.
+        ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => {
             if let Some(fqcn) = method_call_receiver_fqcn(&mc.object, ctx, db, file) {
                 if let ExprKind::Identifier(name) = &mc.method.kind {
                     let method_name_lower = crate::util::php_ident_lowercase(name);
