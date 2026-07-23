@@ -1,8 +1,7 @@
 ===description===
-Spreading a shape into a new array literal (`[...$a]`) widens the key
-domain to `string`/`int`, same as any other path that folds a shape's
-properties into a generic array's key type — not each key kept as its own
-literal.
+Spreading a single, closed, string-keyed shape into a new array literal
+(`[...$a]`) preserves each key as its own literal instead of widening the
+key domain to a generic `string`.
 ===config===
 suppress=UnusedVariable
 ===file===
@@ -10,7 +9,7 @@ suppress=UnusedVariable
 function test(): void {
     $a = ['x' => 1, 'y' => 2];
     $merged = [...$a];
-    /** @mir-check $merged is array<string, 1|2> */
+    /** @mir-check $merged is array{x: 1, y: 2} */
     $_ = $merged;
 }
 ===expect===

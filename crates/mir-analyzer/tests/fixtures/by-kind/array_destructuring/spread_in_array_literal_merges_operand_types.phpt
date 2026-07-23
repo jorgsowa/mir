@@ -1,7 +1,7 @@
 ===description===
-Spreading typed arrays into a literal (`[...$x, ...$y]`) must merge the
-operands' actual key/value types, not collapse the whole literal to
-`array<mixed, mixed>`.
+Spreading two string-keyed shapes into a literal (`[...$x, ...$y]`) merges
+into a precise shape with both operands' keys, not a generic
+`array<string, int|string>` (let alone `array<mixed, mixed>`).
 ===config===
 suppress=UnusedVariable
 ===file===
@@ -12,7 +12,7 @@ suppress=UnusedVariable
  */
 function test(array $x, array $y): void {
     $z = [...$x, ...$y];
-    /** @mir-check $z is array<string, int|string> */
+    /** @mir-check $z is array{a: int, b: string} */
     echo 1;
 }
 ===expect===
