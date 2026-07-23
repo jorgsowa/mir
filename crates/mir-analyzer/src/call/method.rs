@@ -3,7 +3,7 @@ use std::sync::Arc;
 use php_ast::owned::{ExprKind, MethodCallExpr};
 use php_ast::Span;
 
-use crate::narrowing::{extract_expr_guard_key, extract_prop_access};
+use crate::narrowing::{extract_any_prop_access, extract_expr_guard_key};
 use crate::taint::{classify_method_sink, is_expr_tainted, taint_sink_issue, SinkKind};
 use mir_codebase::definitions::{
     Assertion, AssertionKind, DeclaredParam, TemplateParam, Visibility,
@@ -611,8 +611,15 @@ impl CallAnalyzer {
             }
             if let ExprKind::Variable(recv_name) = &call.object.kind {
                 ctx.set_var(recv_name.trim_start_matches('$'), self_out_union);
-            } else if let Some((obj_var, prop)) = extract_prop_access(&call.object) {
+            } else if let Some((obj_var, prop)) = extract_any_prop_access(&call.object) {
+                // `extract_any_prop_access` also matches a nullsafe (`?->`)
+                // receiver chain (`$h?->factory->prepare()`), which the
+                // plain-`->`-only `extract_prop_access` used to miss here.
                 ctx.set_prop_refined(&obj_var, &prop, self_out_union);
+            } else if let Some((static_fqcn, prop)) =
+                crate::narrowing::extract_static_prop_access(&call.object, ctx, ea.db, &ea.file)
+            {
+                ctx.set_prop_refined(&static_fqcn, &prop, self_out_union);
             }
         }
 
