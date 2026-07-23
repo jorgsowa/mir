@@ -5,7 +5,7 @@ use crate::flow_state::FlowState;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Type};
 use php_ast::ast::{BinaryOp, UnaryPostfixOp, UnaryPrefixOp};
-use php_ast::owned::{UnaryPostfixExpr, UnaryPrefixExpr};
+use php_ast::owned::{ExprKind, UnaryPostfixExpr, UnaryPrefixExpr};
 
 /// Returns true when every member of `ty` is definitively `true` or `bool`
 /// (not `false` — that case is reserved for a future FalseOperand kind).
@@ -88,6 +88,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                 Type::single(Atomic::TInt)
             }
             UnaryPrefixOp::PreIncrement | UnaryPrefixOp::PreDecrement => {
+                // `++`/`--` on a property is a write, same as `+=` — route it
+                // through the shared purity/immutability gate, which only
+                // `assign_to_target`'s own PropertyAccess arm reached before.
+                if let ExprKind::PropertyAccess(pa) = &u.operand.kind {
+                    self.check_property_write_purity(pa, ctx, u.operand.span);
+                }
                 // Same operand check as postfix ++/-- — the same PHP warning/
                 // deprecation fires for both forms, only postfix was flagged.
                 if operand_is_definitely_bool(&operand_ty)
@@ -152,6 +158,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                 } else {
                     "--"
                 };
+                if let ExprKind::PropertyAccess(pa) = &u.operand.kind {
+                    self.check_property_write_purity(pa, ctx, u.operand.span);
+                }
                 // Flag increment/decrement on a definitely-bool operand (PHP
                 // silently no-ops; TFalse reserved for future FalseOperand kind)
                 // or on a non-empty literal string (deprecated in PHP 8.3+).
