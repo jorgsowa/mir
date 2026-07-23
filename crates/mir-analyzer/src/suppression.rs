@@ -397,16 +397,67 @@ fn extract_comment(raw: &str) -> Option<Comment<'_>> {
         });
     }
 
-    // Earliest single-line / block introducer on the line.
-    let pos = [raw.find("//"), raw.find('#'), raw.find("/*")]
-        .into_iter()
-        .flatten()
-        .min()?;
+    // Earliest single-line / block introducer on the line, skipping any
+    // that fall inside a quoted string literal — `$x = "// not a
+    // comment";` previously matched `raw.find("//")` regardless, wrongly
+    // treating a plain string-literal statement as carrying a trailing
+    // suppression comment. Only a same-line string is handled here (a
+    // bounded, quote-toggle scan); a heredoc/multi-line string body stays
+    // unrecognized, same as before — that needs cross-line state this
+    // line-at-a-time scanner doesn't have.
+    let pos = find_comment_introducer(raw)?;
     let has_code_before = !raw[..pos].trim().is_empty();
     Some(Comment {
         content: &raw[pos..],
         has_code_before,
     })
+}
+
+/// Byte offset of the earliest `//`, `#`, or `/*` comment introducer in
+/// `raw`, ignoring any that fall inside a single- or double-quoted string
+/// literal (with backslash-escape awareness). Returns `None` if the line
+/// has no real comment introducer at all.
+fn find_comment_introducer(raw: &str) -> Option<usize> {
+    let bytes = raw.as_bytes();
+    let mut in_squote = false;
+    let mut in_dquote = false;
+    let mut i = 0;
+    while i < bytes.len() {
+        let c = bytes[i];
+        if in_squote {
+            i += if c == b'\\' && i + 1 < bytes.len() {
+                2
+            } else {
+                if c == b'\'' {
+                    in_squote = false;
+                }
+                1
+            };
+            continue;
+        }
+        if in_dquote {
+            i += if c == b'\\' && i + 1 < bytes.len() {
+                2
+            } else {
+                if c == b'"' {
+                    in_dquote = false;
+                }
+                1
+            };
+            continue;
+        }
+        match c {
+            b'\'' => in_squote = true,
+            b'"' => in_dquote = true,
+            b'/' if bytes.get(i + 1) == Some(&b'/') || bytes.get(i + 1) == Some(&b'*') => {
+                return Some(i);
+            }
+            b'#' => return Some(i),
+            _ => {}
+        }
+        i += 1;
+    }
+    None
 }
 
 /// Collect issue kind names/codes following a directive keyword. Stops at the
