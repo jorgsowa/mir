@@ -317,17 +317,23 @@ impl<'a> ExpressionAnalyzer<'a> {
                         span,
                     );
                 }
-                let fallback_value_ty: Type = ty
-                    .types
-                    .iter()
-                    .find_map(|a| match a {
-                        Atomic::TArray { value, .. }
-                        | Atomic::TList { value }
-                        | Atomic::TNonEmptyArray { value, .. }
-                        | Atomic::TNonEmptyList { value } => Some(*value.clone()),
-                        _ => None,
-                    })
-                    .unwrap_or_else(Type::mixed);
+                // Value type contributed by every non-keyed atom (TArray/TList/
+                // TNonEmptyArray/TNonEmptyList) in the union, merged rather than
+                // taking just the first match — a heterogeneous union
+                // (`array{a:int}|array<string,string>`) must not drop a
+                // co-existing generic alternative's value type.
+                let mut non_keyed_value_ty = Type::empty();
+                let mut has_non_keyed = false;
+                for a in &ty.types {
+                    if let Atomic::TArray { value, .. }
+                    | Atomic::TList { value }
+                    | Atomic::TNonEmptyArray { value, .. }
+                    | Atomic::TNonEmptyList { value } = a
+                    {
+                        non_keyed_value_ty.merge_with(value);
+                        has_non_keyed = true;
+                    }
+                }
                 // Destructuring a shape-typed source (`['a' => $a] = $arr` or
                 // `[$a, $b] = $arr` against `array{0: int, 1: string}`) should
                 // resolve each target's type from the matching per-key
@@ -365,9 +371,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     }
                                 }
                             }
+                            if has_non_keyed {
+                                result.merge_with(&non_keyed_value_ty);
+                                found_any = true;
+                            }
                             found_any.then_some(result)
                         })
-                        .unwrap_or_else(|| fallback_value_ty.clone());
+                        .unwrap_or_else(Type::mixed);
                     self.assign_to_target(&elem.value, elem_ty, ctx, span);
                 }
             }
