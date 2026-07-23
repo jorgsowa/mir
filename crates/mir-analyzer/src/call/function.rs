@@ -900,6 +900,10 @@ impl CallAnalyzer {
                     // or non-empty-list<key_type> for a literal count > 1.
                     "array_rand" => super::array_builtins::array_rand_return_type(&arg_types)
                         .unwrap_or(return_ty),
+                    // compact(): build a shape from each string-literal name's
+                    // current variable type instead of a generic array.
+                    "compact" => super::array_builtins::compact_return_type(ctx, &call.args)
+                        .unwrap_or(return_ty),
                     // Faithful integer-range returns: counts and lengths are
                     // non-negative (and counts of non-empty collections are `>= 1`).
                     "count" | "sizeof" => {

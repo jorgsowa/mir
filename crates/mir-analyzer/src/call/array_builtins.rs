@@ -1386,6 +1386,41 @@ fn callback_name_for_diagnostic(callback_ty: &Type) -> String {
     }
 }
 
+/// Infer the return type of `compact('a', 'b', ...)`.
+///
+/// Builds a shape from each string-literal argument's current variable type
+/// (`compact()` reads variables by name at runtime, and silently omits any
+/// name that's undefined rather than including it as null — reflected here
+/// by marking a possibly-undefined variable's property optional). Falls back
+/// to the stub (`None`) for any non-literal or spread argument, since the
+/// full set of names it reads then isn't statically knowable.
+pub(crate) fn compact_return_type(ctx: &FlowState, args: &[php_ast::owned::Arg]) -> Option<Type> {
+    use mir_types::atomic::KeyedProperty;
+    let mut properties = IndexMap::new();
+    for arg in args {
+        if arg.unpack {
+            return None;
+        }
+        let ExprKind::String(name) = &arg.value.kind else {
+            return None;
+        };
+        let ty = ctx.get_var(name.as_ref());
+        let optional = ty.possibly_undefined;
+        properties.insert(
+            ArrayKey::String(std::sync::Arc::from(name.as_ref())),
+            KeyedProperty { ty, optional },
+        );
+    }
+    if properties.is_empty() {
+        return None;
+    }
+    Some(Type::single(Atomic::TKeyedArray {
+        properties: Box::new(properties),
+        is_open: false,
+        is_list: false,
+    }))
+}
+
 /// Infer the return type of `array_rand($array, $num = 1)`.
 ///
 /// PHP 8 throws a `ValueError` for an empty `$array` (never returns `false`).
