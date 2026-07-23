@@ -25,6 +25,7 @@ mod objects;
 mod unary;
 mod variables;
 
+pub(crate) use assignment::root_receiver_var;
 pub(crate) use binary::operand_is_definitely_zero;
 #[allow(unused_imports)]
 pub use helpers::{duplicate_literal_conditions, extract_simple_var, infer_arithmetic, infer_div};

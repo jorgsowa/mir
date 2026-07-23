@@ -776,10 +776,8 @@ fn resolve_method_return<'a>(
             && !resolved.is_mutation_free
             && !resolved.is_pure
             && !resolved.is_static
-            && matches!(
-                &call.object.kind,
-                ExprKind::Variable(n) if n.trim_start_matches('$') == "this"
-            )
+            && crate::expr::root_receiver_var(&call.object)
+                .is_some_and(|n| n.trim_start_matches('$') == "this")
         {
             ea.emit(
                 IssueKind::ImpureMethodCall {
@@ -799,7 +797,7 @@ fn resolve_method_return<'a>(
             && !resolved.is_mutation_free
             && !resolved.is_static
         {
-            if let ExprKind::Variable(recv_name) = &call.object.kind {
+            if let Some(recv_name) = crate::expr::root_receiver_var(&call.object) {
                 let recv_stripped = recv_name.trim_start_matches('$');
                 if recv_stripped != "this"
                     && ctx
@@ -828,7 +826,7 @@ fn resolve_method_return<'a>(
             && !resolved.is_mutation_free
             && !resolved.is_static
         {
-            if let ExprKind::Variable(recv_name) = &call.object.kind {
+            if let Some(recv_name) = crate::expr::root_receiver_var(&call.object) {
                 let recv_stripped = recv_name.trim_start_matches('$');
                 if recv_stripped != "this"
                     && ctx

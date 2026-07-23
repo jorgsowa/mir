@@ -38,7 +38,7 @@ fn taint_destructured_targets(target: &Expr, ctx: &mut FlowState) {
 /// a method-call result). Lets a purity/immutability check that only cares
 /// about "is this ultimately reachable from `$this`/a parameter" match a
 /// chained receiver the same way it already matches a direct one.
-fn root_receiver_var(expr: &Expr) -> Option<&str> {
+pub(crate) fn root_receiver_var(expr: &Expr) -> Option<&str> {
     match &expr.kind {
         ExprKind::Variable(name) => Some(name.as_ref()),
         ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) => {
