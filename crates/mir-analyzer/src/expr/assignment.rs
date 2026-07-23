@@ -234,6 +234,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                         Type::single(Atomic::TString)
                     };
                     ctx.set_var(&var_name, result_ty.clone());
+                    // `.=`'s result keeps the OLD value's content (unlike plain
+                    // `=`, which fully replaces it) — so it stays tainted if
+                    // either side was, not just the RHS.
+                    if rhs_tainted || ctx.is_tainted(&var_name) {
+                        ctx.taint_var(&var_name);
+                    } else {
+                        ctx.clear_var_taint(&var_name);
+                    }
                     let (line, col_start) = self.offset_to_line_col(a.target.span.start);
                     let (line_end, col_end) = self.offset_to_line_col(a.target.span.end);
                     ctx.record_var_location(&var_name, line, col_start, line_end, col_end);
@@ -260,6 +268,61 @@ impl<'a> ExpressionAnalyzer<'a> {
                     } else {
                         Type::single(Atomic::TString)
                     };
+                    // Same "sticky" taint reasoning as the simple-variable branch
+                    // above, mirrored per target shape the same way plain `=`
+                    // already is (property/static-property tracked precisely and
+                    // clearable; array-element taint is coarse and monotonic, so
+                    // it only ever needs setting, never clearing).
+                    match &a.target.kind {
+                        ExprKind::PropertyAccess(pa) => {
+                            if let ExprKind::Variable(obj_var) = &pa.object.kind {
+                                if let Some(prop_name) = extract_string_from_expr(&pa.property) {
+                                    let obj_var = obj_var.trim_start_matches('$');
+                                    if rhs_tainted || ctx.is_prop_tainted(obj_var, &prop_name) {
+                                        ctx.taint_prop(obj_var, &prop_name);
+                                    } else {
+                                        ctx.clear_prop_taint(obj_var, &prop_name);
+                                    }
+                                }
+                            }
+                        }
+                        ExprKind::ArrayAccess(aa) if rhs_tainted => {
+                            if let ExprKind::Variable(base_var) = &aa.array.kind {
+                                ctx.taint_var(base_var.trim_start_matches('$'));
+                            }
+                        }
+                        ExprKind::StaticPropertyAccess(spa) => {
+                            if let ExprKind::Identifier(id) = &spa.class.kind {
+                                let resolved =
+                                    crate::db::resolve_name(self.db, &self.file, id.as_ref());
+                                let fqcn_opt: Option<std::sync::Arc<str>> = match resolved.as_str()
+                                {
+                                    "self" | "static" => {
+                                        ctx.self_fqcn.clone().or_else(|| ctx.static_fqcn.clone())
+                                    }
+                                    "parent" => ctx.parent_fqcn.clone(),
+                                    s => Some(std::sync::Arc::from(s)),
+                                };
+                                if let Some(fqcn) = fqcn_opt {
+                                    if let Some(prop_name) = match &spa.member.kind {
+                                        ExprKind::Variable(name) | ExprKind::Identifier(name) => {
+                                            Some(name.trim_start_matches('$').to_string())
+                                        }
+                                        _ => None,
+                                    } {
+                                        if rhs_tainted
+                                            || ctx.is_static_prop_tainted(&fqcn, &prop_name)
+                                        {
+                                            ctx.taint_static_prop(&fqcn, &prop_name);
+                                        } else {
+                                            ctx.clear_static_prop_taint(&fqcn, &prop_name);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
                     self.assign_to_target(&a.target, result_ty.clone(), ctx, expr_span);
                     result_ty
                 }
