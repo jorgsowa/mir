@@ -858,6 +858,23 @@ impl CallAnalyzer {
                     out_bindings.insert(*k, v.clone());
                 }
             }
+            // A by-ref argument that's a property mutates it exactly as much
+            // as an explicit write would, regardless of whether the param
+            // also declares `@param-out` — checked in its own pass since the
+            // loop below only ever runs for `@param-out`-declared params.
+            for (i, param) in resolved.params.iter().enumerate() {
+                if !param.is_byref {
+                    continue;
+                }
+                if param.is_variadic {
+                    for arg in call.args.iter().skip(i) {
+                        ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
+                    }
+                } else if let Some(arg) = call.args.get(i) {
+                    ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
+                }
+            }
+
             for (i, param) in resolved.params.iter().enumerate() {
                 let Some(out_ty) = param.out_ty.as_ref() else {
                     continue;

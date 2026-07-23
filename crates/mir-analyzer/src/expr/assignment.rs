@@ -510,6 +510,22 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
     }
 
+    /// A by-ref call argument that's a property (`array_push($this->items,
+    /// $n)`, `sort($this->items)`) mutates that property exactly as much as
+    /// an explicit `$this->items = …` write would — but every by-ref
+    /// write-back site only ever matched `ExprKind::Variable` for the output
+    /// type, silently skipping (never even reading) a property argument, so
+    /// passing one by reference bypassed purity/immutability/readonly
+    /// checking entirely. A no-op for any other argument shape (the common
+    /// `ExprKind::Variable` case is already handled by each write-back site
+    /// itself).
+    pub(crate) fn check_byref_arg_purity(&mut self, arg_expr: &Expr, ctx: &FlowState, span: Span) {
+        if let ExprKind::PropertyAccess(pa) = &arg_expr.kind {
+            self.check_property_write_purity(pa, ctx, span);
+            self.check_property_readonly_write(pa, ctx, span);
+        }
+    }
+
     pub(crate) fn check_property_write_purity_by_name(
         &mut self,
         recv_name: &str,

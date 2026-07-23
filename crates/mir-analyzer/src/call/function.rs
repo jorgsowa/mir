@@ -238,11 +238,15 @@ impl CallAnalyzer {
                                             name.trim_start_matches('$'),
                                             output_ty.clone(),
                                         );
+                                    } else {
+                                        ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
                                     }
                                 }
                             } else if let Some(arg) = call.args.get(i) {
                                 if let ExprKind::Variable(name) = &arg.value.kind {
                                     ctx.set_var(name.trim_start_matches('$'), output_ty);
+                                } else {
+                                    ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
                                 }
                             }
                         }
@@ -700,12 +704,16 @@ impl CallAnalyzer {
                             if let ExprKind::Variable(name) = &arg.value.kind {
                                 let var_name = name.as_ref().trim_start_matches('$');
                                 ctx.set_var(var_name, output_ty.clone());
+                            } else {
+                                ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
                             }
                         }
                     } else if let Some(arg) = call.args.get(i) {
                         if let ExprKind::Variable(name) = &arg.value.kind {
                             let var_name = name.as_ref().trim_start_matches('$');
                             ctx.set_var(var_name, output_ty);
+                        } else {
+                            ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
                         }
                     }
                 }

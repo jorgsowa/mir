@@ -1175,6 +1175,24 @@ fn resolve_method_return<'a>(
         // deliberately strips the method's own template names (so check_args can
         // still infer them from the arguments), so it can't be reused here: its
         // out_ty would leak the bare method template atom to the caller.
+        // A by-ref argument that's a property (`array_push($this->items, $n)`
+        // called through a helper method) mutates it exactly as much as an
+        // explicit `$this->items = …` write would, regardless of whether the
+        // param also declares `@param-out` — checked in its own pass since
+        // the loop below only ever runs for `@param-out`-declared params.
+        for (i, param) in resolved.params.iter().enumerate() {
+            if !param.is_byref {
+                continue;
+            }
+            if param.is_variadic {
+                for arg in call.args.iter().skip(i) {
+                    ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
+                }
+            } else if let Some(arg) = call.args.get(i) {
+                ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
+            }
+        }
+
         for (i, param) in resolved.params.iter().enumerate() {
             let Some(out_ty) = param.out_ty.as_ref() else {
                 continue;
