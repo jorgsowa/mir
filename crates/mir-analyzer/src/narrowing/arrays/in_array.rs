@@ -126,6 +126,18 @@ pub(crate) fn narrow_to_haystack_values(current: &Type, haystack: &Type) -> Type
     out
 }
 
+/// `null == X` compares both sides as `bool` (PHP's "bool or null vs
+/// anything" comparison rule) — null loosely equals only a FALSY haystack
+/// literal (`0`, `""`, `"0"`), never a truthy one. Shared by the loose-safety
+/// check below and every receiver arm's own reachability reasoning about a
+/// `null` needle matching (or not) under loose comparison.
+pub(crate) fn haystack_admits_null_loosely(haystack: &Type) -> bool {
+    haystack.types.iter().any(|a| {
+        matches!(a, Atomic::TLiteralInt(0))
+            || matches!(a, Atomic::TLiteralString(s) if s.as_ref() == "" || s.as_ref() == "0")
+    })
+}
+
 /// Whether narrowing `current` by an `in_array()`/`!in_array()` check against
 /// `haystack` is sound without a strict (third-argument) comparison. Loose
 /// (`==`) comparison agrees with strict (`===`) comparison whenever both
@@ -133,10 +145,25 @@ pub(crate) fn narrow_to_haystack_values(current: &Type, haystack: &Type) -> Type
 /// comparisons (e.g. a string needle against an int haystack) can match via
 /// PHP's loose-equality coercion rules in ways a same-category narrowing
 /// would incorrectly rule out.
+///
+/// A `current` that also admits `null` (e.g. a nullable string/int) doesn't
+/// need to block narrowing outright: `null` can only loosely match a falsy
+/// haystack literal, so when the haystack has none, `null` is set aside
+/// before checking the same-category requirement on the rest.
 pub(crate) fn in_array_loose_narrowing_is_safe(current: &Type, haystack: &Type) -> bool {
     fn all(ty: &Type, pred: fn(&Atomic) -> bool) -> bool {
         !ty.types.is_empty() && ty.types.iter().all(pred)
     }
+    let current_sans_null;
+    let current = if current.contains(|a| matches!(a, Atomic::TNull)) {
+        if haystack_admits_null_loosely(haystack) {
+            return false;
+        }
+        current_sans_null = current.remove_null();
+        &current_sans_null
+    } else {
+        current
+    };
     (all(current, Atomic::is_int) && all(haystack, Atomic::is_int))
         || (all(current, Atomic::is_string) && all(haystack, Atomic::is_string))
 }
@@ -240,11 +267,7 @@ pub(crate) fn narrow_in_array_condition(
                     // includes a literal null element. So a true match
                     // proves the receiver wasn't null, except in that
                     // one loose-comparison edge case.
-                    let haystack_admits_null_loosely = haystack_ty.types.iter().any(|a| {
-                        matches!(a, Atomic::TLiteralInt(0))
-                            || matches!(a, Atomic::TLiteralString(s) if s.as_ref() == "" || s.as_ref() == "0")
-                    });
-                    if strict || !haystack_admits_null_loosely {
+                    if strict || !haystack_admits_null_loosely(&haystack_ty) {
                         narrow_receiver_non_null_on_prop_match(ctx, &obj, true);
                     }
                 }

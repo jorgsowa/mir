@@ -25,7 +25,7 @@ mod type_fn;
 use arrays::{
     array_access_base_target, extract_array_key_first_or_last_arg,
     extract_array_key_first_or_last_static_prop_arg, extract_haystack_type,
-    in_array_loose_narrowing_is_safe, narrow_array_count_condition,
+    haystack_admits_null_loosely, in_array_loose_narrowing_is_safe, narrow_array_count_condition,
     narrow_array_emptiness_condition, narrow_array_key_exists_condition,
     narrow_array_key_first_or_last_null, narrow_container_non_null_non_false,
     narrow_empty_shape_key, narrow_in_array_condition, narrow_isset_shape_key,
@@ -2100,12 +2100,7 @@ fn narrow_from_false_comparable_call(
                             // array_search(null, $haystack) only matches loosely when the
                             // haystack contains a falsy literal (0, "", "0"); mirrors
                             // in_array()'s identical reasoning.
-                            let haystack_admits_null_loosely =
-                                haystack_ty.types.iter().any(|a| {
-                                    matches!(a, Atomic::TLiteralInt(0))
-                                        || matches!(a, Atomic::TLiteralString(s) if s.as_ref() == "" || s.as_ref() == "0")
-                                });
-                            if strict || !haystack_admits_null_loosely {
+                            if strict || !haystack_admits_null_loosely(&haystack_ty) {
                                 narrow_receiver_non_null_on_prop_match(ctx, obj, true);
                             }
                         }
