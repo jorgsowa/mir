@@ -197,6 +197,14 @@ pub fn is_expr_tainted(expr: &Expr, ctx: &FlowState) -> bool {
                 || is_expr_tainted(&t.else_expr, ctx)
         }
 
+        // `$x ?? $default` — tainted if either side could be, same as a
+        // ternary. This is the single most common superglobal-read idiom
+        // (`$_GET['x'] ?? 'default'`), so missing it left a large real-world
+        // coverage hole.
+        ExprKind::NullCoalesce(nc) => {
+            is_expr_tainted(&nc.left, ctx) || is_expr_tainted(&nc.right, ctx)
+        }
+
         // Numeric/boolean casts sanitize: PHP coerces the value to that scalar
         // type, so a subsequent SQL/shell/HTML sink can no longer receive
         // arbitrary attacker-controlled text through it. String/array/object
