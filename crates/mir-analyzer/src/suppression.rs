@@ -460,24 +460,31 @@ fn find_comment_introducer(raw: &str) -> Option<usize> {
     None
 }
 
-/// Collect issue kind names/codes following a directive keyword. Stops at the
-/// block-comment terminator and ignores non-identifier tokens. An empty result
-/// means "all kinds".
+/// Collect issue kind names/codes following a directive keyword. Kinds are
+/// comma-separated (`Foo, Bar`); only the FIRST whitespace-delimited word of
+/// each comma-separated segment can be a kind name — every further word in
+/// that same segment is treated as free-text prose (e.g. a trailing
+/// explanation like `UndefinedClass because of a vendor stub`), not another
+/// kind, since a real multi-kind list always uses a comma to continue. Stops
+/// entirely at the block-comment terminator. An empty result means "all kinds".
 fn parse_kinds(rest: &str) -> KindSet {
     let mut set = FxHashSet::default();
-    for token in rest.split([' ', '\t', ',']) {
-        let token = token.trim();
-        if token.is_empty() {
-            continue;
-        }
-        // End of the comment / docblock — stop scanning.
-        if token.starts_with("*/") || token.starts_with('*') {
-            break;
-        }
-        // A kind name is alphanumeric (plus `_`); anything else (a PHPStan
-        // identifier like `argument.type`, prose, etc.) is skipped.
-        if token.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
-            set.insert(token.to_string());
+    'segments: for segment in rest.split(',') {
+        for token in segment.split([' ', '\t']) {
+            let token = token.trim();
+            if token.is_empty() {
+                continue;
+            }
+            // End of the comment / docblock — stop scanning entirely.
+            if token.starts_with("*/") || token.starts_with('*') {
+                break 'segments;
+            }
+            // A kind name is alphanumeric (plus `_`); anything else is
+            // skipped, keeping the next token as the segment's candidate.
+            if token.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+                set.insert(token.to_string());
+                continue 'segments;
+            }
         }
     }
     if set.is_empty() {
