@@ -502,15 +502,18 @@ impl<'a> ExpressionAnalyzer<'a> {
         // Purity check: `$GLOBALS['x']` reaches the same external mutable
         // state as `global $x;`, but only the `global` statement was ever
         // checked — accessing the superglobal array directly inside a
-        // @pure function bypassed the check entirely.
+        // @pure function bypassed the check entirely. Any OTHER superglobal
+        // ($_SESSION/$_ENV/$_SERVER/etc.) is exactly the same shape of
+        // external mutable state, previously unrecognized here at all.
         if ctx.is_in_pure_fn {
             if let ExprKind::Variable(name) = &aa.array.kind {
-                if name.trim_start_matches('$') == "GLOBALS" {
+                let bare = name.trim_start_matches('$');
+                if crate::util::is_superglobal_name(bare) {
                     let variable = aa
                         .index
                         .as_ref()
                         .and_then(|idx| super::helpers::extract_string_from_expr(idx))
-                        .unwrap_or_else(|| "GLOBALS".to_string());
+                        .unwrap_or_else(|| bare.to_string());
                     self.emit(
                         IssueKind::ImpureGlobalVariable { variable },
                         Severity::Warning,
