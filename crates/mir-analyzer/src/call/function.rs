@@ -528,19 +528,34 @@ impl CallAnalyzer {
                     let param_idx = params
                         .iter()
                         .position(|p| p.name.as_ref() == param_name.as_ref());
-                    let arg = if let Some(idx) = param_idx {
-                        call.args.get(idx)
+                    // A variadic sink parameter (`...$args`) swallows every
+                    // trailing positional argument from its index onward, not
+                    // just the first — check them all, mirroring how
+                    // narrowing/assertions.rs's variadic assertion handling
+                    // does the same for `@psalm-assert-if-true`.
+                    let is_variadic = param_idx
+                        .and_then(|idx| params.get(idx))
+                        .is_some_and(|p| p.is_variadic);
+                    let args: Vec<&php_ast::owned::Arg> = if is_variadic {
+                        let idx = param_idx.unwrap();
+                        call.args
+                            .iter()
+                            .filter(|a| a.name.is_none())
+                            .skip(idx)
+                            .collect()
                     } else {
-                        None
+                        let positional = param_idx.and_then(|idx| call.args.get(idx));
+                        let named = call.args.iter().find(|a| {
+                            a.name
+                                .as_ref()
+                                .map(|n| {
+                                    crate::parser::name_to_string_owned(n) == param_name.as_ref()
+                                })
+                                .unwrap_or(false)
+                        });
+                        positional.or(named).into_iter().collect()
                     };
-                    let named_arg = call.args.iter().find(|a| {
-                        a.name
-                            .as_ref()
-                            .map(|n| crate::parser::name_to_string_owned(n) == param_name.as_ref())
-                            .unwrap_or(false)
-                    });
-                    let arg = arg.or(named_arg);
-                    if let Some(arg) = arg {
+                    for arg in args {
                         if is_expr_tainted(&arg.value, ctx) {
                             ea.emit(taint_sink_issue(sink_kind), Severity::Error, span);
                         }
