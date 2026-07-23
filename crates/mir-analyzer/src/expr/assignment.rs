@@ -248,6 +248,77 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
     }
 
+    /// Purity/immutability checks for writing to a property, shared between a
+    /// plain `$obj->prop = x` assignment and a mutation reached through a
+    /// non-assignment write path on the same property (array-index write,
+    /// `unset()`) that resolves to the same receiver+property but doesn't go
+    /// through `assign_to_target`'s own `PropertyAccess` arm.
+    pub(crate) fn check_property_write_purity(
+        &mut self,
+        pa: &php_ast::owned::PropertyAccessExpr,
+        ctx: &FlowState,
+        span: Span,
+    ) {
+        // Purity check: assigning to a parameter's property in a @pure function.
+        if ctx.is_in_pure_fn {
+            if let ExprKind::Variable(recv_name) = &pa.object.kind {
+                let recv_stripped = recv_name.trim_start_matches('$');
+                if ctx
+                    .param_names
+                    .contains(&mir_types::Name::from(recv_stripped))
+                {
+                    if let Some(prop_name) = extract_string_from_expr(&pa.property) {
+                        self.emit(
+                            IssueKind::ImpurePropertyAssignment {
+                                property: prop_name,
+                            },
+                            Severity::Warning,
+                            span,
+                        );
+                    }
+                }
+            }
+        }
+        // External-mutation-free check: assigning to a parameter's property in
+        // a @psalm-external-mutation-free method is forbidden.
+        if ctx.is_in_external_mutation_free_method {
+            if let ExprKind::Variable(recv_name) = &pa.object.kind {
+                let recv_stripped = recv_name.trim_start_matches('$');
+                if recv_stripped != "this"
+                    && ctx
+                        .param_names
+                        .contains(&mir_types::Name::from(recv_stripped))
+                {
+                    if let Some(prop_name) = extract_string_from_expr(&pa.property) {
+                        self.emit(
+                            IssueKind::ImpurePropertyAssignment {
+                                property: prop_name,
+                            },
+                            Severity::Warning,
+                            span,
+                        );
+                    }
+                }
+            }
+        }
+        // Immutability check: assigning to $this->prop in a @psalm-immutable class.
+        if ctx.is_in_immutable_method {
+            if let ExprKind::Variable(recv_name) = &pa.object.kind {
+                if recv_name.trim_start_matches('$') == "this" {
+                    if let Some(prop_name) = extract_string_from_expr(&pa.property) {
+                        self.emit(
+                            IssueKind::ImmutablePropertyModification {
+                                property: prop_name,
+                            },
+                            Severity::Warning,
+                            span,
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     pub(crate) fn assign_to_target(
         &mut self,
         target: &Expr,
@@ -386,64 +457,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
             }
             ExprKind::PropertyAccess(pa) => {
-                // Purity check: assigning to a parameter's property in a @pure function.
-                if ctx.is_in_pure_fn {
-                    if let ExprKind::Variable(recv_name) = &pa.object.kind {
-                        let recv_stripped = recv_name.trim_start_matches('$');
-                        if ctx
-                            .param_names
-                            .contains(&mir_types::Name::from(recv_stripped))
-                        {
-                            if let Some(prop_name) = extract_string_from_expr(&pa.property) {
-                                self.emit(
-                                    IssueKind::ImpurePropertyAssignment {
-                                        property: prop_name,
-                                    },
-                                    Severity::Warning,
-                                    span,
-                                );
-                            }
-                        }
-                    }
-                }
-                // External-mutation-free check: assigning to a parameter's property in
-                // a @psalm-external-mutation-free method is forbidden.
-                if ctx.is_in_external_mutation_free_method {
-                    if let ExprKind::Variable(recv_name) = &pa.object.kind {
-                        let recv_stripped = recv_name.trim_start_matches('$');
-                        if recv_stripped != "this"
-                            && ctx
-                                .param_names
-                                .contains(&mir_types::Name::from(recv_stripped))
-                        {
-                            if let Some(prop_name) = extract_string_from_expr(&pa.property) {
-                                self.emit(
-                                    IssueKind::ImpurePropertyAssignment {
-                                        property: prop_name,
-                                    },
-                                    Severity::Warning,
-                                    span,
-                                );
-                            }
-                        }
-                    }
-                }
-                // Immutability check: assigning to $this->prop in a @psalm-immutable class.
-                if ctx.is_in_immutable_method {
-                    if let ExprKind::Variable(recv_name) = &pa.object.kind {
-                        if recv_name.trim_start_matches('$') == "this" {
-                            if let Some(prop_name) = extract_string_from_expr(&pa.property) {
-                                self.emit(
-                                    IssueKind::ImmutablePropertyModification {
-                                        property: prop_name,
-                                    },
-                                    Severity::Warning,
-                                    span,
-                                );
-                            }
-                        }
-                    }
-                }
+                self.check_property_write_purity(pa, ctx, span);
                 let obj_ty = self.analyze(&pa.object, ctx);
                 // A self/static/parent-typed receiver (e.g. a `self $x` param)
                 // previously matched no arm at all below (only TNamedObject),
@@ -1161,10 +1175,23 @@ impl<'a> ExpressionAnalyzer<'a> {
                             key_chain.push(inner_key);
                             base = &inner.array;
                         }
+                        ExprKind::PropertyAccess(pa) => {
+                            // `$this->items[$k] = …` / `$param->items[] = …`:
+                            // an array-index write through a property base is
+                            // still a mutation of that property (it changes
+                            // the array's contents in place), so it must go
+                            // through the same purity/immutability checks as
+                            // a plain `$obj->items = …` assignment — not just
+                            // be read for reference-recording, which is all
+                            // this arm previously did.
+                            self.check_property_write_purity(pa, ctx, span);
+                            let _ = self.analyze(base, ctx);
+                            break;
+                        }
                         _ => {
-                            // Non-variable base (`self::$items[$k] = …`,
-                            // `$this->items[$k] = …`): analyze it as a read so
-                            // the property access records its reference.
+                            // Non-variable base (`self::$items[$k] = …`):
+                            // analyze it as a read so the property access
+                            // records its reference.
                             let _ = self.analyze(base, ctx);
                             break;
                         }
