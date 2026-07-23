@@ -304,6 +304,13 @@ const BARE_KEYWORDS: &[&str] = &[
 fn parse_directive_with_tracking(raw: &str) -> Option<(Directive, bool)> {
     let comment = extract_comment(raw)?;
 
+    // A comment can carry more than one directive-shaped substring (e.g. a
+    // user's own `@mir-ignore-line Foo` followed later by an unrelated
+    // `@phpstan-ignore-next-line`) — pick whichever keyword actually appears
+    // FIRST in the text, not the first entry `KEYWORDS` happens to define,
+    // so an earlier table entry never shadows a later-defined keyword that
+    // the author actually wrote earlier in the comment.
+    let mut best: Option<(usize, &str, Scope, bool)> = None;
     for &(keyword, scope, force_all) in KEYWORDS {
         let Some(pos) = find_ci(comment.content, keyword) else {
             continue;
@@ -318,44 +325,51 @@ fn parse_directive_with_tracking(raw: &str) -> Option<(Directive, bool)> {
         {
             continue;
         }
-
-        let is_bare = BARE_KEYWORDS.contains(&keyword);
-
-        // Bare forms: a trailing comment suppresses its own line.
-        let scope = if is_bare && comment.has_code_before {
-            Scope::SameLine
-        } else {
-            scope
+        let is_leftmost = match best {
+            None => true,
+            Some((best_pos, ..)) => pos < best_pos,
         };
-
-        // The "documents the following element" forms (bare `@psalm-suppress`,
-        // `@mir-ignore`, …) skip past intervening comment lines — e.g. the
-        // closing `*/` of a multi-line docblock — to reach the declaration.
-        // PHPStan's explicit `*-next-line` and bare `@phpstan-ignore` keep their
-        // literal next-non-blank-line semantics.
-        let skip_comments = scope == Scope::NextLine && is_bare && !force_all;
-
-        let kinds = if force_all {
-            KindSet::All
-        } else {
-            parse_kinds(after)
-        };
-
-        // Track named suppressions only for non-phpstan forms (phpstan forms
-        // always suppress all kinds, so they can never be "unused for a specific kind").
-        let track_named = !keyword.starts_with("@phpstan");
-
-        return Some((
-            Directive {
-                scope,
-                kinds,
-                skip_comments,
-            },
-            track_named,
-        ));
+        if is_leftmost {
+            best = Some((pos, keyword, scope, force_all));
+        }
     }
+    let (pos, keyword, scope, force_all) = best?;
+    let after = &comment.content[pos + keyword.len()..];
 
-    None
+    let is_bare = BARE_KEYWORDS.contains(&keyword);
+
+    // Bare forms: a trailing comment suppresses its own line.
+    let scope = if is_bare && comment.has_code_before {
+        Scope::SameLine
+    } else {
+        scope
+    };
+
+    // The "documents the following element" forms (bare `@psalm-suppress`,
+    // `@mir-ignore`, …) skip past intervening comment lines — e.g. the
+    // closing `*/` of a multi-line docblock — to reach the declaration.
+    // PHPStan's explicit `*-next-line` and bare `@phpstan-ignore` keep their
+    // literal next-non-blank-line semantics.
+    let skip_comments = scope == Scope::NextLine && is_bare && !force_all;
+
+    let kinds = if force_all {
+        KindSet::All
+    } else {
+        parse_kinds(after)
+    };
+
+    // Track named suppressions only for non-phpstan forms (phpstan forms
+    // always suppress all kinds, so they can never be "unused for a specific kind").
+    let track_named = !keyword.starts_with("@phpstan");
+
+    Some((
+        Directive {
+            scope,
+            kinds,
+            skip_comments,
+        },
+        track_named,
+    ))
 }
 
 /// Case-insensitive `str::find` for an ASCII directive keyword. Kind names
