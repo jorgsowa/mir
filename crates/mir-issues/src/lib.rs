@@ -2713,6 +2713,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 155);
+        assert_eq!(one_of_each().len(), 156);
     }
 }
