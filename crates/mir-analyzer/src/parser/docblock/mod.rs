@@ -167,7 +167,7 @@ impl DocblockParser {
                         ));
                     }
                 }
-                "extends" | "template-extends" | "phpstan-extends" => {
+                "extends" | "template-extends" | "psalm-extends" | "phpstan-extends" => {
                     if let Some(body_str) = body_text(&tag.body) {
                         let trimmed = body_str.trim();
                         if let Some(msg) = validate_type_str(trimmed, "extends") {
@@ -176,7 +176,10 @@ impl DocblockParser {
                         result.extends.push(parse_type_string(trimmed));
                     }
                 }
-                "implements" | "template-implements" | "phpstan-implements" => {
+                "implements"
+                | "template-implements"
+                | "psalm-implements"
+                | "phpstan-implements" => {
                     if let Some(body_str) = body_text(&tag.body) {
                         let trimmed = body_str.trim();
                         if let Some(msg) = validate_type_str(trimmed, "implements") {
