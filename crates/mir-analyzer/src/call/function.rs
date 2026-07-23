@@ -1006,6 +1006,10 @@ impl CallAnalyzer {
                     // array_search: narrow key type from haystack rather than returning string|int|false.
                     "array_search" => super::array_builtins::array_search_return_type(&arg_types)
                         .unwrap_or(return_ty),
+                    // key(): narrow to the array's own key type (plus null) instead of
+                    // the stub's unrefined int|string|null.
+                    "key" => super::array_builtins::array_key_return_type(&arg_types)
+                        .unwrap_or(return_ty),
                     // date/time formatting functions always return non-empty strings.
                     "date" | "gmdate" | "date_format" => Type::single(Atomic::TNonEmptyString),
                     // Encoding/conversion functions: strip |false from stubs — they only

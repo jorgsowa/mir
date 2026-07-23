@@ -884,6 +884,26 @@ pub(crate) fn array_search_return_type(arg_types: &[Type]) -> Option<Type> {
     Some(result)
 }
 
+/// Infer the return type of `key($array)`.
+///
+/// The stub returns unrefined `int|string|null`. Narrowed to the array's own
+/// key type when known. Always includes `null` — the internal pointer's
+/// position isn't tracked across calls, so even a provably non-empty array
+/// may have its pointer already past the end.
+pub(crate) fn array_key_return_type(arg_types: &[Type]) -> Option<Type> {
+    let source = arg_types.first()?;
+    if source.is_mixed() {
+        return None;
+    }
+    let (key, _) = crate::stmt::infer_foreach_types(source);
+    if key.is_mixed() {
+        return None;
+    }
+    let mut result = key;
+    result.add_type(Atomic::TNull);
+    Some(result)
+}
+
 /// Infer the return type of `array_fill_keys(array $keys, mixed $value)`.
 ///
 /// The result has one entry per element in `$keys`. The key type comes from
