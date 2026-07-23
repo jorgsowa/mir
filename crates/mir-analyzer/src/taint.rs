@@ -258,6 +258,31 @@ pub fn is_expr_tainted(
             false
         }
 
+        // self::$prop / Foo::$prop — tainted if this static property was
+        // previously assigned a tainted value (see FlowState::taint_static_prop,
+        // set on static-property writes in expr/assignment.rs).
+        ExprKind::StaticPropertyAccess(spa) => {
+            if let ExprKind::Identifier(id) = &spa.class.kind {
+                let resolved = crate::db::resolve_name(db, file, id.as_ref());
+                let fqcn_opt: Option<std::sync::Arc<str>> = match resolved.as_str() {
+                    "self" | "static" => ctx.self_fqcn.clone().or_else(|| ctx.static_fqcn.clone()),
+                    "parent" => ctx.parent_fqcn.clone(),
+                    s => Some(std::sync::Arc::from(s)),
+                };
+                if let Some(fqcn) = fqcn_opt {
+                    if let Some(prop_name) = match &spa.member.kind {
+                        ExprKind::Variable(name) | ExprKind::Identifier(name) => {
+                            Some(name.trim_start_matches('$').to_string())
+                        }
+                        _ => None,
+                    } {
+                        return ctx.is_static_prop_tainted(&fqcn, &prop_name);
+                    }
+                }
+            }
+            false
+        }
+
         ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => {
             if let ExprKind::Identifier(method_name) = &mc.method.kind {
                 if let ExprKind::Variable(recv) = &mc.object.kind {

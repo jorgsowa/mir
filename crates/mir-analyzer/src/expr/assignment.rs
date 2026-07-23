@@ -127,6 +127,36 @@ impl<'a> ExpressionAnalyzer<'a> {
                             ctx.taint_var(base_var.trim_start_matches('$'));
                         }
                     }
+                    // `self::$prop = $tainted;` / `Foo::$prop = $tainted;` —
+                    // static properties were entirely untracked for taint,
+                    // unlike instance properties (the arm above).
+                    ExprKind::StaticPropertyAccess(spa) => {
+                        if let ExprKind::Identifier(id) = &spa.class.kind {
+                            let resolved =
+                                crate::db::resolve_name(self.db, &self.file, id.as_ref());
+                            let fqcn_opt: Option<std::sync::Arc<str>> = match resolved.as_str() {
+                                "self" | "static" => {
+                                    ctx.self_fqcn.clone().or_else(|| ctx.static_fqcn.clone())
+                                }
+                                "parent" => ctx.parent_fqcn.clone(),
+                                s => Some(std::sync::Arc::from(s)),
+                            };
+                            if let Some(fqcn) = fqcn_opt {
+                                if let Some(prop_name) = match &spa.member.kind {
+                                    ExprKind::Variable(name) | ExprKind::Identifier(name) => {
+                                        Some(name.trim_start_matches('$').to_string())
+                                    }
+                                    _ => None,
+                                } {
+                                    if rhs_tainted {
+                                        ctx.taint_static_prop(&fqcn, &prop_name);
+                                    } else {
+                                        ctx.clear_static_prop_taint(&fqcn, &prop_name);
+                                    }
+                                }
+                            }
+                        }
+                    }
                     _ => {}
                 }
                 rhs_ty

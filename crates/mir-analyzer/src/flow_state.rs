@@ -120,6 +120,12 @@ pub struct FlowState {
     /// so a later `$obj->prop` access is recognized as tainted.
     pub tainted_props: FxHashSet<(Name, Name)>,
 
+    /// Static properties that carry tainted (user-controlled) values at this
+    /// point. Key: `(fqcn, prop_name)`, mirroring how `prop_refined`'s static
+    /// counterpart is keyed by FQCN instead of a receiver variable name (a
+    /// FQCN can never collide with a real PHP variable name).
+    pub tainted_static_props: FxHashSet<(Name, Name)>,
+
     /// Variables that have been read at least once in this scope.
     /// Used by UnusedParam detection (M18).
     pub read_vars: FxHashSet<Name>,
@@ -338,6 +344,7 @@ impl FlowState {
             strict_types: false,
             tainted_vars: FxHashSet::default(),
             tainted_props: FxHashSet::default(),
+            tainted_static_props: FxHashSet::default(),
             read_vars: FxHashSet::default(),
             param_names: Arc::new(FxHashSet::default()),
             byref_param_names: Arc::new(FxHashSet::default()),
@@ -744,6 +751,25 @@ impl FlowState {
             Name::from(prop),
         );
         self.tainted_props.remove(&key);
+    }
+
+    /// Mark a static property as carrying tainted (user-controlled) data.
+    pub fn taint_static_prop(&mut self, fqcn: &str, prop: &str) {
+        let key = (Name::from(fqcn), Name::from(prop));
+        self.tainted_static_props.insert(key);
+    }
+
+    /// Returns true if the static property is known to carry tainted data.
+    pub fn is_static_prop_tainted(&self, fqcn: &str, prop: &str) -> bool {
+        let key = (Name::from(fqcn), Name::from(prop));
+        self.tainted_static_props.contains(&key)
+    }
+
+    /// Clear a previously-recorded static-property taint — used when the
+    /// property is overwritten with a value proven not tainted.
+    pub fn clear_static_prop_taint(&mut self, fqcn: &str, prop: &str) {
+        let key = (Name::from(fqcn), Name::from(prop));
+        self.tainted_static_props.remove(&key);
     }
 
     /// Record the location of the first assignment to a variable (first-write-wins)
@@ -1180,6 +1206,15 @@ impl FlowState {
             .chain(else_ctx.tainted_props.iter())
         {
             result.tainted_props.insert(*key);
+        }
+
+        // Same conservative union for tainted static properties.
+        for key in if_ctx
+            .tainted_static_props
+            .iter()
+            .chain(else_ctx.tainted_static_props.iter())
+        {
+            result.tainted_static_props.insert(*key);
         }
 
         // Read vars: union — if either branch reads a var, it counts as read
