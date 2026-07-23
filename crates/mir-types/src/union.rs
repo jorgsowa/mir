@@ -340,10 +340,18 @@ impl Type {
             self.types.retain(|t| !matches!(t, Atomic::TNever));
         }
 
-        // Empty keyed array (array{}) is a subtype of any generic array or list.
-        // Remove array{} if we already have a generic array<K,V> or list<V>.
-        if let Atomic::TKeyedArray { properties, .. } = &atomic {
-            if properties.is_empty() {
+        // Closed empty keyed array (array{}) is a subtype of any generic array or
+        // list. Remove it if we already have a generic array<K,V> or list<V>. An
+        // OPEN empty shape (array{...}) carries real information — it may hold
+        // unknown, possibly non-list, extra keys at runtime — so it's not
+        // subsumed and must not be dropped.
+        if let Atomic::TKeyedArray {
+            properties,
+            is_open,
+            ..
+        } = &atomic
+        {
+            if properties.is_empty() && !is_open {
                 for existing in &self.types {
                     match existing {
                         Atomic::TArray { .. }
@@ -358,7 +366,8 @@ impl Type {
             }
         }
 
-        // When adding a generic array or list, remove any empty keyed arrays since they're subtypes.
+        // When adding a generic array or list, remove any CLOSED empty keyed
+        // arrays since they're subtypes (same reasoning as above, mirrored).
         let is_generic_array_or_list = matches!(
             &atomic,
             Atomic::TArray { .. }
@@ -368,8 +377,13 @@ impl Type {
         );
         if is_generic_array_or_list {
             self.types.retain(|t| {
-                if let Atomic::TKeyedArray { properties, .. } = t {
-                    !properties.is_empty()
+                if let Atomic::TKeyedArray {
+                    properties,
+                    is_open,
+                    ..
+                } = t
+                {
+                    !properties.is_empty() || *is_open
                 } else {
                     true
                 }
