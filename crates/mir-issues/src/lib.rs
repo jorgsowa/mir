@@ -395,9 +395,11 @@ pub enum IssueKind {
     /// Fixtures: `tests/fixtures/by-kind/impure_function_call/`.
     ImpureFunctionCall { fn_name: String },
     /// Emitted when a non-constructor method of a `@psalm-immutable` class assigns to a
-    /// `$this` property.
+    /// `$this` property, or when ANY code writes to a property of an object whose class is
+    /// `@psalm-immutable` (`receiver` is the rendered receiver expression — `$this` for the
+    /// former, the actual receiver's source text, e.g. `$b`, for the latter).
     /// Fixtures: `tests/fixtures/by-kind/immutable_property_modification/`.
-    ImmutablePropertyModification { property: String },
+    ImmutablePropertyModification { receiver: String, property: String },
 
     // --- Readonly -----------------------------------------------------------
     /// Emitted by `mir-analyzer/src/expr/assignment.rs`.
@@ -1745,8 +1747,8 @@ impl IssueKind {
             IssueKind::ImpureFunctionCall { fn_name } => {
                 format!("Calling impure function {fn_name}() in a @pure function")
             }
-            IssueKind::ImmutablePropertyModification { property } => {
-                format!("Assigning to property {property} of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)")
+            IssueKind::ImmutablePropertyModification { receiver, property } => {
+                format!("Assigning to property {property} of {receiver} in an immutable context (@psalm-immutable class or @psalm-mutation-free method)")
             }
 
             IssueKind::UnimplementedAbstractMethod { class, method } => {
@@ -2433,7 +2435,10 @@ mod code_tests {
                 property: s(),
             },
             IssueKind::ImpureFunctionCall { fn_name: s() },
-            IssueKind::ImmutablePropertyModification { property: s() },
+            IssueKind::ImmutablePropertyModification {
+                receiver: s(),
+                property: s(),
+            },
             IssueKind::ReadonlyPropertyAssignment {
                 class: s(),
                 property: s(),
