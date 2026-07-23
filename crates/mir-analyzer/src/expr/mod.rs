@@ -332,7 +332,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 self.check_interpolation_implicit_to_string_cast(&expr_ty, inner.span);
                 // `print` is an HTML sink exactly like `echo` — both write
                 // straight to the response body.
-                if crate::taint::is_expr_tainted(inner, ctx) {
+                if crate::taint::is_expr_tainted(inner, ctx, self.db, &self.file) {
                     self.emit(IssueKind::TaintedHtml, Severity::Error, expr.span);
                 }
                 // @pure implies no side effects at all — same purity

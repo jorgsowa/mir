@@ -708,7 +708,7 @@ impl CallAnalyzer {
                         positional.or(named_arg).into_iter().collect()
                     };
                     for arg in args {
-                        if is_expr_tainted(&arg.value, ctx) {
+                        if is_expr_tainted(&arg.value, ctx, ea.db, &ea.file) {
                             ea.emit(taint_sink_issue(sink_kind), Severity::Error, span);
                         }
                     }

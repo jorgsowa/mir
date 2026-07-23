@@ -407,6 +407,7 @@ impl DefinitionCollector<'_> {
                 .iter()
                 .map(|(param, kind)| (Arc::from(param.as_str()), Arc::from(kind.as_str())))
                 .collect(),
+            is_taint_source: doc.is_taint_source,
             type_aliases: type_aliases
                 .iter()
                 .map(|(k, v)| (Arc::from(k.as_str()), v.clone()))
