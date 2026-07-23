@@ -307,7 +307,7 @@ impl<'a> DefinitionCollector<'a> {
                             .iter()
                             .map(|tp| {
                                 self.resolve_union_doc_with_templates(
-                                    tp.clone(),
+                                    super::expand_aliases_only(tp.clone(), &type_aliases),
                                     &trait_template_names,
                                     &fqcn,
                                     &trait_template_params,

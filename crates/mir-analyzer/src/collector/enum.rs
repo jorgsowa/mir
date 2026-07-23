@@ -242,6 +242,11 @@ impl DefinitionCollector<'_> {
             }
         }
 
+        // Hoisted above `implements_type_args`/`trait_use_type_args` (moved
+        // from further down) so their type args can expand local aliases
+        // before resolution, the same as class.rs's sibling handling does.
+        let type_aliases = self.build_type_aliases(&enum_doc);
+
         // `@implements Interface<T1, T2>` — enums have no `@template` of their
         // own, so there's nothing to substitute into the type args (unlike
         // class.rs's `implements_type_args`, which resolves them against the
@@ -261,7 +266,7 @@ impl DefinitionCollector<'_> {
                             .iter()
                             .map(|tp| {
                                 self.resolve_union_doc_with_templates(
-                                    tp.clone(),
+                                    super::expand_aliases_only(tp.clone(), &type_aliases),
                                     &rustc_hash::FxHashSet::default(),
                                     &fqcn,
                                     &[],
@@ -290,7 +295,7 @@ impl DefinitionCollector<'_> {
                             .iter()
                             .map(|tp| {
                                 self.resolve_union_doc_with_templates(
-                                    tp.clone(),
+                                    super::expand_aliases_only(tp.clone(), &type_aliases),
                                     &rustc_hash::FxHashSet::default(),
                                     &fqcn,
                                     &[],
@@ -304,7 +309,6 @@ impl DefinitionCollector<'_> {
             })
             .collect();
 
-        let type_aliases = self.build_type_aliases(&enum_doc);
         let mut own_properties = mir_codebase::definitions::MemberMap::default();
         self.add_docblock_members(
             &enum_doc,

@@ -79,6 +79,11 @@ impl<'a> DefinitionCollector<'a> {
             .map(|n| self.resolve_name(&name_to_string_owned(n)).into())
             .collect();
 
+        // Hoisted above `extends_type_args` (moved from further down) so its
+        // type args can expand local aliases before resolution, the same as
+        // `@template` bound/default handling already does.
+        let type_aliases = self.build_type_aliases(&iface_doc);
+
         // Type args from `@extends BaseIface<T1, T2>` docblock lines — keyed by
         // FQCN (not positional) since a native `extends A, B` clause may list
         // several base interfaces, matched independently of docblock tag order.
@@ -99,7 +104,7 @@ impl<'a> DefinitionCollector<'a> {
                                 // Template-aware: `T1` in `@extends Base<T1>` is
                                 // this interface's own template param, not a class.
                                 self.resolve_union_doc_with_templates(
-                                    tp.clone(),
+                                    super::expand_aliases_only(tp.clone(), &type_aliases),
                                     &iface_template_names,
                                     &fqcn,
                                     &iface_template_params,
@@ -112,8 +117,6 @@ impl<'a> DefinitionCollector<'a> {
                 }
             })
             .collect();
-
-        let type_aliases = self.build_type_aliases(&iface_doc);
 
         let mut own_methods = mir_codebase::definitions::MemberMap::default();
         let mut own_constants = mir_codebase::definitions::MemberMap::default();
