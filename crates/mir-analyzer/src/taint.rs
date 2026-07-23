@@ -307,9 +307,13 @@ pub fn is_expr_tainted(
 
         ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => {
             if let ExprKind::Identifier(method_name) = &mc.method.kind {
-                if let ExprKind::Variable(recv) = &mc.object.kind {
+                // Chain-walk the receiver (`$this->req->getParam()`) the same
+                // way the purity checks already do for a write, instead of
+                // requiring `mc.object` to literally BE a bare variable.
+                if let Some(recv_ty) =
+                    crate::expr::assignment::resolve_chained_receiver_type(&mc.object, ctx, db)
+                {
                     let method_lower = crate::util::php_ident_lowercase(method_name.as_ref());
-                    let recv_ty = ctx.get_var(recv.trim_start_matches('$'));
                     for atom in &recv_ty.types {
                         if let mir_types::Atomic::TNamedObject { fqcn, .. } = atom {
                             let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());

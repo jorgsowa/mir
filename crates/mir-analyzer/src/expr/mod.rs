@@ -13,7 +13,7 @@ use crate::php_version::PhpVersion;
 use crate::symbol::{ReferenceKind, ResolvedSymbol};
 
 mod arrays;
-mod assignment;
+pub(crate) mod assignment;
 mod binary;
 mod casts;
 mod closures;

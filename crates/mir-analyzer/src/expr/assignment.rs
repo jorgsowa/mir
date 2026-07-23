@@ -169,12 +169,12 @@ pub(crate) fn root_receiver_var(expr: &Expr) -> Option<&str> {
 /// declared property type via `find_property_in_chain`, instead of requiring
 /// the receiver to literally BE a bare variable. Doesn't consult
 /// `ctx.get_prop_refined` (unlike `narrowing::resolve_prop_current_type`):
-/// this only feeds a readonly check, which cares about the property's
-/// *declared* type, not a condition-narrowed one. Not re-running
-/// `self.analyze` here is deliberate — the operand was already analyzed by
-/// the surrounding read, and a fresh `analyze` call would double-report its
-/// diagnostics.
-fn resolve_chained_receiver_type(
+/// callers (a readonly check, and `taint.rs`'s taint-source method-call
+/// check) both only care about the property's *declared* type, not a
+/// condition-narrowed one. Not re-running `self.analyze` here is
+/// deliberate — the operand was already analyzed by the surrounding read,
+/// and a fresh `analyze` call would double-report its diagnostics.
+pub(crate) fn resolve_chained_receiver_type(
     expr: &Expr,
     ctx: &FlowState,
     db: &dyn MirDatabase,
