@@ -705,6 +705,14 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
         }
 
+        // A heterogeneous union (shape alongside a generic array/list/string/
+        // object) must merge every atom's contribution, same reasoning as the
+        // all-shapes branch above — returning on the first matching atom
+        // silently drops every other union member's contribution (e.g.
+        // `array{a:int}|array<string,string>` accessed via `$x['a']` must
+        // yield `int|string`, not just the shape arm's `int`).
+        let mut result = Type::empty();
+        let mut contributed = false;
         for atomic in &arr_ty.types {
             match atomic {
                 Atomic::TKeyedArray {
@@ -712,16 +720,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                     is_open,
                     ..
                 } => {
+                    contributed = true;
                     if let Some(ref key) = literal_key {
                         if let Some(prop) = properties.get(key) {
                             if prop.optional {
                                 let mut widened = prop.ty.clone();
                                 widened.add_type(Atomic::TNull);
-                                return widened;
+                                result.merge_with(&widened);
+                            } else {
+                                result.merge_with(&prop.ty);
                             }
-                            return prop.ty.clone();
-                        }
-                        if !is_open && !self.in_existence_check {
+                        } else if !is_open && !self.in_existence_check {
                             let key_str = match key {
                                 mir_types::atomic::ArrayKey::String(s) => s.to_string(),
                                 mir_types::atomic::ArrayKey::Int(i) => i.to_string(),
@@ -732,37 +741,44 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 idx_span,
                             );
                             return Type::mixed();
+                        } else {
+                            for prop in properties.values() {
+                                result.merge_with(&prop.ty);
+                            }
+                        }
+                    } else {
+                        for prop in properties.values() {
+                            result.merge_with(&prop.ty);
                         }
                     }
-                    let mut result = Type::empty();
-                    for prop in properties.values() {
-                        result.merge_with(&prop.ty);
-                    }
-                    return if result.types.is_empty() {
-                        Type::mixed()
-                    } else {
-                        result
-                    };
                 }
                 Atomic::TArray { value, .. } | Atomic::TNonEmptyArray { value, .. } => {
-                    return *value.clone();
+                    contributed = true;
+                    result.merge_with(value);
                 }
                 Atomic::TList { value } | Atomic::TNonEmptyList { value } => {
-                    return *value.clone();
+                    contributed = true;
+                    result.merge_with(value);
                 }
                 Atomic::TString | Atomic::TLiteralString(_) => {
-                    return Type::single(Atomic::TString);
+                    contributed = true;
+                    result.merge_with(&Type::single(Atomic::TString));
                 }
                 Atomic::TNamedObject { fqcn, type_params } => {
                     if let Some(value_ty) =
                         resolve_array_access_value_type(self.db, fqcn, type_params)
                     {
-                        return value_ty;
+                        contributed = true;
+                        result.merge_with(&value_ty);
                     }
                 }
                 _ => {}
             }
         }
-        Type::mixed()
+        if contributed && !result.types.is_empty() {
+            result
+        } else {
+            Type::mixed()
+        }
     }
 }
