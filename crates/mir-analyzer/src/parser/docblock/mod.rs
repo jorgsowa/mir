@@ -490,6 +490,7 @@ impl DocblockParser {
                         }
                     }
                 }
+                "taint-source" => result.is_taint_source = true,
                 _ => {}
             }
         }
@@ -666,6 +667,8 @@ pub struct ParsedDocblock {
     pub trace_vars: Vec<String>,
     /// `@taint-sink <kind> $param` — (param_name_without_dollar, sink_kind_string)
     pub taint_sinks: Vec<(String, String)>,
+    /// `@taint-source` — this function/method's return value is tainted.
+    pub is_taint_source: bool,
     /// `@seal-properties` / `@psalm-seal-properties` — disallows undeclared property access.
     pub seal_properties: bool,
     /// `@if-this-is Type` / `@psalm-if-this-is Type` — the method may only be

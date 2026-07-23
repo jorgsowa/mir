@@ -1452,6 +1452,7 @@ impl<'a> DefinitionCollector<'a> {
                     docstring: None,
                     is_virtual: true,
                     taint_sink_params: vec![],
+                    is_taint_source: false,
                     if_this_is: None,
                     self_out: None,
                     is_inherit_doc: false,
@@ -2085,6 +2086,7 @@ impl<'a> DefinitionCollector<'a> {
                 .iter()
                 .map(|(param, kind)| (Arc::from(param.as_str()), Arc::from(kind.as_str())))
                 .collect(),
+            is_taint_source: doc.is_taint_source,
             if_this_is: if_this_is_resolved,
             self_out: self_out_resolved,
             is_inherit_doc: doc.is_inherit_doc,

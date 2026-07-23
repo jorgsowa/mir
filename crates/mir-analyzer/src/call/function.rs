@@ -285,7 +285,7 @@ impl CallAnalyzer {
                 if relevant.is_some_and(|idxs| !idxs.contains(&i)) {
                     continue;
                 }
-                if is_expr_tainted(&arg.value, ctx) {
+                if is_expr_tainted(&arg.value, ctx, ea.db, &ea.file) {
                     let issue_kind = match sink_kind {
                         SinkKind::Html => IssueKind::TaintedHtml,
                         SinkKind::Sql => IssueKind::TaintedSql,
@@ -556,7 +556,7 @@ impl CallAnalyzer {
                         positional.or(named).into_iter().collect()
                     };
                     for arg in args {
-                        if is_expr_tainted(&arg.value, ctx) {
+                        if is_expr_tainted(&arg.value, ctx, ea.db, &ea.file) {
                             ea.emit(taint_sink_issue(sink_kind), Severity::Error, span);
                         }
                     }

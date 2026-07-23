@@ -148,7 +148,13 @@ pub fn taint_sink_issue(kind: &str) -> mir_issues::IssueKind {
 /// - Any variable that was previously marked tainted in `ctx.tainted_vars` is tainted.
 /// - Binary string-concat or arithmetic on tainted operands propagates taint.
 /// - Interpolated strings are tainted if any embedded variable is tainted.
-pub fn is_expr_tainted(expr: &Expr, ctx: &FlowState) -> bool {
+/// - A call to a `@taint-source`-annotated function/method is tainted.
+pub fn is_expr_tainted(
+    expr: &Expr,
+    ctx: &FlowState,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> bool {
     match &expr.kind {
         ExprKind::Variable(name) => {
             let n = name.trim_start_matches('$');
@@ -157,10 +163,10 @@ pub fn is_expr_tainted(expr: &Expr, ctx: &FlowState) -> bool {
 
         ExprKind::ArrayAccess(aa) => {
             // $_GET['key'] — tainted if the array is tainted/superglobal
-            is_expr_tainted(&aa.array, ctx)
+            is_expr_tainted(&aa.array, ctx, db, file)
         }
 
-        ExprKind::Parenthesized(inner) => is_expr_tainted(inner, ctx),
+        ExprKind::Parenthesized(inner) => is_expr_tainted(inner, ctx, db, file),
 
         // $obj->prop — tainted if this property was previously assigned a
         // tainted value (see FlowState::taint_prop, set on property writes
@@ -177,26 +183,34 @@ pub fn is_expr_tainted(expr: &Expr, ctx: &FlowState) -> bool {
             false
         }
 
-        ExprKind::Assign(a) => is_expr_tainted(&a.value, ctx),
+        ExprKind::Assign(a) => is_expr_tainted(&a.value, ctx, db, file),
 
-        ExprKind::Binary(op) => is_expr_tainted(&op.left, ctx) || is_expr_tainted(&op.right, ctx),
+        ExprKind::Binary(op) => {
+            is_expr_tainted(&op.left, ctx, db, file) || is_expr_tainted(&op.right, ctx, db, file)
+        }
 
-        ExprKind::UnaryPrefix(u) => is_expr_tainted(&u.operand, ctx),
+        ExprKind::UnaryPrefix(u) => is_expr_tainted(&u.operand, ctx, db, file),
 
         ExprKind::InterpolatedString(parts) | ExprKind::Heredoc { parts, .. } => {
             parts.iter().any(|p| match p {
-                StringPart::Expr(e) => is_expr_tainted(e, ctx),
+                StringPart::Expr(e) => is_expr_tainted(e, ctx, db, file),
                 StringPart::Literal(_) => false,
             })
         }
 
         ExprKind::Ternary(t) => match &t.then_expr {
-            Some(then_e) => is_expr_tainted(then_e, ctx) || is_expr_tainted(&t.else_expr, ctx),
+            Some(then_e) => {
+                is_expr_tainted(then_e, ctx, db, file)
+                    || is_expr_tainted(&t.else_expr, ctx, db, file)
+            }
             // Short ternary (`$x ?: $y`): the true branch's VALUE is the
             // condition itself, not a separate expression — `then_expr` is
             // `None` for this form, so the condition's own taint must be
             // checked too, not just skipped.
-            None => is_expr_tainted(&t.condition, ctx) || is_expr_tainted(&t.else_expr, ctx),
+            None => {
+                is_expr_tainted(&t.condition, ctx, db, file)
+                    || is_expr_tainted(&t.else_expr, ctx, db, file)
+            }
         },
 
         // `$x ?? $default` — tainted if either side could be, same as a
@@ -204,7 +218,7 @@ pub fn is_expr_tainted(expr: &Expr, ctx: &FlowState) -> bool {
         // (`$_GET['x'] ?? 'default'`), so missing it left a large real-world
         // coverage hole.
         ExprKind::NullCoalesce(nc) => {
-            is_expr_tainted(&nc.left, ctx) || is_expr_tainted(&nc.right, ctx)
+            is_expr_tainted(&nc.left, ctx, db, file) || is_expr_tainted(&nc.right, ctx, db, file)
         }
 
         // Numeric/boolean casts sanitize: PHP coerces the value to that scalar
@@ -215,12 +229,54 @@ pub fn is_expr_tainted(expr: &Expr, ctx: &FlowState) -> bool {
             php_ast::ast::CastKind::Int
             | php_ast::ast::CastKind::Float
             | php_ast::ast::CastKind::Bool => false,
-            _ => is_expr_tainted(inner, ctx),
+            _ => is_expr_tainted(inner, ctx, db, file),
         },
 
-        ExprKind::Match(m) => m.arms.iter().any(|arm| is_expr_tainted(&arm.body, ctx)),
+        ExprKind::Match(m) => m
+            .arms
+            .iter()
+            .any(|arm| is_expr_tainted(&arm.body, ctx, db, file)),
 
-        ExprKind::Array(elements) => elements.iter().any(|el| is_expr_tainted(&el.value, ctx)),
+        ExprKind::Array(elements) => elements
+            .iter()
+            .any(|el| is_expr_tainted(&el.value, ctx, db, file)),
+
+        // `@taint-source`-annotated function/method calls are themselves a
+        // taint source, mirroring `@taint-sink`'s mechanism on the source
+        // side. A general "any call result could be tainted" pass-through
+        // (e.g. htmlspecialchars-style sanitizers, or an unannotated call
+        // whose body reads a superglobal) is NOT modeled — that's a much
+        // bigger, deliberately deferred change.
+        ExprKind::FunctionCall(fc) => {
+            if let ExprKind::Identifier(name) = &fc.name.kind {
+                let resolved = crate::db::resolve_name(db, file, name.as_ref());
+                let here = crate::db::Fqcn::from_str(db, resolved.as_str());
+                if crate::db::find_function(db, here).is_some_and(|f| f.is_taint_source) {
+                    return true;
+                }
+            }
+            false
+        }
+
+        ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => {
+            if let ExprKind::Identifier(method_name) = &mc.method.kind {
+                if let ExprKind::Variable(recv) = &mc.object.kind {
+                    let method_lower = crate::util::php_ident_lowercase(method_name.as_ref());
+                    let recv_ty = ctx.get_var(recv.trim_start_matches('$'));
+                    for atom in &recv_ty.types {
+                        if let mir_types::Atomic::TNamedObject { fqcn, .. } = atom {
+                            let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
+                            if crate::db::find_method_respecting_precedence(db, here, &method_lower)
+                                .is_some_and(|(_, m)| m.is_taint_source)
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            false
+        }
 
         // Conservative: function call results are not tracked as tainted
         // unless it's a known pass-through built-in (htmlspecialchars sanitizes)

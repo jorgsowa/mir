@@ -39,7 +39,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         expr_span: Span,
         ctx: &mut FlowState,
     ) -> Type {
-        let rhs_tainted = crate::taint::is_expr_tainted(&a.value, ctx);
+        let rhs_tainted = crate::taint::is_expr_tainted(&a.value, ctx, self.db, &self.file);
         // Snapshot which variables were already in consumed_write_locs before
         // analyzing the RHS. When the LHS target variable is consumed DURING RHS
         // analysis (e.g. `$x = f($x)`) the new write to `$x` must be re-armed so it

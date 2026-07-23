@@ -313,7 +313,7 @@ impl<'a> StatementsAnalyzer<'a> {
         // Taint check before the expression is analyzed further below —
         // `is_expr_tainted` only needs the iterable expression + current
         // taint state, same timing as an assignment's RHS taint check.
-        let iterable_tainted = crate::taint::is_expr_tainted(&fe.expr, ctx);
+        let iterable_tainted = crate::taint::is_expr_tainted(&fe.expr, ctx, self.db, &self.file);
         let arr_ty = self.expr_analyzer(ctx).analyze(&fe.expr, ctx);
         let (key_ty, mut value_ty) = infer_foreach_types_with_db(self.db, &arr_ty);
 

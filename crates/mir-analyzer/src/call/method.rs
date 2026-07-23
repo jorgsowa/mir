@@ -1070,7 +1070,7 @@ fn resolve_method_return<'a>(
                     positional.or(named_arg).into_iter().collect()
                 };
                 for arg in args {
-                    if is_expr_tainted(&arg.value, ctx) {
+                    if is_expr_tainted(&arg.value, ctx, ea.db, &ea.file) {
                         ea.emit(taint_sink_issue(sink_kind), Severity::Error, span);
                     }
                 }
@@ -1081,7 +1081,7 @@ fn resolve_method_return<'a>(
         // procedural classify_sink): $pdo->query($sql) etc.
         if let Some(sink_kind) = classify_method_sink(ea.db, fqcn.as_ref(), method_name) {
             for arg in call.args.iter() {
-                if is_expr_tainted(&arg.value, ctx) {
+                if is_expr_tainted(&arg.value, ctx, ea.db, &ea.file) {
                     let issue_kind = match sink_kind {
                         SinkKind::Sql => IssueKind::TaintedSql,
                         _ => unreachable!("classify_method_sink only returns SinkKind::Sql"),

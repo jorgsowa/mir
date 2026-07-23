@@ -447,6 +447,11 @@ pub struct MethodDef {
     /// Each entry is `(param_name_without_dollar, sink_kind_string)`.
     #[serde(default)]
     pub taint_sink_params: Vec<(Arc<str>, Arc<str>)>,
+    /// `@taint-source` — this method's return value is treated as tainted
+    /// (attacker-controlled) at every call site, mirroring `@taint-sink`'s
+    /// mechanism but marking the source side instead.
+    #[serde(default)]
+    pub is_taint_source: bool,
     /// `@if-this-is Type` — the resolved constraint a receiver's type must
     /// satisfy for this method to be callable. `None` when absent.
     #[serde(default)]
@@ -820,6 +825,11 @@ pub struct FunctionDef {
     /// Each entry is `(param_name_without_dollar, sink_kind_string)`.
     #[serde(default)]
     pub taint_sink_params: Vec<(Arc<str>, Arc<str>)>,
+    /// `@taint-source` — this function's return value is treated as tainted
+    /// (attacker-controlled) at every call site, mirroring `@taint-sink`'s
+    /// mechanism but marking the source side instead.
+    #[serde(default)]
+    pub is_taint_source: bool,
     /// Type aliases declared on this function via `@psalm-type` / `@phpstan-type`.
     #[serde(default)]
     pub type_aliases: FxHashMap<Arc<str>, Type>,
