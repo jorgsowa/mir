@@ -254,34 +254,8 @@ impl<'a> StatementsAnalyzer<'a> {
             Some(&dw.condition),
         );
         // Since the body always executes at least once, variables introduced
-        // inside the body are definitely defined after the loop. Strip any
-        // possibly_undefined flag and promote possibly_assigned → assigned.
-        {
-            let new_names: Vec<mir_types::Name> = post
-                .vars
-                .keys()
-                .filter(|n| !pre.vars.contains_key(*n))
-                .copied()
-                .collect();
-            let post_vars = std::sync::Arc::make_mut(&mut post.vars);
-            for name in &new_names {
-                if let Some(ty) = post_vars.get_mut(name) {
-                    if ty.possibly_undefined {
-                        let mut stripped = (**ty).clone();
-                        stripped.possibly_undefined = false;
-                        *ty = mir_codebase::definitions::wrap_var_type(stripped);
-                    }
-                }
-            }
-            let assigned = std::sync::Arc::make_mut(&mut post.assigned_vars);
-            let possibly = std::sync::Arc::make_mut(&mut post.possibly_assigned_vars);
-            for name in &new_names {
-                if possibly.contains(name) {
-                    possibly.remove(name);
-                    assigned.insert(*name);
-                }
-            }
-        }
+        // inside the body are definitely defined after the loop.
+        super::loops::promote_new_loop_vars_when_guaranteed(&pre, &mut post);
         *ctx = post;
     }
 
@@ -420,7 +394,12 @@ impl<'a> StatementsAnalyzer<'a> {
         }
 
         let loop_guaranteed = super::loops::loop_guaranteed_to_execute(&arr_ty);
-        let post = self.analyze_loop_widened(
+        // Snapshot after the key/value binding vars are set on `entry` but before
+        // the body runs — used below as the "new since" baseline so the loop's
+        // own iteration variables (always bound at the header, not first-assigned
+        // inside the body) aren't mistaken for body-introduced variables.
+        let header_bound = entry.clone();
+        let mut post = self.analyze_loop_widened(
             &pre,
             entry,
             |sa, iter| {
@@ -445,6 +424,12 @@ impl<'a> StatementsAnalyzer<'a> {
             false,
             None,
         );
+        // A foreach proven to iterate at least once (loop_guaranteed) makes
+        // variables first assigned in the body definitely defined afterward,
+        // same as do-while's identical guarantee.
+        if loop_guaranteed {
+            super::loops::promote_new_loop_vars_when_guaranteed(&header_bound, &mut post);
+        }
         *ctx = post;
     }
 

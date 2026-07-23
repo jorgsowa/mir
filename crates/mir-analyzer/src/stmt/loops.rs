@@ -7,22 +7,55 @@ use std::sync::Arc;
 // ---------------------------------------------------------------------------
 
 /// Returns true if a foreach loop over `arr_ty` is guaranteed to execute at least once.
-/// A loop is guaranteed to execute if the array is known to be non-empty.
+/// A loop is guaranteed to execute only when EVERY atom in the (possibly union)
+/// type is known to be non-empty — a single possibly-empty alternative means the
+/// loop might not execute at all for that alternative.
 pub(super) fn loop_guaranteed_to_execute(arr_ty: &Type) -> bool {
-    for atomic in &arr_ty.types {
-        match atomic {
-            // Non-empty array types guarantee at least one iteration
-            Atomic::TNonEmptyArray { .. } | Atomic::TNonEmptyList { .. } => return true,
-            // Keyed arrays with known properties are non-empty if closed and not empty
-            Atomic::TKeyedArray {
-                properties,
-                is_open: false,
-                ..
-            } if !properties.is_empty() => return true,
-            _ => {}
+    !arr_ty.types.is_empty()
+        && arr_ty.types.iter().all(|atomic| {
+            matches!(
+                atomic,
+                Atomic::TNonEmptyArray { .. } | Atomic::TNonEmptyList { .. }
+            ) || matches!(
+                atomic,
+                Atomic::TKeyedArray { properties, is_open: false, .. } if !properties.is_empty()
+            )
+        })
+}
+
+/// After a loop body proven to always execute at least once, variables first
+/// assigned inside the body are definitely defined afterward — strip any
+/// `possibly_undefined` flag and promote `possibly_assigned_vars` → `assigned_vars`
+/// for names new since `pre`. Shared by do-while (always executes) and a
+/// foreach proven non-empty (`loop_guaranteed_to_execute`).
+pub(super) fn promote_new_loop_vars_when_guaranteed(
+    pre: &crate::flow_state::FlowState,
+    post: &mut crate::flow_state::FlowState,
+) {
+    let new_names: Vec<Name> = post
+        .vars
+        .keys()
+        .filter(|n| !pre.vars.contains_key(*n))
+        .copied()
+        .collect();
+    let post_vars = Arc::make_mut(&mut post.vars);
+    for name in &new_names {
+        if let Some(ty) = post_vars.get_mut(name) {
+            if ty.possibly_undefined {
+                let mut stripped = (**ty).clone();
+                stripped.possibly_undefined = false;
+                *ty = mir_codebase::definitions::wrap_var_type(stripped);
+            }
         }
     }
-    false
+    let assigned = Arc::make_mut(&mut post.assigned_vars);
+    let possibly = Arc::make_mut(&mut post.possibly_assigned_vars);
+    for name in &new_names {
+        if possibly.contains(name) {
+            possibly.remove(name);
+            assigned.insert(*name);
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
