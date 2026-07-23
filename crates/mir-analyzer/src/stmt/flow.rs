@@ -617,6 +617,8 @@ impl<'a> StatementsAnalyzer<'a> {
                 if let php_ast::owned::ExprKind::PropertyAccess(pa) = &var.kind {
                     self.expr_analyzer(ctx)
                         .check_property_write_purity(pa, ctx, var.span);
+                    self.expr_analyzer(ctx)
+                        .check_property_readonly_write(pa, ctx, var.span);
                 } else if let php_ast::owned::ExprKind::ArrayAccess(aa) = &var.kind {
                     // `unset($this->arr['key'])` mutates the property's
                     // contents just as much as `unset($this->prop)` does --
@@ -629,6 +631,8 @@ impl<'a> StatementsAnalyzer<'a> {
                             php_ast::owned::ExprKind::PropertyAccess(pa) => {
                                 self.expr_analyzer(ctx)
                                     .check_property_write_purity(pa, ctx, var.span);
+                                self.expr_analyzer(ctx)
+                                    .check_property_readonly_write(pa, ctx, var.span);
                                 break;
                             }
                             _ => break,

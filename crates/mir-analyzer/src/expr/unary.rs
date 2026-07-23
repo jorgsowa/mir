@@ -93,6 +93,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // `assign_to_target`'s own PropertyAccess arm reached before.
                 if let ExprKind::PropertyAccess(pa) = &u.operand.kind {
                     self.check_property_write_purity(pa, ctx, u.operand.span);
+                    self.check_property_readonly_write(pa, ctx, u.operand.span);
                 }
                 // Same operand check as postfix ++/-- — the same PHP warning/
                 // deprecation fires for both forms, only postfix was flagged.
@@ -160,6 +161,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 };
                 if let ExprKind::PropertyAccess(pa) = &u.operand.kind {
                     self.check_property_write_purity(pa, ctx, u.operand.span);
+                    self.check_property_readonly_write(pa, ctx, u.operand.span);
                 }
                 // Flag increment/decrement on a definitely-bool operand (PHP
                 // silently no-ops; TFalse reserved for future FalseOperand kind)
