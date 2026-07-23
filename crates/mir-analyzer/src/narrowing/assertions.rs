@@ -219,13 +219,26 @@ fn apply_assertions(
 /// receiver resolved to a single concrete class atom (mirroring
 /// `narrow_nullsafe_method_call_null`'s same conservative scope; a union of
 /// multiple classes could resolve the same method name to different
-/// signatures).
+/// signatures). Handles both a bare-variable receiver (`$v->isInt($p)`) and
+/// a property-access receiver (`$this->validator->isInt($p)`, a very common
+/// real-world shape) — the latter previously fell through unresolved,
+/// silently no-oping the whole assertion. A chained-call-result receiver
+/// (`$h->getValidator()->isInt($p)`) stays unresolved, mirroring the same,
+/// already-accepted scope limit `@psalm-self-out` documents for a
+/// non-variable receiver.
 pub(super) fn method_call_receiver_fqcn(
     object: &php_ast::owned::Expr,
     ctx: &FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
 ) -> Option<std::sync::Arc<str>> {
-    let obj_var = extract_var_name(object)?;
-    let obj_ty = ctx.get_var(&obj_var);
+    let obj_ty = if let Some(obj_var) = extract_var_name(object) {
+        ctx.get_var(&obj_var)
+    } else if let Some((obj_var, prop)) = extract_prop_access(object) {
+        resolve_prop_current_type(ctx, &obj_var, &prop, db, file)
+    } else {
+        return None;
+    };
     let non_null_atoms: Vec<&Atomic> = obj_ty
         .types
         .iter()
