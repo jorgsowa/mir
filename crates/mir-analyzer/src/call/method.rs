@@ -340,15 +340,17 @@ impl CallAnalyzer {
             }
         }
 
-        // Purity check: calling a method on a parameter in a @pure function.
-        // Placed before the `is_mixed()` early return below — this check
-        // doesn't need the receiver's resolved type at all (method
-        // resolution hasn't even happened yet here), only the receiver
-        // expression and the current param names, so it must not be skipped
-        // just because an untyped/mixed parameter makes the callee
-        // unknowable — that's exactly the common case for loosely-typed
-        // legacy code, where this check has the most to catch.
-        if ctx.is_in_pure_fn {
+        // Purity check: calling a method on a parameter in a @pure function,
+        // for a receiver whose type is unknowable (untyped/mixed parameter)
+        // — the callee can't be resolved, so warn blanket rather than
+        // silently allow it. That's exactly the common case for
+        // loosely-typed legacy code, where this check has the most to
+        // catch. A resolvable receiver's callee purity is checked precisely
+        // below instead, once the method is actually resolved (see the
+        // mirrored check in `resolve_method_return`) — narrowing this
+        // blanket check to the unresolvable case avoids flagging a call to
+        // a provably pure/mutation-free method.
+        if ctx.is_in_pure_fn && obj_ty.is_mixed() {
             if let ExprKind::Variable(recv_name) = &call.object.kind {
                 let recv_stripped = recv_name.trim_start_matches('$');
                 if ctx
@@ -784,6 +786,35 @@ fn resolve_method_return<'a>(
         // argument. Only @pure and @mutation-free callees are safe because they
         // guarantee not to mutate their own `$this`.
         if ctx.is_in_external_mutation_free_method
+            && !resolved.is_pure
+            && !resolved.is_mutation_free
+            && !resolved.is_static
+        {
+            if let ExprKind::Variable(recv_name) = &call.object.kind {
+                let recv_stripped = recv_name.trim_start_matches('$');
+                if recv_stripped != "this"
+                    && ctx
+                        .param_names
+                        .contains(&mir_types::Name::from(recv_stripped))
+                {
+                    ea.emit(
+                        IssueKind::ImpureMethodCall {
+                            method: method_name.to_string(),
+                        },
+                        Severity::Warning,
+                        span,
+                    );
+                }
+            }
+        }
+        // Purity check: calling a non-pure/non-mutation-free method on a
+        // parameter inside a @pure function may have side effects or
+        // indirectly mutate the argument. Mirrors the blanket,
+        // resolution-agnostic check above (for unresolvable/mixed
+        // receivers) but only fires here once the callee's own purity is
+        // known, so a call to a provably pure/mutation-free method on a
+        // resolvable receiver isn't flagged.
+        if ctx.is_in_pure_fn
             && !resolved.is_pure
             && !resolved.is_mutation_free
             && !resolved.is_static
