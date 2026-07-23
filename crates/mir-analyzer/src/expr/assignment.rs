@@ -32,6 +32,22 @@ fn taint_destructured_targets(target: &Expr, ctx: &mut FlowState) {
     }
 }
 
+/// Walk through a chain of property accesses (`$this->cache->v`'s object is
+/// `$this->cache`, whose own object is `$this`) to find the root variable
+/// name, or `None` if the chain doesn't bottom out in a bare variable (e.g.
+/// a method-call result). Lets a purity/immutability check that only cares
+/// about "is this ultimately reachable from `$this`/a parameter" match a
+/// chained receiver the same way it already matches a direct one.
+fn root_receiver_var(expr: &Expr) -> Option<&str> {
+    match &expr.kind {
+        ExprKind::Variable(name) => Some(name.as_ref()),
+        ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) => {
+            root_receiver_var(&pa.object)
+        }
+        _ => None,
+    }
+}
+
 impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_assign(
         &mut self,
@@ -363,7 +379,12 @@ impl<'a> ExpressionAnalyzer<'a> {
         ctx: &FlowState,
         span: Span,
     ) {
-        if let ExprKind::Variable(recv_name) = &pa.object.kind {
+        // `$this->cache->v = 5` (a chained, non-`$this`-literal receiver)
+        // still mutates state reachable from `$this`/a parameter, same as a
+        // direct `$this->prop = x` — walk through any nested property-access
+        // chain to find the root variable, instead of only matching when
+        // `pa.object` IS that bare variable.
+        if let Some(recv_name) = root_receiver_var(&pa.object) {
             if let Some(prop_name) = extract_string_from_expr(&pa.property) {
                 self.check_property_write_purity_by_name(recv_name, &prop_name, ctx, span);
             }
