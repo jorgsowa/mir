@@ -356,7 +356,7 @@ impl DocblockParser {
                 "final" => result.is_final = true,
                 "inheritDoc" | "inheritdoc" => result.is_inherit_doc = true,
                 "api" | "psalm-api" => result.is_api = true,
-                "psalm-assert-if-true" | "phpstan-assert-if-true" => {
+                "assert-if-true" | "psalm-assert-if-true" | "phpstan-assert-if-true" => {
                     if let Some(body_str) = body_text(&tag.body) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             let (ty, negated) = parse_assertion_type(&ty_str);
@@ -364,7 +364,7 @@ impl DocblockParser {
                         }
                     }
                 }
-                "psalm-assert-if-false" | "phpstan-assert-if-false" => {
+                "assert-if-false" | "psalm-assert-if-false" | "phpstan-assert-if-false" => {
                     if let Some(body_str) = body_text(&tag.body) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             let (ty, negated) = parse_assertion_type(&ty_str);

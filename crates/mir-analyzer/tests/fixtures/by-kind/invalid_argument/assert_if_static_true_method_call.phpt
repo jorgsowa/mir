@@ -22,3 +22,4 @@ class C {
     }
 }
 ===expect===
+ArgumentTypeCoercion@15:19-15:21: Argument $string of strlen() expects 'string', got 'int' — coercion may fail at runtime
