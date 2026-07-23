@@ -100,7 +100,7 @@ fn return_type_is_invalid(
     true
 }
 
-use mir_issues::{IssueKind, Location};
+use mir_issues::{IssueKind, Location, Severity};
 use mir_types::{Atomic, Type};
 use php_ast::owned::{Expr, StaticVar};
 
@@ -633,6 +633,69 @@ impl<'a> StatementsAnalyzer<'a> {
                                     .check_property_write_purity(pa, ctx, var.span);
                                 self.expr_analyzer(ctx)
                                     .check_property_readonly_write(pa, ctx, var.span);
+                                break;
+                            }
+                            // `unset(self::$store[$k])` / `unset(Foo::$store[$k])`
+                            // mutates the static property's contents just as much
+                            // as the instance-property arm above does — mirrors
+                            // the plain static-property array-index-WRITE check
+                            // (assignment.rs), which this loop had no counterpart
+                            // for at all (fell through to the `_ => break` below).
+                            php_ast::owned::ExprKind::StaticPropertyAccess(spa) => {
+                                if let php_ast::owned::ExprKind::Identifier(id) = &spa.class.kind {
+                                    let resolved =
+                                        crate::db::resolve_name(self.db, &self.file, id.as_ref());
+                                    let fqcn_opt: Option<std::sync::Arc<str>> =
+                                        match resolved.as_str() {
+                                            "self" | "static" => ctx
+                                                .self_fqcn
+                                                .clone()
+                                                .or_else(|| ctx.static_fqcn.clone()),
+                                            "parent" => ctx.parent_fqcn.clone(),
+                                            s => Some(std::sync::Arc::from(s)),
+                                        };
+                                    if let Some(fqcn) = fqcn_opt {
+                                        if let Some(prop_name) = match &spa.member.kind {
+                                            php_ast::owned::ExprKind::Variable(name)
+                                            | php_ast::owned::ExprKind::Identifier(name) => {
+                                                Some(name.trim_start_matches('$').to_string())
+                                            }
+                                            _ => None,
+                                        } {
+                                            if ctx.is_in_pure_fn {
+                                                self.expr_analyzer(ctx).emit(
+                                                    IssueKind::ImpureStaticPropertyAssignment {
+                                                        class: fqcn.to_string(),
+                                                        property: prop_name.clone(),
+                                                    },
+                                                    Severity::Warning,
+                                                    var.span,
+                                                );
+                                            }
+                                            if let Some((owner_cls, prop_def)) =
+                                                crate::db::find_property_in_chain(
+                                                    self.db,
+                                                    crate::db::Fqcn::from_str(
+                                                        self.db,
+                                                        fqcn.as_ref(),
+                                                    ),
+                                                    &prop_name,
+                                                )
+                                            {
+                                                if prop_def.is_readonly {
+                                                    self.expr_analyzer(ctx).emit(
+                                                        IssueKind::ReadonlyPropertyAssignment {
+                                                            class: owner_cls.to_string(),
+                                                            property: prop_name,
+                                                        },
+                                                        Severity::Error,
+                                                        var.span,
+                                                    );
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
                                 break;
                             }
                             _ => break,
