@@ -14,6 +14,7 @@ use crate::expr::ExpressionAnalyzer;
 use crate::flow_state::{self_is_trait, FlowState};
 use crate::narrowing::extract_expr_guard_key;
 use crate::symbol::ReferenceKind;
+use crate::taint::{is_expr_tainted, taint_sink_issue};
 
 use super::args::{
     check_args, check_method_visibility_with_magic, distinct_spans_for_expansion,
@@ -670,6 +671,46 @@ impl CallAnalyzer {
                 for arg in call.args.iter() {
                     if let ExprKind::Variable(name) = &arg.value.kind {
                         ctx.invalidate_prop_refined_receiver(name);
+                    }
+                }
+            }
+
+            // Taint sink check: emit the matching Tainted* issue when a tainted
+            // value reaches a @taint-sink annotated parameter. Mirrors the
+            // instance-call check in call/method.rs, which this static-call
+            // path never had at all.
+            if !resolved.taint_sink_params.is_empty() {
+                for (param_name, sink_kind) in &resolved.taint_sink_params {
+                    let param_idx = resolved
+                        .params
+                        .iter()
+                        .position(|p| p.name.as_ref() == param_name.as_ref());
+                    let is_variadic = param_idx
+                        .and_then(|idx| resolved.params.get(idx))
+                        .is_some_and(|p| p.is_variadic);
+                    let args: Vec<&php_ast::owned::Arg> = if is_variadic {
+                        let idx = param_idx.unwrap();
+                        call.args
+                            .iter()
+                            .filter(|a| a.name.is_none())
+                            .skip(idx)
+                            .collect()
+                    } else {
+                        let positional = param_idx.and_then(|idx| call.args.get(idx));
+                        let named_arg = call.args.iter().find(|a| {
+                            a.name
+                                .as_ref()
+                                .map(|n| {
+                                    crate::parser::name_to_string_owned(n) == param_name.as_ref()
+                                })
+                                .unwrap_or(false)
+                        });
+                        positional.or(named_arg).into_iter().collect()
+                    };
+                    for arg in args {
+                        if is_expr_tainted(&arg.value, ctx) {
+                            ea.emit(taint_sink_issue(sink_kind), Severity::Error, span);
+                        }
                     }
                 }
             }
