@@ -1806,7 +1806,7 @@ pub fn narrow_from_condition(
         // method-call counterpart of the FunctionCall arm above (which only
         // ever resolved a free function via `find_function`).
         ExprKind::MethodCall(mc) => {
-            if let Some(fqcn) = method_call_receiver_fqcn(&mc.object, ctx) {
+            if let Some(fqcn) = method_call_receiver_fqcn(&mc.object, ctx, db, file) {
                 if let ExprKind::Identifier(name) = &mc.method.kind {
                     let method_name_lower = crate::util::php_ident_lowercase(name);
                     if let Some(resolved) =
