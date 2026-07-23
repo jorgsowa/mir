@@ -229,21 +229,88 @@ where
     result.possibly_undefined = union.possibly_undefined;
     result.from_docblock = from_docblock;
     for atomic in union.types {
-        match atomic {
-            mir_types::Atomic::TNamedObject {
-                ref fqcn,
-                ref type_params,
-            } if type_params.is_empty() => {
-                if let Some(alias_ty) = aliases.get(fqcn.as_ref()) {
-                    result.merge_with(alias_ty);
-                } else {
-                    result.add_type(atomic);
-                }
-            }
-            other => result.add_type(other),
-        }
+        result.merge_with(&expand_aliases_in_atomic(atomic, aliases));
     }
     result
+}
+
+/// Expand a single atomic, returning the (possibly multi-atom) `Type` it
+/// contributes. A bare (non-parameterized) `TNamedObject` matching an alias
+/// name substitutes the alias's own definition directly, same as before.
+/// Anything else is rebuilt with alias references in its OWN nested types
+/// (a generic type argument, an array's key/value type, a shape property's
+/// type, an intersection member) recursively expanded — previously a plain
+/// alias used only inside one of these nested positions (e.g. `Box<IntList>`,
+/// or `IntListList = array<IntList>`'s own definition) silently never
+/// expanded at all, since only the single top-level atom was ever checked.
+fn expand_aliases_in_atomic<K>(atomic: mir_types::Atomic, aliases: &FxHashMap<K, Type>) -> Type
+where
+    K: std::borrow::Borrow<str> + std::hash::Hash + Eq,
+{
+    use mir_types::Atomic;
+    match atomic {
+        Atomic::TNamedObject {
+            ref fqcn,
+            ref type_params,
+        } if type_params.is_empty() => {
+            if let Some(alias_ty) = aliases.get(fqcn.as_ref()) {
+                alias_ty.clone()
+            } else {
+                Type::single(atomic)
+            }
+        }
+        Atomic::TNamedObject { fqcn, type_params } => Type::single(Atomic::TNamedObject {
+            fqcn,
+            type_params: type_params
+                .iter()
+                .map(|t| expand_aliases_only(t.clone(), aliases))
+                .collect(),
+        }),
+        Atomic::TArray { key, value } => Type::single(Atomic::TArray {
+            key: Box::new(expand_aliases_only(*key, aliases)),
+            value: Box::new(expand_aliases_only(*value, aliases)),
+        }),
+        Atomic::TNonEmptyArray { key, value } => Type::single(Atomic::TNonEmptyArray {
+            key: Box::new(expand_aliases_only(*key, aliases)),
+            value: Box::new(expand_aliases_only(*value, aliases)),
+        }),
+        Atomic::TList { value } => Type::single(Atomic::TList {
+            value: Box::new(expand_aliases_only(*value, aliases)),
+        }),
+        Atomic::TNonEmptyList { value } => Type::single(Atomic::TNonEmptyList {
+            value: Box::new(expand_aliases_only(*value, aliases)),
+        }),
+        Atomic::TKeyedArray {
+            properties,
+            is_open,
+            is_list,
+        } => {
+            let properties = properties
+                .into_iter()
+                .map(|(k, prop)| {
+                    (
+                        k,
+                        mir_types::atomic::KeyedProperty {
+                            ty: expand_aliases_only(prop.ty, aliases),
+                            optional: prop.optional,
+                        },
+                    )
+                })
+                .collect();
+            Type::single(Atomic::TKeyedArray {
+                properties: Box::new(properties),
+                is_open,
+                is_list,
+            })
+        }
+        Atomic::TIntersection { parts } => Type::single(Atomic::TIntersection {
+            parts: parts
+                .iter()
+                .map(|t| expand_aliases_only(t.clone(), aliases))
+                .collect(),
+        }),
+        other => Type::single(other),
+    }
 }
 
 /// Print profiling statistics for type collection.
@@ -602,37 +669,17 @@ impl<'a> DefinitionCollector<'a> {
         template_params: &[TemplateParam],
         defining_entity: &str,
     ) -> Type {
-        if aliases.is_empty() {
-            return self.resolve_union_doc_with_templates(
-                union,
-                template_names,
-                defining_entity,
-                template_params,
-            );
-        }
-        let mut result = Type::empty();
-        result.possibly_undefined = union.possibly_undefined;
-        result.from_docblock = union.from_docblock;
-        for atomic in union.types {
-            if let Atomic::TNamedObject { fqcn, type_params } = &atomic {
-                if type_params.is_empty() {
-                    if let Some(alias_ty) = aliases.get(fqcn.as_ref()) {
-                        result.merge_with(alias_ty);
-                        continue;
-                    }
-                }
-            }
-            let resolved = self.resolve_union_doc_with_templates(
-                Type::single(atomic),
-                template_names,
-                defining_entity,
-                template_params,
-            );
-            for resolved_atomic in resolved.types {
-                result.add_type(resolved_atomic);
-            }
-        }
-        result
+        // Alias substitution first (recurses into nested positions — a
+        // generic type argument, an array's key/value type, … — via
+        // `expand_aliases_only`), THEN template/namespace resolution, same
+        // ordering as the other docblock-type resolution call sites.
+        let expanded = expand_aliases_only(union, aliases);
+        self.resolve_union_doc_with_templates(
+            expanded,
+            template_names,
+            defining_entity,
+            template_params,
+        )
     }
 
     fn resolve_union_doc_with_templates(

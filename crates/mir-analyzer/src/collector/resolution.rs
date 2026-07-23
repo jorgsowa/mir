@@ -274,31 +274,15 @@ pub(super) fn resolve_union_doc_with_aliases(
     if aliases.is_empty() {
         return resolve_union_doc(union, namespace, use_aliases);
     }
-
-    let from_docblock = union.from_docblock;
-    let mut result = Type::empty();
-    result.possibly_undefined = union.possibly_undefined;
-    result.from_docblock = from_docblock;
-
-    for atomic in union.types {
-        match atomic {
-            Atomic::TNamedObject { fqcn, type_params } if type_params.is_empty() => {
-                if let Some(alias_ty) = aliases.get(fqcn.as_ref()) {
-                    result.merge_with(alias_ty);
-                } else {
-                    result.add_type(resolve_atomic_inner(
-                        Atomic::TNamedObject { fqcn, type_params },
-                        false,
-                        namespace,
-                        use_aliases,
-                    ));
-                }
-            }
-            other => result.add_type(resolve_atomic_inner(other, false, namespace, use_aliases)),
-        }
-    }
-
-    result
+    // Alias substitution first (against the still-raw, pre-FQN-resolution
+    // names the alias map is keyed by), THEN FQN resolution — same ordering
+    // the return-type call site already uses. `expand_aliases_only` recurses
+    // into nested positions (a generic type argument, an array's key/value
+    // type, …), so an alias used as `Box<IntList>` (not just a bare `IntList`)
+    // now expands too; a single top-level-only check here previously missed
+    // that case even though `expand_aliases_only` itself was fixed for it.
+    let expanded = super::expand_aliases_only(union, aliases);
+    resolve_union_doc(expanded, namespace, use_aliases)
 }
 
 pub(super) fn resolve_union_opt(
