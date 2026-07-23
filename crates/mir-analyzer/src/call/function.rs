@@ -282,13 +282,39 @@ impl CallAnalyzer {
         // Taint sink check (M19): before evaluating args so we can inspect raw exprs
         if let Some(sink_kind) = classify_sink(&fn_name) {
             let relevant = sink_kind.tainted_arg_indices();
-            for (i, arg) in call.args.iter().enumerate() {
-                // Path/payload sinks only care about their specific argument
-                // (e.g. a tainted *path*, not tainted *data* written to a
-                // constant path); output/query/command sinks check any arg.
-                if relevant.is_some_and(|idxs| !idxs.contains(&i)) {
-                    continue;
+            // A path/payload sink (File/Unserialize) cares about one specific
+            // PARAMETER, not whichever argument happens to sit at its
+            // declared positional index — a PHP 8 named-argument call can
+            // reorder arguments (`file_put_contents(data: 'safe', filename:
+            // $_GET['path'])`) so the tainted value is no longer at that
+            // index. Resolve by parameter name first; fall back to the
+            // plain positional slot for an ordinary (non-named) call.
+            // Html/Sql/Shell (`relevant == None`) check every argument
+            // regardless of position, so reordering can't hide anything
+            // from them in the first place.
+            let target_args: Vec<&php_ast::owned::Arg> = match relevant {
+                None => call.args.iter().collect(),
+                Some(idxs) => {
+                    let param_name =
+                        crate::taint::sink_param_name(&crate::util::php_ident_lowercase(&fn_name));
+                    let named = param_name.and_then(|name| {
+                        call.args.iter().find(|a| {
+                            a.name
+                                .as_ref()
+                                .is_some_and(|n| crate::parser::name_to_string_owned(n) == name)
+                        })
+                    });
+                    named
+                        .or_else(|| {
+                            idxs.first()
+                                .and_then(|&idx| call.args.get(idx))
+                                .filter(|a| a.name.is_none())
+                        })
+                        .into_iter()
+                        .collect()
                 }
+            };
+            for arg in target_args {
                 if is_expr_tainted(&arg.value, ctx, ea.db, &ea.file) {
                     let issue_kind = match sink_kind {
                         SinkKind::Html => IssueKind::TaintedHtml,

@@ -54,6 +54,23 @@ impl SinkKind {
     }
 }
 
+/// The declared parameter NAME at a File/Unserialize sink's single relevant
+/// index (see `SinkKind::tainted_arg_indices`) — lets the caller resolve a
+/// PHP 8 named argument to the same slot a positional call would use, so
+/// `file_put_contents(data: 'safe', filename: $_GET['path'])` still flags
+/// the actually-tainted `filename` even though it's not in position 0.
+/// `None` for Html/Sql/Shell, which check "any argument" and don't need
+/// per-parameter name resolution.
+pub fn sink_param_name(fn_name_lower: &str) -> Option<&'static str> {
+    match fn_name_lower {
+        "fopen" | "file_get_contents" | "file_put_contents" | "readfile" | "file" | "unlink" => {
+            Some("filename")
+        }
+        "unserialize" => Some("data"),
+        _ => None,
+    }
+}
+
 /// Return the sink kind for a built-in function name, if it is a taint sink.
 pub fn classify_sink(fn_name: &str) -> Option<SinkKind> {
     match crate::util::php_ident_lowercase(fn_name).as_str() {
