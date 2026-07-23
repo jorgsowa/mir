@@ -350,7 +350,9 @@ impl DocblockParser {
                 "mutation-free" | "psalm-mutation-free" | "phpstan-mutation-free" => {
                     result.is_mutation_free = true
                 }
-                "psalm-external-mutation-free" => result.is_external_mutation_free = true,
+                "external-mutation-free"
+                | "psalm-external-mutation-free"
+                | "phpstan-external-mutation-free" => result.is_external_mutation_free = true,
                 "immutable" | "psalm-immutable" | "phpstan-immutable" => result.is_immutable = true,
                 "readonly" | "psalm-readonly" | "phpstan-readonly" => result.is_readonly = true,
                 "final" => result.is_final = true,
