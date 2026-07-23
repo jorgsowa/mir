@@ -22,7 +22,7 @@ pub(super) use count::{
 };
 pub(super) use in_array::{
     extract_haystack_type, in_array_loose_narrowing_is_safe, narrow_in_array_condition,
-    narrow_to_haystack_values,
+    narrow_to_haystack_values, strip_haystack_null,
 };
 pub(super) use key_exists::narrow_array_key_exists_condition;
 pub(super) use shapes::{

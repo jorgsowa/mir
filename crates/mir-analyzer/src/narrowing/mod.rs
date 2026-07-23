@@ -31,6 +31,7 @@ use arrays::{
     narrow_empty_shape_key, narrow_in_array_condition, narrow_isset_shape_key,
     narrow_isset_shape_key_false, narrow_prop_array_key_first_or_last_null,
     narrow_static_prop_array_key_first_or_last_null, narrow_to_haystack_values,
+    strip_haystack_null,
 };
 pub(crate) use assertions::negate_assertion_type;
 use assertions::{
@@ -2090,6 +2091,7 @@ fn narrow_from_false_comparable_call(
             .map(|a| is_truthy_bool_literal(&a.value))
             .unwrap_or(false);
         if let (Some(needle_arg), Some(haystack_arg)) = (call.args.first(), call.args.get(1)) {
+            strip_haystack_null(&haystack_arg.value, ctx, db, file);
             if let Some(target) = ScalarArgTarget::extract(&needle_arg.value) {
                 if let Some(haystack_ty) = extract_haystack_type(&haystack_arg.value, ctx, db, file)
                 {
