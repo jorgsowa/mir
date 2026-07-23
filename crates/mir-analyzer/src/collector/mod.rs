@@ -309,6 +309,62 @@ where
                 .map(|t| expand_aliases_only(t.clone(), aliases))
                 .collect(),
         }),
+        // `callable(T): R` / `Closure(T): R` — an alias used as a param or
+        // return type inside one of these signatures (`@param
+        // Closure(): IntList $factory`) previously never expanded at all,
+        // since no arm here recursed into either variant.
+        Atomic::TCallable {
+            params,
+            return_type,
+        } => Type::single(Atomic::TCallable {
+            params: params.map(|ps| {
+                ps.iter()
+                    .map(|p| mir_types::atomic::FnParam {
+                        ty: p.ty.as_ref().map(|t| {
+                            mir_types::compact::SimpleType::from_union(expand_aliases_only(
+                                t.to_union(),
+                                aliases,
+                            ))
+                        }),
+                        out_ty: p.out_ty.as_ref().map(|t| {
+                            mir_types::compact::SimpleType::from_union(expand_aliases_only(
+                                t.to_union(),
+                                aliases,
+                            ))
+                        }),
+                        ..p.clone()
+                    })
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice()
+            }),
+            return_type: return_type.map(|rt| Box::new(expand_aliases_only(*rt, aliases))),
+        }),
+        Atomic::TClosure { data } => Type::single(Atomic::TClosure {
+            data: Box::new(mir_types::atomic::ClosureData {
+                params: data
+                    .params
+                    .iter()
+                    .map(|p| mir_types::atomic::FnParam {
+                        ty: p.ty.as_ref().map(|t| {
+                            mir_types::compact::SimpleType::from_union(expand_aliases_only(
+                                t.to_union(),
+                                aliases,
+                            ))
+                        }),
+                        out_ty: p.out_ty.as_ref().map(|t| {
+                            mir_types::compact::SimpleType::from_union(expand_aliases_only(
+                                t.to_union(),
+                                aliases,
+                            ))
+                        }),
+                        ..p.clone()
+                    })
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice(),
+                return_type: expand_aliases_only(data.return_type, aliases),
+                this_type: data.this_type.map(|t| expand_aliases_only(t, aliases)),
+            }),
+        }),
         other => Type::single(other),
     }
 }
