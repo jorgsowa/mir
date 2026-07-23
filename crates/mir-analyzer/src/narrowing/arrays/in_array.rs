@@ -40,6 +40,21 @@ fn haystack_type_from_array_type(var_ty: &Type) -> Option<Type> {
                     }
                 }
             }
+            // A list-typed haystack (e.g. `list<'a'|'b'>`) can be a pure
+            // literal union too, not just a `TKeyedArray` shape.
+            Atomic::TList { value } | Atomic::TNonEmptyList { value } => {
+                if value.types.is_empty()
+                    || !value
+                        .types
+                        .iter()
+                        .all(|a| matches!(a, Atomic::TLiteralString(_) | Atomic::TLiteralInt(_)))
+                {
+                    return None;
+                }
+                for a in &value.types {
+                    ty.add_type(a.clone());
+                }
+            }
             _ => return None,
         }
     }
