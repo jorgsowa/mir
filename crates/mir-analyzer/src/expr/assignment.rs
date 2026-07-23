@@ -116,6 +116,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                     ExprKind::Array(_) if rhs_tainted => {
                         taint_destructured_targets(&a.target, ctx);
                     }
+                    // `$arr['k'] = $tainted;` — taint the whole array (same
+                    // coarse, whole-container granularity the Array-literal
+                    // taint check already uses for any tainted element), so
+                    // a later read of ANY key sees it as tainted. Only a
+                    // simple-variable base is tracked, matching every other
+                    // taint-propagating target arm above.
+                    ExprKind::ArrayAccess(aa) if rhs_tainted => {
+                        if let ExprKind::Variable(base_var) = &aa.array.kind {
+                            ctx.taint_var(base_var.trim_start_matches('$'));
+                        }
+                    }
                     _ => {}
                 }
                 rhs_ty
