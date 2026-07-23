@@ -205,10 +205,13 @@ impl SuppressionMap {
                 }
                 // Docblock case: collector-emitted issues (like `InvalidDocblock`)
                 // land at the docblock-start line, which precedes the declaration
-                // that the suppression targets. Allow a 30-line look-back so a
-                // `@psalm-suppress InvalidDocblock` in a multi-line docblock is
-                // recognised as used even though its issue line != target_line.
-                let min_line = target_line.saturating_sub(30);
+                // that the suppression targets. Allow a 100-line look-back so a
+                // `@psalm-suppress InvalidDocblock` in an unusually long
+                // multi-line docblock (heavy @template/@method/@property lists)
+                // is still recognised as used even though its issue line !=
+                // target_line — 30 lines was too easy to exceed for such a
+                // docblock, wrongly reporting a real, used suppression as unused.
+                let min_line = target_line.saturating_sub(100);
                 let covered_by_pre_suppressed = pre_suppressed.iter().any(|issue| {
                     issue.location.line >= min_line
                         && issue.location.line < *target_line
