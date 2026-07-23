@@ -12,7 +12,7 @@ use crate::expr::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
 use crate::generic::{check_template_bounds_with_inheritance, infer_template_bindings};
 use crate::symbol::ReferenceKind;
-use crate::taint::{classify_sink, is_expr_tainted, SinkKind};
+use crate::taint::{classify_sink, is_expr_tainted, taint_sink_issue, SinkKind};
 
 use super::args::{
     check_args, distinct_spans_for_expansion, expand_sole_spread_arg,
@@ -518,12 +518,13 @@ impl CallAnalyzer {
             let is_pure = resolved.is_pure;
             let taint_sink_params = resolved.taint_sink_params;
 
-            // Taint sink check: emit TaintedLlmPrompt when a tainted value reaches a
-            // @taint-sink annotated parameter. Mirrors call/method.rs's identical
-            // check for method/static-method calls — a plain function previously
-            // had no equivalent at all, so `@taint-sink` on one was a silent no-op.
+            // Taint sink check: emit the matching Tainted* issue when a
+            // tainted value reaches a @taint-sink annotated parameter.
+            // Mirrors call/method.rs's identical check for method/
+            // static-method calls — a plain function previously had no
+            // equivalent at all, so `@taint-sink` on one was a silent no-op.
             if !taint_sink_params.is_empty() {
-                'sink: for (param_name, sink_kind) in &taint_sink_params {
+                for (param_name, sink_kind) in &taint_sink_params {
                     let param_idx = params
                         .iter()
                         .position(|p| p.name.as_ref() == param_name.as_ref());
@@ -541,11 +542,7 @@ impl CallAnalyzer {
                     let arg = arg.or(named_arg);
                     if let Some(arg) = arg {
                         if is_expr_tainted(&arg.value, ctx) {
-                            let issue = match sink_kind.as_ref() {
-                                "llm_prompt" => IssueKind::TaintedLlmPrompt,
-                                _ => continue 'sink,
-                            };
-                            ea.emit(issue, Severity::Error, span);
+                            ea.emit(taint_sink_issue(sink_kind), Severity::Error, span);
                         }
                     }
                 }

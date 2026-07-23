@@ -4,7 +4,7 @@ use php_ast::owned::{ExprKind, MethodCallExpr};
 use php_ast::Span;
 
 use crate::narrowing::extract_expr_guard_key;
-use crate::taint::{classify_method_sink, is_expr_tainted, SinkKind};
+use crate::taint::{classify_method_sink, is_expr_tainted, taint_sink_issue, SinkKind};
 use mir_codebase::definitions::{
     Assertion, AssertionKind, DeclaredParam, TemplateParam, Visibility,
 };
@@ -989,10 +989,10 @@ fn resolve_method_return<'a>(
             }
         }
 
-        // Taint sink check: emit TaintedLlmPrompt when a tainted value reaches a
-        // @taint-sink annotated parameter.
+        // Taint sink check: emit the matching Tainted* issue when a tainted
+        // value reaches a @taint-sink annotated parameter.
         if !resolved.taint_sink_params.is_empty() {
-            'sink: for (param_name, sink_kind) in &resolved.taint_sink_params {
+            for (param_name, sink_kind) in &resolved.taint_sink_params {
                 // Find positional index of this param in the method's param list.
                 let param_idx = resolved
                     .params
@@ -1013,11 +1013,7 @@ fn resolve_method_return<'a>(
                 let arg = arg.or(named_arg);
                 if let Some(arg) = arg {
                     if is_expr_tainted(&arg.value, ctx) {
-                        let issue = match sink_kind.as_ref() {
-                            "llm_prompt" => IssueKind::TaintedLlmPrompt,
-                            _ => continue 'sink,
-                        };
-                        ea.emit(issue, Severity::Error, span);
+                        ea.emit(taint_sink_issue(sink_kind), Severity::Error, span);
                     }
                 }
             }
