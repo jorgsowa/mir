@@ -272,13 +272,45 @@ impl<'a> ExpressionAnalyzer<'a> {
         // element's value/key expression a second time.
         let mut all_value_types = Type::empty();
         let mut key_union = Type::empty();
+        // Keys whose current `keyed_props` entry came from a spread rather
+        // than an explicit literal key — a later literal key overriding one
+        // of these is the common, intentional `[...$defaults, 'k' => $v]`
+        // override idiom, not a copy-paste duplicate, so it's exempted from
+        // the `DuplicateArrayKey` check below.
+        let mut spread_contributed_keys: std::collections::HashSet<ArrayKey> =
+            std::collections::HashSet::new();
 
         for elem in elements.iter() {
             if elem.unpack {
-                can_be_keyed = false;
                 let value_ty = self.analyze(&elem.value, ctx);
                 all_value_types.merge_with(&crate::call::spread_element_type(self.db, &value_ty));
                 key_union.merge_with(&spread_key_type(self.db, &value_ty));
+                // A spread of a single, closed, string-keyed shape (the common
+                // `[...$defaults, ...$overrides]` config-merge idiom) can still
+                // contribute precise per-key properties instead of forcing the
+                // generic-array fallback for the WHOLE literal. Int-keyed
+                // sources need renumbering this fast path doesn't attempt, so
+                // those (and anything wider than one shape atom) still fall back.
+                let spread_shape_props = match value_ty.types.as_slice() {
+                    [Atomic::TKeyedArray {
+                        properties,
+                        is_open: false,
+                        ..
+                    }] if properties.keys().all(|k| matches!(k, ArrayKey::String(_))) => {
+                        Some(properties.clone())
+                    }
+                    _ => None,
+                };
+                match spread_shape_props {
+                    Some(props) if can_be_keyed => {
+                        for (k, prop) in props.iter() {
+                            keyed_props.insert(k.clone(), prop.clone());
+                            spread_contributed_keys.insert(k.clone());
+                        }
+                        is_list = false;
+                    }
+                    _ => can_be_keyed = false,
+                }
                 continue;
             }
             let value_ty = self.analyze(&elem.value, ctx);
@@ -334,7 +366,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             // A repeated key silently overwrites the earlier entry at runtime
             // (`['a' => 1, 'b' => 2, 'a' => 3]` evaluates to `['a' => 3, 'b' =>
             // 2]`) — almost always a copy-paste mistake, not intentional.
-            if keyed_props.contains_key(&array_key) {
+            // Exempt a key whose current entry came from a spread: overriding
+            // a spread-contributed key with an explicit literal is the common,
+            // intentional `[...$defaults, 'k' => $v]` idiom, not a duplicate.
+            if keyed_props.contains_key(&array_key) && !spread_contributed_keys.contains(&array_key)
+            {
                 let key_str = match &array_key {
                     ArrayKey::String(s) => format!("'{s}'"),
                     ArrayKey::Int(i) => i.to_string(),
@@ -345,6 +381,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     elem.key.as_ref().map_or(elem.value.span, |k| k.span),
                 );
             }
+            spread_contributed_keys.remove(&array_key);
             keyed_props.insert(
                 array_key,
                 KeyedProperty {
