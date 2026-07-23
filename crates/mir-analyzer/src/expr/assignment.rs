@@ -927,9 +927,25 @@ impl<'a> ExpressionAnalyzer<'a> {
                         }
                         if let Some(prop_name) = prop_name_opt.clone() {
                             let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
-                            if let Some((_, prop_def)) =
+                            if let Some((owner_cls, prop_def)) =
                                 crate::db::find_property_in_chain(self.db, here, &prop_name)
                             {
+                                // A `@readonly`-tagged static property has no constructor-
+                                // scoped "first write" the way an instance property does —
+                                // PHP itself doesn't allow a native `readonly` keyword on a
+                                // static property at all, so the docblock-only annotation's
+                                // only sensible semantics is "never legal to write from
+                                // outside its own declaration", unconditionally.
+                                if prop_def.is_readonly {
+                                    self.emit(
+                                        IssueKind::ReadonlyPropertyAssignment {
+                                            class: owner_cls.to_string(),
+                                            property: prop_name.clone(),
+                                        },
+                                        Severity::Error,
+                                        span,
+                                    );
+                                }
                                 let prop_has_native_type = prop_def.has_native_type;
                                 if let Some(prop_ty) = prop_def.ty.as_deref() {
                                     if !prop_ty.is_mixed_not_template()
