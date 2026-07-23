@@ -308,6 +308,33 @@ pub fn is_expr_tainted(
             false
         }
 
+        // Foo::getQuery() / self::getQuery() with @taint-source — static-call
+        // counterpart of the instance-method arm above, which this had no
+        // pairing for at all (unlike the read-side StaticPropertyAccess arm
+        // right below, which already handles self/static/parent).
+        ExprKind::StaticMethodCall(smc) => {
+            if let ExprKind::Identifier(id) = &smc.class.kind {
+                let resolved = crate::db::resolve_name(db, file, id.as_ref());
+                let fqcn_opt: Option<std::sync::Arc<str>> = match resolved.as_str() {
+                    "self" | "static" => ctx.self_fqcn.clone().or_else(|| ctx.static_fqcn.clone()),
+                    "parent" => ctx.parent_fqcn.clone(),
+                    s => Some(std::sync::Arc::from(s)),
+                };
+                if let (Some(fqcn), ExprKind::Identifier(method_name)) =
+                    (fqcn_opt, &smc.method.kind)
+                {
+                    let method_lower = crate::util::php_ident_lowercase(method_name.as_ref());
+                    let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
+                    if crate::db::find_method_respecting_precedence(db, here, &method_lower)
+                        .is_some_and(|(_, m)| m.is_taint_source)
+                    {
+                        return true;
+                    }
+                }
+            }
+            false
+        }
+
         // Conservative: function call results are not tracked as tainted
         // unless it's a known pass-through built-in (htmlspecialchars sanitizes)
         _ => false,
