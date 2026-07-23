@@ -71,7 +71,7 @@ impl DocblockParser {
                 }
                 "var" | "psalm-var" | "phpstan-var" => {
                     if let Some(body_str) = body_text(&tag.body) {
-                        if let Some((ty_s, name)) = parse_param_line(&body_str) {
+                        if let Some((ty_s, name)) = parse_var_line(&body_str) {
                             if let Some(msg) = validate_type_str(&ty_s, "var") {
                                 result.invalid_annotations.push(msg);
                             }

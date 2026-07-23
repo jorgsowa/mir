@@ -963,6 +963,48 @@ pub(super) fn parse_param_line(s: &str) -> Option<(String, String)> {
     None
 }
 
+/// Like `parse_param_line`, but for `@var`. `@param`'s name always
+/// immediately follows the type, so scanning past a non-`$` token to find
+/// one deeper in the body (as `parse_param_line` deliberately does, to skip
+/// callable-syntax internals) is safe. `@var` is usually nameless free-form
+/// prose instead (`@var string This mentions $foo somewhere`), where that
+/// same scan would mistake a `$mention` in the description for the
+/// variable's name. Only accept a name found at the FIRST depth-0 token
+/// boundary; anything else means there is no name at all.
+pub(super) fn parse_var_line(s: &str) -> Option<(String, String)> {
+    let mut depth: i32 = 0;
+
+    for (i, ch) in s.char_indices() {
+        match ch {
+            '<' | '(' | '{' => depth += 1,
+            '>' | ')' | '}' => depth = (depth - 1).max(0),
+            _ if ch.is_whitespace() && depth == 0 => {
+                let after = s[i..].trim_start();
+                let after_stripped = after.strip_prefix('&').unwrap_or(after);
+                let after_stripped = after_stripped.strip_prefix("...").unwrap_or(after_stripped);
+                if after_stripped.starts_with('$') {
+                    if let Some(name_with_dollar) = after_stripped.split(char::is_whitespace).next()
+                    {
+                        let name = name_with_dollar.trim_start_matches('$').to_string();
+                        if !name.is_empty() {
+                            let type_part = s[..i].trim().to_string();
+                            if !type_part.is_empty() {
+                                return Some((type_part, name));
+                            }
+                        }
+                    }
+                }
+                // The token right after the type isn't a name — unlike
+                // @param, @var never has one further into the description.
+                return None;
+            }
+            _ => {}
+        }
+    }
+
+    None
+}
+
 pub(super) fn extract_return_type(s: &str) -> String {
     // Extract just the type portion from a @return tag body.
     // Format: `Type [description...]`
