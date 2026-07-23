@@ -126,6 +126,37 @@ pub(crate) fn in_array_loose_narrowing_is_safe(current: &Type, haystack: &Type) 
         || (all(current, Atomic::is_string) && all(haystack, Atomic::is_string))
 }
 
+/// Both `in_array()` and `array_search()` type-hint their haystack argument
+/// as non-nullable `array` — passing `null` throws a `TypeError`. So reaching
+/// either branch of a condition built on either function already proves the
+/// haystack argument wasn't null, regardless of which branch. Mirrors
+/// `count.rs`'s identical reasoning for its own array argument.
+pub(crate) fn strip_haystack_null(
+    haystack_expr: &php_ast::owned::Expr,
+    ctx: &mut FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) {
+    if let Some(var_name) = extract_var_name(haystack_expr) {
+        let current = ctx.get_var(&var_name);
+        if current.is_nullable() {
+            ctx.set_var(&var_name, current.remove_null());
+        }
+    } else if let Some((obj, prop)) = extract_any_prop_access(haystack_expr) {
+        let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
+        if current.is_nullable() {
+            let narrowed = current.remove_null();
+            apply_prop_narrowed(ctx, &obj, &prop, current, narrowed, false);
+        }
+    } else if let Some((fqcn, prop)) = extract_static_prop_access(haystack_expr, ctx, db, file) {
+        let current = resolve_static_prop_current_type(ctx, &fqcn, &prop, db);
+        if current.is_nullable() {
+            let narrowed = current.remove_null();
+            apply_prop_narrowed(ctx, &fqcn, &prop, current, narrowed, false);
+        }
+    }
+}
+
 /// Condition-matching glue for `narrow_from_condition`'s `FunctionCall` arm:
 /// handles `in_array($needle, $haystack)`, dispatching to the var/prop/
 /// static-prop haystack narrowing above. Callers are expected to have
@@ -137,6 +168,9 @@ pub(crate) fn narrow_in_array_condition(
     db: &dyn MirDatabase,
     file: &str,
 ) {
+    if let Some(haystack_arg) = call.args.get(1) {
+        strip_haystack_null(&haystack_arg.value, ctx, db, file);
+    }
     // in_array($needle, ['a', 'b', 'c']) true →
     // narrow $needle to 'a'|'b'|'c'. Only safe when either the
     // 3rd (strict) argument is truthy, or $needle's current
