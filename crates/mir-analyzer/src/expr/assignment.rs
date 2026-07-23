@@ -363,6 +363,24 @@ impl<'a> ExpressionAnalyzer<'a> {
                 let (line, col_start) = self.offset_to_line_col(target.span.start);
                 let (line_end, col_end) = self.offset_to_line_col(target.span.end);
                 if ctx.byref_param_names.contains(&name_sym) {
+                    // A by-ref parameter write mutates caller-visible state
+                    // through the reference — a side effect @pure forbids,
+                    // same as a global/static-variable write. Also gate on
+                    // param_names: byref_param_names is shared with `global`
+                    // declarations (see the write-tracking comment below),
+                    // which already have their own, declaration-site-only
+                    // ImpureGlobalVariable check — a real byref PARAMETER is
+                    // also always in param_names, a plain `global $x;`
+                    // never is.
+                    if ctx.is_in_pure_fn && ctx.param_names.contains(&name_sym) {
+                        self.emit(
+                            IssueKind::ImpureByRefAssignment {
+                                variable: name_str.clone(),
+                            },
+                            Severity::Warning,
+                            span,
+                        );
+                    }
                     // Byref/global write: mark as read (externally observable) and clear
                     // any pending dead-write entry rather than creating a new one.
                     ctx.read_vars.insert(name_sym);
