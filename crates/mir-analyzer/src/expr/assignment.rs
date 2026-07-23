@@ -64,7 +64,43 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
         match a.op {
             AssignOp::Assign => {
+                // `$x =& $this->prop;` — record the alias so a later PLAIN
+                // `$x = value` write (which mutates `$this->prop` through the
+                // reference, not just `$x` itself) can run the same
+                // purity/immutability gate a direct `$this->prop = value`
+                // write already does. Narrow: only this one AST-visible
+                // shape (a bare local variable ref-aliased directly to a
+                // var-receiver property) is tracked.
+                if a.by_ref {
+                    if let ExprKind::Variable(target_name) = &a.target.kind {
+                        if let ExprKind::PropertyAccess(pa) = &a.value.kind {
+                            if let ExprKind::Variable(recv_name) = &pa.object.kind {
+                                if let Some(prop_name) = extract_string_from_expr(&pa.property) {
+                                    ctx.set_ref_alias(target_name, recv_name, &prop_name);
+                                }
+                            }
+                        }
+                    }
+                }
                 self.assign_to_target(&a.target, rhs_ty.clone(), ctx, expr_span);
+                // A PLAIN (non-`=&`) write to a variable already ref-aliased
+                // to a property mutates that property through the reference
+                // — run the same purity/immutability gate a direct
+                // `$this->prop = value` write already does. The `=&`
+                // statement itself (handled above) only creates the alias;
+                // it doesn't write the property's value, so it's excluded.
+                if !a.by_ref {
+                    if let ExprKind::Variable(name) = &a.target.kind {
+                        if let Some((recv, prop)) = ctx.get_ref_alias(name) {
+                            self.check_property_write_purity_by_name(
+                                recv.as_ref(),
+                                prop.as_ref(),
+                                ctx,
+                                expr_span,
+                            );
+                        }
+                    }
+                }
                 // If the target variable was consumed during RHS analysis (e.g. `$x = f($x)`),
                 // re-arm the new write location so it is treated as a fresh pending write.
                 // This allows subsequent iterations to detect it as dead if never read.
@@ -327,64 +363,66 @@ impl<'a> ExpressionAnalyzer<'a> {
         ctx: &FlowState,
         span: Span,
     ) {
-        // Purity check: assigning to a parameter's property in a @pure function.
-        if ctx.is_in_pure_fn {
-            if let ExprKind::Variable(recv_name) = &pa.object.kind {
-                let recv_stripped = recv_name.trim_start_matches('$');
-                if ctx
-                    .param_names
-                    .contains(&mir_types::Name::from(recv_stripped))
-                {
-                    if let Some(prop_name) = extract_string_from_expr(&pa.property) {
-                        self.emit(
-                            IssueKind::ImpurePropertyAssignment {
-                                property: prop_name,
-                            },
-                            Severity::Warning,
-                            span,
-                        );
-                    }
-                }
+        if let ExprKind::Variable(recv_name) = &pa.object.kind {
+            if let Some(prop_name) = extract_string_from_expr(&pa.property) {
+                self.check_property_write_purity_by_name(recv_name, &prop_name, ctx, span);
             }
+        }
+    }
+
+    /// Like `check_property_write_purity`, but takes the receiver/property as
+    /// plain strings instead of requiring a real `PropertyAccessExpr` AST
+    /// node — lets a write reached through a local variable ref-aliased to
+    /// a property (`$x =& $this->prop; $x = 5;`) reuse the same gate without
+    /// synthesizing a fake node.
+    pub(crate) fn check_property_write_purity_by_name(
+        &mut self,
+        recv_name: &str,
+        prop_name: &str,
+        ctx: &FlowState,
+        span: Span,
+    ) {
+        let recv_stripped = recv_name.trim_start_matches('$');
+        // Purity check: assigning to a parameter's property in a @pure function.
+        if ctx.is_in_pure_fn
+            && ctx
+                .param_names
+                .contains(&mir_types::Name::from(recv_stripped))
+        {
+            self.emit(
+                IssueKind::ImpurePropertyAssignment {
+                    property: prop_name.to_string(),
+                },
+                Severity::Warning,
+                span,
+            );
         }
         // External-mutation-free check: assigning to a parameter's property in
         // a @psalm-external-mutation-free method is forbidden.
-        if ctx.is_in_external_mutation_free_method {
-            if let ExprKind::Variable(recv_name) = &pa.object.kind {
-                let recv_stripped = recv_name.trim_start_matches('$');
-                if recv_stripped != "this"
-                    && ctx
-                        .param_names
-                        .contains(&mir_types::Name::from(recv_stripped))
-                {
-                    if let Some(prop_name) = extract_string_from_expr(&pa.property) {
-                        self.emit(
-                            IssueKind::ImpurePropertyAssignment {
-                                property: prop_name,
-                            },
-                            Severity::Warning,
-                            span,
-                        );
-                    }
-                }
-            }
+        if ctx.is_in_external_mutation_free_method
+            && recv_stripped != "this"
+            && ctx
+                .param_names
+                .contains(&mir_types::Name::from(recv_stripped))
+        {
+            self.emit(
+                IssueKind::ImpurePropertyAssignment {
+                    property: prop_name.to_string(),
+                },
+                Severity::Warning,
+                span,
+            );
         }
         // Immutability check: assigning to $this->prop in a @psalm-immutable class.
-        if ctx.is_in_immutable_method {
-            if let ExprKind::Variable(recv_name) = &pa.object.kind {
-                if recv_name.trim_start_matches('$') == "this" {
-                    if let Some(prop_name) = extract_string_from_expr(&pa.property) {
-                        self.emit(
-                            IssueKind::ImmutablePropertyModification {
-                                receiver: "$this".to_string(),
-                                property: prop_name,
-                            },
-                            Severity::Warning,
-                            span,
-                        );
-                    }
-                }
-            }
+        if ctx.is_in_immutable_method && recv_stripped == "this" {
+            self.emit(
+                IssueKind::ImmutablePropertyModification {
+                    receiver: "$this".to_string(),
+                    property: prop_name.to_string(),
+                },
+                Severity::Warning,
+                span,
+            );
         }
     }
 
