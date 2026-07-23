@@ -3,7 +3,7 @@ use std::sync::Arc;
 use php_ast::owned::{ExprKind, MethodCallExpr};
 use php_ast::Span;
 
-use crate::narrowing::extract_expr_guard_key;
+use crate::narrowing::{extract_expr_guard_key, extract_prop_access};
 use crate::taint::{classify_method_sink, is_expr_tainted, taint_sink_issue, SinkKind};
 use mir_codebase::definitions::{
     Assertion, AssertionKind, DeclaredParam, TemplateParam, Visibility,
@@ -611,6 +611,8 @@ impl CallAnalyzer {
             }
             if let ExprKind::Variable(recv_name) = &call.object.kind {
                 ctx.set_var(recv_name.trim_start_matches('$'), self_out_union);
+            } else if let Some((obj_var, prop)) = extract_prop_access(&call.object) {
+                ctx.set_prop_refined(&obj_var, &prop, self_out_union);
             }
         }
 
