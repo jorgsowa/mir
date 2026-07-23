@@ -302,7 +302,7 @@ fn parse_directive_with_tracking(raw: &str) -> Option<(Directive, bool)> {
     let comment = extract_comment(raw)?;
 
     for &(keyword, scope, force_all) in KEYWORDS {
-        let Some(pos) = comment.content.find(keyword) else {
+        let Some(pos) = find_ci(comment.content, keyword) else {
             continue;
         };
         // Reject keyword matches that are really a prefix of a longer token
@@ -353,6 +353,18 @@ fn parse_directive_with_tracking(raw: &str) -> Option<(Directive, bool)> {
     }
 
     None
+}
+
+/// Case-insensitive `str::find` for an ASCII directive keyword. Kind names
+/// are already matched case-insensitively (`KindSet::matches`); the keyword
+/// itself was still exact-case, so `@MIR-IGNORE`/`@Psalm-Suppress` silently
+/// matched nothing. `to_ascii_lowercase` never changes a string's byte
+/// length (only ASCII bytes are touched), so the returned index stays valid
+/// against the original, non-lowercased `haystack`.
+fn find_ci(haystack: &str, needle: &str) -> Option<usize> {
+    haystack
+        .to_ascii_lowercase()
+        .find(&needle.to_ascii_lowercase())
 }
 
 struct Comment<'a> {
