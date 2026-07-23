@@ -381,6 +381,20 @@ impl CallAnalyzer {
                     span,
                 );
             }
+            // Detect call to an abstract method via an explicit class name.
+            // `$this::method()` is self-referential too (LSB against the
+            // current instance), same as the `self`/`static`/`parent`
+            // keywords — otherwise it falls into the "explicit class name"
+            // path below and produces a false `InvalidStaticInvocation` on
+            // a non-static method, and drops `@psalm-self-out` narrowing.
+            // Hoisted above the purity checks below — the immutable check
+            // needs it too, to scope itself to a self/parent/$this call the
+            // same way method.rs's instance-call counterpart scopes to $this.
+            let is_self_parent_call = match &call.class.kind {
+                ExprKind::Identifier(id) => matches!(id.as_ref(), "self" | "static" | "parent"),
+                ExprKind::Variable(name) => name.trim_start_matches('$') == "this",
+                _ => false,
+            };
             // Purity check: a static call has no receiver to scope the
             // "only externally-visible mutations matter" exception to (unlike
             // instance calls on a local object) — any non-pure static/self::/
@@ -388,6 +402,26 @@ impl CallAnalyzer {
             // so it's flagged unconditionally, mirroring the plain
             // function-call check in call/function.rs.
             if ctx.is_in_pure_fn && !resolved.is_pure {
+                ea.emit(
+                    IssueKind::ImpureMethodCall {
+                        method: method_name.to_string(),
+                    },
+                    Severity::Warning,
+                    span,
+                );
+            }
+            // Immutability check: calling a non-mutation-free method via
+            // self::/parent:: (i.e. still operating on the same $this) inside
+            // a @psalm-immutable class or @psalm-mutation-free method may
+            // indirectly mutate object state — mirrors method.rs's identical
+            // check for the `$this->method()` call form, which this bypassed
+            // entirely (only `is_pure` was ever checked for a static call).
+            if ctx.is_in_immutable_method
+                && !resolved.is_mutation_free
+                && !resolved.is_pure
+                && !resolved.is_static
+                && is_self_parent_call
+            {
                 ea.emit(
                     IssueKind::ImpureMethodCall {
                         method: method_name.to_string(),
@@ -409,17 +443,6 @@ impl CallAnalyzer {
                     call.method.span,
                 );
             }
-            // Detect call to an abstract method via an explicit class name.
-            // `$this::method()` is self-referential too (LSB against the
-            // current instance), same as the `self`/`static`/`parent`
-            // keywords — otherwise it falls into the "explicit class name"
-            // path below and produces a false `InvalidStaticInvocation` on
-            // a non-static method, and drops `@psalm-self-out` narrowing.
-            let is_self_parent_call = match &call.class.kind {
-                ExprKind::Identifier(id) => matches!(id.as_ref(), "self" | "static" | "parent"),
-                ExprKind::Variable(name) => name.trim_start_matches('$') == "this",
-                _ => false,
-            };
             // Only static:: uses LSB and resolves to the concrete subclass at runtime.
             // self:: resolves to the declaring class (abstract → no body to call).
             // parent:: resolves to the parent class (abstract → no body to call).
