@@ -310,6 +310,10 @@ impl<'a> StatementsAnalyzer<'a> {
         stmt: &php_ast::owned::Stmt,
         ctx: &mut FlowState,
     ) {
+        // Taint check before the expression is analyzed further below —
+        // `is_expr_tainted` only needs the iterable expression + current
+        // taint state, same timing as an assignment's RHS taint check.
+        let iterable_tainted = crate::taint::is_expr_tainted(&fe.expr, ctx);
         let arr_ty = self.expr_analyzer(ctx).analyze(&fe.expr, ctx);
         let (key_ty, mut value_ty) = infer_foreach_types_with_db(self.db, &arr_ty);
 
@@ -348,6 +352,9 @@ impl<'a> StatementsAnalyzer<'a> {
         };
         if let Some(ref vname) = value_var {
             entry.set_var(vname.as_str(), value_ty.clone());
+            if iterable_tainted {
+                entry.taint_var(vname.as_str());
+            }
             if value_is_by_ref {
                 // By-reference iteration: writes to this variable always mutate
                 // the source array through the reference, so they are never dead.
@@ -410,6 +417,9 @@ impl<'a> StatementsAnalyzer<'a> {
                 }
                 if let Some(ref vname) = value_var {
                     iter.set_var(vname.as_str(), value_ty.clone());
+                    if iterable_tainted {
+                        iter.taint_var(vname.as_str());
+                    }
                 } else {
                     sa.expr_analyzer(iter).assign_to_target(
                         &fe.value,
