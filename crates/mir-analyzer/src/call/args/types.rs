@@ -1206,7 +1206,10 @@ fn array_list_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer
                             .values()
                             .all(|p| union_compatible(&p.ty, value, ea)),
                         Atomic::TNonEmptyArray { value, .. } | Atomic::TNonEmptyList { value } => {
-                            (*is_open || !properties.is_empty())
+                            // A closed shape whose only properties are optional (e.g.
+                            // `array{a?: int}`) can still be `[]` at runtime — a
+                            // non-empty properties map alone doesn't guarantee that.
+                            (*is_open || properties.values().any(|p| !p.optional))
                                 && properties
                                     .values()
                                     .all(|p| union_compatible(&p.ty, value, ea))
