@@ -1235,8 +1235,22 @@ impl<'a> DefinitionCollector<'a> {
         result
     }
 
-    fn build_assertions(&self, doc: &crate::parser::ParsedDocblock) -> Vec<Assertion> {
-        annotation::build_assertions(doc, |u| self.resolve_union_doc(u))
+    fn build_assertions(
+        &self,
+        doc: &crate::parser::ParsedDocblock,
+        type_aliases: Option<&FxHashMap<String, Type>>,
+    ) -> Vec<Assertion> {
+        // Expand local type aliases before resolving, matching every other
+        // type position (@param/@return/template bounds) — an assertion type
+        // named after a `@psalm-type` alias previously stayed an unresolved,
+        // unexpandable bare atom.
+        annotation::build_assertions(doc, |u| {
+            let expanded = match type_aliases {
+                Some(a) => expand_aliases_only(u, a),
+                None => u,
+            };
+            self.resolve_union_doc(expanded)
+        })
     }
 
     fn location(&self, start: u32, end: u32) -> Location {
@@ -2040,6 +2054,10 @@ impl<'a> DefinitionCollector<'a> {
         // (it must not outlive the `template_params` move into MethodDef below).
         let if_this_is_resolved: Option<Arc<Type>> = doc.if_this_is.clone().map(|mut ty| {
             ty.from_docblock = true;
+            // Expand type aliases first, matching every other type position
+            // (@param/@return/template bounds) — this and @psalm-self-out
+            // below were the only two still skipping it.
+            let ty = effective_aliases.map_or(ty.clone(), |a| expand_aliases_only(ty, a));
             let resolved = if template_names.is_empty() {
                 self.resolve_union_doc(ty)
             } else {
@@ -2056,6 +2074,7 @@ impl<'a> DefinitionCollector<'a> {
         // Resolve `@psalm-self-out` the same way as `@if-this-is` above.
         let self_out_resolved: Option<Arc<Type>> = doc.self_out.clone().map(|mut ty| {
             ty.from_docblock = true;
+            let ty = effective_aliases.map_or(ty.clone(), |a| expand_aliases_only(ty, a));
             let resolved = if template_names.is_empty() {
                 self.resolve_union_doc(ty)
             } else {
@@ -2111,7 +2130,7 @@ impl<'a> DefinitionCollector<'a> {
             is_final: m.is_final,
             is_constructor: method_name == "__construct",
             template_params,
-            assertions: self.build_assertions(&doc),
+            assertions: self.build_assertions(&doc, effective_aliases),
             throws,
             deprecated: doc.deprecated.as_deref().map(Arc::from).or_else(|| {
                 if m.attributes.iter().any(|a| {

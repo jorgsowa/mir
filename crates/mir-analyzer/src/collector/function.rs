@@ -379,7 +379,7 @@ impl DefinitionCollector<'_> {
             return_type: wrap_return_type(return_type),
             inferred_return_type: None,
             template_params,
-            assertions: self.build_assertions(&doc),
+            assertions: self.build_assertions(&doc, Some(&type_aliases)),
             throws,
             deprecated: doc.deprecated.as_deref().map(Arc::from).or_else(|| {
                 // Only detect #[Deprecated] without arguments (no-arg form used in
