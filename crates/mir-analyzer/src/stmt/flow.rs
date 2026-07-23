@@ -617,6 +617,23 @@ impl<'a> StatementsAnalyzer<'a> {
                 if let php_ast::owned::ExprKind::PropertyAccess(pa) = &var.kind {
                     self.expr_analyzer(ctx)
                         .check_property_write_purity(pa, ctx, var.span);
+                } else if let php_ast::owned::ExprKind::ArrayAccess(aa) = &var.kind {
+                    // `unset($this->arr['key'])` mutates the property's
+                    // contents just as much as `unset($this->prop)` does --
+                    // walk through any nested array-access layers to find a
+                    // property-access base and run the same purity check.
+                    let mut base = &aa.array;
+                    loop {
+                        match &base.kind {
+                            php_ast::owned::ExprKind::ArrayAccess(inner) => base = &inner.array,
+                            php_ast::owned::ExprKind::PropertyAccess(pa) => {
+                                self.expr_analyzer(ctx)
+                                    .check_property_write_purity(pa, ctx, var.span);
+                                break;
+                            }
+                            _ => break,
+                        }
+                    }
                 }
                 // `unset($arr[$key])` / `unset($obj->prop)`: analyze the target
                 // so the variables it reads (e.g. the array-access key) count as
