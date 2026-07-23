@@ -1292,13 +1292,14 @@ pub(crate) fn array_pad_return_type(arg_types: &[Type]) -> Option<Type> {
 
 /// Infer the return type of `array_column($array, $column_key, $index_key = null)`.
 ///
-/// SCOPED to a single resolvable row shape and a literal `string`/`int`
+/// SCOPED to a single resolvable row shape and a literal `string`/`int`/`null`
 /// `$column_key`: `infer_foreach_types` must yield exactly one `TKeyedArray`
-/// atom (a union of row shapes, or non-shape rows, isn't modeled). The
-/// whole-rows form (`$column_key === null`) is out of scope entirely and
-/// falls back to the generic stub. A row missing `$column_key` is silently
-/// excluded at runtime rather than included as null — reflected here by only
-/// treating the result as non-empty when the column property isn't optional.
+/// atom (a union of row shapes, or non-shape rows, isn't modeled). A row
+/// missing `$column_key` is silently excluded at runtime rather than included
+/// as null — reflected here by only treating the result as non-empty when the
+/// column property isn't optional. `$column_key === null` (the "whole rows"
+/// form) has no such exclusion: every row is always present, so it carries no
+/// `.optional` dependency of its own.
 pub(crate) fn array_column_return_type(arg_types: &[Type]) -> Option<Type> {
     let source = arg_types.first()?;
     if source.is_mixed() {
@@ -1313,13 +1314,21 @@ pub(crate) fn array_column_return_type(arg_types: &[Type]) -> Option<Type> {
     };
 
     let column_key_ty = arg_types.get(1)?;
+    // `None` here means "whole rows" ($column_key === null): the value is the
+    // row itself, with no column-presence exclusion to account for.
     let column_key = match column_key_ty.types.as_slice() {
-        [Atomic::TLiteralString(s)] => ArrayKey::String(s.clone()),
-        [Atomic::TLiteralInt(i)] => ArrayKey::Int(*i),
+        [Atomic::TLiteralString(s)] => Some(ArrayKey::String(s.clone())),
+        [Atomic::TLiteralInt(i)] => Some(ArrayKey::Int(*i)),
+        [Atomic::TNull] => None,
         _ => return None,
     };
-    let column_prop = properties.get(&column_key)?;
-    let value = column_prop.ty.clone();
+    let (value, column_optional) = match &column_key {
+        Some(key) => {
+            let column_prop = properties.get(key)?;
+            (column_prop.ty.clone(), column_prop.optional)
+        }
+        None => (row.clone(), false),
+    };
 
     // Omitted or an explicit literal `null` both mean "no $index_key": a
     // fresh 0-indexed list result.
@@ -1329,7 +1338,7 @@ pub(crate) fn array_column_return_type(arg_types: &[Type]) -> Option<Type> {
         Some(t) => matches!(t.types.as_slice(), [Atomic::TNull]),
     };
     if is_no_index {
-        let non_empty = super::callable::is_non_empty_collection(source) && !column_prop.optional;
+        let non_empty = super::callable::is_non_empty_collection(source) && !column_optional;
         let atomic = if non_empty {
             Atomic::TNonEmptyList {
                 value: Box::new(value),
@@ -1352,7 +1361,7 @@ pub(crate) fn array_column_return_type(arg_types: &[Type]) -> Option<Type> {
     let key = crate::expr::helpers::coerce_array_key_type(&index_prop.ty);
 
     let non_empty = super::callable::is_non_empty_collection(source)
-        && !column_prop.optional
+        && !column_optional
         && !index_prop.optional;
     let atomic = if non_empty {
         Atomic::TNonEmptyArray {
