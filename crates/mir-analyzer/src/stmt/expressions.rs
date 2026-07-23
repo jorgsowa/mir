@@ -53,6 +53,21 @@ impl<'a> StatementsAnalyzer<'a> {
         stmt_span: php_ast::Span,
         ctx: &mut FlowState,
     ) {
+        // @pure implies no side effects at all — echo is output, a side
+        // effect just as much as an impure function call, but had no purity
+        // check anywhere. Reuses the existing generic ImpureFunctionCall
+        // issue kind (already used for this exact violation shape at
+        // call/function.rs), emitted once per statement (not per expr, since
+        // `echo $a, $b;` is one statement).
+        if ctx.is_in_pure_fn {
+            self.expr_analyzer(ctx).emit(
+                IssueKind::ImpureFunctionCall {
+                    fn_name: "echo".to_string(),
+                },
+                mir_issues::Severity::Warning,
+                stmt_span,
+            );
+        }
         for expr in exprs.iter() {
             let expr_ty = self.expr_analyzer(ctx).analyze(expr, ctx);
             self.check_echo_implicit_to_string_cast(&expr_ty, expr.span);
