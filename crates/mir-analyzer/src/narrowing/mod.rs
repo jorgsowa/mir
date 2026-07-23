@@ -49,14 +49,15 @@ use class_introspection::{
     narrow_static_prop_from_gettype_literal,
 };
 pub(crate) use core::{
-    apply_prop_narrowed, extract_class_fqcn_from_expr, extract_expr_guard_key, extract_prop_access,
-    extract_static_prop_access, is_numeric_string, narrow_receiver_non_null_on_prop_match,
-    resolve_prop_current_type, resolve_static_prop_current_type, MatchSubject,
+    apply_prop_narrowed, extract_any_prop_access, extract_class_fqcn_from_expr,
+    extract_expr_guard_key, extract_prop_access, extract_static_prop_access, is_numeric_string,
+    narrow_receiver_non_null_on_prop_match, resolve_prop_current_type,
+    resolve_static_prop_current_type, MatchSubject,
 };
 use core::{
-    extract_any_prop_access, extract_class_name, extract_null_coalesce,
-    extract_nullsafe_prop_access, extract_var_name, narrow_count_or_strlen_equality,
-    promote_assignment_effects, same_literal, set_narrowed, ScalarArgTarget, UnionNarrowExt,
+    extract_class_name, extract_null_coalesce, extract_nullsafe_prop_access, extract_var_name,
+    narrow_count_or_strlen_equality, promote_assignment_effects, same_literal, set_narrowed,
+    ScalarArgTarget, UnionNarrowExt,
 };
 use enum_class::{
     extract_enum_value_case, narrow_prop_to_specific_class, narrow_static_prop_to_specific_class,

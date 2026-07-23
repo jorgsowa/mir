@@ -913,7 +913,7 @@ impl CallAnalyzer {
                             };
                             ctx.set_var(var_name, asserted_ty);
                         } else if let Some((obj, prop)) =
-                            crate::narrowing::extract_prop_access(&arg.value)
+                            crate::narrowing::extract_any_prop_access(&arg.value)
                         {
                             let asserted_ty = assertion.ty.substitute_templates(&out_bindings);
                             let asserted_ty = if assertion.negated {

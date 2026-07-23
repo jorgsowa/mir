@@ -246,7 +246,7 @@ pub(super) fn extract_nullsafe_prop_access(
 /// `->` on a null receiver also evaluates to null in PHP 8, same as
 /// `?->`'s short-circuit, so most literal-comparison narrowing arms
 /// should treat both identically).
-pub(super) fn extract_any_prop_access(expr: &php_ast::owned::Expr) -> Option<(String, String)> {
+pub(crate) fn extract_any_prop_access(expr: &php_ast::owned::Expr) -> Option<(String, String)> {
     extract_nullsafe_prop_access(expr).or_else(|| extract_prop_access(expr))
 }
 

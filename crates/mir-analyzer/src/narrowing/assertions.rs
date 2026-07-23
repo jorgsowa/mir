@@ -10,9 +10,9 @@ use crate::db::MirDatabase;
 use crate::flow_state::FlowState;
 
 use super::core::{
-    extract_class_fqcn_from_expr, extract_prop_access, extract_static_prop_access,
-    extract_var_name, narrow_receiver_non_null_on_prop_match, resolve_prop_current_type,
-    resolve_static_prop_current_type,
+    extract_any_prop_access, extract_class_fqcn_from_expr, extract_prop_access,
+    extract_static_prop_access, extract_var_name, narrow_receiver_non_null_on_prop_match,
+    resolve_prop_current_type, resolve_static_prop_current_type,
 };
 use super::instanceof_core::filter_out_instanceof_match;
 
@@ -173,7 +173,7 @@ fn apply_assertions(
                     };
                     ctx.set_var(&var_name, ty);
                     applied = true;
-                } else if let Some((obj, prop)) = extract_prop_access(&arg.value) {
+                } else if let Some((obj, prop)) = extract_any_prop_access(&arg.value) {
                     let ty = match &template_bindings {
                         Some(b) => assertion.ty.substitute_templates(b),
                         None => assertion.ty.clone(),
