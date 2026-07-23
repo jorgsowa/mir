@@ -168,11 +168,16 @@ pub fn is_expr_tainted(
 
         ExprKind::Parenthesized(inner) => is_expr_tainted(inner, ctx, db, file),
 
-        // $obj->prop — tainted if this property was previously assigned a
-        // tainted value (see FlowState::taint_prop, set on property writes
-        // in expr/assignment.rs). Only a simple-variable receiver is tracked,
-        // matching prop_refined's narrowing scope.
-        ExprKind::PropertyAccess(pa) => {
+        // $obj->prop / $obj?->prop — tainted if this property was previously
+        // assigned a tainted value (see FlowState::taint_prop, set on
+        // property writes in expr/assignment.rs). Only a simple-variable
+        // receiver is tracked, matching prop_refined's narrowing scope.
+        // `NullsafePropertyAccess` wraps the identical `PropertyAccessExpr`
+        // shape as `PropertyAccess` (PHP forbids `?->` as a write target, so
+        // only the read side needs this pairing — unlike the taint-source
+        // method-call check below, which pairs both because calls ARE valid
+        // through either).
+        ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) => {
             if let ExprKind::Variable(obj_var) = &pa.object.kind {
                 if let Some(prop_name) =
                     crate::expr::helpers::extract_string_from_expr(&pa.property)
