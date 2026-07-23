@@ -390,6 +390,11 @@ pub enum IssueKind {
     /// (`self::$x = ...`, `Foo::$x = ...`) — static properties are shared
     /// external state, same as a global variable.
     ImpureStaticPropertyAssignment { class: String, property: String },
+    /// Emitted when a @pure function assigns to one of its own by-reference
+    /// parameters (`function f(int &$x) { $x = 1; }`) — this mutates
+    /// caller-visible state through the reference, a side effect @pure
+    /// forbids just as much as a global/static-variable write.
+    ImpureByRefAssignment { variable: String },
     /// Emitted by `mir-analyzer/src/call/function.rs` when a `@pure` function calls a
     /// non-pure named function.
     /// Fixtures: `tests/fixtures/by-kind/impure_function_call/`.
@@ -875,6 +880,7 @@ impl IssueKind {
             | IssueKind::ImpureStaticVariable { .. }
             | IssueKind::ImpureStaticPropertyAssignment { .. }
             | IssueKind::ImpureFunctionCall { .. }
+            | IssueKind::ImpureByRefAssignment { .. }
             | IssueKind::ImmutablePropertyModification { .. }
             | IssueKind::UnsupportedReferenceUsage
             | IssueKind::ParadoxicalCondition { .. }
@@ -1094,6 +1100,7 @@ impl IssueKind {
             IssueKind::ImpureGlobalVariable { .. } => "MIR1702",
             IssueKind::ImpureStaticVariable { .. } => "MIR1703",
             IssueKind::ImpureStaticPropertyAssignment { .. } => "MIR1706",
+            IssueKind::ImpureByRefAssignment { .. } => "MIR1707",
             IssueKind::ImpureFunctionCall { .. } => "MIR1704",
             IssueKind::ImmutablePropertyModification { .. } => "MIR1705",
             IssueKind::UnsupportedReferenceUsage => "MIR1506",
@@ -1225,7 +1232,7 @@ impl IssueKind {
             | "MIR0300" | "MIR0301" | "MIR0302" | "MIR0303" | "MIR0404" | "MIR0405" | "MIR0408"
             | "MIR0500" | "MIR0506" | "MIR0703" | "MIR0710" | "MIR1301" | "MIR1501" | "MIR1502"
             | "MIR1700" | "MIR1701" | "MIR1702" | "MIR1703" | "MIR1704" | "MIR1705" | "MIR1706"
-            | "MIR1506" | "MIR1510" => Some(Severity::Warning),
+            | "MIR1707" | "MIR1506" | "MIR1510" => Some(Severity::Warning),
 
             // Info
             "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207" | "MIR0209"
@@ -1327,6 +1334,7 @@ impl IssueKind {
             IssueKind::ImpureMethodCall { .. } => "ImpureMethodCall",
             IssueKind::ImpureGlobalVariable { .. } => "ImpureGlobalVariable",
             IssueKind::ImpureStaticVariable { .. } => "ImpureStaticVariable",
+            IssueKind::ImpureByRefAssignment { .. } => "ImpureByRefAssignment",
             IssueKind::ImpureStaticPropertyAssignment { .. } => "ImpureStaticPropertyAssignment",
             IssueKind::ImpureFunctionCall { .. } => "ImpureFunctionCall",
             IssueKind::ImmutablePropertyModification { .. } => "ImmutablePropertyModification",
@@ -1740,6 +1748,9 @@ impl IssueKind {
             }
             IssueKind::ImpureStaticVariable { variable } => {
                 format!("Using static variable ${variable} in a @pure function")
+            }
+            IssueKind::ImpureByRefAssignment { variable } => {
+                format!("Assigning to by-reference parameter ${variable} in a @pure function")
             }
             IssueKind::ImpureStaticPropertyAssignment { class, property } => {
                 format!("Assigning to static property {class}::${property} in a @pure function")
@@ -2430,6 +2441,7 @@ mod code_tests {
             IssueKind::ImpureMethodCall { method: s() },
             IssueKind::ImpureGlobalVariable { variable: s() },
             IssueKind::ImpureStaticVariable { variable: s() },
+            IssueKind::ImpureByRefAssignment { variable: s() },
             IssueKind::ImpureStaticPropertyAssignment {
                 class: s(),
                 property: s(),
