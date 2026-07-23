@@ -522,7 +522,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
             }
         }
+        let prev_in_array_access_base = self.in_array_access_base;
+        self.in_array_access_base = true;
         let arr_ty = self.analyze(&aa.array, ctx);
+        self.in_array_access_base = prev_in_array_access_base;
         // `ArrayAccess` receivers (WeakMap, SplObjectStorage, user collections)
         // define their own offset type via offsetGet/offsetSet/offsetExists —
         // the plain-PHP-array "offset must be an array-key" rule below doesn't

@@ -54,6 +54,26 @@ impl<'a> ExpressionAnalyzer<'a> {
                 );
             }
         }
+        // Purity check: a bare (whole-array) superglobal read (`return
+        // $_SERVER;`) reaches the same external mutable state as
+        // `$_SERVER['x']`, already checked in arrays.rs::analyze_array_access
+        // — but only for the indexed-access shape. Skipped when THIS read is
+        // itself that check's own array-access base (`in_array_access_base`),
+        // since that call site already emits its own check for the whole
+        // expression; without the guard this would double-report the same
+        // access at two different spans.
+        if ctx.is_in_pure_fn
+            && !self.in_array_access_base
+            && crate::util::is_superglobal_name(name_str)
+        {
+            self.emit(
+                IssueKind::ImpureGlobalVariable {
+                    variable: name_str.to_string(),
+                },
+                Severity::Warning,
+                expr.span,
+            );
+        }
         ctx.read_vars.insert(sym);
         ctx.mark_consumed_sym(sym);
         let ty = if name_str == "this" && !ctx.var_is_defined_sym(sym) {

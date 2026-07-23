@@ -73,6 +73,15 @@ pub struct ExpressionAnalyzer<'a> {
     /// When true, we are inside an existence-check context (isset/empty/??) where missing
     /// variables and missing array offsets are not errors — they are what is being tested.
     in_existence_check: bool,
+    /// When true, the variable currently being analyzed is the BASE of an
+    /// `ArrayAccess` expression (`$_SERVER` inside `$_SERVER['x']`), which
+    /// already runs its own superglobal purity check at the `ArrayAccess`
+    /// level (`arrays.rs::analyze_array_access`) keyed to the whole
+    /// expression's span — without this, `analyze_variable`'s own bare-read
+    /// superglobal check would fire a SECOND time for the same access, at a
+    /// different (narrower) span, a genuine double-report rather than a
+    /// harmlessly-deduplicated one.
+    in_array_access_base: bool,
     /// `(key type, value type)` for every `yield`/`yield from` encountered so
     /// far in the enclosing function body, regardless of which branch/loop it
     /// syntactically sits in — the AST is walked once, so no branch-merge
@@ -111,6 +120,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             strict_types: false,
             collect_symbols: true,
             in_existence_check: false,
+            in_array_access_base: false,
             yielded_types,
             plugins: mir_plugin::snapshot(),
         }

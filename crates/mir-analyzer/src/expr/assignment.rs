@@ -447,6 +447,20 @@ impl<'a> ExpressionAnalyzer<'a> {
                         span,
                     );
                 }
+                // Purity check: a bare (whole-array) superglobal write
+                // (`$_SESSION = [];`) reaches the same external mutable
+                // state as `$_SESSION['x'] = ...`; the indexed-write shape
+                // is already checked in this same match a few arms up
+                // (ArrayAccess), this is its whole-array-overwrite sibling.
+                if ctx.is_in_pure_fn && crate::util::is_superglobal_name(&name_str) {
+                    self.emit(
+                        IssueKind::ImpureGlobalVariable {
+                            variable: name_str.clone(),
+                        },
+                        Severity::Warning,
+                        span,
+                    );
+                }
                 if ty.is_mixed_not_template() && name_str != "this" {
                     self.emit(
                         IssueKind::MixedAssignment {
