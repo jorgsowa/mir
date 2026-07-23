@@ -126,6 +126,20 @@ pub struct FlowState {
     /// FQCN can never collide with a real PHP variable name).
     pub tainted_static_props: FxHashSet<(Name, Name)>,
 
+    /// Local variables ref-aliased directly to a var-receiver property
+    /// (`$x =& $this->prop;`), keyed by the alias variable name, value is
+    /// `(receiver_var, prop_name)`. A later PLAIN `$x = value` write mutates
+    /// the aliased property through the reference — consulted by
+    /// `check_property_write_purity_by_name` so that write runs the same
+    /// purity/immutability gate a direct `$this->prop = value` write already
+    /// does. Narrow: only this one AST-visible pattern is tracked, not
+    /// general PHP reference semantics (ref params, `foreach(&$v)`, ref
+    /// returns, chained aliases). Once set, an alias is never cleared within
+    /// a scope — a plain reassignment of `$x` does not break the PHP
+    /// reference, so every subsequent `$x = value` keeps mutating the
+    /// property too.
+    pub ref_aliases: FxHashMap<Name, (Name, Name)>,
+
     /// Variables that have been read at least once in this scope.
     /// Used by UnusedParam detection (M18).
     pub read_vars: FxHashSet<Name>,
@@ -345,6 +359,7 @@ impl FlowState {
             tainted_vars: FxHashSet::default(),
             tainted_props: FxHashSet::default(),
             tainted_static_props: FxHashSet::default(),
+            ref_aliases: FxHashMap::default(),
             read_vars: FxHashSet::default(),
             param_names: Arc::new(FxHashSet::default()),
             byref_param_names: Arc::new(FxHashSet::default()),
@@ -770,6 +785,21 @@ impl FlowState {
     pub fn clear_static_prop_taint(&mut self, fqcn: &str, prop: &str) {
         let key = (Name::from(fqcn), Name::from(prop));
         self.tainted_static_props.remove(&key);
+    }
+
+    /// Record `var_name` as ref-aliased to `recv_name`'s `prop` property
+    /// (`$var_name =& $recv_name->prop;`).
+    pub fn set_ref_alias(&mut self, var_name: &str, recv_name: &str, prop: &str) {
+        let var = Name::from(var_name.trim_start_matches('$'));
+        let recv = Name::from(recv_name.trim_start_matches('$'));
+        self.ref_aliases.insert(var, (recv, Name::from(prop)));
+    }
+
+    /// Returns `(receiver_var, prop_name)` if `var_name` is ref-aliased to a
+    /// property in this scope.
+    pub fn get_ref_alias(&self, var_name: &str) -> Option<(Name, Name)> {
+        let var = Name::from(var_name.trim_start_matches('$'));
+        self.ref_aliases.get(&var).copied()
     }
 
     /// Record the location of the first assignment to a variable (first-write-wins)
@@ -1215,6 +1245,13 @@ impl FlowState {
             .chain(else_ctx.tainted_static_props.iter())
         {
             result.tainted_static_props.insert(*key);
+        }
+
+        // Same conservative union for ref-aliases — once either branch
+        // records `$x =& $this->prop;`, later code on the merged path must
+        // still treat writes to `$x` as writes to the property.
+        for (var, alias) in if_ctx.ref_aliases.iter().chain(else_ctx.ref_aliases.iter()) {
+            result.ref_aliases.insert(*var, *alias);
         }
 
         // Read vars: union — if either branch reads a var, it counts as read
