@@ -296,8 +296,25 @@ impl DocblockParser {
                 "psalm-type" | "phpstan-type" => {
                     if let Some(body_str) = body_text(&tag.body) {
                         if let Some((name, type_expr)) = body_str.split_once('=') {
+                            // A generic alias name (`ListOf<T> = array<int, T>`)
+                            // kept the `<T>` suffix verbatim, so even a BARE
+                            // (non-parameterized) use site's lookup by the
+                            // plain name (`ListOf`) never matched — the alias
+                            // was silently 100% dead. Strip the suffix so at
+                            // least bare usage resolves; substituting T at a
+                            // parameterized use site (`ListOf<int>`) stays a
+                            // separate, not-yet-modeled problem (the template
+                            // parameter list itself is discarded here, same
+                            // as before).
+                            let raw_name = name.trim();
+                            let name = raw_name
+                                .split('<')
+                                .next()
+                                .unwrap_or(raw_name)
+                                .trim()
+                                .to_string();
                             result.type_aliases.push(DocTypeAlias {
-                                name: name.trim().to_string(),
+                                name,
                                 type_expr: type_expr.trim().to_string(),
                             });
                         }
