@@ -479,26 +479,33 @@ pub(crate) fn return_arrays_compatible(
                 // TKeyedArray compatibility:
                 // - TKeyedArray <: TKeyedArray: permissive (returning [] from a shaped
                 //   function is a common pattern not flagged at default error level).
-                // - TKeyedArray <: TArray / TNonEmptyArray: check keys + values with
-                //   class hierarchy awareness (structural check deferred named-object values).
+                // - TKeyedArray <: TArray: check keys + values with class hierarchy
+                //   awareness (structural check deferred named-object values). An open
+                //   shape may have extra unknown keys beyond `properties`, left
+                //   unchecked, but every KNOWN property must still satisfy key/value
+                //   regardless of openness (mirrors mir-types' atomic_subtype).
+                // - TKeyedArray <: TNonEmptyArray: same, plus the shape must be
+                //   guaranteed non-empty — at least one non-optional property, or open
+                //   (unknown extra keys may make it non-empty even with none known).
+                let keys_values_compatible = |dk: &Type, dv: &Type| {
+                    properties.iter().all(|(prop_key, prop)| {
+                        let key_atomic = match prop_key {
+                            mir_types::atomic::ArrayKey::String(s) => {
+                                Atomic::TLiteralString(s.clone())
+                            }
+                            mir_types::atomic::ArrayKey::Int(n) => Atomic::TLiteralInt(*n),
+                        };
+                        Type::single(key_atomic).is_subtype_structural(dk)
+                            && (prop.ty.is_subtype_structural(dv)
+                                || named_object_return_compatible(&prop.ty, dv, db, file))
+                    })
+                };
                 return declared.types.iter().any(|d_atomic| match d_atomic {
                     Atomic::TKeyedArray { .. } => true,
-                    Atomic::TArray { key: dk, value: dv }
-                    | Atomic::TNonEmptyArray { key: dk, value: dv } => {
-                        if *is_open {
-                            return true;
-                        }
-                        properties.iter().all(|(prop_key, prop)| {
-                            let key_atomic = match prop_key {
-                                mir_types::atomic::ArrayKey::String(s) => {
-                                    Atomic::TLiteralString(s.clone())
-                                }
-                                mir_types::atomic::ArrayKey::Int(n) => Atomic::TLiteralInt(*n),
-                            };
-                            Type::single(key_atomic).is_subtype_structural(dk)
-                                && (prop.ty.is_subtype_structural(dv)
-                                    || named_object_return_compatible(&prop.ty, dv, db, file))
-                        })
+                    Atomic::TArray { key: dk, value: dv } => keys_values_compatible(dk, dv),
+                    Atomic::TNonEmptyArray { key: dk, value: dv } => {
+                        (*is_open || properties.iter().any(|(_, p)| !p.optional))
+                            && keys_values_compatible(dk, dv)
                     }
                     _ => false,
                 });
