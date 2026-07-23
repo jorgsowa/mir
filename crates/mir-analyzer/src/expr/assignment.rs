@@ -1039,6 +1039,31 @@ impl<'a> ExpressionAnalyzer<'a> {
                     match &base.kind {
                         ExprKind::Variable(name) => {
                             let name_str = name.trim_start_matches('$');
+                            // Purity check: `$GLOBALS['x'] = …` / `$_SESSION['x']
+                            // = …` reach the same external mutable state as
+                            // `global $x;` — mirrors the read-side check in
+                            // expr/arrays.rs::analyze_array_access, which this
+                            // write path had no equivalent of at all.
+                            if ctx.is_in_pure_fn && crate::util::is_superglobal_name(name_str) {
+                                self.emit(
+                                    IssueKind::ImpureGlobalVariable {
+                                        variable: literal_key_chain
+                                            .last()
+                                            .and_then(|k| k.as_ref())
+                                            .map(|k| match k {
+                                                mir_types::atomic::ArrayKey::String(s) => {
+                                                    s.to_string()
+                                                }
+                                                mir_types::atomic::ArrayKey::Int(i) => {
+                                                    i.to_string()
+                                                }
+                                            })
+                                            .unwrap_or_else(|| name_str.to_string()),
+                                    },
+                                    Severity::Warning,
+                                    span,
+                                );
+                            }
                             // Base key: innermost index in the chain (closest to $arr).
                             let base_key_opt = key_chain.last().unwrap().clone();
                             let base_key = base_key_opt.unwrap_or_else(Type::mixed);

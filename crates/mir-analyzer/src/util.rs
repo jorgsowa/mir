@@ -10,3 +10,24 @@
 pub(crate) fn php_ident_lowercase(s: &str) -> String {
     s.to_ascii_lowercase()
 }
+
+/// Every native PHP superglobal name (without the `$` prefix), for purity
+/// checks that treat reading/writing one as touching external mutable
+/// state — deliberately broader than `taint::SUPERGLOBALS` (which excludes
+/// `$_SESSION`/`GLOBALS`/`argv`/`argc` since those aren't attacker-controlled
+/// taint sources; purity cares about "is this external state", not "is this
+/// user input", so the two lists have different membership on purpose).
+pub(crate) fn is_superglobal_name(name: &str) -> bool {
+    matches!(
+        name,
+        "GLOBALS"
+            | "_SERVER"
+            | "_GET"
+            | "_POST"
+            | "_REQUEST"
+            | "_SESSION"
+            | "_COOKIE"
+            | "_FILES"
+            | "_ENV"
+    )
+}
