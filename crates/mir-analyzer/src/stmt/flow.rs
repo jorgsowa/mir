@@ -610,6 +610,14 @@ impl<'a> StatementsAnalyzer<'a> {
             if let php_ast::owned::ExprKind::Variable(name) = &var.kind {
                 ctx.unset_var(name.trim_start_matches('$'));
             } else {
+                // `unset($obj->prop)` mutates the property just as much as a
+                // plain `$obj->prop = x` assignment does — run the same
+                // pure/immutable/external-mutation-free checks, which
+                // previously only ever ran on the assignment path.
+                if let php_ast::owned::ExprKind::PropertyAccess(pa) = &var.kind {
+                    self.expr_analyzer(ctx)
+                        .check_property_write_purity(pa, ctx, var.span);
+                }
                 // `unset($arr[$key])` / `unset($obj->prop)`: analyze the target
                 // so the variables it reads (e.g. the array-access key) count as
                 // uses — otherwise a foreach value used only as an unset key is
