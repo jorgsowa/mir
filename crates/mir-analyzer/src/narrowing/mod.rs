@@ -1810,9 +1810,11 @@ pub fn narrow_from_condition(
         // taint-source check already pairs both — a nullsafe call site was
         // previously silently skipped here.
         ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => {
-            if let Some(fqcn) = method_call_receiver_fqcn(&mc.object, ctx, db, file) {
-                if let ExprKind::Identifier(name) = &mc.method.kind {
-                    let method_name_lower = crate::util::php_ident_lowercase(name);
+            if let ExprKind::Identifier(name) = &mc.method.kind {
+                let method_name_lower = crate::util::php_ident_lowercase(name);
+                if let Some(fqcn) =
+                    method_call_receiver_fqcn(&mc.object, ctx, db, file, &method_name_lower)
+                {
                     if let Some(resolved) =
                         crate::call::method::resolve_method_from_db(db, &fqcn, &method_name_lower)
                     {

@@ -216,21 +216,23 @@ fn apply_assertions(
 
 /// Resolve a method-call receiver's exact class FQCN for dispatching a
 /// `@psalm-assert-if-true`/`-if-false` docblock assertion — only handles a
-/// receiver resolved to a single concrete class atom (mirroring
-/// `narrow_nullsafe_method_call_null`'s same conservative scope; a union of
-/// multiple classes could resolve the same method name to different
-/// signatures). Handles both a bare-variable receiver (`$v->isInt($p)`) and
-/// a property-access receiver (`$this->validator->isInt($p)`, a very common
-/// real-world shape) — the latter previously fell through unresolved,
-/// silently no-oping the whole assertion. A chained-call-result receiver
-/// (`$h->getValidator()->isInt($p)`) stays unresolved, mirroring the same,
-/// already-accepted scope limit `@psalm-self-out` documents for a
-/// non-variable receiver.
+/// receiver resolved to a single concrete class atom, or a `TIntersection`
+/// whose parts unambiguously agree on which one declares `method_name`
+/// (mirroring `narrow_nullsafe_method_call_null`'s same conservative scope;
+/// a union of multiple UNRELATED classes could resolve the same method name
+/// to different signatures, so that case still falls through). Handles both
+/// a bare-variable receiver (`$v->isInt($p)`) and a property-access receiver
+/// (`$this->validator->isInt($p)`, a very common real-world shape) — the
+/// latter previously fell through unresolved, silently no-oping the whole
+/// assertion. A chained-call-result receiver (`$h->getValidator()->isInt($p)`)
+/// stays unresolved, mirroring the same, already-accepted scope limit
+/// `@psalm-self-out` documents for a non-variable receiver.
 pub(super) fn method_call_receiver_fqcn(
     object: &php_ast::owned::Expr,
     ctx: &FlowState,
     db: &dyn MirDatabase,
     file: &str,
+    method_name: &str,
 ) -> Option<std::sync::Arc<str>> {
     let obj_ty = if let Some(obj_var) = extract_var_name(object) {
         ctx.get_var(&obj_var)
@@ -249,6 +251,25 @@ pub(super) fn method_call_receiver_fqcn(
         | [Atomic::TSelf { fqcn }]
         | [Atomic::TStaticObject { fqcn }]
         | [Atomic::TParent { fqcn }] => Some(std::sync::Arc::from(fqcn.as_ref())),
+        // `Foo&Bar` — ordinary method-call resolution (`call/method.rs`'s
+        // own `TIntersection` arm) already dispatches to whichever part
+        // declares the method, so assertion-tag narrowing riding along the
+        // same call must resolve the identical FQCN instead of silently
+        // no-oping just because no single member atom matched above.
+        [Atomic::TIntersection { parts }] => {
+            parts
+                .iter()
+                .flat_map(|p| p.types.iter())
+                .find_map(|atomic| match atomic {
+                    Atomic::TNamedObject { fqcn, .. } => {
+                        let resolved = crate::db::resolve_name(db, file, fqcn.as_ref());
+                        let resolved: std::sync::Arc<str> = std::sync::Arc::from(resolved.as_str());
+                        crate::db::has_method_in_chain(db, &resolved, method_name)
+                            .then_some(resolved)
+                    }
+                    _ => None,
+                })
+        }
         _ => None,
     }
 }
