@@ -834,6 +834,48 @@ pub(crate) fn array_pop_shift_return(arg_types: &[Type]) -> Option<Type> {
     }
 }
 
+/// Infer the return type of `reset($array)` / `end($array)`.
+///
+/// Both reposition the internal pointer to a known first/last slot
+/// regardless of any prior pointer state, so — like `array_pop_shift_return`
+/// — a provably non-empty source can drop the `false` failure case.
+pub(crate) fn array_reset_end_return(arg_types: &[Type]) -> Option<Type> {
+    let source = arg_types.first()?;
+    if source.is_mixed() {
+        return None;
+    }
+    let (_, value) = crate::stmt::infer_foreach_types(source);
+    if value.is_mixed() {
+        return None;
+    }
+    if super::callable::is_non_empty_collection(source) {
+        Some(value)
+    } else {
+        let mut ty = value;
+        ty.add_type(Atomic::TFalse);
+        Some(ty)
+    }
+}
+
+/// Infer the return type of `current($array)` / `next($array)` / `prev($array)`.
+///
+/// Unlike `reset()`/`end()`, these depend on the pointer's position left by
+/// PRIOR calls (not tracked here) — always includes `false`, even for a
+/// provably non-empty source.
+pub(crate) fn array_current_next_prev_return(arg_types: &[Type]) -> Option<Type> {
+    let source = arg_types.first()?;
+    if source.is_mixed() {
+        return None;
+    }
+    let (_, value) = crate::stmt::infer_foreach_types(source);
+    if value.is_mixed() {
+        return None;
+    }
+    let mut ty = value;
+    ty.add_type(Atomic::TFalse);
+    Some(ty)
+}
+
 /// Infer the by-ref array type after an in-place sort function.
 ///
 /// All sort functions preserve element types. Re-indexing sorts (`sort`, `rsort`, `usort`,

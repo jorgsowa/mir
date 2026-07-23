@@ -887,6 +887,15 @@ impl CallAnalyzer {
                         super::array_builtins::array_pop_shift_return(&arg_types)
                             .unwrap_or(return_ty)
                     }
+                    // reset/end: return value type (plus false) when source is typed.
+                    "reset" | "end" => super::array_builtins::array_reset_end_return(&arg_types)
+                        .unwrap_or(return_ty),
+                    // current/next/prev: always value|false — pointer position from
+                    // prior calls isn't tracked, even for a provably non-empty source.
+                    "current" | "next" | "prev" => {
+                        super::array_builtins::array_current_next_prev_return(&arg_types)
+                            .unwrap_or(return_ty)
+                    }
                     // Faithful integer-range returns: counts and lengths are
                     // non-negative (and counts of non-empty collections are `>= 1`).
                     "count" | "sizeof" => {
