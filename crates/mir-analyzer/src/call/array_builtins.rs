@@ -1386,6 +1386,33 @@ fn callback_name_for_diagnostic(callback_ty: &Type) -> String {
     }
 }
 
+/// Infer the return type of `array_rand($array, $num = 1)`.
+///
+/// PHP 8 throws a `ValueError` for an empty `$array` (never returns `false`).
+/// A literal `$num` narrows the shape: omitted or `1` -> the key type alone;
+/// a literal `> 1` -> a non-empty-list of the key type. Falls back to the
+/// stub (`None`) for a non-literal/unresolvable `$num`.
+pub(crate) fn array_rand_return_type(arg_types: &[Type]) -> Option<Type> {
+    let source = arg_types.first()?;
+    if source.is_mixed() {
+        return None;
+    }
+    let (key, _) = crate::stmt::infer_foreach_types(source);
+    if key.is_mixed() {
+        return None;
+    }
+    match arg_types.get(1) {
+        None => Some(key),
+        Some(t) => match t.types.as_slice() {
+            [Atomic::TLiteralInt(1)] => Some(key),
+            [Atomic::TLiteralInt(n)] if *n > 1 => Some(Type::single(Atomic::TNonEmptyList {
+                value: Box::new(key),
+            })),
+            _ => None,
+        },
+    }
+}
+
 pub(crate) fn array_push_unshift_byref_type(
     arr: &Type,
     push_types: &[Type],

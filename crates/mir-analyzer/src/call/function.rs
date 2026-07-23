@@ -896,6 +896,10 @@ impl CallAnalyzer {
                         super::array_builtins::array_current_next_prev_return(&arg_types)
                             .unwrap_or(return_ty)
                     }
+                    // array_rand: narrow by a literal $num — key type alone (omitted/1),
+                    // or non-empty-list<key_type> for a literal count > 1.
+                    "array_rand" => super::array_builtins::array_rand_return_type(&arg_types)
+                        .unwrap_or(return_ty),
                     // Faithful integer-range returns: counts and lengths are
                     // non-negative (and counts of non-empty collections are `>= 1`).
                     "count" | "sizeof" => {
