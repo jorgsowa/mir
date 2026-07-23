@@ -709,9 +709,75 @@ impl<'a> ExpressionAnalyzer<'a> {
     /// `ExprKind::Variable` case is already handled by each write-back site
     /// itself).
     pub(crate) fn check_byref_arg_purity(&mut self, arg_expr: &Expr, ctx: &FlowState, span: Span) {
-        if let ExprKind::PropertyAccess(pa) = &arg_expr.kind {
-            self.check_property_write_purity(pa, ctx, span);
-            self.check_property_readonly_write(pa, ctx, span);
+        match &arg_expr.kind {
+            ExprKind::PropertyAccess(pa) => {
+                self.check_property_write_purity(pa, ctx, span);
+                self.check_property_readonly_write(pa, ctx, span);
+            }
+            // `sort($this->cache['x'])` — an array-index-into-property
+            // by-ref argument mutates that property's contents exactly as
+            // much as a direct property argument (`sort($this->cache)`)
+            // does, but only the direct-property shape was ever checked.
+            ExprKind::ArrayAccess(aa) => match &aa.array.kind {
+                ExprKind::PropertyAccess(pa) => {
+                    self.check_property_write_purity(pa, ctx, span);
+                    self.check_property_readonly_write(pa, ctx, span);
+                }
+                ExprKind::StaticPropertyAccess(spa) => {
+                    self.check_static_prop_byref_purity(spa, ctx, span);
+                }
+                _ => {}
+            },
+            // `array_push(self::$queue, $x)` — a static-property by-ref
+            // argument mutates that property exactly as much as
+            // `self::$queue = …` would; static properties had no by-ref
+            // arm at all, unlike the instance-property one above.
+            ExprKind::StaticPropertyAccess(spa) => {
+                self.check_static_prop_byref_purity(spa, ctx, span);
+            }
+            _ => {}
+        }
+    }
+
+    /// Purity/readonly checks for a static property mutated via a by-ref
+    /// call argument (`array_push(self::$queue, $x)`, `sort(Bag::$items)`)
+    /// — mirrors the plain `self::$prop = …` write arm's own inline checks
+    /// (`ImpureStaticPropertyAssignment` + readonly lookup), which this
+    /// by-ref path never reached at all.
+    fn check_static_prop_byref_purity(
+        &mut self,
+        spa: &php_ast::owned::StaticAccessExpr,
+        ctx: &FlowState,
+        span: Span,
+    ) {
+        let Some((fqcn, prop_name)) = resolve_static_prop_target(spa, ctx, self.db, &self.file)
+        else {
+            return;
+        };
+        if ctx.is_in_pure_fn {
+            self.emit(
+                IssueKind::ImpureStaticPropertyAssignment {
+                    class: fqcn.to_string(),
+                    property: prop_name.clone(),
+                },
+                Severity::Warning,
+                span,
+            );
+        }
+        let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
+        if let Some((owner, prop_def)) =
+            crate::db::find_property_in_chain(self.db, here, &prop_name)
+        {
+            if prop_def.is_readonly {
+                self.emit(
+                    IssueKind::ReadonlyPropertyAssignment {
+                        class: owner.to_string(),
+                        property: prop_name,
+                    },
+                    Severity::Error,
+                    span,
+                );
+            }
         }
     }
 
