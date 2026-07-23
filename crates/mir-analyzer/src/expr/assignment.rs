@@ -69,6 +69,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                     ExprKind::Variable(name) => {
                         if rhs_tainted {
                             ctx.taint_var(name.as_ref());
+                        } else {
+                            // Overwritten with a proven-clean value —
+                            // don't let stale taint survive.
+                            ctx.clear_var_taint(name.as_ref());
                         }
                     }
                     ExprKind::PropertyAccess(pa) => {

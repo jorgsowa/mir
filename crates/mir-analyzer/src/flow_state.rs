@@ -709,6 +709,14 @@ impl FlowState {
         self.tainted_vars.contains(&sym)
     }
 
+    /// Clear a previously-recorded variable taint — used when the variable is
+    /// overwritten with a value proven not tainted, so stale taint doesn't
+    /// survive the reassignment.
+    pub fn clear_var_taint(&mut self, name: &str) {
+        let sym = Name::from(name.trim_start_matches('$'));
+        self.tainted_vars.remove(&sym);
+    }
+
     /// Mark an instance property as carrying tainted (user-controlled) data.
     pub fn taint_prop(&mut self, obj_var: &str, prop: &str) {
         let key = (
