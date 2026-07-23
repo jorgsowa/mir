@@ -878,6 +878,20 @@ impl<'a> ExpressionAnalyzer<'a> {
                             Arc::from(format!("prop:{}::{}", owner, prop_name)),
                             spa.member.span,
                         );
+                        // Same read-side purity check as the explicit-class-name
+                        // path (record_static_prop_access) — reading shared
+                        // external state is non-deterministic across calls,
+                        // same as a superglobal read.
+                        if ctx.is_in_pure_fn {
+                            self.emit(
+                                IssueKind::ImpureStaticPropertyAccess {
+                                    class: owner.to_string(),
+                                    property: prop_name.to_string(),
+                                },
+                                Severity::Warning,
+                                spa.member.span,
+                            );
+                        }
                         self.record_symbol(
                             spa.member.span,
                             ReferenceKind::PropertyAccess {
@@ -1014,6 +1028,21 @@ impl<'a> ExpressionAnalyzer<'a> {
                         ty.substitute_templates(&bindings)
                     };
                 }
+            }
+            // Reading a static property is just as non-deterministic across
+            // calls as reading a superglobal (already checked in
+            // variables.rs/arrays.rs) — but unlike the write side
+            // (ImpureStaticPropertyAssignment), the read side had no check
+            // at all.
+            if ctx.is_in_pure_fn {
+                self.emit(
+                    IssueKind::ImpureStaticPropertyAccess {
+                        class: owner.to_string(),
+                        property: prop_name.to_string(),
+                    },
+                    Severity::Warning,
+                    member_expr.span,
+                );
             }
             self.record_ref(
                 Arc::from(format!("prop:{}::{}", owner, prop_name)),
