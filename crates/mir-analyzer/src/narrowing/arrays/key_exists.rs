@@ -41,7 +41,10 @@ pub(crate) fn narrow_static_prop_array_key_exists(
     if current.is_mixed() {
         return;
     }
-    let narrowed = add_key_to_sealed_shapes(&current, key);
+    // array_key_exists() throws TypeError on a null 2nd arg, so reaching
+    // this point already proves the property itself wasn't null.
+    let non_null = current.remove_null();
+    let narrowed = add_key_to_sealed_shapes(&non_null, key);
     if narrowed != current {
         ctx.set_prop_refined(fqcn, prop, narrowed);
     }
@@ -60,7 +63,10 @@ pub(crate) fn narrow_prop_array_key_exists(
     if current.is_mixed() {
         return;
     }
-    let narrowed = add_key_to_sealed_shapes(&current, key);
+    // array_key_exists() throws TypeError on a null 2nd arg, so reaching
+    // this point already proves the property itself wasn't null.
+    let non_null = current.remove_null();
+    let narrowed = add_key_to_sealed_shapes(&non_null, key);
     if narrowed != current {
         ctx.set_prop_refined(obj_var, prop, narrowed);
     }
@@ -251,7 +257,11 @@ pub(crate) fn narrow_array_key_exists_condition(
             if is_true {
                 if let Some(var_name) = extract_var_name(&arr_arg.value) {
                     let current = ctx.get_var(&var_name);
-                    let narrowed = add_key_to_sealed_shapes(&current, &key);
+                    // array_key_exists() throws TypeError on a null 2nd arg,
+                    // so reaching the true branch already proves $arr wasn't
+                    // null.
+                    let non_null = current.remove_null();
+                    let narrowed = add_key_to_sealed_shapes(&non_null, &key);
                     if narrowed != current {
                         ctx.set_var(&var_name, narrowed);
                     }
@@ -352,12 +362,17 @@ pub(crate) fn narrow_array_key_exists_condition(
                 // `remove_key_from_sealed_shapes`.
                 if let Some(var_name) = extract_var_name(&arr_arg.value) {
                     let current = ctx.get_var(&var_name);
-                    let narrowed = remove_key_from_sealed_shapes(&current, &key);
+                    // array_key_exists() throws TypeError on a null 2nd arg,
+                    // so reaching the false branch also proves $arr wasn't
+                    // null.
+                    let non_null = current.remove_null();
+                    let narrowed = remove_key_from_sealed_shapes(&non_null, &key);
                     set_narrowed(ctx, &var_name, &current, narrowed, true);
                 } else if let Some((obj, prop)) = extract_any_prop_access(&arr_arg.value) {
                     let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
                     if !current.is_mixed() {
-                        let narrowed = remove_key_from_sealed_shapes(&current, &key);
+                        let non_null = current.remove_null();
+                        let narrowed = remove_key_from_sealed_shapes(&non_null, &key);
                         apply_prop_narrowed(ctx, &obj, &prop, current, narrowed, true);
                     }
                     // array_key_exists() throws TypeError on a null 2nd
@@ -369,7 +384,8 @@ pub(crate) fn narrow_array_key_exists_condition(
                 {
                     let current = resolve_static_prop_current_type(ctx, &fqcn, &prop, db);
                     if !current.is_mixed() {
-                        let narrowed = remove_key_from_sealed_shapes(&current, &key);
+                        let non_null = current.remove_null();
+                        let narrowed = remove_key_from_sealed_shapes(&non_null, &key);
                         apply_prop_narrowed(ctx, &fqcn, &prop, current, narrowed, true);
                     }
                 } else if let Some((base, path)) =
