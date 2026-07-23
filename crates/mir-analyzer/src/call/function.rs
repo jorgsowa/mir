@@ -1067,7 +1067,10 @@ impl CallAnalyzer {
                 }
             }
 
-            // Sort functions: the by-ref loop above set $arr to generic `array`; restore
+            // Sort functions (and array_walk/array_walk_recursive, which mutate
+            // values in place without adding/removing/reordering keys — the same
+            // "restore the original type unchanged" shape as a key-preserving
+            // sort): the by-ref loop above set $arr to generic `array`; restore
             // the original element type. Re-indexing sorts also convert to a list.
             {
                 let reindex = matches!(
@@ -1084,6 +1087,8 @@ impl CallAnalyzer {
                         | "uksort"
                         | "natsort"
                         | "natcasesort"
+                        | "array_walk"
+                        | "array_walk_recursive"
                 );
                 if reindex || preserve {
                     if let (Some(arr_arg), Some(original_arr)) =
