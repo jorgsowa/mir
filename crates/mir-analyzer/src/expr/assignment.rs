@@ -13,6 +13,25 @@ use php_ast::owned::{AssignExpr, Expr, ExprKind};
 use php_ast::Span;
 use rustc_hash::{FxHashMap, FxHashSet};
 
+/// Taint every plain-variable leaf of a (possibly nested) array-destructuring
+/// target — `[$a, $b] = $tainted;`, `['x' => $a, 'y' => [$b, $c]] = $tainted;`
+/// — a element that's itself a nested `Array` recurses; a `PropertyAccess`/
+/// `ArrayAccess` element (`[$obj->prop] = $tainted;`) is conservatively
+/// skipped, matching how the plain-assignment case only taints a bare
+/// variable or property, never an arbitrary nested write target.
+fn taint_destructured_targets(target: &Expr, ctx: &mut FlowState) {
+    let ExprKind::Array(elements) = &target.kind else {
+        return;
+    };
+    for elem in elements.iter() {
+        match &elem.value.kind {
+            ExprKind::Variable(name) => ctx.taint_var(name.as_ref()),
+            ExprKind::Array(_) => taint_destructured_targets(&elem.value, ctx),
+            _ => {}
+        }
+    }
+}
+
 impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_assign(
         &mut self,
@@ -88,6 +107,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 }
                             }
                         }
+                    }
+                    // List/array destructuring (`[$a, $b] = $arr;`,
+                    // `['x' => $a] = $arr;`) from a tainted source taints
+                    // every destructured variable — this was the one target
+                    // shape with no taint propagation at all, unlike plain
+                    // variable/property assignment just above.
+                    ExprKind::Array(_) if rhs_tainted => {
+                        taint_destructured_targets(&a.target, ctx);
                     }
                     _ => {}
                 }
