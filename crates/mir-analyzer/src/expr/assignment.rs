@@ -44,6 +44,11 @@ pub(crate) fn root_receiver_var(expr: &Expr) -> Option<&str> {
         ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) => {
             root_receiver_var(&pa.object)
         }
+        // `$this->caches[0]->v = 5` — an array-index hop in the middle of the
+        // chain (`$this->caches[0]`) is still reachable from `$this`/a
+        // parameter, same as a bare property hop; walk through it the same
+        // way instead of bailing out to `None`.
+        ExprKind::ArrayAccess(aa) => root_receiver_var(&aa.array),
         _ => None,
     }
 }
