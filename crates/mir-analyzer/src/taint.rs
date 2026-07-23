@@ -190,12 +190,14 @@ pub fn is_expr_tainted(expr: &Expr, ctx: &FlowState) -> bool {
             })
         }
 
-        ExprKind::Ternary(t) => {
-            t.then_expr
-                .as_deref()
-                .is_some_and(|e| is_expr_tainted(e, ctx))
-                || is_expr_tainted(&t.else_expr, ctx)
-        }
+        ExprKind::Ternary(t) => match &t.then_expr {
+            Some(then_e) => is_expr_tainted(then_e, ctx) || is_expr_tainted(&t.else_expr, ctx),
+            // Short ternary (`$x ?: $y`): the true branch's VALUE is the
+            // condition itself, not a separate expression — `then_expr` is
+            // `None` for this form, so the condition's own taint must be
+            // checked too, not just skipped.
+            None => is_expr_tainted(&t.condition, ctx) || is_expr_tainted(&t.else_expr, ctx),
+        },
 
         // `$x ?? $default` — tainted if either side could be, same as a
         // ternary. This is the single most common superglobal-read idiom
