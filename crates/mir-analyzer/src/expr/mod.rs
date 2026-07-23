@@ -335,6 +335,18 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if crate::taint::is_expr_tainted(inner, ctx) {
                     self.emit(IssueKind::TaintedHtml, Severity::Error, expr.span);
                 }
+                // @pure implies no side effects at all — same purity
+                // violation `echo` now checks (stmt/expressions.rs), for the
+                // `print` expression form.
+                if ctx.is_in_pure_fn {
+                    self.emit(
+                        IssueKind::ImpureFunctionCall {
+                            fn_name: "print".to_string(),
+                        },
+                        Severity::Warning,
+                        expr.span,
+                    );
+                }
                 Type::single(Atomic::TLiteralInt(1))
             }
 
