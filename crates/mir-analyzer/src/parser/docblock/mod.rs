@@ -331,7 +331,7 @@ impl DocblockParser {
                     result.is_mutation_free = true
                 }
                 "psalm-external-mutation-free" => result.is_external_mutation_free = true,
-                "immutable" | "psalm-immutable" => result.is_immutable = true,
+                "immutable" | "psalm-immutable" | "phpstan-immutable" => result.is_immutable = true,
                 "readonly" | "psalm-readonly" | "phpstan-readonly" => result.is_readonly = true,
                 "final" => result.is_final = true,
                 "inheritDoc" | "inheritdoc" => result.is_inherit_doc = true,
