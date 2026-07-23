@@ -323,7 +323,7 @@ impl DocblockParser {
                         }
                     }
                 }
-                "internal" => result.is_internal = true,
+                "internal" | "psalm-internal" => result.is_internal = true,
                 "pure" | "psalm-pure" | "phpstan-pure" => result.is_pure = true,
                 "seal-properties" | "psalm-seal-properties" => result.seal_properties = true,
                 "no-named-arguments" => result.no_named_arguments = true,
