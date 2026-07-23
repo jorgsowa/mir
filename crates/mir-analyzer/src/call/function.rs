@@ -1072,7 +1072,14 @@ impl CallAnalyzer {
                 );
                 let preserve = matches!(
                     resolved_fn_name.as_str(),
-                    "asort" | "arsort" | "ksort" | "krsort" | "uasort" | "uksort"
+                    "asort"
+                        | "arsort"
+                        | "ksort"
+                        | "krsort"
+                        | "uasort"
+                        | "uksort"
+                        | "natsort"
+                        | "natcasesort"
                 );
                 if reindex || preserve {
                     if let (Some(arr_arg), Some(original_arr)) =

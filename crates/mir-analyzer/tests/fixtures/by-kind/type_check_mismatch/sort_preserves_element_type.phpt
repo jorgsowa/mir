@@ -1,5 +1,5 @@
 ===description===
-In-place sort functions preserve element types; re-indexing sorts (sort/rsort/usort/shuffle) convert to list; key-preserving sorts (asort/arsort/ksort/krsort/uasort/uksort) keep the original type.
+In-place sort functions preserve element types; re-indexing sorts (sort/rsort/usort/shuffle) convert to list; key-preserving sorts (asort/arsort/ksort/krsort/uasort/uksort/natsort/natcasesort) keep the original type.
 ===config===
 suppress=UnusedVariable,UnusedParam
 ===file===
@@ -37,6 +37,20 @@ function test_asort_preserves_type(array $arr): void {
 function test_ksort_non_empty(array $arr): void {
     ksort($arr);
     /** @mir-check $arr is non-empty-list<float> */
+    $_ = $arr;
+}
+
+/** @param list<string> $arr */
+function test_natsort_preserves_type(array $arr): void {
+    natsort($arr);
+    /** @mir-check $arr is list<string> */
+    $_ = $arr;
+}
+
+/** @param non-empty-list<string> $arr */
+function test_natcasesort_preserves_type(array $arr): void {
+    natcasesort($arr);
+    /** @mir-check $arr is non-empty-list<string> */
     $_ = $arr;
 }
 ===expect===
