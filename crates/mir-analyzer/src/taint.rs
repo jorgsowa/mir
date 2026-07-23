@@ -116,6 +116,26 @@ pub fn classify_method_sink(
     None
 }
 
+/// Map a `@taint-sink <kind> $param` docblock tag's free-text kind to the
+/// issue it should raise. Previously only the literal string `"llm_prompt"`
+/// produced anything at all — any other kind (a typo, or one of the sink
+/// kinds `classify_sink`/`classify_method_sink` already detect for built-in
+/// functions: html/sql/shell) silently did nothing. Named kinds now reuse
+/// the same issue those built-in sinks raise; anything else falls back to
+/// the generic `TaintedInput`, mirroring the fallback `classify_sink`'s own
+/// File/Unserialize arms already use, instead of a silent no-op.
+pub fn taint_sink_issue(kind: &str) -> mir_issues::IssueKind {
+    match kind {
+        "llm_prompt" => mir_issues::IssueKind::TaintedLlmPrompt,
+        "html" => mir_issues::IssueKind::TaintedHtml,
+        "sql" => mir_issues::IssueKind::TaintedSql,
+        "shell" => mir_issues::IssueKind::TaintedShell,
+        other => mir_issues::IssueKind::TaintedInput {
+            sink: other.to_string(),
+        },
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Expression taint checker
 // ---------------------------------------------------------------------------
