@@ -1872,6 +1872,12 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
                 .iter()
                 .all(|(key, sup_prop)| match sub_props.get(key) {
                     Some(sub_prop) => {
+                        // A key merely optional on the sub side may legally be
+                        // absent at runtime, so it can't satisfy a sup key that
+                        // requires it present.
+                        if !sup_prop.optional && sub_prop.optional {
+                            return false;
+                        }
                         let has_named_obj = sup_prop.ty.types.iter().any(|a| {
                             matches!(
                                 a,
