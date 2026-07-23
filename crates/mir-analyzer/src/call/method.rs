@@ -340,6 +340,32 @@ impl CallAnalyzer {
             }
         }
 
+        // Purity check: calling a method on a parameter in a @pure function.
+        // Placed before the `is_mixed()` early return below — this check
+        // doesn't need the receiver's resolved type at all (method
+        // resolution hasn't even happened yet here), only the receiver
+        // expression and the current param names, so it must not be skipped
+        // just because an untyped/mixed parameter makes the callee
+        // unknowable — that's exactly the common case for loosely-typed
+        // legacy code, where this check has the most to catch.
+        if ctx.is_in_pure_fn {
+            if let ExprKind::Variable(recv_name) = &call.object.kind {
+                let recv_stripped = recv_name.trim_start_matches('$');
+                if ctx
+                    .param_names
+                    .contains(&mir_types::Name::from(recv_stripped))
+                {
+                    ea.emit(
+                        IssueKind::ImpureMethodCall {
+                            method: method_name.to_string(),
+                        },
+                        Severity::Warning,
+                        span,
+                    );
+                }
+            }
+        }
+
         if obj_ty.is_mixed() {
             // Don't report MixedMethodCall on template parameters, since they can be any type
             let is_only_template_params = obj_ty
@@ -366,25 +392,6 @@ impl CallAnalyzer {
                 call.method.span,
             );
             return Type::mixed();
-        }
-
-        // Purity check: calling a method on a parameter in a @pure function.
-        if ctx.is_in_pure_fn {
-            if let ExprKind::Variable(recv_name) = &call.object.kind {
-                let recv_stripped = recv_name.trim_start_matches('$');
-                if ctx
-                    .param_names
-                    .contains(&mir_types::Name::from(recv_stripped))
-                {
-                    ea.emit(
-                        IssueKind::ImpureMethodCall {
-                            method: method_name.to_string(),
-                        },
-                        Severity::Warning,
-                        span,
-                    );
-                }
-            }
         }
 
         let receiver = obj_ty.remove_null();
