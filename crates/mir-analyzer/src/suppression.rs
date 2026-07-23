@@ -131,9 +131,17 @@ impl SuppressionMap {
     /// Scan `source` for suppression directives.
     pub fn from_source(source: &str) -> Self {
         let raw_lines: Vec<&str> = source.lines().collect();
+        let in_heredoc_body = heredoc_body_mask(&raw_lines);
         let mut map = SuppressionMap::default();
 
         for (idx, raw) in raw_lines.iter().enumerate() {
+            // A `#`/`//`-looking line INSIDE a heredoc/nowdoc body (embedded
+            // shell/SQL/etc.) is not a real comment — without this, a line
+            // like `# @mir-ignore-file UndefinedClass` in an embedded script
+            // is indistinguishable from a genuine suppression directive.
+            if in_heredoc_body[idx] {
+                continue;
+            }
             let Some((directive, track_named)) = parse_directive_with_tracking(raw) else {
                 continue;
             };
@@ -231,6 +239,70 @@ fn insert_line(lines: &mut FxHashMap<u32, KindSet>, line: u32, kinds: KindSet) {
             lines.insert(line, kinds);
         }
     }
+}
+
+/// Per-line mask: `true` for a physical line that falls INSIDE a heredoc or
+/// nowdoc body (between the `<<<IDENT` opener line and its closing `IDENT`
+/// line), `false` everywhere else — including the opener line itself, which
+/// still carries real PHP code (`$x = <<<EOT`) before the body starts.
+///
+/// Deliberately simple, matching this file's existing line-based scanning:
+/// doesn't defend against a `<<<` that itself appears inside an unrelated
+/// string literal on the same line (a separate, rarer gap) — only real
+/// heredoc/nowdoc openers are expected to actually appear this way in
+/// practice.
+fn heredoc_body_mask(raw_lines: &[&str]) -> Vec<bool> {
+    let mut mask = vec![false; raw_lines.len()];
+    let mut closing_ident: Option<&str> = None;
+    for (idx, line) in raw_lines.iter().enumerate() {
+        if let Some(ident) = closing_ident {
+            mask[idx] = true;
+            if is_heredoc_closing_line(line, ident) {
+                closing_ident = None;
+            }
+            continue;
+        }
+        closing_ident = find_heredoc_opener(line);
+    }
+    mask
+}
+
+/// If `line` opens a heredoc (`<<<IDENT`) or nowdoc (`<<<'IDENT'`/`<<<"IDENT"`),
+/// return the closing identifier to watch for.
+fn find_heredoc_opener(line: &str) -> Option<&str> {
+    let pos = line.find("<<<")?;
+    let rest = line[pos + 3..].trim_start();
+    let (quote, rest) = match rest.as_bytes().first() {
+        Some(b'\'') => (Some(b'\''), &rest[1..]),
+        Some(b'"') => (Some(b'"'), &rest[1..]),
+        _ => (None, rest),
+    };
+    let end = rest
+        .find(|c: char| !c.is_ascii_alphanumeric() && c != '_')
+        .unwrap_or(rest.len());
+    let ident = &rest[..end];
+    if ident.is_empty() {
+        return None;
+    }
+    if let Some(q) = quote {
+        if rest.as_bytes().get(end) != Some(&q) {
+            return None;
+        }
+    }
+    Some(ident)
+}
+
+/// Whether `line` is the closing line of a heredoc/nowdoc body started with
+/// `ident` — optional leading whitespace (PHP 7.3+ flexible heredoc
+/// indentation), then the identifier as a whole word (not a prefix of a
+/// longer identifier).
+fn is_heredoc_closing_line(line: &str, ident: &str) -> bool {
+    let Some(rest) = line.trim_start().strip_prefix(ident) else {
+        return false;
+    };
+    rest.chars()
+        .next()
+        .is_none_or(|c| !c.is_ascii_alphanumeric() && c != '_')
 }
 
 /// Locate a directive's target line strictly after `idx`, as a 1-based number.
