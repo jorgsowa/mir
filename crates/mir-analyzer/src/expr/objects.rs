@@ -415,6 +415,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             s.params.to_vec(),
                             s.template_params.clone(),
                             s.no_named_arguments,
+                            s.taint_sink_params.clone(),
                         )
                     });
                     // `new static`/`new self`/`new parent` inside a trait binds
@@ -425,9 +426,59 @@ impl<'a> ExpressionAnalyzer<'a> {
                     let trait_relative_new =
                         matches!(resolved.as_str(), "self" | "static" | "parent")
                             && crate::flow_state::self_is_trait(self.db, ctx);
-                    if let Some((ctor_params, ctor_templates, ctor_no_named_args)) =
-                        &ctor_params_and_templates
+                    if let Some((
+                        ctor_params,
+                        ctor_templates,
+                        ctor_no_named_args,
+                        ctor_taint_sink_params,
+                    )) = &ctor_params_and_templates
                     {
+                        // Taint sink check: `new Sink($tainted)` reaching a
+                        // @taint-sink annotated constructor parameter never
+                        // ran this at all — call/function.rs and
+                        // call/method.rs both check it for their own call
+                        // shapes, but analyze_new had no equivalent.
+                        if !ctor_taint_sink_params.is_empty() {
+                            for (param_name, sink_kind) in ctor_taint_sink_params {
+                                let param_idx = ctor_params
+                                    .iter()
+                                    .position(|p| p.name.as_ref() == param_name.as_ref());
+                                let is_variadic = param_idx
+                                    .and_then(|idx| ctor_params.get(idx))
+                                    .is_some_and(|p| p.is_variadic);
+                                let args: Vec<&php_ast::owned::Arg> = if is_variadic {
+                                    let idx = param_idx.unwrap();
+                                    n.args
+                                        .iter()
+                                        .filter(|a| a.name.is_none())
+                                        .skip(idx)
+                                        .collect()
+                                } else {
+                                    let positional = param_idx.and_then(|idx| n.args.get(idx));
+                                    let named = n.args.iter().find(|a| {
+                                        a.name
+                                            .as_ref()
+                                            .map(|nm| {
+                                                crate::parser::name_to_string_owned(nm)
+                                                    == param_name.as_ref()
+                                            })
+                                            .unwrap_or(false)
+                                    });
+                                    positional.or(named).into_iter().collect()
+                                };
+                                for arg in args {
+                                    if crate::taint::is_expr_tainted(
+                                        &arg.value, ctx, self.db, &self.file,
+                                    ) {
+                                        self.emit(
+                                            crate::taint::taint_sink_issue(sink_kind),
+                                            Severity::Error,
+                                            call_span,
+                                        );
+                                    }
+                                }
+                            }
+                        }
                         if !trait_relative_new {
                             // A bare subclass of a generic ancestor fixed via
                             // `@extends Box<int>` already determines T=int for
@@ -552,7 +603,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         &fqcn,
                         ctor_params_and_templates
                             .as_ref()
-                            .map(|(p, _, _)| p.as_slice()),
+                            .map(|(p, _, _, _)| p.as_slice()),
                         &arg_types,
                         &arg_names,
                         call_span,
