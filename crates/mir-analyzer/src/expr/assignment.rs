@@ -5,6 +5,7 @@ use super::helpers::{
     type_refs_any_template, widen_array_as_list, widen_array_with_value_and_key, DefiniteKeyState,
 };
 use super::ExpressionAnalyzer;
+use crate::db::MirDatabase;
 use crate::flow_state::FlowState;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Type};
@@ -49,6 +50,50 @@ pub(crate) fn root_receiver_var(expr: &Expr) -> Option<&str> {
         // parameter, same as a bare property hop; walk through it the same
         // way instead of bailing out to `None`.
         ExprKind::ArrayAccess(aa) => root_receiver_var(&aa.array),
+        _ => None,
+    }
+}
+
+/// Resolve a (possibly chained) property-access receiver's declared type —
+/// e.g. the `$this->cache` part of `$this->cache->v` — by walking each hop's
+/// declared property type via `find_property_in_chain`, instead of requiring
+/// the receiver to literally BE a bare variable. Doesn't consult
+/// `ctx.get_prop_refined` (unlike `narrowing::resolve_prop_current_type`):
+/// this only feeds a readonly check, which cares about the property's
+/// *declared* type, not a condition-narrowed one. Not re-running
+/// `self.analyze` here is deliberate — the operand was already analyzed by
+/// the surrounding read, and a fresh `analyze` call would double-report its
+/// diagnostics.
+fn resolve_chained_receiver_type(
+    expr: &Expr,
+    ctx: &FlowState,
+    db: &dyn MirDatabase,
+) -> Option<Type> {
+    match &expr.kind {
+        ExprKind::Variable(name) => Some(ctx.get_var(name)),
+        ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) => {
+            let obj_ty = resolve_chained_receiver_type(&pa.object, ctx, db)?;
+            let prop_name = extract_string_from_expr(&pa.property)?;
+            let mut result = Type::empty();
+            for atomic in &obj_ty.types {
+                if let Atomic::TNamedObject { fqcn, .. }
+                | Atomic::TSelf { fqcn }
+                | Atomic::TStaticObject { fqcn }
+                | Atomic::TParent { fqcn } = atomic
+                {
+                    if let Some((_, prop_def)) = crate::db::find_property_in_chain(
+                        db,
+                        crate::db::Fqcn::from_str(db, fqcn.as_ref()),
+                        &prop_name,
+                    ) {
+                        if let Some(ty) = prop_def.ty.as_deref() {
+                            result.merge_with(ty);
+                        }
+                    }
+                }
+            }
+            Some(result)
+        }
         _ => None,
     }
 }
@@ -468,12 +513,12 @@ impl<'a> ExpressionAnalyzer<'a> {
     /// base (`$this->items[] = x`) never go through `assign_to_target`'s own
     /// `PropertyAccess` arm, which is the ONLY place a plain `=`/compound-op
     /// write's readonly violation is caught — so all three silently bypassed
-    /// `@readonly` enforcement entirely. Scoped to a bare-variable receiver
-    /// (`$this->prop`, `$param->prop`) via `ctx.get_var`, matching how
-    /// `is_expr_tainted`'s property arm only tracks a simple-variable
-    /// receiver too — a fresh `self.analyze(&pa.object, ...)` here would
-    /// re-run (and double-report) whatever reference/diagnostic recording
-    /// already happened when the surrounding read of the operand ran.
+    /// `@readonly` enforcement entirely. Walks a chained receiver
+    /// (`$this->cache->v`) via `resolve_chained_receiver_type`, mirroring
+    /// `check_property_write_purity`'s own chain-walk — a fresh
+    /// `self.analyze(&pa.object, ...)` here would re-run (and double-report)
+    /// whatever reference/diagnostic recording already happened when the
+    /// surrounding read of the operand ran.
     /// None of these three write shapes can legally be a property's first
     /// (initializing) write — they all read the current value first (an
     /// implicit read for `++`/array-append, an explicit one for a keyed
@@ -485,13 +530,12 @@ impl<'a> ExpressionAnalyzer<'a> {
         ctx: &FlowState,
         span: Span,
     ) {
-        let ExprKind::Variable(recv) = &pa.object.kind else {
-            return;
-        };
         let Some(prop_name) = extract_string_from_expr(&pa.property) else {
             return;
         };
-        let obj_ty = ctx.get_var(recv);
+        let Some(obj_ty) = resolve_chained_receiver_type(&pa.object, ctx, self.db) else {
+            return;
+        };
         for atomic in &obj_ty.types {
             if let Atomic::TNamedObject { fqcn, .. } = atomic {
                 let db = self.db;
