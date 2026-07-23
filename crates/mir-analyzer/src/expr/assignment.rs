@@ -1319,10 +1319,52 @@ impl<'a> ExpressionAnalyzer<'a> {
                             let _ = self.analyze(base, ctx);
                             break;
                         }
+                        ExprKind::StaticPropertyAccess(spa) => {
+                            // `self::$items[$k] = …` / `Foo::$items[] = …`:
+                            // same mutation-through-index-write reasoning as
+                            // the instance-property arm above, mirroring the
+                            // plain `self::$items = …` static-write check
+                            // (there's no immutable-context mirror for
+                            // statics — see the plain write arm's own comment).
+                            if ctx.is_in_pure_fn {
+                                if let ExprKind::Identifier(id) = &spa.class.kind {
+                                    let resolved =
+                                        crate::db::resolve_name(self.db, &self.file, id.as_ref());
+                                    let fqcn_opt: Option<std::sync::Arc<str>> =
+                                        match resolved.as_str() {
+                                            "self" | "static" => ctx
+                                                .self_fqcn
+                                                .clone()
+                                                .or_else(|| ctx.static_fqcn.clone()),
+                                            "parent" => ctx.parent_fqcn.clone(),
+                                            s => Some(std::sync::Arc::from(s)),
+                                        };
+                                    if let Some(fqcn) = fqcn_opt {
+                                        if let Some(prop_name) = match &spa.member.kind {
+                                            ExprKind::Variable(name)
+                                            | ExprKind::Identifier(name) => {
+                                                Some(name.trim_start_matches('$').to_string())
+                                            }
+                                            _ => None,
+                                        } {
+                                            self.emit(
+                                                IssueKind::ImpureStaticPropertyAssignment {
+                                                    class: fqcn.to_string(),
+                                                    property: prop_name,
+                                                },
+                                                Severity::Warning,
+                                                span,
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                            let _ = self.analyze(base, ctx);
+                            break;
+                        }
                         _ => {
-                            // Non-variable base (`self::$items[$k] = …`):
-                            // analyze it as a read so the property access
-                            // records its reference.
+                            // Non-variable base: analyze it as a read so any
+                            // nested property access records its reference.
                             let _ = self.analyze(base, ctx);
                             break;
                         }
