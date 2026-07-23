@@ -1758,6 +1758,10 @@ impl<'a> DefinitionCollector<'a> {
             .map(|(name, bound, variance, default)| TemplateParam {
                 name: name.as_str().into(),
                 bound: wrap_template_bound(bound.clone().map(|b| {
+                    let b = match effective_aliases {
+                        Some(a) => expand_aliases_only(b, a),
+                        None => b,
+                    };
                     Self::fill_self_static_parent(
                         self.resolve_union_doc_with_templates(
                             b,
@@ -1769,6 +1773,10 @@ impl<'a> DefinitionCollector<'a> {
                     )
                 })),
                 default: wrap_template_bound(default.clone().map(|d| {
+                    let d = match effective_aliases {
+                        Some(a) => expand_aliases_only(d, a),
+                        None => d,
+                    };
                     Self::fill_self_static_parent(
                         self.resolve_union_doc_with_templates(
                             d,

@@ -80,6 +80,7 @@ impl<'a> DefinitionCollector<'a> {
                 |(name, bound, variance, default)| mir_codebase::definitions::TemplateParam {
                     name: name.as_str().into(),
                     bound: mir_codebase::definitions::wrap_template_bound(bound.clone().map(|b| {
+                        let b = super::expand_aliases_only(b, &type_aliases);
                         Self::fill_self_static_parent(
                             self.resolve_union_doc_with_templates(
                                 b,
@@ -92,6 +93,7 @@ impl<'a> DefinitionCollector<'a> {
                     })),
                     default: mir_codebase::definitions::wrap_template_bound(default.clone().map(
                         |d| {
+                            let d = super::expand_aliases_only(d, &type_aliases);
                             Self::fill_self_static_parent(
                                 self.resolve_union_doc_with_templates(
                                     d,
