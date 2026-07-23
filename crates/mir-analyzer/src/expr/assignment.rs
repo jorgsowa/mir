@@ -308,6 +308,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     if let Some(prop_name) = extract_string_from_expr(&pa.property) {
                         self.emit(
                             IssueKind::ImmutablePropertyModification {
+                                receiver: "$this".to_string(),
                                 property: prop_name,
                             },
                             Severity::Warning,
@@ -501,6 +502,39 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     );
                                 }
                                 continue;
+                            }
+                            // Cross-class immutable write: only a write from
+                            // INSIDE the immutable class's own methods was
+                            // checked before (via ctx.is_in_immutable_method,
+                            // gated on a literal `$this` receiver above) — an
+                            // outside `$b->x = 1;` on an immutable-tagged
+                            // object was a silent no-op. The contract applies
+                            // to any writer, not just the class's own code.
+                            let is_this_receiver = matches!(
+                                &pa.object.kind,
+                                ExprKind::Variable(n) if n.trim_start_matches('$') == "this"
+                            );
+                            if !is_this_receiver {
+                                if let Some(crate::db::ClassLike::Class(cls)) =
+                                    crate::db::find_class_like(
+                                        self.db,
+                                        crate::db::Fqcn::from_str(self.db, fqcn.as_ref()),
+                                    )
+                                {
+                                    if cls.is_immutable {
+                                        let receiver =
+                                            crate::parser::span_text(self.source, pa.object.span)
+                                                .unwrap_or_else(|| "the receiver".to_string());
+                                        self.emit(
+                                            IssueKind::ImmutablePropertyModification {
+                                                receiver,
+                                                property: prop_name.clone(),
+                                            },
+                                            Severity::Warning,
+                                            span,
+                                        );
+                                    }
+                                }
                             }
                             let db = self.db;
                             let prop_found = crate::db::find_property_in_chain(
