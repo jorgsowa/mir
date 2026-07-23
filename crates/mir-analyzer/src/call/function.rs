@@ -31,6 +31,7 @@ struct ResolvedFn {
     throws: Arc<[Arc<str>]>,
     no_named_arguments: bool,
     is_pure: bool,
+    taint_sink_params: Vec<(Arc<str>, Arc<str>)>,
 }
 
 fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
@@ -54,6 +55,7 @@ fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
             throws: Arc::<[Arc<str>]>::from(f.throws.as_slice()),
             no_named_arguments: f.no_named_arguments,
             is_pure: f.is_pure,
+            taint_sink_params: f.taint_sink_params.clone(),
         });
     }
     None
@@ -514,6 +516,40 @@ impl CallAnalyzer {
             let return_ty_raw = resolved.return_ty_raw;
             let no_named_arguments = resolved.no_named_arguments;
             let is_pure = resolved.is_pure;
+            let taint_sink_params = resolved.taint_sink_params;
+
+            // Taint sink check: emit TaintedLlmPrompt when a tainted value reaches a
+            // @taint-sink annotated parameter. Mirrors call/method.rs's identical
+            // check for method/static-method calls — a plain function previously
+            // had no equivalent at all, so `@taint-sink` on one was a silent no-op.
+            if !taint_sink_params.is_empty() {
+                'sink: for (param_name, sink_kind) in &taint_sink_params {
+                    let param_idx = params
+                        .iter()
+                        .position(|p| p.name.as_ref() == param_name.as_ref());
+                    let arg = if let Some(idx) = param_idx {
+                        call.args.get(idx)
+                    } else {
+                        None
+                    };
+                    let named_arg = call.args.iter().find(|a| {
+                        a.name
+                            .as_ref()
+                            .map(|n| crate::parser::name_to_string_owned(n) == param_name.as_ref())
+                            .unwrap_or(false)
+                    });
+                    let arg = arg.or(named_arg);
+                    if let Some(arg) = arg {
+                        if is_expr_tainted(&arg.value, ctx) {
+                            let issue = match sink_kind.as_ref() {
+                                "llm_prompt" => IssueKind::TaintedLlmPrompt,
+                                _ => continue 'sink,
+                            };
+                            ea.emit(issue, Severity::Error, span);
+                        }
+                    }
+                }
+            }
 
             if ctx.is_in_pure_fn && !is_pure {
                 ea.emit(
