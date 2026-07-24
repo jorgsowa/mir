@@ -295,8 +295,8 @@ impl CallAnalyzer {
             let target_args: Vec<&php_ast::owned::Arg> = match relevant {
                 None => call.args.iter().collect(),
                 Some(idxs) => {
-                    let param_name =
-                        crate::taint::sink_param_name(&crate::util::php_ident_lowercase(&fn_name));
+                    let fn_name_lower = crate::util::php_ident_lowercase(&fn_name);
+                    let param_name = crate::taint::sink_param_name(&fn_name_lower);
                     let named = param_name.and_then(|name| {
                         call.args.iter().find(|a| {
                             a.name
@@ -306,8 +306,9 @@ impl CallAnalyzer {
                     });
                     named
                         .or_else(|| {
-                            idxs.first()
-                                .and_then(|&idx| call.args.get(idx))
+                            let idx = crate::taint::sink_positional_index_override(&fn_name_lower)
+                                .or_else(|| idxs.first().copied());
+                            idx.and_then(|idx| call.args.get(idx))
                                 .filter(|a| a.name.is_none())
                         })
                         .into_iter()

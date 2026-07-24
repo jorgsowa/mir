@@ -66,7 +66,20 @@ pub fn sink_param_name(fn_name_lower: &str) -> Option<&'static str> {
         "fopen" | "file_get_contents" | "file_put_contents" | "readfile" | "file" | "unlink" => {
             Some("filename")
         }
+        "move_uploaded_file" => Some("to"),
         "unserialize" => Some("data"),
+        _ => None,
+    }
+}
+
+/// Positional-call override for a File sink whose dangerous argument isn't at
+/// `SinkKind::tainted_arg_indices`'s shared index 0 — `move_uploaded_file($from,
+/// $to)` writes to `$to` (index 1), unlike every other File sink listed there,
+/// whose sole argument (or first argument) IS the path. `None` means "use the
+/// shared index," which is every other File/Unserialize sink today.
+pub fn sink_positional_index_override(fn_name_lower: &str) -> Option<usize> {
+    match fn_name_lower {
+        "move_uploaded_file" => Some(1),
         _ => None,
     }
 }
@@ -89,10 +102,10 @@ pub fn classify_sink(fn_name: &str) -> Option<SinkKind> {
         }
 
         // Filesystem path (path traversal / local-file-inclusion / SSRF). Each
-        // of these takes the path/URL as its first argument.
-        "fopen" | "file_get_contents" | "file_put_contents" | "readfile" | "file" | "unlink" => {
-            Some(SinkKind::File)
-        }
+        // of these takes the path/URL as its first argument, except
+        // `move_uploaded_file` (see `sink_positional_index_override`).
+        "fopen" | "file_get_contents" | "file_put_contents" | "readfile" | "file" | "unlink"
+        | "move_uploaded_file" => Some(SinkKind::File),
 
         // Object injection.
         "unserialize" => Some(SinkKind::Unserialize),
