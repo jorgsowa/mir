@@ -350,6 +350,15 @@ impl<'a> StatementsAnalyzer<'a> {
             let pre = &self.source[..start.min(self.source.len())];
             pre.chars().rev().find(|c| !c.is_whitespace()) == Some('&')
         };
+        if value_is_by_ref {
+            // `foreach ($this->items as &$v)` mutates that property's
+            // contents in place, exactly as much as a by-ref call argument
+            // (`sort($this->items)`) does — but the iterable expression was
+            // never routed through the same purity/immutability/readonly
+            // check that call-argument path already gets.
+            self.expr_analyzer(&entry)
+                .check_byref_arg_purity(&fe.expr, &entry, fe.expr.span);
+        }
         if let Some(ref vname) = value_var {
             entry.set_var(vname.as_str(), value_ty.clone());
             if iterable_tainted {
