@@ -405,11 +405,35 @@ pub fn build_class_bindings(
     class_template_params: &[TemplateParam],
     receiver_type_params: &[Type],
 ) -> FxHashMap<Name, Type> {
-    class_template_params
+    let mut bindings: FxHashMap<Name, Type> = class_template_params
         .iter()
         .zip(receiver_type_params.iter())
         .map(|(tp, ty)| (Name::from(tp.name.as_ref()), ty.clone()))
-        .collect()
+        .collect();
+
+    // A bare class ref supplies fewer type args than the class declares (most
+    // commonly zero, e.g. `new TypedList()` for `class TypedList<T = int>`) —
+    // fall back to each unbound template's declared default, when it has
+    // one. Leaving it unbound here is what previously made every downstream
+    // consumer treat a bare ref as an unconstrained wildcard even when the
+    // class declared a concrete `@template T = Default`.
+    //
+    // Deliberately only handles a template that HAS a declared default —
+    // does NOT insert any entry (let alone fall back to `tp.bound` or
+    // `mixed`) for a template with neither, matching the pre-existing,
+    // deliberate behavior of leaving such a template's atom raw/unsubstituted
+    // (several fixtures, e.g. `bounded_unbound_template_no_false_positive`
+    // and `bare_subclass_extends_fixed_property_type_resolves`'s
+    // `noFixedTemplateStaysRaw` case, depend on this permissiveness).
+    for tp in class_template_params {
+        if let Some(default) = tp.default.as_deref() {
+            bindings
+                .entry(Name::from(tp.name.as_ref()))
+                .or_insert_with(|| default.clone());
+        }
+    }
+
+    bindings
 }
 
 // ---------------------------------------------------------------------------

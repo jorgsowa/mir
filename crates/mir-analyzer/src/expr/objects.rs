@@ -1695,11 +1695,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                         // ancestor template with no receiver-supplied args at all.
                         let class_tps = crate::db::class_template_params(self.db, fqcn.as_ref())
                             .unwrap_or_default();
-                        let own_bindings: rustc_hash::FxHashMap<mir_types::Name, Type> = class_tps
-                            .iter()
-                            .zip(type_params.iter())
-                            .map(|(tp, t)| (tp.name, t.clone()))
-                            .collect();
+                        let own_bindings =
+                            crate::generic::build_class_bindings(&class_tps, type_params);
                         let inherited = crate::db::inherited_template_bindings(
                             self.db,
                             fqcn.as_ref(),
@@ -1853,12 +1850,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                             let class_tps =
                                 crate::db::class_template_params(self.db, fqcn.as_ref())
                                     .unwrap_or_default();
-                            let own_bindings: rustc_hash::FxHashMap<mir_types::Name, Type> =
-                                class_tps
-                                    .iter()
-                                    .zip(type_params.iter())
-                                    .map(|(tp, t)| (tp.name, t.clone()))
-                                    .collect();
+                            let own_bindings =
+                                crate::generic::build_class_bindings(&class_tps, type_params);
                             return ty.substitute_templates(&own_bindings);
                         }
                     }
