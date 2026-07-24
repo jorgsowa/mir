@@ -247,21 +247,24 @@ impl<'a> ExpressionAnalyzer<'a> {
             ctx.mark_consumed(name);
         }
 
-        // A by-value capture of a variable that is itself a parameter of the
-        // enclosing function is still externally owned by the caller, so
-        // calling a mutating method on it inside the closure body is an
-        // externally observable side effect — exactly like calling one on a
-        // real parameter. Extend `param_names` so the existing pure/
-        // immutable/external-mutation-free method-call checks (which key off
-        // that set) also catch such captures. A capture of a locally-created
-        // object stays out of this set, matching the "local objects are
-        // exempt" rule the same checks already apply to real params.
+        // A capture (by value OR by reference) of a variable that is itself a
+        // parameter of the enclosing function is still externally owned by
+        // the caller, so calling a mutating method on it inside the closure
+        // body is an externally observable side effect — exactly like
+        // calling one on a real parameter. Extend `param_names` so the
+        // existing pure/immutable/external-mutation-free method-call checks
+        // (which key off that set) also catch such captures. A capture of a
+        // locally-created object stays out of this set, matching the "local
+        // objects are exempt" rule the same checks already apply to real
+        // params. Previously only a by-value capture was covered here — a
+        // by-ref capture (`use (&$c)`) is the SAME external variable, not a
+        // copy, so it's just as reachable, yet was silently excluded.
         if closure_ctx.is_in_pure_fn
             || closure_ctx.is_in_immutable_method
             || closure_ctx.is_in_external_mutation_free_method
         {
             let mut extended_param_names = (*closure_ctx.param_names).clone();
-            for use_var in c.use_vars.iter().filter(|uv| !uv.by_ref) {
+            for use_var in c.use_vars.iter() {
                 let name = use_var.name.trim_start_matches('$');
                 if ctx.param_names.contains(&Name::from(name)) {
                     extended_param_names.insert(Name::from(name));
