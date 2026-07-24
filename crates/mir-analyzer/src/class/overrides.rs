@@ -320,6 +320,35 @@ impl<'a> ClassAnalyzer<'a> {
                 issues.push(issue);
             }
 
+            // ---- b2. A @pure override must re-declare @pure -----------------
+            // call/method.rs gates purity/immutability safety checks on the
+            // STATICALLY resolved method's own `is_pure` (resolved against the
+            // receiver's declared type, not runtime dispatch) — a caller typed
+            // as the ancestor treats every call through it as pure. An override
+            // that silently drops `@pure` without re-declaring it therefore
+            // makes that already-shipped enforcement unsound, not just a style
+            // nit.
+            if let Some((parent_fqcn, _)) = all_parent_methods
+                .iter()
+                .find(|(_, p)| p.is_pure && !own.is_pure)
+            {
+                let mut issue = Issue::new(
+                    IssueKind::MethodSignatureMismatch {
+                        class: fqcn.to_string(),
+                        method: method_name_lower.to_string(),
+                        detail: format!(
+                            "{}::{}() is declared @pure and must be re-declared @pure when overridden",
+                            parent_fqcn, method_name_lower
+                        ),
+                    },
+                    loc.clone(),
+                );
+                if let Some(snippet) = extract_snippet(own_location.as_ref(), &self.sources) {
+                    issue = issue.with_snippet(snippet);
+                }
+                issues.push(issue);
+            }
+
             // ---- c. Visibility must not be reduced -------------------------
             if all_parent_methods
                 .iter()
