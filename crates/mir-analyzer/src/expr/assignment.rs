@@ -642,6 +642,50 @@ impl<'a> ExpressionAnalyzer<'a> {
                 self.check_property_write_purity_by_name(recv_name, &prop_name, ctx, span);
             }
         }
+        // Cross-class immutable write: a write to a non-`$this` receiver of
+        // an immutable-tagged class is forbidden from ANY caller, not just
+        // when reached through a plain `$obj->prop = x` assignment — an
+        // array-index write, `++`/`--`, a by-ref call argument, or a by-ref
+        // `foreach` over the same property all mutate it identically, but
+        // only the plain-assignment arm ever ran this check.
+        let is_this_receiver = matches!(
+            &pa.object.kind,
+            ExprKind::Variable(n) if n.trim_start_matches('$') == "this"
+        );
+        if !is_this_receiver {
+            if let Some(prop_name) = extract_string_from_expr(&pa.property) {
+                if let Some(obj_ty) = resolve_chained_receiver_type(&pa.object, ctx, self.db) {
+                    for atomic in &obj_ty.types {
+                        if let Atomic::TNamedObject { fqcn, .. }
+                        | Atomic::TSelf { fqcn }
+                        | Atomic::TStaticObject { fqcn }
+                        | Atomic::TParent { fqcn } = atomic
+                        {
+                            if let Some(crate::db::ClassLike::Class(cls)) =
+                                crate::db::find_class_like(
+                                    self.db,
+                                    crate::db::Fqcn::from_str(self.db, fqcn.as_ref()),
+                                )
+                            {
+                                if cls.is_immutable {
+                                    let receiver =
+                                        crate::parser::span_text(self.source, pa.object.span)
+                                            .unwrap_or_else(|| "the receiver".to_string());
+                                    self.emit(
+                                        IssueKind::ImmutablePropertyModification {
+                                            receiver,
+                                            property: prop_name.clone(),
+                                        },
+                                        Severity::Warning,
+                                        span,
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// Like `check_property_write_purity`, but takes the receiver/property as
@@ -1042,39 +1086,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 }
                                 continue;
                             }
-                            // Cross-class immutable write: only a write from
-                            // INSIDE the immutable class's own methods was
-                            // checked before (via ctx.is_in_immutable_method,
-                            // gated on a literal `$this` receiver above) — an
-                            // outside `$b->x = 1;` on an immutable-tagged
-                            // object was a silent no-op. The contract applies
-                            // to any writer, not just the class's own code.
-                            let is_this_receiver = matches!(
-                                &pa.object.kind,
-                                ExprKind::Variable(n) if n.trim_start_matches('$') == "this"
-                            );
-                            if !is_this_receiver {
-                                if let Some(crate::db::ClassLike::Class(cls)) =
-                                    crate::db::find_class_like(
-                                        self.db,
-                                        crate::db::Fqcn::from_str(self.db, fqcn.as_ref()),
-                                    )
-                                {
-                                    if cls.is_immutable {
-                                        let receiver =
-                                            crate::parser::span_text(self.source, pa.object.span)
-                                                .unwrap_or_else(|| "the receiver".to_string());
-                                        self.emit(
-                                            IssueKind::ImmutablePropertyModification {
-                                                receiver,
-                                                property: prop_name.clone(),
-                                            },
-                                            Severity::Warning,
-                                            span,
-                                        );
-                                    }
-                                }
-                            }
+                            // Cross-class immutable write is now checked once,
+                            // for every write shape, by `check_property_write_purity`
+                            // (called at the top of this arm) — no longer
+                            // duplicated here.
                             let db = self.db;
                             let prop_found = crate::db::find_property_in_chain(
                                 db,
