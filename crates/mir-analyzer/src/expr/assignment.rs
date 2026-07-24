@@ -709,29 +709,24 @@ impl<'a> ExpressionAnalyzer<'a> {
     /// `ExprKind::Variable` case is already handled by each write-back site
     /// itself).
     pub(crate) fn check_byref_arg_purity(&mut self, arg_expr: &Expr, ctx: &FlowState, span: Span) {
-        match &arg_expr.kind {
+        // `sort($this->cache['x']['y'])` — any depth of array-index-into-
+        // property nesting mutates that property's contents exactly as much
+        // as a direct property argument (`sort($this->cache)`) does. Unwrap
+        // every `ArrayAccess` level (not just one) down to the real base
+        // before checking it, mirroring `assign_to_target`'s own base-walk
+        // loop for a plain nested-index write.
+        let mut base = arg_expr;
+        while let ExprKind::ArrayAccess(aa) = &base.kind {
+            base = &aa.array;
+        }
+        match &base.kind {
             ExprKind::PropertyAccess(pa) => {
                 self.check_property_write_purity(pa, ctx, span);
                 self.check_property_readonly_write(pa, ctx, span);
             }
-            // `sort($this->cache['x'])` — an array-index-into-property
-            // by-ref argument mutates that property's contents exactly as
-            // much as a direct property argument (`sort($this->cache)`)
-            // does, but only the direct-property shape was ever checked.
-            ExprKind::ArrayAccess(aa) => match &aa.array.kind {
-                ExprKind::PropertyAccess(pa) => {
-                    self.check_property_write_purity(pa, ctx, span);
-                    self.check_property_readonly_write(pa, ctx, span);
-                }
-                ExprKind::StaticPropertyAccess(spa) => {
-                    self.check_static_prop_byref_purity(spa, ctx, span);
-                }
-                _ => {}
-            },
             // `array_push(self::$queue, $x)` — a static-property by-ref
             // argument mutates that property exactly as much as
-            // `self::$queue = …` would; static properties had no by-ref
-            // arm at all, unlike the instance-property one above.
+            // `self::$queue = …` would.
             ExprKind::StaticPropertyAccess(spa) => {
                 self.check_static_prop_byref_purity(spa, ctx, span);
             }
