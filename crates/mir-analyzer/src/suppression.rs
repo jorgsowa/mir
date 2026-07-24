@@ -331,8 +331,18 @@ fn is_heredoc_closing_line(line: &str, ident: &str) -> bool {
 /// qualifies, so the directive still has a deterministic target.
 fn next_code_line(raw_lines: &[&str], idx: usize, skip_comments: bool) -> (u32, Vec<u32>) {
     let mut attribute_lines = Vec::new();
+    // Net `[`/`]` depth of an in-progress multi-line attribute (`#[` opener
+    // whose closing `]` is on a later line) — 0 when not currently inside
+    // one. Every line consumed while this is positive is itself an
+    // attribute line, same treatment the single-line case already gets.
+    let mut multiline_attr_depth: i32 = 0;
     for (offset, line) in raw_lines.iter().enumerate().skip(idx + 1) {
         let trimmed = line.trim();
+        if multiline_attr_depth > 0 {
+            attribute_lines.push(offset as u32 + 1);
+            multiline_attr_depth += bracket_delta(trimmed);
+            continue;
+        }
         if trimmed.is_empty() {
             continue;
         }
@@ -340,12 +350,36 @@ fn next_code_line(raw_lines: &[&str], idx: usize, skip_comments: bool) -> (u32, 
             attribute_lines.push(offset as u32 + 1);
             continue;
         }
+        // A `#[` opener with no matching `]` on the SAME line (net positive
+        // bracket delta) starts a multi-line attribute — track depth across
+        // subsequent lines instead of wrongly treating this opener line as
+        // the real target.
+        if trimmed.starts_with("#[") {
+            let delta = bracket_delta(trimmed);
+            if delta > 0 {
+                attribute_lines.push(offset as u32 + 1);
+                multiline_attr_depth = delta;
+                continue;
+            }
+        }
         if skip_comments && is_comment_only(trimmed) {
             continue;
         }
         return (offset as u32 + 1, attribute_lines);
     }
     (idx as u32 + 2, attribute_lines)
+}
+
+/// Net count of `[` minus `]` in `s` — no quote-awareness, matching the
+/// same conservative scope `is_attribute_only`'s plain `ends_with(']')`
+/// already accepts (real attribute argument text containing a bracket
+/// inside a string literal is out of scope here).
+fn bracket_delta(s: &str) -> i32 {
+    s.chars().fold(0i32, |depth, c| match c {
+        '[' => depth + 1,
+        ']' => depth - 1,
+        _ => depth,
+    })
 }
 
 /// Whether a trimmed line is purely a comment (no PHP code). `#[` is treated as
