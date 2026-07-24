@@ -259,9 +259,16 @@ pub fn is_expr_tainted(
             .iter()
             .any(|arm| is_expr_tainted(&arm.body, ctx, db, file)),
 
-        ExprKind::Array(elements) => elements
-            .iter()
-            .any(|el| is_expr_tainted(&el.value, ctx, db, file)),
+        // An element's KEY can carry taint just as much as its value
+        // (`[$_GET['env'] => 'active']` — the attacker controls which key
+        // exists), but only `el.value` was ever checked here.
+        ExprKind::Array(elements) => elements.iter().any(|el| {
+            is_expr_tainted(&el.value, ctx, db, file)
+                || el
+                    .key
+                    .as_ref()
+                    .is_some_and(|k| is_expr_tainted(k, ctx, db, file))
+        }),
 
         // `@taint-source`-annotated function/method calls are themselves a
         // taint source, mirroring `@taint-sink`'s mechanism on the source
