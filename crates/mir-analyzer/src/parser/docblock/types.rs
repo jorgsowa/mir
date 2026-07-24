@@ -33,10 +33,20 @@ pub(crate) fn split_array_key_suffix(name: &str) -> (String, Option<mir_types::A
     if inner.contains('[') || name[..open].is_empty() {
         return (name.to_string(), None);
     }
-    (
-        name[..open].to_string(),
-        parse_literal_array_key(inner.trim()),
-    )
+    // A bracket suffix whose key isn't a recognized literal (e.g. a class
+    // constant, `$config[self::KEY]`) must leave the name UNTOUCHED, not
+    // just drop the key — stripping the brackets here would turn
+    // `config[self::KEY]` into the bare name `config`, which then matches
+    // the real `$config` parameter and (via `apply_assertions` treating a
+    // `None` key as "target the whole variable") silently overwrites the
+    // entire parameter's type with the assertion's leaf type instead of a
+    // harmless no-op. Returning the original bracketed text keeps this a
+    // no-match against any real parameter name instead, same as the
+    // nested-bracket case above.
+    match parse_literal_array_key(inner.trim()) {
+        Some(key) => (name[..open].to_string(), Some(key)),
+        None => (name.to_string(), None),
+    }
 }
 
 fn parse_literal_array_key(inner: &str) -> Option<mir_types::ArrayKey> {
