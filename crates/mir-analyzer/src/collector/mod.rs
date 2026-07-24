@@ -365,6 +365,19 @@ where
                 this_type: data.this_type.map(|t| expand_aliases_only(t, aliases)),
             }),
         }),
+        // `@return ($param is X ? A : B)` — a type alias used in either
+        // branch (or the subject) of a conditional return type never expanded
+        // at all, since no arm here recursed into `TConditional`; it fell
+        // through to the `other` catch-all below, leaking the raw
+        // unexpanded alias atom into the resolved branch type.
+        Atomic::TConditional { data } => Type::single(Atomic::TConditional {
+            data: Box::new(mir_types::atomic::ConditionalData {
+                param_name: data.param_name,
+                subject: expand_aliases_only(data.subject, aliases),
+                if_true: expand_aliases_only(data.if_true, aliases),
+                if_false: expand_aliases_only(data.if_false, aliases),
+            }),
+        }),
         other => Type::single(other),
     }
 }
