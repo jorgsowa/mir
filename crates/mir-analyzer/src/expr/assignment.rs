@@ -89,6 +89,33 @@ fn target_is_currently_tainted(
     }
 }
 
+/// `$arr['k'] = $tainted;` / `$arr['k'] .= $tainted;` / `$arr['k'] += $tainted;`
+/// taints the whole container at the same coarse, whole-container
+/// granularity the Array-literal taint check already uses for any tainted
+/// element — but every one of the three array-element-write taint arms
+/// below only ever matched a plain-variable base, silently dropping taint
+/// for a property or static-property base (`$this->items['id'] =
+/// $tainted;`, `self::$items['id'] = $tainted;`), even though the READ
+/// side already supports both.
+fn taint_array_write_base(base: &Expr, ctx: &mut FlowState, db: &dyn MirDatabase, file: &str) {
+    match &base.kind {
+        ExprKind::Variable(name) => ctx.taint_var(name.trim_start_matches('$')),
+        ExprKind::PropertyAccess(pa) => {
+            if let ExprKind::Variable(obj_var) = &pa.object.kind {
+                if let Some(prop_name) = extract_string_from_expr(&pa.property) {
+                    ctx.taint_prop(obj_var.trim_start_matches('$'), &prop_name);
+                }
+            }
+        }
+        ExprKind::StaticPropertyAccess(spa) => {
+            if let Some((fqcn, prop_name)) = resolve_static_prop_target(spa, ctx, db, file) {
+                ctx.taint_static_prop(&fqcn, &prop_name);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// Apply a compound-assignment's taint outcome to its target — shared by
 /// the arithmetic (`+=` family) and `??=` arms, both of which need the same
 /// four-way target-shape taint set/clear that `.=`'s own arm already
@@ -126,9 +153,7 @@ fn apply_compound_assign_taint(
         // cleared, since a single tainted element must not clean the whole
         // container just because THIS write happened to be untainted.
         ExprKind::ArrayAccess(aa) if should_taint => {
-            if let ExprKind::Variable(base_var) = &aa.array.kind {
-                ctx.taint_var(base_var.trim_start_matches('$'));
-            }
+            taint_array_write_base(&aa.array, ctx, db, file);
         }
         ExprKind::StaticPropertyAccess(spa) => {
             if let Some((fqcn, prop_name)) = resolve_static_prop_target(spa, ctx, db, file) {
@@ -335,9 +360,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     // simple-variable base is tracked, matching every other
                     // taint-propagating target arm above.
                     ExprKind::ArrayAccess(aa) if rhs_tainted => {
-                        if let ExprKind::Variable(base_var) = &aa.array.kind {
-                            ctx.taint_var(base_var.trim_start_matches('$'));
-                        }
+                        taint_array_write_base(&aa.array, ctx, self.db, &self.file);
                     }
                     // `self::$prop = $tainted;` / `Foo::$prop = $tainted;` —
                     // static properties were entirely untracked for taint,
@@ -447,9 +470,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             }
                         }
                         ExprKind::ArrayAccess(aa) if rhs_tainted => {
-                            if let ExprKind::Variable(base_var) = &aa.array.kind {
-                                ctx.taint_var(base_var.trim_start_matches('$'));
-                            }
+                            taint_array_write_base(&aa.array, ctx, self.db, &self.file);
                         }
                         ExprKind::StaticPropertyAccess(spa) => {
                             if let ExprKind::Identifier(id) = &spa.class.kind {
