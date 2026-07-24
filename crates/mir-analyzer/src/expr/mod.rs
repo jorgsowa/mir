@@ -522,6 +522,19 @@ impl<'a> ExpressionAnalyzer<'a> {
             // --- Include/require --------------------------------------------
             ExprKind::Include(_, inner) => {
                 self.analyze(inner, ctx);
+                // A tainted path is local/remote file inclusion — the same
+                // File-sink risk as fopen()/file_get_contents(), but this is
+                // its own AST node (not a FunctionCall), so classify_sink's
+                // dispatch never sees it.
+                if crate::taint::is_expr_tainted(inner, ctx, self.db, &self.file) {
+                    self.emit(
+                        IssueKind::TaintedInput {
+                            sink: "include".to_string(),
+                        },
+                        Severity::Error,
+                        expr.span,
+                    );
+                }
                 // A require/include can read any variable currently in scope, so
                 // mark all pending writes as consumed and mark the names as read.
                 // This covers both the last_write_locs path and the assigned_vars
@@ -541,6 +554,19 @@ impl<'a> ExpressionAnalyzer<'a> {
             // --- Eval -------------------------------------------------------
             ExprKind::Eval(inner) => {
                 self.analyze(inner, ctx);
+                // `eval()` is its own AST node (not a FunctionCall), so
+                // classify_sink's name-based dispatch never sees it — tainted
+                // code reaching it is arbitrary code execution, the most
+                // dangerous sink this analyzer models.
+                if crate::taint::is_expr_tainted(inner, ctx, self.db, &self.file) {
+                    self.emit(
+                        IssueKind::TaintedInput {
+                            sink: "eval".to_string(),
+                        },
+                        Severity::Error,
+                        expr.span,
+                    );
+                }
                 Type::mixed()
             }
 
