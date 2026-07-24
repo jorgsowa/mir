@@ -60,6 +60,41 @@ fn propagate_readonly_prop_refinements(
 }
 
 impl<'a> ExpressionAnalyzer<'a> {
+    /// Local type aliases (`@psalm-type`/`@phpstan-type`) declared in the
+    /// enclosing class-like's (or, for a closure declared inside a free
+    /// function, that function's own) docblock never expanded inside a
+    /// nested closure/arrow-function's OWN `@param`/`@return` docblock —
+    /// every usage site showed the literal unresolved alias name instead of
+    /// its expansion. Mirrors `stmt/mod.rs`'s `extract_var_annotation_from`,
+    /// which already does this for a bare `@var` annotation; not cached the
+    /// way that helper is, since a closure body is analyzed once per
+    /// enclosing function, not once per statement.
+    fn expand_local_type_aliases_in_doc(
+        &self,
+        doc: &mut crate::parser::ParsedDocblock,
+        ctx: &FlowState,
+    ) {
+        let aliases = if let Some(fqcn) = ctx.self_fqcn.as_deref() {
+            crate::db::find_class_like(self.db, crate::db::Fqcn::from_str(self.db, fqcn))
+                .map(|cl| cl.type_aliases().clone())
+        } else if let Some(fqn) = ctx.current_function_fqn.as_deref() {
+            crate::db::find_function(self.db, crate::db::Fqcn::from_str(self.db, fqn))
+                .map(|f| f.type_aliases.clone())
+        } else {
+            None
+        };
+        let Some(aliases) = aliases else { return };
+        if aliases.is_empty() {
+            return;
+        }
+        for (_, ty) in doc.params.iter_mut() {
+            *ty = crate::collector::expand_aliases_only(ty.clone(), &aliases);
+        }
+        if let Some(rt) = doc.return_type.take() {
+            doc.return_type = Some(crate::collector::expand_aliases_only(rt, &aliases));
+        }
+    }
+
     pub(super) fn analyze_closure(
         &mut self,
         c: &ClosureExpr,
@@ -75,8 +110,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             self.check_type_hint(hint);
         }
 
-        let leading_doc = crate::parser::find_preceding_docblock(self.source, expr_span.start)
+        let mut leading_doc = crate::parser::find_preceding_docblock(self.source, expr_span.start)
             .map(|doc| crate::parser::DocblockParser::parse(&doc));
+        if let Some(doc) = &mut leading_doc {
+            self.expand_local_type_aliases_in_doc(doc, ctx);
+        }
 
         let mut params = ast_params_to_fn_params_resolved(
             &c.params,
@@ -316,8 +354,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             self.check_type_hint(hint);
         }
 
-        let leading_doc = crate::parser::find_preceding_docblock(self.source, expr_span.start)
+        let mut leading_doc = crate::parser::find_preceding_docblock(self.source, expr_span.start)
             .map(|doc| crate::parser::DocblockParser::parse(&doc));
+        if let Some(doc) = &mut leading_doc {
+            self.expand_local_type_aliases_in_doc(doc, ctx);
+        }
 
         let mut params = ast_params_to_fn_params_resolved(
             &af.params,
