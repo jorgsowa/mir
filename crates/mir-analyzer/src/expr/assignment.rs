@@ -20,7 +20,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 /// `ArrayAccess` element (`[$obj->prop] = $tainted;`) is conservatively
 /// skipped, matching how the plain-assignment case only taints a bare
 /// variable or property, never an arbitrary nested write target.
-fn taint_destructured_targets(target: &Expr, ctx: &mut FlowState) {
+pub(crate) fn taint_destructured_targets(target: &Expr, ctx: &mut FlowState) {
     let ExprKind::Array(elements) = &target.kind else {
         return;
     };

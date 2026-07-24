@@ -413,6 +413,15 @@ impl<'a> StatementsAnalyzer<'a> {
                 &mut entry,
                 fe.value.span,
             );
+            // `foreach ($tainted as [$a, $b])`: `assign_to_target` has no
+            // taint-marking of its own, so a destructured value target
+            // (unlike a plain variable, handled above) silently dropped
+            // taint entirely — reuse the same helper `analyze_assign`'s
+            // `Array` target arm already calls for a plain destructuring
+            // assignment.
+            if iterable_tainted {
+                crate::expr::assignment::taint_destructured_targets(&fe.value, &mut entry);
+            }
         }
 
         let loop_guaranteed = super::loops::loop_guaranteed_to_execute(&arr_ty);
@@ -445,6 +454,9 @@ impl<'a> StatementsAnalyzer<'a> {
                         iter,
                         fe.value.span,
                     );
+                    if iterable_tainted {
+                        crate::expr::assignment::taint_destructured_targets(&fe.value, iter);
+                    }
                 }
                 sa.analyze_stmt(&fe.body, iter);
             },
