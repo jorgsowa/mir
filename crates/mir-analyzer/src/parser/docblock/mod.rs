@@ -201,7 +201,8 @@ impl DocblockParser {
                     if let Some(body_str) = body_text(&tag.body) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             let (ty, negated) = parse_assertion_type(&ty_str);
-                            result.assertions.push((name, ty, negated));
+                            let (name, key) = split_array_key_suffix(&name);
+                            result.assertions.push((name, key, ty, negated));
                         }
                     }
                 }
@@ -362,7 +363,8 @@ impl DocblockParser {
                     if let Some(body_str) = body_text(&tag.body) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             let (ty, negated) = parse_assertion_type(&ty_str);
-                            result.assertions_if_true.push((name, ty, negated));
+                            let (name, key) = split_array_key_suffix(&name);
+                            result.assertions_if_true.push((name, key, ty, negated));
                         }
                     }
                 }
@@ -370,7 +372,8 @@ impl DocblockParser {
                     if let Some(body_str) = body_text(&tag.body) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             let (ty, negated) = parse_assertion_type(&ty_str);
-                            result.assertions_if_false.push((name, ty, negated));
+                            let (name, key) = split_array_key_suffix(&name);
+                            result.assertions_if_false.push((name, key, ty, negated));
                         }
                     }
                 }
@@ -610,12 +613,15 @@ pub struct ParsedDocblock {
     pub uses: Vec<Type>,
     /// `@throws ClassName`
     pub throws: Vec<String>,
-    /// `@psalm-assert Type $var` — the `bool` is true for the `!Type` negated form.
-    pub assertions: Vec<(String, Type, bool)>,
+    /// `@psalm-assert Type $var` — the `bool` is true for the `!Type` negated
+    /// form; the `Option<ArrayKey>` is set when the target is a specific
+    /// array key of `$var` (`@psalm-assert Type $var['key']`) rather than
+    /// the whole variable.
+    pub assertions: Vec<(String, Option<ArrayKey>, Type, bool)>,
     /// `@psalm-assert-if-true Type $var`
-    pub assertions_if_true: Vec<(String, Type, bool)>,
+    pub assertions_if_true: Vec<(String, Option<ArrayKey>, Type, bool)>,
     /// `@psalm-assert-if-false Type $var`
-    pub assertions_if_false: Vec<(String, Type, bool)>,
+    pub assertions_if_false: Vec<(String, Option<ArrayKey>, Type, bool)>,
     /// `@psalm-suppress IssueName`
     pub suppressed_issues: Vec<String>,
     pub is_deprecated: bool,

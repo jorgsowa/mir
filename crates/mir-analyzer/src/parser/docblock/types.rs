@@ -12,6 +12,43 @@ pub(crate) fn parse_assertion_type(s: &str) -> (Type, bool) {
     }
 }
 
+/// Split a trailing literal array-key suffix off an assertion target name
+/// (`arr['key']` -> `("arr", Some(ArrayKey::String("key")))`) — used by
+/// `@psalm-assert(-if-true/-if-false) Type $arr['key']` to target a
+/// specific key of a parameter instead of the whole parameter.
+/// `parse_param_line` (shared with plain `@param` parsing, which never has
+/// this suffix on a real parameter name) returns the bracket text verbatim;
+/// splitting it here keeps that function's generic parsing behavior
+/// untouched. Only a single-level suffix is recognized — a second `[`
+/// (`arr['a']['b']`) bails out, leaving the name untouched (a harmless
+/// no-match against any real param name, same as before this fix).
+pub(crate) fn split_array_key_suffix(name: &str) -> (String, Option<mir_types::ArrayKey>) {
+    if !name.ends_with(']') {
+        return (name.to_string(), None);
+    }
+    let Some(open) = name.find('[') else {
+        return (name.to_string(), None);
+    };
+    let inner = &name[open + 1..name.len() - 1];
+    if inner.contains('[') || name[..open].is_empty() {
+        return (name.to_string(), None);
+    }
+    (
+        name[..open].to_string(),
+        parse_literal_array_key(inner.trim()),
+    )
+}
+
+fn parse_literal_array_key(inner: &str) -> Option<mir_types::ArrayKey> {
+    if let Some(s) = inner.strip_prefix('\'').and_then(|s| s.strip_suffix('\'')) {
+        return Some(mir_types::ArrayKey::String(std::sync::Arc::from(s)));
+    }
+    if let Some(s) = inner.strip_prefix('"').and_then(|s| s.strip_suffix('"')) {
+        return Some(mir_types::ArrayKey::String(std::sync::Arc::from(s)));
+    }
+    inner.parse::<i64>().ok().map(mir_types::ArrayKey::Int)
+}
+
 pub(crate) fn parse_type_string(s: &str) -> Type {
     let s = s.trim();
 

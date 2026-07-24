@@ -385,6 +385,11 @@ pub struct Assertion {
     /// parameter is asserted to NOT be `ty`, rather than to BE it.
     #[serde(default)]
     pub negated: bool,
+    /// Set for an assertion targeting a specific array key of `param`
+    /// rather than the whole parameter (`@psalm-assert-if-true string
+    /// $arr['key']` — `param` is `"arr"`, `param_key` is `Some(String("key"))`).
+    #[serde(default)]
+    pub param_key: Option<mir_types::atomic::ArrayKey>,
 }
 
 // ---------------------------------------------------------------------------

@@ -219,6 +219,99 @@ pub(crate) fn set_shape_base_narrowed(
     }
 }
 
+/// Force `path`'s value type to `asserted` in every `TKeyedArray` union
+/// member — the assign counterpart of `narrow_shape_path` (which only
+/// refines a key ALREADY proven present): used by an assertion-tag target
+/// on a specific array key (`@psalm-assert-if-true string $arr['key']`),
+/// which must set the key's type outright rather than merely narrow an
+/// existing one. Adds the key if the shape doesn't have it yet (open or
+/// not), same as an ordinary literal-keyed array write would. A non-shape
+/// union member (`array`, `TArray`, a non-array atom) is left untouched —
+/// there's no shape structure to attach a single key's type to without
+/// first synthesizing one, out of scope for this targeted fix.
+pub(crate) fn set_shape_path(
+    ty: &Type,
+    path: &[mir_types::atomic::ArrayKey],
+    asserted: &Type,
+) -> Type {
+    let Some((key, rest)) = path.split_first() else {
+        return asserted.clone();
+    };
+    let mut touched = false;
+    let mut result = Type::empty();
+    for atomic in &ty.types {
+        match atomic {
+            Atomic::TKeyedArray {
+                properties,
+                is_open,
+                is_list,
+            } => {
+                touched = true;
+                let mut new_props = properties.clone();
+                let value_ty = if rest.is_empty() {
+                    asserted.clone()
+                } else {
+                    let existing = new_props
+                        .get(key)
+                        .map(|p| p.ty.clone())
+                        .unwrap_or_else(Type::mixed);
+                    set_shape_path(&existing, rest, asserted)
+                };
+                new_props.insert(
+                    key.clone(),
+                    mir_types::atomic::KeyedProperty {
+                        ty: value_ty,
+                        optional: false,
+                    },
+                );
+                result.add_type(Atomic::TKeyedArray {
+                    properties: new_props,
+                    is_open: *is_open,
+                    is_list: *is_list,
+                });
+            }
+            other => result.add_type(other.clone()),
+        }
+    }
+    if touched {
+        result
+    } else {
+        ty.clone()
+    }
+}
+
+/// Read the current type at a shape-key access path, merging across every
+/// `TKeyedArray` union member that carries the key — used to negate an
+/// assertion-tag target against the key's own current value, mirroring how
+/// a plain (whole-parameter) assertion's negation reads the receiver's
+/// current value via `resolve_prop_current_type`/`ctx.get_var`. Falls back
+/// to `mixed` when no union member carries the key at all, the same
+/// conservative default a fresh, never-narrowed variable would have.
+pub(crate) fn get_shape_path_type(ty: &Type, path: &[mir_types::atomic::ArrayKey]) -> Type {
+    let Some((key, rest)) = path.split_first() else {
+        return ty.clone();
+    };
+    let mut result = Type::empty();
+    let mut found = false;
+    for atomic in &ty.types {
+        if let Atomic::TKeyedArray { properties, .. } = atomic {
+            if let Some(prop) = properties.get(key) {
+                found = true;
+                if rest.is_empty() {
+                    result.merge_with(&prop.ty);
+                } else {
+                    result.merge_with(&get_shape_path_type(&prop.ty, rest));
+                }
+            }
+        }
+    }
+    if found {
+        result
+    } else {
+        Type::mixed()
+    }
+}
+
 /// Narrow `ty` along a shape-key access path proven present by `isset()`:
 /// clears `optional`/`null` at `path[0]`, then recurses into that key's own
 /// value type for `path[1..]`. Returns `None` when nothing changed (e.g. no

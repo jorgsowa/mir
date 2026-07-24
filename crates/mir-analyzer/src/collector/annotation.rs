@@ -8,18 +8,24 @@ pub(super) fn build_assertions(
     resolve_union_doc_fn: impl Fn(Type) -> Type,
 ) -> Vec<Assertion> {
     let mut assertions = Vec::new();
-    assertions.extend(doc.assertions.iter().map(|(param, ty, negated)| Assertion {
-        kind: AssertionKind::Assert,
-        param: Arc::from(param.as_str()),
-        ty: resolve_union_doc_fn(ty.clone()),
-        negated: *negated,
-    }));
+    assertions.extend(
+        doc.assertions
+            .iter()
+            .map(|(param, param_key, ty, negated)| Assertion {
+                kind: AssertionKind::Assert,
+                param: Arc::from(param.as_str()),
+                param_key: param_key.clone(),
+                ty: resolve_union_doc_fn(ty.clone()),
+                negated: *negated,
+            }),
+    );
     assertions.extend(
         doc.assertions_if_true
             .iter()
-            .map(|(param, ty, negated)| Assertion {
+            .map(|(param, param_key, ty, negated)| Assertion {
                 kind: AssertionKind::AssertIfTrue,
                 param: Arc::from(param.as_str()),
+                param_key: param_key.clone(),
                 ty: resolve_union_doc_fn(ty.clone()),
                 negated: *negated,
             }),
@@ -27,9 +33,10 @@ pub(super) fn build_assertions(
     assertions.extend(
         doc.assertions_if_false
             .iter()
-            .map(|(param, ty, negated)| Assertion {
+            .map(|(param, param_key, ty, negated)| Assertion {
                 kind: AssertionKind::AssertIfFalse,
                 param: Arc::from(param.as_str()),
+                param_key: param_key.clone(),
                 ty: resolve_union_doc_fn(ty.clone()),
                 negated: *negated,
             }),

@@ -9,6 +9,10 @@ use mir_types::{Atomic, Type};
 use crate::db::MirDatabase;
 use crate::flow_state::FlowState;
 
+use super::arrays::{
+    get_shape_path_type, resolve_shape_base_current_type, set_shape_base_narrowed, set_shape_path,
+    ShapeBase,
+};
 use super::core::{
     extract_any_prop_access, extract_class_fqcn_from_expr, extract_prop_access,
     extract_static_prop_access, extract_var_name, narrow_receiver_non_null_on_prop_match,
@@ -161,6 +165,43 @@ fn apply_assertions(
                 &variadic_args
             };
             for arg in args_to_check {
+                // `@psalm-assert-if-true Type $arr['key']` — the assertion
+                // targets a specific key of this parameter, not the whole
+                // argument. Build a shape-path target from the argument
+                // expression + the asserted key (rather than narrowing the
+                // argument's own whole value) and SET that key's type,
+                // adding it to the shape if not already present — the
+                // array-key-refinement machinery `isset()`/`empty()` already
+                // use for NARROWING an existing key, applied here as an
+                // ASSIGN instead.
+                if let Some(key) = &assertion.param_key {
+                    let base = if let Some(name) = extract_var_name(&arg.value) {
+                        Some(ShapeBase::Var(name))
+                    } else if let Some((obj, prop)) = extract_any_prop_access(&arg.value) {
+                        Some(ShapeBase::Prop(obj, prop))
+                    } else {
+                        extract_static_prop_access(&arg.value, ctx, db, file)
+                            .map(|(fqcn, prop)| ShapeBase::Static(fqcn, prop))
+                    };
+                    if let Some(base) = base {
+                        let path = [key.clone()];
+                        let current = resolve_shape_base_current_type(ctx, &base, db, file);
+                        let ty = match &template_bindings {
+                            Some(b) => assertion.ty.substitute_templates(b),
+                            None => assertion.ty.clone(),
+                        };
+                        let ty = if assertion.negated {
+                            let current_leaf = get_shape_path_type(&current, &path);
+                            negate_assertion_type(&current_leaf, &ty, db)
+                        } else {
+                            ty
+                        };
+                        let narrowed = set_shape_path(&current, &path, &ty);
+                        set_shape_base_narrowed(ctx, &base, current, narrowed);
+                        applied = true;
+                    }
+                    continue;
+                }
                 if let Some(var_name) = extract_var_name(&arg.value) {
                     let ty = match &template_bindings {
                         Some(b) => assertion.ty.substitute_templates(b),
