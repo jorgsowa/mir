@@ -811,7 +811,10 @@ impl<'a> ExpressionAnalyzer<'a> {
         else {
             return;
         };
-        if ctx.is_in_pure_fn {
+        // A static property is shared external state exactly like a global
+        // variable — @mutation-free ("nothing external") forbids writing it
+        // just as much as @pure does, not just a $this-property write.
+        if ctx.is_in_pure_fn || ctx.is_in_immutable_method {
             self.emit(
                 IssueKind::ImpureStaticPropertyAssignment {
                     class: fqcn.to_string(),
@@ -915,7 +918,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // state as `$_SESSION['x'] = ...`; the indexed-write shape
                 // is already checked in this same match a few arms up
                 // (ArrayAccess), this is its whole-array-overwrite sibling.
-                if ctx.is_in_pure_fn && crate::util::is_superglobal_name(&name_str) {
+                if (ctx.is_in_pure_fn || ctx.is_in_immutable_method)
+                    && crate::util::is_superglobal_name(&name_str)
+                {
                     self.emit(
                         IssueKind::ImpureGlobalVariable {
                             variable: name_str.clone(),
@@ -955,7 +960,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                     // ImpureGlobalVariable check — a real byref PARAMETER is
                     // also always in param_names, a plain `global $x;`
                     // never is.
-                    if ctx.is_in_pure_fn && ctx.param_names.contains(&name_sym) {
+                    if (ctx.is_in_pure_fn || ctx.is_in_immutable_method)
+                        && ctx.param_names.contains(&name_sym)
+                    {
                         self.emit(
                             IssueKind::ImpureByRefAssignment {
                                 variable: name_str.clone(),
@@ -1417,8 +1424,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                             // impure through a parameter/captured receiver), a static
                             // property IS the shared external state — same as a
                             // global variable — so every write is impure, not just
-                            // ones through a specific receiver.
-                            if ctx.is_in_pure_fn {
+                            // ones through a specific receiver. @mutation-free
+                            // forbids it too, same as @pure.
+                            if ctx.is_in_pure_fn || ctx.is_in_immutable_method {
                                 self.emit(
                                     IssueKind::ImpureStaticPropertyAssignment {
                                         class: fqcn.to_string(),
@@ -1614,7 +1622,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                             // `global $x;` — mirrors the read-side check in
                             // expr/arrays.rs::analyze_array_access, which this
                             // write path had no equivalent of at all.
-                            if ctx.is_in_pure_fn && crate::util::is_superglobal_name(name_str) {
+                            if (ctx.is_in_pure_fn || ctx.is_in_immutable_method)
+                                && crate::util::is_superglobal_name(name_str)
+                            {
                                 self.emit(
                                     IssueKind::ImpureGlobalVariable {
                                         variable: literal_key_chain
@@ -1861,7 +1871,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                         }
                                         _ => None,
                                     } {
-                                        if ctx.is_in_pure_fn {
+                                        if ctx.is_in_pure_fn || ctx.is_in_immutable_method {
                                             self.emit(
                                                 IssueKind::ImpureStaticPropertyAssignment {
                                                     class: fqcn.to_string(),

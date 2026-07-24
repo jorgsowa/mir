@@ -662,7 +662,7 @@ impl<'a> StatementsAnalyzer<'a> {
                                             }
                                             _ => None,
                                         } {
-                                            if ctx.is_in_pure_fn {
+                                            if ctx.is_in_pure_fn || ctx.is_in_immutable_method {
                                                 self.expr_analyzer(ctx).emit(
                                                     IssueKind::ImpureStaticPropertyAssignment {
                                                         class: fqcn.to_string(),
@@ -791,6 +791,17 @@ impl<'a> StatementsAnalyzer<'a> {
             if let php_ast::owned::ExprKind::Variable(name) = &var.kind {
                 let var_name = name.trim_start_matches('$');
                 // Purity check: using a global variable in a @pure function.
+                // Deliberately NOT also gated on is_in_immutable_method: this
+                // fires at the DECLARATION site regardless of whether `$bar`
+                // is later written or only read, and @mutation-free's
+                // "nothing external" contract is about writes, not reads — a
+                // pre-existing fixture (impure_global_immutable.phpt) pins a
+                // read-only `global $bar; return $bar;` under an immutable
+                // class as correctly unflagged. @pure's stricter
+                // referential-transparency contract (no dependency on hidden
+                // external state at all, read or write) is genuinely
+                // different from @mutation-free's, unlike the static-
+                // property/by-ref-param WRITE checks above.
                 if ctx.is_in_pure_fn {
                     let (line, col_start) = self.offset_to_line_col(var.span.start);
                     let (line_end, col_end) = self.offset_to_line_col(var.span.end);
