@@ -358,12 +358,27 @@ fn is_comment_only(trimmed: &str) -> bool {
 }
 
 /// A single-line PHP 8 attribute (`#[Foo]`, `#[Foo(bar: 1)]`) with no other
-/// code on the same line. Doesn't attempt multi-line bracket-depth tracking
-/// for a `#[` that spans several lines — only the common single-line case,
-/// mirroring the scope this suppression logic already accepts elsewhere
-/// (e.g. no nested-comment tracking either).
+/// code on the same line — a trailing same-line comment (`#[Foo] // note`,
+/// `#[Foo] /* note */`) is stripped first so it doesn't re-defeat this
+/// check (it previously required `]` to be the line's last character,
+/// which a trailing comment always violates). Doesn't attempt multi-line
+/// bracket-depth tracking for a `#[` that spans several lines — only the
+/// common single-line case, mirroring the scope this suppression logic
+/// already accepts elsewhere (e.g. no nested-comment tracking either).
 fn is_attribute_only(trimmed: &str) -> bool {
-    trimmed.starts_with("#[") && trimmed.ends_with(']')
+    if !trimmed.starts_with("#[") {
+        return false;
+    }
+    // Skip the leading `#` (part of the attribute marker, not a comment)
+    // before scanning for a trailing comment introducer — the same
+    // string-literal-aware scan `extract_comment` uses for a suppression
+    // directive's own line, applied here to the attribute's line instead.
+    let rest = &trimmed[1..];
+    let body = match find_comment_introducer(rest) {
+        Some(pos) => rest[..pos].trim_end(),
+        None => rest,
+    };
+    body.ends_with(']')
 }
 
 /// Directive keyword table, ordered longest-first so that, e.g.,
