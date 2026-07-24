@@ -27,3 +27,4 @@ function filterOdd(int $i, A $a) : ?int {
     return null;
 }
 ===expect===
+ImpureFunctionCall@16:9-16:18: Calling impure function Bar\B::__construct() in a @pure function

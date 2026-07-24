@@ -416,6 +416,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                             s.template_params.clone(),
                             s.no_named_arguments,
                             s.taint_sink_params.clone(),
+                            s.is_pure,
+                            s.is_mutation_free,
                         )
                     });
                     // `new static`/`new self`/`new parent` inside a trait binds
@@ -431,6 +433,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                         ctor_templates,
                         ctor_no_named_args,
                         ctor_taint_sink_params,
+                        ctor_is_pure,
+                        ctor_is_mutation_free,
                     )) = &ctor_params_and_templates
                     {
                         // Taint sink check: `new Sink($tainted)` reaching a
@@ -478,6 +482,25 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     }
                                 }
                             }
+                        }
+                        // Purity check: `new X(...)` inside a @pure function
+                        // runs X's constructor exactly like any other call —
+                        // call/function.rs and call/method.rs both check the
+                        // callee's own is_pure for their own call shapes, but
+                        // analyze_new had no equivalent at all. A @mutation-free
+                        // constructor is exempt (not just @pure): initializing
+                        // $this's own properties during construction is not an
+                        // external mutation, the same exemption
+                        // mutation_free_constructor_ok already proves for a
+                        // plain assignment inside the constructor body.
+                        if ctx.is_in_pure_fn && !ctor_is_pure && !ctor_is_mutation_free {
+                            self.emit(
+                                IssueKind::ImpureFunctionCall {
+                                    fn_name: format!("{fqcn}::__construct"),
+                                },
+                                Severity::Warning,
+                                call_span,
+                            );
                         }
                         if !trait_relative_new {
                             // A bare subclass of a generic ancestor fixed via
@@ -603,7 +626,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         &fqcn,
                         ctor_params_and_templates
                             .as_ref()
-                            .map(|(p, _, _, _)| p.as_slice()),
+                            .map(|(p, _, _, _, _, _)| p.as_slice()),
                         &arg_types,
                         &arg_names,
                         call_span,
