@@ -479,6 +479,7 @@ impl CallAnalyzer {
                 mir_types::Atomic::TIntersection { parts } => {
                     let mut intersection_result = Type::empty();
                     let mut found_method = false;
+                    let mut this_self_out = None;
                     for part in parts.iter() {
                         for inner_atomic in &part.types {
                             if let mir_types::Atomic::TNamedObject {
@@ -503,7 +504,7 @@ impl CallAnalyzer {
                                         &arg_spans,
                                         sole_spread_ty.clone(),
                                         &mut None,
-                                        &mut None,
+                                        &mut this_self_out,
                                     ));
                                 }
                             }
@@ -522,9 +523,17 @@ impl CallAnalyzer {
                         );
                         result.add_type(mir_types::Atomic::TMixed);
                     }
-                    // self-out isn't tracked through intersection receivers —
-                    // preserve this branch as-is in the retyped union.
-                    self_out_union.merge_with(&Type::single(atomic.clone()));
+                    // Same atomic-level granularity as the TNamedObject arm
+                    // above: if self-out fired for the declaring part, the
+                    // WHOLE intersection atomic is replaced by the self-out
+                    // type, not merged part-by-part.
+                    match this_self_out {
+                        Some(ty) => {
+                            self_out_used = true;
+                            self_out_union.merge_with(&ty);
+                        }
+                        None => self_out_union.merge_with(&Type::single(atomic.clone())),
+                    }
                 }
                 mir_types::Atomic::TObject | mir_types::Atomic::TTemplateParam { .. } => {
                     result.add_type(mir_types::Atomic::TMixed);
