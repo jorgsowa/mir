@@ -162,13 +162,21 @@ impl SuppressionMap {
                     insert_line(&mut map.lines, line_no, directive.kinds);
                 }
                 Scope::NextLine => {
-                    let target = next_code_line(&raw_lines, idx, directive.skip_comments);
+                    let (target, attribute_lines) =
+                        next_code_line(&raw_lines, idx, directive.skip_comments);
                     if track_named {
                         if let KindSet::Named(ref names) = directive.kinds {
                             for name in names {
                                 map.named_suppressions.push((target, name.clone()));
                             }
                         }
+                    }
+                    // An attribute line skipped en route to `target` stays
+                    // covered by the same directive — an issue about the
+                    // attribute itself (e.g. `UndefinedAttributeClass`) fires
+                    // there, not at `target`.
+                    for attr_line in attribute_lines {
+                        insert_line(&mut map.lines, attr_line, directive.kinds.clone());
                     }
                     insert_line(&mut map.lines, target, directive.kinds);
                 }
@@ -305,25 +313,39 @@ fn is_heredoc_closing_line(line: &str, ident: &str) -> bool {
         .is_none_or(|c| !c.is_ascii_alphanumeric() && c != '_')
 }
 
-/// Locate a directive's target line strictly after `idx`, as a 1-based number.
+/// Locate a directive's target line strictly after `idx`, as a 1-based
+/// number, plus every single-line PHP 8 attribute (`#[Foo]`) line skipped
+/// along the way.
 ///
-/// Always skips blank lines. When `skip_comments` is set, also skips
+/// Always skips blank lines and an attribute line sitting between the
+/// directive and the declaration it modifies — real code, but never what a
+/// suppression directive means to target (the declaration that follows).
+/// The skipped attribute lines are returned too, not just discarded: an
+/// issue about the attribute ITSELF (e.g. `UndefinedAttributeClass`, "this
+/// attribute class does not exist") fires on the attribute's own line, not
+/// the final target, and must stay covered by the same directive as the
+/// declaration it annotates. When `skip_comments` is set, also skips
 /// comment-only lines (`//`, `#`, `/* … */`, ` * …` docblock bodies and the
-/// closing `*/`) so a directive written inside a multi-line docblock lands on
-/// the declaration that follows it. Falls back to `idx + 2` when nothing
+/// closing `*/`) so a directive written inside a multi-line docblock lands
+/// on the declaration that follows it. Falls back to `idx + 2` when nothing
 /// qualifies, so the directive still has a deterministic target.
-fn next_code_line(raw_lines: &[&str], idx: usize, skip_comments: bool) -> u32 {
+fn next_code_line(raw_lines: &[&str], idx: usize, skip_comments: bool) -> (u32, Vec<u32>) {
+    let mut attribute_lines = Vec::new();
     for (offset, line) in raw_lines.iter().enumerate().skip(idx + 1) {
         let trimmed = line.trim();
         if trimmed.is_empty() {
             continue;
         }
+        if is_attribute_only(trimmed) {
+            attribute_lines.push(offset as u32 + 1);
+            continue;
+        }
         if skip_comments && is_comment_only(trimmed) {
             continue;
         }
-        return offset as u32 + 1;
+        return (offset as u32 + 1, attribute_lines);
     }
-    idx as u32 + 2
+    (idx as u32 + 2, attribute_lines)
 }
 
 /// Whether a trimmed line is purely a comment (no PHP code). `#[` is treated as
@@ -333,6 +355,15 @@ fn is_comment_only(trimmed: &str) -> bool {
         || trimmed.starts_with("/*")
         || trimmed.starts_with('*')
         || (trimmed.starts_with('#') && !trimmed.starts_with("#["))
+}
+
+/// A single-line PHP 8 attribute (`#[Foo]`, `#[Foo(bar: 1)]`) with no other
+/// code on the same line. Doesn't attempt multi-line bracket-depth tracking
+/// for a `#[` that spans several lines — only the common single-line case,
+/// mirroring the scope this suppression logic already accepts elsewhere
+/// (e.g. no nested-comment tracking either).
+fn is_attribute_only(trimmed: &str) -> bool {
+    trimmed.starts_with("#[") && trimmed.ends_with(']')
 }
 
 /// Directive keyword table, ordered longest-first so that, e.g.,
