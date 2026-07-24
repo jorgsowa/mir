@@ -742,7 +742,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             return;
         };
         for atomic in &obj_ty.types {
-            if let Atomic::TNamedObject { fqcn, .. } = atomic {
+            if let Atomic::TNamedObject { fqcn, .. }
+            | Atomic::TSelf { fqcn }
+            | Atomic::TStaticObject { fqcn }
+            | Atomic::TParent { fqcn } = atomic
+            {
                 let db = self.db;
                 if let Some((owner, prop_def)) = crate::db::find_property_in_chain(
                     db,
