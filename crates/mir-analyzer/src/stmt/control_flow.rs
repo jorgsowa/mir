@@ -336,6 +336,12 @@ impl<'a> StatementsAnalyzer<'a> {
         if let Some(key_expr) = &fe.key {
             if let Some(var_name) = extract_simple_var(key_expr) {
                 entry.set_var(&var_name, key_ty.clone());
+                // `foreach ($_GET as $k => $v)`: the key is attacker-controlled
+                // exactly as much as the value (a reflected-XSS vector via GET
+                // param NAMES) — only the value binding below was ever tainted.
+                if iterable_tainted {
+                    entry.taint_var(&var_name);
+                }
                 // Emit ResolvedSymbol for key variable at binding position
                 self.record_symbol_for_var(key_expr.span, &var_name, key_ty.clone());
             }
@@ -422,6 +428,9 @@ impl<'a> StatementsAnalyzer<'a> {
                 if let Some(key_expr) = &fe.key {
                     if let Some(var_name) = extract_simple_var(key_expr) {
                         iter.set_var(&var_name, key_ty.clone());
+                        if iterable_tainted {
+                            iter.taint_var(&var_name);
+                        }
                     }
                 }
                 if let Some(ref vname) = value_var {
