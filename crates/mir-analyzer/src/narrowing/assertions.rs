@@ -238,6 +238,13 @@ pub(super) fn method_call_receiver_fqcn(
         ctx.get_var(&obj_var)
     } else if let Some((obj_var, prop)) = extract_prop_access(object) {
         resolve_prop_current_type(ctx, &obj_var, &prop, db, file)
+    } else if let Some((fqcn, prop)) = extract_static_prop_access(object, ctx, db, file) {
+        // `self::$validator->isValid($x)` — a static-property receiver is a
+        // first-class shape everywhere else in this file (the assertion
+        // TARGET side already resolves one), but this receiver-resolution
+        // helper only ever tried a bare variable or an instance-property
+        // chain, silently no-oping assert-if-true/-false narrowing for it.
+        resolve_static_prop_current_type(ctx, &fqcn, &prop, db)
     } else {
         return None;
     };
