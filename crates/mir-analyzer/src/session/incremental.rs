@@ -152,12 +152,17 @@ impl AnalysisSession {
         // frozen view is never stale. Same discipline as the batch body pass.
         let mut db_main = self.snapshot_db();
         db_main.freeze_workspace_index();
+        // Sweeps are the steady-state population path for the mention index:
+        // every analyzed file gets a current mention scan alongside its
+        // postings, so later reference-gate checks are set lookups.
+        let mention_scanner = db_main.class_mention_scanner();
         type Analyzed = (
             Arc<str>,
             Arc<str>,
             std::sync::Arc<crate::db::AnalyzeOutput>,
             Vec<crate::db::SubtypeEntry>,
             Option<super::RefCachePut>,
+            Option<Box<[mir_types::Name]>>,
         );
         let mut results: Vec<Analyzed> = dependents
             .into_par_iter()
@@ -189,7 +194,11 @@ impl AnalysisSession {
                         &out,
                     )
                 };
-                Some((file, text, out, entries, put))
+                let mentions = mention_scanner.as_ref().and_then(|s| {
+                    (!db.class_mentions_current(file.as_ref(), &text, s.epoch()))
+                        .then(|| s.scan(&text))
+                });
+                Some((file, text, out, entries, put, mentions))
             })
             .flatten()
             .collect();
@@ -202,12 +211,15 @@ impl AnalysisSession {
         // entirely, so a no-op re-sweep is a pointer compare per file.
         {
             let guard = self.db.salsa.read();
-            for (file, text, out, entries, put) in results.iter_mut() {
+            for (file, text, out, entries, put, mentions) in results.iter_mut() {
                 // Pointer-identical memo ⇒ identical postings: skip the
                 // index rewrite. The mark is re-stamped unconditionally so a
                 // no-op sweep still advances the commit's generation.
                 if !self.ref_commit_is_current(file.as_ref(), text, out) {
                     guard.set_file_reference_locations(file.as_ref(), out.ref_locs.to_vec());
+                }
+                if let (Some(s), Some(m)) = (&mention_scanner, mentions.take()) {
+                    guard.set_file_class_mentions(file, text, s.epoch(), m);
                 }
                 if let Some(put) = put.take() {
                     self.apply_ref_cache_put(file.as_ref(), out, put);
@@ -228,7 +240,7 @@ impl AnalysisSession {
 
         results
             .into_iter()
-            .map(|(file, _, out, _, _)| {
+            .map(|(file, _, out, _, _, _)| {
                 (
                     file,
                     crate::FileAnalysis {

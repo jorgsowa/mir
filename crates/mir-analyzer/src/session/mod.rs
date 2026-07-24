@@ -194,6 +194,12 @@ impl AnalysisSession {
         self.db.salsa.read().ref_index_lock_count()
     }
 
+    /// Coverage/size counters for the class-mention gate index (host
+    /// metrics and memory-bound checks).
+    pub fn class_mention_stats(&self) -> crate::db::ClassMentionStats {
+        self.db.salsa.read().class_mention_stats()
+    }
+
     /// Whether `file`'s reference postings are exact for `current_text` at
     /// `current_gen`: text pointer-equal, and the commit either resolved
     /// every name (immune to workspace growth) or was stamped at that

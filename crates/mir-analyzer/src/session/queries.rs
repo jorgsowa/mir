@@ -316,9 +316,25 @@ impl AnalysisSession {
         // discipline as `commit_defs_for_matching` on the defs index.
         let needles = reference_gate_needles(symbol);
         let needle_matcher = IdentifierNeedles::new(&needles);
+        // Single-needle gates whose needle is a known class-like short name
+        // answer from the mention index instead of rescanning raw text: the
+        // gate predicate is purely textual, so a recorded mention set is
+        // exactly equivalent. Files the index can't answer for are scanned
+        // once against the whole name universe and recorded, so the next
+        // query's gate is a set lookup.
+        let (mention_query, mention_scanner) = if needles.len() == 1 {
+            let guard = self.db.salsa.read();
+            match guard.prepare_class_mention_query(&needles[0]) {
+                Some(q) => (Some(q), guard.class_mention_scanner()),
+                None => (None, None),
+            }
+        } else {
+            (None, None)
+        };
         let committed_any: rustc_hash::FxHashSet<Arc<str>> =
             self.ref_committed_keys().into_iter().collect();
-        let stale: Vec<Arc<str>> = loop {
+        type MentionScanRec = (Arc<str>, Arc<str>, Box<[mir_types::Name]>);
+        let (stale, scanned): (Vec<Arc<str>>, Vec<MentionScanRec>) = loop {
             if should_cancel() {
                 return None;
             }
@@ -328,28 +344,74 @@ impl AnalysisSession {
                 files
                     .par_iter()
                     .map_with(db_main, |db, f| {
-                        let sf = db.lookup_source_file(f.as_ref())?;
+                        let Some(sf) = db.lookup_source_file(f.as_ref()) else {
+                            return (None, None);
+                        };
                         let text = sf.text(&*db as &dyn MirDatabase);
                         if self.is_ref_committed(f.as_ref(), text, current_gen) {
-                            return None;
+                            return (None, None);
                         }
-                        if !committed_any.contains(f.as_ref())
-                            && !needles.is_empty()
-                            && !needle_matcher.matches(text)
-                        {
-                            return None;
+                        if !committed_any.contains(f.as_ref()) && !needles.is_empty() {
+                            match (&mention_query, &mention_scanner) {
+                                (Some(q), scanner_opt) => {
+                                    match db.class_mention_answer(f.as_ref(), q, text) {
+                                        Some(true) => {}
+                                        Some(false) => return (None, None),
+                                        None => match scanner_opt {
+                                            Some(scanner) => {
+                                                let names = scanner.scan(text);
+                                                let hit = names.binary_search(&q.name).is_ok();
+                                                let rec = (f.clone(), text.clone(), names);
+                                                return (hit.then(|| f.clone()), Some(rec));
+                                            }
+                                            None => {
+                                                if !needle_matcher.matches(text) {
+                                                    return (None, None);
+                                                }
+                                            }
+                                        },
+                                    }
+                                }
+                                (None, _) => {
+                                    if !needle_matcher.matches(text) {
+                                        return (None, None);
+                                    }
+                                }
+                            }
                         }
-                        Some(f.clone())
+                        (Some(f.clone()), None)
                     })
-                    .flatten()
                     .collect::<Vec<_>>()
             }));
             match attempt {
-                Ok(v) => break v,
+                Ok(v) => {
+                    let mut stale = Vec::new();
+                    let mut scanned = Vec::new();
+                    for (s, rec) in v {
+                        if let Some(s) = s {
+                            stale.push(s);
+                        }
+                        if let Some(rec) = rec {
+                            scanned.push(rec);
+                        }
+                    }
+                    break (stale, scanned);
+                }
                 Err(_) if should_cancel() => return None,
                 Err(_) => {}
             }
         };
+
+        // Record the fallback scans regardless of how the query proceeds:
+        // each is a complete, current mention set for its file.
+        if let Some(scanner) = &mention_scanner {
+            if !scanned.is_empty() {
+                let guard = self.db.salsa.read();
+                for (file, text, names) in scanned {
+                    guard.set_file_class_mentions(&file, &text, scanner.epoch(), names);
+                }
+            }
+        }
 
         if !stale.is_empty() {
             // Phase 1 (serial, no live snapshot held): warm up stale
@@ -444,7 +506,14 @@ impl AnalysisSession {
                                     &out,
                                 )
                             };
-                            Some((path.clone(), text, out, entries, put))
+                            // Mention scan piggybacks on the analysis pass
+                            // (pure; committed serially below), skipped when
+                            // the file already holds a current scan.
+                            let mentions = mention_scanner.as_ref().and_then(|s| {
+                                (!db.class_mentions_current(path.as_ref(), &text, s.epoch()))
+                                    .then(|| s.scan(&text))
+                            });
+                            Some((path.clone(), text, out, entries, put, mentions))
                         })
                         .flatten()
                         .collect::<Vec<_>>()
@@ -457,11 +526,14 @@ impl AnalysisSession {
             };
             let mut analyzed = analyzed;
             let guard = self.db.salsa.read();
-            for (file, text, out, entries, put) in analyzed.iter_mut() {
+            for (file, text, out, entries, put, mentions) in analyzed.iter_mut() {
                 // Pointer-identical memo ⇒ identical postings: skip the
                 // index rewrite and only re-stamp the freshness mark.
                 if !self.ref_commit_is_current(file.as_ref(), text, out) {
                     guard.set_file_reference_locations(file.as_ref(), out.ref_locs.to_vec());
+                }
+                if let (Some(s), Some(m)) = (&mention_scanner, mentions.take()) {
+                    guard.set_file_class_mentions(file, text, s.epoch(), m);
                 }
                 if let Some(put) = put.take() {
                     self.apply_ref_cache_put(file.as_ref(), out, put);
@@ -1370,6 +1442,47 @@ mod tests {
                     compiled.matches(hay),
                     owned.iter().any(|n| mentions_identifier(hay, n)),
                     "needles {owned:?} on {hay:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn mention_scanner_membership_equals_per_needle_scans() {
+        // The mention index replaces `IdentifierNeedles::matches` on the
+        // reference gate, so scanner membership must equal the raw per-needle
+        // predicate for every (hay, needle) pair — same boundary and case
+        // semantics.
+        use crate::db::MentionScanner;
+        use std::sync::Arc;
+        let universe = ["Color", "save", "ColorPicker", "Éclair", "C1", "_Wrap"];
+        let names: Vec<mir_types::Name> = universe
+            .iter()
+            .map(|s| mir_types::Name::new(s).ascii_lowercase())
+            .collect();
+        let scanner = Arc::new(MentionScanner::build(1, names).unwrap());
+        let hays = [
+            "$this->save();",
+            "new COLOR()",
+            "use App\\Color as Paint;",
+            "$this->saveAll();",
+            "return $unsaved;",
+            "new ColorPicker(); Color::save();",
+            "function xÉclairFoo() {}",
+            "implements Éclair {}",
+            "colorsave savecolor color_save",
+            "class C1 extends _Wrap {}",
+            "",
+        ];
+        for hay in hays {
+            let scanned = scanner.scan(hay);
+            for needle in universe {
+                let expected = mentions_identifier(hay, needle);
+                let name = mir_types::Name::new(needle).ascii_lowercase();
+                assert_eq!(
+                    scanned.binary_search(&name).is_ok(),
+                    expected,
+                    "needle {needle:?} on {hay:?}"
                 );
             }
         }

@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.62.0] - 2026-07-24
+
+### Added
+
+- **Class-mention index:** the reference-query gate's textual predicate
+  ("does this never-committed file mention the needle?") is now memoized per
+  file. Single-needle queries — classes and `__construct` — answer from
+  recorded mention sets instead of rescanning every candidate's raw text;
+  sets are recorded by the gate's own fallback scan and by analysis sweeps,
+  so coverage is self-populating. Entries are keyed to their source text by
+  `Arc` identity (edits self-invalidate) and per-name universe epochs make
+  classes declared after a scan fall back to the raw scan — the index can
+  narrow work, never hide a reference. Repeat queries stop pulling the whole
+  workspace's text through the CPU per request (~5 MB of index instead of
+  ~100 MB of text at Laravel scale). `AnalysisSession::class_mention_stats()`
+  exposes coverage/size counters for host metrics and memory bounds.
+
 ## [0.61.0] - 2026-07-22
 
 ### Changed

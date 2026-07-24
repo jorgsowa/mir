@@ -30,6 +30,8 @@ use crate::php_version::PhpVersion;
 ///   3. `set_file_reference_locations()` / `set_file_class_edges()` — write
 ///      into the `Arc<Mutex<RefIndex>>` / `Arc<Mutex<SubtypeIndex>>` fields,
 ///      no `ZalsaLocal` access.
+///   4. The `class_mention*` accessors — same shape as (3), all state lives
+///      behind `Arc<Mutex<ClassMentionIndex>>`, no `ZalsaLocal` access.
 ///
 /// None of these touch the `RefCell<QueryStack>` inside `ZalsaLocal`, so
 /// concurrent read-lock holders are data-race-free. Under the *write* lock

@@ -102,8 +102,17 @@ fn concurrent_writes_do_not_abort_parallel_reference_reads() {
                         session.ingest_file(base_path.clone(), base_source(n));
                     } else {
                         let path: Arc<str> = Arc::from(format!("writers/W{w}.php").as_str());
+                        // Every 50th write mints a brand-new class name so the
+                        // mention-universe epoch churns while readers fetch /
+                        // rebuild the gate scanner and commit mention sets —
+                        // the class-mention index's own concurrency hazard.
+                        let fresh = if n.is_multiple_of(50) {
+                            format!("\nclass W{w}Gen{n} {{}}\n")
+                        } else {
+                            String::new()
+                        };
                         let src: Arc<str> = Arc::from(
-                            format!("<?php\nnamespace Lib;\nclass W{w} {{\n    public function f(): int {{ return {n}; }}\n}}\n")
+                            format!("<?php\nnamespace Lib;\nclass W{w} {{\n    public function f(): int {{ return {n}; }}\n}}\n{fresh}")
                                 .as_str(),
                         );
                         session.ingest_file(path, src);

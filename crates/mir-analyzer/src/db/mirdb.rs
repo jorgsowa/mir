@@ -139,6 +139,12 @@ pub struct MirDbStorage {
     /// direct children, replacing per-query workspace scans. See
     /// [`crate::db::subtype_index::SubtypeIndex`].
     subtype_index: Arc<Mutex<crate::db::subtype_index::SubtypeIndex>>,
+    /// file → declared class-like short names its text mentions, so the
+    /// reference-query gate answers repeat single-needle checks with a set
+    /// lookup instead of rescanning raw text. Internally synchronized (not
+    /// a salsa input): safe to use from parallel workers and under the
+    /// session read lock. See [`crate::db::class_mention_index`].
+    class_mentions: Arc<crate::db::class_mention_index::ClassMentionIndex>,
     /// Per-clone staging area for reference locations.  Workers push here
     /// during parallel analysis; the orchestrator drains and commits serially.
     pending_ref_locs: PendingRefLocs,
@@ -265,6 +271,7 @@ impl Default for MirDbStorage {
             ref_index: Arc::default(),
             ref_index_locks: Arc::default(),
             subtype_index: Arc::default(),
+            class_mentions: Arc::default(),
             pending_ref_locs: PendingRefLocs::default(),
             source_files: Arc::default(),
             deleted_files: Arc::default(),
@@ -643,6 +650,7 @@ impl MirDbStorage {
 
         *self.file_decl_snapshots.write() = new_snapshots;
         *self.index_decl_counts.write() = counts;
+        self.add_class_mention_names(class_like.keys().map(|k| k.as_str()));
 
         let new_index = WorkspaceSymbolIndex {
             class_like: Arc::new(class_like),
@@ -740,6 +748,7 @@ impl MirDbStorage {
                 }
             }
         }
+        self.add_class_mention_names(class_like.keys().map(|k| k.as_str()));
         for (file, d) in decls {
             snaps.insert(file, d);
         }
@@ -763,6 +772,11 @@ impl MirDbStorage {
         &mut self,
         decls: &[(SourceFile, crate::db::FileDeclarations)],
     ) {
+        self.add_class_mention_names(
+            decls
+                .iter()
+                .flat_map(|(_, d)| d.class_like.iter().map(|(k, _)| k.as_str())),
+        );
         let Some(singleton) = *self.workspace_symbol_index_input.read() else {
             let mut snaps = self.file_decl_snapshots.write();
             for (file, d) in decls {
@@ -862,6 +876,7 @@ impl MirDbStorage {
             let db: &dyn MirDatabase = &*self;
             collect_file_declarations(db, file).clone()
         };
+        self.add_class_mention_names(new_decls.class_like.iter().map(|(k, _)| k.as_str()));
         if old_decls.as_ref() == Some(&new_decls) {
             return true;
         }
@@ -1005,12 +1020,84 @@ impl MirDbStorage {
     }
 
     /// Replace `file`'s class-like declarations in the subtype edge index.
+    /// Also feeds the declared short names into the mention universe so the
+    /// gate index can answer for them.
     pub fn set_file_class_edges(
         &self,
         file: &Arc<str>,
         entries: Vec<crate::db::subtype_index::SubtypeEntry>,
     ) {
+        self.add_class_mention_names(entries.iter().map(|e| e.fqcn.as_ref()));
         self.subtype_index.lock().set_file_classes(file, entries);
+    }
+
+    /// Register class-like FQCNs (any case/form) in the mention-name
+    /// universe. Idempotent; bumps the universe epoch only for new names.
+    pub fn add_class_mention_names<'a>(&self, fqcns: impl IntoIterator<Item = &'a str>) {
+        let names: Vec<Name> = fqcns
+            .into_iter()
+            .map(|f| Name::new(crate::db::subtype_index::short_name_of(f)).ascii_lowercase())
+            .collect();
+        if names.is_empty() {
+            return;
+        }
+        self.class_mentions.add_names(names);
+    }
+
+    /// The whole-universe mention scanner for the current epoch. `None`
+    /// while the universe is empty.
+    pub fn class_mention_scanner(
+        &self,
+    ) -> Option<Arc<crate::db::class_mention_index::MentionScanner>> {
+        self.class_mentions.scanner()
+    }
+
+    /// Resolve a gate needle against the mention universe. `None` when the
+    /// name is unknown (callers keep the raw-scan path).
+    pub fn prepare_class_mention_query(
+        &self,
+        needle: &str,
+    ) -> Option<crate::db::class_mention_index::MentionQuery> {
+        self.class_mentions.prepare_query(needle)
+    }
+
+    /// See [`crate::db::class_mention_index::ClassMentionIndex::answer`].
+    pub fn class_mention_answer(
+        &self,
+        file: &str,
+        q: &crate::db::class_mention_index::MentionQuery,
+        current_text: &Arc<str>,
+    ) -> Option<bool> {
+        self.class_mentions.answer(file, q, current_text)
+    }
+
+    /// Whether `file` already holds a mention scan of exactly `text` at
+    /// `epoch` or newer.
+    pub fn class_mentions_current(&self, file: &str, text: &Arc<str>, epoch: u64) -> bool {
+        self.class_mentions.is_current(file, text, epoch)
+    }
+
+    /// Record one file's mention-scan result.
+    pub fn set_file_class_mentions(
+        &self,
+        file: &Arc<str>,
+        text: &Arc<str>,
+        epoch: u64,
+        names: Box<[Name]>,
+    ) {
+        self.class_mentions
+            .set_file(file.clone(), text.clone(), epoch, names);
+    }
+
+    /// Drop `file`'s mention entry (file removed, or its text replaced —
+    /// frees the entry's pinned `Arc<str>`).
+    pub fn clear_file_class_mentions(&self, file: &str) {
+        self.class_mentions.clear_file(file);
+    }
+
+    /// Coverage/size counters for the mention index.
+    pub fn class_mention_stats(&self) -> crate::db::class_mention_index::ClassMentionStats {
+        self.class_mentions.stats()
     }
 
     /// Drop `file`'s class-like declarations from the subtype edge index.
@@ -1123,6 +1210,9 @@ impl MirDbStorage {
         if let Some(&sf) = self.source_files.get(&path) {
             Arc::make_mut(&mut self.deleted_files).remove(path.as_ref());
             if *sf.text(self) != text {
+                // Entry pins the old text Arc; the ptr guard would already
+                // sideline it, dropping it now frees the memory too.
+                self.clear_file_class_mentions(path.as_ref());
                 sf.set_text(self).with_durability(durability).to(text);
             }
             return sf;
@@ -1153,6 +1243,7 @@ impl MirDbStorage {
                 {
                     *self.workspace_symbol_index_input.write() = None;
                 }
+                self.clear_file_class_mentions(path);
                 self.file_decl_snapshots.write().remove(&sf);
                 // Free the file text. The salsa input slot is immortal in 0.27
                 // (no delete API), but the Arc<str> content — potentially hundreds

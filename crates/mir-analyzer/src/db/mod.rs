@@ -205,6 +205,9 @@ pub use self::queries::{
     is_unchecked_exception, member_location, parse_file, resolve_name, ClassKind,
     InferredFileTypes, TrackedParseResult,
 };
+pub use self::class_mention_index::{
+    ClassMentionIndex, ClassMentionStats, MentionQuery, MentionScanner,
+};
 pub use self::ref_index::RefIndex;
 pub use self::reference_locations::*;
 pub use self::resolver::{resolve_fqcn_to_path, source_file_for_fqcn, Fqcn, ResolverConfig};
@@ -220,6 +223,7 @@ pub use self::workspace::{
 
 // Sub-modules
 mod ancestors;
+pub(crate) mod class_mention_index;
 mod deps;
 mod find_queries;
 mod inferred_types;
