@@ -844,6 +844,9 @@ impl CallAnalyzer {
                     .params
                     .iter()
                     .position(|p| p.name.as_ref() == param_name)
+                    .and_then(|idx| {
+                        crate::call::resolve_named_arg_type_index(&resolved.params, &call.args, idx)
+                    })
                     .and_then(|idx| arg_types.get(idx))
                     .cloned()
             });

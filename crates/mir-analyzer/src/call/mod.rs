@@ -15,6 +15,37 @@ pub(crate) use function::extract_class_docblock;
 
 pub struct CallAnalyzer;
 
+/// Resolve a declared parameter's own textual argument position at a call
+/// site — the index into `arg_types` (built in call-site TEXTUAL order),
+/// not the parameter's own DECLARED index. The two only differ when a
+/// named argument reorders the call, but `resolve_conditional_returns`'s
+/// three call sites (`@return ($x is T ? A : B)`, in function.rs/
+/// method.rs/static_call.rs) each indexed `arg_types` directly by the
+/// declared position — silently reading the wrong argument's type for a
+/// reordered named call. Mirrors `narrowing/assertions.rs`'s
+/// `arg_for_param_index`, which already fixed the same bug class for the
+/// positional File/Unserialize sink check.
+pub(crate) fn resolve_named_arg_type_index(
+    params: &[mir_codebase::definitions::DeclaredParam],
+    call_args: &[php_ast::owned::Arg],
+    param_index: usize,
+) -> Option<usize> {
+    let param_name = params.get(param_index)?.name.as_ref();
+    if let Some(idx) = call_args.iter().position(|a| {
+        a.name
+            .as_ref()
+            .is_some_and(|n| crate::parser::name_to_string_owned(n) == param_name)
+    }) {
+        return Some(idx);
+    }
+    call_args
+        .iter()
+        .enumerate()
+        .filter(|(_, a)| a.name.is_none())
+        .nth(param_index)
+        .map(|(i, _)| i)
+}
+
 /// An assignment expression in argument position (`f($x = expr)`,
 /// `->andReturn($mock = m::mock(...))`) has its value consumed by the call —
 /// the write is used even if the variable is never read again.
