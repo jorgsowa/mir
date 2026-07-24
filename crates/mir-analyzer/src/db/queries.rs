@@ -165,6 +165,35 @@ pub fn class_template_params(db: &dyn MirDatabase, fqcn: &str) -> Option<Arc<[Te
     None
 }
 
+/// Whether `fqcn` (or any ancestor up its native `extends` chain) is
+/// `@psalm-immutable`. A subclass that doesn't redeclare the tag is just as
+/// immutable as its ancestor — PHP/Psalm don't require re-annotating an
+/// inherited class-level contract, the same reasoning `class_template_params`
+/// already documents for `@template`. Previously this was read straight off
+/// `ClassDef::is_immutable` (own declaration only) at both call sites, so a
+/// subclass of an immutable class allowed an external write to an inherited
+/// property that the ancestor-typed receiver would have correctly rejected.
+pub fn class_is_immutable(db: &dyn MirDatabase, fqcn: &str) -> bool {
+    let mut visited: FxHashSet<Arc<str>> = FxHashSet::default();
+    let mut current: Option<Arc<str>> = Some(Arc::from(fqcn));
+    while let Some(fqcn) = current {
+        if !visited.insert(fqcn.clone()) {
+            break;
+        }
+        let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
+        match crate::db::find_class_like(db, here) {
+            Some(crate::db::ClassLike::Class(cls)) => {
+                if cls.is_immutable {
+                    return true;
+                }
+                current = cls.parent.clone();
+            }
+            _ => break,
+        }
+    }
+    false
+}
+
 pub fn inherited_template_bindings(
     db: &dyn MirDatabase,
     fqcn: &str,

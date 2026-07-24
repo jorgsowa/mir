@@ -682,25 +682,18 @@ impl<'a> ExpressionAnalyzer<'a> {
                         | Atomic::TStaticObject { fqcn }
                         | Atomic::TParent { fqcn } = atomic
                         {
-                            if let Some(crate::db::ClassLike::Class(cls)) =
-                                crate::db::find_class_like(
-                                    self.db,
-                                    crate::db::Fqcn::from_str(self.db, fqcn.as_ref()),
-                                )
-                            {
-                                if cls.is_immutable {
-                                    let receiver =
-                                        crate::parser::span_text(self.source, pa.object.span)
-                                            .unwrap_or_else(|| "the receiver".to_string());
-                                    self.emit(
-                                        IssueKind::ImmutablePropertyModification {
-                                            receiver,
-                                            property: prop_name.clone(),
-                                        },
-                                        Severity::Warning,
-                                        span,
-                                    );
-                                }
+                            if crate::db::class_is_immutable(self.db, fqcn.as_ref()) {
+                                let receiver =
+                                    crate::parser::span_text(self.source, pa.object.span)
+                                        .unwrap_or_else(|| "the receiver".to_string());
+                                self.emit(
+                                    IssueKind::ImmutablePropertyModification {
+                                        receiver,
+                                        property: prop_name.clone(),
+                                    },
+                                    Severity::Warning,
+                                    span,
+                                );
                             }
                         }
                     }
