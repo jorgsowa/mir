@@ -46,6 +46,54 @@ pub(crate) fn resolve_named_arg_type_index(
         .map(|(i, _)| i)
 }
 
+/// `@return ($this is X ? A : B)` / `@return ($param is X ? A : B)` where
+/// `X` is a CLASS name: `Type::resolve_conditional_returns` alone can never
+/// resolve this, even once the discriminator's argument type is looked up
+/// correctly — it's purely structural (`mir-types` has no `db`, so no
+/// ancestor walk) and its closed predicate set (null/true/false/string/
+/// list/array/int/float/bool) has no arm for an object atom at all, so an
+/// object-typed subject always falls through to "unresolvable, widen to
+/// the union of both branches" regardless of the looked-up argument.
+/// Pre-resolves exactly that one shape (a single top-level `TConditional`
+/// atom whose subject and looked-up argument are both object-like) via
+/// `subtype::is_subtype`, then defers to the existing structural resolver
+/// for every other shape (scalar discriminant, non-single-atomic type,
+/// nested conditionals in the chosen branch) unchanged.
+pub(crate) fn resolve_conditional_return<F>(
+    ty: mir_types::Type,
+    db: &dyn crate::db::MirDatabase,
+    lookup: F,
+) -> mir_types::Type
+where
+    F: Fn(&str) -> Option<mir_types::Type>,
+{
+    if let [mir_types::Atomic::TConditional { data }] = ty.types.as_slice() {
+        let subject_is_object = !data.subject.types.is_empty()
+            && data
+                .subject
+                .types
+                .iter()
+                .all(|a| a.named_object_fqcn().is_some());
+        if subject_is_object {
+            if let Some(param_name) = &data.param_name {
+                if let Some(arg_ty) = lookup(param_name.as_ref()) {
+                    let arg_is_object = !arg_ty.types.is_empty()
+                        && arg_ty.types.iter().all(|a| a.named_object_fqcn().is_some());
+                    if arg_is_object {
+                        let branch = if crate::subtype::is_subtype(db, &arg_ty, &data.subject) {
+                            data.if_true.clone()
+                        } else {
+                            data.if_false.clone()
+                        };
+                        return branch.resolve_conditional_returns(&lookup);
+                    }
+                }
+            }
+        }
+    }
+    ty.resolve_conditional_returns(lookup)
+}
+
 /// An assignment expression in argument position (`f($x = expr)`,
 /// `->andReturn($mock = m::mock(...))`) has its value consumed by the call —
 /// the write is used even if the variable is never read again.

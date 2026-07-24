@@ -839,7 +839,20 @@ impl CallAnalyzer {
                 Some(bindings) => ret_substituted.substitute_templates(bindings),
                 None => ret_substituted,
             };
-            let ret = ret.resolve_conditional_returns(|param_name| {
+            let ret = crate::call::resolve_conditional_return(ret, ea.db, |param_name| {
+                // `@return ($this is X ? A : B)`: `self::method()`/
+                // `static::method()`/`parent::method()` still has a real
+                // `$this` when called from inside an instance method —
+                // resolve it to the same receiver `static`/`self` already
+                // substitutes into the return type above, instead of
+                // leaving it permanently unresolved (never a declared
+                // parameter).
+                if param_name == "this" {
+                    return Some(Type::single(mir_types::Atomic::TNamedObject {
+                        fqcn: Name::new(fqcn_arc.as_ref()),
+                        type_params: own_type_params.clone().into(),
+                    }));
+                }
                 resolved
                     .params
                     .iter()

@@ -1329,17 +1329,28 @@ fn resolve_method_return<'a>(
         } else {
             ret_raw
         };
-        let mut return_ty = return_ty.resolve_conditional_returns(|param_name| {
-            resolved
-                .params
-                .iter()
-                .position(|p| p.name.as_ref() == param_name)
-                .and_then(|idx| {
-                    crate::call::resolve_named_arg_type_index(&resolved.params, &call.args, idx)
-                })
-                .and_then(|idx| arg_types.get(idx))
-                .cloned()
-        });
+        let mut return_ty =
+            crate::call::resolve_conditional_return(return_ty, ea.db, |param_name| {
+                // `@return ($this is X ? A : B)`: `$this` is never a declared
+                // parameter, so the lookup below always misses it — resolve it
+                // to the receiver's own concrete type instead, mirroring the
+                // `@if-this-is` receiver construction just above.
+                if param_name == "this" {
+                    return Some(Type::single(mir_types::Atomic::TNamedObject {
+                        fqcn: Name::new(fqcn.as_ref()),
+                        type_params: receiver_type_params.to_vec().into(),
+                    }));
+                }
+                resolved
+                    .params
+                    .iter()
+                    .position(|p| p.name.as_ref() == param_name)
+                    .and_then(|idx| {
+                        crate::call::resolve_named_arg_type_index(&resolved.params, &call.args, idx)
+                    })
+                    .and_then(|idx| arg_types.get(idx))
+                    .cloned()
+            });
         ea.apply_method_call_plugins(
             fqcn.as_ref(),
             resolved.owner_fqcn.as_ref(),

@@ -829,16 +829,17 @@ impl CallAnalyzer {
                 None => return_ty_raw,
             };
 
-            let return_ty = return_ty.resolve_conditional_returns(|param_name| {
-                params
-                    .iter()
-                    .position(|p| p.name.as_ref() == param_name)
-                    .and_then(|idx| {
-                        crate::call::resolve_named_arg_type_index(&params, &call.args, idx)
-                    })
-                    .and_then(|idx| arg_types.get(idx))
-                    .cloned()
-            });
+            let return_ty =
+                crate::call::resolve_conditional_return(return_ty, ea.db, |param_name| {
+                    params
+                        .iter()
+                        .position(|p| p.name.as_ref() == param_name)
+                        .and_then(|idx| {
+                            crate::call::resolve_named_arg_type_index(&params, &call.args, idx)
+                        })
+                        .and_then(|idx| arg_types.get(idx))
+                        .cloned()
+                });
 
             // Built-in array transformers whose stub return type is a generic
             // `array`: refine the element type from the callback / source array
