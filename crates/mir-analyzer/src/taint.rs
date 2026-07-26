@@ -328,6 +328,22 @@ pub fn is_expr_tainted(
                 ) {
                     return true;
                 }
+                // `sprintf`/`vsprintf` interpolate every argument straight
+                // into the returned string — a tainted format string OR any
+                // tainted interpolated value makes the result tainted, the
+                // same pass-through `call/function.rs`/`call/callable.rs`
+                // already special-case for these two builtins' return-type
+                // inference.
+                if matches!(
+                    crate::util::php_ident_lowercase(name.as_ref()).as_str(),
+                    "sprintf" | "vsprintf"
+                ) && fc
+                    .args
+                    .iter()
+                    .any(|a| is_expr_tainted(&a.value, ctx, db, file))
+                {
+                    return true;
+                }
                 let resolved = crate::db::resolve_name(db, file, name.as_ref());
                 let here = crate::db::Fqcn::from_str(db, resolved.as_str());
                 if crate::db::find_function(db, here).is_some_and(|f| f.is_taint_source) {
