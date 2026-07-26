@@ -740,7 +740,15 @@ impl<'a> ExpressionAnalyzer<'a> {
         // chain to find the root variable, instead of only matching when
         // `pa.object` IS that bare variable.
         if let Some(recv_name) = root_receiver_var(&pa.object) {
-            if let Some(prop_name) = extract_string_from_expr(&pa.property) {
+            // A dynamic property name (`$this->$prop = x`) can't be resolved
+            // to a specific property, but the write still mutates SOME
+            // property of the receiver — falling back to the property
+            // expression's own source text (`$prop`) as a display name keeps
+            // the check firing instead of silently no-oping just because the
+            // exact name is unknown.
+            let prop_display = extract_string_from_expr(&pa.property)
+                .or_else(|| crate::parser::span_text(self.source, pa.property.span));
+            if let Some(prop_name) = prop_display {
                 self.check_property_write_purity_by_name(recv_name, &prop_name, ctx, span);
             }
         }
@@ -764,7 +772,13 @@ impl<'a> ExpressionAnalyzer<'a> {
             ExprKind::Variable(n) if ctx.is_cloned_local(n)
         );
         if !is_this_receiver && !is_cloned_local_receiver {
-            if let Some(prop_name) = extract_string_from_expr(&pa.property) {
+            // Same dynamic-name fallback as the purity check above — a
+            // `$b->$prop = x` write on an immutable-tagged receiver is
+            // exactly as externally-visible a mutation as the literal-name
+            // form, even though the specific property can't be named.
+            let prop_display = extract_string_from_expr(&pa.property)
+                .or_else(|| crate::parser::span_text(self.source, pa.property.span));
+            if let Some(prop_name) = prop_display {
                 if let Some(obj_ty) = resolve_chained_receiver_type(&pa.object, ctx, self.db) {
                     for atomic in &obj_ty.types {
                         if let Atomic::TNamedObject { fqcn, .. }
