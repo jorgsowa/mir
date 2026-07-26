@@ -407,22 +407,29 @@ pub(super) fn resolve_static_call_class_fqcn(
 /// Compute the narrowed type for a negated assertion (`@psalm-assert !Type
 /// $x` — "$x is asserted NOT to be this type"): `current` minus `asserted`
 /// for the shapes that can be precisely subtracted — `null`, `false`, and a
-/// single named class/interface (via the same subclass-aware exclusion a
-/// `!($x instanceof C)` guard already uses). Anything else is left
-/// unchanged rather than risk excluding too much.
+/// named class/interface (via the same subclass-aware exclusion a
+/// `!($x instanceof C)` guard already uses). A union/intersection target
+/// (`!A|B`) subtracts each atom in turn — "$x is not A|B" means neither A
+/// nor B — instead of bailing out entirely just because the target has more
+/// than one atom. Any atom kind not recognized is left unchanged rather than
+/// risk excluding too much.
 pub(crate) fn negate_assertion_type(current: &Type, asserted: &Type, db: &dyn MirDatabase) -> Type {
-    if current.is_mixed_not_template() || asserted.types.len() != 1 {
+    if current.is_mixed_not_template() {
         return current.clone();
     }
-    match &asserted.types[0] {
-        Atomic::TNull => current.remove_null(),
-        Atomic::TFalse => current.remove_false(),
-        Atomic::TNamedObject { fqcn, .. }
-        | Atomic::TSelf { fqcn }
-        | Atomic::TStaticObject { fqcn }
-        | Atomic::TParent { fqcn } => filter_out_instanceof_match(current, fqcn, db),
-        _ => current.clone(),
+    let mut result = current.clone();
+    for atomic in &asserted.types {
+        result = match atomic {
+            Atomic::TNull => result.remove_null(),
+            Atomic::TFalse => result.remove_false(),
+            Atomic::TNamedObject { fqcn, .. }
+            | Atomic::TSelf { fqcn }
+            | Atomic::TStaticObject { fqcn }
+            | Atomic::TParent { fqcn } => filter_out_instanceof_match(&result, fqcn, db),
+            _ => result,
+        };
     }
+    result
 }
 
 /// Resolve the call argument that actually feeds `params[param_index]`,
