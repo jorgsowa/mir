@@ -93,6 +93,13 @@ impl DefinitionCollector<'_> {
         let _int_mask_guard =
             crate::parser::docblock::SelfIntConstantsGuard::activate(&fqcn, &self_int_constants);
 
+        // Hoisted above the member loop (mirroring class.rs) so an enum
+        // method's own `@param`/`@return`/assertion tags can resolve a
+        // same-file `@psalm-type` alias declared on the enum itself — a
+        // method body is otherwise processed with `aliases: None` below,
+        // silently leaving any alias reference in its docblock unexpanded.
+        let type_aliases = self.build_type_aliases(&enum_doc);
+
         for member in decl.body.members.iter() {
             match &member.kind {
                 EnumMemberKind::Case(c) => {
@@ -169,9 +176,13 @@ impl DefinitionCollector<'_> {
                     );
                 }
                 EnumMemberKind::Method(m) => {
-                    if let Some(method) =
-                        self.build_method_storage(m, &fqcn, Some(&member.span), None, &[])
-                    {
+                    if let Some(method) = self.build_method_storage(
+                        m,
+                        &fqcn,
+                        Some(&member.span),
+                        Some(&type_aliases),
+                        &[],
+                    ) {
                         own_methods.insert(
                             Arc::from(crate::util::php_ident_lowercase(&method.name).as_str()),
                             Arc::new(method),
@@ -200,7 +211,7 @@ impl DefinitionCollector<'_> {
                     );
                     let const_ty = const_doc
                         .var_type
-                        .map(|t| self.resolve_union_doc(t))
+                        .map(|t| self.resolve_union_doc_with_aliases(t, &type_aliases))
                         .or(hint_ty)
                         .or_else(|| super::infer_const_value(self, &c.value.kind))
                         .unwrap_or_else(Type::mixed);
@@ -241,11 +252,6 @@ impl DefinitionCollector<'_> {
                 }
             }
         }
-
-        // Hoisted above `implements_type_args`/`trait_use_type_args` (moved
-        // from further down) so their type args can expand local aliases
-        // before resolution, the same as class.rs's sibling handling does.
-        let type_aliases = self.build_type_aliases(&enum_doc);
 
         // `@implements Interface<T1, T2>` — enums have no `@template` of their
         // own, so there's nothing to substitute into the type args (unlike
