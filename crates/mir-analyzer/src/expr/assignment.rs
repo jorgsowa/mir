@@ -256,6 +256,39 @@ pub(crate) fn resolve_chained_receiver_type(
             }
             Some(result)
         }
+        // `$http->params()->get('id')` — an intermediate METHOD-CALL hop in
+        // the chain (as opposed to a property/array-index hop, both already
+        // handled above) had no counterpart either, so a `@taint-source`
+        // method resolved through one more hop than a bare property/array
+        // chain silently broke off with `None`. Resolves the called
+        // method's declared return type, same shape as the property arm's
+        // `find_property_in_chain` lookup.
+        ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => {
+            let obj_ty = resolve_chained_receiver_type(&mc.object, ctx, db)?;
+            let ExprKind::Identifier(method_name) = &mc.method.kind else {
+                return None;
+            };
+            let method_lower = crate::util::php_ident_lowercase(method_name.as_ref());
+            let mut result = Type::empty();
+            for atomic in &obj_ty.types {
+                if let Atomic::TNamedObject { fqcn, .. }
+                | Atomic::TSelf { fqcn }
+                | Atomic::TStaticObject { fqcn }
+                | Atomic::TParent { fqcn } = atomic
+                {
+                    if let Some((_, method_def)) = crate::db::find_method_respecting_precedence(
+                        db,
+                        crate::db::Fqcn::from_str(db, fqcn.as_ref()),
+                        &method_lower,
+                    ) {
+                        if let Some(ty) = method_def.return_type.as_deref() {
+                            result.merge_with(ty);
+                        }
+                    }
+                }
+            }
+            Some(result)
+        }
         _ => None,
     }
 }
