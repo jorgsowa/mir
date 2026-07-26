@@ -698,6 +698,21 @@ impl<'a> StatementsAnalyzer<'a> {
                                 }
                                 break;
                             }
+                            // `unset($items['k'])` on a by-ref PARAMETER or
+                            // a superglobal mutates it exactly as much as a
+                            // plain `$items['k'] = …` write does — this
+                            // unwrap loop previously fell straight to the
+                            // `_ => break` no-op arm for a bare variable
+                            // base, unlike the property/static-property arms
+                            // above which already run their own checks.
+                            php_ast::owned::ExprKind::Variable(name) => {
+                                self.expr_analyzer(ctx).check_var_write_purity(
+                                    name.trim_start_matches('$'),
+                                    ctx,
+                                    var.span,
+                                );
+                                break;
+                            }
                             _ => break,
                         }
                     }

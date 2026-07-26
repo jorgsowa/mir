@@ -398,6 +398,12 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
             AssignOp::Concat => {
                 if let Some(var_name) = extract_simple_var(&a.target) {
+                    // `.=` on a by-ref PARAMETER or superglobal mutates it
+                    // exactly as much as a plain `=` overwrite does, but this
+                    // fast path (unlike the non-variable branch below, which
+                    // falls through to `assign_to_target`) never routed
+                    // through any purity check at all.
+                    self.check_var_write_purity(&var_name, ctx, expr_span);
                     // `.=` reads the LHS before writing — mark the old write consumed.
                     ctx.mark_consumed(&var_name);
                     let lhs_ty = ctx.get_var(&var_name);
@@ -792,7 +798,46 @@ impl<'a> ExpressionAnalyzer<'a> {
             ExprKind::StaticPropertyAccess(spa) => {
                 self.check_static_prop_byref_purity(spa, ctx, span);
             }
+            // A bare variable base covers every mutation shape that reuses
+            // this function for a plain by-ref PARAMETER or superglobal
+            // (`++`/`--` and `foreach (&$v)`, both routed here by their own
+            // call sites, plus a direct by-ref call argument like
+            // `sort($items)`) — previously unchecked entirely, unlike the
+            // property/static-property arms above.
+            ExprKind::Variable(name) => {
+                self.check_var_write_purity(name.trim_start_matches('$'), ctx, span);
+            }
             _ => {}
+        }
+    }
+
+    /// Purity/mutation-free check for a bare variable mutated OUTSIDE the
+    /// plain `$x = value` assignment shape (`assign_to_target`'s own
+    /// `Variable` arm already covers that one) — a `.=` fast path, a
+    /// by-ref call argument/`++`/`--`/`foreach(&$v)` (via
+    /// `check_byref_arg_purity`), or an `unset()` all mutate a by-ref
+    /// PARAMETER or a superglobal exactly as much as a plain overwrite does.
+    pub(crate) fn check_var_write_purity(&mut self, name: &str, ctx: &FlowState, span: Span) {
+        if !(ctx.is_in_pure_fn || ctx.is_in_immutable_method) {
+            return;
+        }
+        let name_sym = mir_types::Name::from(name);
+        if ctx.byref_param_names.contains(&name_sym) && ctx.param_names.contains(&name_sym) {
+            self.emit(
+                IssueKind::ImpureByRefAssignment {
+                    variable: name.to_string(),
+                },
+                Severity::Warning,
+                span,
+            );
+        } else if crate::util::is_superglobal_name(name) {
+            self.emit(
+                IssueKind::ImpureGlobalVariable {
+                    variable: name.to_string(),
+                },
+                Severity::Warning,
+                span,
+            );
         }
     }
 
@@ -1639,6 +1684,26 @@ impl<'a> ExpressionAnalyzer<'a> {
                                                 }
                                             })
                                             .unwrap_or_else(|| name_str.to_string()),
+                                    },
+                                    Severity::Warning,
+                                    span,
+                                );
+                            }
+                            // `$items['k'] = …` on a by-ref PARAMETER mutates
+                            // caller-visible state through the reference,
+                            // same as a plain `$items = …` overwrite (which
+                            // `assign_to_target`'s own `Variable` arm already
+                            // catches) — this array-index-write arm had no
+                            // counterpart at all.
+                            if (ctx.is_in_pure_fn || ctx.is_in_immutable_method)
+                                && ctx
+                                    .byref_param_names
+                                    .contains(&mir_types::Name::from(name_str))
+                                && ctx.param_names.contains(&mir_types::Name::from(name_str))
+                            {
+                                self.emit(
+                                    IssueKind::ImpureByRefAssignment {
+                                        variable: name_str.to_string(),
                                     },
                                     Severity::Warning,
                                     span,

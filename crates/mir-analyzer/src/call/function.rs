@@ -234,17 +234,18 @@ impl CallAnalyzer {
                             if param.is_variadic {
                                 for arg in call.args.iter().skip(i) {
                                     if let ExprKind::Variable(name) = &arg.value.kind {
-                                        ctx.set_var(
-                                            name.trim_start_matches('$'),
-                                            output_ty.clone(),
-                                        );
+                                        let var_name = name.trim_start_matches('$');
+                                        ea.check_var_write_purity(var_name, ctx, arg.value.span);
+                                        ctx.set_var(var_name, output_ty.clone());
                                     } else {
                                         ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
                                     }
                                 }
                             } else if let Some(arg) = call.args.get(i) {
                                 if let ExprKind::Variable(name) = &arg.value.kind {
-                                    ctx.set_var(name.trim_start_matches('$'), output_ty);
+                                    let var_name = name.trim_start_matches('$');
+                                    ea.check_var_write_purity(var_name, ctx, arg.value.span);
+                                    ctx.set_var(var_name, output_ty);
                                 } else {
                                     ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
                                 }
@@ -730,6 +731,13 @@ impl CallAnalyzer {
                         for arg in call.args.iter().skip(i) {
                             if let ExprKind::Variable(name) = &arg.value.kind {
                                 let var_name = name.as_ref().trim_start_matches('$');
+                                // A plain-variable by-ref argument (`sort($items)`)
+                                // mutates it exactly as much as an explicit write
+                                // would — this branch used to go straight to
+                                // `ctx.set_var` without ever routing through the
+                                // purity check the `else` (non-variable) branch
+                                // below already gets.
+                                ea.check_var_write_purity(var_name, ctx, arg.value.span);
                                 ctx.set_var(var_name, output_ty.clone());
                             } else {
                                 ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
@@ -738,6 +746,7 @@ impl CallAnalyzer {
                     } else if let Some(arg) = call.args.get(i) {
                         if let ExprKind::Variable(name) = &arg.value.kind {
                             let var_name = name.as_ref().trim_start_matches('$');
+                            ea.check_var_write_purity(var_name, ctx, arg.value.span);
                             ctx.set_var(var_name, output_ty);
                         } else {
                             ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
