@@ -12,41 +12,52 @@ pub(crate) fn parse_assertion_type(s: &str) -> (Type, bool) {
     }
 }
 
-/// Split a trailing literal array-key suffix off an assertion target name
-/// (`arr['key']` -> `("arr", Some(ArrayKey::String("key")))`) — used by
-/// `@psalm-assert(-if-true/-if-false) Type $arr['key']` to target a
-/// specific key of a parameter instead of the whole parameter.
+/// Split a trailing (possibly nested) literal array-key suffix off an
+/// assertion target name (`arr['a']['b']` -> `("arr", [String("a"),
+/// String("b")])`) — used by `@psalm-assert(-if-true/-if-false) Type
+/// $arr['a']['b']` to target a specific, possibly nested key path of a
+/// parameter instead of the whole parameter.
 /// `parse_param_line` (shared with plain `@param` parsing, which never has
 /// this suffix on a real parameter name) returns the bracket text verbatim;
 /// splitting it here keeps that function's generic parsing behavior
-/// untouched. Only a single-level suffix is recognized — a second `[`
-/// (`arr['a']['b']`) bails out, leaving the name untouched (a harmless
-/// no-match against any real param name, same as before this fix).
-pub(crate) fn split_array_key_suffix(name: &str) -> (String, Option<mir_types::ArrayKey>) {
-    if !name.ends_with(']') {
-        return (name.to_string(), None);
+/// untouched. Every bracket in the chain must hold a recognized literal key
+/// — if ANY of them doesn't (e.g. a class constant, `$config[self::KEY]['x']`),
+/// the whole name is left UNTOUCHED rather than partially split, same
+/// no-corruption reasoning as the single-key case below.
+pub(crate) fn split_array_key_suffix(name: &str) -> (String, Vec<mir_types::ArrayKey>) {
+    let mut rest = name;
+    let mut keys = Vec::new();
+    while rest.ends_with(']') {
+        let Some(open) = rest.rfind('[') else {
+            return (name.to_string(), Vec::new());
+        };
+        if open == 0 {
+            return (name.to_string(), Vec::new());
+        }
+        let inner = &rest[open + 1..rest.len() - 1];
+        // A bracket suffix whose key isn't a recognized literal must leave
+        // the name UNTOUCHED, not just drop the key — stripping the
+        // brackets here would turn `config[self::KEY]` into the bare name
+        // `config`, which then matches the real `$config` parameter and
+        // (via `apply_assertions` treating an empty path as "target the
+        // whole variable") silently overwrites the entire parameter's type
+        // with the assertion's leaf type instead of a harmless no-op.
+        // Returning the original bracketed text keeps this a no-match
+        // against any real parameter name instead.
+        let Some(key) = parse_literal_array_key(inner.trim()) else {
+            return (name.to_string(), Vec::new());
+        };
+        keys.push(key);
+        rest = &rest[..open];
     }
-    let Some(open) = name.find('[') else {
-        return (name.to_string(), None);
-    };
-    let inner = &name[open + 1..name.len() - 1];
-    if inner.contains('[') || name[..open].is_empty() {
-        return (name.to_string(), None);
+    if rest.is_empty() {
+        return (name.to_string(), Vec::new());
     }
-    // A bracket suffix whose key isn't a recognized literal (e.g. a class
-    // constant, `$config[self::KEY]`) must leave the name UNTOUCHED, not
-    // just drop the key — stripping the brackets here would turn
-    // `config[self::KEY]` into the bare name `config`, which then matches
-    // the real `$config` parameter and (via `apply_assertions` treating a
-    // `None` key as "target the whole variable") silently overwrites the
-    // entire parameter's type with the assertion's leaf type instead of a
-    // harmless no-op. Returning the original bracketed text keeps this a
-    // no-match against any real parameter name instead, same as the
-    // nested-bracket case above.
-    match parse_literal_array_key(inner.trim()) {
-        Some(key) => (name[..open].to_string(), Some(key)),
-        None => (name.to_string(), None),
-    }
+    // Keys were collected innermost-last-to-first (`arr['a']['b']` pushes
+    // "b" then "a"); the path must read outermost-first to match traversal
+    // order.
+    keys.reverse();
+    (rest.to_string(), keys)
 }
 
 fn parse_literal_array_key(inner: &str) -> Option<mir_types::ArrayKey> {

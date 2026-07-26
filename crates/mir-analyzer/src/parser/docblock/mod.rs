@@ -614,14 +614,14 @@ pub struct ParsedDocblock {
     /// `@throws ClassName`
     pub throws: Vec<String>,
     /// `@psalm-assert Type $var` — the `bool` is true for the `!Type` negated
-    /// form; the `Option<ArrayKey>` is set when the target is a specific
-    /// array key of `$var` (`@psalm-assert Type $var['key']`) rather than
-    /// the whole variable.
-    pub assertions: Vec<(String, Option<ArrayKey>, Type, bool)>,
+    /// form; the key path is non-empty when the target is a specific
+    /// (possibly nested) array key of `$var` (`@psalm-assert Type
+    /// $var['a']['b']`) rather than the whole variable.
+    pub assertions: Vec<(String, Vec<ArrayKey>, Type, bool)>,
     /// `@psalm-assert-if-true Type $var`
-    pub assertions_if_true: Vec<(String, Option<ArrayKey>, Type, bool)>,
+    pub assertions_if_true: Vec<(String, Vec<ArrayKey>, Type, bool)>,
     /// `@psalm-assert-if-false Type $var`
-    pub assertions_if_false: Vec<(String, Option<ArrayKey>, Type, bool)>,
+    pub assertions_if_false: Vec<(String, Vec<ArrayKey>, Type, bool)>,
     /// `@psalm-suppress IssueName`
     pub suppressed_issues: Vec<String>,
     pub is_deprecated: bool,

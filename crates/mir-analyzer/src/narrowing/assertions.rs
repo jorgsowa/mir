@@ -174,7 +174,8 @@ fn apply_assertions(
                 // array-key-refinement machinery `isset()`/`empty()` already
                 // use for NARROWING an existing key, applied here as an
                 // ASSIGN instead.
-                if let Some(key) = &assertion.param_key {
+                if !assertion.param_key.is_empty() {
+                    let path = &assertion.param_key;
                     let base = if let Some(name) = extract_var_name(&arg.value) {
                         Some(ShapeBase::Var(name))
                     } else if let Some((obj, prop)) = extract_any_prop_access(&arg.value) {
@@ -184,19 +185,18 @@ fn apply_assertions(
                             .map(|(fqcn, prop)| ShapeBase::Static(fqcn, prop))
                     };
                     if let Some(base) = base {
-                        let path = [key.clone()];
                         let current = resolve_shape_base_current_type(ctx, &base, db, file);
                         let ty = match &template_bindings {
                             Some(b) => assertion.ty.substitute_templates(b),
                             None => assertion.ty.clone(),
                         };
                         let ty = if assertion.negated {
-                            let current_leaf = get_shape_path_type(&current, &path);
+                            let current_leaf = get_shape_path_type(&current, path);
                             negate_assertion_type(&current_leaf, &ty, db)
                         } else {
                             ty
                         };
-                        let narrowed = set_shape_path(&current, &path, &ty);
+                        let narrowed = set_shape_path(&current, path, &ty);
                         set_shape_base_narrowed(ctx, &base, current, narrowed);
                         applied = true;
                     }
