@@ -1406,6 +1406,25 @@ impl<'a> DefinitionCollector<'a> {
                 *ty = expand_aliases_only(ty.clone(), &snapshot);
             }
         }
+        // A genuinely self- or mutually-referential alias (`Tree = array{value:
+        // int, children: array<Tree>}`) can never fully expand — the loop above
+        // only guarantees an ACYCLIC chain of N aliases is fully resolved within
+        // N passes. Any bare alias-name atom still present after that many
+        // passes is, by construction, part of a real cycle — there's no other
+        // way it could have survived — so it can never resolve to a real class.
+        // Previously left as-is, it silently became a phantom reference to a
+        // nonexistent class two-plus levels into the expansion. Substitute
+        // `mixed` for every alias name at this point instead: any part of a
+        // body that was NOT part of a cycle no longer contains an atom
+        // matching an alias name at all (it was already fully expanded away
+        // above), so this only ever touches genuinely-cyclic residue.
+        let neutralize_cycles: FxHashMap<String, Type> = aliases
+            .keys()
+            .map(|name| (name.clone(), Type::mixed()))
+            .collect();
+        for ty in aliases.values_mut() {
+            *ty = expand_aliases_only(ty.clone(), &neutralize_cycles);
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
