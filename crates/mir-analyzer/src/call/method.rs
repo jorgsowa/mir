@@ -340,17 +340,21 @@ impl CallAnalyzer {
             }
         }
 
-        // Purity check: calling a method on a parameter in a @pure function,
-        // for a receiver whose type is unknowable (untyped/mixed parameter)
-        // — the callee can't be resolved, so warn blanket rather than
-        // silently allow it. That's exactly the common case for
-        // loosely-typed legacy code, where this check has the most to
-        // catch. A resolvable receiver's callee purity is checked precisely
-        // below instead, once the method is actually resolved (see the
-        // mirrored check in `resolve_method_return`) — narrowing this
-        // blanket check to the unresolvable case avoids flagging a call to
-        // a provably pure/mutation-free method.
-        if ctx.is_in_pure_fn && obj_ty.is_mixed() {
+        // Purity check: calling a method on a parameter in a @pure function
+        // OR a @psalm-external-mutation-free method, for a receiver whose
+        // type is unknowable (untyped/mixed parameter) — the callee can't
+        // be resolved, so warn blanket rather than silently allow it.
+        // That's exactly the common case for loosely-typed legacy code,
+        // where this check has the most to catch. A resolvable receiver's
+        // callee purity is checked precisely below instead, once the
+        // method is actually resolved (see the mirrored check in
+        // `resolve_method_return`) — narrowing this blanket check to the
+        // unresolvable case avoids flagging a call to a provably
+        // pure/mutation-free method. Previously only gated on
+        // `is_in_pure_fn`, unlike the resolved-callee checks below which
+        // also cover `is_in_external_mutation_free_method` for the same
+        // param-receiver shape.
+        if (ctx.is_in_pure_fn || ctx.is_in_external_mutation_free_method) && obj_ty.is_mixed() {
             if let ExprKind::Variable(recv_name) = &call.object.kind {
                 let recv_stripped = recv_name.trim_start_matches('$');
                 if ctx
