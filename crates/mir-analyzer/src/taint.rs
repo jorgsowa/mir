@@ -199,7 +199,16 @@ pub fn is_expr_tainted(
     match &expr.kind {
         ExprKind::Variable(name) => {
             let n = name.trim_start_matches('$');
-            is_superglobal(n) || ctx.is_tainted(n)
+            is_superglobal(n)
+                || ctx.is_tainted(n)
+                // A variable with no tracked definition at all may be one
+                // `extract()` just defined from a tainted source array —
+                // its name isn't known statically, so this can't be a
+                // specific per-name taint lookup like `is_tainted` above.
+                // Doesn't apply to an already-tracked variable: that one has
+                // its own real, independently-computed taint state.
+                || (ctx.has_dynamic_tainted_var_def
+                    && !ctx.var_is_defined_sym(mir_types::Name::from(n)))
         }
 
         // `$$name` where `$name` holds a known literal string resolves to

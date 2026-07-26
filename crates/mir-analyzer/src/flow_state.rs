@@ -192,6 +192,16 @@ pub struct FlowState {
     /// Monotonic like `has_dynamic_var_def`, for the same reason.
     pub has_dynamic_var_read: bool,
 
+    /// Set once an `extract()` call whose source array is tainted is seen on
+    /// this path (`extract($_GET)`). `extract()` defines variables whose
+    /// names are only known at runtime (`has_dynamic_var_def` already
+    /// handles the "don't report undefined" side of that) — this is the
+    /// taint counterpart: any later read of an otherwise-untracked variable
+    /// must be treated as possibly tainted too, since it may be one
+    /// `extract()` just defined from attacker-controlled data. Monotonic
+    /// like `has_dynamic_var_def`, for the same reason.
+    pub has_dynamic_tainted_var_def: bool,
+
     /// Pre-converted (line, col_start, line_end, col_end) of the first assignment
     /// to each variable. Used to emit accurate locations for UnusedVariable / UnusedParam.
     pub var_locations: FxHashMap<Name, (u32, u16, u32, u16)>,
@@ -358,6 +368,7 @@ impl FlowState {
             inside_loop: false,
             has_dynamic_var_def: false,
             has_dynamic_var_read: false,
+            has_dynamic_tainted_var_def: false,
             inside_finally: false,
             is_generator: false,
             inside_constructor: false,
@@ -956,6 +967,9 @@ impl FlowState {
         let dynamic_var_read = pre.has_dynamic_var_read
             || if_ctx.has_dynamic_var_read
             || else_ctx.has_dynamic_var_read;
+        let dynamic_tainted_var_def = pre.has_dynamic_tainted_var_def
+            || if_ctx.has_dynamic_tainted_var_def
+            || else_ctx.has_dynamic_tainted_var_def;
         // `this_escaped_to_call` is sticky the same way: once `$this` may
         // have reached an unanalyzed call on any path, the constructor
         // definite-assignment check must abstain on every path afterward.
@@ -1000,6 +1014,7 @@ impl FlowState {
             result.has_dynamic_var_def = dynamic_var_def;
             result.this_escaped_to_call = this_escaped;
             result.has_dynamic_var_read = dynamic_var_read;
+            result.has_dynamic_tainted_var_def = dynamic_tainted_var_def;
             return result;
         }
         // If the else-branch always diverges, code after the if runs only
@@ -1035,6 +1050,7 @@ impl FlowState {
             result.has_dynamic_var_def = dynamic_var_def;
             result.this_escaped_to_call = this_escaped;
             result.has_dynamic_var_read = dynamic_var_read;
+            result.has_dynamic_tainted_var_def = dynamic_tainted_var_def;
             return result;
         }
         // If both diverge, the code after the if is unreachable.
@@ -1080,6 +1096,7 @@ impl FlowState {
             result.has_dynamic_var_def = dynamic_var_def;
             result.this_escaped_to_call = this_escaped;
             result.has_dynamic_var_read = dynamic_var_read;
+            result.has_dynamic_tainted_var_def = dynamic_tainted_var_def;
             return result;
         }
 
@@ -1294,6 +1311,7 @@ impl FlowState {
 
         result.has_dynamic_var_def = dynamic_var_def;
         result.this_escaped_to_call = this_escaped;
+        result.has_dynamic_tainted_var_def = dynamic_tainted_var_def;
 
         // Foreach value var names: union — if either branch marks a var as a foreach value, keep it
         for name in if_ctx

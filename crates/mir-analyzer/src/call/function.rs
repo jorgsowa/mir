@@ -552,6 +552,16 @@ impl CallAnalyzer {
         // variable-variables.
         if fn_name.eq_ignore_ascii_case("extract") {
             ctx.has_dynamic_var_def = true;
+            // A tainted source array (`extract($_GET)`) means the variables
+            // it defines may carry attacker-controlled data too — their
+            // names aren't known statically, so mark the WHOLE scope as
+            // possibly holding a tainted dynamically-defined variable rather
+            // than trying (and failing) to taint a specific name.
+            if let Some(arg) = call.args.first() {
+                if crate::taint::is_expr_tainted(&arg.value, ctx, ea.db, &ea.file) {
+                    ctx.has_dynamic_tainted_var_def = true;
+                }
+            }
         }
 
         if let Some(resolved) = resolved {
