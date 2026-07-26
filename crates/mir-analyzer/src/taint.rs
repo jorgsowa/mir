@@ -344,6 +344,22 @@ pub fn is_expr_tainted(
                 {
                     return true;
                 }
+                // `compact('id')` copies `$id`'s CURRENT value into the
+                // returned array under key `'id'` — `call/array_builtins.rs`'s
+                // `compact_return_type` already reads each named variable's
+                // TYPE this same way for shape inference; do the same lookup
+                // for taint so `$data = compact('id'); echo $data['id'];`
+                // is recognized as tainted when `$id` is. Only literal
+                // string argument names are handled, matching
+                // `compact_return_type`'s own scope (a dynamic/computed name
+                // bails there too).
+                if crate::util::php_ident_lowercase(name.as_ref()) == "compact"
+                    && fc.args.iter().any(|a| {
+                        matches!(&a.value.kind, ExprKind::String(var_name) if ctx.is_tainted(var_name.as_ref()))
+                    })
+                {
+                    return true;
+                }
                 let resolved = crate::db::resolve_name(db, file, name.as_ref());
                 let here = crate::db::Fqcn::from_str(db, resolved.as_str());
                 if crate::db::find_function(db, here).is_some_and(|f| f.is_taint_source) {
