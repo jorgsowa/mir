@@ -162,7 +162,7 @@ impl SuppressionMap {
                     insert_line(&mut map.lines, line_no, directive.kinds);
                 }
                 Scope::NextLine => {
-                    let (target, attribute_lines) =
+                    let (target, extra_covered_lines) =
                         next_code_line(&raw_lines, idx, directive.skip_comments);
                     if track_named {
                         if let KindSet::Named(ref names) = directive.kinds {
@@ -171,12 +171,14 @@ impl SuppressionMap {
                             }
                         }
                     }
-                    // An attribute line skipped en route to `target` stays
-                    // covered by the same directive — an issue about the
-                    // attribute itself (e.g. `UndefinedAttributeClass`) fires
-                    // there, not at `target`.
-                    for attr_line in attribute_lines {
-                        insert_line(&mut map.lines, attr_line, directive.kinds.clone());
+                    // An attribute line skipped en route to `target`, or a
+                    // continuation line of `target`'s own multi-line
+                    // signature, stays covered by the same directive — an
+                    // issue about the attribute itself (e.g.
+                    // `UndefinedAttributeClass`) or about a later parameter
+                    // (e.g. `UnusedParam`) fires there, not at `target`.
+                    for extra_line in extra_covered_lines {
+                        insert_line(&mut map.lines, extra_line, directive.kinds.clone());
                     }
                     insert_line(&mut map.lines, target, directive.kinds);
                 }
@@ -330,7 +332,7 @@ fn is_heredoc_closing_line(line: &str, ident: &str) -> bool {
 /// on the declaration that follows it. Falls back to `idx + 2` when nothing
 /// qualifies, so the directive still has a deterministic target.
 fn next_code_line(raw_lines: &[&str], idx: usize, skip_comments: bool) -> (u32, Vec<u32>) {
-    let mut attribute_lines = Vec::new();
+    let mut extra_covered_lines = Vec::new();
     // Net `[`/`]` depth of an in-progress multi-line attribute (`#[` opener
     // whose closing `]` is on a later line) — 0 when not currently inside
     // one. Every line consumed while this is positive is itself an
@@ -339,7 +341,7 @@ fn next_code_line(raw_lines: &[&str], idx: usize, skip_comments: bool) -> (u32, 
     for (offset, line) in raw_lines.iter().enumerate().skip(idx + 1) {
         let trimmed = line.trim();
         if multiline_attr_depth > 0 {
-            attribute_lines.push(offset as u32 + 1);
+            extra_covered_lines.push(offset as u32 + 1);
             multiline_attr_depth += bracket_delta(trimmed);
             continue;
         }
@@ -347,7 +349,7 @@ fn next_code_line(raw_lines: &[&str], idx: usize, skip_comments: bool) -> (u32, 
             continue;
         }
         if is_attribute_only(trimmed) {
-            attribute_lines.push(offset as u32 + 1);
+            extra_covered_lines.push(offset as u32 + 1);
             continue;
         }
         // A `#[` opener with no matching `]` on the SAME line (net positive
@@ -357,7 +359,7 @@ fn next_code_line(raw_lines: &[&str], idx: usize, skip_comments: bool) -> (u32, 
         if trimmed.starts_with("#[") {
             let delta = bracket_delta(trimmed);
             if delta > 0 {
-                attribute_lines.push(offset as u32 + 1);
+                extra_covered_lines.push(offset as u32 + 1);
                 multiline_attr_depth = delta;
                 continue;
             }
@@ -365,9 +367,39 @@ fn next_code_line(raw_lines: &[&str], idx: usize, skip_comments: bool) -> (u32, 
         if skip_comments && is_comment_only(trimmed) {
             continue;
         }
-        return (offset as u32 + 1, attribute_lines);
+        // A declaration whose own signature spans multiple physical lines
+        // (one parameter per line is a common style) still has exactly one
+        // target line for suppression purposes — but a per-line issue
+        // reported later in the SAME signature (e.g. `UnusedParam` on a
+        // parameter several lines down) previously escaped the directive
+        // entirely, since only the signature's first line was ever recorded
+        // as covered. Track open/close paren depth from the target line
+        // onward and keep covering every continuation line until the
+        // signature's parens close.
+        let target = offset as u32 + 1;
+        let mut paren_depth = paren_delta(trimmed);
+        let mut cont_idx = offset + 1;
+        while paren_depth > 0 {
+            let Some(cont_line) = raw_lines.get(cont_idx) else {
+                break;
+            };
+            extra_covered_lines.push(cont_idx as u32 + 1);
+            paren_depth += paren_delta(cont_line.trim());
+            cont_idx += 1;
+        }
+        return (target, extra_covered_lines);
     }
-    (idx as u32 + 2, attribute_lines)
+    (idx as u32 + 2, extra_covered_lines)
+}
+
+/// Net count of `(` minus `)` in `s` — no quote-awareness, matching
+/// `bracket_delta`'s same conservative scope.
+fn paren_delta(s: &str) -> i32 {
+    s.chars().fold(0i32, |depth, c| match c {
+        '(' => depth + 1,
+        ')' => depth - 1,
+        _ => depth,
+    })
 }
 
 /// Net count of `[` minus `]` in `s` — no quote-awareness, matching the
