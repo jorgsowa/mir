@@ -93,6 +93,13 @@ impl<'a> ExpressionAnalyzer<'a> {
 
     pub(super) fn analyze_variable_variable(&mut self, inner: &Expr, ctx: &mut FlowState) -> Type {
         let inner_ty = self.analyze(inner, ctx);
+        // `$$name` where `$name` holds a known literal string (or union of
+        // them) resolves to that variable's OWN real type — this used to
+        // always return bare `mixed`, even when the accessed variable name
+        // was fully known at analysis time. A non-literal-string `$name`
+        // (or no `$name` at all) stays `mixed`: the accessed variable is
+        // genuinely unknown.
+        let mut result = Type::empty();
         if let Some(var_name) = extract_simple_var(inner) {
             ctx.read_vars
                 .insert(mir_types::Name::from(var_name.as_str()));
@@ -100,10 +107,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if let Atomic::TLiteralString(accessed_var_name) = atomic {
                     ctx.read_vars
                         .insert(mir_types::Name::from(accessed_var_name.as_ref()));
+                    result.merge_with(&ctx.get_var(accessed_var_name.as_ref()));
                 }
             }
         }
-        Type::mixed()
+        if result.is_empty() {
+            Type::mixed()
+        } else {
+            result
+        }
     }
 
     pub(super) fn analyze_identifier(

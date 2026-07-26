@@ -191,6 +191,22 @@ pub fn is_expr_tainted(
             is_superglobal(n) || ctx.is_tainted(n)
         }
 
+        // `$$name` where `$name` holds a known literal string resolves to
+        // that variable's own taint state — previously always untainted
+        // (no arm at all), even when the accessed variable name was fully
+        // known and itself tainted.
+        ExprKind::VariableVariable(inner) => {
+            if let Some(var_name) = crate::expr::helpers::extract_simple_var(inner) {
+                let inner_ty = ctx.get_var(&var_name);
+                inner_ty.types.iter().any(|atomic| {
+                    matches!(atomic, mir_types::Atomic::TLiteralString(accessed)
+                        if ctx.is_tainted(accessed.as_ref()))
+                })
+            } else {
+                false
+            }
+        }
+
         ExprKind::ArrayAccess(aa) => {
             // $_GET['key'] — tainted if the array is tainted/superglobal
             is_expr_tainted(&aa.array, ctx, db, file)
