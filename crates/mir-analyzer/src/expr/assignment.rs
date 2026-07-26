@@ -310,6 +310,21 @@ impl<'a> ExpressionAnalyzer<'a> {
                         }
                     }
                 }
+                // `$clone = clone $this;` — record that `$clone` directly
+                // holds a fresh, unaliased clone, so a later write through it
+                // (the standard immutable "wither" idiom) isn't mistaken for
+                // an externally-visible mutation. Any other plain reassignment
+                // of the same variable clears the marker: the new value may
+                // not be a fresh clone.
+                if !a.by_ref {
+                    if let ExprKind::Variable(target_name) = &a.target.kind {
+                        if matches!(&a.value.kind, ExprKind::Clone(_) | ExprKind::CloneWith(..)) {
+                            ctx.mark_cloned_local(target_name);
+                        } else {
+                            ctx.clear_cloned_local(target_name);
+                        }
+                    }
+                }
                 self.assign_to_target(&a.target, rhs_ty.clone(), ctx, expr_span);
                 // A PLAIN (non-`=&`) write to a variable already ref-aliased
                 // to a property mutates that property through the reference
@@ -706,7 +721,16 @@ impl<'a> ExpressionAnalyzer<'a> {
             &pa.object.kind,
             ExprKind::Variable(n) if n.trim_start_matches('$') == "this"
         );
-        if !is_this_receiver {
+        // A write through a variable directly holding a fresh `clone $this`
+        // (the standard immutable "wither" idiom: clone, mutate the clone,
+        // return it) isn't an externally-visible mutation — the clone is a
+        // new, unaliased object nothing else can observe yet, unlike a write
+        // reached through a parameter or another already-shared reference.
+        let is_cloned_local_receiver = matches!(
+            &pa.object.kind,
+            ExprKind::Variable(n) if ctx.is_cloned_local(n)
+        );
+        if !is_this_receiver && !is_cloned_local_receiver {
             if let Some(prop_name) = extract_string_from_expr(&pa.property) {
                 if let Some(obj_ty) = resolve_chained_receiver_type(&pa.object, ctx, self.db) {
                     for atomic in &obj_ty.types {

@@ -140,6 +140,18 @@ pub struct FlowState {
     /// property too.
     pub ref_aliases: FxHashMap<Name, (Name, Name)>,
 
+    /// Local variables directly assigned from a bare `clone $expr` expression
+    /// (`$clone = clone $this;`), keyed by the variable's own name. A write
+    /// through such a variable (`$clone->x = $value;`, the standard immutable
+    /// "wither" idiom) is not an externally-visible mutation the way a write
+    /// through a parameter or `$this` would be — the clone is a fresh,
+    /// unaliased object nothing else can observe yet — so
+    /// `check_property_write_purity`'s cross-class immutable-write check
+    /// consults this set to exempt it. Cleared on any subsequent plain
+    /// reassignment of the same variable to something that isn't itself a
+    /// clone, since the new value may no longer be a fresh, unaliased object.
+    pub cloned_local_vars: FxHashSet<Name>,
+
     /// Variables that have been read at least once in this scope.
     /// Used by UnusedParam detection (M18).
     pub read_vars: FxHashSet<Name>,
@@ -360,6 +372,7 @@ impl FlowState {
             tainted_props: FxHashSet::default(),
             tainted_static_props: FxHashSet::default(),
             ref_aliases: FxHashMap::default(),
+            cloned_local_vars: FxHashSet::default(),
             read_vars: FxHashSet::default(),
             param_names: Arc::new(FxHashSet::default()),
             byref_param_names: Arc::new(FxHashSet::default()),
@@ -800,6 +813,26 @@ impl FlowState {
     pub fn get_ref_alias(&self, var_name: &str) -> Option<(Name, Name)> {
         let var = Name::from(var_name.trim_start_matches('$'));
         self.ref_aliases.get(&var).copied()
+    }
+
+    /// Record `var_name` as directly holding a fresh `clone $expr` result.
+    pub fn mark_cloned_local(&mut self, var_name: &str) {
+        let var = Name::from(var_name.trim_start_matches('$'));
+        self.cloned_local_vars.insert(var);
+    }
+
+    /// Returns true if `var_name` is known to directly hold a fresh, unaliased
+    /// `clone $expr` result in this scope.
+    pub fn is_cloned_local(&self, var_name: &str) -> bool {
+        let var = Name::from(var_name.trim_start_matches('$'));
+        self.cloned_local_vars.contains(&var)
+    }
+
+    /// Clear a previously-recorded clone marker — used when the variable is
+    /// overwritten with a value that isn't itself a fresh clone.
+    pub fn clear_cloned_local(&mut self, var_name: &str) {
+        let var = Name::from(var_name.trim_start_matches('$'));
+        self.cloned_local_vars.remove(&var);
     }
 
     /// Record the location of the first assignment to a variable (first-write-wins)
