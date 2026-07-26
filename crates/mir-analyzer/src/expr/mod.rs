@@ -278,7 +278,21 @@ impl<'a> ExpressionAnalyzer<'a> {
             ExprKind::Nowdoc { value, .. } => {
                 Type::single(Atomic::TLiteralString(value.as_ref().into()))
             }
-            ExprKind::ShellExec(_) => {
+            ExprKind::ShellExec(parts) => {
+                // The backtick operator is a shell-exec sink exactly like
+                // `shell_exec()`/`exec()`, which already run their argument
+                // through `is_expr_tainted` -> `TaintedShell` — this arm used
+                // to discard `parts` entirely (`_`), so an interpolated
+                // tainted value never got analyzed OR taint-checked here.
+                for part in parts.iter() {
+                    if let php_ast::owned::StringPart::Expr(e) = part {
+                        let expr_ty = self.analyze(e, ctx);
+                        self.check_interpolation_implicit_to_string_cast(&expr_ty, e.span);
+                    }
+                }
+                if crate::taint::is_expr_tainted(expr, ctx, self.db, &self.file) {
+                    self.emit(IssueKind::TaintedShell, Severity::Error, expr.span);
+                }
                 self.emit(
                     IssueKind::ForbiddenCode {
                         message: "Use of shell_exec (backtick) is forbidden".to_string(),

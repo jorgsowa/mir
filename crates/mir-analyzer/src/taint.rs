@@ -226,12 +226,12 @@ pub fn is_expr_tainted(
 
         ExprKind::UnaryPrefix(u) => is_expr_tainted(&u.operand, ctx, db, file),
 
-        ExprKind::InterpolatedString(parts) | ExprKind::Heredoc { parts, .. } => {
-            parts.iter().any(|p| match p {
-                StringPart::Expr(e) => is_expr_tainted(e, ctx, db, file),
-                StringPart::Literal(_) => false,
-            })
-        }
+        ExprKind::InterpolatedString(parts)
+        | ExprKind::Heredoc { parts, .. }
+        | ExprKind::ShellExec(parts) => parts.iter().any(|p| match p {
+            StringPart::Expr(e) => is_expr_tainted(e, ctx, db, file),
+            StringPart::Literal(_) => false,
+        }),
 
         ExprKind::Ternary(t) => match &t.then_expr {
             Some(then_e) => {
