@@ -642,57 +642,37 @@ impl<'a> StatementsAnalyzer<'a> {
                             // (assignment.rs), which this loop had no counterpart
                             // for at all (fell through to the `_ => break` below).
                             php_ast::owned::ExprKind::StaticPropertyAccess(spa) => {
-                                if let php_ast::owned::ExprKind::Identifier(id) = &spa.class.kind {
-                                    let resolved =
-                                        crate::db::resolve_name(self.db, &self.file, id.as_ref());
-                                    let fqcn_opt: Option<std::sync::Arc<str>> =
-                                        match resolved.as_str() {
-                                            "self" | "static" => ctx
-                                                .self_fqcn
-                                                .clone()
-                                                .or_else(|| ctx.static_fqcn.clone()),
-                                            "parent" => ctx.parent_fqcn.clone(),
-                                            s => Some(std::sync::Arc::from(s)),
-                                        };
-                                    if let Some(fqcn) = fqcn_opt {
-                                        if let Some(prop_name) = match &spa.member.kind {
-                                            php_ast::owned::ExprKind::Variable(name)
-                                            | php_ast::owned::ExprKind::Identifier(name) => {
-                                                Some(name.trim_start_matches('$').to_string())
-                                            }
-                                            _ => None,
-                                        } {
-                                            if ctx.is_in_pure_fn || ctx.is_in_immutable_method {
-                                                self.expr_analyzer(ctx).emit(
-                                                    IssueKind::ImpureStaticPropertyAssignment {
-                                                        class: fqcn.to_string(),
-                                                        property: prop_name.clone(),
-                                                    },
-                                                    Severity::Warning,
-                                                    var.span,
-                                                );
-                                            }
-                                            if let Some((owner_cls, prop_def)) =
-                                                crate::db::find_property_in_chain(
-                                                    self.db,
-                                                    crate::db::Fqcn::from_str(
-                                                        self.db,
-                                                        fqcn.as_ref(),
-                                                    ),
-                                                    &prop_name,
-                                                )
-                                            {
-                                                if prop_def.is_readonly {
-                                                    self.expr_analyzer(ctx).emit(
-                                                        IssueKind::ReadonlyPropertyAssignment {
-                                                            class: owner_cls.to_string(),
-                                                            property: prop_name,
-                                                        },
-                                                        Severity::Error,
-                                                        var.span,
-                                                    );
-                                                }
-                                            }
+                                if let Some((fqcn, prop_name)) =
+                                    crate::expr::assignment::resolve_static_prop_target(
+                                        spa, ctx, self.db, &self.file,
+                                    )
+                                {
+                                    if ctx.is_in_pure_fn || ctx.is_in_immutable_method {
+                                        self.expr_analyzer(ctx).emit(
+                                            IssueKind::ImpureStaticPropertyAssignment {
+                                                class: fqcn.to_string(),
+                                                property: prop_name.clone(),
+                                            },
+                                            Severity::Warning,
+                                            var.span,
+                                        );
+                                    }
+                                    if let Some((owner_cls, prop_def)) =
+                                        crate::db::find_property_in_chain(
+                                            self.db,
+                                            crate::db::Fqcn::from_str(self.db, fqcn.as_ref()),
+                                            &prop_name,
+                                        )
+                                    {
+                                        if prop_def.is_readonly {
+                                            self.expr_analyzer(ctx).emit(
+                                                IssueKind::ReadonlyPropertyAssignment {
+                                                    class: owner_cls.to_string(),
+                                                    property: prop_name,
+                                                },
+                                                Severity::Error,
+                                                var.span,
+                                            );
                                         }
                                     }
                                 }

@@ -35,24 +35,38 @@ pub(crate) fn taint_destructured_targets(target: &Expr, ctx: &mut FlowState) {
 
 /// Resolve a `self::$prop`/`static::$prop`/`parent::$prop`/`Foo::$prop`
 /// static-property target to its owning FQCN + bare property name — shared
-/// resolution logic for the taint helpers below, mirroring the inline
-/// version already duplicated in the `Assign`/`Concat` arms' own
-/// `StaticPropertyAccess` match arms.
-fn resolve_static_prop_target(
+/// resolution logic reused by every write/taint call site below instead of
+/// each reimplementing it inline. A variable class-string receiver
+/// (`$cls::$prop`, where `$cls` holds a `class-string<Foo>`-typed value)
+/// used to fall straight to `None` here (only a literal class-name
+/// `Identifier` was matched), silently bypassing purity/readonly/taint
+/// tracking for every one of this function's callers at once.
+pub(crate) fn resolve_static_prop_target(
     spa: &php_ast::owned::StaticAccessExpr,
     ctx: &FlowState,
     db: &dyn MirDatabase,
     file: &str,
 ) -> Option<(std::sync::Arc<str>, String)> {
-    let ExprKind::Identifier(id) = &spa.class.kind else {
-        return None;
+    let fqcn = match &spa.class.kind {
+        ExprKind::Identifier(id) => {
+            let resolved = crate::db::resolve_name(db, file, id.as_ref());
+            match resolved.as_str() {
+                "self" | "static" => ctx.self_fqcn.clone().or_else(|| ctx.static_fqcn.clone()),
+                "parent" => ctx.parent_fqcn.clone(),
+                s => Some(std::sync::Arc::from(s)),
+            }?
+        }
+        ExprKind::Variable(name) => {
+            ctx.get_var(name)
+                .types
+                .iter()
+                .find_map(|atomic| match atomic {
+                    Atomic::TClassString(Some(fqcn)) => Some(std::sync::Arc::from(fqcn.as_ref())),
+                    _ => None,
+                })?
+        }
+        _ => return None,
     };
-    let resolved = crate::db::resolve_name(db, file, id.as_ref());
-    let fqcn = match resolved.as_str() {
-        "self" | "static" => ctx.self_fqcn.clone().or_else(|| ctx.static_fqcn.clone()),
-        "parent" => ctx.parent_fqcn.clone(),
-        s => Some(std::sync::Arc::from(s)),
-    }?;
     let prop_name = match &spa.member.kind {
         ExprKind::Variable(name) | ExprKind::Identifier(name) => {
             Some(name.trim_start_matches('$').to_string())
@@ -441,29 +455,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                     // static properties were entirely untracked for taint,
                     // unlike instance properties (the arm above).
                     ExprKind::StaticPropertyAccess(spa) => {
-                        if let ExprKind::Identifier(id) = &spa.class.kind {
-                            let resolved =
-                                crate::db::resolve_name(self.db, &self.file, id.as_ref());
-                            let fqcn_opt: Option<std::sync::Arc<str>> = match resolved.as_str() {
-                                "self" | "static" => {
-                                    ctx.self_fqcn.clone().or_else(|| ctx.static_fqcn.clone())
-                                }
-                                "parent" => ctx.parent_fqcn.clone(),
-                                s => Some(std::sync::Arc::from(s)),
-                            };
-                            if let Some(fqcn) = fqcn_opt {
-                                if let Some(prop_name) = match &spa.member.kind {
-                                    ExprKind::Variable(name) | ExprKind::Identifier(name) => {
-                                        Some(name.trim_start_matches('$').to_string())
-                                    }
-                                    _ => None,
-                                } {
-                                    if rhs_tainted {
-                                        ctx.taint_static_prop(&fqcn, &prop_name);
-                                    } else {
-                                        ctx.clear_static_prop_taint(&fqcn, &prop_name);
-                                    }
-                                }
+                        if let Some((fqcn, prop_name)) =
+                            resolve_static_prop_target(spa, ctx, self.db, &self.file)
+                        {
+                            if rhs_tainted {
+                                ctx.taint_static_prop(&fqcn, &prop_name);
+                            } else {
+                                ctx.clear_static_prop_taint(&fqcn, &prop_name);
                             }
                         }
                     }
@@ -554,32 +552,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                             taint_array_write_base(&aa.array, ctx, self.db, &self.file);
                         }
                         ExprKind::StaticPropertyAccess(spa) => {
-                            if let ExprKind::Identifier(id) = &spa.class.kind {
-                                let resolved =
-                                    crate::db::resolve_name(self.db, &self.file, id.as_ref());
-                                let fqcn_opt: Option<std::sync::Arc<str>> = match resolved.as_str()
-                                {
-                                    "self" | "static" => {
-                                        ctx.self_fqcn.clone().or_else(|| ctx.static_fqcn.clone())
-                                    }
-                                    "parent" => ctx.parent_fqcn.clone(),
-                                    s => Some(std::sync::Arc::from(s)),
-                                };
-                                if let Some(fqcn) = fqcn_opt {
-                                    if let Some(prop_name) = match &spa.member.kind {
-                                        ExprKind::Variable(name) | ExprKind::Identifier(name) => {
-                                            Some(name.trim_start_matches('$').to_string())
-                                        }
-                                        _ => None,
-                                    } {
-                                        if rhs_tainted
-                                            || ctx.is_static_prop_tainted(&fqcn, &prop_name)
-                                        {
-                                            ctx.taint_static_prop(&fqcn, &prop_name);
-                                        } else {
-                                            ctx.clear_static_prop_taint(&fqcn, &prop_name);
-                                        }
-                                    }
+                            if let Some((fqcn, prop_name)) =
+                                resolve_static_prop_target(spa, ctx, self.db, &self.file)
+                            {
+                                if rhs_tainted || ctx.is_static_prop_tainted(&fqcn, &prop_name) {
+                                    ctx.taint_static_prop(&fqcn, &prop_name);
+                                } else {
+                                    ctx.clear_static_prop_taint(&fqcn, &prop_name);
                                 }
                             }
                         }
@@ -1553,95 +1532,78 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
             }
             ExprKind::StaticPropertyAccess(spa) => {
-                if let ExprKind::Identifier(id) = &spa.class.kind {
-                    let resolved = crate::db::resolve_name(self.db, &self.file, id.as_ref());
-                    let fqcn_opt: Option<std::sync::Arc<str>> = match resolved.as_str() {
-                        "self" | "static" => {
-                            ctx.self_fqcn.clone().or_else(|| ctx.static_fqcn.clone())
+                if let Some((fqcn, prop_name)) =
+                    resolve_static_prop_target(spa, ctx, self.db, &self.file)
+                {
+                    let prop_name_opt = Some(prop_name);
+                    if let Some(prop_name) = &prop_name_opt {
+                        // Purity check: assigning to a static property in a @pure
+                        // function. Unlike an instance property assignment (only
+                        // impure through a parameter/captured receiver), a static
+                        // property IS the shared external state — same as a
+                        // global variable — so every write is impure, not just
+                        // ones through a specific receiver. @mutation-free
+                        // forbids it too, same as @pure.
+                        if ctx.is_in_pure_fn || ctx.is_in_immutable_method {
+                            self.emit(
+                                IssueKind::ImpureStaticPropertyAssignment {
+                                    class: fqcn.to_string(),
+                                    property: prop_name.clone(),
+                                },
+                                Severity::Warning,
+                                span,
+                            );
                         }
-                        "parent" => ctx.parent_fqcn.clone(),
-                        s => Some(std::sync::Arc::from(s)),
-                    };
-                    if let Some(fqcn) = fqcn_opt {
-                        let prop_name_opt = match &spa.member.kind {
-                            ExprKind::Variable(name) | ExprKind::Identifier(name) => {
-                                Some(name.trim_start_matches('$').to_string())
-                            }
-                            _ => None,
-                        };
-                        if let Some(prop_name) = &prop_name_opt {
-                            // Purity check: assigning to a static property in a @pure
-                            // function. Unlike an instance property assignment (only
-                            // impure through a parameter/captured receiver), a static
-                            // property IS the shared external state — same as a
-                            // global variable — so every write is impure, not just
-                            // ones through a specific receiver. @mutation-free
-                            // forbids it too, same as @pure.
-                            if ctx.is_in_pure_fn || ctx.is_in_immutable_method {
+                        // Without this, a static property write (Foo::$prop = ...,
+                        // self::$prop = ..., static::$prop = ...) got no hover,
+                        // go-to-definition, or find-all-references at all — unlike
+                        // the read path (analyze_static_property_access), which
+                        // records both. Key by the declaring owner, not the
+                        // accessed-through class, matching the read path.
+                        let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
+                        let prop_owner =
+                            crate::db::find_property_in_chain(self.db, here, prop_name)
+                                .map(|(cls, _)| cls)
+                                .unwrap_or_else(|| fqcn.clone());
+                        self.record_ref(
+                            std::sync::Arc::from(format!("prop:{}::{}", prop_owner, prop_name)),
+                            spa.member.span,
+                        );
+                        self.record_symbol(
+                            spa.member.span,
+                            crate::symbol::ReferenceKind::PropertyAccess {
+                                class: prop_owner,
+                                property: std::sync::Arc::from(prop_name.as_str()),
+                            },
+                            ty.clone(),
+                        );
+                    }
+                    if let Some(prop_name) = prop_name_opt.clone() {
+                        let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
+                        if let Some((owner_cls, prop_def)) =
+                            crate::db::find_property_in_chain(self.db, here, &prop_name)
+                        {
+                            // A `@readonly`-tagged static property has no constructor-
+                            // scoped "first write" the way an instance property does —
+                            // PHP itself doesn't allow a native `readonly` keyword on a
+                            // static property at all, so the docblock-only annotation's
+                            // only sensible semantics is "never legal to write from
+                            // outside its own declaration", unconditionally.
+                            if prop_def.is_readonly {
                                 self.emit(
-                                    IssueKind::ImpureStaticPropertyAssignment {
-                                        class: fqcn.to_string(),
+                                    IssueKind::ReadonlyPropertyAssignment {
+                                        class: owner_cls.to_string(),
                                         property: prop_name.clone(),
                                     },
-                                    Severity::Warning,
+                                    Severity::Error,
                                     span,
                                 );
                             }
-                            // Without this, a static property write (Foo::$prop = ...,
-                            // self::$prop = ..., static::$prop = ...) got no hover,
-                            // go-to-definition, or find-all-references at all — unlike
-                            // the read path (analyze_static_property_access), which
-                            // records both. Key by the declaring owner, not the
-                            // accessed-through class, matching the read path.
-                            let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
-                            let prop_owner =
-                                crate::db::find_property_in_chain(self.db, here, prop_name)
-                                    .map(|(cls, _)| cls)
-                                    .unwrap_or_else(|| fqcn.clone());
-                            self.record_ref(
-                                std::sync::Arc::from(format!("prop:{}::{}", prop_owner, prop_name)),
-                                spa.member.span,
-                            );
-                            self.record_symbol(
-                                spa.member.span,
-                                crate::symbol::ReferenceKind::PropertyAccess {
-                                    class: prop_owner,
-                                    property: std::sync::Arc::from(prop_name.as_str()),
-                                },
-                                ty.clone(),
-                            );
-                        }
-                        if let Some(prop_name) = prop_name_opt.clone() {
-                            let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
-                            if let Some((owner_cls, prop_def)) =
-                                crate::db::find_property_in_chain(self.db, here, &prop_name)
-                            {
-                                // A `@readonly`-tagged static property has no constructor-
-                                // scoped "first write" the way an instance property does —
-                                // PHP itself doesn't allow a native `readonly` keyword on a
-                                // static property at all, so the docblock-only annotation's
-                                // only sensible semantics is "never legal to write from
-                                // outside its own declaration", unconditionally.
-                                if prop_def.is_readonly {
-                                    self.emit(
-                                        IssueKind::ReadonlyPropertyAssignment {
-                                            class: owner_cls.to_string(),
-                                            property: prop_name.clone(),
-                                        },
-                                        Severity::Error,
-                                        span,
-                                    );
-                                }
-                                let prop_has_native_type = prop_def.has_native_type;
-                                if let Some(prop_ty) = prop_def.ty.as_deref() {
-                                    if !prop_ty.is_mixed_not_template()
-                                        && !ty.is_mixed_not_template()
-                                    {
-                                        let class_tp_names: FxHashSet<mir_types::Name> =
-                                            crate::db::class_template_params(
-                                                self.db,
-                                                fqcn.as_ref(),
-                                            )
+                            let prop_has_native_type = prop_def.has_native_type;
+                            if let Some(prop_ty) = prop_def.ty.as_deref() {
+                                if !prop_ty.is_mixed_not_template() && !ty.is_mixed_not_template() {
+                                    let class_tp_names: FxHashSet<mir_types::Name> =
+                                        crate::db::class_template_params(self.db, fqcn.as_ref())
                                             .map(|tps| {
                                                 tps.iter()
                                                     .map(|tp| {
@@ -1650,102 +1612,98 @@ impl<'a> ExpressionAnalyzer<'a> {
                                                     .collect()
                                             })
                                             .unwrap_or_default();
-                                        // A static access has no receiver instance to carry
-                                        // type args, but an `@extends Box<int>` clause on the
-                                        // accessed class itself still statically binds the
-                                        // declaring class's template param — resolve that
-                                        // before deciding whether to skip.
-                                        let bindings = crate::db::inherited_template_bindings(
-                                            self.db,
-                                            fqcn.as_ref(),
-                                            &FxHashMap::default(),
-                                        );
-                                        let resolved_prop_ty = if bindings.is_empty() {
-                                            prop_ty.clone()
-                                        } else {
-                                            prop_ty.substitute_templates(&bindings)
-                                        };
-                                        let skip =
-                                            type_refs_any_template(
-                                                &resolved_prop_ty,
-                                                &class_tp_names,
-                                            ) || type_refs_any_template(&ty, &class_tp_names)
-                                                || type_refs_any_template(
-                                                    &ty,
-                                                    &ctx.template_param_names,
-                                                );
-                                        // A docblock-only (`@var`) property
-                                        // accepts null (implicit null default);
-                                        // widen for the compatibility decision
-                                        // only, keeping the declared type in the
-                                        // emitted message.
-                                        let compat_ty = if prop_has_native_type {
-                                            resolved_prop_ty.clone()
-                                        } else {
-                                            let mut t = resolved_prop_ty.clone();
-                                            t.add_type(Atomic::TNull);
-                                            t
-                                        };
-                                        if !skip
-                                            && !property_assign_compatible(&ty, &compat_ty, self.db)
-                                        {
-                                            if is_property_type_coercion(
+                                    // A static access has no receiver instance to carry
+                                    // type args, but an `@extends Box<int>` clause on the
+                                    // accessed class itself still statically binds the
+                                    // declaring class's template param — resolve that
+                                    // before deciding whether to skip.
+                                    let bindings = crate::db::inherited_template_bindings(
+                                        self.db,
+                                        fqcn.as_ref(),
+                                        &FxHashMap::default(),
+                                    );
+                                    let resolved_prop_ty = if bindings.is_empty() {
+                                        prop_ty.clone()
+                                    } else {
+                                        prop_ty.substitute_templates(&bindings)
+                                    };
+                                    let skip =
+                                        type_refs_any_template(&resolved_prop_ty, &class_tp_names)
+                                            || type_refs_any_template(&ty, &class_tp_names)
+                                            || type_refs_any_template(
                                                 &ty,
-                                                &resolved_prop_ty,
-                                                self.db,
-                                            ) {
-                                                self.emit(
-                                                    IssueKind::PropertyTypeCoercion {
-                                                        property: prop_name.clone(),
-                                                        expected: format!("{resolved_prop_ty}"),
-                                                        actual: format!("{ty}"),
-                                                    },
-                                                    Severity::Info,
-                                                    span,
-                                                );
-                                            } else {
-                                                self.emit(
-                                                    IssueKind::InvalidPropertyAssignment {
-                                                        property: prop_name.clone(),
-                                                        expected: format!("{resolved_prop_ty}"),
-                                                        actual: format!("{ty}"),
-                                                    },
-                                                    Severity::Warning,
-                                                    span,
-                                                );
-                                            }
+                                                &ctx.template_param_names,
+                                            );
+                                    // A docblock-only (`@var`) property
+                                    // accepts null (implicit null default);
+                                    // widen for the compatibility decision
+                                    // only, keeping the declared type in the
+                                    // emitted message.
+                                    let compat_ty = if prop_has_native_type {
+                                        resolved_prop_ty.clone()
+                                    } else {
+                                        let mut t = resolved_prop_ty.clone();
+                                        t.add_type(Atomic::TNull);
+                                        t
+                                    };
+                                    if !skip
+                                        && !property_assign_compatible(&ty, &compat_ty, self.db)
+                                    {
+                                        if is_property_type_coercion(
+                                            &ty,
+                                            &resolved_prop_ty,
+                                            self.db,
+                                        ) {
+                                            self.emit(
+                                                IssueKind::PropertyTypeCoercion {
+                                                    property: prop_name.clone(),
+                                                    expected: format!("{resolved_prop_ty}"),
+                                                    actual: format!("{ty}"),
+                                                },
+                                                Severity::Info,
+                                                span,
+                                            );
+                                        } else {
+                                            self.emit(
+                                                IssueKind::InvalidPropertyAssignment {
+                                                    property: prop_name.clone(),
+                                                    expected: format!("{resolved_prop_ty}"),
+                                                    actual: format!("{ty}"),
+                                                },
+                                                Severity::Warning,
+                                                span,
+                                            );
                                         }
                                     }
                                 }
                             }
                         }
-                        // Narrow the static property type the same way an instance
-                        // property is narrowed on assignment (reusing prop_refined,
-                        // keyed by the FQCN instead of a receiver variable name — a
-                        // FQCN can never collide with a real PHP variable name).
-                        if let Some(prop_name) = prop_name_opt {
-                            let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
-                            let declared_opt =
-                                crate::db::find_property_in_chain(self.db, here, &prop_name)
-                                    .and_then(|(_, p)| p.ty.clone());
-                            let should_refine = !ty.is_mixed()
-                                && declared_opt
-                                    .as_deref()
-                                    .map(|declared| {
-                                        crate::subtype::is_subtype(self.db, &ty, declared)
-                                    })
-                                    .unwrap_or(true);
-                            if should_refine {
-                                ctx.set_prop_refined(fqcn.as_ref(), &prop_name, ty.clone());
-                            } else {
-                                ctx.clear_prop_refined(fqcn.as_ref(), &prop_name);
-                            }
+                    }
+                    // Narrow the static property type the same way an instance
+                    // property is narrowed on assignment (reusing prop_refined,
+                    // keyed by the FQCN instead of a receiver variable name — a
+                    // FQCN can never collide with a real PHP variable name).
+                    if let Some(prop_name) = prop_name_opt {
+                        let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
+                        let declared_opt =
+                            crate::db::find_property_in_chain(self.db, here, &prop_name)
+                                .and_then(|(_, p)| p.ty.clone());
+                        let should_refine = !ty.is_mixed()
+                            && declared_opt
+                                .as_deref()
+                                .map(|declared| crate::subtype::is_subtype(self.db, &ty, declared))
+                                .unwrap_or(true);
+                        if should_refine {
+                            ctx.set_prop_refined(fqcn.as_ref(), &prop_name, ty.clone());
+                        } else {
+                            ctx.clear_prop_refined(fqcn.as_ref(), &prop_name);
                         }
                     }
                 }
             }
             ExprKind::ArrayAccess(aa) => {
                 // Collect the full index chain from outermost to innermost.
+
                 // For `$arr[$a][$b] = $val`, this gives [type($b), type($a)].
                 // None means push notation (`[]`), which produces TList rather than TArray.
                 // The base variable's key is the innermost (last in vec), and
@@ -2024,59 +1982,42 @@ impl<'a> ExpressionAnalyzer<'a> {
                             // plain `self::$items = …` static-write check
                             // (there's no immutable-context mirror for
                             // statics — see the plain write arm's own comment).
-                            if let ExprKind::Identifier(id) = &spa.class.kind {
-                                let resolved =
-                                    crate::db::resolve_name(self.db, &self.file, id.as_ref());
-                                let fqcn_opt: Option<std::sync::Arc<str>> = match resolved.as_str()
+                            if let Some((fqcn, prop_name)) =
+                                resolve_static_prop_target(spa, ctx, self.db, &self.file)
+                            {
+                                if ctx.is_in_pure_fn || ctx.is_in_immutable_method {
+                                    self.emit(
+                                        IssueKind::ImpureStaticPropertyAssignment {
+                                            class: fqcn.to_string(),
+                                            property: prop_name.clone(),
+                                        },
+                                        Severity::Warning,
+                                        span,
+                                    );
+                                }
+                                // `self::$store['k'] = …` mutates the array
+                                // the same way a plain `self::$store = …`
+                                // write would — reuse the same is_readonly
+                                // lookup the plain static-write arm above
+                                // already does, unconditionally (readonly
+                                // is a class contract, not scoped to
+                                // @pure-annotated functions).
+                                if let Some((owner_cls, prop_def)) =
+                                    crate::db::find_property_in_chain(
+                                        self.db,
+                                        crate::db::Fqcn::from_str(self.db, fqcn.as_ref()),
+                                        &prop_name,
+                                    )
                                 {
-                                    "self" | "static" => {
-                                        ctx.self_fqcn.clone().or_else(|| ctx.static_fqcn.clone())
-                                    }
-                                    "parent" => ctx.parent_fqcn.clone(),
-                                    s => Some(std::sync::Arc::from(s)),
-                                };
-                                if let Some(fqcn) = fqcn_opt {
-                                    if let Some(prop_name) = match &spa.member.kind {
-                                        ExprKind::Variable(name) | ExprKind::Identifier(name) => {
-                                            Some(name.trim_start_matches('$').to_string())
-                                        }
-                                        _ => None,
-                                    } {
-                                        if ctx.is_in_pure_fn || ctx.is_in_immutable_method {
-                                            self.emit(
-                                                IssueKind::ImpureStaticPropertyAssignment {
-                                                    class: fqcn.to_string(),
-                                                    property: prop_name.clone(),
-                                                },
-                                                Severity::Warning,
-                                                span,
-                                            );
-                                        }
-                                        // `self::$store['k'] = …` mutates the array
-                                        // the same way a plain `self::$store = …`
-                                        // write would — reuse the same is_readonly
-                                        // lookup the plain static-write arm above
-                                        // already does, unconditionally (readonly
-                                        // is a class contract, not scoped to
-                                        // @pure-annotated functions).
-                                        if let Some((owner_cls, prop_def)) =
-                                            crate::db::find_property_in_chain(
-                                                self.db,
-                                                crate::db::Fqcn::from_str(self.db, fqcn.as_ref()),
-                                                &prop_name,
-                                            )
-                                        {
-                                            if prop_def.is_readonly {
-                                                self.emit(
-                                                    IssueKind::ReadonlyPropertyAssignment {
-                                                        class: owner_cls.to_string(),
-                                                        property: prop_name,
-                                                    },
-                                                    Severity::Error,
-                                                    span,
-                                                );
-                                            }
-                                        }
+                                    if prop_def.is_readonly {
+                                        self.emit(
+                                            IssueKind::ReadonlyPropertyAssignment {
+                                                class: owner_cls.to_string(),
+                                                property: prop_name,
+                                            },
+                                            Severity::Error,
+                                            span,
+                                        );
                                     }
                                 }
                             }
