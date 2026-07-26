@@ -1,5 +1,5 @@
 use super::helpers::extract_string_from_expr;
-use super::ExpressionAnalyzer;
+use super::{root_receiver_var, ExpressionAnalyzer};
 use crate::flow_state::FlowState;
 use crate::symbol::ReferenceKind;
 use mir_issues::{IssueKind, Severity};
@@ -501,6 +501,64 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 Severity::Warning,
                                 call_span,
                             );
+                        }
+                        // Same check for @psalm-immutable/@psalm-external-
+                        // mutation-free, scoped to when a constructor
+                        // argument is both OBJECT-typed and reachable from
+                        // `$this`/a parameter — passing `$this`'s own state
+                        // (or a parameter's) into an impure constructor lets
+                        // it store/mutate that object just as much as
+                        // calling an impure METHOD on it would
+                        // (call/method.rs's own external-mutation-free check
+                        // has the identical receiver scoping). The
+                        // object-typed requirement matters: passing a plain
+                        // VALUE read off `$this` (`new self($this->intProp)`,
+                        // the standard immutable "wither" idiom) is not a
+                        // mutation risk at all — only an object reference the
+                        // constructor could hold onto and later mutate is.
+                        if (ctx.is_in_immutable_method || ctx.is_in_external_mutation_free_method)
+                            && !ctor_is_pure
+                            && !ctor_is_mutation_free
+                        {
+                            for arg in n.args.iter() {
+                                let Some(recv_name) = root_receiver_var(&arg.value) else {
+                                    continue;
+                                };
+                                let recv_stripped = recv_name.trim_start_matches('$');
+                                let reachable = (ctx.is_in_immutable_method
+                                    && recv_stripped == "this")
+                                    || (ctx.is_in_external_mutation_free_method
+                                        && recv_stripped != "this"
+                                        && ctx.param_names.contains(&Name::from(recv_stripped)));
+                                if !reachable {
+                                    continue;
+                                }
+                                let arg_is_object =
+                                    crate::expr::assignment::resolve_chained_receiver_type(
+                                        &arg.value, ctx, self.db,
+                                    )
+                                    .is_some_and(|ty| {
+                                        ty.types.iter().any(|a| {
+                                            matches!(
+                                                a,
+                                                Atomic::TNamedObject { .. }
+                                                    | Atomic::TSelf { .. }
+                                                    | Atomic::TStaticObject { .. }
+                                                    | Atomic::TParent { .. }
+                                            )
+                                        })
+                                    });
+                                if arg_is_object {
+                                    self.emit(
+                                        IssueKind::ImpureFunctionCall {
+                                            fn_name: format!("{fqcn}::__construct"),
+                                        },
+                                        Severity::Warning,
+                                        call_span,
+                                    );
+                                    break;
+                                }
+                            }
                         }
                         if !trait_relative_new {
                             // A bare subclass of a generic ancestor fixed via
