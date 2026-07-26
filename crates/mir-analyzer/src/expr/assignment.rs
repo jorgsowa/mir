@@ -229,6 +229,33 @@ pub(crate) fn resolve_chained_receiver_type(
             }
             Some(result)
         }
+        // `$this->repos['main']->getInput()` — an array-index hop in the
+        // middle of the chain is still reachable from `$this`/a parameter,
+        // same as `root_receiver_var`'s own array-index arm above; this
+        // resolver had no counterpart, so a chain with an index hop
+        // silently broke off with `None` instead of yielding the element
+        // type callers (e.g. the `@taint-source` method-call check) need.
+        ExprKind::ArrayAccess(aa) => {
+            let base_ty = resolve_chained_receiver_type(&aa.array, ctx, db)?;
+            let mut result = Type::empty();
+            for atomic in &base_ty.types {
+                match atomic {
+                    Atomic::TArray { value, .. } | Atomic::TNonEmptyArray { value, .. } => {
+                        result.merge_with(value);
+                    }
+                    Atomic::TList { value } | Atomic::TNonEmptyList { value } => {
+                        result.merge_with(value);
+                    }
+                    Atomic::TKeyedArray { properties, .. } => {
+                        for prop in properties.values() {
+                            result.merge_with(&prop.ty);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Some(result)
+        }
         _ => None,
     }
 }
