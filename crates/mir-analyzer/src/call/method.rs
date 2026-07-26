@@ -729,44 +729,6 @@ fn resolve_method_return<'a>(
             )),
             call.method.span,
         );
-        // `@if-this-is X<Y>`: the method may only be called when the receiver
-        // satisfies the constraint. We can only judge this when the receiver's
-        // type arguments are known — an unparameterized receiver (e.g.
-        // `new Foo()` with no `@var`) carries nothing to contradict.
-        if let Some(constraint) = resolved.if_this_is.clone() {
-            let constraint_has_params = constraint.types.iter().any(|a| {
-                matches!(a, mir_types::Atomic::TNamedObject { type_params, .. } if !type_params.is_empty())
-            });
-            // Receiver type args that are still unresolved template vars (e.g.
-            // a call on `$this` inside the generic class body) carry no concrete
-            // instantiation to judge against — skip rather than risk a false
-            // mismatch.
-            let receiver_has_unresolved_template = receiver_type_params.iter().any(|t| {
-                t.types
-                    .iter()
-                    .any(|a| matches!(a, mir_types::Atomic::TTemplateParam { .. }))
-            });
-            if !receiver_has_unresolved_template
-                && (!receiver_type_params.is_empty() || !constraint_has_params)
-            {
-                let receiver = Type::single(mir_types::Atomic::TNamedObject {
-                    fqcn: Name::new(fqcn.as_ref()),
-                    type_params: receiver_type_params.to_vec().into(),
-                });
-                if !crate::subtype::is_subtype(ea.db, &receiver, &constraint) {
-                    ea.emit(
-                        IssueKind::IfThisIsMismatch {
-                            class: fqcn.to_string(),
-                            method: method_name.to_string(),
-                            expected: format!("{constraint}"),
-                            actual: format!("{receiver}"),
-                        },
-                        Severity::Info,
-                        span,
-                    );
-                }
-            }
-        }
         if let Some(msg) = resolved.deprecated.clone() {
             ea.emit(
                 IssueKind::DeprecatedMethod {
@@ -1161,6 +1123,63 @@ fn resolve_method_return<'a>(
                     Severity::Error,
                     span,
                 );
+            }
+        }
+
+        // `@if-this-is X<Y>`: the method may only be called when the receiver
+        // satisfies the constraint. We can only judge this when the receiver's
+        // type arguments are known — an unparameterized receiver (e.g.
+        // `new Foo()` with no `@var`) carries nothing to contradict. Checked
+        // here (after `bindings` includes this call's own inferred method-
+        // level template bindings, not right at method resolution) so a
+        // constraint referencing the METHOD's own `@template` (`@if-this-is
+        // Box<U>` where `U` is this call's own template, inferred from an
+        // argument) is substituted before the comparison — otherwise `U`
+        // stays a bare, never-excluded template atom and the check can never
+        // fail for its own template params (it already worked correctly for
+        // a constraint referencing only the CLASS's template, since that's
+        // already resolved into `receiver_type_params` by this point).
+        if let Some(original_constraint) = resolved.if_this_is.clone() {
+            let constraint = original_constraint.substitute_templates(&bindings);
+            let constraint_has_params = constraint.types.iter().any(|a| {
+                matches!(a, mir_types::Atomic::TNamedObject { type_params, .. } if !type_params.is_empty())
+            });
+            // Receiver type args that are still unresolved template vars (e.g.
+            // a call on `$this` inside the generic class body) carry no concrete
+            // instantiation to judge against — skip rather than risk a false
+            // mismatch.
+            let receiver_has_unresolved_template = receiver_type_params.iter().any(|t| {
+                t.types
+                    .iter()
+                    .any(|a| matches!(a, mir_types::Atomic::TTemplateParam { .. }))
+            });
+            if !receiver_has_unresolved_template
+                && (!receiver_type_params.is_empty() || !constraint_has_params)
+            {
+                let receiver = Type::single(mir_types::Atomic::TNamedObject {
+                    fqcn: Name::new(fqcn.as_ref()),
+                    type_params: receiver_type_params.to_vec().into(),
+                });
+                if !crate::subtype::is_subtype(ea.db, &receiver, &constraint) {
+                    ea.emit(
+                        IssueKind::IfThisIsMismatch {
+                            class: fqcn.to_string(),
+                            method: method_name.to_string(),
+                            // The message displays the ORIGINAL, unsubstituted
+                            // constraint (`Box<U>`, not `Box<mixed>`) — a
+                            // method template with no way to be inferred
+                            // (never appears in a real @param) substitutes to
+                            // `mixed`, which renders as if the generic were
+                            // entirely absent (`Box`) instead of keeping the
+                            // more informative raw template name. Only the
+                            // actual subtype CHECK needs the substituted form.
+                            expected: format!("{original_constraint}"),
+                            actual: format!("{receiver}"),
+                        },
+                        Severity::Info,
+                        span,
+                    );
+                }
             }
         }
 
