@@ -184,7 +184,7 @@ impl<'a> DefinitionCollector<'a> {
                         .or_else(|| {
                             prop_doc.var_type.clone().map(|t| {
                                 self.resolve_union_doc_with_templates(
-                                    t,
+                                    super::expand_aliases_only(t, &type_aliases),
                                     &trait_template_names,
                                     fqcn.as_str(),
                                     &trait_template_params,

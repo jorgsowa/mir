@@ -190,7 +190,7 @@ impl<'a> DefinitionCollector<'a> {
                         .var_type
                         .map(|t| {
                             self.resolve_union_doc_with_templates(
-                                t,
+                                super::expand_aliases_only(t, &type_aliases),
                                 &iface_template_names,
                                 &fqcn,
                                 &iface_template_params,

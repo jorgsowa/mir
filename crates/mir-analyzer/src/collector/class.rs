@@ -263,7 +263,7 @@ impl<'a> DefinitionCollector<'a> {
                         .or_else(|| {
                             prop_doc.var_type.map(|t| {
                                 self.resolve_union_doc_with_templates(
-                                    t,
+                                    super::expand_aliases_only(t, &type_aliases),
                                     &class_template_names,
                                     &fqcn,
                                     &class_template_params,
@@ -344,7 +344,7 @@ impl<'a> DefinitionCollector<'a> {
                         .var_type
                         .map(|t| {
                             self.resolve_union_doc_with_templates(
-                                t,
+                                super::expand_aliases_only(t, &type_aliases),
                                 &class_template_names,
                                 &fqcn,
                                 &class_template_params,
