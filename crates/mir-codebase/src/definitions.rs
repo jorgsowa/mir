@@ -819,6 +819,17 @@ pub struct FunctionDef {
     pub throws: Vec<Arc<str>>,
     pub deprecated: Option<Arc<str>>,
     pub is_pure: bool,
+    /// `@psalm-mutation-free` / `@phpstan-mutation-free` on a free function.
+    /// A free function has no `$this`, so this is behaviorally equivalent to
+    /// `is_external_mutation_free` here (both forbid mutating a parameter);
+    /// see `MethodDef::is_mutation_free` for the method-level (has-`$this`)
+    /// distinction this mirrors.
+    #[serde(default)]
+    pub is_mutation_free: bool,
+    /// `@psalm-external-mutation-free` on a free function — must not mutate
+    /// any object passed as an argument.
+    #[serde(default)]
+    pub is_external_mutation_free: bool,
     /// `@no-named-arguments` — callers must not use named argument syntax.
     #[serde(default)]
     pub no_named_arguments: bool,

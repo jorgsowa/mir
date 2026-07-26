@@ -137,6 +137,17 @@ impl<'a> BodyAnalyzer<'a> {
             Some(&template_params),
         );
         ctx.is_in_pure_fn = resolved.as_ref().map(|(_, s)| s.is_pure).unwrap_or(false);
+        // A free function has no `$this`, so `@mutation-free` has nothing to
+        // exempt — its only meaningful half is exactly `@external-mutation-
+        // free`'s "don't mutate a parameter" constraint. Reuse the existing
+        // (method-shaped) flag rather than introduce a function-specific one:
+        // its own gate (`recv_stripped != "this" && recv is a param`) already
+        // does the right thing here, since a free function's receiver is
+        // never literally `"this"`. `@pure` already covers this case via its
+        // own, separate `is_in_pure_fn` check above.
+        ctx.is_in_external_mutation_free_method = resolved
+            .as_ref()
+            .is_some_and(|(_, s)| s.is_mutation_free || s.is_external_mutation_free);
         ctx.current_function_fqn = fqn.clone();
         seed_param_locations(&mut ctx, &decl.params, source, source_map);
         record_param_symbols(all_symbols, file, source, &decl.params, &ctx);
@@ -839,6 +850,17 @@ impl<'a> BodyAnalyzer<'a> {
             true,
         );
         ctx.is_in_pure_fn = resolved.as_ref().map(|(_, s)| s.is_pure).unwrap_or(false);
+        // A free function has no `$this`, so `@mutation-free` has nothing to
+        // exempt — its only meaningful half is exactly `@external-mutation-
+        // free`'s "don't mutate a parameter" constraint. Reuse the existing
+        // (method-shaped) flag rather than introduce a function-specific one:
+        // its own gate (`recv_stripped != "this" && recv is a param`) already
+        // does the right thing here, since a free function's receiver is
+        // never literally `"this"`. `@pure` already covers this case via its
+        // own, separate `is_in_pure_fn` check above.
+        ctx.is_in_external_mutation_free_method = resolved
+            .as_ref()
+            .is_some_and(|(_, s)| s.is_mutation_free || s.is_external_mutation_free);
         ctx.current_function_fqn = fqn.clone();
         seed_param_locations(&mut ctx, &decl.params, source, source_map);
         record_param_symbols(all_symbols, file, source, &decl.params, &ctx);

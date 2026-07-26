@@ -399,6 +399,8 @@ impl DefinitionCollector<'_> {
                 }
             }),
             is_pure: doc.is_pure,
+            is_mutation_free: doc.is_mutation_free,
+            is_external_mutation_free: doc.is_external_mutation_free,
             no_named_arguments: doc.no_named_arguments,
             location: Some(self.location(stmt_span.start, stmt_span.end)),
             docstring,
