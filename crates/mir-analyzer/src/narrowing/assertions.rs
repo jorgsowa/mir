@@ -277,7 +277,11 @@ pub(super) fn method_call_receiver_fqcn(
 ) -> Option<std::sync::Arc<str>> {
     let obj_ty = if let Some(obj_var) = extract_var_name(object) {
         ctx.get_var(&obj_var)
-    } else if let Some((obj_var, prop)) = extract_prop_access(object) {
+    } else if let Some((obj_var, prop)) = extract_any_prop_access(object) {
+        // `extract_any_prop_access` also matches a nullsafe (`?->`) receiver
+        // chain, unlike the plain-`->`-only `extract_prop_access` this used
+        // to call — mirrors the same fix already applied to the self-out
+        // write-back's receiver resolution in `call/method.rs`.
         resolve_prop_current_type(ctx, &obj_var, &prop, db, file)
     } else if let Some((fqcn, prop)) = extract_static_prop_access(object, ctx, db, file) {
         // `self::$validator->isValid($x)` — a static-property receiver is a
