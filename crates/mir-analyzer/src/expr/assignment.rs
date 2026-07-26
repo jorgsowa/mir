@@ -1158,7 +1158,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                             found_any.then_some(result)
                         })
                         .unwrap_or_else(Type::mixed);
-                    self.assign_to_target(&elem.value, elem_ty, ctx, span);
+                    // Each destructured target gets its OWN span, not the
+                    // outer destructuring statement's span — `[$this->x,
+                    // $this->y] = $vals;` previously passed the same `span`
+                    // for every element, so a purity/readonly/immutability
+                    // diagnostic on the second+ target collided with the
+                    // first's under the issue buffer's (kind, file, line,
+                    // col_start) dedup key and was silently discarded, even
+                    // though it names a different property.
+                    self.assign_to_target(&elem.value, elem_ty, ctx, elem.value.span);
                 }
             }
             ExprKind::PropertyAccess(pa) => {
