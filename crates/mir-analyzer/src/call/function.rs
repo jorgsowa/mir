@@ -789,83 +789,28 @@ impl CallAnalyzer {
                 }
             }
 
+            // A bare-statement (unconditional) `@psalm-assert` call —
+            // reuses the exact per-assertion body the conditional if-true/
+            // if-false dispatch uses (`apply_one_assertion`), which this
+            // hand-duplicated loop never did: it never read
+            // `assertion.param_key` (an array-key-targeted assertion
+            // silently no-oped), never handled a variadic param (only
+            // ever resolved a single positional arg via `call.args.get(index)`),
+            // and never resolved a named argument.
             for assertion in resolved
                 .assertions
                 .iter()
                 .filter(|a| a.kind == AssertionKind::Assert)
             {
-                if let Some(index) = params.iter().position(|p| p.name == assertion.param) {
-                    if let Some(arg) = call.args.get(index) {
-                        if let ExprKind::Variable(name) = &arg.value.kind {
-                            let var_name = name.as_ref().trim_start_matches('$');
-                            let asserted_ty = match &template_bindings {
-                                Some(b) => assertion.ty.substitute_templates(b),
-                                None => assertion.ty.clone(),
-                            };
-                            let asserted_ty = if assertion.negated {
-                                crate::narrowing::negate_assertion_type(
-                                    &ctx.get_var(var_name),
-                                    &asserted_ty,
-                                    ea.db,
-                                )
-                            } else {
-                                asserted_ty
-                            };
-                            ctx.set_var(var_name, asserted_ty);
-                        } else if let Some((obj, prop)) =
-                            crate::narrowing::extract_any_prop_access(&arg.value)
-                        {
-                            let asserted_ty = match &template_bindings {
-                                Some(b) => assertion.ty.substitute_templates(b),
-                                None => assertion.ty.clone(),
-                            };
-                            let asserted_ty = if assertion.negated {
-                                let current = crate::narrowing::resolve_prop_current_type(
-                                    ctx, &obj, &prop, ea.db, &ea.file,
-                                );
-                                crate::narrowing::negate_assertion_type(
-                                    &current,
-                                    &asserted_ty,
-                                    ea.db,
-                                )
-                            } else {
-                                asserted_ty
-                            };
-                            // `$obj->prop` on a null `$obj` reads as null, so
-                            // proving the property itself is non-nullable
-                            // also proves `$obj` wasn't null.
-                            let proved_prop_non_null = !asserted_ty.is_nullable();
-                            ctx.set_prop_refined(&obj, &prop, asserted_ty);
-                            crate::narrowing::narrow_receiver_non_null_on_prop_match(
-                                ctx,
-                                &obj,
-                                proved_prop_non_null,
-                            );
-                        } else if let Some((fqcn, prop)) =
-                            crate::narrowing::extract_static_prop_access(
-                                &arg.value, ctx, ea.db, &ea.file,
-                            )
-                        {
-                            let asserted_ty = match &template_bindings {
-                                Some(b) => assertion.ty.substitute_templates(b),
-                                None => assertion.ty.clone(),
-                            };
-                            let asserted_ty = if assertion.negated {
-                                let current = crate::narrowing::resolve_static_prop_current_type(
-                                    ctx, &fqcn, &prop, ea.db,
-                                );
-                                crate::narrowing::negate_assertion_type(
-                                    &current,
-                                    &asserted_ty,
-                                    ea.db,
-                                )
-                            } else {
-                                asserted_ty
-                            };
-                            ctx.set_prop_refined(&fqcn, &prop, asserted_ty);
-                        }
-                    }
-                }
+                crate::narrowing::apply_one_assertion(
+                    assertion,
+                    &params,
+                    &call.args,
+                    ctx,
+                    template_bindings.as_ref(),
+                    ea.db,
+                    &ea.file,
+                );
             }
 
             let return_ty = match &template_bindings {

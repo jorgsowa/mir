@@ -33,7 +33,7 @@ use arrays::{
     narrow_static_prop_array_key_first_or_last_null, narrow_to_haystack_values,
     strip_haystack_null,
 };
-pub(crate) use assertions::negate_assertion_type;
+pub(crate) use assertions::apply_one_assertion;
 use assertions::{
     apply_docblock_assertions, apply_method_docblock_assertions, method_call_receiver_fqcn,
     resolve_static_call_class_fqcn,

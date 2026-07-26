@@ -117,142 +117,194 @@ fn apply_assertions(
     // class-string<T> $class`) must resolve T from this call's actual
     // arguments before narrowing — otherwise the variable narrows to the
     // bare, unresolved template atom instead of the concrete type.
-    let template_bindings = if template_params.is_empty() {
-        None
-    } else {
-        let arg_types: Vec<Type> = call_args
-            .iter()
-            .map(|arg| assertion_arg_type(&arg.value, ctx, db, file))
-            .collect();
-        let arg_names: Vec<Option<String>> = call_args
-            .iter()
-            .map(|arg| arg.name.as_ref().map(crate::parser::name_to_string_owned))
-            .collect();
-        Some(
-            crate::generic::infer_template_bindings(
-                db,
-                template_params,
-                params,
-                &arg_types,
-                &arg_names,
-            )
-            .0,
-        )
-    };
+    let template_bindings =
+        compute_assertion_template_bindings(template_params, params, call_args, ctx, db, file);
 
     let mut applied = false;
     for assertion in assertions
         .iter()
         .filter(|a| a.kind == expected_kind || (is_true && a.kind == AssertionKind::Assert))
     {
-        if let Some(index) = params.iter().position(|p| p.name == assertion.param) {
-            // A variadic param's assertion applies to every trailing positional
-            // arg it swallows (`assertVariadic(...$values)` asserted over each
-            // of `assertVariadic($a, $b, $c)`), not just the first one —
-            // `arg_for_param_index` only ever resolves a single positional arg.
-            let variadic_args: Vec<&php_ast::owned::Arg>;
-            let args_to_check: &[&php_ast::owned::Arg] = if params[index].is_variadic {
-                variadic_args = call_args
-                    .iter()
-                    .filter(|a| a.name.is_none())
-                    .skip(index)
-                    .collect();
-                &variadic_args
-            } else {
-                variadic_args = arg_for_param_index(params, call_args, index)
-                    .into_iter()
-                    .collect();
-                &variadic_args
-            };
-            for arg in args_to_check {
-                // `@psalm-assert-if-true Type $arr['key']` — the assertion
-                // targets a specific key of this parameter, not the whole
-                // argument. Build a shape-path target from the argument
-                // expression + the asserted key (rather than narrowing the
-                // argument's own whole value) and SET that key's type,
-                // adding it to the shape if not already present — the
-                // array-key-refinement machinery `isset()`/`empty()` already
-                // use for NARROWING an existing key, applied here as an
-                // ASSIGN instead.
-                if !assertion.param_key.is_empty() {
-                    let path = &assertion.param_key;
-                    let base = if let Some(name) = extract_var_name(&arg.value) {
-                        Some(ShapeBase::Var(name))
-                    } else if let Some((obj, prop)) = extract_any_prop_access(&arg.value) {
-                        Some(ShapeBase::Prop(obj, prop))
-                    } else {
-                        extract_static_prop_access(&arg.value, ctx, db, file)
-                            .map(|(fqcn, prop)| ShapeBase::Static(fqcn, prop))
-                    };
-                    if let Some(base) = base {
-                        let current = resolve_shape_base_current_type(ctx, &base, db, file);
-                        let ty = match &template_bindings {
-                            Some(b) => assertion.ty.substitute_templates(b),
-                            None => assertion.ty.clone(),
-                        };
-                        let ty = if assertion.negated {
-                            let current_leaf = get_shape_path_type(&current, path);
-                            negate_assertion_type(&current_leaf, &ty, db)
-                        } else {
-                            ty
-                        };
-                        let narrowed = set_shape_path(&current, path, &ty);
-                        set_shape_base_narrowed(ctx, &base, current, narrowed);
-                        applied = true;
-                    }
-                    continue;
-                }
-                if let Some(var_name) = extract_var_name(&arg.value) {
-                    let ty = match &template_bindings {
-                        Some(b) => assertion.ty.substitute_templates(b),
-                        None => assertion.ty.clone(),
-                    };
-                    let ty = if assertion.negated {
-                        negate_assertion_type(&ctx.get_var(&var_name), &ty, db)
-                    } else {
-                        ty
-                    };
-                    ctx.set_var(&var_name, ty);
-                    applied = true;
-                } else if let Some((obj, prop)) = extract_any_prop_access(&arg.value) {
-                    let ty = match &template_bindings {
-                        Some(b) => assertion.ty.substitute_templates(b),
-                        None => assertion.ty.clone(),
-                    };
-                    let ty = if assertion.negated {
-                        let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
-                        negate_assertion_type(&current, &ty, db)
-                    } else {
-                        ty
-                    };
-                    // `$obj->prop` on a null `$obj` reads as null, so proving
-                    // the property itself is non-nullable also proves `$obj`
-                    // wasn't null.
-                    let proved_prop_non_null = !ty.is_nullable();
-                    ctx.set_prop_refined(&obj, &prop, ty);
-                    narrow_receiver_non_null_on_prop_match(ctx, &obj, proved_prop_non_null);
-                    applied = true;
-                } else if let Some((fqcn, prop)) =
-                    extract_static_prop_access(&arg.value, ctx, db, file)
-                {
-                    let ty = match &template_bindings {
-                        Some(b) => assertion.ty.substitute_templates(b),
-                        None => assertion.ty.clone(),
-                    };
-                    let ty = if assertion.negated {
-                        let current = resolve_static_prop_current_type(ctx, &fqcn, &prop, db);
-                        negate_assertion_type(&current, &ty, db)
-                    } else {
-                        ty
-                    };
-                    ctx.set_prop_refined(&fqcn, &prop, ty);
-                    applied = true;
-                }
-            }
+        if apply_one_assertion(
+            assertion,
+            params,
+            call_args,
+            ctx,
+            template_bindings.as_ref(),
+            db,
+            file,
+        ) {
+            applied = true;
         }
     }
 
     applied
+}
+
+/// Apply a single already-selected assertion to its matching argument(s) —
+/// the per-assertion body shared between `apply_assertions`'s conditional
+/// if-true/if-false narrowing (pre-filtered by kind + branch) and a bare,
+/// unconditional `@psalm-assert` statement call (which always applies,
+/// regardless of any condition, and must never fall through to the generic
+/// per-call-site `AssertionKind::Assert` handling that used to be
+/// hand-duplicated in `call/function.rs`, `call/method.rs`, and
+/// `call/static_call.rs` — none of which ever read `assertion.param_key`,
+/// handled a variadic param, or resolved a named argument, unlike this
+/// shared body).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn apply_one_assertion(
+    assertion: &mir_codebase::definitions::Assertion,
+    params: &[mir_codebase::definitions::DeclaredParam],
+    call_args: &[php_ast::owned::Arg],
+    ctx: &mut FlowState,
+    template_bindings: Option<&rustc_hash::FxHashMap<mir_types::Name, Type>>,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> bool {
+    let Some(index) = params.iter().position(|p| p.name == assertion.param) else {
+        return false;
+    };
+    let mut applied = false;
+    // A variadic param's assertion applies to every trailing positional
+    // arg it swallows (`assertVariadic(...$values)` asserted over each
+    // of `assertVariadic($a, $b, $c)`), not just the first one —
+    // `arg_for_param_index` only ever resolves a single positional arg.
+    let variadic_args: Vec<&php_ast::owned::Arg>;
+    let args_to_check: &[&php_ast::owned::Arg] = if params[index].is_variadic {
+        variadic_args = call_args
+            .iter()
+            .filter(|a| a.name.is_none())
+            .skip(index)
+            .collect();
+        &variadic_args
+    } else {
+        variadic_args = arg_for_param_index(params, call_args, index)
+            .into_iter()
+            .collect();
+        &variadic_args
+    };
+    for arg in args_to_check {
+        // `@psalm-assert-if-true Type $arr['key']` — the assertion
+        // targets a specific key of this parameter, not the whole
+        // argument. Build a shape-path target from the argument
+        // expression + the asserted key (rather than narrowing the
+        // argument's own whole value) and SET that key's type,
+        // adding it to the shape if not already present — the
+        // array-key-refinement machinery `isset()`/`empty()` already
+        // use for NARROWING an existing key, applied here as an
+        // ASSIGN instead.
+        if !assertion.param_key.is_empty() {
+            let path = &assertion.param_key;
+            let base = if let Some(name) = extract_var_name(&arg.value) {
+                Some(ShapeBase::Var(name))
+            } else if let Some((obj, prop)) = extract_any_prop_access(&arg.value) {
+                Some(ShapeBase::Prop(obj, prop))
+            } else {
+                extract_static_prop_access(&arg.value, ctx, db, file)
+                    .map(|(fqcn, prop)| ShapeBase::Static(fqcn, prop))
+            };
+            if let Some(base) = base {
+                let current = resolve_shape_base_current_type(ctx, &base, db, file);
+                let ty = match template_bindings {
+                    Some(b) => assertion.ty.substitute_templates(b),
+                    None => assertion.ty.clone(),
+                };
+                let ty = if assertion.negated {
+                    let current_leaf = get_shape_path_type(&current, path);
+                    negate_assertion_type(&current_leaf, &ty, db)
+                } else {
+                    ty
+                };
+                let narrowed = set_shape_path(&current, path, &ty);
+                set_shape_base_narrowed(ctx, &base, current, narrowed);
+                applied = true;
+            }
+            continue;
+        }
+        if let Some(var_name) = extract_var_name(&arg.value) {
+            let ty = match template_bindings {
+                Some(b) => assertion.ty.substitute_templates(b),
+                None => assertion.ty.clone(),
+            };
+            let ty = if assertion.negated {
+                negate_assertion_type(&ctx.get_var(&var_name), &ty, db)
+            } else {
+                ty
+            };
+            ctx.set_var(&var_name, ty);
+            applied = true;
+        } else if let Some((obj, prop)) = extract_any_prop_access(&arg.value) {
+            let ty = match template_bindings {
+                Some(b) => assertion.ty.substitute_templates(b),
+                None => assertion.ty.clone(),
+            };
+            let ty = if assertion.negated {
+                let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
+                negate_assertion_type(&current, &ty, db)
+            } else {
+                ty
+            };
+            // `$obj->prop` on a null `$obj` reads as null, so proving
+            // the property itself is non-nullable also proves `$obj`
+            // wasn't null.
+            let proved_prop_non_null = !ty.is_nullable();
+            ctx.set_prop_refined(&obj, &prop, ty);
+            narrow_receiver_non_null_on_prop_match(ctx, &obj, proved_prop_non_null);
+            applied = true;
+        } else if let Some((fqcn, prop)) = extract_static_prop_access(&arg.value, ctx, db, file) {
+            let ty = match template_bindings {
+                Some(b) => assertion.ty.substitute_templates(b),
+                None => assertion.ty.clone(),
+            };
+            let ty = if assertion.negated {
+                let current = resolve_static_prop_current_type(ctx, &fqcn, &prop, db);
+                negate_assertion_type(&current, &ty, db)
+            } else {
+                ty
+            };
+            ctx.set_prop_refined(&fqcn, &prop, ty);
+            applied = true;
+        }
+    }
+    applied
+}
+
+/// Compute the `@template`-resolved bindings for an assertion's callee, the
+/// same "resolve T from this call's actual arguments" logic
+/// `apply_assertions` needs internally — exposed so a bare, unconditional
+/// `@psalm-assert` statement call (which never goes through
+/// `apply_assertions` at all, since that dispatch only ever runs for a call
+/// used as a boolean CONDITION) can compute the identical bindings before
+/// calling `apply_one_assertion` per matching assertion.
+pub(crate) fn compute_assertion_template_bindings(
+    template_params: &[mir_codebase::definitions::TemplateParam],
+    params: &[mir_codebase::definitions::DeclaredParam],
+    call_args: &[php_ast::owned::Arg],
+    ctx: &FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> Option<rustc_hash::FxHashMap<mir_types::Name, Type>> {
+    if template_params.is_empty() {
+        return None;
+    }
+    let arg_types: Vec<Type> = call_args
+        .iter()
+        .map(|arg| assertion_arg_type(&arg.value, ctx, db, file))
+        .collect();
+    let arg_names: Vec<Option<String>> = call_args
+        .iter()
+        .map(|arg| arg.name.as_ref().map(crate::parser::name_to_string_owned))
+        .collect();
+    Some(
+        crate::generic::infer_template_bindings(
+            db,
+            template_params,
+            params,
+            &arg_types,
+            &arg_names,
+        )
+        .0,
+    )
 }
 
 /// Resolve a method-call receiver's exact class FQCN for dispatching a
