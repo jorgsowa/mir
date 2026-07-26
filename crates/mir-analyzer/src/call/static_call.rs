@@ -976,7 +976,17 @@ impl CallAnalyzer {
             // self/static/parent/`$this` calls were checked at all.
             let is_object_var_call = !matches!(&call.class.kind, ExprKind::Identifier(_));
             if is_self_parent_call || is_object_var_call {
-                if let Some(constraint) = resolved.if_this_is.clone() {
+                if let Some(original_constraint) = resolved.if_this_is.clone() {
+                    // Substitute this call's own inferred method-level
+                    // template bindings (`out_bindings`, already the fully
+                    // merged class + method map by this point) before the
+                    // comparison — otherwise a constraint referencing the
+                    // METHOD's own `@template` (as opposed to the class's,
+                    // already resolved into `receiver_type_params`) always
+                    // compared against a bare, unsubstituted atom and could
+                    // never actually contradict. Mirrors the identical fix
+                    // in `resolve_method_return` (call/method.rs).
+                    let constraint = original_constraint.substitute_templates(&out_bindings);
                     let receiver_type_params = if is_self_parent_call {
                         extract_receiver_type_params(&ctx.get_var("this"), &fqcn_arc)
                     } else {
@@ -1002,7 +1012,13 @@ impl CallAnalyzer {
                                 IssueKind::IfThisIsMismatch {
                                     class: fqcn.clone(),
                                     method: method_name.to_string(),
-                                    expected: format!("{constraint}"),
+                                    // Display the original (unsubstituted)
+                                    // constraint — an unbindable method
+                                    // template defaults to mixed, which
+                                    // renders as if the generic were absent
+                                    // entirely (see call/method.rs's
+                                    // identical fix for the full rationale).
+                                    expected: format!("{original_constraint}"),
                                     actual: format!("{receiver}"),
                                 },
                                 Severity::Info,
