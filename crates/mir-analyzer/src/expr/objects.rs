@@ -798,15 +798,17 @@ impl<'a> ExpressionAnalyzer<'a> {
         let resolved =
             self.resolve_property_type(&non_null_ty, &prop_name, pa.property.span, &mut declaring);
 
-        // If we have a narrowed type for this property access ($var->prop),
-        // return it instead of the declared type.
-        let mut resolved = if let ExprKind::Variable(obj_var) = &pa.object.kind {
-            ctx.get_prop_refined(obj_var.as_ref(), &prop_name)
-                .cloned()
-                .unwrap_or(resolved)
-        } else {
-            resolved
-        };
+        // If we have a narrowed type for this property access ($var->prop,
+        // or the one-more-hop $var->a->prop), return it instead of the
+        // declared type.
+        let mut resolved =
+            if let Some(obj_key) = crate::narrowing::chained_prop_receiver_key(&pa.object) {
+                ctx.get_prop_refined(&obj_key, &prop_name)
+                    .cloned()
+                    .unwrap_or(resolved)
+            } else {
+                resolved
+            };
         // PHP 8 reads a plain `->` access on a null receiver as a warning
         // (not fatal), still evaluating to null — same observable value as
         // `?->`'s short-circuit (see analyze_nullsafe_property_access, which
@@ -855,16 +857,18 @@ impl<'a> ExpressionAnalyzer<'a> {
         let resolved =
             self.resolve_property_type(&non_null_ty, &prop_name, pa.property.span, &mut declaring);
 
-        // If we have a narrowed type for this property access ($var?->prop),
-        // return it instead of the declared type — matching the plain `->`
-        // path in analyze_property_access above.
-        let mut prop_ty = if let ExprKind::Variable(obj_var) = &pa.object.kind {
-            ctx.get_prop_refined(obj_var.as_ref(), &prop_name)
-                .cloned()
-                .unwrap_or(resolved)
-        } else {
-            resolved
-        };
+        // If we have a narrowed type for this property access ($var?->prop,
+        // or the one-more-hop $var->a?->prop), return it instead of the
+        // declared type — matching the plain `->` path in
+        // analyze_property_access above.
+        let mut prop_ty =
+            if let Some(obj_key) = crate::narrowing::chained_prop_receiver_key(&pa.object) {
+                ctx.get_prop_refined(&obj_key, &prop_name)
+                    .cloned()
+                    .unwrap_or(resolved)
+            } else {
+                resolved
+            };
         // Only the receiver's own nullability can make `$obj?->prop` evaluate to
         // null — if `$obj` can never be null, this is exactly `$obj->prop`'s type,
         // narrowed-or-not. Adding TNull unconditionally clobbered a narrowed

@@ -250,6 +250,48 @@ pub(crate) fn extract_any_prop_access(expr: &php_ast::owned::Expr) -> Option<(St
     extract_nullsafe_prop_access(expr).or_else(|| extract_prop_access(expr))
 }
 
+/// Compute `prop_refined`'s "object" key component for a property-access
+/// receiver expression, accepting one MORE hop than a bare variable —
+/// `$this->a` (as a receiver) encodes as `"this->a"` instead of returning
+/// `None`. `prop_refined` is a flat `(Name, Name)` map keyed by
+/// receiver+property, not a real path; a full path-based refactor is a much
+/// bigger change, but a synthetic multi-hop string key (mirroring
+/// `extract_expr_guard_key`'s own synthetic-key precedent) lets a 2-hop
+/// chain reuse the exact same map without one. Still bottoms out at a bare
+/// variable base — a 3+-hop chain or a method-call/array-index hop in the
+/// middle is NOT covered.
+pub(crate) fn chained_prop_receiver_key(object_expr: &php_ast::owned::Expr) -> Option<String> {
+    match &object_expr.kind {
+        ExprKind::Variable(name) => Some(name.trim_start_matches('$').to_string()),
+        ExprKind::PropertyAccess(inner_pa) | ExprKind::NullsafePropertyAccess(inner_pa) => {
+            let base = extract_var_name(&inner_pa.object)?;
+            let mid_prop = match &inner_pa.property.kind {
+                ExprKind::Identifier(s) => s.as_ref(),
+                _ => return None,
+            };
+            Some(format!("{base}->{mid_prop}"))
+        }
+        _ => None,
+    }
+}
+
+/// Like `extract_any_prop_access`, but also accepts one more receiver hop
+/// via `chained_prop_receiver_key` (`$this->a->b` encodes as
+/// `("this->a", "b")` instead of returning `None`).
+pub(crate) fn extract_chained_prop_access(expr: &php_ast::owned::Expr) -> Option<(String, String)> {
+    let pa = match &expr.kind {
+        ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) => pa,
+        ExprKind::Parenthesized(inner) => return extract_chained_prop_access(inner),
+        _ => return None,
+    };
+    let prop = match &pa.property.kind {
+        ExprKind::Identifier(s) => s.as_ref().to_string(),
+        _ => return None,
+    };
+    let obj_key = chained_prop_receiver_key(&pa.object)?;
+    Some((obj_key, prop))
+}
+
 /// Extract `(fqcn, prop_name)` from a `self::$prop` / `static::$prop` /
 /// `parent::$prop` / `ClassName::$prop` expression, resolving relative
 /// keywords through the current `FlowState`.

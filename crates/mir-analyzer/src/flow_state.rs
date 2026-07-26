@@ -738,8 +738,19 @@ impl FlowState {
             self.mark_this_escaped_to_call();
         }
         let receiver = Name::from(stripped);
-        if self.prop_refined.keys().any(|(obj, _)| *obj == receiver) {
-            Arc::make_mut(&mut self.prop_refined).retain(|(obj, _), _| *obj != receiver);
+        // A 2-hop chained receiver key (`chained_prop_receiver_key`) encodes
+        // as `"{receiver}->{prop}"` — an entry keyed this way is also stale
+        // once `receiver` itself may have been reassigned by an opaque call,
+        // not just an entry keyed by `receiver` exactly.
+        let chain_prefix = format!("{stripped}->");
+        if self
+            .prop_refined
+            .keys()
+            .any(|(obj, _)| *obj == receiver || obj.as_ref().starts_with(chain_prefix.as_str()))
+        {
+            Arc::make_mut(&mut self.prop_refined).retain(|(obj, _), _| {
+                *obj != receiver && !obj.as_ref().starts_with(chain_prefix.as_str())
+            });
         }
     }
 

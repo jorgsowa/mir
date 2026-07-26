@@ -49,8 +49,9 @@ use class_introspection::{
     narrow_static_prop_from_gettype_literal,
 };
 pub(crate) use core::{
-    apply_prop_narrowed, extract_any_prop_access, extract_class_fqcn_from_expr,
-    extract_expr_guard_key, extract_prop_access, extract_static_prop_access, is_numeric_string,
+    apply_prop_narrowed, chained_prop_receiver_key, extract_any_prop_access,
+    extract_chained_prop_access, extract_class_fqcn_from_expr, extract_expr_guard_key,
+    extract_prop_access, extract_static_prop_access, is_numeric_string,
     narrow_receiver_non_null_on_prop_match, resolve_prop_current_type,
     resolve_static_prop_current_type, MatchSubject,
 };

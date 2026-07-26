@@ -629,6 +629,15 @@ impl CallAnalyzer {
                 // receiver chain (`$h?->factory->prepare()`), which the
                 // plain-`->`-only `extract_prop_access` used to miss here.
                 ctx.set_prop_refined(&obj_var, &prop, self_out_union);
+            } else if let Some((obj_key, prop)) =
+                crate::narrowing::extract_chained_prop_access(&call.object)
+            {
+                // `$this->a->b->touch()` — a chained (2+ hop) property
+                // receiver. `extract_any_prop_access` only matches a
+                // bare-variable object, so this fell through entirely
+                // before; see `extract_chained_prop_access`'s own doc
+                // comment for the synthetic-key encoding.
+                ctx.set_prop_refined(&obj_key, &prop, self_out_union);
             } else if let Some((static_fqcn, prop)) =
                 crate::narrowing::extract_static_prop_access(&call.object, ctx, ea.db, &ea.file)
             {
