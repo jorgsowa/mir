@@ -223,6 +223,10 @@ impl CallAnalyzer {
 
                 // Write back output types to by-ref argument variables.
                 if let Some((_, ref params)) = callee_params {
+                    let any_arg_tainted = call
+                        .args
+                        .iter()
+                        .any(|arg| is_expr_tainted(&arg.value, ctx, ea.db, &ea.file));
                     for (i, param) in params.iter().enumerate() {
                         if param.is_byref {
                             let output_ty = param
@@ -237,6 +241,11 @@ impl CallAnalyzer {
                                         let var_name = name.trim_start_matches('$');
                                         ea.check_var_write_purity(var_name, ctx, arg.value.span);
                                         ctx.set_var(var_name, output_ty.clone());
+                                        if any_arg_tainted {
+                                            ctx.taint_var(var_name);
+                                        } else {
+                                            ctx.clear_var_taint(var_name);
+                                        }
                                     } else {
                                         ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
                                     }
@@ -246,6 +255,11 @@ impl CallAnalyzer {
                                     let var_name = name.trim_start_matches('$');
                                     ea.check_var_write_purity(var_name, ctx, arg.value.span);
                                     ctx.set_var(var_name, output_ty);
+                                    if any_arg_tainted {
+                                        ctx.taint_var(var_name);
+                                    } else {
+                                        ctx.clear_var_taint(var_name);
+                                    }
                                 } else {
                                     ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
                                 }
@@ -711,6 +725,16 @@ impl CallAnalyzer {
                 None
             };
 
+            // A by-ref output parameter's written-back value derives from the
+            // call's own arguments (e.g. `preg_match`'s `$matches` derives
+            // from the tainted subject) — conservatively taint (or clear) it
+            // the same "sticky" way `.=`/`??=` already treat their own
+            // result, rather than leaving its taint bit untouched from
+            // whatever it happened to hold before the call.
+            let any_arg_tainted = call
+                .args
+                .iter()
+                .any(|arg| is_expr_tainted(&arg.value, ctx, ea.db, &ea.file));
             for (i, param) in params.iter().enumerate() {
                 if param.is_byref {
                     // Prefer @param-out type if declared; fall back to declared in-type.
@@ -739,6 +763,11 @@ impl CallAnalyzer {
                                 // below already gets.
                                 ea.check_var_write_purity(var_name, ctx, arg.value.span);
                                 ctx.set_var(var_name, output_ty.clone());
+                                if any_arg_tainted {
+                                    ctx.taint_var(var_name);
+                                } else {
+                                    ctx.clear_var_taint(var_name);
+                                }
                             } else {
                                 ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
                             }
@@ -748,6 +777,11 @@ impl CallAnalyzer {
                             let var_name = name.as_ref().trim_start_matches('$');
                             ea.check_var_write_purity(var_name, ctx, arg.value.span);
                             ctx.set_var(var_name, output_ty);
+                            if any_arg_tainted {
+                                ctx.taint_var(var_name);
+                            } else {
+                                ctx.clear_var_taint(var_name);
+                            }
                         } else {
                             ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
                         }

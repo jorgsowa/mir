@@ -1206,6 +1206,16 @@ fn resolve_method_return<'a>(
             }
         }
 
+        // A by-ref output parameter's written-back value derives from the
+        // call's own arguments (e.g. `preg_match`'s `$matches` derives from
+        // the tainted subject) — conservatively taint (or clear) it the same
+        // "sticky" way `.=`/`??=` already treat their own result, rather
+        // than leaving its taint bit untouched from whatever it happened to
+        // hold before the call.
+        let any_arg_tainted = call
+            .args
+            .iter()
+            .any(|arg| is_expr_tainted(&arg.value, ctx, ea.db, &ea.file));
         for (i, param) in resolved.params.iter().enumerate() {
             let Some(out_ty) = param.out_ty.as_ref() else {
                 continue;
@@ -1222,12 +1232,24 @@ fn resolve_method_return<'a>(
             if param.is_variadic {
                 for arg in call.args.iter().skip(i) {
                     if let php_ast::owned::ExprKind::Variable(name) = &arg.value.kind {
-                        ctx.set_var(name.as_ref().trim_start_matches('$'), out_ty.clone());
+                        let var_name = name.as_ref().trim_start_matches('$');
+                        ctx.set_var(var_name, out_ty.clone());
+                        if any_arg_tainted {
+                            ctx.taint_var(var_name);
+                        } else {
+                            ctx.clear_var_taint(var_name);
+                        }
                     }
                 }
             } else if let Some(arg) = call.args.get(i) {
                 if let php_ast::owned::ExprKind::Variable(name) = &arg.value.kind {
-                    ctx.set_var(name.as_ref().trim_start_matches('$'), out_ty);
+                    let var_name = name.as_ref().trim_start_matches('$');
+                    ctx.set_var(var_name, out_ty);
+                    if any_arg_tainted {
+                        ctx.taint_var(var_name);
+                    } else {
+                        ctx.clear_var_taint(var_name);
+                    }
                 }
             }
         }
