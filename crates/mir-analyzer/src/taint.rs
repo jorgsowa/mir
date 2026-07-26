@@ -291,6 +291,16 @@ pub fn is_expr_tainted(
         // bigger, deliberately deferred change.
         ExprKind::FunctionCall(fc) => {
             if let ExprKind::Identifier(name) = &fc.name.kind {
+                // `getallheaders()`/`apache_request_headers()` return the raw
+                // HTTP request headers — as attacker-controlled as any
+                // superglobal, but neither was ever treated as a source
+                // (unlike $_SERVER, which only covers some of the same data).
+                if matches!(
+                    crate::util::php_ident_lowercase(name.as_ref()).as_str(),
+                    "getallheaders" | "apache_request_headers"
+                ) {
+                    return true;
+                }
                 let resolved = crate::db::resolve_name(db, file, name.as_ref());
                 let here = crate::db::Fqcn::from_str(db, resolved.as_str());
                 if crate::db::find_function(db, here).is_some_and(|f| f.is_taint_source) {
