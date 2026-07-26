@@ -170,6 +170,17 @@ pub fn taint_sink_issue(kind: &str) -> mir_issues::IssueKind {
 // Expression taint checker
 // ---------------------------------------------------------------------------
 
+/// Strip any number of redundant parens (`((expr))` -> `expr`) — a call
+/// target keeps its parens in the AST (`(fn() => ...)()`), unlike most
+/// other expression positions.
+fn unwrap_parens(expr: &Expr) -> &Expr {
+    let mut e = expr;
+    while let ExprKind::Parenthesized(inner) = &e.kind {
+        e = inner;
+    }
+    e
+}
+
 /// Returns `true` if the expression could carry tainted data, given the
 /// current `FlowState` taint state.
 ///
@@ -321,6 +332,21 @@ pub fn is_expr_tainted(
                 let here = crate::db::Fqcn::from_str(db, resolved.as_str());
                 if crate::db::find_function(db, here).is_some_and(|f| f.is_taint_source) {
                     return true;
+                }
+            } else if let ExprKind::ArrowFunction(af) = &unwrap_parens(&fc.name).kind {
+                // An immediately-invoked, argument-less arrow function
+                // (`(fn() => $_GET['x'])()`) is tainted iff its single
+                // expression body is — narrower than the general
+                // "any call result could be tainted" pass-through this
+                // module deliberately doesn't model (see the comment
+                // above), since an arrow function's body is a single
+                // expression evaluated with no params to shadow the outer
+                // scope, so checking it directly against the SAME `ctx`
+                // is sound here specifically. A closure (`function(){...}`)
+                // or an arrow function taking arguments is NOT covered —
+                // both need real per-callee analysis, not a same-ctx check.
+                if af.params.is_empty() && fc.args.is_empty() {
+                    return is_expr_tainted(&af.body, ctx, db, file);
                 }
             }
             false
