@@ -34,6 +34,12 @@ impl<'a> DefinitionCollector<'a> {
             return ControlFlow::Continue(());
         }
 
+        // Hoisted above the `@template` bound/default resolution below so a
+        // same-file `@psalm-type` alias used in a bound/default (`@template T
+        // of Numeric`) is expanded before resolution — mirrors `class.rs`'s
+        // own template-param construction, which already does this.
+        let type_aliases = self.build_type_aliases(&trait_doc);
+
         let trait_template_names: rustc_hash::FxHashSet<String> = trait_doc
             .templates
             .iter()
@@ -45,6 +51,7 @@ impl<'a> DefinitionCollector<'a> {
             .map(|(name, bound, variance, default)| TemplateParam {
                 name: name.as_str().into(),
                 bound: wrap_template_bound(bound.clone().map(|b| {
+                    let b = super::expand_aliases_only(b, &type_aliases);
                     Self::fill_self_static_parent(
                         self.resolve_union_doc_with_templates(
                             b,
@@ -56,6 +63,7 @@ impl<'a> DefinitionCollector<'a> {
                     )
                 })),
                 default: wrap_template_bound(default.clone().map(|d| {
+                    let d = super::expand_aliases_only(d, &type_aliases);
                     Self::fill_self_static_parent(
                         self.resolve_union_doc_with_templates(
                             d,
@@ -70,8 +78,6 @@ impl<'a> DefinitionCollector<'a> {
                 variance: *variance,
             })
             .collect();
-
-        let type_aliases = self.build_type_aliases(&trait_doc);
 
         let mut own_methods = mir_codebase::definitions::MemberMap::default();
         let mut own_properties = mir_codebase::definitions::MemberMap::default();

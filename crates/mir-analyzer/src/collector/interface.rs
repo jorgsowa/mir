@@ -32,6 +32,13 @@ impl<'a> DefinitionCollector<'a> {
             return ControlFlow::Continue(());
         }
 
+        // Hoisted above the `@template` bound/default resolution below so a
+        // same-file `@psalm-type` alias used in a bound/default (`@template T
+        // of Numeric`) is expanded before resolution — `class.rs`'s own
+        // template-param construction already does this, this collector
+        // previously built its aliases too late to ever use them here.
+        let type_aliases = self.build_type_aliases(&iface_doc);
+
         let iface_template_names: rustc_hash::FxHashSet<String> = iface_doc
             .templates
             .iter()
@@ -43,6 +50,7 @@ impl<'a> DefinitionCollector<'a> {
             .map(|(name, bound, variance, default)| TemplateParam {
                 name: name.as_str().into(),
                 bound: wrap_template_bound(bound.clone().map(|b| {
+                    let b = super::expand_aliases_only(b, &type_aliases);
                     Self::fill_self_static_parent(
                         self.resolve_union_doc_with_templates(
                             b,
@@ -54,6 +62,7 @@ impl<'a> DefinitionCollector<'a> {
                     )
                 })),
                 default: wrap_template_bound(default.clone().map(|d| {
+                    let d = super::expand_aliases_only(d, &type_aliases);
                     Self::fill_self_static_parent(
                         self.resolve_union_doc_with_templates(
                             d,
@@ -78,11 +87,6 @@ impl<'a> DefinitionCollector<'a> {
             .iter()
             .map(|n| self.resolve_name(&name_to_string_owned(n)).into())
             .collect();
-
-        // Hoisted above `extends_type_args` (moved from further down) so its
-        // type args can expand local aliases before resolution, the same as
-        // `@template` bound/default handling already does.
-        let type_aliases = self.build_type_aliases(&iface_doc);
 
         // Type args from `@extends BaseIface<T1, T2>` docblock lines — keyed by
         // FQCN (not positional) since a native `extends A, B` clause may list
