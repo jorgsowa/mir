@@ -106,7 +106,12 @@ fn warm_query_equals_cold_query() {
     // A different class known at scan time is answerable from the same
     // recorded sets (no rescans needed for correctness).
     let picker = session
-        .indexed_references_to(&Name::class("App\\ColorPicker"), &files, false, &no_cancel())
+        .indexed_references_to(
+            &Name::class("App\\ColorPicker"),
+            &files,
+            false,
+            &no_cancel(),
+        )
         .expect("not cancelled");
     assert_eq!(refs_files(&picker), vec!["uses_picker.php"]);
 }
@@ -244,7 +249,12 @@ fn edited_file_self_invalidates_its_mention_entry() {
 #[test]
 fn cold_and_warm_gate_agree_across_generated_workspace() {
     let class_names = [
-        "Alpha", "AlphaBeta", "Beta", "Beta_Gamma", "Gamma", "GammaX",
+        "Alpha",
+        "AlphaBeta",
+        "Beta",
+        "Beta_Gamma",
+        "Gamma",
+        "GammaX",
     ];
     let declared: Vec<(String, String)> = class_names
         .iter()

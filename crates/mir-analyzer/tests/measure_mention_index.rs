@@ -181,9 +181,21 @@ fn measure_mention_index() {
     // epoch (8) + boxed slice (16) + map slot ≈ 64 B fixed per file.
     let entry_bytes = stats.total_mentions * 8 + stats.files_covered * 64;
     eprintln!("--- gate pass timings (zero-reference probe classes) ---");
-    eprintln!("cold  (scan+record) : {cold:>10.2?}   allocs {:>10}  bytes {:>12}", a1 - a0, b1 - b0);
-    eprintln!("warm  (same needle) : {warm_same:>10.2?}   allocs {:>10}  bytes {:>12}", a2 - a1, b2 - b1);
-    eprintln!("warm  (other needle): {warm_other:>10.2?}   allocs {:>10}  bytes {:>12}", a3 - a2, b3 - b2);
+    eprintln!(
+        "cold  (scan+record) : {cold:>10.2?}   allocs {:>10}  bytes {:>12}",
+        a1 - a0,
+        b1 - b0
+    );
+    eprintln!(
+        "warm  (same needle) : {warm_same:>10.2?}   allocs {:>10}  bytes {:>12}",
+        a2 - a1,
+        b2 - b1
+    );
+    eprintln!(
+        "warm  (other needle): {warm_other:>10.2?}   allocs {:>10}  bytes {:>12}",
+        a3 - a2,
+        b3 - b2
+    );
     eprintln!("--- mention index footprint ---");
     eprintln!(
         "universe {} names | files covered {} | mentions {} (~{:.1} MB entries) | scanner {:.1} MB | scans recorded {}",

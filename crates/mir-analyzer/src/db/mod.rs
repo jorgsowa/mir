@@ -178,6 +178,9 @@ pub trait MirDatabase: salsa::Database {
 
 // Re-export all public items from sub-modules to preserve the flat db::* namespace.
 pub use self::ancestors::*;
+pub use self::class_mention_index::{
+    ClassMentionIndex, ClassMentionStats, MentionQuery, MentionScanner,
+};
 pub use self::deps::file_structural_deps;
 pub use self::find_queries::{
     analyzed_class_defs, analyzed_enum_defs, analyzed_interface_defs, analyzed_trait_defs,
@@ -204,9 +207,6 @@ pub use self::queries::{
     has_unknown_ancestor, infer_file_return_types, inherited_template_bindings, is_final,
     is_unchecked_exception, member_location, parse_file, resolve_name, ClassKind,
     InferredFileTypes, TrackedParseResult,
-};
-pub use self::class_mention_index::{
-    ClassMentionIndex, ClassMentionStats, MentionQuery, MentionScanner,
 };
 pub use self::ref_index::RefIndex;
 pub use self::reference_locations::*;
