@@ -438,6 +438,7 @@ impl CallAnalyzer {
                         sole_spread_ty.clone(),
                         &mut declaring,
                         &mut this_self_out,
+                        None,
                     ));
                     match this_self_out {
                         Some(ty) => {
@@ -471,6 +472,7 @@ impl CallAnalyzer {
                         sole_spread_ty.clone(),
                         &mut None,
                         &mut this_self_out,
+                        None,
                     ));
                     match this_self_out {
                         Some(ty) => {
@@ -484,6 +486,7 @@ impl CallAnalyzer {
                     let mut intersection_result = Type::empty();
                     let mut found_method = false;
                     let mut this_self_out = None;
+                    let full_receiver_ty = Type::single(atomic.clone());
                     for part in parts.iter() {
                         for inner_atomic in &part.types {
                             if let mir_types::Atomic::TNamedObject {
@@ -509,6 +512,7 @@ impl CallAnalyzer {
                                         sole_spread_ty.clone(),
                                         &mut None,
                                         &mut this_self_out,
+                                        Some(&full_receiver_ty),
                                     ));
                                 }
                             }
@@ -589,6 +593,7 @@ impl CallAnalyzer {
                                 sole_spread_ty.clone(),
                                 &mut None,
                                 &mut None,
+                                None,
                             ));
                         }
                     }
@@ -713,6 +718,7 @@ fn resolve_method_return<'a>(
     sole_spread_ty: Option<Type>,
     declaring_class: &mut Option<Arc<str>>,
     self_out_out: &mut Option<Type>,
+    full_receiver: Option<&Type>,
 ) -> Type {
     let method_name_lower = crate::util::php_ident_lowercase(method_name);
     let resolved = resolve_method_from_db(ea.db, fqcn, &method_name_lower);
@@ -1156,9 +1162,19 @@ fn resolve_method_return<'a>(
             if !receiver_has_unresolved_template
                 && (!receiver_type_params.is_empty() || !constraint_has_params)
             {
-                let receiver = Type::single(mir_types::Atomic::TNamedObject {
-                    fqcn: Name::new(fqcn.as_ref()),
-                    type_params: receiver_type_params.to_vec().into(),
+                // For an intersection-typed receiver, `full_receiver` carries
+                // every part (`Foo&HasBar`), not just the one part that
+                // declares the called method — checking only the bare
+                // declaring atom against a constraint naming a SIBLING part
+                // (`@if-this-is HasBar` on a method declared in `Foo`) would
+                // false-positive since `Foo` alone doesn't implement
+                // `HasBar`, even though the actual receiver does via the
+                // intersection.
+                let receiver = full_receiver.cloned().unwrap_or_else(|| {
+                    Type::single(mir_types::Atomic::TNamedObject {
+                        fqcn: Name::new(fqcn.as_ref()),
+                        type_params: receiver_type_params.to_vec().into(),
+                    })
                 });
                 if !crate::subtype::is_subtype(ea.db, &receiver, &constraint) {
                     ea.emit(
