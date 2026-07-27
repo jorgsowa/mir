@@ -512,23 +512,41 @@ pub fn is_expr_tainted(
         // pairing for at all (unlike the read-side StaticPropertyAccess arm
         // right below, which already handles self/static/parent).
         ExprKind::StaticMethodCall(smc) => {
-            if let ExprKind::Identifier(id) = &smc.class.kind {
+            let fqcn_opt: Option<std::sync::Arc<str>> = if let ExprKind::Identifier(id) =
+                &smc.class.kind
+            {
                 let resolved = crate::db::resolve_name(db, file, id.as_ref());
-                let fqcn_opt: Option<std::sync::Arc<str>> = match resolved.as_str() {
+                match resolved.as_str() {
                     "self" | "static" => ctx.self_fqcn.clone().or_else(|| ctx.static_fqcn.clone()),
                     "parent" => ctx.parent_fqcn.clone(),
                     s => Some(std::sync::Arc::from(s)),
-                };
-                if let (Some(fqcn), ExprKind::Identifier(method_name)) =
-                    (fqcn_opt, &smc.method.kind)
+                }
+            } else {
+                // `$class::method()` / `$this::method()` — a variable
+                // holding a class-string or object instance. Mirrors the
+                // instance-method arm's chained-receiver resolution above
+                // instead of requiring a literal class name.
+                crate::expr::assignment::resolve_chained_receiver_type(&smc.class, ctx, db, file)
+                    .and_then(|ty| {
+                        ty.types.iter().find_map(|atom| match atom {
+                            mir_types::Atomic::TClassString(Some(fqcn))
+                            | mir_types::Atomic::TNamedObject { fqcn, .. }
+                            | mir_types::Atomic::TSelf { fqcn }
+                            | mir_types::Atomic::TStaticObject { fqcn }
+                            | mir_types::Atomic::TParent { fqcn } => {
+                                Some(std::sync::Arc::from(fqcn.as_ref()))
+                            }
+                            _ => None,
+                        })
+                    })
+            };
+            if let (Some(fqcn), ExprKind::Identifier(method_name)) = (fqcn_opt, &smc.method.kind) {
+                let method_lower = crate::util::php_ident_lowercase(method_name.as_ref());
+                let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
+                if crate::db::find_method_respecting_precedence(db, here, &method_lower)
+                    .is_some_and(|(_, m)| m.is_taint_source)
                 {
-                    let method_lower = crate::util::php_ident_lowercase(method_name.as_ref());
-                    let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
-                    if crate::db::find_method_respecting_precedence(db, here, &method_lower)
-                        .is_some_and(|(_, m)| m.is_taint_source)
-                    {
-                        return true;
-                    }
+                    return true;
                 }
             }
             false
