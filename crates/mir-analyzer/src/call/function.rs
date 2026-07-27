@@ -31,6 +31,11 @@ struct ResolvedFn {
     throws: Arc<[Arc<str>]>,
     no_named_arguments: bool,
     is_pure: bool,
+    /// `@psalm-mutation-free`/`@psalm-external-mutation-free` on a free
+    /// function — both forbid mutating an argument (a free function has no
+    /// `$this`, so the two collapse to the same "don't touch parameters"
+    /// meaning; see `FunctionDef::is_mutation_free`'s own doc comment).
+    is_mutation_free: bool,
     taint_sink_params: Vec<(Arc<str>, Arc<str>)>,
 }
 
@@ -55,6 +60,7 @@ fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
             throws: Arc::<[Arc<str>]>::from(f.throws.as_slice()),
             no_named_arguments: f.no_named_arguments,
             is_pure: f.is_pure,
+            is_mutation_free: f.is_mutation_free || f.is_external_mutation_free,
             taint_sink_params: f.taint_sink_params.clone(),
         });
     }
@@ -572,6 +578,7 @@ impl CallAnalyzer {
             let return_ty_raw = resolved.return_ty_raw;
             let no_named_arguments = resolved.no_named_arguments;
             let is_pure = resolved.is_pure;
+            let is_mutation_free = resolved.is_mutation_free;
             let taint_sink_params = resolved.taint_sink_params;
 
             // Taint sink check: emit the matching Tainted* issue when a
@@ -627,6 +634,60 @@ impl CallAnalyzer {
                     Severity::Warning,
                     span,
                 );
+            }
+
+            // Same check for @psalm-immutable/@psalm-external-mutation-free,
+            // scoped exactly like `new X(...)`'s own identical check in
+            // `expr/objects.rs`: an argument reachable from `$this`/a
+            // parameter that resolves to an OBJECT atom (not just a plain
+            // value read off it) lets a not-provably-safe callee store/
+            // mutate that object just as much as calling an impure METHOD
+            // on it would.
+            if (ctx.is_in_immutable_method || ctx.is_in_external_mutation_free_method)
+                && !is_pure
+                && !is_mutation_free
+            {
+                for arg in call.args.iter() {
+                    let Some(recv_name) = crate::expr::root_receiver_var(&arg.value) else {
+                        continue;
+                    };
+                    let recv_stripped = recv_name.trim_start_matches('$');
+                    let reachable = (ctx.is_in_immutable_method && recv_stripped == "this")
+                        || (ctx.is_in_external_mutation_free_method
+                            && recv_stripped != "this"
+                            && ctx.param_names.contains(&Name::from(recv_stripped)));
+                    if !reachable {
+                        continue;
+                    }
+                    let arg_is_object = crate::expr::assignment::resolve_chained_receiver_type(
+                        &arg.value, ctx, ea.db, &ea.file,
+                    )
+                    .is_some_and(|ty| {
+                        ty.types.iter().any(|a| {
+                            matches!(
+                                a,
+                                Atomic::TNamedObject { .. }
+                                    | Atomic::TSelf { .. }
+                                    | Atomic::TStaticObject { .. }
+                                    | Atomic::TParent { .. }
+                            )
+                        })
+                    });
+                    if arg_is_object {
+                        ea.emit(
+                            IssueKind::ImpureFunctionCall {
+                                fn_name: fn_name
+                                    .rsplit('\\')
+                                    .next()
+                                    .unwrap_or(&fn_name)
+                                    .to_string(),
+                            },
+                            Severity::Warning,
+                            span,
+                        );
+                        break;
+                    }
+                }
             }
 
             // A free function has no receiver, but an object passed as an
