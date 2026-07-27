@@ -349,6 +349,54 @@ impl<'a> ClassAnalyzer<'a> {
                 issues.push(issue);
             }
 
+            // ---- b3. A @mutation-free override must re-declare it -----------
+            // Same unsoundness as b2: call/method.rs resolves `is_mutation_free`
+            // against the receiver's declared type, so a silently-dropped
+            // re-declaration lets a mutating override slip through a caller
+            // holding an ancestor-typed reference.
+            if let Some((parent_fqcn, _)) = all_parent_methods
+                .iter()
+                .find(|(_, p)| p.is_mutation_free && !own.is_mutation_free)
+            {
+                let mut issue = Issue::new(
+                    IssueKind::MethodSignatureMismatch {
+                        class: fqcn.to_string(),
+                        method: method_name_lower.to_string(),
+                        detail: format!(
+                            "{}::{}() is declared @mutation-free and must be re-declared @mutation-free when overridden",
+                            parent_fqcn, method_name_lower
+                        ),
+                    },
+                    loc.clone(),
+                );
+                if let Some(snippet) = extract_snippet(own_location.as_ref(), &self.sources) {
+                    issue = issue.with_snippet(snippet);
+                }
+                issues.push(issue);
+            }
+
+            // ---- b4. An @external-mutation-free override must re-declare it -
+            if let Some((parent_fqcn, _)) = all_parent_methods
+                .iter()
+                .find(|(_, p)| p.is_external_mutation_free && !own.is_external_mutation_free)
+            {
+                let mut issue = Issue::new(
+                    IssueKind::MethodSignatureMismatch {
+                        class: fqcn.to_string(),
+                        method: method_name_lower.to_string(),
+                        detail: format!(
+                            "{}::{}() is declared @external-mutation-free and must be re-declared @external-mutation-free when overridden",
+                            parent_fqcn, method_name_lower
+                        ),
+                    },
+                    loc.clone(),
+                );
+                if let Some(snippet) = extract_snippet(own_location.as_ref(), &self.sources) {
+                    issue = issue.with_snippet(snippet);
+                }
+                issues.push(issue);
+            }
+
             // ---- c. Visibility must not be reduced -------------------------
             if all_parent_methods
                 .iter()
