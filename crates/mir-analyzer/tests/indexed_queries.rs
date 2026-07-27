@@ -1000,3 +1000,32 @@ fn constructor_reinit_via_instance_receiver_is_found_without_naming_owner() {
         "explicit __construct re-init site must be found: {refs:?}"
     );
 }
+
+/// PHP class names are case-insensitive: a lowercased fully-qualified static
+/// call must still be resolved and recorded under the declared owner's key.
+/// Currently a KNOWN GAP — the static-call arm drops the site instead of
+/// resolving the FQCN case-insensitively. Un-ignore when fixed.
+#[test]
+#[ignore = "known gap: case-mismatched FQCN call sites are not recorded"]
+fn static_call_with_case_mismatched_fqcn_is_found() {
+    let files = [
+        (
+            "owner.php",
+            "<?php\nnamespace App;\nclass Owner {\n    public static function m(): void {}\n}\n",
+        ),
+        (
+            "caller.php",
+            "<?php\nnamespace Other;\n\\app\\owner::m();\n",
+        ),
+    ];
+    let session = session_with(&files);
+    let refs = session
+        .indexed_references_to(&Name::method("App\\Owner", "m"), &paths(&files), false, &|| {
+            false
+        })
+        .expect("not cancelled");
+    assert!(
+        refs.iter().any(|(f, _)| f.as_ref() == "caller.php"),
+        "case-mismatched FQCN static call site must be found: {refs:?}"
+    );
+}
