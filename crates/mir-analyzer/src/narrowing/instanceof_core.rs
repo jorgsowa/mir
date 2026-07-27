@@ -543,6 +543,51 @@ pub(super) fn filter_out_instanceof_match(
     })
 }
 
+/// Multi-target generalization of `filter_out_instanceof_match`, for negating
+/// an asserted INTERSECTION type (`@psalm-assert !(A&B) $x`) instead of a
+/// single class name — excludes any atom in `current` (a plain named-object,
+/// or itself an intersection) that's provably an instance of EVERY part of
+/// `parts`. A value with fewer capabilities than required (fails at least
+/// one part) still survives, same as `subtype.rs`'s (TIntersection,
+/// TIntersection) arm.
+pub(super) fn filter_out_intersection_match(
+    current: &Type,
+    parts: &[Type],
+    db: &dyn MirDatabase,
+) -> Type {
+    current.filter(|t| {
+        let atom_fqcns: Vec<&str> = match t {
+            Atomic::TNamedObject { fqcn, .. }
+            | Atomic::TSelf { fqcn }
+            | Atomic::TStaticObject { fqcn }
+            | Atomic::TParent { fqcn } => vec![fqcn.as_ref()],
+            Atomic::TIntersection { parts: cur_parts } => cur_parts
+                .iter()
+                .flat_map(|p| p.types.iter())
+                .filter_map(|a| match a {
+                    Atomic::TNamedObject { fqcn, .. }
+                    | Atomic::TSelf { fqcn }
+                    | Atomic::TStaticObject { fqcn }
+                    | Atomic::TParent { fqcn } => Some(fqcn.as_ref()),
+                    _ => None,
+                })
+                .collect(),
+            _ => return true,
+        };
+        !parts.iter().all(|part| {
+            part.types.iter().any(|inner| match inner {
+                Atomic::TNamedObject { fqcn: target, .. }
+                | Atomic::TSelf { fqcn: target }
+                | Atomic::TStaticObject { fqcn: target }
+                | Atomic::TParent { fqcn: target } => atom_fqcns
+                    .iter()
+                    .any(|fqcn| named_object_matches_instanceof(fqcn, target, db)),
+                _ => false,
+            })
+        })
+    })
+}
+
 pub(super) fn named_object_matches_instanceof(
     fqcn: &str,
     class_name: &str,

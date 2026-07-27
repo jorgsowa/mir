@@ -19,7 +19,7 @@ use super::core::{
     narrow_receiver_non_null_on_prop_match, resolve_prop_current_type,
     resolve_static_prop_current_type,
 };
-use super::instanceof_core::filter_out_instanceof_match;
+use super::instanceof_core::{filter_out_instanceof_match, filter_out_intersection_match};
 
 pub(super) fn apply_docblock_assertions(
     call: &php_ast::owned::FunctionCallExpr,
@@ -437,10 +437,12 @@ pub(crate) fn negate_assertion_type(current: &Type, asserted: &Type, db: &dyn Mi
         result = match atomic {
             Atomic::TNull => result.remove_null(),
             Atomic::TFalse => result.remove_false(),
+            Atomic::TTrue => result.remove_true(),
             Atomic::TNamedObject { fqcn, .. }
             | Atomic::TSelf { fqcn }
             | Atomic::TStaticObject { fqcn }
             | Atomic::TParent { fqcn } => filter_out_instanceof_match(&result, fqcn, db),
+            Atomic::TIntersection { parts } => filter_out_intersection_match(&result, parts, db),
             _ => result,
         };
     }
