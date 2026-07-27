@@ -936,19 +936,41 @@ impl<'a> ExpressionAnalyzer<'a> {
     /// `check_byref_arg_purity`), or an `unset()` all mutate a by-ref
     /// PARAMETER or a superglobal exactly as much as a plain overwrite does.
     pub(crate) fn check_var_write_purity(&mut self, name: &str, ctx: &FlowState, span: Span) {
-        if !(ctx.is_in_pure_fn || ctx.is_in_immutable_method) {
+        if !(ctx.is_in_pure_fn
+            || ctx.is_in_immutable_method
+            || ctx.is_in_external_mutation_free_method)
+        {
             return;
         }
         let name_sym = mir_types::Name::from(name);
-        if ctx.byref_param_names.contains(&name_sym) && ctx.param_names.contains(&name_sym) {
+        let is_real_byref_param =
+            ctx.byref_param_names.contains(&name_sym) && ctx.param_names.contains(&name_sym);
+        if is_real_byref_param {
+            if ctx.is_in_pure_fn || ctx.is_in_immutable_method {
+                self.emit(
+                    IssueKind::ImpureByRefAssignment {
+                        variable: name.to_string(),
+                    },
+                    Severity::Warning,
+                    span,
+                );
+            }
+        } else if crate::util::is_superglobal_name(name) {
             self.emit(
-                IssueKind::ImpureByRefAssignment {
+                IssueKind::ImpureGlobalVariable {
                     variable: name.to_string(),
                 },
                 Severity::Warning,
                 span,
             );
-        } else if crate::util::is_superglobal_name(name) {
+        } else if ctx.byref_param_names.contains(&name_sym)
+            && (ctx.is_in_immutable_method || ctx.is_in_external_mutation_free_method)
+        {
+            // A plain `global $x;`-declared variable mutated via `.=`/
+            // `++`/`--`/`unset()`/a by-ref call argument — the same
+            // externally-visible write @mutation-free/@external-mutation-
+            // free forbid for a plain `$x = value` overwrite (see
+            // `assign_to_target`'s identical `else if` branch).
             self.emit(
                 IssueKind::ImpureGlobalVariable {
                     variable: name.to_string(),
@@ -1053,6 +1075,25 @@ impl<'a> ExpressionAnalyzer<'a> {
                 span,
             );
         }
+        // A property write through a `global`-held object receiver
+        // (`global $registry; $registry->count = 5;`) is exactly as much
+        // external-state mutation as writing the global variable itself —
+        // the `param_names`-only checks above never cover a global-declared
+        // receiver, which is tracked in `byref_param_names` instead (see
+        // `assign_to_target`'s identical variable-write distinction).
+        let recv_sym = mir_types::Name::from(recv_stripped);
+        if (ctx.is_in_immutable_method || ctx.is_in_external_mutation_free_method)
+            && !ctx.param_names.contains(&recv_sym)
+            && ctx.byref_param_names.contains(&recv_sym)
+        {
+            self.emit(
+                IssueKind::ImpurePropertyAssignment {
+                    property: prop_name.to_string(),
+                },
+                Severity::Warning,
+                span,
+            );
+        }
     }
 
     pub(crate) fn assign_to_target(
@@ -1123,11 +1164,26 @@ impl<'a> ExpressionAnalyzer<'a> {
                     // ImpureGlobalVariable check — a real byref PARAMETER is
                     // also always in param_names, a plain `global $x;`
                     // never is.
-                    if (ctx.is_in_pure_fn || ctx.is_in_immutable_method)
-                        && ctx.param_names.contains(&name_sym)
-                    {
+                    let is_real_byref_param = ctx.param_names.contains(&name_sym);
+                    if (ctx.is_in_pure_fn || ctx.is_in_immutable_method) && is_real_byref_param {
                         self.emit(
                             IssueKind::ImpureByRefAssignment {
+                                variable: name_str.clone(),
+                            },
+                            Severity::Warning,
+                            span,
+                        );
+                    } else if !is_real_byref_param
+                        && (ctx.is_in_immutable_method || ctx.is_in_external_mutation_free_method)
+                    {
+                        // A plain `global $x;` WRITE is externally-visible
+                        // mutation exactly like a static-property write —
+                        // @mutation-free/@external-mutation-free forbid it
+                        // even though (unlike @pure) neither flags the mere
+                        // declaration/a read, since their contract is about
+                        // writes, not reads.
+                        self.emit(
+                            IssueKind::ImpureGlobalVariable {
                                 variable: name_str.clone(),
                             },
                             Severity::Warning,
