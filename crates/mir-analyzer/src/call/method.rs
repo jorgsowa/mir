@@ -1467,7 +1467,19 @@ fn resolve_method_return<'a>(
                 call.method.span,
             );
         }
-        if is_interface || is_abstract || is_trait || has_call_magic || guarded_by_method_exists {
+        if has_call_magic {
+            // `__call`'s own declared return type is more precise than a blanket
+            // `mixed` — e.g. a fluent test-double stub typed `@return static`.
+            resolve_method_from_db(ea.db, fqcn, "__call")
+                .map(|call_magic| {
+                    substitute_static_in_return(
+                        call_magic.return_ty_raw,
+                        fqcn,
+                        receiver_type_params,
+                    )
+                })
+                .unwrap_or_else(Type::mixed)
+        } else if is_interface || is_abstract || is_trait || guarded_by_method_exists {
             Type::mixed()
         } else {
             ea.emit(
