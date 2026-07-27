@@ -930,3 +930,73 @@ fn static_method_inherited_via_subclass_is_found_without_naming_owner() {
         "every real static call site found, no noise leakage: {refs:?}"
     );
 }
+
+/// A static call through an *instance* receiver (`$obj::m()`) is a real,
+/// recorded reference whose file may never name the owner class at all —
+/// the receiver's type here comes from a property declared on a parent in
+/// another file. The member-name gate must admit the cold file; requiring
+/// an owner-or-subtype name (the reverted AND-gate) dropped it.
+#[test]
+fn static_call_via_instance_receiver_is_found_without_naming_owner() {
+    let files = [
+        (
+            "owner.php",
+            "<?php\nnamespace App;\nclass Owner {\n    public static function m(): void {}\n}\n",
+        ),
+        (
+            "base.php",
+            "<?php\nnamespace Other;\nuse App\\Owner;\nclass Base {\n    protected Owner $w;\n}\n",
+        ),
+        (
+            // Never spells `Owner` anywhere in this file.
+            "caller.php",
+            "<?php\nnamespace Other;\nclass Caller extends Base {\n    public function run(): void {\n        $this->w::m();\n    }\n}\n",
+        ),
+    ];
+    let session = session_with(&files);
+    let refs = session
+        .indexed_references_to(&Name::method("App\\Owner", "m"), &paths(&files), false, &|| {
+            false
+        })
+        .expect("not cancelled");
+    assert!(
+        refs.iter().any(|(f, _)| f.as_ref() == "caller.php"),
+        "instance-receiver static call site must be found: {refs:?}"
+    );
+}
+
+/// An explicit re-init call (`$obj->__construct()`) is a real, recorded
+/// reference whose file may never name the class — the constructor gate's
+/// raw `->__construct` token must admit the cold file; the owner-name-only
+/// needle used to drop it.
+#[test]
+fn constructor_reinit_via_instance_receiver_is_found_without_naming_owner() {
+    let files = [
+        (
+            "owner.php",
+            "<?php\nnamespace App;\nclass Owner {\n    public function __construct() {}\n}\n",
+        ),
+        (
+            "base.php",
+            "<?php\nnamespace Other;\nuse App\\Owner;\nclass Base {\n    protected Owner $w;\n}\n",
+        ),
+        (
+            // Never spells `Owner` anywhere in this file.
+            "caller.php",
+            "<?php\nnamespace Other;\nclass Caller extends Base {\n    public function run(): void {\n        $this->w->__construct();\n    }\n}\n",
+        ),
+    ];
+    let session = session_with(&files);
+    let refs = session
+        .indexed_references_to(
+            &Name::method("App\\Owner", "__construct"),
+            &paths(&files),
+            false,
+            &|| false,
+        )
+        .expect("not cancelled");
+    assert!(
+        refs.iter().any(|(f, _)| f.as_ref() == "caller.php"),
+        "explicit __construct re-init site must be found: {refs:?}"
+    );
+}

@@ -315,60 +315,36 @@ impl AnalysisSession {
         // unconditionally — their existing postings must be replaced. Same
         // discipline as `commit_defs_for_matching` on the defs index.
         //
-        // `AllOf` (static-only members, see `reference_gate_strategy`) needs
-        // its own matcher/mention-query pairs per owner-group name, alongside
-        // the member-name matcher — built once up front like the `AnyOf` path.
-        let strategy = self.reference_gate_strategy(symbol);
-        let needles: Vec<String> = match &strategy {
-            GateStrategy::AnyOf(n) => n.clone(),
-            GateStrategy::AllOf {
-                member,
-                owner_group,
-            } => {
-                let mut all = vec![member.clone()];
-                all.extend(owner_group.iter().cloned());
-                all
-            }
-        };
+        let gate = self.reference_gate(symbol);
+        let needles: Vec<String> = gate.idents.clone();
         let needle_matcher = IdentifierNeedles::new(&needles);
+        // Raw substring needles (constructor call tokens) — matched with no
+        // word bounds, so they get a plain automaton instead of the
+        // identifier matcher. `None` when the gate has no raw needles.
+        let raw_matcher: Option<aho_corasick::AhoCorasick> = if gate.raw.is_empty() {
+            None
+        } else {
+            aho_corasick::AhoCorasick::builder()
+                .ascii_case_insensitive(true)
+                .build(&gate.raw)
+                .ok()
+        };
         // Single-needle gates whose needle is a known class-like short name
         // answer from the mention index instead of rescanning raw text: the
         // gate predicate is purely textual, so a recorded mention set is
         // exactly equivalent. Files the index can't answer for are scanned
         // once against the whole name universe and recorded, so the next
-        // query's gate is a set lookup.
-        let (mention_query, mention_scanner) = match &strategy {
-            GateStrategy::AnyOf(n) if n.len() == 1 => {
-                let guard = self.db.salsa.read();
-                match guard.prepare_class_mention_query(&n[0]) {
-                    Some(q) => (Some(q), guard.class_mention_scanner()),
-                    None => (None, None),
-                }
-            }
-            _ => (None, None),
-        };
-        // `AllOf`'s member-name check (always a raw scan — member names
-        // aren't class-like, so they were never eligible for the mention
-        // index) and its owner-group mention-index queries (one per name,
-        // each individually eligible), with the same whole-group raw scan as
-        // a fallback for names the index can't yet answer.
-        let (member_matcher, owner_mention_queries, owner_matcher) = if let GateStrategy::AllOf {
-            member,
-            owner_group,
-        } = &strategy
-        {
+        // query's gate is a set lookup. With raw needles present, a
+        // negative mention answer is not conclusive — the raw scan below
+        // still gets its say.
+        let (mention_query, mention_scanner) = if needles.len() == 1 {
             let guard = self.db.salsa.read();
-            let queries: Vec<crate::db::MentionQuery> = owner_group
-                .iter()
-                .filter_map(|n| guard.prepare_class_mention_query(n))
-                .collect();
-            (
-                Some(IdentifierNeedles::new(std::slice::from_ref(member))),
-                queries,
-                Some(IdentifierNeedles::new(owner_group)),
-            )
+            match guard.prepare_class_mention_query(&needles[0]) {
+                Some(q) => (Some(q), guard.class_mention_scanner()),
+                None => (None, None),
+            }
         } else {
-            (None, Vec::new(), None)
+            (None, None)
         };
         let committed_any: rustc_hash::FxHashSet<Arc<str>> =
             self.ref_committed_keys().into_iter().collect();
@@ -393,51 +369,28 @@ impl AnalysisSession {
                         if committed_any.contains(f.as_ref()) {
                             return (Some(f.clone()), None);
                         }
-                        if let GateStrategy::AllOf { .. } = &strategy {
-                            // Member-name needle: always a raw scan (never a
-                            // class-like name, so never mention-index eligible).
-                            if !member_matcher.as_ref().is_some_and(|m| m.matches(text)) {
-                                return (None, None);
-                            }
-                            // Owner-group needle: admit on the first name the
-                            // mention index confirms present; only fall back to
-                            // a raw whole-group scan when the index can't
-                            // answer for *any* name in the group (never
-                            // scanned, or text changed since).
-                            let mut inconclusive = false;
-                            for q in &owner_mention_queries {
-                                match db.class_mention_answer(f.as_ref(), q, text) {
-                                    Some(true) => return (Some(f.clone()), None),
-                                    Some(false) => {}
-                                    None => inconclusive = true,
-                                }
-                            }
-                            if !inconclusive && !owner_mention_queries.is_empty() {
-                                // Every owner-group name answered definitively
-                                // false: no need for the raw fallback scan.
-                                return (None, None);
-                            }
-                            return if owner_matcher.as_ref().is_some_and(|m| m.matches(text)) {
-                                (Some(f.clone()), None)
-                            } else {
-                                (None, None)
-                            };
-                        }
+                        let raw_hit =
+                            || raw_matcher.as_ref().is_some_and(|m| m.is_match(text.as_ref()));
                         if !needles.is_empty() {
                             match (&mention_query, &mention_scanner) {
                                 (Some(q), scanner_opt) => {
                                     match db.class_mention_answer(f.as_ref(), q, text) {
                                         Some(true) => {}
-                                        Some(false) => return (None, None),
+                                        Some(false) => {
+                                            if !raw_hit() {
+                                                return (None, None);
+                                            }
+                                        }
                                         None => match scanner_opt {
                                             Some(scanner) => {
                                                 let names = scanner.scan(text);
-                                                let hit = names.binary_search(&q.name).is_ok();
+                                                let hit = names.binary_search(&q.name).is_ok()
+                                                    || raw_hit();
                                                 let rec = (f.clone(), text.clone(), names);
                                                 return (hit.then(|| f.clone()), Some(rec));
                                             }
                                             None => {
-                                                if !needle_matcher.matches(text) {
+                                                if !needle_matcher.matches(text) && !raw_hit() {
                                                     return (None, None);
                                                 }
                                             }
@@ -445,7 +398,7 @@ impl AnalysisSession {
                                     }
                                 }
                                 (None, _) => {
-                                    if !needle_matcher.matches(text) {
+                                    if !needle_matcher.matches(text) && !raw_hit() {
                                         return (None, None);
                                     }
                                 }
@@ -1273,23 +1226,38 @@ impl AnalysisSession {
         out
     }
 
-    /// Choose the candidate-admission gate for `symbol`. `AnyOf` is the
-    /// always-sound general gate ([`reference_gate_needles`]). `AllOf` is a
-    /// strictly narrower gate usable only for a resolved *static-only*
-    /// method: since PHP forbids a static/non-static override mismatch
-    /// (flagged as `MethodSignatureMismatch` in `class::overrides`), a
-    /// method resolving to a static declaration is static everywhere
-    /// reachable in a valid hierarchy, and every real call site
-    /// (`Owner::m()`, `Sub::m()` inherited unmodified, `self::`/`static::`/
-    /// `parent::m()` from inside `Owner`'s or a subclass's own file, aliased
-    /// `use Owner as Alias; Alias::m()`) textually names either `Owner` or
-    /// one of its transitive subtypes — so requiring the member name AND one
-    /// of those names cannot drop a real reference. `__construct` is
-    /// excluded (its own single-needle gate already ships in
-    /// `reference_gate_needles`); any owner that can't be resolved to a
-    /// static declaration falls back to `AnyOf`, never a false negative.
-    fn reference_gate_strategy(&self, symbol: &crate::Name) -> GateStrategy {
+    /// Choose the candidate-admission gate for `symbol`.
+    ///
+    /// For a method resolving to a *static* declaration (PHP forbids a
+    /// static/non-static override mismatch, so it is static everywhere
+    /// reachable in a valid hierarchy), the member name alone is a sound
+    /// gate — and drops the owner short name the general needle set ORs in,
+    /// which on common owner names (Color, Asset, ...) admits most of a
+    /// large workspace. Every posting-producing static reference spells the
+    /// member token: `Owner::m()`, inherited `Sub::m()`, `self::`/
+    /// `static::`/`parent::m()`, aliased `Alias::m()`, an *instance*
+    /// receiver `$obj::m()` (whose file may never name the class at all —
+    /// this is what makes requiring an owner-group name unsound), and
+    /// callable strings `'Owner::m'`. Dynamic member names (`Owner::$m()`)
+    /// produce no posting, so nothing is lost there.
+    ///
+    /// For `__construct` with a known owner, the identifier needle is the
+    /// owner's short name (`new Cls(` sites never spell the member name and
+    /// the bare word `__construct` would admit every file *declaring* a
+    /// constructor), complemented by the raw call tokens `->__construct` /
+    /// `::__construct`: an explicit re-init `$obj->__construct()` is a real
+    /// recorded reference whose file may never name the class.
+    ///
+    /// Everything else uses the general OR needles
+    /// ([`reference_gate_needles`]).
+    fn reference_gate(&self, symbol: &crate::Name) -> ReferenceGate {
         if let crate::Name::Method { class, name } = symbol {
+            if name.as_ref() == "__construct" && !class.is_empty() {
+                return ReferenceGate {
+                    idents: reference_gate_needles(symbol),
+                    raw: vec!["->__construct".to_string(), "::__construct".to_string()],
+                };
+            }
             if name.as_ref() != "__construct" && !class.is_empty() {
                 let db = self.snapshot_db();
                 let here = crate::db::Fqcn::from_str(&db, class.as_ref());
@@ -1297,23 +1265,17 @@ impl AnalysisSession {
                     .map(|(_, m)| m.is_static)
                     .unwrap_or(false);
                 if is_static {
-                    let all_files = db.source_file_paths();
-                    let mut owner_group: Vec<String> = self
-                        .indexed_subtype_classes(class.as_ref(), &all_files, false)
-                        .into_iter()
-                        .map(|s| short(&s.fqcn).to_string())
-                        .collect();
-                    owner_group.push(short(class).to_string());
-                    owner_group.sort();
-                    owner_group.dedup();
-                    return GateStrategy::AllOf {
-                        member: name.to_string(),
-                        owner_group,
+                    return ReferenceGate {
+                        idents: vec![name.to_string()],
+                        raw: Vec::new(),
                     };
                 }
             }
         }
-        GateStrategy::AnyOf(reference_gate_needles(symbol))
+        ReferenceGate {
+            idents: reference_gate_needles(symbol),
+            raw: Vec::new(),
+        }
     }
 }
 
@@ -1464,17 +1426,15 @@ fn short(fqn: &str) -> &str {
 }
 
 /// A candidate-file admission predicate for `indexed_references_to`'s
-/// freshness pass, chosen by [`AnalysisSession::reference_gate_strategy`].
-/// `AnyOf` is the general, always-sound OR-gate ([`reference_gate_needles`]).
-/// `AllOf` is a strictly narrower gate — sound only for a resolved
-/// static-only member — requiring both the member name and at least one name
-/// from the owner-or-subtype group.
-enum GateStrategy {
-    AnyOf(Vec<String>),
-    AllOf {
-        member: String,
-        owner_group: Vec<String>,
-    },
+/// freshness pass, chosen by [`AnalysisSession::reference_gate`]. A file is
+/// admitted when its text mentions any of `idents` as a whole identifier
+/// (word-bounded, ASCII-case-insensitive) OR contains any of `raw` as a
+/// plain substring (ASCII-case-insensitive, no word bounds — used for
+/// call-shaped tokens like `->__construct`). A file matching neither can
+/// hold no posting for the symbol.
+struct ReferenceGate {
+    idents: Vec<String>,
+    raw: Vec<String>,
 }
 
 /// Identifier words whose whole-word presence in a file's text is necessary
@@ -1653,25 +1613,11 @@ mod tests {
     }
 
     #[test]
-    fn gate_strategy_static_method_no_subtypes_is_all_of() {
-        let session = session_with(&[(
-            "owner.php",
-            "<?php\nclass Owner { public static function m(): void {} }\n",
-        )]);
-        match session.reference_gate_strategy(&crate::Name::method("Owner", "m")) {
-            GateStrategy::AllOf {
-                member,
-                owner_group,
-            } => {
-                assert_eq!(member, "m");
-                assert_eq!(owner_group, vec!["Owner".to_string()]);
-            }
-            GateStrategy::AnyOf(n) => panic!("expected AllOf for a resolved static method: {n:?}"),
-        }
-    }
-
-    #[test]
-    fn gate_strategy_static_method_with_subtypes_covers_whole_closure() {
+    fn gate_static_method_is_member_name_only() {
+        // Regardless of subtypes: the member token alone is the sound gate
+        // (an instance receiver `$obj::m()` never names the owner), and it
+        // is also the selective part — the owner short name would only
+        // widen the admitted set.
         let session = session_with(&[
             (
                 "owner.php",
@@ -1679,59 +1625,57 @@ mod tests {
             ),
             ("sub.php", "<?php\nclass Sub extends Owner {}\n"),
         ]);
-        match session.reference_gate_strategy(&crate::Name::method("Owner", "m")) {
-            GateStrategy::AllOf { owner_group, .. } => {
-                assert_eq!(owner_group, vec!["Owner".to_string(), "Sub".to_string()]);
-            }
-            GateStrategy::AnyOf(n) => panic!("expected AllOf for a resolved static method: {n:?}"),
-        }
+        let gate = session.reference_gate(&crate::Name::method("Owner", "m"));
+        assert_eq!(gate.idents, vec!["m".to_string()]);
+        assert!(gate.raw.is_empty());
     }
 
     #[test]
-    fn gate_strategy_instance_method_is_any_of() {
+    fn gate_instance_method_keeps_general_needles() {
         let session = session_with(&[(
             "owner.php",
             "<?php\nclass Owner { public function m(): void {} }\n",
         )]);
-        match session.reference_gate_strategy(&crate::Name::method("Owner", "m")) {
-            GateStrategy::AnyOf(n) => {
-                assert_eq!(
-                    n,
-                    reference_gate_needles(&crate::Name::method("Owner", "m"))
-                )
-            }
-            GateStrategy::AllOf { .. } => {
-                panic!("instance method must not get the static AND-gate")
-            }
-        }
+        let gate = session.reference_gate(&crate::Name::method("Owner", "m"));
+        assert_eq!(
+            gate.idents,
+            reference_gate_needles(&crate::Name::method("Owner", "m"))
+        );
+        assert!(gate.raw.is_empty());
     }
 
     #[test]
-    fn gate_strategy_leaves_constructor_gate_unchanged() {
+    fn gate_constructor_adds_raw_call_tokens() {
+        // Owner short name for `new Cls(` sites, plus the raw call tokens
+        // for explicit re-init (`$obj->__construct()`) whose file may never
+        // name the class. The bare identifier `__construct` must NOT be a
+        // needle — it would admit every file declaring a constructor.
         let session = session_with(&[(
             "owner.php",
             "<?php\nclass Owner { public function __construct() {} }\n",
         )]);
-        match session.reference_gate_strategy(&crate::Name::method("Owner", "__construct")) {
-            GateStrategy::AnyOf(n) => assert_eq!(
-                n,
-                reference_gate_needles(&crate::Name::method("Owner", "__construct"))
-            ),
-            GateStrategy::AllOf { .. } => {
-                panic!("__construct must keep its own single-needle gate")
-            }
-        }
+        let gate = session.reference_gate(&crate::Name::method("Owner", "__construct"));
+        assert_eq!(
+            gate.idents,
+            reference_gate_needles(&crate::Name::method("Owner", "__construct"))
+        );
+        assert_eq!(
+            gate.raw,
+            vec!["->__construct".to_string(), "::__construct".to_string()]
+        );
     }
 
     #[test]
-    fn gate_strategy_unresolvable_owner_falls_back_to_any_of() {
+    fn gate_unresolvable_owner_falls_back_to_general_needles() {
         let session = session_with(&[(
             "owner.php",
             "<?php\nclass Owner { public static function m(): void {} }\n",
         )]);
-        match session.reference_gate_strategy(&crate::Name::method("Nonexistent\\Missing", "m")) {
-            GateStrategy::AnyOf(_) => {}
-            GateStrategy::AllOf { .. } => panic!("unresolvable owner must not get the AND-gate"),
-        }
+        let gate = session.reference_gate(&crate::Name::method("Nonexistent\\Missing", "m"));
+        assert_eq!(
+            gate.idents,
+            reference_gate_needles(&crate::Name::method("Nonexistent\\Missing", "m"))
+        );
+        assert!(gate.raw.is_empty());
     }
 }
