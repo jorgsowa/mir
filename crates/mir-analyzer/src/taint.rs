@@ -435,6 +435,18 @@ pub fn is_expr_tainted(
                 {
                     return true;
                 }
+                // `json_decode($_GET['payload'], true)` — attacker fully
+                // controls the decoded structure's keys/values, but a call
+                // result is never tainted unless matched here; JSON-body web
+                // APIs are a common real-world route for this.
+                if lower_name == "json_decode"
+                    && fc
+                        .args
+                        .first()
+                        .is_some_and(|a| is_expr_tainted(&a.value, ctx, db, file))
+                {
+                    return true;
+                }
                 let resolved = crate::db::resolve_name(db, file, name.as_ref());
                 let here = crate::db::Fqcn::from_str(db, resolved.as_str());
                 if crate::db::find_function(db, here).is_some_and(|f| f.is_taint_source) {
