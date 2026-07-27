@@ -20,4 +20,4 @@ class B implements A {
     }
 }
 ===expect===
-MethodSignatureMismatch@14:4-14:42: Method B::foofoo() signature mismatch: method has fewer parameters (1) than parent T::foofoo() (2)
+MethodSignatureMismatch@14:4-14:42: Method B::foofoo() signature mismatch: method has fewer parameters (1) than parent A::foofoo() (2)

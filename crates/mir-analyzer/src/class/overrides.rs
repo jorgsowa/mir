@@ -17,6 +17,20 @@ impl<'a> ClassAnalyzer<'a> {
             .map(|(k, m)| (k.clone(), m.clone()))
             .collect();
 
+        // Traits `here` directly `use`s. A class's own effective method always
+        // wins over a same-named method from one of these — whether the class
+        // body redeclares it, or the trait method is simply flattened in
+        // unopposed — so neither shape is a real "override" subject to
+        // final/static/visibility/signature compatibility checks against that
+        // trait. Verified live: PHP raises no error either way, only a real
+        // subclass later overriding the now-flattened method is checked.
+        let own_traits: HashSet<Arc<str>> = match &class {
+            crate::db::ClassLike::Class(c) => c.traits.iter().cloned().collect(),
+            crate::db::ClassLike::Trait(t) => t.traits.iter().cloned().collect(),
+            crate::db::ClassLike::Enum(e) => e.traits.iter().cloned().collect(),
+            crate::db::ClassLike::Interface(_) => HashSet::default(),
+        };
+
         // Members composed via `use Trait;` behave like "own" methods for override
         // purposes: this class inherits the trait's *implementation*, so a conflict
         // against the real parent/interfaces must be checked even when the class
@@ -137,6 +151,14 @@ impl<'a> ClassAnalyzer<'a> {
                             here2,
                             method_name_lower.as_ref(),
                         ) {
+                            // A CONCRETE method from a trait `here` directly
+                            // uses is never a real "parent" for `own` — see
+                            // `own_traits` above. An ABSTRACT trait method is
+                            // still a real contract PHP enforces regardless
+                            // (same as an interface method would be).
+                            if own_traits.contains(anc) && !m.is_abstract {
+                                return None;
+                            }
                             return Some((anc.clone(), m));
                         }
                         // Trait method alias (`use T { orig as alias; }`): the

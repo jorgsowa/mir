@@ -1,5 +1,9 @@
 ===description===
-Replace trait method
+FP: a class's own method replacing a same-named CONCRETE trait method is a
+composition-time precedence rule, not an override — PHP performs no
+compatibility check between them (verified live: this file loads with no
+fatal, `$this->foo()` inside the trait itself still calls the trait's own
+0-arg copy, unaffected by the composing class's replacement).
 ===config===
 suppress=UnusedParam
 ===file===
@@ -18,4 +22,3 @@ class C {
     protected function foo(string $s) : void {}
 }
 ===expect===
-MethodSignatureMismatch@13:4-13:47: Method C::foo() signature mismatch: overriding method requires 1 argument(s) but parent requires 0
