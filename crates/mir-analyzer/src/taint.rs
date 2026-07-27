@@ -369,6 +369,44 @@ pub fn is_expr_tainted(
                 {
                     return true;
                 }
+                // A broad set of non-sanitizing string-transform builtins pass
+                // taint straight through, unchanged — same "any tainted
+                // argument taints the result" rule already established for
+                // sprintf/vsprintf above. Deliberately excludes genuine
+                // sanitizers/encoders (htmlspecialchars, htmlentities,
+                // addslashes, urlencode, rawurlencode,
+                // quoted_printable_encode, …), which correctly stay untainted.
+                if matches!(
+                    crate::util::php_ident_lowercase(name.as_ref()).as_str(),
+                    "str_replace"
+                        | "str_ireplace"
+                        | "preg_replace"
+                        | "preg_replace_callback"
+                        | "substr_replace"
+                        | "trim"
+                        | "ltrim"
+                        | "rtrim"
+                        | "explode"
+                        | "implode"
+                        | "join"
+                        | "strtolower"
+                        | "strtoupper"
+                        | "mb_strtolower"
+                        | "mb_strtoupper"
+                        | "ucfirst"
+                        | "ucwords"
+                        | "wordwrap"
+                        | "chunk_split"
+                        | "str_pad"
+                        | "str_rot13"
+                        | "nl2br"
+                ) && fc
+                    .args
+                    .iter()
+                    .any(|a| is_expr_tainted(&a.value, ctx, db, file))
+                {
+                    return true;
+                }
                 let resolved = crate::db::resolve_name(db, file, name.as_ref());
                 let here = crate::db::Fqcn::from_str(db, resolved.as_str());
                 if crate::db::find_function(db, here).is_some_and(|f| f.is_taint_source) {
