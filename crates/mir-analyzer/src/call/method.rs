@@ -1293,7 +1293,10 @@ fn resolve_method_return<'a>(
                 for arg in call.args.iter().skip(i) {
                     ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
                 }
-            } else if let Some(arg) = call.args.get(i) {
+            } else if let Some(arg) =
+                super::resolve_named_arg_type_index(&resolved.params, &call.args, i)
+                    .and_then(|idx| call.args.get(idx))
+            {
                 ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
             }
         }
@@ -1333,7 +1336,10 @@ fn resolve_method_return<'a>(
                         }
                     }
                 }
-            } else if let Some(arg) = call.args.get(i) {
+            } else if let Some(arg) =
+                super::resolve_named_arg_type_index(&resolved.params, &call.args, i)
+                    .and_then(|idx| call.args.get(idx))
+            {
                 if let php_ast::owned::ExprKind::Variable(name) = &arg.value.kind {
                     let var_name = name.as_ref().trim_start_matches('$');
                     ctx.set_var(var_name, out_ty);

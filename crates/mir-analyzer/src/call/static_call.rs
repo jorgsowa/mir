@@ -936,7 +936,10 @@ impl CallAnalyzer {
                     for arg in call.args.iter().skip(i) {
                         ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
                     }
-                } else if let Some(arg) = call.args.get(i) {
+                } else if let Some(arg) =
+                    crate::call::resolve_named_arg_type_index(&resolved.params, &call.args, i)
+                        .and_then(|idx| call.args.get(idx))
+                {
                     ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
                 }
             }
@@ -976,7 +979,10 @@ impl CallAnalyzer {
                             }
                         }
                     }
-                } else if let Some(arg) = call.args.get(i) {
+                } else if let Some(arg) =
+                    crate::call::resolve_named_arg_type_index(&resolved.params, &call.args, i)
+                        .and_then(|idx| call.args.get(idx))
+                {
                     if let ExprKind::Variable(name) = &arg.value.kind {
                         let var_name = name.as_ref().trim_start_matches('$');
                         ctx.set_var(var_name, out_ty);
