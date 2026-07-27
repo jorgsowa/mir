@@ -14,9 +14,10 @@ use super::arrays::{
     ShapeBase,
 };
 use super::core::{
-    extract_any_prop_access, extract_class_fqcn_from_expr, extract_prop_access,
-    extract_static_prop_access, extract_var_name, narrow_receiver_non_null_on_prop_match,
-    resolve_prop_current_type, resolve_static_prop_current_type,
+    extract_any_prop_access, extract_chained_prop_access, extract_class_fqcn_from_expr,
+    extract_prop_access, extract_static_prop_access, extract_var_name,
+    narrow_receiver_non_null_on_prop_match, resolve_prop_current_type,
+    resolve_static_prop_current_type,
 };
 use super::instanceof_core::filter_out_instanceof_match;
 
@@ -197,7 +198,11 @@ pub(crate) fn apply_one_assertion(
             let path = &assertion.param_key;
             let base = if let Some(name) = extract_var_name(&arg.value) {
                 Some(ShapeBase::Var(name))
-            } else if let Some((obj, prop)) = extract_any_prop_access(&arg.value) {
+            } else if let Some((obj, prop)) = extract_chained_prop_access(&arg.value) {
+                // `extract_chained_prop_access` subsumes the bare 1-hop case
+                // (identical `(obj, prop)` for `$x->prop`) and additionally
+                // covers a 2-hop chain (`$this->a->b`) via a synthetic
+                // `"this->a"` key — see its own doc comment.
                 Some(ShapeBase::Prop(obj, prop))
             } else {
                 extract_static_prop_access(&arg.value, ctx, db, file)
@@ -233,7 +238,7 @@ pub(crate) fn apply_one_assertion(
             };
             ctx.set_var(&var_name, ty);
             applied = true;
-        } else if let Some((obj, prop)) = extract_any_prop_access(&arg.value) {
+        } else if let Some((obj, prop)) = extract_chained_prop_access(&arg.value) {
             let ty = match template_bindings {
                 Some(b) => assertion.ty.substitute_templates(b),
                 None => assertion.ty.clone(),
@@ -313,13 +318,13 @@ pub(crate) fn compute_assertion_template_bindings(
 /// whose parts unambiguously agree on which one declares `method_name`
 /// (mirroring `narrow_nullsafe_method_call_null`'s same conservative scope;
 /// a union of multiple UNRELATED classes could resolve the same method name
-/// to different signatures, so that case still falls through). Handles both
-/// a bare-variable receiver (`$v->isInt($p)`) and a property-access receiver
-/// (`$this->validator->isInt($p)`, a very common real-world shape) — the
-/// latter previously fell through unresolved, silently no-oping the whole
-/// assertion. A chained-call-result receiver (`$h->getValidator()->isInt($p)`)
-/// stays unresolved, mirroring the same, already-accepted scope limit
-/// `@psalm-self-out` documents for a non-variable receiver.
+/// to different signatures, so that case still falls through). Handles a
+/// bare-variable receiver (`$v->isInt($p)`), a 1-hop property receiver
+/// (`$this->validator->isInt($p)`, a very common real-world shape), a
+/// static-property receiver, and — via `resolve_chained_receiver_type` — a
+/// deeper property chain, an array-index hop, or a method-call hop
+/// (`$h->getValidator()->isInt($p)`), all of which previously fell through
+/// unresolved, silently no-oping the whole assertion.
 pub(super) fn method_call_receiver_fqcn(
     object: &php_ast::owned::Expr,
     ctx: &FlowState,
@@ -330,10 +335,14 @@ pub(super) fn method_call_receiver_fqcn(
     let obj_ty = if let Some(obj_var) = extract_var_name(object) {
         ctx.get_var(&obj_var)
     } else if let Some((obj_var, prop)) = extract_any_prop_access(object) {
-        // `extract_any_prop_access` also matches a nullsafe (`?->`) receiver
-        // chain, unlike the plain-`->`-only `extract_prop_access` this used
-        // to call — mirrors the same fix already applied to the self-out
-        // write-back's receiver resolution in `call/method.rs`.
+        // `extract_any_prop_access` also matches a nullsafe (`?->`) receiver,
+        // unlike the plain-`->`-only `extract_prop_access` this used to
+        // call — mirrors the same fix already applied to the self-out
+        // write-back's receiver resolution in `call/method.rs`. Deliberately
+        // 1-hop-only here (not `extract_chained_prop_access`): a 2+-hop
+        // receiver must fall through to the `resolve_chained_receiver_type`
+        // arm below instead, which resolves its DECLARED type rather than
+        // an unpopulated `prop_refined` synthetic-key lookup.
         resolve_prop_current_type(ctx, &obj_var, &prop, db, file)
     } else if let Some((fqcn, prop)) = extract_static_prop_access(object, ctx, db, file) {
         // `self::$validator->isValid($x)` — a static-property receiver is a
@@ -343,7 +352,13 @@ pub(super) fn method_call_receiver_fqcn(
         // chain, silently no-oping assert-if-true/-false narrowing for it.
         resolve_static_prop_current_type(ctx, &fqcn, &prop, db)
     } else {
-        return None;
+        // A 2+-hop property chain (`$this->service->validator->isInt($p)`),
+        // an array-index hop, or a method-call hop — none has a
+        // `prop_refined` narrowing history keyed the way the 1-hop arm
+        // above needs, but the DECLARED type through the chain (the same
+        // resolver purity/taint checks already chain-walk with) is enough
+        // to resolve which class's method this assertion targets.
+        crate::expr::assignment::resolve_chained_receiver_type(object, ctx, db, file)?
     };
     let non_null_atoms: Vec<&Atomic> = obj_ty
         .types
