@@ -431,6 +431,56 @@ impl CallAnalyzer {
                     span,
                 );
             }
+            // Same "argument passed into a not-provably-safe callee" check
+            // as `new X(...)` and free-function calls — a genuinely static
+            // call (`Foo::bar($this)`) or a variable-class-string call
+            // (`$param::method($this)`) has no `$this`-mutation vector of
+            // its own (unlike the self::/parent:: case just above), but can
+            // still store/mutate an object argument reachable from `$this`/
+            // a parameter just as easily as an instance method call can.
+            if !is_self_parent_call
+                && (ctx.is_in_immutable_method || ctx.is_in_external_mutation_free_method)
+                && !resolved.is_pure
+                && !resolved.is_mutation_free
+            {
+                for arg in call.args.iter() {
+                    let Some(recv_name) = crate::expr::root_receiver_var(&arg.value) else {
+                        continue;
+                    };
+                    let recv_stripped = recv_name.trim_start_matches('$');
+                    let reachable = (ctx.is_in_immutable_method && recv_stripped == "this")
+                        || (ctx.is_in_external_mutation_free_method
+                            && recv_stripped != "this"
+                            && ctx.param_names.contains(&Name::from(recv_stripped)));
+                    if !reachable {
+                        continue;
+                    }
+                    let arg_is_object = crate::expr::assignment::resolve_chained_receiver_type(
+                        &arg.value, ctx, ea.db, &ea.file,
+                    )
+                    .is_some_and(|ty| {
+                        ty.types.iter().any(|a| {
+                            matches!(
+                                a,
+                                Atomic::TNamedObject { .. }
+                                    | Atomic::TSelf { .. }
+                                    | Atomic::TStaticObject { .. }
+                                    | Atomic::TParent { .. }
+                            )
+                        })
+                    });
+                    if arg_is_object {
+                        ea.emit(
+                            IssueKind::ImpureMethodCall {
+                                method: method_name.to_string(),
+                            },
+                            Severity::Warning,
+                            span,
+                        );
+                        break;
+                    }
+                }
+            }
             if method_name != resolved.name.as_ref()
                 && method_name.eq_ignore_ascii_case(resolved.name.as_ref())
             {
