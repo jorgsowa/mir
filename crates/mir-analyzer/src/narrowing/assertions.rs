@@ -165,6 +165,23 @@ pub(crate) fn apply_one_assertion(
     let Some(index) = params.iter().position(|p| p.name == assertion.param) else {
         return false;
     };
+    // A literal spread call (`f(...[$x, Foo::class])`) is a single `Arg`
+    // whose value is the whole array literal — resolving "the argument for
+    // param N" by nth-positional index (`arg_for_param_index`) then picks
+    // that WHOLE spread arg for every N, not the individual element
+    // expression, so the narrowing target itself is wrong regardless of
+    // which param the assertion names. Expand it into one synthetic `Arg`
+    // per literal element first, mirroring the same expansion
+    // `call/method.rs`/`call/static_call.rs`/`call/function.rs` already do
+    // for real argument-type checking.
+    let expanded_args: Vec<php_ast::owned::Arg>;
+    let call_args: &[php_ast::owned::Arg] =
+        if let Some(v) = expand_literal_spread_call_args(call_args) {
+            expanded_args = v;
+            &expanded_args
+        } else {
+            call_args
+        };
     let mut applied = false;
     // A variadic param's assertion applies to every trailing positional
     // arg it swallows (`assertVariadic(...$values)` asserted over each
@@ -300,6 +317,14 @@ pub(crate) fn compute_assertion_template_bindings(
     if template_params.is_empty() {
         return None;
     }
+    let expanded_args: Vec<php_ast::owned::Arg>;
+    let call_args: &[php_ast::owned::Arg] =
+        if let Some(v) = expand_literal_spread_call_args(call_args) {
+            expanded_args = v;
+            &expanded_args
+        } else {
+            call_args
+        };
     let arg_types: Vec<Type> = call_args
         .iter()
         .map(|arg| assertion_arg_type(&arg.value, ctx, db, file))
@@ -478,6 +503,42 @@ fn arg_for_param_index<'a>(
         .iter()
         .filter(|a| a.name.is_none())
         .nth(param_index)
+}
+
+/// If `call_args` is a single spread argument over a literal array
+/// (`f(...[$a, $b])`), rewrite it into one synthetic, non-spread `Arg` per
+/// element — each wrapping the element's own real expression (so a
+/// subsequent narrowing target, e.g. `extract_var_name`, still resolves to
+/// the actual `$a`/`$b`, not the outer array). Returns `None` for anything
+/// else (no spread, more than one arg, a non-literal spread source, or a
+/// keyed/nested-spread/by-ref element), leaving the caller to fall back to
+/// the original `call_args` unexpanded.
+fn expand_literal_spread_call_args(
+    call_args: &[php_ast::owned::Arg],
+) -> Option<Vec<php_ast::owned::Arg>> {
+    let [sole] = call_args else {
+        return None;
+    };
+    if !sole.unpack {
+        return None;
+    }
+    let ExprKind::Array(elements) = &sole.value.kind else {
+        return None;
+    };
+    let mut expanded = Vec::with_capacity(elements.len());
+    for el in elements.iter() {
+        if el.key.is_some() || el.unpack || el.by_ref {
+            return None;
+        }
+        expanded.push(php_ast::owned::Arg {
+            name: None,
+            value: el.value.clone(),
+            unpack: false,
+            by_ref: false,
+            span: el.span,
+        });
+    }
+    Some(expanded)
 }
 
 /// Best-effort type of a call argument for inferring `@template` bindings on
