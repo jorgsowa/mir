@@ -16,5 +16,5 @@ function foo(): callable {
     };
 }
 ===expect===
-ImpureFunctionCall@9:8-9:19: Calling impure function echo() in a @pure function
 UnusedSuppress@8:0-8:0: Suppress annotation for 'ImpureFunctionCall' is never used
+ImpureFunctionCall@9:8-9:19: Calling impure function echo() in a @pure function

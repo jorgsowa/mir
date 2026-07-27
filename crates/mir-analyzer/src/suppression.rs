@@ -424,9 +424,84 @@ fn next_code_line(raw_lines: &[&str], idx: usize, skip_comments: bool) -> (u32, 
             paren_depth += paren_delta(cont_line.trim());
             cont_idx += 1;
         }
+        // A "documents the following element" directive above a function or
+        // method covers its whole body in real Psalm/PHPStan semantics, not
+        // just the signature line — extend coverage to every line spanned by
+        // the function's own `{ ... }`, if it has one (abstract/interface
+        // methods don't).
+        if skip_comments && is_function_like(trimmed) {
+            if let Some(body_lines) = function_body_lines(raw_lines, offset) {
+                extra_covered_lines.extend(body_lines);
+            }
+        }
         return (target, extra_covered_lines);
     }
     (idx as u32 + 2, extra_covered_lines)
+}
+
+/// Whether a trimmed line is itself a function/method DECLARATION (after
+/// skipping any leading visibility/`static`/`abstract`/`final` modifiers, the
+/// next word is `function`). Used to decide whether a "documents the
+/// following element" suppression directive's target has a body worth
+/// extending coverage into.
+///
+/// Deliberately does not match on `function` appearing anywhere in the line —
+/// a directive whose target statement merely CONTAINS a closure (`return
+/// function () {…};`, `$cb = function () {…};`, an `array_map(function ()
+/// {…}, …)` call) annotates that statement, not the closure's own nested
+/// scope, so it must not be treated as covering the closure's body.
+fn is_function_like(trimmed: &str) -> bool {
+    const MODIFIERS: &[&str] = &[
+        "public",
+        "private",
+        "protected",
+        "static",
+        "abstract",
+        "final",
+    ];
+    for word in trimmed.split_whitespace() {
+        let lower = word.to_ascii_lowercase();
+        if MODIFIERS.contains(&lower.as_str()) {
+            continue;
+        }
+        return lower == "function" || lower.starts_with("function(");
+    }
+    false
+}
+
+/// Physical line numbers (1-based, excluding `start_idx`'s own line) spanned
+/// by a function/method body starting at 0-based `start_idx`, found by
+/// scanning forward for a balanced `{`...`}` pair. Returns `None` if a bare
+/// `;` terminates the declaration before any `{` appears — an abstract or
+/// interface method, which has no body to extend suppression coverage into.
+/// No quote-awareness, same conservative scope as `paren_delta`/`bracket_delta`:
+/// a stray unmatched `{`/`}` inside a plain string literal (as opposed to
+/// `"{$expr}"` interpolation, which is always balanced) could throw off depth
+/// tracking — an accepted rare edge case.
+fn function_body_lines(raw_lines: &[&str], start_idx: usize) -> Option<Vec<u32>> {
+    let mut depth: i32 = 0;
+    let mut opened = false;
+    let mut covered = Vec::new();
+    for (offset, line) in raw_lines.iter().enumerate().skip(start_idx) {
+        for c in line.chars() {
+            match c {
+                '{' => {
+                    depth += 1;
+                    opened = true;
+                }
+                '}' => depth -= 1,
+                ';' if !opened && depth == 0 => return None,
+                _ => {}
+            }
+        }
+        if offset != start_idx {
+            covered.push(offset as u32 + 1);
+        }
+        if opened && depth <= 0 {
+            return Some(covered);
+        }
+    }
+    None
 }
 
 /// Net count of `(` minus `)` in `s` — no quote-awareness, matching
