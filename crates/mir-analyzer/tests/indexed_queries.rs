@@ -877,3 +877,56 @@ fn static_call_on_unresolved_ancestor_does_not_collide_with_unrelated_class() {
     );
     assert_eq!(base_thing_refs[0].0.as_ref(), "child.php");
 }
+
+/// The sound AND-gate for static-only members (`reference_gate_strategy`)
+/// must find every real call site even though several of them never spell
+/// the owner's name at all — that's the whole point of expanding the
+/// owner-group needle set to the transitive subtype closure. A noise file
+/// sharing the bare method name on an unrelated class proves the gate isn't
+/// just falling back to admitting everything.
+#[test]
+fn static_method_inherited_via_subclass_is_found_without_naming_owner() {
+    let files = [
+        (
+            "owner.php",
+            "<?php\nnamespace App;\nclass Owner {\n    public static function m(): void {}\n    public static function viaSelf(): void { self::m(); }\n    public static function viaStatic(): void { static::m(); }\n}\n",
+        ),
+        (
+            "sub.php",
+            "<?php\nnamespace App;\nclass Sub extends Owner {\n    public static function viaParent(): void { parent::m(); }\n}\n",
+        ),
+        (
+            // Calls the method via the subclass name, inherited unmodified —
+            // never spells `Owner` anywhere in this file.
+            "callsite.php",
+            "<?php\nnamespace App;\nfunction callIt(): void { Sub::m(); }\n",
+        ),
+        (
+            "alias.php",
+            "<?php\nnamespace Other;\nuse App\\Owner as Alias;\nfunction f(): void { Alias::m(); }\n",
+        ),
+        (
+            // Unrelated class sharing the bare method name `m` — must never
+            // be attributed to App\Owner::m.
+            "noise.php",
+            "<?php\nnamespace Noise;\nclass Widget {\n    public static function m(): void {}\n    public static function go(): void { self::m(); }\n}\n",
+        ),
+    ];
+    let session = session_with(&files);
+    let refs = session
+        .indexed_references_to(
+            &Name::method("App\\Owner", "m"),
+            &paths(&files),
+            false,
+            &|| false,
+        )
+        .expect("not cancelled");
+    let mut found_files: Vec<&str> = refs.iter().map(|(f, _)| f.as_ref()).collect();
+    found_files.sort();
+    found_files.dedup();
+    assert_eq!(
+        found_files,
+        vec!["alias.php", "callsite.php", "owner.php", "sub.php"],
+        "every real static call site found, no noise leakage: {refs:?}"
+    );
+}
