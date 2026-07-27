@@ -153,7 +153,17 @@ impl PartialEq for FileDeclarations {
 /// Extract the declared names from one source file without exposing body
 /// content.  Used as the input to `workspace_symbol_index` so that body-only
 /// edits don't propagate to the workspace-wide FQCN index.
-#[salsa::tracked(lru = 4096)]
+///
+/// Deliberately NOT `lru`-capped (unlike `collect_file_definitions`): the
+/// result is a few name/loc pairs per file, and `workspace_symbol_index`
+/// walks EVERY source file through this query on each rebuild. With a cap
+/// smaller than the workspace (a 15K-file session vs the old `lru = 4096`),
+/// each walk re-executed the evicted majority — and since the walk happens
+/// after every `workspace_revision` bump (each file ingested by a reference
+/// query's prepare loop), a single cold query degraded into
+/// O(prepared_files × workspace) re-parsing, measured at ~28s wall on a
+/// 15K-file workspace. Uncapped, a walk is a cheap memo validation.
+#[salsa::tracked]
 pub fn collect_file_declarations(db: &dyn MirDatabase, file: SourceFile) -> FileDeclarations {
     let defs = collect_file_definitions(db, file);
     let mut class_like = Vec::new();

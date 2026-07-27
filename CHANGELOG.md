@@ -26,6 +26,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Cold reference queries no longer degrade into O(prepared-files ×
+  workspace):** `collect_file_declarations` shared `collect_file_definitions`'
+  `lru = 4096` cap, but `workspace_symbol_index` walks *every* source file
+  through it on each rebuild — and rebuilds after every `workspace_revision`
+  bump, i.e. after each file a reference query's prepare loop ingests. On a
+  15K-file workspace each walk re-executed the ~11K evicted memos
+  (re-parsing included), turning one cold query into ~90 full re-walks —
+  measured 28s wall, 4.2s after the fix. The declarations result is a few
+  name/loc pairs per file, so the memo table is now uncapped; the
+  heavyweight `collect_file_definitions` keeps its LRU.
+
 - **Constructor gate admits explicit re-init call sites:** the
   `__construct` reference gate (owner short name only, since `new Cls(`
   sites never spell the member name) dropped `$obj->__construct()` re-init
