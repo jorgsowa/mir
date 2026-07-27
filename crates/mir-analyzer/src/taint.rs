@@ -407,6 +407,34 @@ pub fn is_expr_tainted(
                 {
                     return true;
                 }
+                // `array_map`/`array_filter`/`array_reduce` don't need their
+                // callback's BODY analyzed to know the result can carry
+                // taint — same "check the args, not the callee" shortcut
+                // `compact` above already relies on: the result is tainted
+                // whenever the SOURCE array argument is, regardless of what
+                // the callback does to individual elements (conservative,
+                // since the callback could just pass a value through).
+                // `array_map`'s array arguments start at index 1 (any of
+                // 2+ parallel arrays counts); `array_filter`/`array_reduce`
+                // take theirs at index 0.
+                let lower_name = crate::util::php_ident_lowercase(name.as_ref());
+                if lower_name == "array_map"
+                    && fc
+                        .args
+                        .iter()
+                        .skip(1)
+                        .any(|a| is_expr_tainted(&a.value, ctx, db, file))
+                {
+                    return true;
+                }
+                if matches!(lower_name.as_str(), "array_filter" | "array_reduce")
+                    && fc
+                        .args
+                        .first()
+                        .is_some_and(|a| is_expr_tainted(&a.value, ctx, db, file))
+                {
+                    return true;
+                }
                 let resolved = crate::db::resolve_name(db, file, name.as_ref());
                 let here = crate::db::Fqcn::from_str(db, resolved.as_str());
                 if crate::db::find_function(db, here).is_some_and(|f| f.is_taint_source) {
