@@ -650,6 +650,11 @@ fn find_comment_introducer(raw: &str) -> Option<usize> {
             b'/' if bytes.get(i + 1) == Some(&b'/') || bytes.get(i + 1) == Some(&b'*') => {
                 return Some(i);
             }
+            // `#[` is a PHP 8 attribute opener, not a `#` line comment (see
+            // `is_comment_only`'s identical carve-out) — keep scanning past
+            // it instead of stopping here, so a REAL trailing comment after
+            // the attribute (`#[Attr] // note`) is still found.
+            b'#' if bytes.get(i + 1) == Some(&b'[') => {}
             b'#' => return Some(i),
             _ => {}
         }
