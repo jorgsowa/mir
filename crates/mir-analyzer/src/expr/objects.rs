@@ -535,7 +535,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 }
                                 let arg_is_object =
                                     crate::expr::assignment::resolve_chained_receiver_type(
-                                        &arg.value, ctx, self.db,
+                                        &arg.value, ctx, self.db, &self.file,
                                     )
                                     .is_some_and(|ty| {
                                         ty.types.iter().any(|a| {

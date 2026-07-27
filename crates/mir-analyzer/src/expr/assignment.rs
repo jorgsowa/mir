@@ -217,11 +217,49 @@ pub(crate) fn resolve_chained_receiver_type(
     expr: &Expr,
     ctx: &FlowState,
     db: &dyn MirDatabase,
+    file: &str,
 ) -> Option<Type> {
     match &expr.kind {
         ExprKind::Variable(name) => Some(ctx.get_var(name)),
+        // `self::$repo->getInput()` — a static-property hop in the middle of
+        // the chain had no counterpart either, unlike the read-side
+        // `StaticPropertyAccess` handling `taint.rs` already has at the TOP
+        // level (a bare `self::$repo` receiver, not one more hop deep).
+        ExprKind::StaticPropertyAccess(spa) => {
+            let (fqcn, prop_name) = resolve_static_prop_target(spa, ctx, db, file)?;
+            let (_, prop_def) = crate::db::find_property_in_chain(
+                db,
+                crate::db::Fqcn::from_str(db, fqcn.as_ref()),
+                &prop_name,
+            )?;
+            Some((*prop_def.ty.as_deref()?).clone())
+        }
+        // `Factory::repo()->getInput()` — a static-method-call hop in the
+        // middle of the chain, the static-call counterpart of the
+        // `MethodCall` arm below.
+        ExprKind::StaticMethodCall(smc) => {
+            let ExprKind::Identifier(id) = &smc.class.kind else {
+                return None;
+            };
+            let resolved = crate::db::resolve_name(db, file, id.as_ref());
+            let fqcn: std::sync::Arc<str> = match resolved.as_str() {
+                "self" | "static" => ctx.self_fqcn.clone().or_else(|| ctx.static_fqcn.clone())?,
+                "parent" => ctx.parent_fqcn.clone()?,
+                s => std::sync::Arc::from(s),
+            };
+            let ExprKind::Identifier(method_name) = &smc.method.kind else {
+                return None;
+            };
+            let method_lower = crate::util::php_ident_lowercase(method_name.as_ref());
+            let (_, method_def) = crate::db::find_method_respecting_precedence(
+                db,
+                crate::db::Fqcn::from_str(db, fqcn.as_ref()),
+                &method_lower,
+            )?;
+            Some((*method_def.return_type.as_deref()?).clone())
+        }
         ExprKind::PropertyAccess(pa) | ExprKind::NullsafePropertyAccess(pa) => {
-            let obj_ty = resolve_chained_receiver_type(&pa.object, ctx, db)?;
+            let obj_ty = resolve_chained_receiver_type(&pa.object, ctx, db, file)?;
             let prop_name = extract_string_from_expr(&pa.property)?;
             let mut result = Type::empty();
             for atomic in &obj_ty.types {
@@ -250,7 +288,7 @@ pub(crate) fn resolve_chained_receiver_type(
         // silently broke off with `None` instead of yielding the element
         // type callers (e.g. the `@taint-source` method-call check) need.
         ExprKind::ArrayAccess(aa) => {
-            let base_ty = resolve_chained_receiver_type(&aa.array, ctx, db)?;
+            let base_ty = resolve_chained_receiver_type(&aa.array, ctx, db, file)?;
             let mut result = Type::empty();
             for atomic in &base_ty.types {
                 match atomic {
@@ -278,7 +316,7 @@ pub(crate) fn resolve_chained_receiver_type(
         // method's declared return type, same shape as the property arm's
         // `find_property_in_chain` lookup.
         ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => {
-            let obj_ty = resolve_chained_receiver_type(&mc.object, ctx, db)?;
+            let obj_ty = resolve_chained_receiver_type(&mc.object, ctx, db, file)?;
             let ExprKind::Identifier(method_name) = &mc.method.kind else {
                 return None;
             };
@@ -758,7 +796,9 @@ impl<'a> ExpressionAnalyzer<'a> {
             let prop_display = extract_string_from_expr(&pa.property)
                 .or_else(|| crate::parser::span_text(self.source, pa.property.span));
             if let Some(prop_name) = prop_display {
-                if let Some(obj_ty) = resolve_chained_receiver_type(&pa.object, ctx, self.db) {
+                if let Some(obj_ty) =
+                    resolve_chained_receiver_type(&pa.object, ctx, self.db, &self.file)
+                {
                     for atomic in &obj_ty.types {
                         if let Atomic::TNamedObject { fqcn, .. }
                         | Atomic::TSelf { fqcn }
@@ -814,7 +854,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         let Some(prop_name) = extract_string_from_expr(&pa.property) else {
             return;
         };
-        let Some(obj_ty) = resolve_chained_receiver_type(&pa.object, ctx, self.db) else {
+        let Some(obj_ty) = resolve_chained_receiver_type(&pa.object, ctx, self.db, &self.file)
+        else {
             return;
         };
         for atomic in &obj_ty.types {

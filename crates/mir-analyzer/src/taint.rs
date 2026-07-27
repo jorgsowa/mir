@@ -406,9 +406,9 @@ pub fn is_expr_tainted(
                 // Chain-walk the receiver (`$this->req->getParam()`) the same
                 // way the purity checks already do for a write, instead of
                 // requiring `mc.object` to literally BE a bare variable.
-                if let Some(recv_ty) =
-                    crate::expr::assignment::resolve_chained_receiver_type(&mc.object, ctx, db)
-                {
+                if let Some(recv_ty) = crate::expr::assignment::resolve_chained_receiver_type(
+                    &mc.object, ctx, db, file,
+                ) {
                     let method_lower = crate::util::php_ident_lowercase(method_name.as_ref());
                     for atom in &recv_ty.types {
                         if let mir_types::Atomic::TNamedObject { fqcn, .. } = atom {
