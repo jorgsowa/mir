@@ -234,6 +234,10 @@ pub fn is_expr_tainted(
 
         ExprKind::Parenthesized(inner) => is_expr_tainted(inner, ctx, db, file),
 
+        // @$_GET['x'] — the error-suppression operator only silences a
+        // notice/warning, it doesn't sanitize the value.
+        ExprKind::ErrorSuppress(inner) => is_expr_tainted(inner, ctx, db, file),
+
         // $obj->prop / $obj?->prop — tainted if this property was previously
         // assigned a tainted value (see FlowState::taint_prop, set on
         // property writes in expr/assignment.rs). Only a simple-variable
