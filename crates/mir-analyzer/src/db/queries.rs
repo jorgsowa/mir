@@ -573,15 +573,23 @@ pub fn collect_file_definitions_uncached(
     }
 }
 
-/// `lru = 4096` caps the number of `FileDefinitions` results held in Salsa's
+/// `lru = 65536` caps the number of `FileDefinitions` results held in Salsa's
 /// memo table. Without an LRU, every vendor class file ever loaded in a
 /// long-running LSP session retains its `Arc<StubSlice>` in the memo
 /// indefinitely, even after the file is evicted from the session via
-/// `invalidate_file`. 4096 safely exceeds the typical simultaneous active-file
-/// count (stubs ≈120 + vendor hundreds + workspace hundreds) so active files
-/// are never churned; vendor files loaded and later evicted are displaced by
-/// subsequent queries, freeing their StubSlice allocations.
-#[salsa::tracked(lru = 4096)]
+/// `invalidate_file`.
+///
+/// The cap must comfortably exceed the workspace's file count, not just the
+/// simultaneous active-file count: the first subtype/defs index build and
+/// the ancestor resolution behind it walk EVERY registered file through
+/// this query, and a cap below the workspace size makes each walk
+/// re-execute the evicted majority — measured as every file re-collected
+/// (and re-parsed past `parse_file`'s own LRU) ~3× within a single cold
+/// reference query on a 15K-file workspace under the old `lru = 4096`.
+/// 65536 covers the LSP consumer's 50K-file scan ceiling with headroom
+/// while still bounding transiently-loaded vendor slices in pathological
+/// sessions.
+#[salsa::tracked(lru = 65536)]
 pub fn collect_file_definitions(db: &dyn MirDatabase, file: SourceFile) -> FileDefinitions {
     collect_file_definitions_uncached(db, file)
 }

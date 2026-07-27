@@ -26,6 +26,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **First index build no longer re-collects definitions ~3× per file:**
+  `collect_file_definitions`' `lru = 4096` cap sat below real workspace
+  sizes, so the whole-workspace walks of the first subtype/defs build (and
+  the ancestor resolution behind it) re-executed the evicted majority —
+  re-parsing included, since `parse_file`'s own LRU is far smaller — within
+  a single cold query. Raised to 65536, covering the LSP consumer's
+  50K-file scan ceiling while still bounding transiently-loaded vendor
+  slices.
+
 - **Cold reference queries no longer degrade into O(prepared-files ×
   workspace):** `collect_file_declarations` shared `collect_file_definitions`'
   `lru = 4096` cap, but `workspace_symbol_index` walks *every* source file
