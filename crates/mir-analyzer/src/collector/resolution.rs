@@ -223,6 +223,85 @@ pub(super) fn resolve_atomic_inner(
             is_open,
             is_list,
         },
+        // `callable(T): R` / `Closure(T): R` — a class name embedded in one
+        // of these signatures (including inside a `@psalm-type` alias body)
+        // previously never went through `use`-import/namespace resolution at
+        // all, since no arm here recursed into either variant. Mirrors the
+        // identical fix already applied to the sibling `expand_aliases_in_atomic`.
+        Atomic::TCallable {
+            params,
+            return_type,
+        } => Atomic::TCallable {
+            params: params.map(|ps| {
+                ps.iter()
+                    .map(|p| mir_types::atomic::FnParam {
+                        ty: p.ty.as_ref().map(|t| {
+                            mir_types::compact::SimpleType::from_union(resolve_union_inner(
+                                t.to_union(),
+                                full_qualify,
+                                namespace,
+                                use_aliases,
+                            ))
+                        }),
+                        out_ty: p.out_ty.as_ref().map(|t| {
+                            mir_types::compact::SimpleType::from_union(resolve_union_inner(
+                                t.to_union(),
+                                full_qualify,
+                                namespace,
+                                use_aliases,
+                            ))
+                        }),
+                        ..p.clone()
+                    })
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice()
+            }),
+            return_type: return_type.map(|rt| {
+                Box::new(resolve_union_inner(
+                    *rt,
+                    full_qualify,
+                    namespace,
+                    use_aliases,
+                ))
+            }),
+        },
+        Atomic::TClosure { data } => Atomic::TClosure {
+            data: Box::new(mir_types::atomic::ClosureData {
+                params: data
+                    .params
+                    .iter()
+                    .map(|p| mir_types::atomic::FnParam {
+                        ty: p.ty.as_ref().map(|t| {
+                            mir_types::compact::SimpleType::from_union(resolve_union_inner(
+                                t.to_union(),
+                                full_qualify,
+                                namespace,
+                                use_aliases,
+                            ))
+                        }),
+                        out_ty: p.out_ty.as_ref().map(|t| {
+                            mir_types::compact::SimpleType::from_union(resolve_union_inner(
+                                t.to_union(),
+                                full_qualify,
+                                namespace,
+                                use_aliases,
+                            ))
+                        }),
+                        ..p.clone()
+                    })
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice(),
+                return_type: resolve_union_inner(
+                    data.return_type,
+                    full_qualify,
+                    namespace,
+                    use_aliases,
+                ),
+                this_type: data
+                    .this_type
+                    .map(|t| resolve_union_inner(t, full_qualify, namespace, use_aliases)),
+            }),
+        },
         other => other,
     }
 }
