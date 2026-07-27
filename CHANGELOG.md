@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.63.0] - 2026-07-27
+
+### Added
+
+- **Sound AND-gate for static-only member references:** `indexed_references_to`'s
+  candidate gate now recognizes when a queried method resolves to a
+  static-only declaration and, in that case, requires a never-committed
+  file's text to mention *both* the member name and the owner class (or one
+  of its transitive subtypes) before admitting it for analysis — instead of
+  the general OR-gate, which admits on either name alone. This is sound only
+  for statics: every real static call site (`Owner::m()`, an inherited
+  `Sub::m()`, `self::`/`static::`/`parent::m()` from inside the hierarchy, an
+  aliased `use Owner as X; X::m()`) textually names the owner or a subtype,
+  which isn't true for instance members (a receiver typed by an inherited
+  property never names its class in the calling file — the general AND-gate
+  stays OR-only for those). Cuts the false-positive candidate set — and the
+  full semantic analysis each one costs — for static methods on classes
+  whose short name collides with many unrelated classes in a large
+  codebase. Falls back to the existing OR-gate whenever the method can't be
+  resolved to a definite static declaration.
+
 ## [0.62.0] - 2026-07-24
 
 ### Added
