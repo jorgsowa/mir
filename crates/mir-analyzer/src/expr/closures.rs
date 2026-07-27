@@ -264,13 +264,27 @@ impl<'a> ExpressionAnalyzer<'a> {
             || closure_ctx.is_in_external_mutation_free_method
         {
             let mut extended_param_names = (*closure_ctx.param_names).clone();
+            // A by-ref capture of the enclosing function's OWN by-ref
+            // parameter (`use (&$x)` where `&$x` is itself a by-ref
+            // parameter) is the SAME reference, not a copy — a write
+            // through it inside the closure body is exactly as
+            // externally observable as writing `$x` directly in the
+            // enclosing scope, but `check_var_write_purity`/
+            // `assign_to_target`'s `Variable` arm (both keyed on
+            // `byref_param_names`) could never see it, since that set was
+            // never propagated into a closure's own `FlowState` at all.
+            let mut extended_byref_param_names = (*closure_ctx.byref_param_names).clone();
             for use_var in c.use_vars.iter() {
                 let name = use_var.name.trim_start_matches('$');
                 if ctx.param_names.contains(&Name::from(name)) {
                     extended_param_names.insert(Name::from(name));
                 }
+                if use_var.by_ref && ctx.byref_param_names.contains(&Name::from(name)) {
+                    extended_byref_param_names.insert(Name::from(name));
+                }
             }
             closure_ctx.param_names = Arc::new(extended_param_names);
+            closure_ctx.byref_param_names = Arc::new(extended_byref_param_names);
         }
 
         let mut sa = crate::stmt::StatementsAnalyzer::new(
