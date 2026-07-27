@@ -833,6 +833,54 @@ fn resolve_method_return<'a>(
                 }
             }
         }
+        // Same "argument passed into a not-provably-safe callee" check as
+        // `new X(...)` (expr/objects.rs), free-function calls
+        // (call/function.rs), and static calls (call/static_call.rs) — a
+        // plain, by-value argument reachable from `$this`/a parameter can
+        // still be stored/mutated by a callee that isn't provably pure, even
+        // though the RECEIVER checks above only cover the call's own object.
+        if (ctx.is_in_immutable_method || ctx.is_in_external_mutation_free_method)
+            && !resolved.is_pure
+            && !resolved.is_mutation_free
+        {
+            for arg in call.args.iter() {
+                let Some(recv_name) = crate::expr::root_receiver_var(&arg.value) else {
+                    continue;
+                };
+                let recv_stripped = recv_name.trim_start_matches('$');
+                let reachable = (ctx.is_in_immutable_method && recv_stripped == "this")
+                    || (ctx.is_in_external_mutation_free_method
+                        && recv_stripped != "this"
+                        && ctx.param_names.contains(&Name::from(recv_stripped)));
+                if !reachable {
+                    continue;
+                }
+                let arg_is_object = crate::expr::assignment::resolve_chained_receiver_type(
+                    &arg.value, ctx, ea.db, &ea.file,
+                )
+                .is_some_and(|ty| {
+                    ty.types.iter().any(|a| {
+                        matches!(
+                            a,
+                            mir_types::Atomic::TNamedObject { .. }
+                                | mir_types::Atomic::TSelf { .. }
+                                | mir_types::Atomic::TStaticObject { .. }
+                                | mir_types::Atomic::TParent { .. }
+                        )
+                    })
+                });
+                if arg_is_object {
+                    ea.emit(
+                        IssueKind::ImpureMethodCall {
+                            method: method_name.to_string(),
+                        },
+                        Severity::Warning,
+                        span,
+                    );
+                    break;
+                }
+            }
+        }
         if resolved.is_internal {
             let calling_ns = ea.db.file_namespace(&ea.file);
             let calling_root = namespace_root(calling_ns.as_deref());
