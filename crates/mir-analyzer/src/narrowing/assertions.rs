@@ -172,9 +172,17 @@ pub(crate) fn apply_one_assertion(
     // `arg_for_param_index` only ever resolves a single positional arg.
     let variadic_args: Vec<&php_ast::owned::Arg>;
     let args_to_check: &[&php_ast::owned::Arg] = if params[index].is_variadic {
+        // A spread argument (`f(...$list)`) is a single `Arg` whose value is
+        // the WHOLE array, not one of the variadic's scalar elements —
+        // narrowing it here as if it were a per-element target would
+        // overwrite the array variable's own type with the assertion's
+        // per-element type. No per-element narrowing is possible without
+        // knowing the spread array's contents, so skip it entirely (safe:
+        // this just means the assertion doesn't narrow through a spread
+        // call, not a false positive).
         variadic_args = call_args
             .iter()
-            .filter(|a| a.name.is_none())
+            .filter(|a| a.name.is_none() && !a.unpack)
             .skip(index)
             .collect();
         &variadic_args
