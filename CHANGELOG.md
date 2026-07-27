@@ -35,6 +35,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   50K-file scan ceiling while still bounding transiently-loaded vendor
   slices.
 
+- **Stub-slice cache writes moved off the caller's critical path:**
+  `StubSliceCache::put` serialized and wrote each entry synchronously, so
+  the first whole-workspace definition collection paid ~15K disk writes
+  inside whatever query triggered it (measured +3.7s on a 15K-file
+  workspace). Writes now queue to a background writer thread;
+  `flush()`/`Drop` join it, so a clean shutdown still loses nothing.
+  Same-session reads are served by Salsa memos, so the delay is only
+  observable across sessions.
+
 - **Cold reference queries no longer degrade into O(prepared-files ×
   workspace):** `collect_file_declarations` shared `collect_file_definitions`'
   `lru = 4096` cap, but `workspace_symbol_index` walks *every* source file

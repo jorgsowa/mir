@@ -71,14 +71,33 @@ fn mir_version_hash() -> u64 {
     })
 }
 
-/// Persistent definition cache. Thread-safe; no in-memory shared state — every
-/// operation goes through the filesystem.
+/// One queued disk write for the background writer thread.
+struct WriteJob {
+    entry_path: PathBuf,
+    header: Header,
+    slice: std::sync::Arc<StubSlice>,
+    seq: u64,
+}
+
+/// Persistent definition cache. Thread-safe. Reads go straight to the
+/// filesystem; writes are handed to a lazily-spawned background thread so a
+/// whole-workspace definition walk never serializes 15K slice files on its
+/// own (query-latency) critical path. Reads-after-write in the same session
+/// are served by Salsa's memos, not this cache, so the write delay is
+/// unobservable except across sessions — and [`Self::flush`]/`Drop` join the
+/// writer, so a clean shutdown loses nothing.
 pub struct StubSliceCache {
     root: PathBuf,
     hits: AtomicU64,
     misses: AtomicU64,
     writes: AtomicU64,
     enabled: bool,
+    writer: std::sync::Mutex<
+        Option<(
+            std::sync::mpsc::Sender<WriteJob>,
+            std::thread::JoinHandle<()>,
+        )>,
+    >,
 }
 
 impl StubSliceCache {
@@ -94,6 +113,7 @@ impl StubSliceCache {
             misses: AtomicU64::new(0),
             writes: AtomicU64::new(0),
             enabled,
+            writer: std::sync::Mutex::new(None),
         }
     }
 
@@ -159,52 +179,65 @@ impl StubSliceCache {
     /// rename. Errors (disk full, permission denied, race with another
     /// writer) are swallowed — the cache is an optimization, never a
     /// correctness dependency.
-    pub fn put(&self, path: &str, content_hash: &[u8; 32], php_version: u8, slice: &StubSlice) {
+    pub fn put(
+        &self,
+        path: &str,
+        content_hash: &[u8; 32],
+        php_version: u8,
+        slice: &std::sync::Arc<StubSlice>,
+    ) {
         if !self.enabled {
             return;
         }
-        let entry_path = self.shard_path(path);
-        let Some(shard_dir) = entry_path.parent() else {
-            return;
+        let job = WriteJob {
+            entry_path: self.shard_path(path),
+            header: Header {
+                magic: MAGIC,
+                mir_version: mir_version_hash(),
+                format_version: FORMAT_VERSION,
+                php_version,
+                content_hash: *content_hash,
+            },
+            slice: std::sync::Arc::clone(slice),
+            seq: self.writes.fetch_add(1, Ordering::Relaxed),
         };
-        if std::fs::create_dir_all(shard_dir).is_err() {
-            return;
+        let mut guard = self.writer.lock().unwrap();
+        if guard.is_none() {
+            let (tx, rx) = std::sync::mpsc::channel::<WriteJob>();
+            let handle = std::thread::Builder::new()
+                .name("mir-stub-cache-writer".into())
+                .spawn(move || {
+                    for job in rx {
+                        write_entry(job);
+                    }
+                })
+                .ok();
+            match handle {
+                Some(h) => *guard = Some((tx, h)),
+                // Can't spawn: degrade to a synchronous write.
+                None => {
+                    drop(guard);
+                    write_entry(job);
+                    return;
+                }
+            }
         }
-
-        let header = Header {
-            magic: MAGIC,
-            mir_version: mir_version_hash(),
-            format_version: FORMAT_VERSION,
-            php_version,
-            content_hash: *content_hash,
-        };
-
-        // Serialize header + body into a single buffer so we issue exactly
-        // one write syscall.
-        let mut buf = match bincode::serialize(&header) {
-            Ok(b) => b,
-            Err(_) => return,
-        };
-        // Strip path-bearing field; the loader re-applies it.
-        let mut slice_for_disk = slice.clone();
-        slice_for_disk.file = None;
-        // `is_deduped` is #[serde(skip)] so it does not need stripping.
-        match bincode::serialize(&slice_for_disk) {
-            Ok(body) => buf.extend_from_slice(&body),
-            Err(_) => return,
+        if let Some((tx, _)) = guard.as_ref() {
+            // A send can only fail if the writer thread died; the entry is
+            // then simply not cached — same contract as any other I/O error.
+            let _ = tx.send(job);
         }
+    }
 
-        // Tempfile in the same directory so the rename is atomic on every
-        // POSIX filesystem (cross-mount renames would degrade to copy).
-        let tmp = entry_path.with_extension(format!(
-            "tmp.{}.{}",
-            std::process::id(),
-            self.writes.fetch_add(1, Ordering::Relaxed),
-        ));
-        if std::fs::write(&tmp, &buf).is_err() {
-            return;
+    /// Join the background writer, guaranteeing every queued entry is on
+    /// disk. The next [`Self::put`] respawns it. Called by `Drop`, so a
+    /// clean session shutdown never loses queued writes.
+    pub fn flush(&self) {
+        let taken = self.writer.lock().unwrap().take();
+        if let Some((tx, handle)) = taken {
+            drop(tx);
+            let _ = handle.join();
         }
-        let _ = std::fs::rename(&tmp, &entry_path);
     }
 
     /// Cumulative hit count across this cache instance.
@@ -216,6 +249,50 @@ impl StubSliceCache {
     pub fn misses(&self) -> u64 {
         self.misses.load(Ordering::Relaxed)
     }
+}
+
+impl Drop for StubSliceCache {
+    fn drop(&mut self) {
+        self.flush();
+    }
+}
+
+/// Serialize and atomically write one cache entry. Runs on the background
+/// writer thread (or inline when spawning failed).
+fn write_entry(job: WriteJob) {
+    let WriteJob {
+        entry_path,
+        header,
+        slice,
+        seq,
+    } = job;
+    let Some(shard_dir) = entry_path.parent() else {
+        return;
+    };
+    if std::fs::create_dir_all(shard_dir).is_err() {
+        return;
+    }
+    // Serialize header + body into a single buffer so we issue exactly
+    // one write syscall.
+    let mut buf = match bincode::serialize(&header) {
+        Ok(b) => b,
+        Err(_) => return,
+    };
+    // Strip path-bearing field; the loader re-applies it.
+    let mut slice_for_disk = (*slice).clone();
+    slice_for_disk.file = None;
+    // `is_deduped` is #[serde(skip)] so it does not need stripping.
+    match bincode::serialize(&slice_for_disk) {
+        Ok(body) => buf.extend_from_slice(&body),
+        Err(_) => return,
+    }
+    // Tempfile in the same directory so the rename is atomic on every
+    // POSIX filesystem (cross-mount renames would degrade to copy).
+    let tmp = entry_path.with_extension(format!("tmp.{}.{}", std::process::id(), seq));
+    if std::fs::write(&tmp, &buf).is_err() {
+        return;
+    }
+    let _ = std::fs::rename(&tmp, &entry_path);
 }
 
 /// Convenience: hash a source string into the 32-byte digest the cache
@@ -251,7 +328,8 @@ mod tests {
         let (_dir, cache) = make_cache();
         let hash = hash_source("<?php class A {}");
         let slice = StubSlice::default();
-        cache.put("/x/a.php", &hash, 8, &slice);
+        cache.put("/x/a.php", &hash, 8, &std::sync::Arc::new(slice));
+        cache.flush();
 
         let got = cache.get("/x/a.php", &hash, 8).expect("hit");
         assert_eq!(
@@ -266,7 +344,8 @@ mod tests {
         let (_dir, cache) = make_cache();
         let hash_a = hash_source("a");
         let hash_b = hash_source("b");
-        cache.put("/x/a.php", &hash_a, 8, &StubSlice::default());
+        cache.put("/x/a.php", &hash_a, 8, &std::sync::Arc::new(StubSlice::default()));
+        cache.flush();
 
         assert!(cache.get("/x/a.php", &hash_b, 8).is_none());
     }
@@ -275,7 +354,8 @@ mod tests {
     fn miss_on_php_version_mismatch() {
         let (_dir, cache) = make_cache();
         let hash = hash_source("a");
-        cache.put("/x/a.php", &hash, 8, &StubSlice::default());
+        cache.put("/x/a.php", &hash, 8, &std::sync::Arc::new(StubSlice::default()));
+        cache.flush();
 
         assert!(cache.get("/x/a.php", &hash, 7).is_none());
     }
@@ -297,7 +377,8 @@ mod tests {
             file: Some(std::sync::Arc::from("/different/path.php")),
             ..Default::default()
         };
-        cache.put("/x/a.php", &hash, 8, &slice);
+        cache.put("/x/a.php", &hash, 8, &std::sync::Arc::new(slice));
+        cache.flush();
 
         let got = cache.get("/x/a.php", &hash, 8).unwrap();
         assert_eq!(
@@ -310,7 +391,8 @@ mod tests {
     fn corrupt_entry_is_treated_as_miss() {
         let (dir, cache) = make_cache();
         let hash = hash_source("a");
-        cache.put("/x/a.php", &hash, 8, &StubSlice::default());
+        cache.put("/x/a.php", &hash, 8, &std::sync::Arc::new(StubSlice::default()));
+        cache.flush();
 
         // Overwrite the shard with garbage.
         let digest = blake3::hash("/x/a.php".as_bytes()).to_hex();
@@ -333,7 +415,8 @@ mod tests {
     fn oversized_length_prefix_is_treated_as_miss_not_a_huge_allocation() {
         let (dir, cache) = make_cache();
         let hash = hash_source("a");
-        cache.put("/x/a.php", &hash, 8, &StubSlice::default());
+        cache.put("/x/a.php", &hash, 8, &std::sync::Arc::new(StubSlice::default()));
+        cache.flush();
 
         let digest = blake3::hash("/x/a.php".as_bytes()).to_hex();
         let s = digest.as_str();
