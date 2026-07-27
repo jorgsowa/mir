@@ -164,6 +164,12 @@ impl CallAnalyzer {
         };
 
         let mut receiver_type_params: Vec<Type> = Vec::new();
+        // Only a real object receiver ($this::, $obj::) is guaranteed concrete
+        // at runtime — an abstract class can never be instantiated. A
+        // class-string receiver ($cls = Foo::class; $cls::method()) can hold
+        // the literal abstract class name itself, so it gets no such
+        // guarantee and must still be checked below.
+        let mut receiver_is_object_instance = false;
         let fqcn = match &call.class.kind {
             ExprKind::Identifier(name) => crate::db::resolve_name(ea.db, &ea.file, name.as_ref()),
             _ => {
@@ -180,6 +186,15 @@ impl CallAnalyzer {
                         );
                     }
                     receiver_type_params = extract_receiver_type_params(&ty, &fqcn);
+                    receiver_is_object_instance = ty.types.iter().any(|atom| {
+                        matches!(
+                            atom,
+                            Atomic::TNamedObject { .. }
+                                | Atomic::TStaticObject { .. }
+                                | Atomic::TSelf { .. }
+                                | Atomic::TParent { .. }
+                        )
+                    });
                     fqcn
                 } else {
                     // All-object unions (Foo|Bar, object) are valid PHP — skip error
@@ -494,15 +509,17 @@ impl CallAnalyzer {
                     call.method.span,
                 );
             }
-            // Only static:: uses LSB and resolves to the concrete subclass at runtime.
-            // self:: resolves to the declaring class (abstract → no body to call).
-            // parent:: resolves to the parent class (abstract → no body to call).
-            let is_static_keyword = if let ExprKind::Identifier(id) = &call.class.kind {
-                id.as_ref() == "static"
-            } else {
-                false
+            // static::, $this::, and $var:: (when $var holds an object) all
+            // use LSB and resolve to the concrete runtime class — an abstract
+            // class can never be instantiated, so an object receiver is
+            // always a concrete instance. self::, parent::, an explicit class
+            // name, and a class-string receiver (which may hold the literal
+            // abstract class name itself) get no such guarantee.
+            let uses_late_static_binding = match &call.class.kind {
+                ExprKind::Identifier(id) => id.as_ref() == "static",
+                _ => receiver_is_object_instance,
             };
-            if resolved.is_abstract && !is_static_keyword {
+            if resolved.is_abstract && !uses_late_static_binding {
                 ea.emit(
                     IssueKind::AbstractMethodCall {
                         class: fqcn.clone(),
