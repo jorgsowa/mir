@@ -978,6 +978,20 @@ impl<'a> ExpressionAnalyzer<'a> {
                 Severity::Warning,
                 span,
             );
+        } else if ctx.static_var_names.contains(&name_sym)
+            && (ctx.is_in_immutable_method || ctx.is_in_external_mutation_free_method)
+        {
+            // A `static $var` mutated via `.=`/`++`/`--`/`unset()`/a by-ref
+            // call argument — the same persistent cross-call state a plain
+            // `$n = value` overwrite mutates (see `assign_to_target`'s
+            // identical `else if` branch).
+            self.emit(
+                IssueKind::ImpureStaticVariable {
+                    variable: name.to_string(),
+                },
+                Severity::Warning,
+                span,
+            );
         }
     }
 
@@ -1194,6 +1208,22 @@ impl<'a> ExpressionAnalyzer<'a> {
                     // any pending dead-write entry rather than creating a new one.
                     ctx.read_vars.insert(name_sym);
                     ctx.mark_consumed(&name_str);
+                } else if ctx.static_var_names.contains(&name_sym) {
+                    // A `static $n;` write mutates the persistent cross-call
+                    // state it holds — the same externally-visible mutation
+                    // @mutation-free/@external-mutation-free forbid for a
+                    // global-variable write (their contract is about writes,
+                    // not reads, unlike @pure's declaration-site-only check).
+                    if ctx.is_in_immutable_method || ctx.is_in_external_mutation_free_method {
+                        self.emit(
+                            IssueKind::ImpureStaticVariable {
+                                variable: name_str.clone(),
+                            },
+                            Severity::Warning,
+                            span,
+                        );
+                    }
+                    ctx.record_var_location(&name_str, line, col_start, line_end, col_end);
                 } else {
                     ctx.record_var_location(&name_str, line, col_start, line_end, col_end);
                 }

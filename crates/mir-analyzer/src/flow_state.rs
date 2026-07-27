@@ -166,6 +166,16 @@ pub struct FlowState {
     /// Arc-shared — set once at context construction, never mutated during analysis.
     pub byref_param_names: Arc<FxHashSet<Name>>,
 
+    /// Names of `static $var`-declared local variables (stripped of `$`),
+    /// inserted dynamically as each declaration is analyzed (mirrors
+    /// `byref_param_names`'s own dynamic insertion for `global $x;`).
+    /// Consulted by `check_var_write_purity`/`assign_to_target`'s `Variable`
+    /// arm so a later WRITE to the persistent cross-call state a `static`
+    /// var holds can be checked under @mutation-free/@external-mutation-free
+    /// — unlike the declaration site's own `is_in_pure_fn`-only check, which
+    /// already covers @pure regardless of whether the var is later written.
+    pub static_var_names: Arc<FxHashSet<Name>>,
+
     /// Each parameter's declared (docblock-merged) type, stripped of `$`.
     /// Unlike `vars`, this is never updated by narrowing — it's the original
     /// contract, used as a generalization ceiling when a narrowed array type
@@ -387,6 +397,7 @@ impl FlowState {
             read_vars: FxHashSet::default(),
             param_names: Arc::new(FxHashSet::default()),
             byref_param_names: Arc::new(FxHashSet::default()),
+            static_var_names: Arc::new(FxHashSet::default()),
             declared_var_types: Arc::new(FxHashMap::default()),
             diverges: false,
             var_locations: FxHashMap::default(),

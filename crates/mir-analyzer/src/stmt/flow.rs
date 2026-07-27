@@ -767,6 +767,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 ));
             }
             ctx.set_var(name, ty);
+            std::sync::Arc::make_mut(&mut ctx.static_var_names).insert(mir_types::Name::from(name));
             let (line, col_start) = self.offset_to_line_col(sv.span.start);
             let (line_end, col_end) = self.offset_to_line_col(sv.span.end);
             ctx.record_var_location(name, line, col_start, line_end, col_end);
