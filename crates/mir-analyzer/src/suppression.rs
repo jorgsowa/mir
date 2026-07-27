@@ -98,6 +98,21 @@ struct Directive {
     skip_comments: bool,
 }
 
+/// A named (non-All) suppression, tracked for `UnusedSuppress` detection.
+/// `report_line` is where an `UnusedSuppress` issue is emitted if this
+/// directive never matches anything; `covered_lines` is every line an
+/// issue of `kind` may legitimately land on to count as "used" — normally
+/// just `report_line` itself, but a multi-line signature's continuation
+/// lines (where a per-parameter issue like `UnusedParam` actually fires)
+/// are included too, since the directive covers those the same way
+/// `SuppressionMap::lines` already does.
+#[derive(Debug, Clone)]
+pub struct NamedSuppression {
+    pub report_line: u32,
+    pub covered_lines: Vec<u32>,
+    pub kind: String,
+}
+
 /// Per-file map of suppressed lines, built from source comments.
 #[derive(Debug, Default)]
 pub struct SuppressionMap {
@@ -105,11 +120,10 @@ pub struct SuppressionMap {
     lines: FxHashMap<u32, KindSet>,
     /// Whole-file suppression, if any directive requested it.
     file: Option<KindSet>,
-    /// Named (non-All) suppressions with their target lines, for
-    /// `UnusedSuppress` detection. Each entry is `(target_line, kind_name)`.
-    /// Only `@psalm-suppress X` / `@suppress X` / `@mir-suppress X` forms populate
+    /// Named (non-All) suppressions, for `UnusedSuppress` detection. Only
+    /// `@psalm-suppress X` / `@suppress X` / `@mir-suppress X` forms populate
     /// this — blanket `@phpstan-ignore*` suppressions are intentionally excluded.
-    pub named_suppressions: Vec<(u32, String)>,
+    pub named_suppressions: Vec<NamedSuppression>,
 }
 
 impl SuppressionMap {
@@ -155,7 +169,11 @@ impl SuppressionMap {
                     if track_named {
                         if let KindSet::Named(ref names) = directive.kinds {
                             for name in names {
-                                map.named_suppressions.push((line_no, name.clone()));
+                                map.named_suppressions.push(NamedSuppression {
+                                    report_line: line_no,
+                                    covered_lines: vec![line_no],
+                                    kind: name.clone(),
+                                });
                             }
                         }
                     }
@@ -166,8 +184,22 @@ impl SuppressionMap {
                         next_code_line(&raw_lines, idx, directive.skip_comments);
                     if track_named {
                         if let KindSet::Named(ref names) = directive.kinds {
+                            // A continuation line of `target`'s own multi-line
+                            // signature (a later parameter, e.g.) is where a
+                            // per-parameter issue like `UnusedParam` actually
+                            // fires — track it alongside `target` as a single
+                            // suppression that's "used" if EITHER line has a
+                            // matching issue, so a genuinely-used directive
+                            // whose issue lands on a continuation line isn't
+                            // misreported as unused.
+                            let mut covered_lines = extra_covered_lines.clone();
+                            covered_lines.push(target);
                             for name in names {
-                                map.named_suppressions.push((target, name.clone()));
+                                map.named_suppressions.push(NamedSuppression {
+                                    report_line: target,
+                                    covered_lines: covered_lines.clone(),
+                                    kind: name.clone(),
+                                });
                             }
                         }
                     }
@@ -204,7 +236,9 @@ impl SuppressionMap {
     ) -> Vec<(u32, String)> {
         self.named_suppressions
             .iter()
-            .filter(|(target_line, kind)| {
+            .filter(|ns| {
+                let target_line = ns.report_line;
+                let kind = &ns.kind;
                 // Compare case-insensitively, same as `KindSet::matches` —
                 // a directive can name a kind in any casing.
                 let kind_matches = |issue: &&mir_issues::Issue| {
@@ -214,11 +248,14 @@ impl SuppressionMap {
                         .eq_ignore_ascii_case(kind.as_str())
                         || issue.kind.code().eq_ignore_ascii_case(kind.as_str())
                 };
-                // Normal case: SuppressionMap-suppressed issue at the exact target line.
-                let at_target = all_issues
-                    .iter()
-                    .any(|issue| issue.location.line == *target_line && kind_matches(issue));
-                if at_target {
+                // Normal case: a SuppressionMap-suppressed issue at the report
+                // line itself, OR any other line this same directive covers
+                // (a multi-line signature's continuation lines, where a
+                // per-parameter issue like `UnusedParam` actually fires).
+                let at_covered_line = all_issues.iter().any(|issue| {
+                    ns.covered_lines.contains(&issue.location.line) && kind_matches(issue)
+                });
+                if at_covered_line {
                     return false; // suppression IS used
                 }
                 // Docblock case: collector-emitted issues (like `InvalidDocblock`)
@@ -232,12 +269,12 @@ impl SuppressionMap {
                 let min_line = target_line.saturating_sub(100);
                 let covered_by_pre_suppressed = pre_suppressed.iter().any(|issue| {
                     issue.location.line >= min_line
-                        && issue.location.line < *target_line
+                        && issue.location.line < target_line
                         && kind_matches(issue)
                 });
                 !covered_by_pre_suppressed
             })
-            .cloned()
+            .map(|ns| (ns.report_line, ns.kind.clone()))
             .collect()
     }
 }
