@@ -344,7 +344,12 @@ mod tests {
         let (_dir, cache) = make_cache();
         let hash_a = hash_source("a");
         let hash_b = hash_source("b");
-        cache.put("/x/a.php", &hash_a, 8, &std::sync::Arc::new(StubSlice::default()));
+        cache.put(
+            "/x/a.php",
+            &hash_a,
+            8,
+            &std::sync::Arc::new(StubSlice::default()),
+        );
         cache.flush();
 
         assert!(cache.get("/x/a.php", &hash_b, 8).is_none());
@@ -354,7 +359,12 @@ mod tests {
     fn miss_on_php_version_mismatch() {
         let (_dir, cache) = make_cache();
         let hash = hash_source("a");
-        cache.put("/x/a.php", &hash, 8, &std::sync::Arc::new(StubSlice::default()));
+        cache.put(
+            "/x/a.php",
+            &hash,
+            8,
+            &std::sync::Arc::new(StubSlice::default()),
+        );
         cache.flush();
 
         assert!(cache.get("/x/a.php", &hash, 7).is_none());
@@ -391,7 +401,12 @@ mod tests {
     fn corrupt_entry_is_treated_as_miss() {
         let (dir, cache) = make_cache();
         let hash = hash_source("a");
-        cache.put("/x/a.php", &hash, 8, &std::sync::Arc::new(StubSlice::default()));
+        cache.put(
+            "/x/a.php",
+            &hash,
+            8,
+            &std::sync::Arc::new(StubSlice::default()),
+        );
         cache.flush();
 
         // Overwrite the shard with garbage.
@@ -415,7 +430,12 @@ mod tests {
     fn oversized_length_prefix_is_treated_as_miss_not_a_huge_allocation() {
         let (dir, cache) = make_cache();
         let hash = hash_source("a");
-        cache.put("/x/a.php", &hash, 8, &std::sync::Arc::new(StubSlice::default()));
+        cache.put(
+            "/x/a.php",
+            &hash,
+            8,
+            &std::sync::Arc::new(StubSlice::default()),
+        );
         cache.flush();
 
         let digest = blake3::hash("/x/a.php".as_bytes()).to_hex();

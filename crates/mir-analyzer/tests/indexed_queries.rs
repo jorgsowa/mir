@@ -955,9 +955,12 @@ fn static_call_via_instance_receiver_is_found_without_naming_owner() {
     ];
     let session = session_with(&files);
     let refs = session
-        .indexed_references_to(&Name::method("App\\Owner", "m"), &paths(&files), false, &|| {
-            false
-        })
+        .indexed_references_to(
+            &Name::method("App\\Owner", "m"),
+            &paths(&files),
+            false,
+            &|| false,
+        )
         .expect("not cancelled");
     assert!(
         refs.iter().any(|(f, _)| f.as_ref() == "caller.php"),
@@ -1020,9 +1023,12 @@ fn static_call_with_case_mismatched_fqcn_is_found() {
     ];
     let session = session_with(&files);
     let refs = session
-        .indexed_references_to(&Name::method("App\\Owner", "m"), &paths(&files), false, &|| {
-            false
-        })
+        .indexed_references_to(
+            &Name::method("App\\Owner", "m"),
+            &paths(&files),
+            false,
+            &|| false,
+        )
         .expect("not cancelled");
     assert!(
         refs.iter().any(|(f, _)| f.as_ref() == "caller.php"),

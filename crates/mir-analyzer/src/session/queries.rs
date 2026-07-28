@@ -369,8 +369,11 @@ impl AnalysisSession {
                         if committed_any.contains(f.as_ref()) {
                             return (Some(f.clone()), None);
                         }
-                        let raw_hit =
-                            || raw_matcher.as_ref().is_some_and(|m| m.is_match(text.as_ref()));
+                        let raw_hit = || {
+                            raw_matcher
+                                .as_ref()
+                                .is_some_and(|m| m.is_match(text.as_ref()))
+                        };
                         if !needles.is_empty() {
                             match (&mention_query, &mention_scanner) {
                                 (Some(q), scanner_opt) => {
