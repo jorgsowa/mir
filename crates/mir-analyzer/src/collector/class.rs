@@ -230,6 +230,9 @@ impl<'a> DefinitionCollector<'a> {
                             own_methods.insert(key, Arc::new(method));
                         }
                     }
+                    if let Some(body) = &m.body {
+                        self.scan_stmts_for_defines(&body.stmts);
+                    }
                 }
                 ClassMemberKind::Property(p) => {
                     let prop_doc = self.parse_docblock_from_node(p.doc_comment.as_ref());

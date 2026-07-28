@@ -188,6 +188,9 @@ impl DefinitionCollector<'_> {
                             Arc::new(method),
                         );
                     }
+                    if let Some(body) = &m.body {
+                        self.scan_stmts_for_defines(&body.stmts);
+                    }
                 }
                 EnumMemberKind::ClassConst(c) => {
                     let const_name = c.name.as_deref().unwrap_or_default();

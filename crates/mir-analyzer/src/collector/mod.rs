@@ -1620,6 +1620,92 @@ impl<'a> DefinitionCollector<'a> {
             self.try_collect_global_var_annotation(stmt);
         }
     }
+
+    /// Registers a `define('NAME', value)` call as a global constant. mir does
+    /// no call-graph reachability analysis, so — like the guarded
+    /// `function_exists()`-wrapped declarations above — a `define()` found
+    /// anywhere is treated as unconditionally available, not gated on whether
+    /// its enclosing function is ever actually called.
+    fn try_collect_define(&mut self, stmt: &php_ast::owned::Stmt, expr: &php_ast::owned::Expr) {
+        let php_ast::owned::ExprKind::FunctionCall(call) = &expr.kind else {
+            return;
+        };
+        let php_ast::owned::ExprKind::Identifier(fn_name) = &call.name.kind else {
+            return;
+        };
+        if !fn_name.eq_ignore_ascii_case("define") {
+            return;
+        }
+        let Some(name_arg) = call.args.first() else {
+            return;
+        };
+        let php_ast::owned::ExprKind::String(name) = &name_arg.value.kind else {
+            return;
+        };
+        let define_doc = stmt
+            .leading_doc_comment()
+            .map(|c| crate::parser::DocblockParser::parse(&c.text))
+            .unwrap_or_default();
+        self.emit_docblock_issues(&define_doc, stmt.span.start);
+        if !self.version_allows(&define_doc) {
+            return;
+        }
+        let fqn: Arc<str> = Arc::from(&**name);
+        // Try to infer the type of the constant value from the second argument
+        let const_type = call
+            .args
+            .get(1)
+            .and_then(|arg| infer_const_value(self, &arg.value.kind))
+            .unwrap_or(Type::mixed());
+        self.slice.constants.push((fqn, const_type));
+    }
+
+    /// Recurses through control-flow wrappers to find `define()` calls inside
+    /// a function/method body, which the top-level visitor never re-enters
+    /// (see `visit_expr` below). Mirrors `stmts_use_func_get_args`'s
+    /// recursion shape but deliberately does NOT descend into nested
+    /// function/class declarations — those aren't collected by this pass
+    /// either, so scanning inside them would be inconsistent scope creep.
+    fn scan_stmts_for_defines(&mut self, stmts: &[php_ast::owned::Stmt]) {
+        for stmt in stmts.iter() {
+            self.scan_stmt_for_defines(stmt);
+        }
+    }
+
+    fn scan_stmt_for_defines(&mut self, stmt: &php_ast::owned::Stmt) {
+        match &stmt.kind {
+            StmtKind::Expression(expr) => self.try_collect_define(stmt, expr),
+            StmtKind::If(s) => {
+                self.scan_stmt_for_defines(&s.then_branch);
+                for branch in s.elseif_branches.iter() {
+                    self.scan_stmt_for_defines(&branch.body);
+                }
+                if let Some(else_branch) = &s.else_branch {
+                    self.scan_stmt_for_defines(else_branch);
+                }
+            }
+            StmtKind::While(s) => self.scan_stmt_for_defines(&s.body),
+            StmtKind::DoWhile(s) => self.scan_stmt_for_defines(&s.body),
+            StmtKind::For(s) => self.scan_stmt_for_defines(&s.body),
+            StmtKind::Foreach(s) => self.scan_stmt_for_defines(&s.body),
+            StmtKind::Switch(s) => {
+                for case in s.body.cases.iter() {
+                    self.scan_stmts_for_defines(&case.body);
+                }
+            }
+            StmtKind::TryCatch(t) => {
+                self.scan_stmts_for_defines(&t.body.stmts);
+                for catch in t.catches.iter() {
+                    self.scan_stmts_for_defines(&catch.body.stmts);
+                }
+                if let Some(finally) = &t.finally {
+                    self.scan_stmts_for_defines(&finally.stmts);
+                }
+            }
+            StmtKind::Block(b) => self.scan_stmts_for_defines(&b.stmts),
+            _ => {}
+        }
+    }
 }
 
 impl<'a> OwnedVisitor for DefinitionCollector<'a> {
@@ -1734,34 +1820,7 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
             // Collect top-level define('NAME', value) calls as global constants.
             // phpstorm-stubs uses this form extensively in *_defines.php files.
             StmtKind::Expression(expr) => {
-                if let php_ast::owned::ExprKind::FunctionCall(call) = &expr.kind {
-                    if let php_ast::owned::ExprKind::Identifier(fn_name) = &call.name.kind {
-                        if fn_name.eq_ignore_ascii_case("define") {
-                            if let Some(name_arg) = call.args.first() {
-                                if let php_ast::owned::ExprKind::String(name) = &name_arg.value.kind
-                                {
-                                    let define_doc = stmt
-                                        .leading_doc_comment()
-                                        .map(|c| crate::parser::DocblockParser::parse(&c.text))
-                                        .unwrap_or_default();
-                                    self.emit_docblock_issues(&define_doc, stmt.span.start);
-                                    if self.version_allows(&define_doc) {
-                                        let fqn: Arc<str> = Arc::from(&**name);
-                                        // Try to infer the type of the constant value from the second argument
-                                        let const_type = call
-                                            .args
-                                            .get(1)
-                                            .and_then(|arg| {
-                                                infer_const_value(self, &arg.value.kind)
-                                            })
-                                            .unwrap_or(Type::mixed());
-                                        self.slice.constants.push((fqn, const_type));
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                self.try_collect_define(stmt, expr);
             }
 
             // Recurse through control-flow wrappers (`if`/`while`/`for`/`foreach`/

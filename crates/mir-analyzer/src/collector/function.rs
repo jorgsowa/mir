@@ -420,6 +420,7 @@ impl DefinitionCollector<'_> {
 
         // Scan the function body for `@var`-annotated global declarations.
         self.scan_stmts_for_global_vars(&decl.body.stmts);
+        self.scan_stmts_for_defines(&decl.body.stmts);
     }
 
     pub(super) fn collect_global_stmt(&mut self, stmt: &php_ast::owned::Stmt) {

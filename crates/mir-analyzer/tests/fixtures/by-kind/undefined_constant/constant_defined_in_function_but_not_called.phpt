@@ -1,5 +1,7 @@
 ===description===
-Constant defined in function but not called
+A define() inside a function body is indexed unconditionally, regardless of
+whether the function is ever called — mir does not do call-graph reachability
+analysis, matching the existing guarded-function-declaration precedent.
 ===file===
 <?php
 /**
@@ -11,4 +13,3 @@ function defineConstant() {
 
 echo CONSTANT;
 ===expect===
-UndefinedConstant@9:5-9:13: Constant CONSTANT is not defined
