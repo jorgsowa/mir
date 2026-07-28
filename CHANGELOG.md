@@ -24,6 +24,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   names the class.) Falls back to the general OR-gate whenever the method
   can't be resolved to a definite static declaration.
 
+- **Free-function parameter mutation now checked against
+  `@mutation-free`/`@external-mutation-free`:** these tags previously did
+  nothing on a free function — `FunctionDef` had no fields for either, so a
+  documented mutation-free function whose body wrote to a passed-in
+  object's property went unflagged. A free function has no `$this`, so
+  both tags behave identically here and now reuse the existing
+  method-shaped enforcement.
+
+- **`getallheaders()`/`apache_request_headers()` recognized as taint
+  sources:** both return raw, attacker-controlled HTTP request headers but
+  neither was modeled as tainted, so header-derived values reaching a sink
+  produced no diagnostic. `getenv()` is deliberately left untainted — env
+  vars are typically server-controlled configuration, not attacker input.
+
+- **An assertion tag now resolves a nested array-key path target:**
+  `Assertion.param_key` held a single array key, so a second bracket
+  (`$arr['a']['b']`) made the whole assertion a silent no-op. Widened to a
+  path of keys; the existing shape-path plumbing already supported it.
+
 ### Fixed
 
 - **First index build no longer re-collects definitions ~3× per file:**
@@ -62,6 +81,349 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   by a parent-declared property. The gate now also admits files containing
   the raw call tokens `->__construct` / `::__construct` (plain substring,
   so files merely *declaring* a constructor are still excluded).
+
+- **`AbstractMethodCall` no longer flags an object receiver's
+  late-static-binding call:** `$this::method()`/`$var::method()` always
+  dispatch to the runtime class, which is guaranteed concrete since an
+  abstract class can never be instantiated. Only `self::`, `parent::`, an
+  explicit class name, and a `class-string` receiver (which can hold the
+  literal abstract name itself) still lack that guarantee and remain
+  flagged.
+
+- **A directly-used trait is no longer treated as a real override
+  parent:** a class using a trait, or replacing a same-named concrete
+  trait method with its own, isn't overriding anything — PHP performs no
+  `final`/static/visibility/signature compatibility check either way. Only
+  a genuine subclass override, or a trait's abstract-method contract, is
+  still enforced.
+
+- **`__call` dispatch honors its own declared return type:** a
+  magic-method call always collapsed to `mixed`, discarding `__call`'s own
+  `@return` docblock — e.g. a fluent test-double stub typed `@return
+  static`. Falls back to `mixed` only when `__call` itself has no declared
+  return type.
+
+- **A function-level suppression now covers its whole body:**
+  `@psalm-suppress`/`@mir-ignore`/`@suppress` written above a function or
+  method only covered the signature line, never the body, unlike real
+  Psalm/PHPStan semantics.
+
+- **A variable class-string static call is now recognized as a taint
+  source:** `is_expr_tainted`'s `StaticMethodCall` arm only resolved a
+  literal class name (or `self`/`static`/`parent`) — `$class::getQuery()`
+  through a variable holding a known class-string fell through unhandled,
+  unlike the instance-method arm beside it.
+
+- **By-ref/`@param-out` write-back now resolves a named-arg-reordered
+  target:** the write-back loops in `method.rs`/`function.rs`/
+  `static_call.rs` indexed `call.args` by the parameter's declared
+  position, so a by-ref parameter passed out of order by name checked the
+  wrong argument or missed the real target entirely.
+
+- **A literal spread call now expands before a docblock assertion is
+  applied:** `f(...[$x, Foo::class])`'s single spread argument resolved as
+  one positional argument for every parameter index instead of the
+  individual elements, corrupting both the narrowing target and
+  template-binding inference from a sibling argument.
+
+- **A spread variadic call no longer corrupts the spread array's own
+  type:** a variadic assertion's argument filter excluded named arguments
+  but not a spread argument (`f(...$list)`) — since a spread call's single
+  `Arg` is the whole array, not a scalar element, narrowing it overwrote
+  the array variable's type with the assertion's per-element type.
+
+- **Class names inside a `Closure()`/`callable()` signature now
+  resolve:** `resolve_atomic_inner` had no arm for `TCallable`/`TClosure`,
+  so a class name nested in one of these signatures skipped use-import/
+  namespace resolution entirely — a correctly-typed argument
+  false-positived against the signature's own unresolved bare class name.
+
+- **A named suppression on a multi-line signature is no longer flagged as
+  unused:** `named_suppressions` only recorded a directive's first target
+  line, so a per-parameter issue on a later continuation line of the same
+  signature — where the directive genuinely applies — still reported
+  `UnusedSuppress`.
+
+- **Taint now propagates through the error-suppression operator:**
+  `is_expr_tainted` had no arm for `@expr`, so `@$_GET['x']` silently
+  bypassed every taint-sink check — `@` only silences a notice, it doesn't
+  sanitize the value.
+
+- **A plain method-call argument is now checked against
+  `@psalm-immutable`/mutation-free:** `new X(...)`, free-function calls,
+  and static calls already checked a by-value argument reachable from
+  `$this`/a parameter against a not-provably-safe callee — an ordinary
+  instance method call (`$logger->record($this->box)`) only checked its
+  own receiver, never its arguments.
+
+- **A `@mutation-free`/`@external-mutation-free` override must now
+  re-declare the tag:** the same unsoundness the existing `@pure`-override
+  check already closed — since a call resolves purity against the
+  receiver's statically-declared type, silently dropping the tag on an
+  override made enforcement unsound.
+
+- **`byref_param_names` now propagates into a closure's `use(&$x)`
+  capture:** a write to a by-ref-captured by-ref parameter inside a
+  closure body was invisible to `check_var_write_purity`/
+  `assign_to_target`, both keyed off that set, even though it mutates the
+  same caller-visible reference a direct write in the enclosing scope
+  would.
+
+- **A `static $var` write is now flagged under mutation-free contracts:**
+  unlike `global $x`, a static variable's write had no write-time tracking
+  at all — only the one-time `@pure` declaration check saw it. Both a
+  compound-op/`++`/`--`/`unset()` write and a plain overwrite are now
+  checked against `@mutation-free`/`@external-mutation-free`.
+
+- **A static call's arguments are now checked against
+  `@psalm-immutable`/mutation-free:** a genuinely static call
+  (`Foo::bar($this)`) or a variable-class-string call
+  (`$cls::method($this)`) passing an object argument reachable from
+  `$this`/a parameter went unflagged, unlike `new X(...)` and
+  free-function calls which already had the identical check.
+
+- **Free-function calls are now checked against
+  `@psalm-immutable`/`@psalm-external-mutation-free`:** only `@pure` gated
+  a free-function call at all — passing `$this` or a parameter into a
+  not-provably-safe callee went unchecked, unlike `new X(...)` and method
+  calls.
+
+- **A `global`-declared variable's write is now flagged under
+  mutation-free contracts:** a whole-variable overwrite, or a property
+  write through a global-held object, was invisible to
+  `@mutation-free`/`@external-mutation-free` — only `@pure` caught it,
+  since these two tags deliberately permit reads.
+
+- **A negated `true` literal or intersection assertion target now
+  narrows:** `negate_assertion_type` had arms for `TNull`/`TFalse`/
+  named-object atoms but none for `TTrue` or `TIntersection` — `!true $v`
+  and `!(A&B) $v` both fell to the catch-all and left the type unchanged.
+
+- **Assertion narrowing now reaches beyond a 1-hop property chain:**
+  `apply_one_assertion`'s property arm and `method_call_receiver_fqcn`
+  both only matched a bare 1-hop receiver, silently no-oping the whole
+  assertion for a 2+-hop chain like `$c->box->inner` or
+  `$this->service->validator->isInt()`.
+
+- **Taint now propagates through `json_decode()`:** the decoded result of
+  a tainted JSON payload — a common shape for JSON-body web APIs — stayed
+  untainted regardless of the subject argument.
+
+- **Taint now propagates through `array_map`/`array_filter`/
+  `array_reduce`:** none of the three checked the source array argument's
+  taint, so an attacker-controlled array run through any of them stayed
+  silently untainted regardless of what the callback did.
+
+- **Taint now propagates through non-sanitizing string builtins:**
+  `str_replace`, `trim`, `explode`/`implode`, `preg_replace`, and similar
+  transforms returned untainted regardless of their arguments, even
+  though none of them strip attacker-controlled content. Genuine
+  sanitizers/encoders (`htmlspecialchars`, `urlencode`, ...) are
+  deliberately left excluded.
+
+- **A `#[Attribute]`'s own `#` is no longer treated as a comment
+  introducer:** `find_comment_introducer` stopped at the leading `#` of
+  `#[Attr]` the same as a plain `#` line comment, so a trailing directive
+  on the attribute's own line (`#[BadAttrClass] // @mir-ignore
+  UndefinedAttributeClass`) was swallowed into one giant same-line
+  "comment" and silently defaulted to `NextLine` scope, missing the
+  attribute's own diagnostic (plus reporting a spurious `UnusedSuppress`).
+
+- **Chained-receiver resolution now handles a static hop:**
+  `resolve_chained_receiver_type` had arms for a property/array-index/
+  instance-method-call hop mid-chain but none for a static-property or
+  static-method-call hop — `self::$param->get()` and `Factory::repo()
+  ->get()` both fell through to `None`, so a `@taint-source` method
+  reached through either static hop stayed silently untainted.
+
+- **`@if-this-is` now checks against the full intersection receiver:**
+  `resolve_method_return`'s check rebuilt the receiver from only the
+  declaring intersection part's own atom, discarding sibling parts — a
+  constraint naming a part only the call-site intersection provides could
+  both false-positive a satisfying receiver and miss a genuinely
+  non-satisfying one.
+
+- **A recursive type alias's cyclic residue now resolves to `mixed`:**
+  `expand_type_aliases_fixpoint` runs exactly `aliases.len()` passes —
+  enough for a finite chain but never enough to fully expand a genuine
+  self- or mutually-referential alias. Any alias-name atom still present
+  after that many passes is, by construction, cyclic residue, and
+  previously stayed a dangling reference to a nonexistent class.
+
+- **`@if-this-is` template substitution now also applies to static
+  calls:** the same gap fixed for instance-call syntax, for a method
+  reached through `self::`/`static::` or an object-typed variable's static
+  call syntax.
+
+- **`@if-this-is` now substitutes a method's own template before
+  checking:** the check previously ran before the call's own inferred
+  template bindings existed, so a constraint referencing the method's own
+  `@template` always compared against a bare, unsubstituted atom and could
+  never actually contradict. Moved the check to run after bindings are
+  inferred.
+
+- **`new X(...)` is now checked against `@psalm-immutable`/
+  `@external-mutation-free`:** only a plain `@pure` function's `new` calls
+  were checked against the constructor's own purity — passing `$this`/a
+  parameter into a constructor that isn't proven pure/mutation-free lets
+  it store and later mutate that object, the same risk an impure method
+  call already caught. A plain value read off `$this` (the standard
+  immutable "wither" idiom) stays exempt.
+
+- **`@psalm-self-out` now supports a chained 2-hop receiver:**
+  `$this->a->b->method()` previously silently no-oped a self-out
+  write-back, since `extract_any_prop_access` only matched a bare-variable
+  object. Adds a synthetic "base->mid_prop" key to the existing flat
+  `prop_refined` map, and extends invalidation to strip stale
+  chain-prefixed entries too.
+
+- **A variable class-string receiver now resolves for static property
+  writes:** `$cls::$prop = x` (a `class-string<Foo>`-typed variable
+  receiver) silently bypassed purity/readonly/taint tracking across every
+  caller of `resolve_static_prop_target`, since it only matched a literal
+  class-name identifier. Also deduplicates 6 sibling inline copies of this
+  resolution logic onto the one shared, now-fixed helper.
+
+- **A dynamic property write now falls back to source text for its
+  purity check:** `$this->$prop = x` / `$other->$prop = x` silently
+  bypassed the pure/external-mutation-free/immutable write checks
+  entirely, since the property-name resolver returns `None` for a
+  variable name and both call sites guarded the check behind an exact
+  name match. Falls back to the property expression's own source text as
+  a display name; the readonly-write check has the same gap but needs a
+  different fix, left for a follow-up.
+
+- **Chained-receiver resolution now handles an intermediate method-call
+  hop:** `resolve_chained_receiver_type` had arms for a property, nullsafe
+  property, and array-index hop, but none for an intermediate method-call
+  hop — `$http->params()->get('id')` died at the intermediate call, so a
+  `@taint-source` method reached this way was never recognized.
+
+- **`extract()` of a tainted array is now treated as a taint source:**
+  `extract()` defines variables whose names are only known at runtime,
+  from the keys of its source array — a tainted source array never made
+  any of those variables taint-tracked. A new
+  `has_dynamic_tainted_var_def` scope flag marks any otherwise-untracked
+  variable as possibly tainted once a tainted-source `extract()` is seen
+  on the path.
+
+- **Taint now propagates through `compact()`:** `compact('id')` copies
+  `$id`'s current value into the returned array, but the taint check never
+  consulted the named variable's taint state, so echoing the result gave
+  no diagnostic even when `$id` was tainted.
+
+- **`sprintf()`/`vsprintf()` are now treated as taint pass-throughs:**
+  both interpolate every argument straight into the returned string, but
+  neither was modeled as tainting its result — echoing `sprintf`'s output
+  with a tainted argument produced no diagnostic at all.
+
+- **A negated multi-atom assertion target now subtracts each atom:**
+  `@psalm-assert !A|B $x` was a total no-op — `negate_assertion_type`
+  bailed out entirely whenever the asserted type had more than one atom,
+  instead of subtracting each recognized atom in turn. Also flips a
+  pre-existing fixture to its now-correct diagnostic: `!empty` is itself a
+  multi-atom falsy union, so excluding it from `bool` now correctly
+  narrows to `true`.
+
+- **An enum's own type alias now reaches its methods and constants:**
+  enum methods were always collected with `aliases: None` (unlike class/
+  interface/trait), and the enum's own alias table was built after the
+  member loop had already processed everything — so a same-file
+  `@psalm-type` alias referenced from a method's `@param` or a constant's
+  `@var` silently resolved to a nonexistent class instead of its
+  expansion.
+
+- **A class-like's own type alias now expands in a property/const
+  `@var`:** a class/trait property's `@var` and an interface constant's
+  `@var` never expanded the declaring class-like's own type alias, unlike
+  `@param`/`@return` and an inline local `@var` — the member resolved to
+  the literal, nonexistent alias name instead of its expansion.
+
+- **Suppression coverage now extends across a multi-line signature:** a
+  directive above a declaration whose signature spans several physical
+  lines (one parameter per line) only ever recorded the first line as
+  covered — a per-parameter diagnostic on a later line escaped suppression
+  entirely. Tracks paren depth across continuation lines the same way an
+  in-progress multi-line attribute already does.
+
+- **Each array-destructure target now gets its own diagnostic span:**
+  `[$this->x, $this->y] = $vals` writes to multiple guarded properties in
+  one statement, but every element reused the outer statement's span — a
+  second violation collided with the first's dedup key and was silently
+  discarded.
+
+- **A fresh clone is now exempt from the immutable cross-class write
+  check:** a write through a variable directly holding `clone $this` — the
+  standard immutable "wither" idiom: clone, mutate the clone, return it —
+  was flagged as an external mutation the same as a write through a real
+  parameter, even though the clone is a fresh, unaliased object nothing
+  else can observe yet.
+
+- **Taint now propagates through an immediately-invoked, argument-less
+  arrow function:** `(fn() => $_GET['x'])()` wasn't recognized as tainted
+  at all. Narrower than the general call-result taint pass-through this
+  module deliberately doesn't model: only an arrow function's
+  single-expression body with no parameters is checked directly against
+  the same context; a closure or an arrow function taking arguments is
+  still not covered.
+
+- **`$$name` now resolves its real type and taint when `$name` is a
+  literal string:** `analyze_variable_variable` always returned bare
+  `mixed`, and `is_expr_tainted` had no arm for it at all. When the name
+  is a known literal string (or union of them), the referenced variable's
+  actual type and taint state are now resolved instead of treating the
+  access as fully opaque.
+
+- **A bare-statement `@psalm-assert` now routes through the shared
+  assertion applier:** `function.rs`, `method.rs`, and `static_call.rs`
+  each hand-duplicated their own var/prop/static-prop application loop for
+  an unconditional assert call — none of which read `assertion.param_key`
+  (silently corrupting the whole parameter's type for an array-key-
+  targeted assertion), handled a variadic parameter, or resolved a named
+  argument. Extracted `apply_one_assertion` from the conditional
+  if-true/if-false dispatch and reused it at all three call sites.
+
+- **Taint now propagates through a by-ref output parameter's
+  write-back:** every by-ref output write-back site (free functions,
+  closures, methods, static methods) called `ctx.set_var` for the new
+  type but never touched its taint bit, so a value like `preg_match`'s
+  `$matches` stayed untainted even when derived from a tainted subject.
+
+- **The backtick shell-exec operator is now checked for tainted input:**
+  the `ShellExec` arm discarded its interpolated parts entirely — never
+  analyzed, never taint-checked — unlike its functional twin
+  `shell_exec()`/`exec()`, which already ran through `is_expr_tainted`.
+
+- **A method call on an untyped `mixed` parameter is now flagged under
+  `@external-mutation-free`:** the unresolvable-receiver blanket check
+  only gated on `is_in_pure_fn`, unlike the resolved-callee checks just
+  below it which also cover `is_in_external_mutation_free_method` for the
+  same parameter-receiver shape.
+
+- **Chained taint-source resolution now handles an array-index hop:**
+  `resolve_chained_receiver_type` had no `ArrayAccess` arm, unlike its
+  sibling `root_receiver_var`, so a chain like
+  `$this->repos['main']->getParam()` broke off with `None` before the
+  `@taint-source` check ever ran.
+
+- **Same-file type aliases now expand in an interface/trait template
+  bound:** `interface.rs`/`trait.rs` resolved a `@template T of Alias`
+  bound directly, and built their type-aliases map only after already
+  using it, so the alias name was namespace-qualified as an unresolvable
+  class instead of expanding to its real type.
+
+- **An assert-if-true/-if-false receiver now resolves through a nullsafe
+  property:** `method_call_receiver_fqcn` only tried `extract_prop_access`
+  (plain `->` only) for a property-access receiver, silently no-oping the
+  whole assertion when reached through a nullsafe property chain instead.
+
+- **By-ref-parameter purity checking now extends beyond plain
+  assignment:** `ImpureByRefAssignment` only fired for a plain
+  `=`/compound-arithmetic write to a by-ref parameter. A shared
+  `check_var_write_purity` now also covers `.=`, `++`/`--`, an array-index
+  write, `unset()`, `foreach(&$v)`, and passing the variable further by
+  reference to a builtin like `sort()` — each of these mutation shapes
+  previously bypassed the check via its own code path.
 
 ## [0.62.0] - 2026-07-24
 
