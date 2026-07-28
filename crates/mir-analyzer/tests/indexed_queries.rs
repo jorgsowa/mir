@@ -1006,10 +1006,7 @@ fn constructor_reinit_via_instance_receiver_is_found_without_naming_owner() {
 
 /// PHP class names are case-insensitive: a lowercased fully-qualified static
 /// call must still be resolved and recorded under the declared owner's key.
-/// Currently a KNOWN GAP — the static-call arm drops the site instead of
-/// resolving the FQCN case-insensitively. Un-ignore when fixed.
 #[test]
-#[ignore = "known gap: case-mismatched FQCN call sites are not recorded"]
 fn static_call_with_case_mismatched_fqcn_is_found() {
     let files = [
         (

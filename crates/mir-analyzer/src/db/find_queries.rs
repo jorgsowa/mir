@@ -1093,7 +1093,10 @@ fn walk_method_with_precedence<'db>(
 
     // Check this class/trait's own methods first.
     if let Some(m) = find_method_in_class(db, fqcn, method_lower) {
-        return Some((class_name, m));
+        // Return the class's own canonically-cased FQCN, not the (possibly
+        // differently-cased) FQCN string the caller queried with — PHP class
+        // names are case-insensitive, but posting keys must be canonical.
+        return Some((class.fqcn().clone(), m));
     }
 
     // For a plain class: respect its insteadof exclusions when walking its traits.
@@ -1122,7 +1125,7 @@ fn walk_method_with_precedence<'db>(
                     }
                     // Return the declaring class as owner so visibility checks use
                     // the class that declared the alias (not the trait).
-                    return Some((class_name, Arc::new(m_clone)));
+                    return Some((class.fqcn().clone(), Arc::new(m_clone)));
                 }
             }
         }
