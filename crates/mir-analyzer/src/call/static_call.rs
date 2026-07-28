@@ -170,6 +170,13 @@ impl CallAnalyzer {
         // the literal abstract class name itself, so it gets no such
         // guarantee and must still be checked below.
         let mut receiver_is_object_instance = false;
+        // A literal class-name receiver (`Foo::bar()`, including `self`/`static`/
+        // `parent`) is the only shape where an interface target is genuinely
+        // invalid PHP (interfaces have no implementation to dispatch to). A
+        // variable receiver (`$var::bar()`) — an object or class-string typed as
+        // the interface — dispatches at runtime to whatever concrete class it
+        // actually holds, which is valid PHP regardless of the declared type.
+        let is_literal_class_receiver = matches!(&call.class.kind, ExprKind::Identifier(_));
         let fqcn = match &call.class.kind {
             ExprKind::Identifier(name) => crate::db::resolve_name(ea.db, &ea.file, name.as_ref()),
             _ => {
@@ -241,7 +248,7 @@ impl CallAnalyzer {
             fqcn.clone()
         };
 
-        if matches!(&call.class.kind, ExprKind::Identifier(_)) {
+        if is_literal_class_receiver {
             ea.record_ref(Arc::from(format!("cls:{fqcn}")), call.class.span);
             // Record a symbol on the class token itself so hover / go-to-definition
             // works when the cursor sits on the class name — including the
@@ -318,7 +325,8 @@ impl CallAnalyzer {
         let mut arg_spans: Vec<Span> = call.args.iter().map(|a| a.span).collect();
 
         // Check if trying to call static method on an interface (not allowed)
-        if crate::db::class_exists(ea.db, &fqcn) {
+        // — only for a literal class-name receiver; see `is_literal_class_receiver`.
+        if is_literal_class_receiver && crate::db::class_exists(ea.db, &fqcn) {
             let here = crate::db::Fqcn::from_str(ea.db, fqcn_arc.as_ref());
             let is_interface = crate::db::find_class_like(ea.db, here)
                 .map(|c| c.is_interface())
