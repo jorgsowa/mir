@@ -322,6 +322,23 @@ impl AnalysisSession {
         }
     }
 
+    /// Whether the workspace symbol index singleton is populated (seeded by
+    /// [`Self::warm_start_files`] or built by `index_batch`) — symbol lookups
+    /// answer from the O(1) map instead of the tracked O(all-files) walk.
+    pub fn workspace_symbol_index_ready(&self) -> bool {
+        self.db
+            .salsa
+            .read()
+            .workspace_symbol_index_singleton()
+            .is_some()
+    }
+
+    /// Executions of the tracked O(all-files) `workspace_symbol_index` walk
+    /// (diagnostic; a warm-started session should keep this at zero).
+    pub fn workspace_index_walks(&self) -> u64 {
+        self.db.salsa.read().workspace_index_walks()
+    }
+
     /// Whether `file`'s subtype-index class edges were committed from exactly
     /// `current_text`.
     pub(crate) fn is_defs_committed(&self, file: &str, current_text: &Arc<str>) -> bool {

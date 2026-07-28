@@ -217,6 +217,7 @@ impl AnalysisSession {
                     if !guard.update_workspace_index_for_file(sf) {
                         guard.rebuild_workspace_symbol_index();
                     }
+                    guard.clear_index_pending(file.as_ref());
                 }
             }
         }
@@ -536,6 +537,14 @@ impl AnalysisSession {
         let stub_cache = self.db.stub_cache.clone();
         let php_v = self.php_version.cache_byte();
 
+        // Register the whole bundled stub set up front. A seeded symbol-index
+        // singleton is only sound when no stub registration arrives after the
+        // seed (`ensure_stubs_for_ast` upserts bypass index maintenance and
+        // would leave the new stubs invisible); with everything registered
+        // here, later lazy stub loads are no-ops. Same contract as
+        // `index_batch`.
+        self.ensure_all_stubs();
+
         {
             let mut guard = self.db.salsa.write();
             for (file, text) in files {
@@ -552,19 +561,22 @@ impl AnalysisSession {
         // them (the None-output mark below also disables resolved immunity).
         let commit_gen = self.index_generation();
 
+        // (handle, declarations) pairs projected from the disk slices read
+        // below — raw material for seeding the symbol-index singleton without
+        // re-reading anything.
+        let mut seed_decls: Vec<(crate::db::SourceFile, crate::db::FileDeclarations)> =
+            Vec::with_capacity(files.len());
+
+        let snap = self.snapshot_db();
         for (file, _) in files {
             // Freshness is keyed on the Arc actually stored on the input — an
             // upsert against already-registered, content-equal text keeps the
             // prior Arc (see `ingest_file`), so read back what's really there
             // rather than assume identity with the `text` passed in above.
-            let stored_text = {
-                let db = self.snapshot_db();
-                db.lookup_source_file(file.as_ref())
-                    .map(|sf| sf.text(&db as &dyn MirDatabase).clone())
-            };
-            let Some(stored_text) = stored_text else {
+            let Some(sf) = snap.lookup_source_file(file.as_ref()) else {
                 continue;
             };
+            let stored_text = sf.text(&snap as &dyn MirDatabase).clone();
 
             let hex = crate::cache::hash_content(&stored_text);
             if let Some((issues, ref_locs)) = cache.get(file, &hex) {
@@ -595,7 +607,127 @@ impl AnalysisSession {
                         guard.set_file_class_edges(file, entries);
                     }
                     self.mark_defs_committed(file, &stored_text);
+                    seed_decls.push((sf, crate::db::decls_from_slice(&slice, sf)));
                 }
+            }
+        }
+        drop(snap);
+
+        self.seed_workspace_index_from_warm_start(seed_decls);
+    }
+
+    /// Seed the workspace symbol index singleton from warm-start declaration
+    /// projections, so a returning session's first query answers from an O(1)
+    /// map instead of the tracked O(all-files) `workspace_symbol_index` walk
+    /// (~4s at 15K files: one `collect_file_definitions` slice-deserialization
+    /// per file, re-validated after every prepare-loop revision bump).
+    ///
+    /// `covered` holds decls projected from content-hash-valid disk slices.
+    /// Files without a valid slice (changed since last session, plus any stub
+    /// not yet slice-cached) are collected in parallel — real parses, so the
+    /// seed is skipped entirely when the gap is large (a first-ever boot,
+    /// where the parse bill belongs to the background sweep, not startup).
+    fn seed_workspace_index_from_warm_start(
+        &self,
+        covered: Vec<(crate::db::SourceFile, crate::db::FileDeclarations)>,
+    ) {
+        use rustc_hash::FxHashSet;
+        if covered.is_empty() {
+            return;
+        }
+
+        let snap = self.snapshot_db();
+        let all = snap.all_source_files();
+        let covered_set: FxHashSet<crate::db::SourceFile> =
+            covered.iter().map(|(sf, _)| *sf).collect();
+        let missing: Vec<crate::db::SourceFile> = all
+            .iter()
+            .copied()
+            .filter(|sf| !covered_set.contains(sf))
+            .collect();
+
+        // Gap ceiling: beyond this the "fill" is a workspace-scale parse and
+        // seeding stops being a warm start. 1024 absorbs a large changed set
+        // plus the bundled stubs; the quarter bound keeps tiny workspaces
+        // seedable even when most files changed.
+        let threshold = 1024usize.max(all.len() / 4);
+        if missing.len() > threshold {
+            return;
+        }
+
+        // Parse/collect the gap off the write lock, in parallel, on one
+        // snapshot — the `index_batch` pattern. `collect_file_declarations`
+        // is disk-slice-accelerated itself, so "missing" here often means a
+        // cheap deserialization rather than a parse.
+        let gap_decls: Vec<(crate::db::SourceFile, crate::db::FileDeclarations)> = {
+            use rayon::prelude::*;
+            missing
+                .par_iter()
+                .map_with(snap.clone(), |db, &sf| {
+                    (sf, crate::db::collect_file_declarations(db, sf).clone())
+                })
+                .collect()
+        };
+        drop(snap);
+
+        let mut decls = covered;
+        decls.extend(gap_decls);
+
+        let mut guard = self.db.salsa.write();
+        if guard.workspace_symbol_index_singleton().is_none() {
+            guard.build_workspace_index_from_decls(decls);
+        } else {
+            // Something (e.g. a vendor-eager `index_batch`) seeded first; its
+            // singleton is already maintained incrementally. Merge only files
+            // it hasn't seen — `merge_precomputed_into_workspace_index` skips
+            // files already snapshotted.
+            guard.merge_precomputed_into_workspace_index(&decls);
+        }
+    }
+
+    /// Reconcile the symbol-index singleton with mirror-only text writes.
+    ///
+    /// Plain `upsert_source_file_with_durability` calls (an LSP host
+    /// mirroring watcher-driven external edits or new files) bypass
+    /// `ingest_file`'s incremental index maintenance; those files accumulate
+    /// in a pending set while a singleton exists. Query entry points call
+    /// this first so the singleton is never consulted stale. Declaration
+    /// memos are pre-warmed on a snapshot (parallel, off the write lock);
+    /// the per-file merge under the lock is then a memo hit.
+    pub fn settle_workspace_index(&self) {
+        if self.db.salsa.read().index_pending_is_empty() {
+            return;
+        }
+        let pending = self.db.salsa.read().take_index_pending();
+        if pending.is_empty() {
+            return;
+        }
+        let snap = self.snapshot_db();
+        let sfs: Vec<crate::db::SourceFile> = pending
+            .iter()
+            .filter_map(|p| snap.lookup_source_file(p.as_ref()))
+            .collect();
+        // Best-effort pre-warm; a concurrent write may cancel it, in which
+        // case the update below collects under the lock (single file, rare).
+        let _ = salsa::Cancelled::catch(std::panic::AssertUnwindSafe(|| {
+            use rayon::prelude::*;
+            sfs.par_iter().for_each_with(snap.clone(), |db, &sf| {
+                let _ = crate::db::collect_file_declarations(db, sf);
+            });
+        }));
+        drop(snap);
+        let mut guard = self.db.salsa.write();
+        // `update_workspace_index_for_file` clones the singleton maps per
+        // call; for a bulk arrival (branch switch) one full rebuild — memo
+        // validations plus a single map build, since the decls were just
+        // pre-warmed above — beats N clones under the write lock.
+        if sfs.len() > 32 {
+            guard.rebuild_workspace_symbol_index();
+            return;
+        }
+        for sf in sfs {
+            if !guard.update_workspace_index_for_file(sf) {
+                guard.rebuild_workspace_symbol_index();
             }
         }
     }

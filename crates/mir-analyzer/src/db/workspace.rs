@@ -166,6 +166,18 @@ impl PartialEq for FileDeclarations {
 #[salsa::tracked]
 pub fn collect_file_declarations(db: &dyn MirDatabase, file: SourceFile) -> FileDeclarations {
     let defs = collect_file_definitions(db, file);
+    decls_from_slice(&defs.slice, file)
+}
+
+/// The projection behind [`collect_file_declarations`], callable on a raw
+/// [`StubSlice`]. The warm-start path uses this to seed the workspace symbol
+/// index from disk-cached slices without pulling `collect_file_definitions`;
+/// sharing one projection keeps the seeded snapshots byte-identical to what
+/// the tracked query would later compute for unchanged text.
+pub fn decls_from_slice(
+    slice: &mir_codebase::definitions::StubSlice,
+    file: SourceFile,
+) -> FileDeclarations {
     let mut class_like = Vec::new();
     let mut functions = Vec::new();
     let mut constants = Vec::new();
@@ -173,37 +185,37 @@ pub fn collect_file_declarations(db: &dyn MirDatabase, file: SourceFile) -> File
     // Pre-lowercase FQCNs once at collection time and intern via Name so
     // downstream lookups (find_class_like, inferred_*_demand) can hash u64
     // pointers instead of byte-by-byte strings.
-    for (idx, c) in defs.slice.classes.iter().enumerate() {
+    for (idx, c) in slice.classes.iter().enumerate() {
         class_like.push((
             Name::new(c.fqcn.as_ref()).ascii_lowercase(),
             SymbolLoc::Class { file, idx },
         ));
     }
-    for (idx, i) in defs.slice.interfaces.iter().enumerate() {
+    for (idx, i) in slice.interfaces.iter().enumerate() {
         class_like.push((
             Name::new(i.fqcn.as_ref()).ascii_lowercase(),
             SymbolLoc::Interface { file, idx },
         ));
     }
-    for (idx, t) in defs.slice.traits.iter().enumerate() {
+    for (idx, t) in slice.traits.iter().enumerate() {
         class_like.push((
             Name::new(t.fqcn.as_ref()).ascii_lowercase(),
             SymbolLoc::Trait { file, idx },
         ));
     }
-    for (idx, e) in defs.slice.enums.iter().enumerate() {
+    for (idx, e) in slice.enums.iter().enumerate() {
         class_like.push((
             Name::new(e.fqcn.as_ref()).ascii_lowercase(),
             SymbolLoc::Enum { file, idx },
         ));
     }
-    for (idx, f) in defs.slice.functions.iter().enumerate() {
+    for (idx, f) in slice.functions.iter().enumerate() {
         functions.push((
             Name::new(f.fqn.as_ref()).ascii_lowercase(),
             SymbolLoc::Function { file, idx },
         ));
     }
-    for (idx, (name, _)) in defs.slice.constants.iter().enumerate() {
+    for (idx, (name, _)) in slice.constants.iter().enumerate() {
         constants.push((Name::new(name.as_ref()), SymbolLoc::Constant { file, idx }));
     }
 
@@ -358,6 +370,7 @@ pub fn workspace_symbol_index(db: &dyn MirDatabase) -> WorkspaceSymbolIndex {
         .workspace_revision()
         .expect("WorkspaceRevision not initialized");
     let _ = rev.revision(db);
+    db.note_workspace_index_walk();
 
     let files = db.all_source_files();
     let mut class_like: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
@@ -466,4 +479,51 @@ pub fn workspace_global_vars(db: &dyn MirDatabase) -> GlobalVarMap {
         }
     }
     GlobalVarMap(Arc::new(out))
+}
+
+#[cfg(test)]
+mod decl_projection_tests {
+    use super::*;
+    use std::sync::Arc;
+
+    /// The warm-start seed projects `FileDeclarations` from raw disk slices;
+    /// any drift from the tracked query's projection would poison
+    /// `file_decl_snapshots` and the singleton. Pin full equality — names AND
+    /// `SymbolLoc` variants/indices (the name-only `PartialEq` is too weak).
+    #[test]
+    fn decls_from_slice_matches_tracked_projection() {
+        let mut db = crate::db::MirDbStorage::default();
+        let text = "<?php\nnamespace App;\n\
+            const TOP = 1;\n\
+            interface I {}\n\
+            trait T {}\n\
+            enum E { case A; }\n\
+            abstract class C implements I { use T; }\n\
+            class D extends C {}\n\
+            function f(): void {}\n\
+            function g(int $x): int { return $x; }\n";
+        let sf = db.upsert_source_file_with_durability(
+            Arc::from("proj.php"),
+            Arc::from(text),
+            salsa::Durability::LOW,
+        );
+
+        let tracked = collect_file_declarations(&db, sf);
+        let slice = collect_file_definitions(&db, sf).slice.clone();
+        let projected = decls_from_slice(&slice, sf);
+
+        let pairs = [
+            (&tracked.class_like, &projected.class_like),
+            (&tracked.functions, &projected.functions),
+            (&tracked.constants, &projected.constants),
+        ];
+        for (t, p) in pairs {
+            assert_eq!(t.len(), p.len());
+            for ((tn, tl), (pn, pl)) in t.iter().zip(p.iter()) {
+                assert_eq!(tn, pn);
+                assert!(tl == pl, "SymbolLoc drift for {tn:?}");
+            }
+        }
+        assert_eq!(tracked.class_like.len(), 5, "I, T, E, C, D expected");
+    }
 }

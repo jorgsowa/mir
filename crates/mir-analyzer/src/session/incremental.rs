@@ -79,6 +79,7 @@ impl AnalysisSession {
         if cancel.is_cancelled() || files.is_empty() {
             return Vec::new();
         }
+        self.settle_workspace_index();
         self.reanalyze_file_set(files.to_vec(), cancel)
     }
 

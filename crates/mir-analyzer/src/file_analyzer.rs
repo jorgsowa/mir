@@ -93,6 +93,9 @@ impl<'a> FileAnalyzer<'a> {
         source_map: &SourceMap,
     ) -> FileAnalysis {
         crate::metrics::record_file_analysis();
+        // Reconcile mirror-only writes with the symbol-index singleton before
+        // resolution runs against it (no-op when nothing is pending).
+        self.session.settle_workspace_index();
 
         // Priority-index the buffer's direct class references so any not yet
         // reached by the background indexer resolve in this single pass (no

@@ -152,6 +152,10 @@ pub trait MirDatabase: salsa::Database {
     /// mid-analysis and a cache would go stale. See [`SubtypeCache`].
     fn subtype_cache(&self) -> Option<&SubtypeCache>;
 
+    /// Diagnostic hook: one execution of the tracked O(all-files)
+    /// `workspace_symbol_index` walk (the fallback the singleton avoids).
+    fn note_workspace_index_walk(&self) {}
+
     /// Snapshot every registered SourceFile. Side channel — not
     /// salsa-tracked; tracked queries that consult this must also
     /// read `workspace_revision().revision(db)` so file add/remove
@@ -216,8 +220,9 @@ pub use self::scopes::{
 };
 pub use self::subtype_index::{ClassLikeKind, SubtypeEntry, SubtypeIndex, SubtypeSite};
 pub use self::workspace::{
-    collect_file_declarations, workspace_classes, workspace_functions, workspace_global_vars,
-    workspace_index, workspace_symbol_index, FileDeclarations, GlobalVarMap, IndexDeclCounts,
+    collect_file_declarations, decls_from_slice, workspace_classes, workspace_functions,
+    workspace_global_vars, workspace_index, workspace_symbol_index, FileDeclarations,
+    GlobalVarMap, IndexDeclCounts,
     SymbolLoc, SymbolTier, WorkspaceRevision, WorkspaceSymbolIndex, WorkspaceSymbolIndexSingleton,
 };
 

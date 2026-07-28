@@ -360,3 +360,193 @@ fn warm_start_files_is_a_no_op_without_a_cache() {
         .expect("not cancelled");
     assert!(refs.is_empty(), "no reference sites expected: {refs:?}");
 }
+
+// ---------------------------------------------------------------------------
+// Symbol-index singleton seeding (mir 0.64): warm_start_files projects
+// declarations from the disk slices it already reads for edge replay and
+// seeds the singleton, so a returning session's first query never runs the
+// tracked O(all-files) workspace_symbol_index walk.
+// ---------------------------------------------------------------------------
+
+/// Simulated "session 1": ingest files against a cache dir so their
+/// StubSlices land on disk, then drop the session.
+fn seed_disk_caches(dir: &std::path::Path, files: &[(&str, &str)]) {
+    let seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir);
+    seed.ensure_all_stubs();
+    for (path, text) in files {
+        seed.ingest_file(Arc::from(*path), Arc::from(*text));
+    }
+    seed.flush_analysis_cache();
+}
+
+#[test]
+fn warm_start_seeds_workspace_symbol_index_without_tracked_walk() {
+    let dir = create_temp_dir("warm_start_seed_index");
+    let files = [
+        (
+            "svc.php",
+            "<?php\nnamespace App;\nclass Service { public static function run(): void {} }\n",
+        ),
+        (
+            "caller.php",
+            "<?php\nnamespace App;\nclass Caller { public function go(): void { Service::run(); } }\n",
+        ),
+    ];
+    seed_disk_caches(dir.path(), &files);
+
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    let warm: Vec<(Arc<str>, Arc<str>)> = files
+        .iter()
+        .map(|(p, t)| (Arc::from(*p), Arc::from(*t)))
+        .collect();
+    session.warm_start_files(&warm);
+
+    assert!(
+        session.workspace_symbol_index_ready(),
+        "warm_start over fully slice-covered files must seed the singleton"
+    );
+    let walks_after_seed = session.workspace_index_walks();
+
+    let candidates: Vec<Arc<str>> = files.iter().map(|(p, _)| Arc::from(*p)).collect();
+    let refs = session
+        .indexed_references_to(
+            &Name::method("App\\Service", "run"),
+            &candidates,
+            false,
+            &|| false,
+        )
+        .expect("not cancelled");
+    assert_eq!(refs.len(), 1, "must find the static call site: {refs:?}");
+    assert_eq!(refs[0].0.as_ref(), "caller.php");
+    assert_eq!(
+        session.workspace_index_walks(),
+        walks_after_seed,
+        "a seeded session's query must not run the tracked O(all-files) walk"
+    );
+}
+
+#[test]
+fn warm_start_seed_skipped_when_slices_missing() {
+    // Fresh cache dir: no slices on disk, so the coverage gap is the whole
+    // workspace and seeding must be skipped (first-ever boot keeps the lazy
+    // behavior; the background sweep owns the parse bill).
+    let dir = create_temp_dir("warm_start_seed_skipped");
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    let files: Vec<(Arc<str>, Arc<str>)> = (0..8)
+        .map(|i| {
+            (
+                Arc::from(format!("f{i}.php").as_str()),
+                Arc::from(format!("<?php\nclass C{i} {{}}\n").as_str()),
+            )
+        })
+        .collect();
+    session.warm_start_files(&files);
+    assert!(
+        !session.workspace_symbol_index_ready(),
+        "no slice coverage -> no seed"
+    );
+    // Queries still work through the tracked fallback.
+    let refs = session
+        .indexed_references_to(
+            &Name::class("C3"),
+            &files.iter().map(|(p, _)| p.clone()).collect::<Vec<_>>(),
+            false,
+            &|| false,
+        )
+        .expect("not cancelled");
+    assert!(refs.is_empty(), "{refs:?}");
+}
+
+#[test]
+fn mirror_only_new_file_is_visible_after_settle() {
+    let dir = create_temp_dir("warm_start_settle_new_file");
+    let files = [(
+        "base.php",
+        "<?php\nnamespace App;\nclass Base { public static function ping(): void {} }\n",
+    )];
+    seed_disk_caches(dir.path(), &files);
+
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    session.warm_start_files(&[(Arc::from("base.php"), Arc::from(files[0].1))]);
+    assert!(session.workspace_symbol_index_ready());
+
+    // A new file arrives via a plain mirror write (watcher shape) — no
+    // ingest_file, so only the pending-set/settle path can index it.
+    let new_text = "<?php\nnamespace App;\nclass Fresh { public function hit(): void { Base::ping(); } }\n";
+    session.set_file_text(Arc::from("fresh.php"), Arc::from(new_text));
+
+    let candidates: Vec<Arc<str>> = vec![Arc::from("base.php"), Arc::from("fresh.php")];
+    let refs = session
+        .indexed_references_to(
+            &Name::method("App\\Base", "ping"),
+            &candidates,
+            false,
+            &|| false,
+        )
+        .expect("not cancelled");
+    assert_eq!(
+        refs.len(),
+        1,
+        "the mirror-only file's call site must be found: {refs:?}"
+    );
+    assert_eq!(refs[0].0.as_ref(), "fresh.php");
+
+    // And the new class itself must resolve (singleton settled, not stale).
+    let sub_files: Vec<Arc<str>> = candidates.clone();
+    let sites = session.indexed_subtype_classes("App\\Fresh", &sub_files, false);
+    assert!(
+        sites.is_empty(),
+        "no subtypes expected, but the query must not panic: {sites:?}"
+    );
+}
+
+#[test]
+fn mirror_only_class_rename_updates_index_after_settle() {
+    let dir = create_temp_dir("warm_start_settle_rename");
+    let files = [
+        (
+            "shape.php",
+            "<?php\nnamespace App;\nclass OldShape { public static function draw(): void {} }\n",
+        ),
+        (
+            "user.php",
+            "<?php\nnamespace App;\nclass User { public function go(): void { OldShape::draw(); } }\n",
+        ),
+    ];
+    seed_disk_caches(dir.path(), &files);
+
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    let warm: Vec<(Arc<str>, Arc<str>)> = files
+        .iter()
+        .map(|(p, t)| (Arc::from(*p), Arc::from(*t)))
+        .collect();
+    session.warm_start_files(&warm);
+    assert!(session.workspace_symbol_index_ready());
+
+    // Both files change on disk (git pull shape): the class is renamed and
+    // the caller follows. Plain mirror writes only.
+    session.set_file_text(
+        Arc::from("shape.php"),
+        Arc::from("<?php\nnamespace App;\nclass NewShape { public static function draw(): void {} }\n"),
+    );
+    session.set_file_text(
+        Arc::from("user.php"),
+        Arc::from("<?php\nnamespace App;\nclass User { public function go(): void { NewShape::draw(); } }\n"),
+    );
+
+    let candidates: Vec<Arc<str>> = files.iter().map(|(p, _)| Arc::from(*p)).collect();
+    let refs = session
+        .indexed_references_to(
+            &Name::method("App\\NewShape", "draw"),
+            &candidates,
+            false,
+            &|| false,
+        )
+        .expect("not cancelled");
+    assert_eq!(
+        refs.len(),
+        1,
+        "renamed class's call site must resolve through the settled index: {refs:?}"
+    );
+    assert_eq!(refs[0].0.as_ref(), "user.php");
+}

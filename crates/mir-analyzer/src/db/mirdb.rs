@@ -249,6 +249,17 @@ pub struct MirDbStorage {
     /// canonical / open-file db. See [`crate::db::SubtypeCache`] and
     /// [`MirDatabase::subtype_cache`].
     subtype_cache: Option<Arc<crate::db::SubtypeCache>>,
+    /// Files whose text changed through a plain mirror write while the
+    /// symbol-index singleton exists — mutations that bypass `ingest_file`'s
+    /// incremental index maintenance (watcher-driven external edits, bulk
+    /// re-mirrors). Drained by `AnalysisSession::settle_workspace_index`
+    /// before index-consuming queries; the singleton may be stale for exactly
+    /// these files until then.
+    pending_index_files: Arc<parking_lot::RwLock<rustc_hash::FxHashSet<Arc<str>>>>,
+    /// Executions of the tracked `workspace_symbol_index` fallback (the
+    /// O(all-files) walk the singleton exists to avoid). Diagnostic only —
+    /// hosts assert warm-started sessions keep this at zero.
+    workspace_index_walks: Arc<std::sync::atomic::AtomicU64>,
 }
 
 /// Resolver-related state held outside salsa storage. Wrapped in a
@@ -288,6 +299,8 @@ impl Default for MirDbStorage {
             index_decl_counts: Arc::default(),
             frozen_index: None,
             subtype_cache: None,
+            pending_index_files: Arc::default(),
+            workspace_index_walks: Arc::default(),
         };
         db.init_workspace_revision();
         db
@@ -301,6 +314,10 @@ impl salsa::Database for MirDbStorage {}
 impl MirDatabase for MirDbStorage {
     fn php_version_str(&self) -> Arc<str> {
         self.php_version.read().clone()
+    }
+
+    fn note_workspace_index_walk(&self) {
+        self.count_workspace_index_walk();
     }
 
     fn file_namespace(&self, file: &str) -> Option<Arc<str>> {
@@ -1214,15 +1231,56 @@ impl MirDbStorage {
                 // sideline it, dropping it now frees the memory too.
                 self.clear_file_class_mentions(path.as_ref());
                 sf.set_text(self).with_durability(durability).to(text);
+                self.mark_index_pending(&path);
             }
             return sf;
         }
         let sf = SourceFile::builder(path.clone(), text)
             .durability(durability)
             .new(self);
-        Arc::make_mut(&mut self.source_files).insert(path, sf);
+        Arc::make_mut(&mut self.source_files).insert(path.clone(), sf);
         self.bump_workspace_revision();
+        self.mark_index_pending(&path);
         sf
+    }
+
+    /// Record that `path`'s declarations may be out of step with the symbol
+    /// index singleton (a plain text write bypassed `ingest_file`'s index
+    /// maintenance). No-op without a singleton — the tracked
+    /// `workspace_symbol_index` walk is always consistent by construction.
+    fn mark_index_pending(&self, path: &Arc<str>) {
+        if self.workspace_symbol_index_input.read().is_some() {
+            self.pending_index_files.write().insert(path.clone());
+        }
+    }
+
+    /// Clear `path`'s pending-index mark (its declarations were just merged
+    /// into the singleton by an `ingest_file`-style update).
+    pub(crate) fn clear_index_pending(&self, path: &str) {
+        let mut pending = self.pending_index_files.write();
+        pending.remove(path);
+    }
+
+    /// Take the current pending-index set, leaving it empty.
+    pub(crate) fn take_index_pending(&self) -> rustc_hash::FxHashSet<Arc<str>> {
+        std::mem::take(&mut *self.pending_index_files.write())
+    }
+
+    /// Whether any mirror-written file awaits symbol-index reconciliation.
+    pub fn index_pending_is_empty(&self) -> bool {
+        self.pending_index_files.read().is_empty()
+    }
+
+    /// Executions of the tracked O(all-files) `workspace_symbol_index` walk.
+    pub fn workspace_index_walks(&self) -> u64 {
+        self.workspace_index_walks
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Count one tracked `workspace_symbol_index` execution (diagnostic).
+    pub(crate) fn count_workspace_index_walk(&self) {
+        self.workspace_index_walks
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Remove the Salsa SourceFile handle for `path` from the registry and
@@ -1234,6 +1292,7 @@ impl MirDbStorage {
     /// incremental subtract is ambiguous, the singleton is nulled so the next
     /// lookup falls back to the tracked query / a finalize rebuilds it.
     pub fn remove_source_file(&mut self, path: &str) {
+        self.clear_index_pending(path);
         let sf = self.source_files.get(path).copied();
         if Arc::make_mut(&mut self.source_files).remove(path).is_some() {
             Arc::make_mut(&mut self.deleted_files).insert(Arc::from(path));
