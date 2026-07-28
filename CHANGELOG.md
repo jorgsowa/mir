@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.64.0] - 2026-07-28
+
+### Added
+
+- **Warm start seeds the workspace symbol index singleton:**
+  `warm_start_files` now projects per-file declarations from the disk
+  definition slices it already reads for subtype-edge replay (a shared
+  `decls_from_slice` projection, byte-identical to the tracked query's) and
+  seeds the `WorkspaceSymbolIndexSingleton` — so a returning session's first
+  query answers symbol lookups from the O(1) map instead of running the
+  tracked O(all-files) `workspace_symbol_index` walk, one
+  `collect_file_definitions` slice deserialization per file re-validated
+  after every prepare-loop revision bump (~4s per process at 15K files).
+  Files without a content-valid slice are collected in parallel off-lock;
+  seeding is skipped when the coverage gap exceeds max(1024, 25%) so a
+  first-ever boot keeps the lazy path. All bundled stubs are registered up
+  front (the `index_batch` contract) so later lazy stub loads cannot leave
+  the seeded singleton incomplete.
+- **Pending-set reconciliation for mirror-only writes:** plain
+  `upsert_source_file_with_durability` calls (an LSP host mirroring
+  watcher-driven external edits or new files) now enqueue the file while a
+  singleton exists; `AnalysisSession::settle_workspace_index` — invoked at
+  the head of `indexed_references_to`, `indexed_subtype_classes`,
+  `indexed_use_import_locations`, `subtype_files`, `class_issues`,
+  `reanalyze_files_cancellable`, and `FileAnalyzer::analyze` — pre-warms
+  declaration memos on a snapshot and merges them under a short write lock,
+  so the seeded singleton is never consulted stale.
+- **Index-walk diagnostics:** `AnalysisSession::workspace_symbol_index_ready`
+  and `workspace_index_walks` (executions of the tracked fallback walk) let
+  hosts assert warm-started sessions never pay the O(all-files) rebuild.
+
+### Fixed
+
+- `self`/`static`/`parent` inside `class-string<...>`/`interface-string<...>`
+  generic arguments now substitute to the enclosing class type.
+- `define()` calls inside function and method bodies are collected as
+  global constant definitions.
+
 ## [0.63.0] - 2026-07-27
 
 ### Added
