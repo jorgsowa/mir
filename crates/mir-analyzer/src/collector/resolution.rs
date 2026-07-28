@@ -306,6 +306,13 @@ pub(super) fn resolve_atomic_inner(
     }
 }
 
+fn is_self_static_parent_keyword(name: &Name) -> bool {
+    matches!(
+        crate::util::php_ident_lowercase(name.as_ref()).as_str(),
+        "self" | "static" | "parent"
+    )
+}
+
 pub(super) fn fill_self_static_parent(union: Type, class_fqcn: &str) -> Type {
     let mut result = Type::empty();
     result.possibly_undefined = union.possibly_undefined;
@@ -321,6 +328,17 @@ pub(super) fn fill_self_static_parent(union: Type, class_fqcn: &str) -> Type {
             Atomic::TParent { ref fqcn } if fqcn.is_empty() => Atomic::TParent {
                 fqcn: class_fqcn.into(),
             },
+            // `class-string<self>`/`class-string<static>`/`class-string<parent>` parse
+            // with the keyword stored literally as the inner name (there's no sentinel
+            // atom to fill unlike bare TSelf/TStaticObject/TParent above) — substitute
+            // it here the same way, or it's never resolved and silently misses real bugs
+            // through a `Foo::method()::other()` chain.
+            Atomic::TClassString(Some(ref name)) if is_self_static_parent_keyword(name) => {
+                Atomic::TClassString(Some(class_fqcn.into()))
+            }
+            Atomic::TInterfaceString(Some(ref name)) if is_self_static_parent_keyword(name) => {
+                Atomic::TInterfaceString(Some(class_fqcn.into()))
+            }
             other => other,
         };
         result.types.push(filled);
