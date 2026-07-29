@@ -737,8 +737,8 @@ mod tests {
             "empty string should not be a builtin"
         );
         assert!(
-            !is_builtin_function("ast\\parse_file"),
-            "extension function should not be a builtin"
+            !is_builtin_function("xdebug_break"),
+            "extension function with no vendored stub dir should not be a builtin"
         );
     }
 
