@@ -780,16 +780,20 @@ fn find_comment_introducer(raw: &str) -> Option<usize> {
 /// each comma-separated segment can be a kind name — every further word in
 /// that same segment is treated as free-text prose (e.g. a trailing
 /// explanation like `UndefinedClass because of a vendor stub`), not another
-/// kind, since a real multi-kind list always uses a comma to continue. Stops
-/// entirely at the block-comment terminator. An empty result means "all kinds".
+/// kind, since a real multi-kind list always uses a comma to continue. Once a
+/// segment has trailing words after its kind name, everything from there on
+/// — including later comma-separated segments — is that same free-text
+/// prose, so a comma inside the prose (`Foo because of X, not fully typed`)
+/// must not be mistaken for the start of another kind. Stops entirely at the
+/// block-comment terminator. An empty result means "all kinds".
 fn parse_kinds(rest: &str) -> KindSet {
     let mut set = FxHashSet::default();
     'segments: for segment in rest.split(',') {
-        for token in segment.split([' ', '\t']) {
-            let token = token.trim();
-            if token.is_empty() {
-                continue;
-            }
+        let mut tokens = segment
+            .split([' ', '\t'])
+            .map(str::trim)
+            .filter(|t| !t.is_empty());
+        for token in tokens.by_ref() {
             // End of the comment / docblock — stop scanning entirely.
             if token.starts_with("*/") || token.starts_with('*') {
                 break 'segments;
@@ -798,6 +802,11 @@ fn parse_kinds(rest: &str) -> KindSet {
             // skipped, keeping the next token as the segment's candidate.
             if token.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
                 set.insert(token.to_string());
+                if tokens.next().is_some() {
+                    // Trailing prose follows in this segment — the rest of
+                    // the comment, comma or not, is that same free text.
+                    break 'segments;
+                }
                 continue 'segments;
             }
         }
