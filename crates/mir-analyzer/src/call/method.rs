@@ -401,6 +401,26 @@ impl CallAnalyzer {
         }
 
         let receiver = obj_ty.remove_null();
+        // A test-double-style union (e.g. `Real|Mock` from a mocking library's
+        // `prophesize()`-style helper) is only ever a `Real` instance in the
+        // type system, never at runtime — the real value always satisfies the
+        // magic-`__call` sibling. So a sibling atom's catch-all `__call`
+        // suppresses UndefinedMethod on atoms that lack the method themselves.
+        let union_has_call_magic = receiver.types.iter().any(|atomic| {
+            let fqcn = match atomic {
+                mir_types::Atomic::TNamedObject { fqcn, .. }
+                | mir_types::Atomic::TSelf { fqcn }
+                | mir_types::Atomic::TStaticObject { fqcn }
+                | mir_types::Atomic::TParent { fqcn } => Some(fqcn),
+                _ => None,
+            };
+            fqcn.is_some_and(|fqcn| {
+                let resolved = crate::db::resolve_name(ea.db, &ea.file, fqcn);
+                let resolved: Arc<str> = Arc::from(resolved.as_str());
+                crate::db::class_exists(ea.db, &resolved)
+                    && crate::db::has_method_in_chain(ea.db, &resolved, "__call")
+            })
+        });
         let mut result = Type::empty();
         // Declaring class of the resolved method, threaded out of
         // `resolve_method_return` so the symbol-recording loop below does not
@@ -439,6 +459,7 @@ impl CallAnalyzer {
                         &mut declaring,
                         &mut this_self_out,
                         None,
+                        union_has_call_magic,
                     ));
                     match this_self_out {
                         Some(ty) => {
@@ -473,6 +494,7 @@ impl CallAnalyzer {
                         &mut None,
                         &mut this_self_out,
                         None,
+                        union_has_call_magic,
                     ));
                     match this_self_out {
                         Some(ty) => {
@@ -513,6 +535,7 @@ impl CallAnalyzer {
                                         &mut None,
                                         &mut this_self_out,
                                         Some(&full_receiver_ty),
+                                        union_has_call_magic,
                                     ));
                                 }
                             }
@@ -594,6 +617,7 @@ impl CallAnalyzer {
                                 &mut None,
                                 &mut None,
                                 None,
+                                union_has_call_magic,
                             ));
                         }
                     }
@@ -704,6 +728,10 @@ impl CallAnalyzer {
 /// responsible for merging every atomic's contribution into the receiver's
 /// final retyped union (a single atomic's resolution must not unilaterally
 /// overwrite a union receiver's other branches).
+///
+/// `sibling_has_call_magic` suppresses UndefinedMethod when a DIFFERENT atom
+/// in the same union receiver has a catch-all `__call` — a real|test-double
+/// union is never actually the "real" atom at runtime.
 #[allow(clippy::too_many_arguments)]
 fn resolve_method_return<'a>(
     ea: &mut ExpressionAnalyzer<'a>,
@@ -719,6 +747,7 @@ fn resolve_method_return<'a>(
     declaring_class: &mut Option<Arc<str>>,
     self_out_out: &mut Option<Type>,
     full_receiver: Option<&Type>,
+    sibling_has_call_magic: bool,
 ) -> Type {
     let method_name_lower = crate::util::php_ident_lowercase(method_name);
     let resolved = resolve_method_from_db(ea.db, fqcn, &method_name_lower);
@@ -1479,7 +1508,12 @@ fn resolve_method_return<'a>(
                     )
                 })
                 .unwrap_or_else(Type::mixed)
-        } else if is_interface || is_abstract || is_trait || guarded_by_method_exists {
+        } else if is_interface
+            || is_abstract
+            || is_trait
+            || guarded_by_method_exists
+            || sibling_has_call_magic
+        {
             Type::mixed()
         } else {
             ea.emit(
