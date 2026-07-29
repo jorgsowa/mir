@@ -1643,10 +1643,19 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     None
                                 }
                             });
+                        // Compare the non-null part of the assigned type: a
+                        // nullable RHS (e.g. a stub method typed `T|null`) is
+                        // still refinement-worthy when T itself narrows the
+                        // declared type — the null part is preserved in the
+                        // stored refinement, not discarded, so a later read
+                        // correctly surfaces a possibly-null diagnostic
+                        // instead of losing the narrowing entirely.
                         let should_refine = !ty.is_mixed()
                             && declared_opt
                                 .as_deref()
-                                .map(|declared| crate::subtype::is_subtype(self.db, &ty, declared))
+                                .map(|declared| {
+                                    crate::subtype::is_subtype(self.db, &ty.remove_null(), declared)
+                                })
                                 .unwrap_or(true);
                         if should_refine {
                             ctx.set_prop_refined(obj_var.as_ref(), &prop_name, ty.clone());
@@ -1815,10 +1824,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                         let declared_opt =
                             crate::db::find_property_in_chain(self.db, here, &prop_name)
                                 .and_then(|(_, p)| p.ty.clone());
+                        // Same non-null comparison as the instance-property
+                        // path above — see the comment there.
                         let should_refine = !ty.is_mixed()
                             && declared_opt
                                 .as_deref()
-                                .map(|declared| crate::subtype::is_subtype(self.db, &ty, declared))
+                                .map(|declared| {
+                                    crate::subtype::is_subtype(self.db, &ty.remove_null(), declared)
+                                })
                                 .unwrap_or(true);
                         if should_refine {
                             ctx.set_prop_refined(fqcn.as_ref(), &prop_name, ty.clone());
