@@ -1880,8 +1880,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                         self.db,
                         crate::db::Fqcn::from_str(self.db, fqcn.as_ref()),
                     ) {
-                        if iface.seal_properties
-                            && !self.in_existence_check
+                        // Real PHP semantics: interfaces (pre-8.4 property hooks)
+                        // can't declare properties at all, so any access through a
+                        // plain interface type is suspect regardless of whether the
+                        // interface opted into @seal-properties — @property* tags
+                        // are the only thing that legitimizes an access.
+                        if !self.in_existence_check
                             && !iface.own_properties.contains_key(prop_name)
                         {
                             self.emit(

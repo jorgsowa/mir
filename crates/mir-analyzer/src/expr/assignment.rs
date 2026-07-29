@@ -1348,16 +1348,16 @@ impl<'a> ExpressionAnalyzer<'a> {
                 } else if let Some(prop_name) = prop_name_opt {
                     for atomic in &obj_ty.types {
                         if let Atomic::TNamedObject { fqcn, type_params } = atomic {
-                            // Check NoInterfaceProperties for sealed interfaces.
+                            // NoInterfaceProperties fires on any undeclared property
+                            // write through a plain interface type, sealed or not —
+                            // see the matching read-side check in expr/objects.rs.
                             if let Some(crate::db::ClassLike::Interface(iface)) =
                                 crate::db::find_class_like(
                                     self.db,
                                     crate::db::Fqcn::from_str(self.db, fqcn.as_ref()),
                                 )
                             {
-                                if iface.seal_properties
-                                    && !iface.own_properties.contains_key(prop_name.as_str())
-                                {
+                                if !iface.own_properties.contains_key(prop_name.as_str()) {
                                     self.emit(
                                         IssueKind::NoInterfaceProperties {
                                             property: prop_name.clone(),

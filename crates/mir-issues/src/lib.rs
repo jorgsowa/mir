@@ -2019,7 +2019,7 @@ impl IssueKind {
                 "Reference assignment is not supported".to_string()
             }
             IssueKind::NoInterfaceProperties { property } => {
-                format!("Property ${property} is not defined on sealed interface")
+                format!("Property ${property} is not defined on this interface")
             }
             IssueKind::UndefinedDocblockClass { name } => {
                 format!("Docblock type '{name}' does not exist")

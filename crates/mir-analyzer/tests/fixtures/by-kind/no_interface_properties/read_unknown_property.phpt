@@ -17,4 +17,4 @@ function getAge(Sealed $s): mixed {
 }
 
 ===expect===
-NoInterfaceProperties@12:15-12:18: Property $age is not defined on sealed interface
+NoInterfaceProperties@12:15-12:18: Property $age is not defined on this interface

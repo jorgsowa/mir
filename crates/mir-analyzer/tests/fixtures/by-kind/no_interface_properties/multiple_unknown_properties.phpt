@@ -23,5 +23,5 @@ function readMultiple(Sealed $s): void {
 }
 
 ===expect===
-NoInterfaceProperties@15:13-15:16: Property $age is not defined on sealed interface
-NoInterfaceProperties@16:4-16:22: Property $role is not defined on sealed interface
+NoInterfaceProperties@15:13-15:16: Property $age is not defined on this interface
+NoInterfaceProperties@16:4-16:22: Property $role is not defined on this interface
