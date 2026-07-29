@@ -1,6 +1,6 @@
 ===description===
 !isset short-circuit — foreach loop with nullable accumulator
-Reproducer from app-server: !isset($leftPoint) || $item['x'] < $leftPoint
+Reproducer from a real corpus: !isset($leftPoint) || $item['x'] < $leftPoint
 ===file===
 <?php
 /** @param array<array{x: int}> $items */

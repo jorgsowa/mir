@@ -416,7 +416,15 @@ impl AnalysisCache {
             reverse_deps: &reverse_deps,
         };
         if let Ok(bytes) = bincode::serialize(&view) {
-            std::fs::write(cache_file, bytes).ok();
+            // Tempfile in the same directory so the rename is atomic on every
+            // POSIX filesystem (cross-mount renames would degrade to copy) —
+            // same pattern as stub_cache.rs. A crash mid-write leaves only
+            // the tmp file; the prior cache.bin (or none, on a first run)
+            // stays intact instead of being truncated in place.
+            let tmp = cache_file.with_extension(format!("bin.tmp.{}", std::process::id()));
+            if std::fs::write(&tmp, &bytes).is_ok() {
+                let _ = std::fs::rename(&tmp, &cache_file);
+            }
         }
     }
 
@@ -765,6 +773,41 @@ mod tests {
         assert!(
             hit.1.is_empty(),
             "reference_locations should default to empty vec, not fail"
+        );
+    }
+
+    #[test]
+    fn flush_writes_atomically_leaving_no_tmp_file() {
+        // flush() must go through tempfile-in-same-dir + rename, not a plain
+        // in-place fs::write: a crash mid-write must leave the prior
+        // cache.bin (or none) intact rather than a truncated file. This
+        // can't directly simulate a crash, but it pins the observable
+        // contract: after a successful flush, cache.bin exists with the
+        // right content and no stray `.tmp.*` sibling is left behind.
+        let dir = TempDir::new().unwrap();
+        {
+            let cache = make_cache(&dir);
+            seed(&cache, "a.php");
+            cache.flush();
+        }
+        let cache_file = dir.path().join("cache.bin");
+        assert!(cache_file.is_file(), "cache.bin must exist after flush");
+
+        let leftover: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|name| name.contains(".tmp."))
+            .collect();
+        assert!(
+            leftover.is_empty(),
+            "flush left a tmp file behind: {leftover:?}"
+        );
+
+        let reopened = AnalysisCache::open(dir.path(), TEST_PHP_V, 0);
+        assert!(
+            reopened.get("a.php", "hash").is_some(),
+            "content must survive the atomic write"
         );
     }
 
