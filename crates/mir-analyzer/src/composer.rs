@@ -1,4 +1,8 @@
+use php_ast::ast::{BinaryOp, MagicConstKind};
+use php_ast::owned::visitor::{walk_owned_expr, OwnedVisitor};
+use php_ast::owned::{Expr, ExprKind};
 use rustc_hash::FxHashMap;
+use std::ops::ControlFlow;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
@@ -461,6 +465,7 @@ impl Psr4Map {
         for path in &self.project_extra_paths {
             collect_php_path(path, &mut out);
         }
+        expand_via_local_requires(&mut out);
         out
     }
 
@@ -589,6 +594,108 @@ fn collect_php_path(path: &Path, out: &mut Vec<PathBuf>) {
         }
     } else if meta.is_dir() {
         crate::batch::collect_php_files(path, out);
+    }
+}
+
+/// Follows `require`/`include` targets reaching outside every autoload root
+/// (composer.json's autoload sections are otherwise the sole "this file is
+/// part of the project" signal) and adds any that resolve to a real `.php`
+/// file, recursing since a newly-added file may itself reach further
+/// out-of-root files. Only statically-resolvable target shapes are
+/// followed: a literal string, and `__DIR__` / `dirname(__FILE__)`
+/// concatenated with a literal string — the common manual-bootstrap idiom
+/// (e.g. `require_once __DIR__ . '/../legacy/bootstrap.php'`). A bare
+/// literal with no `__DIR__` is resolved relative to the including file's
+/// own directory, the conventional meaning for this idiom in practice.
+/// Files under a `vendor` directory are skipped — those are already reached
+/// through the composer autoload machinery, and re-adding them here would
+/// double-index vendor code as project code.
+fn expand_via_local_requires(out: &mut Vec<PathBuf>) {
+    let mut seen: rustc_hash::FxHashSet<PathBuf> = out.iter().cloned().collect();
+    let mut queue: Vec<PathBuf> = out.clone();
+    while let Some(file) = queue.pop() {
+        let Some(dir) = file.parent() else {
+            continue;
+        };
+        let Ok(text) = std::fs::read_to_string(&file) else {
+            continue;
+        };
+        // Cheap bailout: skip the full parse for the (common) majority of
+        // files that don't even mention require/include.
+        if !text.contains("require") && !text.contains("include") {
+            continue;
+        }
+        let parsed = php_rs_parser::parse(&text);
+        let mut scanner = IncludeTargetScanner {
+            dir,
+            targets: Vec::new(),
+        };
+        let _ = scanner.visit_program(&parsed.program);
+        for target in scanner.targets {
+            let resolved = if Path::new(&target).is_absolute() {
+                PathBuf::from(target)
+            } else {
+                dir.join(target)
+            };
+            if resolved.extension().and_then(|e| e.to_str()) != Some("php") {
+                continue;
+            }
+            if resolved.components().any(|c| c.as_os_str() == "vendor") {
+                continue;
+            }
+            if !resolved.is_file() {
+                continue;
+            }
+            if seen.insert(resolved.clone()) {
+                out.push(resolved.clone());
+                queue.push(resolved);
+            }
+        }
+    }
+}
+
+struct IncludeTargetScanner<'a> {
+    dir: &'a Path,
+    targets: Vec<String>,
+}
+
+impl OwnedVisitor for IncludeTargetScanner<'_> {
+    fn visit_expr(&mut self, expr: &Expr) -> ControlFlow<()> {
+        if let ExprKind::Include(_, inner) = &expr.kind {
+            if let Some(target) = resolve_static_include_target(inner, self.dir) {
+                self.targets.push(target);
+            }
+        }
+        walk_owned_expr(self, expr)
+    }
+}
+
+/// Statically evaluates the include-target expression shapes real code
+/// actually uses: a literal string, `__DIR__` / `dirname(__FILE__)`, and `.`
+/// concatenations of those. Anything else (a variable, a non-`dirname` call)
+/// can't be resolved without running the program, so is left alone.
+fn resolve_static_include_target(expr: &Expr, dir: &Path) -> Option<String> {
+    match &expr.kind {
+        ExprKind::String(s) => Some(s.to_string()),
+        ExprKind::MagicConst(MagicConstKind::Dir) => Some(dir.to_string_lossy().into_owned()),
+        ExprKind::Parenthesized(inner) => resolve_static_include_target(inner, dir),
+        ExprKind::Binary(b) if b.op == BinaryOp::Concat => {
+            let left = resolve_static_include_target(&b.left, dir)?;
+            let right = resolve_static_include_target(&b.right, dir)?;
+            Some(format!("{left}{right}"))
+        }
+        ExprKind::FunctionCall(call) => {
+            let ExprKind::Identifier(name) = &call.name.kind else {
+                return None;
+            };
+            if !name.eq_ignore_ascii_case("dirname") {
+                return None;
+            }
+            let arg = call.args.first()?;
+            matches!(arg.value.kind, ExprKind::MagicConst(MagicConstKind::File))
+                .then(|| dir.to_string_lossy().into_owned())
+        }
+        _ => None,
     }
 }
 
@@ -749,6 +856,244 @@ mod tests {
         let files = map.project_files();
         assert_eq!(files.len(), 1);
         assert!(files[0].ends_with("Foo.php"));
+    }
+
+    // -----------------------------------------------------------------------
+    // project_files() — require/include reaching outside every autoload root
+    // (Sector C7)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn project_files_follows_dir_relative_require() {
+        let root = make_temp_project("require_dir_relative");
+        let src = root.join("src");
+        let legacy = root.join("legacy");
+        fs::create_dir_all(&src).unwrap();
+        fs::create_dir_all(&legacy).unwrap();
+        fs::write(
+            src.join("Bootstrap.php"),
+            "<?php require_once __DIR__ . '/../legacy/bootstrap.php'; class Bootstrap {}",
+        )
+        .unwrap();
+        fs::write(
+            legacy.join("bootstrap.php"),
+            "<?php function legacy_init() {}",
+        )
+        .unwrap();
+        fs::write(
+            root.join("composer.json"),
+            r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+        )
+        .unwrap();
+
+        let map = Psr4Map::from_composer(&root).unwrap();
+        let files = map.project_files();
+        assert_eq!(files.len(), 2, "expected Bootstrap.php + bootstrap.php");
+        assert!(files.iter().any(|f| f.ends_with("bootstrap.php")));
+    }
+
+    #[test]
+    fn project_files_follows_dirname_file_require() {
+        let root = make_temp_project("require_dirname_file");
+        let src = root.join("src");
+        let legacy = root.join("legacy");
+        fs::create_dir_all(&src).unwrap();
+        fs::create_dir_all(&legacy).unwrap();
+        fs::write(
+            src.join("Bootstrap.php"),
+            "<?php require_once dirname(__FILE__) . '/../legacy/bootstrap.php'; class Bootstrap {}",
+        )
+        .unwrap();
+        fs::write(
+            legacy.join("bootstrap.php"),
+            "<?php function legacy_init() {}",
+        )
+        .unwrap();
+        fs::write(
+            root.join("composer.json"),
+            r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+        )
+        .unwrap();
+
+        let map = Psr4Map::from_composer(&root).unwrap();
+        let files = map.project_files();
+        assert!(files.iter().any(|f| f.ends_with("bootstrap.php")));
+    }
+
+    #[test]
+    fn project_files_follows_bare_literal_require_relative_to_including_file() {
+        let root = make_temp_project("require_bare_literal");
+        let src = root.join("src");
+        let legacy = root.join("legacy");
+        fs::create_dir_all(&src).unwrap();
+        fs::create_dir_all(&legacy).unwrap();
+        fs::write(
+            src.join("Bootstrap.php"),
+            "<?php require_once '../legacy/bootstrap.php'; class Bootstrap {}",
+        )
+        .unwrap();
+        fs::write(
+            legacy.join("bootstrap.php"),
+            "<?php function legacy_init() {}",
+        )
+        .unwrap();
+        fs::write(
+            root.join("composer.json"),
+            r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+        )
+        .unwrap();
+
+        let map = Psr4Map::from_composer(&root).unwrap();
+        let files = map.project_files();
+        assert!(files.iter().any(|f| f.ends_with("bootstrap.php")));
+    }
+
+    #[test]
+    fn project_files_follows_require_transitively() {
+        let root = make_temp_project("require_transitive");
+        let src = root.join("src");
+        let legacy = root.join("legacy");
+        fs::create_dir_all(&src).unwrap();
+        fs::create_dir_all(&legacy).unwrap();
+        fs::write(
+            src.join("Bootstrap.php"),
+            "<?php require_once __DIR__ . '/../legacy/a.php';",
+        )
+        .unwrap();
+        fs::write(
+            legacy.join("a.php"),
+            "<?php require_once __DIR__ . '/b.php';",
+        )
+        .unwrap();
+        fs::write(legacy.join("b.php"), "<?php function b() {}").unwrap();
+        fs::write(
+            root.join("composer.json"),
+            r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+        )
+        .unwrap();
+
+        let map = Psr4Map::from_composer(&root).unwrap();
+        let files = map.project_files();
+        assert!(files.iter().any(|f| f.ends_with("a.php")));
+        assert!(files.iter().any(|f| f.ends_with("b.php")));
+    }
+
+    #[test]
+    fn project_files_require_cycle_does_not_hang() {
+        let root = make_temp_project("require_cycle");
+        let src = root.join("src");
+        let legacy = root.join("legacy");
+        fs::create_dir_all(&src).unwrap();
+        fs::create_dir_all(&legacy).unwrap();
+        fs::write(
+            src.join("Bootstrap.php"),
+            "<?php require_once __DIR__ . '/../legacy/a.php';",
+        )
+        .unwrap();
+        fs::write(
+            legacy.join("a.php"),
+            "<?php require_once __DIR__ . '/b.php';",
+        )
+        .unwrap();
+        fs::write(
+            legacy.join("b.php"),
+            "<?php require_once __DIR__ . '/a.php';",
+        )
+        .unwrap();
+        fs::write(
+            root.join("composer.json"),
+            r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+        )
+        .unwrap();
+
+        let map = Psr4Map::from_composer(&root).unwrap();
+        let files = map.project_files();
+        assert_eq!(
+            files.len(),
+            3,
+            "each file discovered exactly once despite the cycle"
+        );
+    }
+
+    #[test]
+    fn project_files_missing_require_target_is_skipped() {
+        let root = make_temp_project("require_missing_target");
+        let src = root.join("src");
+        fs::create_dir_all(&src).unwrap();
+        fs::write(
+            src.join("Bootstrap.php"),
+            "<?php require_once __DIR__ . '/../legacy/does_not_exist.php';",
+        )
+        .unwrap();
+        fs::write(
+            root.join("composer.json"),
+            r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+        )
+        .unwrap();
+
+        let map = Psr4Map::from_composer(&root).unwrap();
+        let files = map.project_files();
+        assert_eq!(files.len(), 1, "only Bootstrap.php itself");
+    }
+
+    #[test]
+    fn project_files_dynamic_require_target_not_followed() {
+        let root = make_temp_project("require_dynamic_target");
+        let src = root.join("src");
+        let legacy = root.join("legacy");
+        fs::create_dir_all(&src).unwrap();
+        fs::create_dir_all(&legacy).unwrap();
+        fs::write(
+            src.join("Bootstrap.php"),
+            "<?php $path = getPath(); require_once $path;",
+        )
+        .unwrap();
+        fs::write(
+            legacy.join("bootstrap.php"),
+            "<?php function legacy_init() {}",
+        )
+        .unwrap();
+        fs::write(
+            root.join("composer.json"),
+            r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+        )
+        .unwrap();
+
+        let map = Psr4Map::from_composer(&root).unwrap();
+        let files = map.project_files();
+        assert_eq!(
+            files.len(),
+            1,
+            "a non-statically-resolvable require target must not be followed"
+        );
+    }
+
+    #[test]
+    fn project_files_require_into_vendor_is_skipped() {
+        let root = make_temp_project("require_into_vendor");
+        let src = root.join("src");
+        let vendor_pkg = root.join("vendor/some/pkg");
+        fs::create_dir_all(&src).unwrap();
+        fs::create_dir_all(&vendor_pkg).unwrap();
+        fs::write(
+            src.join("Bootstrap.php"),
+            "<?php require_once __DIR__ . '/../vendor/some/pkg/lib.php';",
+        )
+        .unwrap();
+        fs::write(vendor_pkg.join("lib.php"), "<?php function lib() {}").unwrap();
+        fs::write(
+            root.join("composer.json"),
+            r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+        )
+        .unwrap();
+
+        let map = Psr4Map::from_composer(&root).unwrap();
+        let files = map.project_files();
+        assert_eq!(
+            files.len(),
+            1,
+            "vendor-reaching require must not be indexed as a project file"
+        );
     }
 
     #[test]
