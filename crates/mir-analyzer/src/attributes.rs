@@ -39,6 +39,16 @@ const TARGET_PROPERTY: i64 = 8;
 const TARGET_CLASS_CONSTANT: i64 = 16;
 const TARGET_PARAMETER: i64 = 32;
 
+/// A promoted constructor parameter is reflectable as both a `ReflectionParameter`
+/// and a `ReflectionProperty`, so its attributes must be checked against either target.
+fn param_target_flags(param: &php_ast::owned::Param) -> i64 {
+    if param.visibility.is_some() {
+        TARGET_PARAMETER | TARGET_PROPERTY
+    } else {
+        TARGET_PARAMETER
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Location helpers
 // ---------------------------------------------------------------------------
@@ -349,7 +359,7 @@ pub(crate) fn check_class_attributes(
                 for param in method.params.iter() {
                     check_attribute_list(
                         &param.attributes,
-                        TARGET_PARAMETER,
+                        param_target_flags(param),
                         db,
                         file,
                         source,
@@ -568,7 +578,7 @@ pub(crate) fn check_trait_attributes(
                 for param in method.params.iter() {
                     check_attribute_list(
                         &param.attributes,
-                        TARGET_PARAMETER,
+                        param_target_flags(param),
                         db,
                         file,
                         source,
