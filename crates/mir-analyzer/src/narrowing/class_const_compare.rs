@@ -13,15 +13,16 @@ use super::class_introspection::{
     extract_get_parent_class_static_prop_arg, narrow_from_get_parent_class_literal,
 };
 use super::core::{
-    extract_any_prop_access, extract_static_prop_access, extract_var_name,
-    narrow_receiver_non_null_on_prop_match, ScalarArgTarget,
+    extract_any_prop_access, extract_class_fqcn_from_expr, extract_static_prop_access,
+    extract_var_name, narrow_receiver_non_null_on_prop_match, ScalarArgTarget,
 };
 use super::enum_class::{
     extract_class_const_fqcn, extract_enum_case, narrow_prop_to_class_string,
     narrow_prop_to_literal_enum_case, narrow_prop_to_specific_class,
-    narrow_static_prop_to_class_string, narrow_static_prop_to_literal_enum_case,
-    narrow_static_prop_to_specific_class, narrow_var_to_class_string,
-    narrow_var_to_literal_enum_case, narrow_var_to_specific_class,
+    narrow_prop_to_specific_classes, narrow_static_prop_to_class_string,
+    narrow_static_prop_to_literal_enum_case, narrow_static_prop_to_specific_class,
+    narrow_static_prop_to_specific_classes, narrow_var_to_class_string,
+    narrow_var_to_literal_enum_case, narrow_var_to_specific_class, narrow_var_to_specific_classes,
 };
 use super::instanceof_core::narrow_static_prop_is_subclass_of;
 
@@ -736,4 +737,61 @@ pub(super) fn narrow_from_static_or_class_const_comparison(
             }
         }
     }
+}
+
+/// `match ($x::class) { A::class, B::class => ... }` (also a property or
+/// static-property `::class` receiver) — narrows the receiver to the union
+/// of classes named by the arm's own conditions. Unlike a plain `===`
+/// comparison, match-arm conditions are OR-composed, so this always narrows
+/// to a union rather than a single exact class. Returns `true` when the
+/// subject has this shape at all (regardless of whether any condition
+/// resolved to a class), so the caller can skip its other subject-shape
+/// narrowing for this match.
+pub(crate) fn narrow_match_arm_from_dynamic_class_const(
+    subject: &php_ast::owned::Expr,
+    conditions: &[php_ast::owned::Expr],
+    ctx: &mut FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+) -> bool {
+    let var_target = extract_dynamic_class_const_var(subject);
+    let static_recv = if var_target.is_some() {
+        None
+    } else {
+        extract_dynamic_class_const_static_prop_var(subject, ctx, db, file)
+    };
+    if var_target.is_none() && static_recv.is_none() {
+        return false;
+    }
+
+    let fqcns: Vec<std::sync::Arc<str>> = conditions
+        .iter()
+        .filter_map(|cond| {
+            extract_class_fqcn_from_expr(
+                cond,
+                ctx.self_fqcn.as_deref(),
+                ctx.static_fqcn.as_deref(),
+                ctx.parent_fqcn.as_deref(),
+                db,
+                file,
+            )
+        })
+        .collect();
+
+    if fqcns.is_empty() {
+        return true;
+    }
+
+    if let Some(target) = var_target {
+        match target {
+            ScalarArgTarget::Var(name) => narrow_var_to_specific_classes(ctx, &name, &fqcns, db),
+            ScalarArgTarget::Prop(obj, prop) => {
+                narrow_prop_to_specific_classes(ctx, &obj, &prop, &fqcns, db, file);
+                narrow_receiver_non_null_on_prop_match(ctx, &obj, true);
+            }
+        }
+    } else if let Some((fqcn_recv, prop)) = static_recv {
+        narrow_static_prop_to_specific_classes(ctx, &fqcn_recv, &prop, &fqcns, db);
+    }
+    true
 }

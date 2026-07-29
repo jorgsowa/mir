@@ -220,6 +220,19 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                 }
             }
+            // `match ($x::class) { A::class, B::class => ... }` — the
+            // subject/arm-type intersection above operates on the
+            // class-string domain of `$x::class` itself, which can't narrow
+            // the *object* `$x`; handle this shape separately.
+            if let Some(conditions) = &arm.conditions {
+                crate::narrowing::narrow_match_arm_from_dynamic_class_const(
+                    &m.subject,
+                    conditions,
+                    &mut arm_ctx,
+                    self.db,
+                    &self.file,
+                );
+            }
             // Narrow the arm context based on the condition expressions.
             // Comma-separated conditions are OR semantics (the arm fires if
             // ANY is true) — `$x instanceof A, $x instanceof B` must narrow

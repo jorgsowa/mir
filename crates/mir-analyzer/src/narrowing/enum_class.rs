@@ -390,6 +390,66 @@ pub(super) fn narrow_static_prop_to_specific_class(
     apply_prop_narrowed(ctx, fqcn_receiver, prop, current, narrowed, true);
 }
 
+/// Union-narrowing counterpart of `narrow_var_to_specific_class`, for a
+/// `match ($x::class) { A::class, B::class => ... }` arm listing more than
+/// one class — comma-separated arm conditions are OR semantics, so this
+/// narrows to the union of all named classes rather than just the last.
+pub(super) fn narrow_var_to_specific_classes(
+    ctx: &mut FlowState,
+    name: &str,
+    fqcns: &[std::sync::Arc<str>],
+    db: &dyn MirDatabase,
+) {
+    let current = ctx.get_var(name);
+    let mut narrowed = Type::empty();
+    for fqcn in fqcns {
+        narrowed.merge_with(&Type::single(Atomic::TNamedObject {
+            fqcn: fqcn.clone().into(),
+            type_params: type_params_for_exact_class(&current, fqcn.as_ref(), db),
+        }));
+    }
+    set_narrowed(ctx, name, &current, narrowed, true);
+}
+
+/// Property-access counterpart of `narrow_var_to_specific_classes`.
+pub(super) fn narrow_prop_to_specific_classes(
+    ctx: &mut FlowState,
+    obj_var: &str,
+    prop: &str,
+    fqcns: &[std::sync::Arc<str>],
+    db: &dyn MirDatabase,
+    file: &str,
+) {
+    let current = resolve_prop_current_type(ctx, obj_var, prop, db, file);
+    let mut narrowed = Type::empty();
+    for fqcn in fqcns {
+        narrowed.merge_with(&Type::single(Atomic::TNamedObject {
+            fqcn: fqcn.clone().into(),
+            type_params: type_params_for_exact_class(&current, fqcn.as_ref(), db),
+        }));
+    }
+    apply_prop_narrowed(ctx, obj_var, prop, current, narrowed, true);
+}
+
+/// Static-property counterpart of `narrow_var_to_specific_classes`.
+pub(super) fn narrow_static_prop_to_specific_classes(
+    ctx: &mut FlowState,
+    fqcn_receiver: &str,
+    prop: &str,
+    fqcns: &[std::sync::Arc<str>],
+    db: &dyn MirDatabase,
+) {
+    let current = resolve_static_prop_current_type(ctx, fqcn_receiver, prop, db);
+    let mut narrowed = Type::empty();
+    for fqcn in fqcns {
+        narrowed.merge_with(&Type::single(Atomic::TNamedObject {
+            fqcn: fqcn.clone().into(),
+            type_params: type_params_for_exact_class(&current, fqcn.as_ref(), db),
+        }));
+    }
+    apply_prop_narrowed(ctx, fqcn_receiver, prop, current, narrowed, true);
+}
+
 pub(super) fn extract_enum_case(
     expr: &php_ast::owned::Expr,
     self_fqcn: Option<&str>,

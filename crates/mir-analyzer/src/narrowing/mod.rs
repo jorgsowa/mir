@@ -39,6 +39,7 @@ use assertions::{
     resolve_static_call_class_fqcn,
 };
 use class_const_compare::narrow_from_static_or_class_const_comparison;
+pub(crate) use class_const_compare::narrow_match_arm_from_dynamic_class_const;
 use class_introspection::{
     extract_dynamic_class_const_static_prop_var, extract_dynamic_class_const_var,
     extract_get_class_arg, extract_get_class_static_prop_arg, extract_get_debug_type_arg,
