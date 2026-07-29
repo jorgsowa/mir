@@ -23,18 +23,23 @@ pub enum ComposerError {
 /// PSR-4 / PSR-0 / classmap / files autoload mapping, built from `composer.json`
 /// and `vendor/composer/installed.json`.
 ///
-/// `project_entries` covers `autoload.psr-4` / `autoload-dev.psr-4` /
-/// `autoload.psr-0` / `autoload-dev.psr-0` for the project itself.
-/// `vendor_entries` covers the same keys from each installed package.
+/// `project_entries` covers `autoload.psr-4` / `autoload-dev.psr-4` for the
+/// project itself; `project_psr0_entries` covers `autoload.psr-0` /
+/// `autoload-dev.psr-0` (kept separate because PSR-0 file-path construction
+/// differs from PSR-4 — see [`Self::resolve`]). `vendor_entries` /
+/// `vendor_psr0_entries` cover the same keys from each installed package.
 /// `project_extra_paths` and `vendor_extra_paths` collect the (prefix-less)
-/// `classmap` and `files` entries as raw paths — files are kept as-is, dirs
-/// are walked when assembling the file list.
+/// `classmap` and `files` entries as raw paths, plus the PSR-0 dirs themselves
+/// (for bulk file-list walking) — files are kept as-is, dirs are walked when
+/// assembling the file list.
 ///
-/// Both prefix lists are sorted longest-prefix-first for correct prefix matching.
+/// All prefix lists are sorted longest-prefix-first for correct prefix matching.
 #[derive(Clone)]
 pub struct Psr4Map {
     project_entries: Vec<(String, PathBuf)>,
     vendor_entries: Vec<(String, PathBuf)>,
+    project_psr0_entries: Vec<(String, PathBuf)>,
+    vendor_psr0_entries: Vec<(String, PathBuf)>,
     project_extra_paths: Vec<PathBuf>,
     vendor_extra_paths: Vec<PathBuf>,
     /// Pre-resolved FQCN → file map from `vendor/composer/autoload_classmap.php`.
@@ -82,6 +87,27 @@ fn collect_prefix_dirs(
     }
 }
 
+/// Same as [`collect_prefix_dirs`] but keeps the prefix exactly as written in
+/// `composer.json` (no forced trailing backslash). PSR-0 prefixes are matched
+/// as literal string prefixes by Composer — e.g. a PEAR-style `"Old_"` key has
+/// no namespace separator at all, so appending one would break prefix matching.
+fn collect_prefix_dirs_raw(
+    value: &serde_json::Value,
+    prefix: &str,
+    base: &Path,
+    entries: &mut Vec<(String, PathBuf)>,
+) {
+    if let Some(d) = value.as_str() {
+        entries.push((prefix.to_string(), base.join(d)));
+    } else if let Some(arr) = value.as_array() {
+        for item in arr {
+            if let Some(d) = item.as_str() {
+                entries.push((prefix.to_string(), base.join(d)));
+            }
+        }
+    }
+}
+
 /// Append every string in `value` (a JSON array) to `out` as `base.join(s)`.
 fn collect_path_array(value: &serde_json::Value, base: &Path, out: &mut Vec<PathBuf>) {
     if let Some(arr) = value.as_array() {
@@ -97,6 +123,7 @@ fn parse_autoload_section(
     autoload: &serde_json::Value,
     base: &Path,
     entries: &mut Vec<(String, PathBuf)>,
+    psr0_entries: &mut Vec<(String, PathBuf)>,
     extras: &mut Vec<PathBuf>,
 ) {
     if let Some(map) = autoload.get("psr-4").and_then(|v| v.as_object()) {
@@ -104,14 +131,15 @@ fn parse_autoload_section(
             collect_prefix_dirs(dir, prefix, base, entries);
         }
     }
-    // PSR-0 maps prefix → dir similarly to PSR-4. The class-name-to-file
-    // resolution differs (underscores in class basename become dirs), but for
-    // discovering all .php files in the mapped directories, walking the dir
-    // is sufficient. We do NOT add these to `entries` for FQCN resolution
-    // because `Psr4Map::resolve` uses PSR-4 semantics — instead we treat the
-    // dirs as bulk-scan paths.
+    // PSR-0 maps prefix → dir similarly to PSR-4, but the class-name-to-file
+    // resolution differs (namespace separators AND trailing underscores in the
+    // class basename become directories — see `psr0_logical_path`), so these
+    // go into their own prefix list rather than `entries`. We ALSO keep
+    // pushing the raw dirs into `extras` so bulk file discovery (project/vendor
+    // file listing) still walks them, same as before.
     if let Some(map) = autoload.get("psr-0").and_then(|v| v.as_object()) {
-        for (_, dir) in map {
+        for (prefix, dir) in map {
+            collect_prefix_dirs_raw(dir, prefix, base, psr0_entries);
             if let Some(d) = dir.as_str() {
                 extras.push(base.join(d));
             } else if let Some(arr) = dir.as_array() {
@@ -223,7 +251,12 @@ fn extract_quoted(s: &str) -> Option<(String, &str)> {
     None
 }
 
-fn parse_vendor(root: &Path, entries: &mut Vec<(String, PathBuf)>, extras: &mut Vec<PathBuf>) {
+fn parse_vendor(
+    root: &Path,
+    entries: &mut Vec<(String, PathBuf)>,
+    psr0_entries: &mut Vec<(String, PathBuf)>,
+    extras: &mut Vec<PathBuf>,
+) {
     let installed_path = root.join("vendor/composer/installed.json");
     let content = match std::fs::read_to_string(&installed_path) {
         Ok(c) => c,
@@ -254,7 +287,7 @@ fn parse_vendor(root: &Path, entries: &mut Vec<(String, PathBuf)>, extras: &mut 
         let pkg_name = pkg.get("name").and_then(|v| v.as_str()).unwrap_or("");
         let pkg_dir = vendor_dir.join(pkg_name);
         if let Some(autoload) = pkg.get("autoload") {
-            parse_autoload_section(autoload, &pkg_dir, entries, extras);
+            parse_autoload_section(autoload, &pkg_dir, entries, psr0_entries, extras);
         }
     }
 }
@@ -326,6 +359,27 @@ fn read_files_autoload(vendor_dir: &Path, base_dir: &Path) -> Vec<PathBuf> {
     out.into_iter().filter(|p| p.is_file()).collect()
 }
 
+/// Build a PSR-0 relative file path from a class name, per Composer's own
+/// `ClassLoader::findFileWithExtension`: namespace separators always become
+/// directory separators, but `_` only becomes a directory separator within
+/// the last (class-name) segment — a namespaced `App\Foo_Bar` stays
+/// `App/Foo_Bar.php`, while a PEAR-style `Foo_Bar` (no namespace) becomes
+/// `Foo/Bar.php`.
+fn psr0_logical_path(key: &str) -> PathBuf {
+    let logical = match key.rfind('\\') {
+        Some(pos) => {
+            let (namespace, class_name) = key.split_at(pos + 1);
+            format!(
+                "{}{}",
+                namespace.replace('\\', "/"),
+                class_name.replace('_', "/")
+            )
+        }
+        None => key.replace('_', "/"),
+    };
+    PathBuf::from(logical).with_extension("php")
+}
+
 impl Psr4Map {
     pub fn from_composer(root: &Path) -> Result<Self, ComposerError> {
         let composer_path = root.join("composer.json");
@@ -338,6 +392,7 @@ impl Psr4Map {
         }
 
         let mut project_entries: Vec<(String, PathBuf)> = Vec::new();
+        let mut project_psr0_entries: Vec<(String, PathBuf)> = Vec::new();
         let mut project_extra_paths: Vec<PathBuf> = Vec::new();
 
         if let Some(autoload) = value.get("autoload") {
@@ -345,6 +400,7 @@ impl Psr4Map {
                 autoload,
                 root,
                 &mut project_entries,
+                &mut project_psr0_entries,
                 &mut project_extra_paths,
             );
         }
@@ -353,16 +409,25 @@ impl Psr4Map {
                 autoload,
                 root,
                 &mut project_entries,
+                &mut project_psr0_entries,
                 &mut project_extra_paths,
             );
         }
 
         project_entries.sort_by_key(|b| std::cmp::Reverse(b.0.len()));
+        project_psr0_entries.sort_by_key(|b| std::cmp::Reverse(b.0.len()));
 
         let mut vendor_entries: Vec<(String, PathBuf)> = Vec::new();
+        let mut vendor_psr0_entries: Vec<(String, PathBuf)> = Vec::new();
         let mut vendor_extra_paths: Vec<PathBuf> = Vec::new();
-        parse_vendor(root, &mut vendor_entries, &mut vendor_extra_paths);
+        parse_vendor(
+            root,
+            &mut vendor_entries,
+            &mut vendor_psr0_entries,
+            &mut vendor_extra_paths,
+        );
         vendor_entries.sort_by_key(|b| std::cmp::Reverse(b.0.len()));
+        vendor_psr0_entries.sort_by_key(|b| std::cmp::Reverse(b.0.len()));
 
         // Read composer-generated FQCN → file map from autoload_classmap.php.
         // When present this is the source of truth for non-PSR-4 vendor classes,
@@ -378,6 +443,8 @@ impl Psr4Map {
         Ok(Psr4Map {
             project_entries,
             vendor_entries,
+            project_psr0_entries,
+            vendor_psr0_entries,
             project_extra_paths,
             vendor_extra_paths,
             classmap,
@@ -414,10 +481,13 @@ impl Psr4Map {
     /// Resolution order:
     /// 1. PSR-4 project entries (longest-prefix-first).
     /// 2. PSR-4 vendor entries (longest-prefix-first).
-    /// 3. Classmap from `vendor/composer/autoload_classmap.php` — exact FQCN match.
+    /// 3. PSR-0 project entries (longest-prefix-first).
+    /// 4. PSR-0 vendor entries (longest-prefix-first).
+    /// 5. Classmap from `vendor/composer/autoload_classmap.php` — exact FQCN match.
     ///
-    /// PSR-4 wins over classmap because Composer's runtime resolver uses the
-    /// same order; this matches what the PHP code being analyzed actually sees.
+    /// PSR-4 wins over PSR-0 wins over classmap because Composer's runtime
+    /// resolver uses the same order; this matches what the PHP code being
+    /// analyzed actually sees.
     pub fn resolve(&self, fqcn: &str) -> Option<PathBuf> {
         let key = fqcn.trim_start_matches('\\');
         for (prefix, dir) in self
@@ -431,6 +501,19 @@ impl Psr4Map {
                 if file_path.exists() {
                     return Some(file_path);
                 }
+            }
+        }
+        for (prefix, dir) in self
+            .project_psr0_entries
+            .iter()
+            .chain(self.vendor_psr0_entries.iter())
+        {
+            if !prefix.is_empty() && !key.starts_with(prefix.as_str()) {
+                continue;
+            }
+            let file_path = dir.join(psr0_logical_path(key));
+            if file_path.exists() {
+                return Some(file_path);
             }
         }
         if let Some(path) = self.classmap.get(key) {
@@ -864,6 +947,94 @@ mod tests {
         let files = map.vendor_files();
         assert_eq!(files.len(), 1);
         assert!(files[0].ends_with("bootstrap.php"));
+    }
+
+    #[test]
+    fn resolve_psr0_project_namespaced_class() {
+        let root = make_temp_project("resolve_psr0_project_namespaced");
+        let mailer_dir = root.join("src/Mailer");
+        fs::create_dir_all(&mailer_dir).unwrap();
+        fs::write(
+            mailer_dir.join("Message.php"),
+            "<?php namespace Mailer; class Message {}",
+        )
+        .unwrap();
+        fs::write(
+            root.join("composer.json"),
+            r#"{"autoload":{"psr-0":{"Mailer\\":"src/"}}}"#,
+        )
+        .unwrap();
+
+        let map = Psr4Map::from_composer(&root).unwrap();
+        let result = map.resolve("Mailer\\Message");
+        assert!(result.is_some(), "expected a resolved PSR-0 path");
+        assert!(result.unwrap().ends_with("Mailer/Message.php"));
+    }
+
+    #[test]
+    fn resolve_psr0_pear_style_class_with_underscores() {
+        let root = make_temp_project("resolve_psr0_pear_style");
+        let old_dir = root.join("src/Old");
+        fs::create_dir_all(&old_dir).unwrap();
+        fs::write(old_dir.join("Thing.php"), "<?php class Old_Thing {}").unwrap();
+        fs::write(
+            root.join("composer.json"),
+            r#"{"autoload":{"psr-0":{"Old_":"src/"}}}"#,
+        )
+        .unwrap();
+
+        let map = Psr4Map::from_composer(&root).unwrap();
+        let result = map.resolve("Old_Thing");
+        assert!(result.is_some(), "expected a resolved PSR-0 path");
+        assert!(result.unwrap().ends_with("Old/Thing.php"));
+    }
+
+    #[test]
+    fn resolve_psr0_vendor_class() {
+        let root = make_temp_project("resolve_psr0_vendor");
+        fs::write(
+            root.join("composer.json"),
+            r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+        )
+        .unwrap();
+        let vendor_dir = root.join("vendor/composer");
+        fs::create_dir_all(&vendor_dir).unwrap();
+        fs::write(
+            vendor_dir.join("installed.json"),
+            r#"{
+                "packages": [{
+                    "name": "vendor/pkg",
+                    "autoload": { "psr-0": { "Old_": "src/" } }
+                }]
+            }"#,
+        )
+        .unwrap();
+        let pkg_src = root.join("vendor/vendor/pkg/src/Old");
+        fs::create_dir_all(&pkg_src).unwrap();
+        fs::write(pkg_src.join("Thing.php"), "<?php class Old_Thing {}").unwrap();
+
+        let map = Psr4Map::from_composer(&root).unwrap();
+        let result = map.resolve("Old_Thing");
+        assert!(result.is_some(), "expected a resolved PSR-0 vendor path");
+        assert!(result.unwrap().ends_with("Old/Thing.php"));
+    }
+
+    #[test]
+    fn resolve_psr0_prefix_must_still_match() {
+        let root = make_temp_project("resolve_psr0_prefix_mismatch");
+        fs::create_dir_all(root.join("src")).unwrap();
+        fs::write(
+            root.join("composer.json"),
+            r#"{"autoload":{"psr-0":{"Mailer\\":"src/"}}}"#,
+        )
+        .unwrap();
+
+        let map = Psr4Map::from_composer(&root).unwrap();
+        let result = map.resolve("Other\\Message");
+        assert!(
+            result.is_none(),
+            "Mailer\\ psr-0 prefix must not match Other\\Message"
+        );
     }
 
     #[test]
