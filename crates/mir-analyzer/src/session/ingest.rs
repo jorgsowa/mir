@@ -1,5 +1,18 @@
 use super::*;
 
+/// One file's disk-cache lookup result from `AnalysisSession::warm_start_files`'s
+/// parallel read phase — everything the sequential apply phase needs, so it
+/// never has to re-read anything.
+struct WarmStartHit {
+    file: Arc<str>,
+    sf: crate::db::SourceFile,
+    stored_text: Arc<str>,
+    /// `(reference locations, resolved)` from a cached `AnalysisCache` hit.
+    refs: Option<(Vec<RefLoc>, bool)>,
+    /// `(subtype edges, declarations)` from a cached stub-slice hit.
+    stub: Option<(Vec<crate::db::subtype_index::SubtypeEntry>, crate::db::FileDeclarations)>,
+}
+
 impl AnalysisSession {
     /// Cheap clone of the salsa db for a read-only query. The lock is held
     /// only for the duration of the clone, so concurrent readers never
@@ -561,57 +574,91 @@ impl AnalysisSession {
         // them (the None-output mark below also disables resolved immunity).
         let commit_gen = self.index_generation();
 
-        // (handle, declarations) pairs projected from the disk slices read
-        // below — raw material for seeding the symbol-index singleton without
-        // re-reading anything.
-        let mut seed_decls: Vec<(crate::db::SourceFile, crate::db::FileDeclarations)> =
-            Vec::with_capacity(files.len());
-
+        // Phase 1: read the disk-cache slices in parallel, off any lock — the
+        // actual I/O cost of a warm-start replay at scale (~0.8-0.9s of a
+        // 3.9s warm boot at 15.4K files serially; this is the `index_batch`
+        // pattern already used elsewhere in this file). Only cheap map
+        // construction/merge runs in phase 2, under a lock.
         let snap = self.snapshot_db();
-        for (file, _) in files {
-            // Freshness is keyed on the Arc actually stored on the input — an
-            // upsert against already-registered, content-equal text keeps the
-            // prior Arc (see `ingest_file`), so read back what's really there
-            // rather than assume identity with the `text` passed in above.
-            let Some(sf) = snap.lookup_source_file(file.as_ref()) else {
-                continue;
-            };
-            let stored_text = sf.text(&snap as &dyn MirDatabase).clone();
+        let hits: Vec<WarmStartHit> = {
+            use rayon::prelude::*;
+            files
+                .par_iter()
+                .map_with(snap.clone(), |db, (file, _)| {
+                    // Freshness is keyed on the Arc actually stored on the
+                    // input — an upsert against already-registered,
+                    // content-equal text keeps the prior Arc (see
+                    // `ingest_file`), so read back what's really there rather
+                    // than assume identity with the file's own `text`.
+                    let sf = db.lookup_source_file(file.as_ref())?;
+                    let stored_text = sf.text(db).clone();
 
-            let hex = crate::cache::hash_content(&stored_text);
-            if let Some((issues, ref_locs)) = cache.get(file, &hex) {
-                let locs: Vec<RefLoc> = ref_locs
-                    .iter()
-                    .map(|(symbol, line, col_start, col_end)| RefLoc {
-                        symbol_key: Arc::clone(symbol),
+                    let hex = crate::cache::hash_content(&stored_text);
+                    let refs = cache.get(file, &hex).map(|(issues, ref_locs)| {
+                        let locs: Vec<RefLoc> = ref_locs
+                            .iter()
+                            .map(|(symbol, line, col_start, col_end)| RefLoc {
+                                symbol_key: Arc::clone(symbol),
+                                file: file.clone(),
+                                line: *line,
+                                col_start: *col_start,
+                                col_end: *col_end,
+                            })
+                            .collect();
+                        // Resolved from the cached issue set: a fully-resolved
+                        // replay survives the registrations/lazy loads that
+                        // follow warm-up instead of being invalidated by the
+                        // first generation bump.
+                        let resolved = !crate::db::issues_have_unresolved_names(&issues);
+                        (locs, resolved)
+                    });
+
+                    let stub = stub_cache.as_ref().and_then(|stub_cache| {
+                        let hash = crate::stub_cache::hash_source(&stored_text);
+                        let mut slice = stub_cache.get(file, &hash, php_v)?;
+                        crate::stub_cache::prepare_for_ingest(&mut slice);
+                        let entries = crate::db::subtype_index::entries_from_slice(&slice);
+                        let decls = crate::db::decls_from_slice(&slice, sf);
+                        Some((entries, decls))
+                    });
+
+                    Some(WarmStartHit {
                         file: file.clone(),
-                        line: *line,
-                        col_start: *col_start,
-                        col_end: *col_end,
+                        sf,
+                        stored_text,
+                        refs,
+                        stub,
                     })
-                    .collect();
-                // Resolved from the cached issue set: a fully-resolved replay
-                // survives the registrations/lazy loads that follow warm-up
-                // instead of being invalidated by the first generation bump.
-                let resolved = !crate::db::issues_have_unresolved_names(&issues);
-                self.commit_file_refs(file, Some(stored_text.clone()), locs, commit_gen, resolved);
-            }
+                })
+                .filter_map(|hit| hit)
+                .collect()
+        };
+        drop(snap);
 
-            if let Some(stub_cache) = &stub_cache {
-                let hash = crate::stub_cache::hash_source(&stored_text);
-                if let Some(mut slice) = stub_cache.get(file, &hash, php_v) {
-                    crate::stub_cache::prepare_for_ingest(&mut slice);
-                    let entries = crate::db::subtype_index::entries_from_slice(&slice);
-                    {
-                        let guard = self.db.salsa.read();
-                        guard.set_file_class_edges(file, entries);
-                    }
-                    self.mark_defs_committed(file, &stored_text);
-                    seed_decls.push((sf, crate::db::decls_from_slice(&slice, sf)));
+        // Phase 2: apply — only cheap salsa input writes and map merges run
+        // here, under the lock each one already required individually.
+        let mut seed_decls: Vec<(crate::db::SourceFile, crate::db::FileDeclarations)> =
+            Vec::with_capacity(hits.len());
+        for hit in hits {
+            let WarmStartHit {
+                file,
+                sf,
+                stored_text,
+                refs,
+                stub,
+            } = hit;
+            if let Some((locs, resolved)) = refs {
+                self.commit_file_refs(&file, Some(stored_text.clone()), locs, commit_gen, resolved);
+            }
+            if let Some((entries, decls)) = stub {
+                {
+                    let guard = self.db.salsa.read();
+                    guard.set_file_class_edges(&file, entries);
                 }
+                self.mark_defs_committed(&file, &stored_text);
+                seed_decls.push((sf, decls));
             }
         }
-        drop(snap);
 
         self.seed_workspace_index_from_warm_start(seed_decls);
     }
