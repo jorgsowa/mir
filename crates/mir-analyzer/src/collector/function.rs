@@ -254,7 +254,10 @@ impl DefinitionCollector<'_> {
                         // of storing the raw union, which would let body analysis
                         // believe $x could hold a value the native hint rules out.
                         let mut doc_ty = match native_ty.as_ref() {
-                            Some(n) => super::resolve_docblock_scalar_conflict(n, doc_ty),
+                            Some(n) => super::preserve_native_nullability(
+                                n,
+                                super::resolve_docblock_scalar_conflict(n, doc_ty),
+                            ),
                             None => doc_ty,
                         };
                         // Mark the type as docblock-sourced so signature checks (e.g.

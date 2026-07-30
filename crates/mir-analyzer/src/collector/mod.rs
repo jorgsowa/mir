@@ -169,6 +169,23 @@ pub(crate) fn resolve_docblock_scalar_conflict(native: &Type, doc: Type) -> Type
     }
 }
 
+/// A native `?Type` hint's nullability is PHP-enforced — always a real
+/// possible runtime value — but a `@param` docblock that omits `null`
+/// (`@param object $x` alongside a native `?object $x` hint) silently
+/// dropped it entirely, since the docblock type otherwise wins outright over
+/// the native hint. `resolve_docblock_scalar_conflict` above already guards
+/// the scalar family case for a conflicting (non-null) atom; this is the
+/// non-scalar counterpart, specifically for the null atom, since a scalar
+/// hint's own family-conflict guard doesn't touch nullability at all. Unions
+/// `TNull` back in when the native hint has it and the docblock doesn't;
+/// otherwise returns `doc` unchanged.
+pub(crate) fn preserve_native_nullability(native: &Type, mut doc: Type) -> Type {
+    if native.is_nullable() && !doc.is_nullable() {
+        doc.add_type(Atomic::TNull);
+    }
+    doc
+}
+
 /// Returns true for PHP built-in type keywords and Psalm pseudo-types that must never be
 /// namespace-qualified, even when they appear as TNamedObject (e.g. inside generic params).
 fn is_php_builtin_type(name: &str) -> bool {
@@ -2105,7 +2122,9 @@ impl<'a> DefinitionCollector<'a> {
                         // hint): strip the atoms foreign to the hint's family instead
                         // of storing the raw union.
                         let mut doc_ty = match native_ty.as_ref() {
-                            Some(n) => resolve_docblock_scalar_conflict(n, doc_ty),
+                            Some(n) => {
+                                preserve_native_nullability(n, resolve_docblock_scalar_conflict(n, doc_ty))
+                            }
                             None => doc_ty,
                         };
                         // Mark the type as docblock-sourced so signature checks (e.g.
