@@ -10,7 +10,10 @@ struct WarmStartHit {
     /// `(reference locations, resolved)` from a cached `AnalysisCache` hit.
     refs: Option<(Vec<RefLoc>, bool)>,
     /// `(subtype edges, declarations)` from a cached stub-slice hit.
-    stub: Option<(Vec<crate::db::subtype_index::SubtypeEntry>, crate::db::FileDeclarations)>,
+    stub: Option<(
+        Vec<crate::db::subtype_index::SubtypeEntry>,
+        crate::db::FileDeclarations,
+    )>,
 }
 
 impl AnalysisSession {

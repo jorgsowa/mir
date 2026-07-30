@@ -472,7 +472,8 @@ fn mirror_only_new_file_is_visible_after_settle() {
 
     // A new file arrives via a plain mirror write (watcher shape) — no
     // ingest_file, so only the pending-set/settle path can index it.
-    let new_text = "<?php\nnamespace App;\nclass Fresh { public function hit(): void { Base::ping(); } }\n";
+    let new_text =
+        "<?php\nnamespace App;\nclass Fresh { public function hit(): void { Base::ping(); } }\n";
     session.set_file_text(Arc::from("fresh.php"), Arc::from(new_text));
 
     let candidates: Vec<Arc<str>> = vec![Arc::from("base.php"), Arc::from("fresh.php")];
@@ -527,7 +528,9 @@ fn mirror_only_class_rename_updates_index_after_settle() {
     // the caller follows. Plain mirror writes only.
     session.set_file_text(
         Arc::from("shape.php"),
-        Arc::from("<?php\nnamespace App;\nclass NewShape { public static function draw(): void {} }\n"),
+        Arc::from(
+            "<?php\nnamespace App;\nclass NewShape { public static function draw(): void {} }\n",
+        ),
     );
     session.set_file_text(
         Arc::from("user.php"),

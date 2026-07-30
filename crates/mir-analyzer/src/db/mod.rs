@@ -221,9 +221,9 @@ pub use self::scopes::{
 pub use self::subtype_index::{ClassLikeKind, SubtypeEntry, SubtypeIndex, SubtypeSite};
 pub use self::workspace::{
     collect_file_declarations, decls_from_slice, workspace_classes, workspace_functions,
-    workspace_global_vars, workspace_index, workspace_symbol_index, FileDeclarations,
-    GlobalVarMap, IndexDeclCounts,
-    SymbolLoc, SymbolTier, WorkspaceRevision, WorkspaceSymbolIndex, WorkspaceSymbolIndexSingleton,
+    workspace_global_vars, workspace_index, workspace_symbol_index, FileDeclarations, GlobalVarMap,
+    IndexDeclCounts, SymbolLoc, SymbolTier, WorkspaceRevision, WorkspaceSymbolIndex,
+    WorkspaceSymbolIndexSingleton,
 };
 
 // Sub-modules

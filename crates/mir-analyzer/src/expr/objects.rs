@@ -1885,8 +1885,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         // plain interface type is suspect regardless of whether the
                         // interface opted into @seal-properties — @property* tags
                         // are the only thing that legitimizes an access.
-                        if !self.in_existence_check
-                            && !iface.own_properties.contains_key(prop_name)
+                        if !self.in_existence_check && !iface.own_properties.contains_key(prop_name)
                         {
                             self.emit(
                                 IssueKind::NoInterfaceProperties {

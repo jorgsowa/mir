@@ -248,7 +248,7 @@ impl AnalysisSession {
         &self,
         symbol: &crate::Name,
         files: &[Arc<str>],
-) -> Vec<(Arc<str>, crate::Range)> {
+    ) -> Vec<(Arc<str>, crate::Range)> {
         self.settle_workspace_index();
         let key = format!("use:{}", symbol.codebase_key());
         let scope: rustc_hash::FxHashSet<&str> = files.iter().map(|f| f.as_ref()).collect();
@@ -299,7 +299,7 @@ impl AnalysisSession {
         files: &[Arc<str>],
         include_declaration: bool,
         should_cancel: &(dyn Fn() -> bool + Sync),
-) -> Option<Vec<(Arc<str>, crate::Range)>> {
+    ) -> Option<Vec<(Arc<str>, crate::Range)>> {
         self.settle_workspace_index();
         use std::panic::AssertUnwindSafe;
 
@@ -868,7 +868,7 @@ impl AnalysisSession {
         class_fqn: &str,
         files: &[Arc<str>],
         include_trait_users: bool,
-) -> Vec<SubtypeClassSite> {
+    ) -> Vec<SubtypeClassSite> {
         self.settle_workspace_index();
         let mut scanned: rustc_hash::FxHashSet<String> = rustc_hash::FxHashSet::default();
         let mut pending: Vec<String> = vec![class_fqn.trim_start_matches('\\').to_string()];
