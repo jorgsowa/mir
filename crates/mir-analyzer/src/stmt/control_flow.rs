@@ -44,6 +44,16 @@ impl<'a> StatementsAnalyzer<'a> {
             );
             let pre_elseif_diverges = pre_elseif.diverges;
 
+            // Analyze the elseif condition's own expression BEFORE narrowing
+            // from it (mirrors the primary `if`'s own condition analysis
+            // order at the top of this function) — otherwise a sub-condition
+            // narrowed by an earlier `&&` operand (e.g. `$x instanceof B &&
+            // $x->value !== null`) gets re-checked against a context where
+            // that very narrowing already applied, making a genuine
+            // `!== null` check look like an always-true tautology.
+            self.expr_analyzer(&pre_elseif)
+                .analyze(&elseif.condition, &mut pre_elseif);
+
             let mut elseif_true_ctx = pre_elseif.clone();
             narrow_from_condition(
                 &elseif.condition,
@@ -88,8 +98,6 @@ impl<'a> StatementsAnalyzer<'a> {
             }
 
             let mut branch_ctx = elseif_true_ctx;
-            self.expr_analyzer(&branch_ctx)
-                .analyze(&elseif.condition, &mut branch_ctx);
             if !branch_ctx.diverges {
                 self.analyze_stmt(&elseif.body, &mut branch_ctx);
             }
