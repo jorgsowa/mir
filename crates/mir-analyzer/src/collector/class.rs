@@ -337,7 +337,8 @@ impl<'a> DefinitionCollector<'a> {
                     }
                     let const_name = c.name.as_deref().unwrap_or_default();
                     // PHP 8.3: typed class constants (`const int FOO = 1`).
-                    // Prefer @var docblock, then the native type hint, then mixed.
+                    // Prefer @var docblock, then a same-kind literal narrowing
+                    // of the native hint, then the bare hint, then mixed.
                     let hint_ty = self.resolve_union_opt(
                         c.type_hint
                             .as_ref()
@@ -353,8 +354,12 @@ impl<'a> DefinitionCollector<'a> {
                                 &class_template_params,
                             )
                         })
-                        .or(hint_ty)
-                        .or_else(|| super::infer_const_value(self, &c.value.kind))
+                        .or_else(|| {
+                            super::const_type_with_literal_narrowing(
+                                hint_ty,
+                                super::infer_const_value(self, &c.value.kind),
+                            )
+                        })
                         .unwrap_or_else(mir_types::Type::mixed);
                     let constant = ConstantDef {
                         name: Arc::from(const_name),

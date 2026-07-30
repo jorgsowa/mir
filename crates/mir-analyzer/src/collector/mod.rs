@@ -520,6 +520,32 @@ pub(super) fn infer_const_value(
     }
 }
 
+/// A native scalar type hint on a class/interface/enum constant (PHP 8.3+)
+/// otherwise wins over literal inference outright, discarding precision a
+/// same-kind literal would give (`const int ID = 5;` typing as bare `int`
+/// instead of `5`). Narrows back to the literal only when the hint is
+/// exactly the literal's own base scalar — anything else (e.g. a `float`
+/// hint on an int literal, which PHP coerces to a float value at runtime)
+/// keeps the hint as-is.
+pub(super) fn const_type_with_literal_narrowing(
+    hint_ty: Option<Type>,
+    literal_ty: Option<Type>,
+) -> Option<Type> {
+    let narrows = matches!(
+        (
+            hint_ty.as_ref().map(|t| t.types.as_slice()),
+            literal_ty.as_ref().map(|t| t.types.as_slice()),
+        ),
+        (Some([Atomic::TInt]), Some([Atomic::TLiteralInt(_)]))
+            | (Some([Atomic::TString]), Some([Atomic::TLiteralString(_)]))
+    );
+    if narrows {
+        literal_ty
+    } else {
+        hint_ty.or(literal_ty)
+    }
+}
+
 // ---------------------------------------------------------------------------
 // DefinitionCollector
 // ---------------------------------------------------------------------------

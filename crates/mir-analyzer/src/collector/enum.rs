@@ -205,8 +205,9 @@ impl DefinitionCollector<'_> {
                         continue;
                     }
                     // PHP 8.3: typed enum constants (`const int FOO = 1;`).
-                    // Prefer @var docblock, then the native type hint, then the
-                    // literal value, then mixed — same precedence as class.rs.
+                    // Prefer @var docblock, then a same-kind literal narrowing
+                    // of the native hint, then the bare hint, then mixed —
+                    // same precedence as class.rs.
                     let hint_ty = self.resolve_union_opt(
                         c.type_hint
                             .as_ref()
@@ -215,8 +216,12 @@ impl DefinitionCollector<'_> {
                     let const_ty = const_doc
                         .var_type
                         .map(|t| self.resolve_union_doc_with_aliases(t, &type_aliases))
-                        .or(hint_ty)
-                        .or_else(|| super::infer_const_value(self, &c.value.kind))
+                        .or_else(|| {
+                            super::const_type_with_literal_narrowing(
+                                hint_ty,
+                                super::infer_const_value(self, &c.value.kind),
+                            )
+                        })
                         .unwrap_or_else(Type::mixed);
                     own_constants.insert(
                         Arc::from(const_name),

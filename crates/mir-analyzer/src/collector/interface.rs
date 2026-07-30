@@ -179,8 +179,9 @@ impl<'a> DefinitionCollector<'a> {
                     }
                     let const_name = c.name.as_deref().unwrap_or_default();
                     // PHP 8.3: typed interface constants (`const int FOO;`).
-                    // Prefer @var docblock, then the native type hint, then the
-                    // literal value, then mixed — same precedence as class.rs.
+                    // Prefer @var docblock, then a same-kind literal narrowing
+                    // of the native hint, then the bare hint, then mixed —
+                    // same precedence as class.rs.
                     let hint_ty = self.resolve_union_opt(
                         c.type_hint
                             .as_ref()
@@ -196,8 +197,12 @@ impl<'a> DefinitionCollector<'a> {
                                 &iface_template_params,
                             )
                         })
-                        .or(hint_ty)
-                        .or_else(|| super::infer_const_value(self, &c.value.kind))
+                        .or_else(|| {
+                            super::const_type_with_literal_narrowing(
+                                hint_ty,
+                                super::infer_const_value(self, &c.value.kind),
+                            )
+                        })
                         .unwrap_or_else(Type::mixed);
                     own_constants.insert(
                         Arc::from(const_name),
