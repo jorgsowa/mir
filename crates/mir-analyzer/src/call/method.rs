@@ -1443,6 +1443,7 @@ fn resolve_method_return<'a>(
                 assertion,
                 &resolved.params,
                 &call.args,
+                Some(&call.object),
                 ctx,
                 Some(&bindings),
                 ea.db,

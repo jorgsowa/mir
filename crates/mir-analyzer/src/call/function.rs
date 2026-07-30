@@ -893,6 +893,7 @@ impl CallAnalyzer {
                     assertion,
                     &params,
                     &call.args,
+                    None,
                     ctx,
                     template_bindings.as_ref(),
                     ea.db,

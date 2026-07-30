@@ -1821,7 +1821,7 @@ pub fn narrow_from_condition(
                         crate::call::method::resolve_method_from_db(db, &fqcn, &method_name_lower)
                     {
                         apply_method_docblock_assertions(
-                            &mc.args, &resolved, ctx, is_true, db, file,
+                            &mc.args, &mc.object, &resolved, ctx, is_true, db, file,
                         );
                     }
                 }
@@ -1838,7 +1838,7 @@ pub fn narrow_from_condition(
                         crate::call::method::resolve_method_from_db(db, &fqcn, &method_name_lower)
                     {
                         apply_method_docblock_assertions(
-                            &smc.args, &resolved, ctx, is_true, db, file,
+                            &smc.args, &smc.class, &resolved, ctx, is_true, db, file,
                         );
                     }
                 }

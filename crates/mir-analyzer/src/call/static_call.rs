@@ -1039,6 +1039,7 @@ impl CallAnalyzer {
                     assertion,
                     &resolved.params,
                     &call.args,
+                    Some(&call.class),
                     ctx,
                     Some(&out_bindings),
                     ea.db,

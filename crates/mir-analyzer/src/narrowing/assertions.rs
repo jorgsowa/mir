@@ -57,6 +57,9 @@ pub(super) fn apply_docblock_assertions(
         &f.params,
         &f.template_params,
         &call.args,
+        // A free function has no receiver — `$this` in one of its
+        // assertions can never resolve to anything real.
+        None,
         ctx,
         is_true,
         db,
@@ -67,9 +70,11 @@ pub(super) fn apply_docblock_assertions(
 /// Method-call counterpart of `apply_docblock_assertions` — the callee is
 /// already resolved (via `resolve_method_from_db`, shared with both instance
 /// and static method-call resolution) instead of looked up by free-function
-/// name here.
+/// name here. `receiver` is the call's own object/class expression — what
+/// `$this` refers to from the assertion's perspective.
 pub(super) fn apply_method_docblock_assertions(
     call_args: &[php_ast::owned::Arg],
+    receiver: &php_ast::owned::Expr,
     resolved: &crate::call::method::ResolvedMethod,
     ctx: &mut FlowState,
     is_true: bool,
@@ -84,6 +89,7 @@ pub(super) fn apply_method_docblock_assertions(
         &resolved.params,
         &resolved.template_params,
         call_args,
+        Some(receiver),
         ctx,
         is_true,
         db,
@@ -102,6 +108,7 @@ fn apply_assertions(
     params: &[mir_codebase::definitions::DeclaredParam],
     template_params: &[mir_codebase::definitions::TemplateParam],
     call_args: &[php_ast::owned::Arg],
+    receiver: Option<&php_ast::owned::Expr>,
     ctx: &mut FlowState,
     is_true: bool,
     db: &dyn MirDatabase,
@@ -130,6 +137,7 @@ fn apply_assertions(
             assertion,
             params,
             call_args,
+            receiver,
             ctx,
             template_bindings.as_ref(),
             db,
@@ -157,11 +165,44 @@ pub(crate) fn apply_one_assertion(
     assertion: &mir_codebase::definitions::Assertion,
     params: &[mir_codebase::definitions::DeclaredParam],
     call_args: &[php_ast::owned::Arg],
+    receiver: Option<&php_ast::owned::Expr>,
     ctx: &mut FlowState,
     template_bindings: Option<&rustc_hash::FxHashMap<mir_types::Name, Type>>,
     db: &dyn MirDatabase,
     file: &str,
 ) -> bool {
+    // `@psalm-assert Type $this->prop` targets the CALL'S OWN RECEIVER —
+    // `$this` in the docblock is written from the method's own
+    // perspective, not a declared parameter, so it can never match the
+    // by-name lookup below. Scoped to a bare-variable receiver only (the
+    // reported shape, `$this->connect()` or `$obj->connect()`) — a
+    // receiver that's itself a property chain (`$this->service->connect()`)
+    // would need a synthetic 2-hop key, which collides with unrelated
+    // unused-variable tracking for that same key; not attempted here.
+    if assertion.param_key.is_empty() {
+        if let Some(prop_name) = assertion.param.strip_prefix("this->") {
+            if !prop_name.contains("->") && !prop_name.contains('[') {
+                let Some(obj_key) = receiver.and_then(extract_var_name) else {
+                    return false;
+                };
+                let ty = match template_bindings {
+                    Some(b) => assertion.ty.substitute_templates(b),
+                    None => assertion.ty.clone(),
+                };
+                let ty = if assertion.negated {
+                    let current = resolve_prop_current_type(ctx, &obj_key, prop_name, db, file);
+                    negate_assertion_type(&current, &ty, db)
+                } else {
+                    ty
+                };
+                let proved_prop_non_null = !ty.is_nullable();
+                ctx.set_prop_refined(&obj_key, prop_name, ty);
+                narrow_receiver_non_null_on_prop_match(ctx, &obj_key, proved_prop_non_null);
+                return true;
+            }
+        }
+    }
+
     let Some(index) = params.iter().position(|p| p.name == assertion.param) else {
         return false;
     };
