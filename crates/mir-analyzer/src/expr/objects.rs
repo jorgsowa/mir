@@ -756,6 +756,47 @@ impl<'a> ExpressionAnalyzer<'a> {
         class_ty
     }
 
+    /// `EnumName::CaseName->value` / `->name`: look the case up directly from
+    /// the object EXPRESSION's own syntax rather than its (widened, generic
+    /// enum) inferred type — see the call sites for why. Returns `None` for
+    /// anything else (a variable, a method call, `self::Case`, an unresolved
+    /// class, an unknown case name, …), which falls through to the ordinary
+    /// property-resolution path unchanged.
+    fn enum_case_literal_property(&self, object: &Expr, prop_name: &str) -> Option<Type> {
+        let ExprKind::ClassConstAccess(cca) = &object.kind else {
+            return None;
+        };
+        let ExprKind::Identifier(class_id) = &cca.class.kind else {
+            return None;
+        };
+        let ExprKind::Identifier(case_name) = &cca.member.kind else {
+            return None;
+        };
+        if case_name.as_ref() == "class" {
+            return None;
+        }
+        let resolved = crate::db::resolve_name(self.db, &self.file, class_id.as_ref());
+        let here = crate::db::Fqcn::from_str(self.db, &resolved);
+        let crate::db::ClassLike::Enum(e) = crate::db::find_class_like(self.db, here)? else {
+            return None;
+        };
+        let case = e.cases.get(case_name.as_ref())?;
+        match prop_name {
+            // A non-backed enum has no `->value` at all — `case.value` is
+            // always `Some` regardless (a plain `mixed` fallback when the
+            // case has no explicit value, same as an unbacked case), so this
+            // must be gated on the ENUM's own backing type, not just an
+            // `Option` check, or accessing `->value` on a non-backed case
+            // would silently resolve instead of the `UndefinedProperty` the
+            // ordinary property-resolution path below correctly emits.
+            "value" if e.scalar_type.is_some() => case.value.clone(),
+            "name" => Some(Type::single(Atomic::TLiteralString(Arc::from(
+                case_name.as_ref(),
+            )))),
+            _ => None,
+        }
+    }
+
     pub(super) fn analyze_property_access(
         &mut self,
         pa: &PropertyAccessExpr,
@@ -852,6 +893,22 @@ impl<'a> ExpressionAnalyzer<'a> {
             self.record_dynamic_member_access(&obj_ty, pa.property.span);
             return Type::mixed();
         }
+        // `Kind::Foo->value`/`->name` on a LITERAL case reference: the
+        // receiver's inferred type (`obj_ty`) is only ever the generic enum
+        // object type (`Kind::Foo` is typed as bare `Kind`, not a
+        // case-specific atom — a separate, wider gap than this one property-
+        // access site), so `resolve_property_type` below can only ever widen
+        // to the enum's whole backing scalar type. Recovering the specific
+        // case directly from the object EXPRESSION's own syntax (rather than
+        // its already-widened type) is what lets match arms written as
+        // `Kind::Foo->value => ...` keep their literal value, which
+        // exhaustiveness checking needs to prove a match over `->value` is
+        // complete.
+        if prop_name == "value" || prop_name == "name" {
+            if let Some(ty) = self.enum_case_literal_property(&pa.object, &prop_name) {
+                return ty;
+            }
+        }
         let non_null_ty = obj_ty.remove_null();
         let mut declaring = None;
         let resolved = self.resolve_property_type(
@@ -915,6 +972,16 @@ impl<'a> ExpressionAnalyzer<'a> {
             self.analyze(&pa.property, ctx);
             self.record_dynamic_member_access(&obj_ty, pa.property.span);
             return Type::mixed();
+        }
+        // See the identical special case in `analyze_property_access` above —
+        // a literal `Kind::Foo?->value`/`->name` access recovers the specific
+        // case from the receiver's own syntax. `Kind::Foo` is never itself
+        // null, so no `TNull` needs adding here the way the general path below
+        // does for a genuinely nullable receiver.
+        if prop_name == "value" || prop_name == "name" {
+            if let Some(ty) = self.enum_case_literal_property(&pa.object, &prop_name) {
+                return ty;
+            }
         }
         let non_null_ty = obj_ty.remove_null();
         let mut declaring = None;

@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use super::helpers::extract_string_from_expr;
 use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
 use mir_issues::{IssueKind, Severity};
@@ -332,7 +333,8 @@ impl<'a> ExpressionAnalyzer<'a> {
 
         // Exhaustiveness check: emit UnhandledMatchCondition if the match does not
         // cover all possible values and has no default (conditions: None) arm.
-        if let Some(detail) = self.check_match_exhaustiveness(&subject_ty, &m.arms, ctx) {
+        if let Some(detail) = self.check_match_exhaustiveness(&m.subject, &subject_ty, &m.arms, ctx)
+        {
             self.emit(
                 IssueKind::UnhandledMatchCondition { detail },
                 Severity::Warning,
@@ -385,6 +387,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
     fn check_match_exhaustiveness(
         &self,
+        subject_expr: &Expr,
         subject_ty: &Type,
         arms: &[MatchArm],
         ctx: &FlowState,
@@ -608,6 +611,104 @@ impl<'a> ExpressionAnalyzer<'a> {
                     return Some(uncovered.join(", "));
                 }
                 return None;
+            }
+        }
+
+        // Case 2b: Subject is `$receiver->value` — a plain scalar backing
+        // value is never itself enumerable, but `$receiver`'s OWN type can
+        // be a single backed enum, in which case exhaustiveness follows
+        // Case 2's exact logic, just keyed off that type instead of the
+        // subject's. Each arm condition must be the identical `->value`
+        // access on an `EnumName::Case` reference to the SAME enum. Scoped
+        // to a bare-variable receiver (the common `fn f(Kind $k) { match
+        // ($k->value) { Kind::Foo->value => ... } }` idiom); a property
+        // chain or method-call receiver falls through unfixed.
+        if let ExprKind::PropertyAccess(pa) = &subject_expr.kind {
+            if extract_string_from_expr(&pa.property).as_deref() == Some("value") {
+                if let Some(receiver_name) = crate::expr::extract_simple_var(&pa.object) {
+                    let receiver_ty = ctx.get_var(&receiver_name);
+                    let receiver_atoms: Vec<&Atomic> = receiver_ty
+                        .types
+                        .iter()
+                        .filter(|t| !matches!(t, Atomic::TNull))
+                        .collect();
+                    if let [Atomic::TNamedObject { fqcn, .. }] = receiver_atoms.as_slice() {
+                        let here = crate::db::Fqcn::new(self.db, *fqcn);
+                        if let Some(crate::db::ClassLike::Enum(enum_def)) =
+                            crate::db::find_class_like(self.db, here)
+                        {
+                            let fqcn_str = fqcn.to_string();
+                            let receiver_is_nullable =
+                                receiver_ty.contains(|t| matches!(t, Atomic::TNull));
+                            let mut null_covered = false;
+                            let covered: rustc_hash::FxHashSet<String> = arms
+                                .iter()
+                                .filter_map(|a| a.conditions.as_deref())
+                                .flatten()
+                                .filter_map(|cond| {
+                                    if matches!(cond.kind, ExprKind::Null) {
+                                        null_covered = true;
+                                        return None;
+                                    }
+                                    let ExprKind::PropertyAccess(cond_pa) = &cond.kind else {
+                                        return None;
+                                    };
+                                    if extract_string_from_expr(&cond_pa.property).as_deref()
+                                        != Some("value")
+                                    {
+                                        return None;
+                                    }
+                                    let ExprKind::ClassConstAccess(cca) = &cond_pa.object.kind
+                                    else {
+                                        return None;
+                                    };
+                                    let resolved_class = match &cca.class.kind {
+                                        ExprKind::Identifier(id) => {
+                                            let r = crate::db::resolve_name(
+                                                self.db,
+                                                &self.file,
+                                                id.as_ref(),
+                                            );
+                                            if r == "self" || r == "static" {
+                                                ctx.self_fqcn.as_deref().unwrap_or("").to_string()
+                                            } else {
+                                                r
+                                            }
+                                        }
+                                        _ => return None,
+                                    };
+                                    if !resolved_class.eq_ignore_ascii_case(&fqcn_str) {
+                                        return None;
+                                    }
+                                    let member = match &cca.member.kind {
+                                        ExprKind::Identifier(s) | ExprKind::Variable(s) => {
+                                            s.as_ref()
+                                        }
+                                        _ => return None,
+                                    };
+                                    Some(crate::util::php_ident_lowercase(member))
+                                })
+                                .collect();
+
+                            let mut uncovered: Vec<String> = enum_def
+                                .cases
+                                .keys()
+                                .filter(|k| {
+                                    !covered.contains(&crate::util::php_ident_lowercase(k.as_ref()))
+                                })
+                                .map(|k| format!("{fqcn_str}::{k}->value"))
+                                .collect();
+                            uncovered.sort();
+                            if receiver_is_nullable && !null_covered {
+                                uncovered.push("null".to_string());
+                            }
+                            if !uncovered.is_empty() {
+                                return Some(uncovered.join(", "));
+                            }
+                            return None;
+                        }
+                    }
+                }
             }
         }
 
