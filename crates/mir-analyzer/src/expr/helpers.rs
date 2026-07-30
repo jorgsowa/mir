@@ -511,6 +511,13 @@ pub fn widen_array_with_value_and_key(
             Atomic::TMixed => {
                 return Type::mixed();
             }
+            // An array-index write auto-vivifies: `$data['k'] = $v;` turns a
+            // null base into a fresh array at runtime (silently — unlike
+            // most other operations on null), so `TNull` must not survive a
+            // write the way every other non-array atom does below (e.g. an
+            // already-invalid `int`, kept as-is so the surrounding
+            // InvalidArrayOffset-family checks still see it).
+            Atomic::TNull => {}
             other => {
                 result.add_type(other.clone());
             }
@@ -574,6 +581,10 @@ pub fn widen_array_as_list(
                 found_array = true;
             }
             Atomic::TMixed => return Type::mixed(),
+            // Same auto-vivification reasoning as widen_array_with_value_and_key:
+            // `$data[] = $v;` on a null base creates a fresh array, so `TNull`
+            // must not survive a push either.
+            Atomic::TNull => {}
             other => result.add_type(other.clone()),
         }
     }
