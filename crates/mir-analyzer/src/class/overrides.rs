@@ -504,6 +504,41 @@ impl<'a> ClassAnalyzer<'a> {
                     } else {
                         Self::scalar_return_types_compatible(child_ret, parent_ret)
                     };
+                    // A child that never restates the generic/`@inheritDoc`
+                    // refinement (no own docblock `@return`) only promised
+                    // whatever its plain native hint says — which, for a
+                    // template-typed ancestor, is the template's own declared
+                    // bound (e.g. `@template T of Base` bounds every legal
+                    // substitution to at most `Base`), not this class's
+                    // concrete `@extends Container<Concrete>` binding. Retry
+                    // against the bound (rather than the concrete binding)
+                    // before flagging — a real narrowing violation (no bound,
+                    // or a bound the child's native hint doesn't satisfy
+                    // either) still falls through to the flag below.
+                    let compatible = compatible
+                        || (had_template && !child_ret_raw.from_docblock && {
+                            let bound_ret = Self::substitute_own_template_bounds(parent_ret_raw);
+                            !bound_ret.is_mixed()
+                                && !self.return_type_has_template(&bound_ret)
+                                && {
+                                    let bound_has_object =
+                                        Self::type_has_named_objects(&bound_ret)
+                                            || self.type_has_self_or_static(&bound_ret);
+                                    if child_has_object && bound_has_object {
+                                        crate::stmt::named_object_return_compatible(
+                                            child_ret, &bound_ret, self.db, child_file,
+                                        ) || crate::stmt::return_arrays_compatible(
+                                            child_ret, &bound_ret, self.db, child_file,
+                                        )
+                                    } else if child_has_object || bound_has_object {
+                                        true
+                                    } else {
+                                        Self::scalar_return_types_compatible(
+                                            child_ret, &bound_ret,
+                                        )
+                                    }
+                                }
+                        });
                     if !compatible {
                         // Primary parent uses the original message format for
                         // backwards-compatibility with existing fixtures. Additional
@@ -1005,6 +1040,27 @@ impl<'a> ClassAnalyzer<'a> {
     /// Returns true if the type contains template params or class-strings with unknown types.
     /// Used to suppress MethodSignatureMismatch on generic parent return types.
     /// Checks recursively into array key/value types.
+    /// Collapse each top-level `TTemplateParam` atom to its own declared bound
+    /// (`as_type` — `mixed` for an unbounded template), leaving every other
+    /// atom untouched. Unlike substituting a class's concrete `@extends`
+    /// binding, this reflects only what the template's OWN declaration
+    /// guarantees — the widest type any legal binding could produce.
+    fn substitute_own_template_bounds(ty: &mir_types::Type) -> mir_types::Type {
+        use mir_types::Atomic;
+        let mut result = mir_types::Type::empty();
+        for atomic in ty.types.iter() {
+            match atomic {
+                Atomic::TTemplateParam { as_type, .. } => {
+                    for bound_atom in as_type.types.iter() {
+                        result.add_type(bound_atom.clone());
+                    }
+                }
+                other => result.add_type(other.clone()),
+            }
+        }
+        result
+    }
+
     fn return_type_has_template(&self, ty: &mir_types::Type) -> bool {
         use mir_types::Atomic;
         ty.types.iter().any(|atomic| match atomic {
