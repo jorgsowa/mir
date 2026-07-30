@@ -1042,10 +1042,12 @@ pub(crate) fn check_typed_callable_arg(
         return;
     }
 
-    let expected_required = expected_params
-        .iter()
-        .filter(|p| !p.is_optional && !p.is_variadic)
-        .count();
+    // The `=` suffix on a docblock callable param (`Closure(mixed, array=, T=):mixed`) marks
+    // a parameter the implementing closure is free to leave out of its own signature — it
+    // isn't a promise that invocations always omit it, so it doesn't lower how many required
+    // params a closure may declare. The real ceiling is the full declared param count (a
+    // trailing variadic accepts any number, so it never caps).
+    let expected_required = expected_params.iter().filter(|p| !p.is_variadic).count();
     let actual_required = candidates
         .iter()
         .map(|params| {
