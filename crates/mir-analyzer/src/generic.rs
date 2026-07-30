@@ -626,6 +626,23 @@ fn atomic_carries_template(a: &Atomic, template_names: &FxHashSet<Name>) -> bool
                 .iter()
                 .any(|t| is_template_atomic(t, template_names))
         }
+        Atomic::TCallable {
+            params,
+            return_type,
+        } => {
+            params.iter().flat_map(|ps| ps.iter()).any(|p| {
+                p.ty.as_ref().is_some_and(|t| {
+                    t.to_union()
+                        .types
+                        .iter()
+                        .any(|a| is_template_atomic(a, template_names))
+                })
+            }) || return_type.as_ref().is_some_and(|r| {
+                r.types
+                    .iter()
+                    .any(|t| is_template_atomic(t, template_names))
+            })
+        }
         _ => false,
     }
 }
@@ -655,6 +672,8 @@ fn atomics_match_for_filter(concrete: &Atomic, arg: &Atomic) -> bool {
             | (Atomic::TIntegralFloat, Atomic::TFloat)
             | (Atomic::TString, Atomic::TString)
             | (Atomic::TClosure { .. }, Atomic::TClosure { .. })
+            | (Atomic::TCallable { .. }, Atomic::TCallable { .. })
+            | (Atomic::TCallable { .. }, Atomic::TClosure { .. })
     ) || (concrete.is_array() && arg.is_array())
         || matches!(
             (concrete, arg),
