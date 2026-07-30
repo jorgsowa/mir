@@ -692,7 +692,10 @@ pub(super) fn parse_keyed_array(inner: &str, is_list: bool) -> Type {
         if item.is_empty() {
             continue;
         }
-        if item == "..." {
+        // `...` (untyped) or `...array<K, V>` (typed catch-all remainder) — both
+        // mark the shape open; TKeyedArray has no field for the remainder's
+        // value type, so a typed one is treated the same as bare `...`.
+        if item == "..." || item.starts_with("...") {
             is_open = true;
             continue;
         }
