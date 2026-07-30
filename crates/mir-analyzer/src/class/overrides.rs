@@ -819,9 +819,12 @@ impl<'a> ClassAnalyzer<'a> {
             }
             // PHP fatal-errors when a redeclared property flips native `readonly`-ness in
             // either direction. Only real PHP properties carry this contract — `@readonly`
-            // is advisory and not runtime-enforced, so skip docblock-only entries.
+            // is advisory and not runtime-enforced, so skip docblock-only entries. A private
+            // ancestor property isn't inherited, so a same-named child property is an
+            // unrelated declaration, not a redeclaration.
             if !own_prop.from_docblock
                 && !parent_prop.from_docblock
+                && parent_prop.visibility != Visibility::Private
                 && own_prop.has_native_readonly != parent_prop.has_native_readonly
             {
                 let loc = issue_location(
@@ -849,9 +852,11 @@ impl<'a> ClassAnalyzer<'a> {
             // direction ("Cannot redeclare static X::$y as non static Y::$y" and vice
             // versa). Only real PHP properties carry this contract — `@property` docblock
             // entries are virtual (no runtime static/instance distinction), so skip
-            // docblock-only entries just like the readonly check above.
+            // docblock-only entries just like the readonly check above. A private ancestor
+            // property is a separate declaration, not a redeclaration.
             if !own_prop.from_docblock
                 && !parent_prop.from_docblock
+                && parent_prop.visibility != Visibility::Private
                 && own_prop.is_static != parent_prop.is_static
             {
                 let loc = issue_location(
@@ -878,8 +883,13 @@ impl<'a> ClassAnalyzer<'a> {
             // PHP requires redeclared typed properties to keep the same type (invariant).
             // Only flag when both sides carry a native type hint — docblock-only types are
             // not enforced by the runtime. Compare `native_ty`, not `ty`: `ty` folds in any
-            // `@var` docblock refinement, which PHP's redeclaration rule never checks.
-            if own_prop.has_native_type && parent_prop.has_native_type {
+            // `@var` docblock refinement, which PHP's redeclaration rule never checks. A
+            // private ancestor property isn't visible to the subclass, so it establishes no
+            // type contract to redeclare.
+            if parent_prop.visibility != Visibility::Private
+                && own_prop.has_native_type
+                && parent_prop.has_native_type
+            {
                 if let (Some(own_t), Some(parent_t)) = (
                     own_prop.native_ty.as_deref(),
                     parent_prop.native_ty.as_deref(),
