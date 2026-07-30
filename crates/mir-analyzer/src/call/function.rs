@@ -439,6 +439,14 @@ impl CallAnalyzer {
             .iter()
             .map(|a| expr_can_be_passed_by_reference_owned(&a.value))
             .collect();
+        // array_multisort accepts ANY expression for both the sort-key arrays
+        // and the trailing SORT_* order/flags scalars bound to its `&...$rest`
+        // stub slot — verified empirically against real PHP, no "Only
+        // variables should be passed by reference" notice either, unlike
+        // sort()/usort() and other by-ref array functions.
+        if fn_name.eq_ignore_ascii_case("array_multisort") {
+            arg_can_be_byref = vec![true; call.args.len()];
+        }
         let mut has_spread = call.args.iter().any(|a| a.unpack);
         let mut arity_unknown = has_spread;
         // A sole spread arg over a literal, sequentially-keyed shape can be
