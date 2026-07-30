@@ -321,11 +321,21 @@ impl<'a> ClassAnalyzer<'a> {
         issues: &mut Vec<Issue>,
     ) {
         let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
-        if crate::db::find_method_in_chain(self.db, here, "__construct").is_some() {
-            return;
-        }
         let ancestors = crate::db::class_ancestors_by_fqcn(self.db, here);
-        let has_uninitialized = ancestors.iter().any(|ancestor| {
+        // Index (in `ancestors`, self-first) of the class whose constructor
+        // actually runs for `new fqcn()`. That constructor can only reach
+        // properties declared at or above its own class in the chain — it
+        // can't initialize a property a more-derived subclass added later,
+        // even though PHP still resolves it as the effective constructor
+        // (e.g. a shared base class with a `setUp()`-style subclass convention).
+        // A mixin-provided constructor isn't positioned in `ancestors` at
+        // all; treat that as covering everything, matching prior behavior.
+        let ctor_idx = crate::db::find_method_in_chain(self.db, here, "__construct")
+            .map(|(owner, _)| ancestors.iter().position(|a| *a == owner).unwrap_or(0));
+        let has_uninitialized = ancestors.iter().enumerate().any(|(idx, ancestor)| {
+            if ctor_idx.is_some_and(|ci| ci <= idx) {
+                return false;
+            }
             let anc_here = crate::db::Fqcn::from_str(self.db, ancestor.as_ref());
             if let Some(class) = crate::db::find_class_like(self.db, anc_here) {
                 if let Some(props) = class.own_properties() {
