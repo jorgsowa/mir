@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.64.0] - 2026-07-28
+## [0.64.0] - 2026-07-30
 
 ### Added
 
@@ -42,6 +42,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   generic arguments now substitute to the enclosing class type.
 - `define()` calls inside function and method bodies are collected as
   global constant definitions.
+- **psr-0 classes resolve by FQCN:** psr-0 autoload entries were only
+  used for bulk file-list scanning, never added to the FQCN-keyed
+  resolution map lazy class loading relies on — a class reachable
+  solely via psr-0 (a legacy/isolated-vendor pattern) always
+  false-flagged as `UndefinedClass`. psr-0 now gets its own
+  prefix-keyed entry list, consulted after psr-4 and before classmap.
+- **Property refinement narrows through a nullable RHS:** comparing
+  the whole RHS (`T|null`) against a wider declared property type
+  failed the subtype check and discarded the refinement entirely,
+  causing a false `UndefinedMethod` on the next read. Now compares
+  only the non-null part while still storing the full refinement, on
+  both the instance- and static-property assignment paths.
+- **`match($x::class)` narrows its subject per arm:** a
+  `ClassConstAccess` subject was never recognized by the
+  match-arm narrowing intersection at all. Adds a dedicated dispatch,
+  plus union-narrowing helpers for comma-separated (OR-semantics) arm
+  conditions.
+- **Union-sibling `__call` satisfies `UndefinedMethod`:** a
+  `Real|TestDouble` union (a mocking-library idiom, e.g. Prophecy)
+  flagged `UndefinedMethod` when the real class lacked a method only
+  the test-double sibling declares. A sibling atom having a catch-all
+  `__call` now suppresses the check on atoms that lack both the
+  method and their own `__call`.
+- **Atomic `cache.bin` write:** `flush()` wrote the cache directly in
+  place via `std::fs::write`, so a crash mid-write left a truncated
+  cache silently discarded on the next boot. Switched to
+  tempfile-in-same-dir + rename, matching `stub_cache.rs`'s pattern.
+- **Vendor the missing `ast/ast.php` stub:** `PhpStormStubsMap.php`
+  already listed all 201 `ast\*` (nikic/php-ast) entries pointing at
+  it, but the `stubs/ast/` directory was never vendored, so the whole
+  extension (`Node`, `Metadata`, `AST_*`/`flags\*` constants,
+  `parse_code`, etc.) was reported undefined.
+- **Follow require/include targets outside every autoload root:** the
+  whole-project file list came from composer.json's autoload sections
+  only, so a file reached solely via a manual `require_once`/`include`
+  outside every psr-4/psr-0 root (a common isolated-legacy-bootstrap
+  pattern) was never indexed. Now follows statically-resolvable
+  include targets (literal strings, and `__DIR__`/`dirname(__FILE__)`
+  concatenated with a literal) recursively from every discovered
+  project file, skipping `vendor/`.
+- **Property-target attributes on promoted params:** a promoted
+  constructor parameter is reflectable as both a `ReflectionParameter`
+  and a `ReflectionProperty`, so an attribute restricted to
+  `TARGET_PROPERTY` alone should be accepted on it. mir only checked
+  `TARGET_PARAMETER`, false-flagging every such attribute.
+- **`NoInterfaceProperties` fires regardless of `@seal-properties`:**
+  real PHP/Psalm semantics treat any property access through a plain
+  interface type as suspect unless declared via `@property`, whether
+  the interface opts into `@seal-properties` or not. Sealing only ever
+  narrowed which unknown accesses got rejected, not what legitimized a
+  known one.
+- **Suppress kind-list parsing stops at trailing prose:** a comma
+  inside a suppress directive's free-text explanation (e.g.
+  "`@psalm-suppress Foo because of X, not fully typed`") was mistaken
+  for the start of a new kind name, producing a phantom
+  `UnusedSuppress`. Stop scanning for further kinds once a segment has
+  trailing words after its kind name.
+
+### Performance
+
+- **Parallel `warm_start_files` disk-slice reads:** the per-file loop
+  read the `AnalysisCache` and `StubSliceCache` serially (~0.8-0.9s of
+  a 3.9s warm boot at 15.4K files). Split into a rayon-parallel read
+  phase (mirroring `index_batch`'s existing pattern) that only touches
+  disk-cache lookups off any lock, and a sequential apply phase for
+  the cheap salsa input writes and map merges.
 
 ## [0.63.0] - 2026-07-27
 
