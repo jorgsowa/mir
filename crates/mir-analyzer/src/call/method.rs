@@ -985,6 +985,18 @@ fn resolve_method_return<'a>(
             has_spread = false;
             arity_unknown = true;
         }
+        // The resolved method has no concrete body of its own (an `abstract`
+        // method, or any interface method — interfaces never carry a body) —
+        // whatever object this receiver actually holds at runtime is some
+        // OTHER concrete (sub)class providing the real implementation, and
+        // PHP's override-compatibility rules let that override freely ADD
+        // extra optional params beyond this signature. Only TooMany is
+        // suppressed: an override can never REQUIRE more params than an
+        // abstract/interface method declares, so the required-param count is
+        // still a reliable floor.
+        let too_many_arity_unknown = resolved.is_abstract
+            || crate::db::class_kind(ea.db, &resolved.owner_fqcn)
+                .is_some_and(|k| k.is_interface);
         // Build class-level template bindings before arg-checking so we can substitute
         // template params (e.g. T → int from Box<int>) into param types. A plain
         // subclass that doesn't redeclare `@template` (`class IntBox extends
@@ -1081,6 +1093,7 @@ fn resolve_method_return<'a>(
                 call_span: span,
                 has_spread,
                 arity_unknown,
+                too_many_arity_unknown,
                 template_params: &resolved.template_params,
                 no_named_arguments: resolved.no_named_arguments,
             },

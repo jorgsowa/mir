@@ -40,6 +40,15 @@ pub struct CheckArgsParams<'a> {
     /// after the first) while this stays `true`, preserving the existing
     /// "don't flag arity through a spread" behavior.
     pub arity_unknown: bool,
+    /// True when the resolved method has no concrete body of its own (an
+    /// `abstract` method or an interface method) — a concrete override may
+    /// freely add extra OPTIONAL params beyond this signature (valid PHP
+    /// override variance), so a call through the abstract/interface-typed
+    /// receiver can't be trusted to flag TooManyArguments. Unlike
+    /// `arity_unknown`, this does NOT suppress TooFewArguments: an override
+    /// can never REQUIRE more params than its abstract/interface declares,
+    /// so the required-param floor is still a reliable lower bound.
+    pub too_many_arity_unknown: bool,
     pub template_params: &'a [TemplateParam],
     /// True when the function/method is tagged `@no-named-arguments`.
     pub no_named_arguments: bool,
@@ -386,6 +395,7 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
         call_span,
         has_spread,
         arity_unknown,
+        too_many_arity_unknown,
         template_params,
         no_named_arguments,
     } = p;
@@ -400,6 +410,7 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
         call_span,
         has_spread,
         arity_unknown,
+        too_many_arity_unknown,
         no_named_arguments,
     );
 

@@ -19,6 +19,7 @@ pub(super) fn check_counts(
     call_span: Span,
     has_spread: bool,
     arity_unknown: bool,
+    too_many_arity_unknown: bool,
     no_named_arguments: bool,
 ) -> Vec<ArgBinding> {
     let variadic_index = params.iter().position(|p| p.is_variadic);
@@ -160,6 +161,7 @@ pub(super) fn check_counts(
     if variadic_index.is_none()
         && arg_types.len() > params.len()
         && !arity_unknown
+        && !too_many_arity_unknown
         && !has_shape_error
         && fn_name != "{closure}"
     {

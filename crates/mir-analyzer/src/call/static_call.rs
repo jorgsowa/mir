@@ -716,6 +716,7 @@ impl CallAnalyzer {
                     call_span: span,
                     has_spread,
                     arity_unknown,
+                    too_many_arity_unknown: false,
                     template_params: &resolved.template_params,
                     no_named_arguments: resolved.no_named_arguments,
                 },

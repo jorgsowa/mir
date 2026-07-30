@@ -648,6 +648,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     call_span,
                                     has_spread: ctor_has_spread,
                                     arity_unknown: ctor_arity_unknown,
+                                    too_many_arity_unknown: false,
                                     template_params: ctor_templates,
                                     no_named_arguments: *ctor_no_named_args,
                                 },
