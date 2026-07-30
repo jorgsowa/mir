@@ -3,7 +3,7 @@ use php_ast::owned::visitor::{walk_owned_expr, OwnedVisitor};
 use php_ast::owned::{Expr, ExprKind};
 use rustc_hash::FxHashMap;
 use std::ops::ControlFlow;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use thiserror::Error;
 
 // ---------------------------------------------------------------------------
@@ -637,6 +637,7 @@ fn expand_via_local_requires(out: &mut Vec<PathBuf>) {
             } else {
                 dir.join(target)
             };
+            let resolved = lexically_normalize(&resolved);
             if resolved.extension().and_then(|e| e.to_str()) != Some("php") {
                 continue;
             }
@@ -652,6 +653,34 @@ fn expand_via_local_requires(out: &mut Vec<PathBuf>) {
             }
         }
     }
+}
+
+/// Collapses `.`/`..` components lexically instead of relying on the OS to
+/// resolve them, since a `__DIR__`-derived base can be a Windows verbatim
+/// (`\\?\`-prefixed) path — those disable `..` resolution by the OS, so a
+/// naively-concatenated `\\?\C:\...\src/../legacy/helpers.php` would never
+/// resolve to a real file even though the target genuinely exists.
+fn lexically_normalize(path: &Path) -> PathBuf {
+    let mut components = path.components().peekable();
+    let mut ret = if let Some(c @ Component::Prefix(_)) = components.peek().copied() {
+        components.next();
+        PathBuf::from(c.as_os_str())
+    } else {
+        PathBuf::new()
+    };
+
+    for component in components {
+        match component {
+            Component::Prefix(_) => unreachable!(),
+            Component::RootDir => ret.push(component.as_os_str()),
+            Component::CurDir => {}
+            Component::ParentDir => {
+                ret.pop();
+            }
+            Component::Normal(c) => ret.push(c),
+        }
+    }
+    ret
 }
 
 struct IncludeTargetScanner<'a> {

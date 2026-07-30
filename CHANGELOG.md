@@ -81,7 +81,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pattern) was never indexed. Now follows statically-resolvable
   include targets (literal strings, and `__DIR__`/`dirname(__FILE__)`
   concatenated with a literal) recursively from every discovered
-  project file, skipping `vendor/`.
+  project file, skipping `vendor/`. On Windows, `__DIR__` concatenated
+  with a `..`-containing literal produced a verbatim (`\\?\`-prefixed)
+  path the OS won't resolve `..` in, so the target was never found;
+  `..`/`.` are now collapsed lexically before the filesystem check.
 - **Property-target attributes on promoted params:** a promoted
   constructor parameter is reflectable as both a `ReflectionParameter`
   and a `ReflectionProperty`, so an attribute restricted to
