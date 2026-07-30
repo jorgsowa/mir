@@ -171,23 +171,39 @@ impl<'a> DefinitionCollector<'a> {
                                         )
                                     })
                                 };
-                                // When the native hint is a plain unspecialized `array` or
-                                // `mixed` — the two hints PHP generics idioms fall back to
-                                // when there's no way to natively express a template param —
-                                // prefer the @param docblock if it provides a more specific
-                                // type, e.g. `@param T $value` alongside `public mixed $value`.
+                                // Same priority as an ordinary (non-promoted) `@param`:
+                                // the docblock wins by default — covering both a plain
+                                // unspecialized `array`/`mixed` native hint (the two
+                                // PHP generics idioms fall back to when there's no way
+                                // to natively express a template param, e.g. `@param T
+                                // $value` alongside `public mixed $value`) AND a
+                                // concrete scalar hint refined by a literal-union
+                                // docblock (`@param 'a'|'b' $value` alongside `public
+                                // string $value`) — guarded the same way against a
+                                // genuine scalar-family conflict and a dropped native
+                                // nullability.
                                 let native_ty_only = native_ty.clone();
-                                let ty = if native_ty.as_ref().is_some_and(|t| {
-                                    t.types.len() == 1
-                                        && (matches!(
-                                            &t.types[0],
-                                            Atomic::TArray { key, value }
-                                                if key.is_mixed() && value.is_mixed()
-                                        ) || matches!(&t.types[0], Atomic::TMixed))
-                                }) {
-                                    resolve_doc().or(native_ty)
-                                } else {
-                                    native_ty.or_else(resolve_doc)
+                                let ty = match resolve_doc() {
+                                    Some(doc_ty) => {
+                                        if native_ty.as_ref().is_some_and(|n| {
+                                            super::native_hint_wins_over_docblock_scalar(
+                                                n, &doc_ty,
+                                            )
+                                        }) {
+                                            native_ty
+                                        } else {
+                                            Some(match native_ty.as_ref() {
+                                                Some(n) => super::preserve_native_nullability(
+                                                    n,
+                                                    super::resolve_docblock_scalar_conflict(
+                                                        n, doc_ty,
+                                                    ),
+                                                ),
+                                                None => doc_ty,
+                                            })
+                                        }
+                                    }
+                                    None => native_ty,
                                 };
                                 let prop = PropertyDef {
                                     name: Arc::from(param_name),
