@@ -729,7 +729,8 @@ impl CallAnalyzer {
 /// final retyped union (a single atomic's resolution must not unilaterally
 /// overwrite a union receiver's other branches).
 ///
-/// `sibling_has_call_magic` suppresses UndefinedMethod when a DIFFERENT atom
+/// `sibling_has_call_magic` suppresses UndefinedMethod, and (via
+/// `arity_unknown`) TooFewArguments/TooManyArguments, when a DIFFERENT atom
 /// in the same union receiver has a catch-all `__call` — a real|test-double
 /// union is never actually the "real" atom at runtime.
 #[allow(clippy::too_many_arguments)]
@@ -968,7 +969,13 @@ fn resolve_method_return<'a>(
         // call forms. `arity_unknown` stays true even after expansion — PHP
         // allows extra/spread positional args, so a concretely-known count
         // still shouldn't trigger TooFew/TooManyArguments.
-        let mut arity_unknown = has_spread;
+        //
+        // A sibling atom's catch-all `__call` also forces `arity_unknown`:
+        // the real runtime value may actually be that sibling (test-double
+        // idiom), which never enforces this atom's own arity at all — so a
+        // mismatch here can't be trusted as a genuine error, same reasoning
+        // `union_has_call_magic` already applies to UndefinedMethod above.
+        let mut arity_unknown = has_spread || sibling_has_call_magic;
         if let Some(expanded) = sole_spread_ty.and_then(|t| expand_sole_spread_arg(&t)) {
             effective_arg_spans =
                 distinct_spans_for_expansion(effective_arg_spans[0], expanded.len());
