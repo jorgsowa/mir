@@ -3,7 +3,7 @@ use super::helpers::{
 };
 use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
-use crate::stmt::{mir_check_matches, widen_for_check};
+use crate::stmt::{mir_check_matches, return_type_is_invalid, widen_for_check};
 use crate::symbol::ReferenceKind;
 use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Name, Type};
@@ -509,6 +509,63 @@ impl<'a> ExpressionAnalyzer<'a> {
         for name in &arrow_ctx.read_vars {
             ctx.read_vars.insert(*name);
             ctx.mark_consumed(name.as_str());
+        }
+
+        // The `=> expr` body is exactly one implicit `return expr;` — check it
+        // against the declared return type the same way analyze_return_stmt does
+        // for a regular closure/function body.
+        if let Some(declared) = &return_ty_hint {
+            let has_invalid = !declared.contains(|t| matches!(t, Atomic::TConditional { .. }))
+                && ((declared.is_void()
+                    && !inferred_return.is_void()
+                    && !inferred_return.is_mixed())
+                    || return_type_is_invalid(
+                        &inferred_return,
+                        declared,
+                        ctx.strict_types,
+                        self.db,
+                        &self.file,
+                    ));
+            let is_mixed_return = !has_invalid
+                && !declared.is_void()
+                && !declared.is_mixed()
+                && inferred_return.is_mixed()
+                && !declared.contains(|t| matches!(t, Atomic::TConditional { .. }));
+            if is_mixed_return {
+                let kind = IssueKind::MixedReturnStatement {
+                    declared: format!("{declared}"),
+                };
+                let severity = kind.default_severity();
+                self.emit(kind, severity, check_target.span);
+            } else if has_invalid {
+                let kind = IssueKind::InvalidReturnType {
+                    expected: format!("{declared}"),
+                    actual: format!("{inferred_return}"),
+                };
+                let severity = kind.default_severity();
+                self.emit(kind, severity, check_target.span);
+            } else if !declared.is_void()
+                && !declared.is_mixed()
+                && !declared.contains(|t| matches!(t, Atomic::TNull))
+                && !declared.contains(|t| matches!(t, Atomic::TConditional { .. }))
+                && !declared.contains(|t| matches!(t, Atomic::TTemplateParam { .. }))
+                && inferred_return.contains(|t| matches!(t, Atomic::TNull))
+                && !inferred_return.remove_null().is_empty()
+                && !return_type_is_invalid(
+                    &inferred_return.remove_null(),
+                    declared,
+                    ctx.strict_types,
+                    self.db,
+                    &self.file,
+                )
+            {
+                let kind = IssueKind::NullableReturnStatement {
+                    expected: format!("{declared}"),
+                    actual: format!("{inferred_return}"),
+                };
+                let severity = kind.default_severity();
+                self.emit(kind, severity, check_target.span);
+            }
         }
 
         let return_ty = return_ty_hint.unwrap_or(inferred_return);

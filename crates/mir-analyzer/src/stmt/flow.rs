@@ -10,7 +10,10 @@ use super::StatementsAnalyzer;
 /// Returns true when `actual` does not satisfy `declared` and an InvalidReturnType
 /// diagnostic should fire.  Combines scalar structural checks (fast path for primitives)
 /// with codebase-aware named-object and array checks.
-fn return_type_is_invalid(
+///
+/// Shared with arrow-function return checking (`expr/closures.rs`) — an arrow
+/// function's `=> expr` is exactly one implicit `return expr;`.
+pub(crate) fn return_type_is_invalid(
     actual: &Type,
     declared: &Type,
     strict_types: bool,

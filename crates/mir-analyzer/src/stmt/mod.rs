@@ -7,6 +7,7 @@ mod flow;
 mod loops;
 mod return_type;
 
+pub(crate) use flow::return_type_is_invalid;
 pub(crate) use loops::infer_foreach_types;
 pub(crate) use loops::resolve_iterator_item_types;
 use loops::{vars_stabilized, widen_unstable};
