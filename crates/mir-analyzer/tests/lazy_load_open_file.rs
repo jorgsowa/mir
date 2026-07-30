@@ -352,3 +352,185 @@ fn priority_index_pre_loads_docblock_only_param_class() {
         analysis.issues
     );
 }
+
+// -----------------------------------------------------------------------------
+// PSR-0 lazy loading through the open-file path.
+//
+// `Psr4Map::resolve` has its own PSR-4/PSR-0/classmap unit tests in
+// `composer.rs`, and the batch pipeline has phpt coverage under
+// `tests/fixtures/by-kind/undefined_class/psr0_*.phpt`. Neither exercises
+// this crate's open-file lazy-load path (`priority_index_for_ast` +
+// `AnalysisSession::load_class`), which is what an LSP's default
+// `indexVendor: false` mode actually depends on — a PSR-0 class is
+// resolvable on disk but not eagerly indexed. These tests close that gap.
+// -----------------------------------------------------------------------------
+
+fn undefined_class_count(analysis: &mir_analyzer::FileAnalysis) -> usize {
+    analysis
+        .issues
+        .iter()
+        .filter(|i| i.kind.name() == "UndefinedClass")
+        .count()
+}
+
+/// Set up a `psr-0` autoload entry pointing at `vendor_dir`, write
+/// `vendor_files` there (resolvable via the resolver but NOT eagerly
+/// indexed), then analyze `open_src` through the open-file path.
+fn analyze_open_file_unindexed_psr0(
+    prefix: &str,
+    vendor_dir: &str,
+    vendor_files: &[(&str, &str)],
+    open_name: &str,
+    open_src: &str,
+) -> mir_analyzer::FileAnalysis {
+    let root = common::create_temp_dir("priority_index_unindexed_psr0");
+    for (name, src) in vendor_files {
+        let p = root.path().join(vendor_dir).join(name);
+        fs::create_dir_all(p.parent().unwrap()).unwrap();
+        fs::write(p, src).unwrap();
+    }
+    fs::write(
+        root.path().join("composer.json"),
+        format!(r#"{{"autoload":{{"psr-0":{{"{prefix}":"{vendor_dir}/"}}}}}}"#),
+    )
+    .unwrap();
+
+    let psr4 = mir_analyzer::composer::Psr4Map::from_composer(root.path()).expect("psr4 map");
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
+
+    let open_path: Arc<str> = Arc::from(root.path().join(open_name).to_string_lossy().as_ref());
+    session.ingest_file(open_path.clone(), Arc::from(open_src));
+
+    let parsed = php_parse(open_src);
+    assert!(
+        parsed.errors.is_empty(),
+        "parse errors: {:?}",
+        parsed.errors
+    );
+    FileAnalyzer::new(&session).analyze(open_path, open_src, &parsed.program, &parsed.source_map)
+}
+
+/// Issue: default lazy-vendor mode reported a PSR-0 (PEAR-style, no
+/// namespace) vendor class as `UndefinedClass` even though it resolves on
+/// disk, because the open-file path never lazily loaded it. `new
+/// Legacy_Service()` must not be flagged, and the genuinely-undefined
+/// `nope()` call on it must surface — proving the class was actually loaded
+/// rather than silently degraded to `mixed` (which would also suppress
+/// `UndefinedClass` but for the wrong reason).
+#[test]
+fn open_file_resolves_psr0_pear_style_vendor_class() {
+    let analysis = analyze_open_file_unindexed_psr0(
+        "Legacy_",
+        "vendor/legacy/src",
+        &[(
+            "Legacy/Service.php",
+            "<?php\nclass Legacy_Service {\n    public function name(): string { return 'legacy'; }\n}\n",
+        )],
+        "repro.php",
+        "<?php\n$service = new Legacy_Service();\n$service->nope();\n",
+    );
+
+    assert_eq!(
+        undefined_class_count(&analysis),
+        0,
+        "Legacy_Service is resolvable via the psr-0 entry and must not be flagged \
+         UndefinedClass. Got issues: {:?}",
+        analysis.issues
+    );
+    assert_eq!(
+        undefined_method_count(&analysis),
+        1,
+        "nope() is genuinely undefined on the lazily-loaded Legacy_Service. A count \
+         of 0 means the class was never loaded and the call silently degraded to \
+         mixed. Got issues: {:?}",
+        analysis.issues
+    );
+}
+
+/// Control: a member that genuinely exists on the lazily-loaded PSR-0 class
+/// must NOT be flagged — guards against the fix over-reporting.
+#[test]
+fn open_file_does_not_flag_valid_psr0_method_call() {
+    let analysis = analyze_open_file_unindexed_psr0(
+        "Legacy_",
+        "vendor/legacy/src",
+        &[(
+            "Legacy/Service.php",
+            "<?php\nclass Legacy_Service {\n    public function name(): string { return 'legacy'; }\n}\n",
+        )],
+        "repro.php",
+        "<?php\n$service = new Legacy_Service();\necho $service->name();\n",
+    );
+
+    assert_eq!(
+        undefined_class_count(&analysis),
+        0,
+        "Legacy_Service must resolve cleanly. Got issues: {:?}",
+        analysis.issues
+    );
+    assert_eq!(
+        undefined_method_count(&analysis),
+        0,
+        "name() is a real method on the lazily-loaded Legacy_Service and must \
+         resolve cleanly. Got issues: {:?}",
+        analysis.issues
+    );
+}
+
+/// Control: a class whose name doesn't match any psr-0 prefix must stay
+/// genuinely `UndefinedClass` through the open-file path too — guards
+/// against the psr-0 lazy-load fix loosening prefix matching.
+#[test]
+fn open_file_still_flags_undefined_class_for_psr0_prefix_mismatch() {
+    let analysis = analyze_open_file_unindexed_psr0(
+        "Legacy_",
+        "vendor/legacy/src",
+        &[(
+            "Legacy/Service.php",
+            "<?php\nclass Legacy_Service {\n    public function name(): string { return 'legacy'; }\n}\n",
+        )],
+        "repro.php",
+        "<?php\n$service = new Totally_Unrelated();\n",
+    );
+
+    assert_eq!(
+        undefined_class_count(&analysis),
+        1,
+        "Totally_Unrelated matches no psr-0 prefix and must stay UndefinedClass. \
+         Got issues: {:?}",
+        analysis.issues
+    );
+}
+
+/// A namespaced PSR-0 class (not PEAR-style) is also lazily loaded through
+/// the open-file path — the mapping differs from PEAR-style (only the
+/// class-name segment maps underscores to directories; the namespace
+/// separators always do).
+#[test]
+fn open_file_resolves_psr0_namespaced_vendor_class() {
+    let analysis = analyze_open_file_unindexed_psr0(
+        "Mailer\\\\",
+        "vendor/mailer/src",
+        &[(
+            "Mailer/Message.php",
+            "<?php\nnamespace Mailer;\nclass Message {\n    public function send(): void {}\n}\n",
+        )],
+        "repro.php",
+        "<?php\n$m = new \\Mailer\\Message();\n$m->nope();\n",
+    );
+
+    assert_eq!(
+        undefined_class_count(&analysis),
+        0,
+        "Mailer\\Message is resolvable via the psr-0 entry and must not be flagged \
+         UndefinedClass. Got issues: {:?}",
+        analysis.issues
+    );
+    assert_eq!(
+        undefined_method_count(&analysis),
+        1,
+        "nope() is genuinely undefined on the lazily-loaded Mailer\\Message. A count \
+         of 0 means the class was never loaded. Got issues: {:?}",
+        analysis.issues
+    );
+}
