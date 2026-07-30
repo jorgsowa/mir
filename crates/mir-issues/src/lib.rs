@@ -66,6 +66,11 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/expr/objects.rs`.
     /// Fixtures: `tests/fixtures/by-kind/undefined_property/`.
     UndefinedProperty { class: String, property: String },
+    /// A private or protected property is read from outside the scope PHP
+    /// visibility rules allow — a fatal error at runtime.
+    /// Emitted by `mir-analyzer/src/expr/objects.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/inaccessible_property/`.
+    InaccessibleProperty { class: String, property: String },
     /// Emitted by `mir-analyzer/src/expr/variables.rs`.
     /// Fixtures: `tests/fixtures/by-kind/undefined_constant/`.
     UndefinedConstant { name: String },
@@ -812,6 +817,7 @@ impl IssueKind {
             | IssueKind::NotAnInterface { .. }
             | IssueKind::UndefinedConstant { .. }
             | IssueKind::InaccessibleClassConstant { .. }
+            | IssueKind::InaccessibleProperty { .. }
             | IssueKind::InvalidReturnType { .. }
             | IssueKind::InvalidArgument { .. }
             | IssueKind::TooFewArguments { .. }
@@ -1023,6 +1029,7 @@ impl IssueKind {
             IssueKind::UndefinedProperty { .. } => "MIR0006",
             IssueKind::UndefinedConstant { .. } => "MIR0007",
             IssueKind::InaccessibleClassConstant { .. } => "MIR0011",
+            IssueKind::InaccessibleProperty { .. } => "MIR0014",
             IssueKind::TraitConstantAccessedDirectly { .. } => "MIR0012",
             IssueKind::UndefinedTraitAliasMethod { .. } => "MIR0013",
             IssueKind::PossiblyUndefinedVariable { .. } => "MIR0008",
@@ -1224,14 +1231,14 @@ impl IssueKind {
         match code {
             // Errors
             "MIR0001" | "MIR0002" | "MIR0003" | "MIR0004" | "MIR0005" | "MIR0007" | "MIR0009"
-            | "MIR0010" | "MIR0011" | "MIR0012" | "MIR0013" | "MIR0200" | "MIR0201" | "MIR0202"
-            | "MIR0203" | "MIR0204" | "MIR0205" | "MIR0212" | "MIR0215" | "MIR0216" | "MIR0217"
-            | "MIR0224" | "MIR0600" | "MIR0601" | "MIR0700" | "MIR0701" | "MIR0702" | "MIR0704"
-            | "MIR0705" | "MIR0706" | "MIR0707" | "MIR0708" | "MIR0709" | "MIR0711" | "MIR0712"
-            | "MIR0713" | "MIR0714" | "MIR0715" | "MIR0716" | "MIR0717" | "MIR0228" | "MIR0229"
-            | "MIR0800" | "MIR0801" | "MIR0802" | "MIR0803" | "MIR0804" | "MIR0900" | "MIR1205"
-            | "MIR1207" | "MIR1300" | "MIR1400" | "MIR1500" | "MIR1503" | "MIR1602" | "MIR1603"
-            | "MIR1604" | "MIR1605" | "MIR1606" => Some(Severity::Error),
+            | "MIR0010" | "MIR0011" | "MIR0012" | "MIR0013" | "MIR0014" | "MIR0200" | "MIR0201"
+            | "MIR0202" | "MIR0203" | "MIR0204" | "MIR0205" | "MIR0212" | "MIR0215" | "MIR0216"
+            | "MIR0217" | "MIR0224" | "MIR0600" | "MIR0601" | "MIR0700" | "MIR0701" | "MIR0702"
+            | "MIR0704" | "MIR0705" | "MIR0706" | "MIR0707" | "MIR0708" | "MIR0709" | "MIR0711"
+            | "MIR0712" | "MIR0713" | "MIR0714" | "MIR0715" | "MIR0716" | "MIR0717" | "MIR0228"
+            | "MIR0229" | "MIR0800" | "MIR0801" | "MIR0802" | "MIR0803" | "MIR0804" | "MIR0900"
+            | "MIR1205" | "MIR1207" | "MIR1300" | "MIR1400" | "MIR1500" | "MIR1503" | "MIR1602"
+            | "MIR1603" | "MIR1604" | "MIR1605" | "MIR1606" => Some(Severity::Error),
 
             // Warnings
             "MIR0006" | "MIR0008" | "MIR0100" | "MIR0101" | "MIR0102" | "MIR0103" | "MIR0109"
@@ -1270,6 +1277,7 @@ impl IssueKind {
             IssueKind::UndefinedProperty { .. } => "UndefinedProperty",
             IssueKind::UndefinedConstant { .. } => "UndefinedConstant",
             IssueKind::InaccessibleClassConstant { .. } => "InaccessibleClassConstant",
+            IssueKind::InaccessibleProperty { .. } => "InaccessibleProperty",
             IssueKind::TraitConstantAccessedDirectly { .. } => "TraitConstantAccessedDirectly",
             IssueKind::UndefinedTraitAliasMethod { .. } => "UndefinedTraitAliasMethod",
             IssueKind::PossiblyUndefinedVariable { .. } => "PossiblyUndefinedVariable",
@@ -1476,6 +1484,9 @@ impl IssueKind {
             IssueKind::UndefinedConstant { name } => format!("Constant {name} is not defined"),
             IssueKind::InaccessibleClassConstant { class, constant } => {
                 format!("Cannot access constant {class}::{constant}")
+            }
+            IssueKind::InaccessibleProperty { class, property } => {
+                format!("Cannot access property {class}::${property}")
             }
             IssueKind::PossiblyUndefinedVariable { name } => {
                 format!("Variable ${name} might not be defined")
@@ -2294,6 +2305,10 @@ mod code_tests {
                 class: s(),
                 constant: s(),
             },
+            IssueKind::InaccessibleProperty {
+                class: s(),
+                property: s(),
+            },
             IssueKind::PossiblyUndefinedVariable { name: s() },
             IssueKind::UndefinedTrait { name: s() },
             IssueKind::TraitConstantAccessedDirectly {
@@ -2728,6 +2743,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 157);
+        assert_eq!(one_of_each().len(), 158);
     }
 }

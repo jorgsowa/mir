@@ -53,6 +53,7 @@ issues keep their code.
 | MIR0009  | UndefinedTrait                | [undefined/undefined-trait](../undefined/undefined-trait/) |
 | MIR0010  | ParentNotFound                | [undefined/parent-not-found](../undefined/parent-not-found/) |
 | MIR0011  | InaccessibleClassConstant     | [undefined/inaccessible-class-constant](../undefined/inaccessible-class-constant/) |
+| MIR0014  | InaccessibleProperty          | [undefined/inaccessible-property](../undefined/inaccessible-property/) |
 | MIR0100  | NullArgument                  | [nullability/null-argument](../nullability/null-argument/) |
 | MIR0101  | NullPropertyFetch             | [nullability/null-property-fetch](../nullability/null-property-fetch/) |
 | MIR0102  | NullMethodCall                | [nullability/null-method-call](../nullability/null-method-call/) |

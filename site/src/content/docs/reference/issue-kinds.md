@@ -20,6 +20,7 @@ All issue types mir can emit, grouped by category.
 | `UndefinedTrait` | A trait is used that does not exist in the codebase or stubs. |
 | `ParentNotFound` | Use of `parent::` in a class that has no parent. |
 | `InaccessibleClassConstant` | Access to a private or protected class constant from an incompatible scope. |
+| `InaccessibleProperty` | Access to a private or protected property from an incompatible scope. |
 
 ## Nullability
 

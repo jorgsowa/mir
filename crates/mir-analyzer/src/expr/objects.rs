@@ -853,8 +853,13 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
         let non_null_ty = obj_ty.remove_null();
         let mut declaring = None;
-        let resolved =
-            self.resolve_property_type(&non_null_ty, &prop_name, pa.property.span, &mut declaring);
+        let resolved = self.resolve_property_type(
+            &non_null_ty,
+            &prop_name,
+            pa.property.span,
+            &mut declaring,
+            ctx,
+        );
 
         // If we have a narrowed type for this property access ($var->prop,
         // or the one-more-hop $var->a->prop), return it instead of the
@@ -912,8 +917,13 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
         let non_null_ty = obj_ty.remove_null();
         let mut declaring = None;
-        let resolved =
-            self.resolve_property_type(&non_null_ty, &prop_name, pa.property.span, &mut declaring);
+        let resolved = self.resolve_property_type(
+            &non_null_ty,
+            &prop_name,
+            pa.property.span,
+            &mut declaring,
+            ctx,
+        );
 
         // If we have a narrowed type for this property access ($var?->prop,
         // or the one-more-hop $var->a?->prop), return it instead of the
@@ -990,6 +1000,18 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 crate::db::find_property_in_chain(self.db, here, prop_name)
                             {
                                 owner = prop_owner;
+                                if !self.in_existence_check
+                                    && self.property_inaccessible(p.visibility, owner.as_ref(), ctx)
+                                {
+                                    self.emit(
+                                        IssueKind::InaccessibleProperty {
+                                            class: owner.to_string(),
+                                            property: prop_name.to_string(),
+                                        },
+                                        Severity::Error,
+                                        spa.member.span,
+                                    );
+                                }
                                 let ty = p.ty.as_deref().cloned().unwrap_or_else(Type::mixed);
                                 // A static access has no receiver instance to carry
                                 // type args, but an `@extends Box<int>` clause on the
@@ -1142,6 +1164,18 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 message: Some(msg.clone()).filter(|m| !m.is_empty()),
                             },
                             Severity::Info,
+                            member_expr.span,
+                        );
+                    }
+                    if !self.in_existence_check
+                        && self.property_inaccessible(p.1.visibility, owner.as_ref(), ctx)
+                    {
+                        self.emit(
+                            IssueKind::InaccessibleProperty {
+                                class: owner.to_string(),
+                                property: prop_name.to_string(),
+                            },
+                            Severity::Error,
                             member_expr.span,
                         );
                     }
@@ -1711,6 +1745,36 @@ impl<'a> ExpressionAnalyzer<'a> {
         })
     }
 
+    /// Whether `ctx`'s scope is disallowed from reading a private/protected
+    /// property declared on `owner_fqcn` — same private/protected rules as
+    /// the class-constant checks in `analyze_class_const_access` /
+    /// `record_object_const_access` above.
+    fn property_inaccessible(
+        &self,
+        visibility: mir_codebase::definitions::Visibility,
+        owner_fqcn: &str,
+        ctx: &FlowState,
+    ) -> bool {
+        use mir_codebase::definitions::Visibility;
+        match visibility {
+            Visibility::Private => ctx
+                .self_fqcn
+                .as_deref()
+                .map(|s| !s.eq_ignore_ascii_case(owner_fqcn))
+                .unwrap_or(true),
+            Visibility::Protected => {
+                let caller = ctx.self_fqcn.as_deref().unwrap_or("");
+                if caller.is_empty() {
+                    true
+                } else {
+                    !crate::db::extends_or_implements(self.db, caller, owner_fqcn)
+                        && !caller.eq_ignore_ascii_case(owner_fqcn)
+                }
+            }
+            Visibility::Public => false,
+        }
+    }
+
     /// `declaring_class` is set to the FQCN of the class that declares the
     /// property when the inheritance-chain lookup resolves it — reused by the
     /// callers for symbol recording so the chain is only walked once.
@@ -1720,6 +1784,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         prop_name: &str,
         span: php_ast::Span,
         declaring_class: &mut Option<Arc<str>>,
+        ctx: &FlowState,
     ) -> Type {
         for atomic in &obj_ty.types {
             match atomic {
@@ -1741,6 +1806,18 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     message: Some(msg.clone()).filter(|m| !m.is_empty()),
                                 },
                                 Severity::Info,
+                                span,
+                            );
+                        }
+                        if !self.in_existence_check
+                            && self.property_inaccessible(p.visibility, owner.as_ref(), ctx)
+                        {
+                            self.emit(
+                                IssueKind::InaccessibleProperty {
+                                    class: owner.to_string(),
+                                    property: prop_name.to_string(),
+                                },
+                                Severity::Error,
                                 span,
                             );
                         }
@@ -1997,6 +2074,18 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     message: Some(msg.clone()).filter(|m| !m.is_empty()),
                                 },
                                 Severity::Info,
+                                span,
+                            );
+                        }
+                        if !self.in_existence_check
+                            && self.property_inaccessible(p.visibility, owner.as_ref(), ctx)
+                        {
+                            self.emit(
+                                IssueKind::InaccessibleProperty {
+                                    class: owner.to_string(),
+                                    property: prop_name.to_string(),
+                                },
+                                Severity::Error,
                                 span,
                             );
                         }

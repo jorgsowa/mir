@@ -102,6 +102,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for the start of a new kind name, producing a phantom
   `UnusedSuppress`. Stop scanning for further kinds once a segment has
   trailing words after its kind name.
+- **Private/protected property access from an invalid scope (new
+  `InaccessibleProperty`, `MIR0014`):** equivalent method and
+  class-constant access was already rejected, but reading a private or
+  protected property from outside the declaring class (or its
+  subclasses, for `protected`) went unreported, hiding a runtime-fatal
+  error. Checked for both instance (`$obj->prop`/`$obj?->prop`) and
+  static (`Class::$prop`/`self::$prop`) property reads.
 
 ### Performance
 
