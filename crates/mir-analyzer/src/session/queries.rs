@@ -314,9 +314,17 @@ impl AnalysisSession {
         // gated on their text mentioning the symbol's name: such a file can
         // neither hold stale postings nor produce new ones, so a cold query
         // on a common name skips the bulk of the workspace instead of
-        // analyzing it. Stale (previously committed) files re-analyze
-        // unconditionally — their existing postings must be replaced. Same
-        // discipline as `commit_defs_for_matching` on the defs index.
+        // analyzing it. A LIVE-analyzed file stale only by generation
+        // (unresolved-name commit, text unchanged since) gets the same gate:
+        // the current text is exactly what this session's own analysis
+        // already scanned, so a needle miss is just as conclusive as for a
+        // never-committed file. Everything else — a genuinely edited file, or
+        // a commit seeded by an unverified disk-cache replay
+        // (`warm_start_files`, never scanned by this session) — re-analyzes
+        // unconditionally: an edited file's old postings are for different
+        // text, and a replayed commit's postings are only as trustworthy as
+        // the cache entry, so neither can be cleared by a textual gate alone.
+        // Same discipline as `commit_defs_for_matching` on the defs index.
         //
         let gate = self.reference_gate(symbol);
         let needles: Vec<String> = gate.idents.clone();
@@ -369,7 +377,9 @@ impl AnalysisSession {
                         if self.is_ref_committed(f.as_ref(), text, current_gen) {
                             return (None, None);
                         }
-                        if committed_any.contains(f.as_ref()) {
+                        if committed_any.contains(f.as_ref())
+                            && !self.ref_commit_stale_by_generation_only(f.as_ref(), text)
+                        {
                             return (Some(f.clone()), None);
                         }
                         let raw_hit = || {

@@ -151,6 +151,13 @@ pub(crate) struct RefCommit {
     /// generation bumps. FQCN shadowing and unqualified-call fallback
     /// switches remain the reanalyze_dependents flow's job, as before.
     resolved: bool,
+    /// Whether this commit came from this session's own `analyze_file` pass
+    /// (`out: Some(..)`) rather than a disk-cache replay (`out: None`, from
+    /// `warm_start_files`). A live analysis's postings are guaranteed
+    /// consistent with a fresh textual scan of the same text — a replayed
+    /// commit's are only as trustworthy as the cache entry, so it always
+    /// re-verifies via full re-analysis instead of the cheaper gate.
+    live_analyzed: bool,
 }
 
 /// file → [`RefCommit`] map shared across session clones.
@@ -216,6 +223,30 @@ impl AnalysisSession {
         })
     }
 
+    /// Whether `file` has a *live-analyzed* reference commit recorded against
+    /// exactly `current_text` — i.e. it's only stale by generation (an
+    /// unresolved-name commit racing a workspace-growth bump), not because
+    /// its text changed or because it was seeded by an unverified disk-cache
+    /// replay. Such a commit is still eligible for the mention/needle gate:
+    /// the current text is exactly what this session's own analysis already
+    /// scanned, so a needle miss is just as conclusive as for a
+    /// never-committed file. A replayed commit (`live_analyzed: false`)
+    /// never qualifies here, regardless of text match — its postings are
+    /// only as trustworthy as the cache entry, so it always falls through to
+    /// unconditional re-analysis. Same for a genuinely edited file (text
+    /// differs): the old commit's postings are for different text and must
+    /// be replaced regardless of what the new text mentions.
+    pub(crate) fn ref_commit_stale_by_generation_only(
+        &self,
+        file: &str,
+        current_text: &Arc<str>,
+    ) -> bool {
+        self.ref_committed
+            .read()
+            .get(file)
+            .is_some_and(|c| c.live_analyzed && Arc::ptr_eq(&c.text, current_text))
+    }
+
     /// Whether `file`'s stored postings came from exactly this
     /// (text, output) pair — generation aside. Pointer-identical output
     /// means identical postings (salsa backdates equal results to the same
@@ -252,6 +283,7 @@ impl AnalysisSession {
             out: out.map(Arc::downgrade).unwrap_or_default(),
             generation,
             resolved,
+            live_analyzed: out.is_some(),
         };
         self.ref_committed.write().insert(file.clone(), commit);
     }
