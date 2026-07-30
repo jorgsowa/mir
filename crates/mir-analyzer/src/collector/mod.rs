@@ -444,6 +444,56 @@ pub(super) fn infer_const_value(
             _ => None,
         },
         php_ast::owned::ExprKind::Parenthesized(inner) => infer_const_value(collector, &inner.kind),
+        // A literal array constant (`const array D = [',', ';', "\t"];`) gets
+        // the same keyed-shape/list treatment an inline array literal already
+        // gets from `expr/arrays.rs::analyze_array` — building it here (rather
+        // than through that function, which needs a live `FlowState` for
+        // diagnostics/taint that a compile-time constant expression has no use
+        // for) is what lets `self::D` retain its element count and per-element
+        // literal types instead of widening to a bare `array`. Bails to `None`
+        // (falls back to the native `array` hint, same as today) on anything
+        // not fully resolvable at compile time: a spread, a by-ref element, a
+        // non-literal key, or any element value that isn't itself inferable.
+        php_ast::owned::ExprKind::Array(elements) => {
+            use mir_types::atomic::{ArrayKey, KeyedProperty};
+            let mut keyed_props: indexmap::IndexMap<ArrayKey, KeyedProperty> =
+                indexmap::IndexMap::new();
+            let mut is_list = true;
+            let mut next_int_key: i64 = 0;
+            for elem in elements.iter() {
+                if elem.unpack || elem.by_ref {
+                    return None;
+                }
+                let value_ty = infer_const_value(collector, &elem.value.kind)?;
+                let key = if let Some(key_expr) = &elem.key {
+                    is_list = false;
+                    match infer_const_value(collector, &key_expr.kind)?.types.as_slice() {
+                        [Atomic::TLiteralString(s)] => ArrayKey::String(s.clone()),
+                        [Atomic::TLiteralInt(i)] => {
+                            next_int_key = *i + 1;
+                            ArrayKey::Int(*i)
+                        }
+                        _ => return None,
+                    }
+                } else {
+                    let k = ArrayKey::Int(next_int_key);
+                    next_int_key += 1;
+                    k
+                };
+                keyed_props.insert(
+                    key,
+                    KeyedProperty {
+                        ty: value_ty,
+                        optional: false,
+                    },
+                );
+            }
+            Some(Type::single(Atomic::TKeyedArray {
+                properties: Box::new(keyed_props),
+                is_open: false,
+                is_list,
+            }))
+        }
         // Idiomatic bitflag declarations (`const FLAG_A = 1 << 0;`) and other
         // literal-int arithmetic. Only evaluated when both operands are
         // themselves literal ints, so `self::OTHER_CONST | 1` still falls
@@ -531,14 +581,22 @@ pub(super) fn const_type_with_literal_narrowing(
     hint_ty: Option<Type>,
     literal_ty: Option<Type>,
 ) -> Option<Type> {
-    let narrows = matches!(
-        (
-            hint_ty.as_ref().map(|t| t.types.as_slice()),
-            literal_ty.as_ref().map(|t| t.types.as_slice()),
-        ),
+    let narrows = match (
+        hint_ty.as_ref().map(|t| t.types.as_slice()),
+        literal_ty.as_ref().map(|t| t.types.as_slice()),
+    ) {
         (Some([Atomic::TInt]), Some([Atomic::TLiteralInt(_)]))
-            | (Some([Atomic::TString]), Some([Atomic::TLiteralString(_)]))
-    );
+        | (Some([Atomic::TString]), Some([Atomic::TLiteralString(_)])) => true,
+        // A bare `array` hint (key/value both unannotated `mixed`) narrows to
+        // the literal's own keyed-shape/list type the same way — an explicitly
+        // narrower hint (`array<int, string>`) is left as-is, since the
+        // literal might not actually satisfy it and this isn't the place to
+        // check that.
+        (Some([Atomic::TArray { key, value }]), Some([Atomic::TKeyedArray { .. }])) => {
+            key.is_mixed() && value.is_mixed()
+        }
+        _ => false,
+    };
     if narrows {
         literal_ty
     } else {
