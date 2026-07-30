@@ -103,26 +103,16 @@ fn validate_callback_arity(
             .iter()
             .filter(|p| !p.is_optional && !p.is_variadic)
             .count();
-        let has_variadic = params.iter().any(|p| p.is_variadic);
-        let max_params = params.len();
 
+        // A callback may always declare fewer params than the number of arrays
+        // passed — PHP simply drops the extra invocation arguments. Only a callback
+        // that REQUIRES more than what array_map will pass is actually broken.
         if required_count > expected_arity {
             let fn_name = callback_name_for_diagnostic(callback_ty);
             ea.emit(
                 IssueKind::TooFewArguments {
                     fn_name,
                     expected: required_count,
-                    actual: expected_arity,
-                },
-                Severity::Error,
-                callback_span,
-            );
-        } else if !has_variadic && max_params < expected_arity {
-            let fn_name = callback_name_for_diagnostic(callback_ty);
-            ea.emit(
-                IssueKind::TooManyArguments {
-                    fn_name,
-                    expected: max_params,
                     actual: expected_arity,
                 },
                 Severity::Error,
@@ -184,17 +174,14 @@ pub(crate) fn check_array_filter_callback(
             .iter()
             .filter(|p| !p.is_optional && !p.is_variadic)
             .count();
-        let has_variadic = params.iter().any(|p| p.is_variadic);
-        let max_params = params.len();
 
-        if required_count > expected_arity || (!has_variadic && max_params < expected_arity) {
-            let actual_count = if has_variadic {
-                required_count
-            } else {
-                max_params
-            };
+        // A callback may always declare fewer params than array_filter will pass
+        // (e.g. a value-only callback under ARRAY_FILTER_USE_BOTH) — PHP simply
+        // drops the extra invocation argument. Only requiring MORE than what
+        // array_filter passes is actually broken.
+        if required_count > expected_arity {
             let expected_plural = if expected_arity == 1 { "" } else { "s" };
-            let actual_plural = if actual_count == 1 { "" } else { "s" };
+            let actual_plural = if required_count == 1 { "" } else { "s" };
             ea.emit(
                 IssueKind::InvalidArgument {
                     param: "callback".to_string(),
@@ -205,7 +192,7 @@ pub(crate) fn check_array_filter_callback(
                     ),
                     actual: format!(
                         "callable accepting {} argument{}",
-                        actual_count, actual_plural
+                        required_count, actual_plural
                     ),
                 },
                 Severity::Error,
