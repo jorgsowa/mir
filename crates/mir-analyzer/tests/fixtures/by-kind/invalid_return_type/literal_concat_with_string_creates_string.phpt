@@ -1,5 +1,7 @@
 ===description===
-Literal concat with string creates string
+Literal concat with string creates string. Previously baked in the
+`literal-string` docblock-keyword bug: expected `UndefinedDocblockClass`
+since the keyword wasn't recognized at all.
 ===config===
 suppress=ImplicitToStringCast
 ===file===
@@ -12,4 +14,3 @@ function foo(string $s1, string $s2): string {
     return $s1 . $s2;
 }
 ===expect===
-UndefinedDocblockClass@6:9-6:12: Docblock type 'literal-string' does not exist

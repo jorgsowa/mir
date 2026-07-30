@@ -189,6 +189,16 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         "class-string" => Type::single(Atomic::TClassString(None)),
         "interface-string" => Type::single(Atomic::TInterfaceString(None)),
         "int" | "integer" => Type::single(Atomic::TInt),
+        // `literal-int`/`literal-string`: "any literal value of this kind",
+        // used almost exclusively as a template bound (`@template T of
+        // literal-string`). mir has no atom for "any literal, unspecified
+        // value" — approximate with the bare scalar type, same approach as
+        // the `truthy-string`/`lowercase-string` approximations above (every
+        // literal atom is already a subtype of its bare scalar, so a bound
+        // check against the base type still accepts any literal argument;
+        // it's merely lenient about accepting a non-literal one too).
+        "literal-int" => Type::single(Atomic::TInt),
+        "literal-string" => Type::single(Atomic::TString),
         "positive-int" => Type::single(Atomic::TPositiveInt),
         "negative-int" => Type::single(Atomic::TNegativeInt),
         "non-negative-int" => Type::single(Atomic::TNonNegativeInt),
