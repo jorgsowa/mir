@@ -11,7 +11,7 @@ use mir_analyzer::{
 };
 
 use crate::config::Config;
-use crate::path_util::strip_verbatim_prefix;
+use crate::path_util::normalize_for_compare;
 use crate::{color, Cli, OutputFormat};
 
 // ---------------------------------------------------------------------------
@@ -60,8 +60,7 @@ pub fn run_composer_flow(
         || cli
             .paths
             .first()
-            .and_then(|p| p.canonicalize().ok())
-            .is_some_and(|p| strip_verbatim_prefix(&p) == strip_verbatim_prefix(composer_root));
+            .is_some_and(|p| normalize_for_compare(p) == normalize_for_compare(composer_root));
 
     let discovered: Vec<PathBuf> = if analyze_whole_composer_project {
         let all = map.project_files();
@@ -157,11 +156,13 @@ pub fn run_plain_flow(
     };
 
     let cwd_abs = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let normalized_ignore_dirs: Vec<PathBuf> =
+        ignore_dirs.iter().map(|ig| normalize_for_compare(ig)).collect();
     let files: Vec<PathBuf> = scan_roots
         .iter()
         .flat_map(|p| discover_files(p))
         .filter(|p| {
-            if ignore_dirs.is_empty() {
+            if normalized_ignore_dirs.is_empty() {
                 return true;
             }
             let abs = if p.is_absolute() {
@@ -169,10 +170,8 @@ pub fn run_plain_flow(
             } else {
                 cwd_abs.join(p)
             };
-            let abs = strip_verbatim_prefix(&abs);
-            !ignore_dirs
-                .iter()
-                .any(|ig| abs.starts_with(strip_verbatim_prefix(ig)))
+            let abs = normalize_for_compare(&abs);
+            !normalized_ignore_dirs.iter().any(|ig| abs.starts_with(ig))
         })
         .collect();
 
@@ -462,21 +461,20 @@ fn filter_ignore(
     ignore_dirs: &[PathBuf],
     base: &std::path::Path,
 ) -> Vec<PathBuf> {
+    if ignore_dirs.is_empty() {
+        return files;
+    }
+    let ignore_dirs: Vec<PathBuf> = ignore_dirs.iter().map(|ig| normalize_for_compare(ig)).collect();
     files
         .into_iter()
         .filter(|p| {
-            if ignore_dirs.is_empty() {
-                return true;
-            }
             let abs = if p.is_absolute() {
                 p.clone()
             } else {
                 base.join(p)
             };
-            let abs = strip_verbatim_prefix(&abs);
-            !ignore_dirs
-                .iter()
-                .any(|ig| abs.starts_with(strip_verbatim_prefix(ig)))
+            let abs = normalize_for_compare(&abs);
+            !ignore_dirs.iter().any(|ig| abs.starts_with(ig))
         })
         .collect()
 }
@@ -487,6 +485,7 @@ fn filter_to_dirs(files: Vec<PathBuf>, roots: &[PathBuf], base: &std::path::Path
     if roots.is_empty() {
         return files;
     }
+    let roots: Vec<PathBuf> = roots.iter().map(|r| normalize_for_compare(r)).collect();
     files
         .into_iter()
         .filter(|p| {
@@ -495,10 +494,8 @@ fn filter_to_dirs(files: Vec<PathBuf>, roots: &[PathBuf], base: &std::path::Path
             } else {
                 base.join(p)
             };
-            let abs = strip_verbatim_prefix(&abs);
-            roots
-                .iter()
-                .any(|r| abs.starts_with(strip_verbatim_prefix(r)))
+            let abs = normalize_for_compare(&abs);
+            roots.iter().any(|r| abs.starts_with(r))
         })
         .collect()
 }

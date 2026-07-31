@@ -25,3 +25,15 @@ pub(crate) fn strip_verbatim_prefix(p: &Path) -> PathBuf {
 pub(crate) fn strip_verbatim_prefix(p: &Path) -> PathBuf {
     p.to_path_buf()
 }
+
+/// Best-effort `canonicalize()` (falling back to `p` unchanged if the path doesn't exist
+/// yet or the call errors) followed by [`strip_verbatim_prefix`]. Two paths that denote the
+/// same directory can still disagree byte-for-byte before this — one may have gone through
+/// `canonicalize()` upstream (e.g. `composer::find_composer_root_for_path`) and picked up a
+/// resolved symlink, 8.3-short-name expansion, or on-disk casing that the other path (built
+/// by plain `PathBuf::join` from a config-relative entry) never went through. Applying the
+/// same normalization to both sides before `starts_with`/`==` is the only way to make them
+/// comparable.
+pub(crate) fn normalize_for_compare(p: &Path) -> PathBuf {
+    strip_verbatim_prefix(&p.canonicalize().unwrap_or_else(|_| p.to_path_buf()))
+}
