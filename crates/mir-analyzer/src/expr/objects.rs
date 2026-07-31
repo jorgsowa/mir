@@ -290,8 +290,12 @@ impl<'a> ExpressionAnalyzer<'a> {
         arg_types.clear();
         let mut sole_spread_ty: Option<Type> = None;
         for a in n.args.iter() {
-            let ty = self.analyze(&a.value, ctx);
-            crate::call::consume_arg_assignment(&a.value, ctx);
+            let Some(value) = &a.value else {
+                arg_types.push(Type::mixed());
+                continue;
+            };
+            let ty = self.analyze(value, ctx);
+            crate::call::consume_arg_assignment(value, ctx);
             if a.unpack {
                 if n.args.len() == 1 {
                     sole_spread_ty = Some(ty.clone());
@@ -310,7 +314,11 @@ impl<'a> ExpressionAnalyzer<'a> {
         let mut arg_can_be_byref: Vec<bool> = n
             .args
             .iter()
-            .map(|a| expr_can_be_passed_by_reference_owned(&a.value))
+            .map(|a| {
+                a.value
+                    .as_ref()
+                    .is_some_and(expr_can_be_passed_by_reference_owned)
+            })
             .collect();
         let mut ctor_has_spread = n.args.iter().any(|a| a.unpack);
         let mut ctor_arity_unknown = ctor_has_spread;
@@ -477,8 +485,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     positional.or(named).into_iter().collect()
                                 };
                                 for arg in args {
+                                    let Some(value) = &arg.value else { continue };
                                     if crate::taint::is_expr_tainted(
-                                        &arg.value, ctx, self.db, &self.file,
+                                        value, ctx, self.db, &self.file,
                                     ) {
                                         self.emit(
                                             crate::taint::taint_sink_issue(sink_kind),
@@ -527,7 +536,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                             && !ctor_is_mutation_free
                         {
                             for arg in n.args.iter() {
-                                let Some(recv_name) = root_receiver_var(&arg.value) else {
+                                let Some(value) = &arg.value else { continue };
+                                let Some(recv_name) = root_receiver_var(value) else {
                                     continue;
                                 };
                                 let recv_stripped = recv_name.trim_start_matches('$');
@@ -541,7 +551,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 }
                                 let arg_is_object =
                                     crate::expr::assignment::resolve_chained_receiver_type(
-                                        &arg.value, ctx, self.db, &self.file,
+                                        value, ctx, self.db, &self.file,
                                     )
                                     .is_some_and(|ty| {
                                         ty.types.iter().any(|a| {

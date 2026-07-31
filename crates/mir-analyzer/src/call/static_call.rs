@@ -306,22 +306,25 @@ impl CallAnalyzer {
         }
 
         let mut sole_spread_ty: Option<Type> = None;
-        let mut arg_types: Vec<Type> = call
-            .args
-            .iter()
-            .map(|arg| {
-                let ty = ea.analyze(&arg.value, ctx);
-                super::consume_arg_assignment(&arg.value, ctx);
-                if arg.unpack {
-                    if call.args.len() == 1 {
-                        sole_spread_ty = Some(ty.clone());
-                    }
-                    spread_element_type(ea.db, &ty)
-                } else {
-                    ty
+        let mut arg_types: Vec<Type> = Vec::with_capacity(call.args.len());
+        for arg in call.args.iter() {
+            // `None` is a PHP 8.6 partial-application placeholder (`?`/`...`)
+            // — not yet modeled; keep positional slots aligned with `mixed`.
+            let Some(value) = &arg.value else {
+                arg_types.push(Type::mixed());
+                continue;
+            };
+            let ty = ea.analyze(value, ctx);
+            super::consume_arg_assignment(value, ctx);
+            if arg.unpack {
+                if call.args.len() == 1 {
+                    sole_spread_ty = Some(ty.clone());
                 }
-            })
-            .collect();
+                arg_types.push(spread_element_type(ea.db, &ty));
+            } else {
+                arg_types.push(ty);
+            }
+        }
         let mut arg_spans: Vec<Span> = call.args.iter().map(|a| a.span).collect();
 
         // Check if trying to call static method on an interface (not allowed)
@@ -467,7 +470,8 @@ impl CallAnalyzer {
                 && !resolved.is_mutation_free
             {
                 for arg in call.args.iter() {
-                    let Some(recv_name) = crate::expr::root_receiver_var(&arg.value) else {
+                    let Some(value) = &arg.value else { continue };
+                    let Some(recv_name) = crate::expr::root_receiver_var(value) else {
                         continue;
                     };
                     let recv_stripped = recv_name.trim_start_matches('$');
@@ -479,7 +483,7 @@ impl CallAnalyzer {
                         continue;
                     }
                     let arg_is_object = crate::expr::assignment::resolve_chained_receiver_type(
-                        &arg.value, ctx, ea.db, &ea.file,
+                        value, ctx, ea.db, &ea.file,
                     )
                     .is_some_and(|ty| {
                         ty.types.iter().any(|a| {
@@ -614,7 +618,11 @@ impl CallAnalyzer {
             let mut arg_can_be_byref: Vec<bool> = call
                 .args
                 .iter()
-                .map(|a| expr_can_be_passed_by_reference_owned(&a.value))
+                .map(|a| {
+                    a.value
+                        .as_ref()
+                        .is_some_and(expr_can_be_passed_by_reference_owned)
+                })
                 .collect();
             let mut has_spread = call.args.iter().any(|a| a.unpack);
             let mut arity_unknown = has_spread;
@@ -745,7 +753,7 @@ impl CallAnalyzer {
             // mutation-free, regardless of what's being called on.
             if !resolved.is_pure && !resolved.is_external_mutation_free {
                 for arg in call.args.iter() {
-                    if let ExprKind::Variable(name) = &arg.value.kind {
+                    if let Some(ExprKind::Variable(name)) = arg.value.as_ref().map(|v| &v.kind) {
                         ctx.invalidate_prop_refined_receiver(name);
                     }
                 }
@@ -784,7 +792,8 @@ impl CallAnalyzer {
                         positional.or(named_arg).into_iter().collect()
                     };
                     for arg in args {
-                        if is_expr_tainted(&arg.value, ctx, ea.db, &ea.file) {
+                        let Some(value) = &arg.value else { continue };
+                        if is_expr_tainted(value, ctx, ea.db, &ea.file) {
                             ea.emit(taint_sink_issue(sink_kind), Severity::Error, span);
                         }
                     }
@@ -960,13 +969,15 @@ impl CallAnalyzer {
                 }
                 if param.is_variadic {
                     for arg in call.args.iter().skip(i) {
-                        ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
+                        let Some(value) = &arg.value else { continue };
+                        ea.check_byref_arg_purity(value, ctx, value.span);
                     }
-                } else if let Some(arg) =
+                } else if let Some(value) =
                     crate::call::resolve_named_arg_type_index(&resolved.params, &call.args, i)
                         .and_then(|idx| call.args.get(idx))
+                        .and_then(|arg| arg.value.as_ref())
                 {
-                    ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
+                    ea.check_byref_arg_purity(value, ctx, value.span);
                 }
             }
 
@@ -976,10 +987,11 @@ impl CallAnalyzer {
             // clear) it the same "sticky" way `.=`/`??=` already treat
             // their own result, rather than leaving its taint bit untouched
             // from whatever it happened to hold before the call.
-            let any_arg_tainted = call
-                .args
-                .iter()
-                .any(|arg| is_expr_tainted(&arg.value, ctx, ea.db, &ea.file));
+            let any_arg_tainted = call.args.iter().any(|arg| {
+                arg.value
+                    .as_ref()
+                    .is_some_and(|v| is_expr_tainted(v, ctx, ea.db, &ea.file))
+            });
             for (i, param) in resolved.params.iter().enumerate() {
                 let Some(out_ty) = param.out_ty.as_ref() else {
                     continue;
@@ -995,7 +1007,8 @@ impl CallAnalyzer {
                 };
                 if param.is_variadic {
                     for arg in call.args.iter().skip(i) {
-                        if let ExprKind::Variable(name) = &arg.value.kind {
+                        let Some(value) = &arg.value else { continue };
+                        if let ExprKind::Variable(name) = &value.kind {
                             let var_name = name.as_ref().trim_start_matches('$');
                             ctx.set_var(var_name, out_ty.clone());
                             if any_arg_tainted {
@@ -1005,11 +1018,12 @@ impl CallAnalyzer {
                             }
                         }
                     }
-                } else if let Some(arg) =
+                } else if let Some(value) =
                     crate::call::resolve_named_arg_type_index(&resolved.params, &call.args, i)
                         .and_then(|idx| call.args.get(idx))
+                        .and_then(|arg| arg.value.as_ref())
                 {
-                    if let ExprKind::Variable(name) = &arg.value.kind {
+                    if let ExprKind::Variable(name) = &value.kind {
                         let var_name = name.as_ref().trim_start_matches('$');
                         ctx.set_var(var_name, out_ty);
                         if any_arg_tainted {
@@ -1289,9 +1303,10 @@ impl CallAnalyzer {
         }
         ea.analyze(&call.method, ctx);
         for arg in call.args.iter() {
-            ea.analyze(&arg.value, ctx);
-            super::consume_arg_assignment(&arg.value, ctx);
-            if let ExprKind::Variable(name) = &arg.value.kind {
+            let Some(value) = &arg.value else { continue };
+            ea.analyze(value, ctx);
+            super::consume_arg_assignment(value, ctx);
+            if let ExprKind::Variable(name) = &value.kind {
                 ctx.invalidate_prop_refined_receiver(name);
             }
         }

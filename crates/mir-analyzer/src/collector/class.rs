@@ -661,7 +661,11 @@ pub(crate) fn parse_attribute_flags(attrs: &[php_ast::owned::Attribute]) -> Opti
         let flags = if attr.args.is_empty() {
             ATTR_TARGET_ALL
         } else {
-            eval_attribute_flags_expr(&attr.args[0].value).unwrap_or(ATTR_TARGET_ALL)
+            attr.args[0]
+                .value
+                .as_ref()
+                .and_then(eval_attribute_flags_expr)
+                .unwrap_or(ATTR_TARGET_ALL)
         };
         return Some(flags);
     }

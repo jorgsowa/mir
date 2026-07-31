@@ -226,7 +226,12 @@ pub(crate) fn narrow_array_key_exists_condition(
     // `key_exists()` is a built-in alias of `array_key_exists()`
     // with identical semantics.
     if let (Some(key_arg), Some(arr_arg)) = (call.args.first(), call.args.get(1)) {
-        let literal_key = match &key_arg.value.kind {
+        let (Some(key_value), Some(arr_value)) = (&key_arg.value, &arr_arg.value) else {
+            // A partial-application placeholder (`?`/`...`) as either
+            // argument leaves nothing concrete to narrow on.
+            return;
+        };
+        let literal_key = match &key_value.kind {
             ExprKind::String(s) => Some(mir_types::atomic::ArrayKey::String(std::sync::Arc::from(
                 s.as_ref(),
             ))),
@@ -236,12 +241,12 @@ pub(crate) fn narrow_array_key_exists_condition(
             // narrowed to a single literal, same as an inline literal
             // would be.
             _ => {
-                let key_ty = if let Some(name) = extract_var_name(&key_arg.value) {
+                let key_ty = if let Some(name) = extract_var_name(key_value) {
                     Some(ctx.get_var(&name))
-                } else if let Some((obj, prop)) = extract_any_prop_access(&key_arg.value) {
+                } else if let Some((obj, prop)) = extract_any_prop_access(key_value) {
                     Some(resolve_prop_current_type(ctx, &obj, &prop, db, file))
                 } else {
-                    extract_static_prop_access(&key_arg.value, ctx, db, file)
+                    extract_static_prop_access(key_value, ctx, db, file)
                         .map(|(fqcn, prop)| resolve_static_prop_current_type(ctx, &fqcn, &prop, db))
                 };
                 key_ty.and_then(|ty| match ty.types.as_slice() {
@@ -255,7 +260,7 @@ pub(crate) fn narrow_array_key_exists_condition(
         };
         if let Some(key) = literal_key {
             if is_true {
-                if let Some(var_name) = extract_var_name(&arr_arg.value) {
+                if let Some(var_name) = extract_var_name(arr_value) {
                     let current = ctx.get_var(&var_name);
                     // array_key_exists() throws TypeError on a null 2nd arg,
                     // so reaching the true branch already proves $arr wasn't
@@ -265,18 +270,18 @@ pub(crate) fn narrow_array_key_exists_condition(
                     if narrowed != current {
                         ctx.set_var(&var_name, narrowed);
                     }
-                } else if let Some((obj, prop)) = extract_any_prop_access(&arr_arg.value) {
+                } else if let Some((obj, prop)) = extract_any_prop_access(arr_value) {
                     narrow_prop_array_key_exists(ctx, &obj, &prop, &key, db, file);
                     // array_key_exists() throws TypeError on a null 2nd
                     // arg, so reaching the true branch already proves
                     // $obj->prop (and thus $obj) was non-null.
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, true);
                 } else if let Some((fqcn, prop)) =
-                    extract_static_prop_access(&arr_arg.value, ctx, db, file)
+                    extract_static_prop_access(arr_value, ctx, db, file)
                 {
                     narrow_static_prop_array_key_exists(ctx, &fqcn, &prop, &key, db);
                 } else if let Some((base, path)) =
-                    collect_array_access_path(&arr_arg.value, ctx, db, file)
+                    collect_array_access_path(arr_value, ctx, db, file)
                 {
                     // Nested container, e.g. array_key_exists('b', $arr['a']) —
                     // walk down to the ['a'] shape and prove 'b' present there,
@@ -288,10 +293,8 @@ pub(crate) fn narrow_array_key_exists_condition(
                 } else if let (
                     mir_types::atomic::ArrayKey::String(iface_name),
                     Some((target, is_parents)),
-                ) = (
-                    &key,
-                    extract_class_implements_or_parents_arg(&arr_arg.value),
-                ) {
+                ) = (&key, extract_class_implements_or_parents_arg(arr_value))
+                {
                     // array_key_exists('Iface', class_implements($x)) —
                     // same relationship `$x instanceof Iface` proves.
                     // array_key_exists('Ancestor', class_parents($x)) is
@@ -333,12 +336,7 @@ pub(crate) fn narrow_array_key_exists_condition(
                     Some(((static_fqcn, prop), is_parents)),
                 ) = (
                     &key,
-                    extract_class_implements_or_parents_static_prop_arg(
-                        &arr_arg.value,
-                        ctx,
-                        db,
-                        file,
-                    ),
+                    extract_class_implements_or_parents_static_prop_arg(arr_value, ctx, db, file),
                 ) {
                     // array_key_exists('Iface', class_implements(self::$prop)) —
                     // static-property counterpart of the var/prop arm above.
@@ -360,7 +358,7 @@ pub(crate) fn narrow_array_key_exists_condition(
                 // False branch: exclude shape members that
                 // guarantee the key's presence — see
                 // `remove_key_from_sealed_shapes`.
-                if let Some(var_name) = extract_var_name(&arr_arg.value) {
+                if let Some(var_name) = extract_var_name(arr_value) {
                     let current = ctx.get_var(&var_name);
                     // array_key_exists() throws TypeError on a null 2nd arg,
                     // so reaching the false branch also proves $arr wasn't
@@ -368,7 +366,7 @@ pub(crate) fn narrow_array_key_exists_condition(
                     let non_null = current.remove_null();
                     let narrowed = remove_key_from_sealed_shapes(&non_null, &key);
                     set_narrowed(ctx, &var_name, &current, narrowed, true);
-                } else if let Some((obj, prop)) = extract_any_prop_access(&arr_arg.value) {
+                } else if let Some((obj, prop)) = extract_any_prop_access(arr_value) {
                     let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
                     if !current.is_mixed() {
                         let non_null = current.remove_null();
@@ -380,7 +378,7 @@ pub(crate) fn narrow_array_key_exists_condition(
                     // $obj->prop (and thus $obj) was non-null.
                     narrow_receiver_non_null_on_prop_match(ctx, &obj, true);
                 } else if let Some((fqcn, prop)) =
-                    extract_static_prop_access(&arr_arg.value, ctx, db, file)
+                    extract_static_prop_access(arr_value, ctx, db, file)
                 {
                     let current = resolve_static_prop_current_type(ctx, &fqcn, &prop, db);
                     if !current.is_mixed() {
@@ -389,7 +387,7 @@ pub(crate) fn narrow_array_key_exists_condition(
                         apply_prop_narrowed(ctx, &fqcn, &prop, current, narrowed, true);
                     }
                 } else if let Some((base, path)) =
-                    collect_array_access_path(&arr_arg.value, ctx, db, file)
+                    collect_array_access_path(arr_value, ctx, db, file)
                 {
                     // Nested container, false branch, e.g.
                     // array_key_exists('b', $arr['a']) proven
@@ -404,10 +402,8 @@ pub(crate) fn narrow_array_key_exists_condition(
                 } else if let (
                     mir_types::atomic::ArrayKey::String(iface_name),
                     Some((target, is_parents)),
-                ) = (
-                    &key,
-                    extract_class_implements_or_parents_arg(&arr_arg.value),
-                ) {
+                ) = (&key, extract_class_implements_or_parents_arg(arr_value))
+                {
                     // !array_key_exists('Iface', class_implements($x)) —
                     // exclude Iface, same as `!($x instanceof Iface)`.
                     // class_parents(), by contrast, never narrows on the
@@ -432,12 +428,7 @@ pub(crate) fn narrow_array_key_exists_condition(
                     Some(((static_fqcn, prop), is_parents)),
                 ) = (
                     &key,
-                    extract_class_implements_or_parents_static_prop_arg(
-                        &arr_arg.value,
-                        ctx,
-                        db,
-                        file,
-                    ),
+                    extract_class_implements_or_parents_static_prop_arg(arr_value, ctx, db, file),
                 ) {
                     // !array_key_exists('Iface', class_implements(self::$prop)) —
                     // static-property counterpart of the var/prop arm above.

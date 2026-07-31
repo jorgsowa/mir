@@ -457,7 +457,7 @@ fn extract_type_fn_check(expr: &php_ast::owned::Expr) -> Option<(&str, String)> 
     if call.args.len() != 1 {
         return None;
     }
-    let var_name = extract_var_name(&call.args[0].value)?;
+    let var_name = extract_var_name(call.args[0].value.as_ref()?)?;
     Some((canonical, var_name))
 }
 
@@ -482,7 +482,7 @@ fn extract_type_fn_check_prop(expr: &php_ast::owned::Expr) -> Option<(&str, Stri
     if call.args.len() != 1 {
         return None;
     }
-    let (obj, prop) = extract_prop_access(&call.args[0].value)?;
+    let (obj, prop) = extract_prop_access(call.args[0].value.as_ref()?)?;
     Some((canonical, obj, prop))
 }
 
@@ -607,7 +607,7 @@ fn extract_type_fn_check_static_prop(
         return None;
     }
     let (fqcn, prop) = extract_static_prop_access_parts(
-        &call.args[0].value,
+        call.args[0].value.as_ref()?,
         db,
         file,
         self_fqcn,
@@ -683,7 +683,7 @@ fn is_a_or_subclass_of_call_receiver(expr: &php_ast::owned::Expr) -> Option<&php
     if !(bare.eq_ignore_ascii_case("is_a") || bare.eq_ignore_ascii_case("is_subclass_of")) {
         return None;
     }
-    Some(&call.args.first()?.value)
+    call.args.first()?.value.as_ref()
 }
 
 /// Extract the single variable a leaf disjunct condition narrows — either a

@@ -130,8 +130,14 @@ impl CallAnalyzer {
                 let mut inner_arg_types: Vec<Type> = Vec::with_capacity(call.args.len());
                 let mut sole_spread_ty: Option<Type> = None;
                 for arg in call.args.iter() {
-                    let ty = ea.analyze(&arg.value, ctx);
-                    super::consume_arg_assignment(&arg.value, ctx);
+                    // `None` is a PHP 8.6 partial-application placeholder (`?`/`...`)
+                    // — not yet modeled; keep positional slots aligned with `mixed`.
+                    let Some(value) = &arg.value else {
+                        inner_arg_types.push(Type::mixed());
+                        continue;
+                    };
+                    let ty = ea.analyze(value, ctx);
+                    super::consume_arg_assignment(value, ctx);
                     if arg.unpack {
                         if call.args.len() == 1 {
                             sole_spread_ty = Some(ty.clone());
@@ -150,7 +156,11 @@ impl CallAnalyzer {
                 let mut inner_arg_byref: Vec<bool> = call
                     .args
                     .iter()
-                    .map(|a| expr_can_be_passed_by_reference_owned(&a.value))
+                    .map(|a| {
+                        a.value
+                            .as_ref()
+                            .is_some_and(expr_can_be_passed_by_reference_owned)
+                    })
                     .collect();
                 let mut has_spread = call.args.iter().any(|a| a.unpack);
                 let mut arity_unknown = has_spread;
@@ -230,10 +240,11 @@ impl CallAnalyzer {
 
                 // Write back output types to by-ref argument variables.
                 if let Some((_, ref params)) = callee_params {
-                    let any_arg_tainted = call
-                        .args
-                        .iter()
-                        .any(|arg| is_expr_tainted(&arg.value, ctx, ea.db, &ea.file));
+                    let any_arg_tainted = call.args.iter().any(|arg| {
+                        arg.value
+                            .as_ref()
+                            .is_some_and(|v| is_expr_tainted(v, ctx, ea.db, &ea.file))
+                    });
                     for (i, param) in params.iter().enumerate() {
                         if param.is_byref {
                             let output_ty = param
@@ -244,9 +255,10 @@ impl CallAnalyzer {
                                 .unwrap_or_else(Type::mixed);
                             if param.is_variadic {
                                 for arg in call.args.iter().skip(i) {
-                                    if let ExprKind::Variable(name) = &arg.value.kind {
+                                    let Some(value) = &arg.value else { continue };
+                                    if let ExprKind::Variable(name) = &value.kind {
                                         let var_name = name.trim_start_matches('$');
-                                        ea.check_var_write_purity(var_name, ctx, arg.value.span);
+                                        ea.check_var_write_purity(var_name, ctx, value.span);
                                         ctx.set_var(var_name, output_ty.clone());
                                         if any_arg_tainted {
                                             ctx.taint_var(var_name);
@@ -254,16 +266,17 @@ impl CallAnalyzer {
                                             ctx.clear_var_taint(var_name);
                                         }
                                     } else {
-                                        ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
+                                        ea.check_byref_arg_purity(value, ctx, value.span);
                                     }
                                 }
-                            } else if let Some(arg) =
+                            } else if let Some(value) =
                                 crate::call::resolve_named_arg_type_index(params, &call.args, i)
                                     .and_then(|idx| call.args.get(idx))
+                                    .and_then(|arg| arg.value.as_ref())
                             {
-                                if let ExprKind::Variable(name) = &arg.value.kind {
+                                if let ExprKind::Variable(name) = &value.kind {
                                     let var_name = name.trim_start_matches('$');
-                                    ea.check_var_write_purity(var_name, ctx, arg.value.span);
+                                    ea.check_var_write_purity(var_name, ctx, value.span);
                                     ctx.set_var(var_name, output_ty);
                                     if any_arg_tainted {
                                         ctx.taint_var(var_name);
@@ -271,7 +284,7 @@ impl CallAnalyzer {
                                         ctx.clear_var_taint(var_name);
                                     }
                                 } else {
-                                    ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
+                                    ea.check_byref_arg_purity(value, ctx, value.span);
                                 }
                             }
                         }
@@ -285,7 +298,7 @@ impl CallAnalyzer {
                 // `$this` and any object passed as an argument.
                 ctx.invalidate_prop_refined_receiver("this");
                 for arg in call.args.iter() {
-                    if let ExprKind::Variable(name) = &arg.value.kind {
+                    if let Some(ExprKind::Variable(name)) = arg.value.as_ref().map(|v| &v.kind) {
                         ctx.invalidate_prop_refined_receiver(name);
                     }
                 }
@@ -341,7 +354,8 @@ impl CallAnalyzer {
                 }
             };
             for arg in target_args {
-                if is_expr_tainted(&arg.value, ctx, ea.db, &ea.file) {
+                let Some(value) = &arg.value else { continue };
+                if is_expr_tainted(value, ctx, ea.db, &ea.file) {
                     let issue_kind = match sink_kind {
                         SinkKind::Html => IssueKind::TaintedHtml,
                         SinkKind::Sql => IssueKind::TaintedSql,
@@ -416,8 +430,12 @@ impl CallAnalyzer {
         arg_types.clear();
         let mut sole_spread_ty: Option<Type> = None;
         for arg in call.args.iter() {
-            let ty = ea.analyze(&arg.value, ctx);
-            super::consume_arg_assignment(&arg.value, ctx);
+            let Some(value) = &arg.value else {
+                arg_types.push(Type::mixed());
+                continue;
+            };
+            let ty = ea.analyze(value, ctx);
+            super::consume_arg_assignment(value, ctx);
             if arg.unpack {
                 if call.args.len() == 1 {
                     sole_spread_ty = Some(ty.clone());
@@ -437,7 +455,11 @@ impl CallAnalyzer {
         let mut arg_can_be_byref: Vec<bool> = call
             .args
             .iter()
-            .map(|a| expr_can_be_passed_by_reference_owned(&a.value))
+            .map(|a| {
+                a.value
+                    .as_ref()
+                    .is_some_and(expr_can_be_passed_by_reference_owned)
+            })
             .collect();
         // array_multisort accepts ANY expression for both the sort-key arrays
         // and the trailing SORT_* order/flags scalars bound to its `&...$rest`
@@ -475,8 +497,8 @@ impl CallAnalyzer {
             resolved_fn_name.as_str(),
             "call_user_func" | "call_user_func_array"
         ) {
-            if let Some(arg) = call.args.first() {
-                if let ExprKind::String(name) = &arg.value.kind {
+            if let Some(value) = call.args.first().and_then(|a| a.value.as_ref()) {
+                if let ExprKind::String(name) = &value.kind {
                     call_user_func_string_arg = true;
                     if let Some((class_name, method_name)) = name.as_ref().split_once("::") {
                         // "Class::method" static-callable string — resolve
@@ -488,13 +510,13 @@ impl CallAnalyzer {
                         if let Some((owner_fqcn, method)) =
                             crate::db::find_method_in_chain(ea.db, here, method_name)
                         {
-                            ea.record_ref(Arc::from(format!("cls:{resolved_class}")), arg.span);
+                            ea.record_ref(Arc::from(format!("cls:{resolved_class}")), value.span);
                             ea.record_ref(
                                 Arc::from(format!(
                                     "meth:{owner_fqcn}::{}",
                                     crate::util::php_ident_lowercase(&method.name)
                                 )),
-                                arg.span,
+                                value.span,
                             );
                         }
                     } else {
@@ -510,7 +532,7 @@ impl CallAnalyzer {
                         let canonical_fqn: Option<Arc<str>> =
                             crate::db::find_function(ea.db, here).map(|f| f.fqn.clone());
                         if let Some(canonical_fqn) = canonical_fqn {
-                            ea.record_ref(Arc::from(format!("fn:{canonical_fqn}")), arg.span);
+                            ea.record_ref(Arc::from(format!("fn:{canonical_fqn}")), value.span);
                         }
                     }
                 }
@@ -540,7 +562,7 @@ impl CallAnalyzer {
         };
         if let Some(idx) = class_name_arg_index {
             if let Some(arg) = call.args.get(idx) {
-                if let ExprKind::String(name) = &arg.value.kind {
+                if let Some(ExprKind::String(name)) = arg.value.as_ref().map(|v| &v.kind) {
                     let resolved_class = crate::db::resolve_name(ea.db, &ea.file, name.as_ref());
                     if crate::db::class_exists(ea.db, &resolved_class) {
                         ea.record_ref(Arc::from(format!("cls:{resolved_class}")), arg.span);
@@ -555,7 +577,7 @@ impl CallAnalyzer {
         // below rather than risk flagging a variable that's actually read this way.
         if fn_name == "compact" {
             for arg in call.args.iter() {
-                if let ExprKind::String(name) = &arg.value.kind {
+                if let Some(ExprKind::String(name)) = arg.value.as_ref().map(|v| &v.kind) {
                     ctx.read_vars.insert(mir_types::Name::from(name.as_ref()));
                     ctx.mark_consumed(name.as_ref());
                 } else {
@@ -575,8 +597,8 @@ impl CallAnalyzer {
             // names aren't known statically, so mark the WHOLE scope as
             // possibly holding a tainted dynamically-defined variable rather
             // than trying (and failing) to taint a specific name.
-            if let Some(arg) = call.args.first() {
-                if crate::taint::is_expr_tainted(&arg.value, ctx, ea.db, &ea.file) {
+            if let Some(value) = call.args.first().and_then(|a| a.value.as_ref()) {
+                if crate::taint::is_expr_tainted(value, ctx, ea.db, &ea.file) {
                     ctx.has_dynamic_tainted_var_def = true;
                 }
             }
@@ -631,7 +653,8 @@ impl CallAnalyzer {
                         positional.or(named).into_iter().collect()
                     };
                     for arg in args {
-                        if is_expr_tainted(&arg.value, ctx, ea.db, &ea.file) {
+                        let Some(value) = &arg.value else { continue };
+                        if is_expr_tainted(value, ctx, ea.db, &ea.file) {
                             ea.emit(taint_sink_issue(sink_kind), Severity::Error, span);
                         }
                     }
@@ -660,7 +683,8 @@ impl CallAnalyzer {
                 && !is_mutation_free
             {
                 for arg in call.args.iter() {
-                    let Some(recv_name) = crate::expr::root_receiver_var(&arg.value) else {
+                    let Some(value) = &arg.value else { continue };
+                    let Some(recv_name) = crate::expr::root_receiver_var(value) else {
                         continue;
                     };
                     let recv_stripped = recv_name.trim_start_matches('$');
@@ -672,7 +696,7 @@ impl CallAnalyzer {
                         continue;
                     }
                     let arg_is_object = crate::expr::assignment::resolve_chained_receiver_type(
-                        &arg.value, ctx, ea.db, &ea.file,
+                        value, ctx, ea.db, &ea.file,
                     )
                     .is_some_and(|ty| {
                         ty.types.iter().any(|a| {
@@ -710,7 +734,7 @@ impl CallAnalyzer {
             // free`), so `is_pure` is the only safe "touches nothing" check.
             if !is_pure {
                 for arg in call.args.iter() {
-                    if let ExprKind::Variable(name) = &arg.value.kind {
+                    if let Some(ExprKind::Variable(name)) = arg.value.as_ref().map(|v| &v.kind) {
                         ctx.invalidate_prop_refined_receiver(name);
                     }
                 }
@@ -815,10 +839,11 @@ impl CallAnalyzer {
             // the same "sticky" way `.=`/`??=` already treat their own
             // result, rather than leaving its taint bit untouched from
             // whatever it happened to hold before the call.
-            let any_arg_tainted = call
-                .args
-                .iter()
-                .any(|arg| is_expr_tainted(&arg.value, ctx, ea.db, &ea.file));
+            let any_arg_tainted = call.args.iter().any(|arg| {
+                arg.value
+                    .as_ref()
+                    .is_some_and(|v| is_expr_tainted(v, ctx, ea.db, &ea.file))
+            });
             for (i, param) in params.iter().enumerate() {
                 if param.is_byref {
                     // Prefer @param-out type if declared; fall back to declared in-type.
@@ -837,7 +862,8 @@ impl CallAnalyzer {
                     };
                     if param.is_variadic {
                         for arg in call.args.iter().skip(i) {
-                            if let ExprKind::Variable(name) = &arg.value.kind {
+                            let Some(value) = &arg.value else { continue };
+                            if let ExprKind::Variable(name) = &value.kind {
                                 let var_name = name.as_ref().trim_start_matches('$');
                                 // A plain-variable by-ref argument (`sort($items)`)
                                 // mutates it exactly as much as an explicit write
@@ -845,7 +871,7 @@ impl CallAnalyzer {
                                 // `ctx.set_var` without ever routing through the
                                 // purity check the `else` (non-variable) branch
                                 // below already gets.
-                                ea.check_var_write_purity(var_name, ctx, arg.value.span);
+                                ea.check_var_write_purity(var_name, ctx, value.span);
                                 ctx.set_var(var_name, output_ty.clone());
                                 if any_arg_tainted {
                                     ctx.taint_var(var_name);
@@ -853,16 +879,17 @@ impl CallAnalyzer {
                                     ctx.clear_var_taint(var_name);
                                 }
                             } else {
-                                ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
+                                ea.check_byref_arg_purity(value, ctx, value.span);
                             }
                         }
-                    } else if let Some(arg) =
+                    } else if let Some(value) =
                         crate::call::resolve_named_arg_type_index(&params, &call.args, i)
                             .and_then(|idx| call.args.get(idx))
+                            .and_then(|arg| arg.value.as_ref())
                     {
-                        if let ExprKind::Variable(name) = &arg.value.kind {
+                        if let ExprKind::Variable(name) = &value.kind {
                             let var_name = name.as_ref().trim_start_matches('$');
-                            ea.check_var_write_purity(var_name, ctx, arg.value.span);
+                            ea.check_var_write_purity(var_name, ctx, value.span);
                             ctx.set_var(var_name, output_ty);
                             if any_arg_tainted {
                                 ctx.taint_var(var_name);
@@ -870,7 +897,7 @@ impl CallAnalyzer {
                                 ctx.clear_var_taint(var_name);
                             }
                         } else {
-                            ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
+                            ea.check_byref_arg_purity(value, ctx, value.span);
                         }
                     }
                 }
@@ -925,7 +952,7 @@ impl CallAnalyzer {
             let return_ty =
                 match resolved_fn_name.as_str() {
                     "array_map" => {
-                        let callback_expr = call.args.first().map(|a| &a.value);
+                        let callback_expr = call.args.first().and_then(|a| a.value.as_ref());
                         super::array_builtins::infer_array_map_return(
                             ea,
                             &arg_types,
@@ -937,7 +964,7 @@ impl CallAnalyzer {
                     "array_filter" => super::array_builtins::infer_array_filter_return(&arg_types)
                         .unwrap_or(return_ty),
                     "array_reduce" => {
-                        let callback_expr = call.args.get(1).map(|a| &a.value);
+                        let callback_expr = call.args.get(1).and_then(|a| a.value.as_ref());
                         super::array_builtins::infer_array_reduce_return(
                             ea,
                             &arg_types,
@@ -1234,7 +1261,8 @@ impl CallAnalyzer {
             if matches!(resolved_fn_name.as_str(), "array_push" | "array_unshift") {
                 if let (Some(arr_arg), Some(original_arr)) = (call.args.first(), arg_types.first())
                 {
-                    if let ExprKind::Variable(name) = &arr_arg.value.kind {
+                    if let Some(ExprKind::Variable(name)) = arr_arg.value.as_ref().map(|v| &v.kind)
+                    {
                         let var_name = name.as_ref().trim_start_matches('$');
                         let push_types: Vec<Type> = arg_types.iter().skip(1).cloned().collect();
                         let new_type = super::array_builtins::array_push_unshift_byref_type(
@@ -1274,7 +1302,9 @@ impl CallAnalyzer {
                     if let (Some(arr_arg), Some(original_arr)) =
                         (call.args.first(), arg_types.first())
                     {
-                        if let ExprKind::Variable(name) = &arr_arg.value.kind {
+                        if let Some(ExprKind::Variable(name)) =
+                            arr_arg.value.as_ref().map(|v| &v.kind)
+                        {
                             let var_name = name.as_ref().trim_start_matches('$');
                             let new_type =
                                 super::array_builtins::sort_byref_type(original_arr, reindex);
@@ -1290,7 +1320,9 @@ impl CallAnalyzer {
             // preg_match_all wraps one more list level.
             if matches!(resolved_fn_name.as_str(), "preg_match" | "preg_match_all") {
                 if let Some(matches_arg) = call.args.get(2) {
-                    if let ExprKind::Variable(name) = &matches_arg.value.kind {
+                    if let Some(ExprKind::Variable(name)) =
+                        matches_arg.value.as_ref().map(|v| &v.kind)
+                    {
                         let var_name = name.as_ref().trim_start_matches('$');
                         let flags: i64 = arg_types
                             .get(3)

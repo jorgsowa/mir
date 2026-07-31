@@ -30,7 +30,8 @@ pub(super) fn extract_strlen_arg(expr: &php_ast::owned::Expr) -> Option<ScalarAr
             || bare.eq_ignore_ascii_case("iconv_strlen")
         {
             if let Some(arg) = call.args.first() {
-                return ScalarArgTarget::extract(&arg.value);
+                let value = arg.value.as_ref()?;
+                return ScalarArgTarget::extract(value);
             }
         }
     }
@@ -55,7 +56,8 @@ pub(super) fn extract_strlen_static_prop_arg(
             || bare.eq_ignore_ascii_case("iconv_strlen")
         {
             if let Some(arg) = call.args.first() {
-                return extract_static_prop_access(&arg.value, ctx, db, file);
+                let value = arg.value.as_ref()?;
+                return extract_static_prop_access(value, ctx, db, file);
             }
         }
     }
@@ -192,11 +194,17 @@ pub(super) fn narrow_string_false_comparable_condition(
     let (Some(haystack_arg), Some(needle_arg)) = (call.args.first(), call.args.get(1)) else {
         return;
     };
-    let needle_non_empty = expr_is_nonempty_string_literal(&needle_arg.value, ctx, db, file);
+    // A partial-application placeholder (`?`/`...`) for either argument
+    // leaves nothing concrete to narrow on.
+    let (Some(haystack_value), Some(needle_value)) = (&haystack_arg.value, &needle_arg.value)
+    else {
+        return;
+    };
+    let needle_non_empty = expr_is_nonempty_string_literal(needle_value, ctx, db, file);
     if !needle_non_empty {
         return;
     }
-    match ScalarArgTarget::extract(&haystack_arg.value) {
+    match ScalarArgTarget::extract(haystack_value) {
         Some(ScalarArgTarget::Var(var_name)) => {
             let current = ctx.get_var(&var_name);
             if !current.is_mixed() {
@@ -221,9 +229,7 @@ pub(super) fn narrow_string_false_comparable_condition(
             // ScalarArgTarget has no static-property variant (tracked
             // as S19) — extract it call-site-locally instead, mirroring
             // the str_contains-family recipe.
-            if let Some((fqcn, prop)) =
-                extract_static_prop_access(&haystack_arg.value, ctx, db, file)
-            {
+            if let Some((fqcn, prop)) = extract_static_prop_access(haystack_value, ctx, db, file) {
                 let current = resolve_static_prop_current_type(ctx, &fqcn, &prop, db);
                 if !current.is_mixed() {
                     let narrowed = narrow_string_to_non_empty(&current);

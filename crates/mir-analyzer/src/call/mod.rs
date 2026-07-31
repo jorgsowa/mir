@@ -139,7 +139,8 @@ pub(crate) fn premark_byref_arg_vars(
         if !param.is_byref {
             return;
         }
-        if let ExprKind::Variable(name) = &arg.value.kind {
+        let Some(value) = &arg.value else { return };
+        if let ExprKind::Variable(name) = &value.kind {
             let var_name = name.trim_start_matches('$');
             if !ctx.var_is_defined(var_name) {
                 // Prefer @param-out type if declared; fall back to declared

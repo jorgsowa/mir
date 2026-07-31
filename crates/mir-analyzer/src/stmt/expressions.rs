@@ -20,11 +20,11 @@ impl<'a> StatementsAnalyzer<'a> {
                     .trim_start_matches('\\')
                     .eq_ignore_ascii_case("assert")
                 {
-                    if let Some(arg) = call.args.first() {
+                    if let Some(value) = call.args.first().and_then(|a| a.value.as_ref()) {
                         // Check the asserted condition *before* narrowing, so the
                         // original (docblock) type is still in scope.
-                        self.check_docblock_contradiction(&arg.value, ctx);
-                        narrow_from_condition(&arg.value, ctx, true, self.db, &self.file);
+                        self.check_docblock_contradiction(value, ctx);
+                        narrow_from_condition(value, ctx, true, self.db, &self.file);
                     }
                 }
             }

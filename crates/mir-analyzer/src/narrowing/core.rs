@@ -535,14 +535,18 @@ pub(super) fn promote_assignment_effects(
                         if param.is_byref {
                             let arg = call.args.get(i);
                             if let Some(arg) = arg {
-                                if let ExprKind::Variable(name) = &arg.value.kind {
-                                    let var_name = name.as_ref().trim_start_matches('$');
-                                    let sym = mir_types::Name::from(var_name);
-                                    if ctx.possibly_assigned_vars.contains(&sym) {
-                                        let ty = ctx.get_var(var_name);
-                                        ctx.set_var(var_name, ty);
-                                        std::sync::Arc::make_mut(&mut ctx.possibly_assigned_vars)
+                                if let Some(value) = &arg.value {
+                                    if let ExprKind::Variable(name) = &value.kind {
+                                        let var_name = name.as_ref().trim_start_matches('$');
+                                        let sym = mir_types::Name::from(var_name);
+                                        if ctx.possibly_assigned_vars.contains(&sym) {
+                                            let ty = ctx.get_var(var_name);
+                                            ctx.set_var(var_name, ty);
+                                            std::sync::Arc::make_mut(
+                                                &mut ctx.possibly_assigned_vars,
+                                            )
                                             .remove(&sym);
+                                        }
                                     }
                                 }
                             }
@@ -551,18 +555,24 @@ pub(super) fn promote_assignment_effects(
                 }
             }
             for arg in call.args.iter() {
-                promote_assignment_effects(&arg.value, ctx, db, file);
+                if let Some(value) = &arg.value {
+                    promote_assignment_effects(value, ctx, db, file);
+                }
             }
         }
         ExprKind::MethodCall(mc) | ExprKind::NullsafeMethodCall(mc) => {
             promote_assignment_effects(&mc.object, ctx, db, file);
             for arg in mc.args.iter() {
-                promote_assignment_effects(&arg.value, ctx, db, file);
+                if let Some(value) = &arg.value {
+                    promote_assignment_effects(value, ctx, db, file);
+                }
             }
         }
         ExprKind::StaticMethodCall(smc) => {
             for arg in smc.args.iter() {
-                promote_assignment_effects(&arg.value, ctx, db, file);
+                if let Some(value) = &arg.value {
+                    promote_assignment_effects(value, ctx, db, file);
+                }
             }
         }
         // For nested &&: LHS is always evaluated; RHS might short-circuit — only recurse LHS.

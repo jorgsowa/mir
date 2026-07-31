@@ -32,7 +32,9 @@ pub(crate) fn stmts_use_func_get_args(stmts: &[php_ast::owned::Stmt]) -> bool {
                         return true;
                     }
                 }
-                call.args.iter().any(|a| check_expr(&a.value))
+                call.args
+                    .iter()
+                    .any(|a| a.value.as_ref().is_some_and(check_expr))
             }
             // Do NOT descend into new function/closure/arrow-fn bodies.
             Closure(_) | ArrowFunction(_) | AnonymousClass(_) => false,
@@ -48,17 +50,28 @@ pub(crate) fn stmts_use_func_get_args(stmts: &[php_ast::owned::Stmt]) -> bool {
             }
             NullCoalesce(e) => check_expr(&e.left) || check_expr(&e.right),
             MethodCall(e) | NullsafeMethodCall(e) => {
-                check_expr(&e.object) || e.args.iter().any(|a| check_expr(&a.value))
+                check_expr(&e.object)
+                    || e.args
+                        .iter()
+                        .any(|a| a.value.as_ref().is_some_and(check_expr))
             }
             StaticMethodCall(e) => {
-                check_expr(&e.class) || e.args.iter().any(|a| check_expr(&a.value))
+                check_expr(&e.class)
+                    || e.args
+                        .iter()
+                        .any(|a| a.value.as_ref().is_some_and(check_expr))
             }
             StaticDynMethodCall(e) => {
                 check_expr(&e.class)
                     || check_expr(&e.method)
-                    || e.args.iter().any(|a| check_expr(&a.value))
+                    || e.args
+                        .iter()
+                        .any(|a| a.value.as_ref().is_some_and(check_expr))
             }
-            New(e) => e.args.iter().any(|a| check_expr(&a.value)),
+            New(e) => e
+                .args
+                .iter()
+                .any(|a| a.value.as_ref().is_some_and(check_expr)),
             Array(elems) => elems
                 .iter()
                 .any(|el| el.key.as_ref().is_some_and(|k| check_expr(k)) || check_expr(&el.value)),

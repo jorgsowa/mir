@@ -1388,7 +1388,10 @@ pub(crate) fn compact_return_type(ctx: &FlowState, args: &[php_ast::owned::Arg])
         if arg.unpack {
             return None;
         }
-        let ExprKind::String(name) = &arg.value.kind else {
+        let Some(value) = &arg.value else {
+            return None;
+        };
+        let ExprKind::String(name) = &value.kind else {
             return None;
         };
         let ty = ctx.get_var(name.as_ref());

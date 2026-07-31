@@ -27,7 +27,8 @@ pub(super) fn extract_get_class_arg(expr: &php_ast::owned::Expr) -> Option<Scala
                 .eq_ignore_ascii_case("get_class")
             {
                 if let Some(arg) = call.args.first() {
-                    return ScalarArgTarget::extract(&arg.value);
+                    let value = arg.value.as_ref()?;
+                    return ScalarArgTarget::extract(value);
                 }
             }
         }
@@ -52,7 +53,8 @@ pub(super) fn extract_get_class_static_prop_arg(
                 .eq_ignore_ascii_case("get_class")
             {
                 if let Some(arg) = call.args.first() {
-                    return extract_static_prop_access(&arg.value, ctx, db, file);
+                    let value = arg.value.as_ref()?;
+                    return extract_static_prop_access(value, ctx, db, file);
                 }
             }
         }
@@ -68,7 +70,8 @@ pub(super) fn extract_gettype_arg(expr: &php_ast::owned::Expr) -> Option<ScalarA
                 .eq_ignore_ascii_case("gettype")
             {
                 if let Some(arg) = call.args.first() {
-                    return ScalarArgTarget::extract(&arg.value);
+                    let value = arg.value.as_ref()?;
+                    return ScalarArgTarget::extract(value);
                 }
             }
         }
@@ -84,7 +87,8 @@ pub(super) fn extract_get_debug_type_arg(expr: &php_ast::owned::Expr) -> Option<
                 .eq_ignore_ascii_case("get_debug_type")
             {
                 if let Some(arg) = call.args.first() {
-                    return ScalarArgTarget::extract(&arg.value);
+                    let value = arg.value.as_ref()?;
+                    return ScalarArgTarget::extract(value);
                 }
             }
         }
@@ -111,7 +115,8 @@ pub(super) fn extract_gettype_static_prop_arg(
                 .eq_ignore_ascii_case("gettype")
             {
                 if let Some(arg) = call.args.first() {
-                    return extract_static_prop_access(&arg.value, ctx, db, file);
+                    let value = arg.value.as_ref()?;
+                    return extract_static_prop_access(value, ctx, db, file);
                 }
             }
         }
@@ -133,7 +138,8 @@ pub(super) fn extract_get_debug_type_static_prop_arg(
                 .eq_ignore_ascii_case("get_debug_type")
             {
                 if let Some(arg) = call.args.first() {
-                    return extract_static_prop_access(&arg.value, ctx, db, file);
+                    let value = arg.value.as_ref()?;
+                    return extract_static_prop_access(value, ctx, db, file);
                 }
             }
         }
@@ -149,7 +155,8 @@ pub(super) fn extract_get_parent_class_arg(expr: &php_ast::owned::Expr) -> Optio
                 .eq_ignore_ascii_case("get_parent_class")
             {
                 if let Some(arg) = call.args.first() {
-                    return ScalarArgTarget::extract(&arg.value);
+                    let value = arg.value.as_ref()?;
+                    return ScalarArgTarget::extract(value);
                 }
             }
         }
@@ -174,7 +181,8 @@ pub(super) fn extract_get_parent_class_static_prop_arg(
                 .eq_ignore_ascii_case("get_parent_class")
             {
                 if let Some(arg) = call.args.first() {
-                    return extract_static_prop_access(&arg.value, ctx, db, file);
+                    let value = arg.value.as_ref()?;
+                    return extract_static_prop_access(value, ctx, db, file);
                 }
             }
         }
@@ -200,7 +208,8 @@ pub(super) fn extract_class_implements_or_parents_arg(
             let is_parents = bare.eq_ignore_ascii_case("class_parents");
             if is_parents || bare.eq_ignore_ascii_case("class_implements") {
                 if let Some(arg) = call.args.first() {
-                    return ScalarArgTarget::extract(&arg.value).map(|t| (t, is_parents));
+                    let value = arg.value.as_ref()?;
+                    return ScalarArgTarget::extract(value).map(|t| (t, is_parents));
                 }
             }
         }
@@ -226,7 +235,8 @@ pub(super) fn extract_class_implements_or_parents_static_prop_arg(
             let is_parents = bare.eq_ignore_ascii_case("class_parents");
             if is_parents || bare.eq_ignore_ascii_case("class_implements") {
                 if let Some(arg) = call.args.first() {
-                    return extract_static_prop_access(&arg.value, ctx, db, file)
+                    let value = arg.value.as_ref()?;
+                    return extract_static_prop_access(value, ctx, db, file)
                         .map(|t| (t, is_parents));
                 }
             }

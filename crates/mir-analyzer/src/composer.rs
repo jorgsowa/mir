@@ -733,7 +733,9 @@ fn resolve_static_include_target(expr: &Expr, dir: &Path) -> Option<String> {
                 return None;
             }
             let arg = call.args.first()?;
-            matches!(arg.value.kind, ExprKind::MagicConst(MagicConstKind::File))
+            arg.value
+                .as_ref()
+                .is_some_and(|v| matches!(v.kind, ExprKind::MagicConst(MagicConstKind::File)))
                 .then(|| dir.to_string_lossy().into_owned())
         }
         _ => None,

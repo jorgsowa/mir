@@ -60,12 +60,12 @@ fn arg_name_is(arg: &Arg, target: &str) -> bool {
 /// (unnamed) argument or a named argument `name:`. Named takes precedence.
 fn arg_value<'a>(args: &'a [Arg], pos: usize, name: &str) -> Option<&'a Expr> {
     if let Some(a) = args.iter().find(|a| arg_name_is(a, name)) {
-        return Some(&a.value);
+        return a.value.as_ref();
     }
     args.iter()
         .filter(|a| a.name.is_none())
         .nth(pos)
-        .map(|a| &a.value)
+        .and_then(|a| a.value.as_ref())
 }
 
 /// Read a string-literal argument (positional `pos` or named `name`).
@@ -177,7 +177,7 @@ mod tests {
     fn positional(value: Expr) -> Arg {
         Arg {
             name: None,
-            value,
+            value: Some(value),
             unpack: false,
             by_ref: false,
             span: span(),
@@ -187,7 +187,7 @@ mod tests {
     fn named(n: &str, value: Expr) -> Arg {
         Arg {
             name: Some(name(&[n], false)),
-            value,
+            value: Some(value),
             unpack: false,
             by_ref: false,
             span: span(),

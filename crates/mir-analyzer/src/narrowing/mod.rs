@@ -1378,9 +1378,13 @@ pub fn narrow_from_condition(
                     // `enum_exists($var)`/`trait_exists($var)` narrow like class_exists —
                     // no dedicated enum-string/trait-string atomic exists.
                     if is_true {
-                        if let Some(arg_expr) = call.args.first() {
+                        if let Some(arg_value) = call
+                            .args
+                            .first()
+                            .and_then(|arg_expr| arg_expr.value.as_ref())
+                        {
                             if let Some(fqcn) = extract_class_fqcn_from_expr(
-                                &arg_expr.value,
+                                arg_value,
                                 ctx.self_fqcn.as_deref(),
                                 ctx.static_fqcn.as_deref(),
                                 ctx.parent_fqcn.as_deref(),
@@ -1388,7 +1392,7 @@ pub fn narrow_from_condition(
                                 file,
                             ) {
                                 ctx.class_exists_guards.insert(fqcn);
-                            } else if let Some(var_name) = extract_var_name(&arg_expr.value) {
+                            } else if let Some(var_name) = extract_var_name(arg_value) {
                                 let current = ctx.get_var(&var_name);
                                 let narrowed = if bare.eq_ignore_ascii_case("interface_exists") {
                                     current.narrow_to_interface_string()
@@ -1396,9 +1400,7 @@ pub fn narrow_from_condition(
                                     current.narrow_to_class_string()
                                 };
                                 set_narrowed(ctx, &var_name, &current, narrowed, true);
-                            } else if let Some((obj, prop)) =
-                                extract_any_prop_access(&arg_expr.value)
-                            {
+                            } else if let Some((obj, prop)) = extract_any_prop_access(arg_value) {
                                 let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
                                 if !current.is_mixed() {
                                     let narrowed = if bare.eq_ignore_ascii_case("interface_exists")
@@ -1413,7 +1415,7 @@ pub fn narrow_from_condition(
                                     narrow_receiver_non_null_on_prop_match(ctx, &obj, true);
                                 }
                             } else if let Some((fqcn_recv, prop)) =
-                                extract_static_prop_access(&arg_expr.value, ctx, db, file)
+                                extract_static_prop_access(arg_value, ctx, db, file)
                             {
                                 let current =
                                     resolve_static_prop_current_type(ctx, &fqcn_recv, &prop, db);
@@ -1436,8 +1438,8 @@ pub fn narrow_from_condition(
                     // proven-defined in the true branch to suppress
                     // UndefinedConstant within the guarded block.
                     if is_true {
-                        if let Some(arg) = call.args.first() {
-                            if let ExprKind::String(name) = &arg.value.kind {
+                        if let Some(value) = call.args.first().and_then(|arg| arg.value.as_ref()) {
+                            if let ExprKind::String(name) = &value.kind {
                                 let name = name.as_ref().trim_start_matches('\\');
                                 if !name.is_empty() {
                                     ctx.defined_guards.insert(std::sync::Arc::from(name));
@@ -1452,8 +1454,8 @@ pub fn narrow_from_condition(
                     // negation + divergence (`if (!function_exists('fn')) throw;`)
                     // this also covers the early-exit pattern.
                     if is_true {
-                        if let Some(arg) = call.args.first() {
-                            if let ExprKind::String(name) = &arg.value.kind {
+                        if let Some(value) = call.args.first().and_then(|arg| arg.value.as_ref()) {
+                            if let ExprKind::String(name) = &value.kind {
                                 let name = name.as_ref().trim_start_matches('\\');
                                 if !name.is_empty() {
                                     ctx.function_exists_guards
@@ -1469,8 +1471,8 @@ pub fn narrow_from_condition(
                     // present). The false-branch / early-exit pattern also works via
                     // the normal divergence+narrowing mechanism.
                     if is_true {
-                        if let Some(arg) = call.args.first() {
-                            if let ExprKind::String(ext) = &arg.value.kind {
+                        if let Some(value) = call.args.first().and_then(|arg| arg.value.as_ref()) {
+                            if let ExprKind::String(ext) = &value.kind {
                                 if !ext.is_empty() {
                                     ctx.extension_loaded_guards
                                         .insert(std::sync::Arc::from(ext.as_ref()));
@@ -1480,8 +1482,12 @@ pub fn narrow_from_condition(
                     }
                 } else if bare.eq_ignore_ascii_case("assert") {
                     // assert($condition) — narrow as if the condition is is_true
-                    if let Some(arg_expr) = call.args.first() {
-                        narrow_from_condition(&arg_expr.value, ctx, is_true, db, file);
+                    if let Some(arg_value) = call
+                        .args
+                        .first()
+                        .and_then(|arg_expr| arg_expr.value.as_ref())
+                    {
+                        narrow_from_condition(arg_value, ctx, is_true, db, file);
                     }
                 } else if bare.eq_ignore_ascii_case("method_exists")
                     || bare.eq_ignore_ascii_case("property_exists")
@@ -1491,22 +1497,27 @@ pub fn narrow_from_condition(
                     // property-access first args where variable narrowing can't reach — but only
                     // for method_exists(): properties and methods are independent namespaces in
                     // PHP, so property_exists($obj, 'foo') proves nothing about a method 'foo'.
-                    if let Some(arg_expr) = call.args.first() {
-                        if let Some(var_name) = extract_var_name(&arg_expr.value) {
+                    if let Some(arg_value) = call
+                        .args
+                        .first()
+                        .and_then(|arg_expr| arg_expr.value.as_ref())
+                    {
+                        if let Some(var_name) = extract_var_name(arg_value) {
                             narrow_from_type_fn(ctx, bare, &var_name, db, is_true);
-                        } else if let Some((obj, prop)) = extract_any_prop_access(&arg_expr.value) {
+                        } else if let Some((obj, prop)) = extract_any_prop_access(arg_value) {
                             narrow_prop_from_type_fn(ctx, bare, &obj, &prop, db, file, is_true);
                         } else if let Some((fqcn, prop)) =
-                            extract_static_prop_access(&arg_expr.value, ctx, db, file)
+                            extract_static_prop_access(arg_value, ctx, db, file)
                         {
                             narrow_static_prop_from_type_fn(ctx, bare, &fqcn, &prop, db, is_true);
                         }
                         if is_true && bare.eq_ignore_ascii_case("method_exists") {
-                            if let Some(expr_key) =
-                                extract_expr_guard_key(&arg_expr.value, ctx, db, file)
+                            if let Some(expr_key) = extract_expr_guard_key(arg_value, ctx, db, file)
                             {
-                                if let Some(method_arg) = call.args.get(1) {
-                                    if let ExprKind::String(method_name) = &method_arg.value.kind {
+                                if let Some(method_value) =
+                                    call.args.get(1).and_then(|a| a.value.as_ref())
+                                {
+                                    if let ExprKind::String(method_name) = &method_value.kind {
                                         let method_lc = std::sync::Arc::from(
                                             crate::util::php_ident_lowercase(method_name).as_str(),
                                         );
@@ -1520,11 +1531,12 @@ pub fn narrow_from_condition(
                         // UndefinedProperty. Property names are case-sensitive in PHP
                         // (unlike method names above), so the literal is kept as-is.
                         if is_true && bare.eq_ignore_ascii_case("property_exists") {
-                            if let Some(expr_key) =
-                                extract_expr_guard_key(&arg_expr.value, ctx, db, file)
+                            if let Some(expr_key) = extract_expr_guard_key(arg_value, ctx, db, file)
                             {
-                                if let Some(prop_arg) = call.args.get(1) {
-                                    if let ExprKind::String(prop_name) = &prop_arg.value.kind {
+                                if let Some(prop_value) =
+                                    call.args.get(1).and_then(|a| a.value.as_ref())
+                                {
+                                    if let ExprKind::String(prop_name) = &prop_value.kind {
                                         ctx.property_exists_guards.insert((
                                             expr_key,
                                             std::sync::Arc::from(prop_name.as_ref()),
@@ -1549,13 +1561,14 @@ pub fn narrow_from_condition(
                     // (when the needle is a non-empty literal — a non-empty needle can
                     // only be found in a non-empty haystack).
                     if is_true {
-                        if let (Some(haystack_arg), Some(needle_arg)) =
-                            (call.args.first(), call.args.get(1))
-                        {
+                        if let (Some(haystack_value), Some(needle_value)) = (
+                            call.args.first().and_then(|a| a.value.as_ref()),
+                            call.args.get(1).and_then(|a| a.value.as_ref()),
+                        ) {
                             let needle_non_empty =
-                                expr_is_nonempty_string_literal(&needle_arg.value, ctx, db, file);
+                                expr_is_nonempty_string_literal(needle_value, ctx, db, file);
                             if needle_non_empty {
-                                match ScalarArgTarget::extract(&haystack_arg.value) {
+                                match ScalarArgTarget::extract(haystack_value) {
                                     Some(ScalarArgTarget::Var(var_name)) => {
                                         let current = ctx.get_var(&var_name);
                                         if !current.is_mixed() {
@@ -1584,7 +1597,7 @@ pub fn narrow_from_condition(
                                         // call-site-locally instead, mirroring
                                         // gettype()/count()/strlen() on a static prop.
                                         if let Some((fqcn, prop)) = extract_static_prop_access(
-                                            &haystack_arg.value,
+                                            haystack_value,
                                             ctx,
                                             db,
                                             file,
@@ -1611,11 +1624,13 @@ pub fn narrow_from_condition(
                     // When $allow_string (3rd arg) is truthy, the first arg may be a class-string
                     // — preserve string/class-string atoms so the true branch stays reachable
                     // and no false diverge is set in the false branch.
-                    if let (Some(obj_arg), Some(class_arg)) = (call.args.first(), call.args.get(1))
-                    {
-                        if let Some(var_name) = extract_var_name(&obj_arg.value) {
+                    if let (Some(obj_value), Some(class_value)) = (
+                        call.args.first().and_then(|a| a.value.as_ref()),
+                        call.args.get(1).and_then(|a| a.value.as_ref()),
+                    ) {
+                        if let Some(var_name) = extract_var_name(obj_value) {
                             if let Some(class_name) = extract_class_fqcn_from_expr(
-                                &class_arg.value,
+                                class_value,
                                 ctx.self_fqcn.as_deref(),
                                 ctx.static_fqcn.as_deref(),
                                 ctx.parent_fqcn.as_deref(),
@@ -1625,7 +1640,8 @@ pub fn narrow_from_condition(
                                 let allow_string = call
                                     .args
                                     .get(2)
-                                    .map(|a| is_truthy_bool_literal(&a.value))
+                                    .and_then(|a| a.value.as_ref())
+                                    .map(is_truthy_bool_literal)
                                     .unwrap_or(false);
                                 let current = ctx.get_var(&var_name);
                                 if allow_string {
@@ -1679,9 +1695,9 @@ pub fn narrow_from_condition(
                                     set_narrowed(ctx, &var_name, &current, narrowed, true);
                                 }
                             }
-                        } else if let Some((obj, prop)) = extract_any_prop_access(&obj_arg.value) {
+                        } else if let Some((obj, prop)) = extract_any_prop_access(obj_value) {
                             if let Some(class_name) = extract_class_fqcn_from_expr(
-                                &class_arg.value,
+                                class_value,
                                 ctx.self_fqcn.as_deref(),
                                 ctx.static_fqcn.as_deref(),
                                 ctx.parent_fqcn.as_deref(),
@@ -1691,7 +1707,8 @@ pub fn narrow_from_condition(
                                 let allow_string = call
                                     .args
                                     .get(2)
-                                    .map(|a| is_truthy_bool_literal(&a.value))
+                                    .and_then(|a| a.value.as_ref())
+                                    .map(is_truthy_bool_literal)
                                     .unwrap_or(false);
                                 narrow_prop_is_a(
                                     ctx,
@@ -1706,10 +1723,10 @@ pub fn narrow_from_condition(
                                 narrow_receiver_non_null_on_prop_match(ctx, &obj, is_true);
                             }
                         } else if let Some((fqcn, prop)) =
-                            extract_static_prop_access(&obj_arg.value, ctx, db, file)
+                            extract_static_prop_access(obj_value, ctx, db, file)
                         {
                             if let Some(class_name) = extract_class_fqcn_from_expr(
-                                &class_arg.value,
+                                class_value,
                                 ctx.self_fqcn.as_deref(),
                                 ctx.static_fqcn.as_deref(),
                                 ctx.parent_fqcn.as_deref(),
@@ -1719,7 +1736,8 @@ pub fn narrow_from_condition(
                                 let allow_string = call
                                     .args
                                     .get(2)
-                                    .map(|a| is_truthy_bool_literal(&a.value))
+                                    .and_then(|a| a.value.as_ref())
+                                    .map(is_truthy_bool_literal)
                                     .unwrap_or(false);
                                 narrow_static_prop_is_a(
                                     ctx,
@@ -1740,11 +1758,13 @@ pub fn narrow_from_condition(
                     // False branch: no narrowing — is_subclass_of being false doesn't tell us
                     // the variable isn't Foo; Foo is not a subclass of itself, so Foo atoms
                     // must be kept (removing them would make a later `Foo` use diverge).
-                    if let (Some(obj_arg), Some(class_arg)) = (call.args.first(), call.args.get(1))
-                    {
-                        if let Some(var_name) = extract_var_name(&obj_arg.value) {
+                    if let (Some(obj_value), Some(class_value)) = (
+                        call.args.first().and_then(|a| a.value.as_ref()),
+                        call.args.get(1).and_then(|a| a.value.as_ref()),
+                    ) {
+                        if let Some(var_name) = extract_var_name(obj_value) {
                             if let Some(class_name) = extract_class_fqcn_from_expr(
-                                &class_arg.value,
+                                class_value,
                                 ctx.self_fqcn.as_deref(),
                                 ctx.static_fqcn.as_deref(),
                                 ctx.parent_fqcn.as_deref(),
@@ -1765,9 +1785,9 @@ pub fn narrow_from_condition(
                                 }
                                 // False branch: leave current type unchanged.
                             }
-                        } else if let Some((obj, prop)) = extract_any_prop_access(&obj_arg.value) {
+                        } else if let Some((obj, prop)) = extract_any_prop_access(obj_value) {
                             if let Some(class_name) = extract_class_fqcn_from_expr(
-                                &class_arg.value,
+                                class_value,
                                 ctx.self_fqcn.as_deref(),
                                 ctx.static_fqcn.as_deref(),
                                 ctx.parent_fqcn.as_deref(),
@@ -1786,10 +1806,10 @@ pub fn narrow_from_condition(
                                 narrow_receiver_non_null_on_prop_match(ctx, &obj, is_true);
                             }
                         } else if let Some((fqcn, prop)) =
-                            extract_static_prop_access(&obj_arg.value, ctx, db, file)
+                            extract_static_prop_access(obj_value, ctx, db, file)
                         {
                             if let Some(class_name) = extract_class_fqcn_from_expr(
-                                &class_arg.value,
+                                class_value,
                                 ctx.self_fqcn.as_deref(),
                                 ctx.static_fqcn.as_deref(),
                                 ctx.parent_fqcn.as_deref(),
@@ -1809,13 +1829,17 @@ pub fn narrow_from_condition(
                     }
                 } else if apply_docblock_assertions(call, ctx, is_true, db, file, fn_name) {
                     // User-defined assertion applied.
-                } else if let Some(arg_expr) = call.args.first() {
-                    if let Some(var_name) = extract_var_name(&arg_expr.value) {
+                } else if let Some(arg_value) = call
+                    .args
+                    .first()
+                    .and_then(|arg_expr| arg_expr.value.as_ref())
+                {
+                    if let Some(var_name) = extract_var_name(arg_value) {
                         narrow_from_type_fn(ctx, bare, &var_name, db, is_true);
-                    } else if let Some((obj, prop)) = extract_any_prop_access(&arg_expr.value) {
+                    } else if let Some((obj, prop)) = extract_any_prop_access(arg_value) {
                         narrow_prop_from_type_fn(ctx, bare, &obj, &prop, db, file, is_true);
                     } else if let Some((fqcn, prop)) =
-                        extract_static_prop_access(&arg_expr.value, ctx, db, file)
+                        extract_static_prop_access(arg_value, ctx, db, file)
                     {
                         narrow_static_prop_from_type_fn(ctx, bare, &fqcn, &prop, db, is_true);
                     }
@@ -2122,13 +2146,16 @@ fn narrow_from_false_comparable_call(
         let strict = call
             .args
             .get(2)
-            .map(|a| is_truthy_bool_literal(&a.value))
+            .and_then(|a| a.value.as_ref())
+            .map(is_truthy_bool_literal)
             .unwrap_or(false);
-        if let (Some(needle_arg), Some(haystack_arg)) = (call.args.first(), call.args.get(1)) {
-            strip_haystack_null(&haystack_arg.value, ctx, db, file);
-            if let Some(target) = ScalarArgTarget::extract(&needle_arg.value) {
-                if let Some(haystack_ty) = extract_haystack_type(&haystack_arg.value, ctx, db, file)
-                {
+        if let (Some(needle_value), Some(haystack_value)) = (
+            call.args.first().and_then(|a| a.value.as_ref()),
+            call.args.get(1).and_then(|a| a.value.as_ref()),
+        ) {
+            strip_haystack_null(haystack_value, ctx, db, file);
+            if let Some(target) = ScalarArgTarget::extract(needle_value) {
+                if let Some(haystack_ty) = extract_haystack_type(haystack_value, ctx, db, file) {
                     if !is_false {
                         if let ScalarArgTarget::Prop(obj, _) = &target {
                             // array_search(null, $haystack) only matches loosely when the
@@ -2176,13 +2203,12 @@ fn narrow_from_false_comparable_call(
                     }
                 }
             } else if let Some((fqcn, prop)) =
-                extract_static_prop_access(&needle_arg.value, ctx, db, file)
+                extract_static_prop_access(needle_value, ctx, db, file)
             {
                 // ScalarArgTarget has no static-property variant (tracked as S19) —
                 // extract it call-site-locally instead, mirroring the
                 // str_contains-family recipe (no receiver to narrow non-null).
-                if let Some(haystack_ty) = extract_haystack_type(&haystack_arg.value, ctx, db, file)
-                {
+                if let Some(haystack_ty) = extract_haystack_type(haystack_value, ctx, db, file) {
                     let current = resolve_static_prop_current_type(ctx, &fqcn, &prop, db);
                     let loose_safe =
                         strict || in_array_loose_narrowing_is_safe(&current, &haystack_ty);

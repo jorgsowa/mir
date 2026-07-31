@@ -153,7 +153,8 @@ fn record_class_refs_in_expr(
                 record_class_refs_in_expr(&n.class, db, file, source, source_map);
             }
             for arg in n.args.iter() {
-                record_class_refs_in_expr(&arg.value, db, file, source, source_map);
+                let Some(value) = &arg.value else { continue };
+                record_class_refs_in_expr(value, db, file, source, source_map);
             }
         }
         ExprKind::Array(elements) => {
@@ -769,7 +770,8 @@ pub(crate) fn check_parent_in_class_attrs(
     use php_ast::owned::ExprKind;
     for attr in attrs {
         for arg in attr.args.iter() {
-            if let ExprKind::ClassConstAccess(cca) = &arg.value.kind {
+            let Some(value) = &arg.value else { continue };
+            if let ExprKind::ClassConstAccess(cca) = &value.kind {
                 if let ExprKind::Identifier(id) = &cca.class.kind {
                     if id.as_ref().eq_ignore_ascii_case("parent") {
                         let loc = span_to_location(
@@ -828,7 +830,8 @@ fn check_attribute_list(
         // flagged UnusedClass.
         if record_refs {
             for arg in attr.args.iter() {
-                record_class_refs_in_expr(&arg.value, db, file, source, source_map);
+                let Some(value) = &arg.value else { continue };
+                record_class_refs_in_expr(value, db, file, source, source_map);
             }
         }
 

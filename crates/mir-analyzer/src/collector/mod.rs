@@ -1787,7 +1787,10 @@ impl<'a> DefinitionCollector<'a> {
         let Some(name_arg) = call.args.first() else {
             return;
         };
-        let php_ast::owned::ExprKind::String(name) = &name_arg.value.kind else {
+        let Some(name_value) = &name_arg.value else {
+            return;
+        };
+        let php_ast::owned::ExprKind::String(name) = &name_value.kind else {
             return;
         };
         let define_doc = stmt
@@ -1798,12 +1801,13 @@ impl<'a> DefinitionCollector<'a> {
         if !self.version_allows(&define_doc) {
             return;
         }
-        let fqn: Arc<str> = Arc::from(&**name);
+        let fqn: Arc<str> = Arc::from(name.as_ref());
         // Try to infer the type of the constant value from the second argument
         let const_type = call
             .args
             .get(1)
-            .and_then(|arg| infer_const_value(self, &arg.value.kind))
+            .and_then(|arg| arg.value.as_ref())
+            .and_then(|value| infer_const_value(self, &value.kind))
             .unwrap_or(Type::mixed());
         let const_type = widen_environment_dependent_constant(&fqn, const_type);
         self.slice.constants.push((fqn, const_type));
@@ -2356,7 +2360,12 @@ impl<'a> DefinitionCollector<'a> {
             if !is_data_provider {
                 return None;
             }
-            match a.args.first().map(|arg| &arg.value.kind) {
+            match a
+                .args
+                .first()
+                .and_then(|arg| arg.value.as_ref())
+                .map(|v| &v.kind)
+            {
                 Some(php_ast::owned::ExprKind::String(s)) => Some(Arc::from(s.as_ref())),
                 _ => None,
             }

@@ -226,7 +226,8 @@ impl CallAnalyzer {
                 ea.record_dynamic_member_access(&obj_ty, call.method.span);
                 // Analyze arguments so variables used in them are marked as consumed.
                 for arg in &call.args {
-                    ea.analyze(&arg.value, ctx);
+                    let Some(value) = &arg.value else { continue };
+                    ea.analyze(value, ctx);
                 }
                 return Type::mixed();
             }
@@ -304,8 +305,14 @@ impl CallAnalyzer {
         // `resolve_method_return`, mirroring `static_call.rs`/`function.rs`.
         let mut sole_spread_ty: Option<Type> = None;
         for arg in call.args.iter() {
-            let ty = ea.analyze(&arg.value, ctx);
-            super::consume_arg_assignment(&arg.value, ctx);
+            // `None` is a PHP 8.6 partial-application placeholder (`?`/`...`)
+            // — not yet modeled; keep positional slots aligned with `mixed`.
+            let Some(value) = &arg.value else {
+                arg_types.push(Type::mixed());
+                continue;
+            };
+            let ty = ea.analyze(value, ctx);
+            super::consume_arg_assignment(value, ctx);
             if arg.unpack && call.args.len() == 1 {
                 sole_spread_ty = Some(ty.clone());
             }
@@ -880,7 +887,8 @@ fn resolve_method_return<'a>(
             && !resolved.is_mutation_free
         {
             for arg in call.args.iter() {
-                let Some(recv_name) = crate::expr::root_receiver_var(&arg.value) else {
+                let Some(value) = &arg.value else { continue };
+                let Some(recv_name) = crate::expr::root_receiver_var(value) else {
                     continue;
                 };
                 let recv_stripped = recv_name.trim_start_matches('$');
@@ -892,7 +900,7 @@ fn resolve_method_return<'a>(
                     continue;
                 }
                 let arg_is_object = crate::expr::assignment::resolve_chained_receiver_type(
-                    &arg.value, ctx, ea.db, &ea.file,
+                    value, ctx, ea.db, &ea.file,
                 )
                 .is_some_and(|ty| {
                     ty.types.iter().any(|a| {
@@ -957,7 +965,11 @@ fn resolve_method_return<'a>(
         let mut arg_can_be_byref: Vec<bool> = call
             .args
             .iter()
-            .map(|a| expr_can_be_passed_by_reference_owned(&a.value))
+            .map(|a| {
+                a.value
+                    .as_ref()
+                    .is_some_and(expr_can_be_passed_by_reference_owned)
+            })
             .collect();
         // `effective_arg_types`/`effective_arg_spans` are kept distinct from
         // the `arg_types`/`arg_spans` parameters (rather than shadowing them)
@@ -1120,7 +1132,7 @@ fn resolve_method_return<'a>(
         // the call itself (e.g. `$this->save($logger)` mutating `$logger`).
         if !resolved.is_pure && !resolved.is_external_mutation_free {
             for arg in call.args.iter() {
-                if let ExprKind::Variable(name) = &arg.value.kind {
+                if let Some(ExprKind::Variable(name)) = arg.value.as_ref().map(|v| &v.kind) {
                     ctx.invalidate_prop_refined_receiver(name);
                 }
             }
@@ -1160,7 +1172,8 @@ fn resolve_method_return<'a>(
                     positional.or(named_arg).into_iter().collect()
                 };
                 for arg in args {
-                    if is_expr_tainted(&arg.value, ctx, ea.db, &ea.file) {
+                    let Some(value) = &arg.value else { continue };
+                    if is_expr_tainted(value, ctx, ea.db, &ea.file) {
                         ea.emit(taint_sink_issue(sink_kind), Severity::Error, span);
                     }
                 }
@@ -1171,7 +1184,8 @@ fn resolve_method_return<'a>(
         // procedural classify_sink): $pdo->query($sql) etc.
         if let Some(sink_kind) = classify_method_sink(ea.db, fqcn.as_ref(), method_name) {
             for arg in call.args.iter() {
-                if is_expr_tainted(&arg.value, ctx, ea.db, &ea.file) {
+                let Some(value) = &arg.value else { continue };
+                if is_expr_tainted(value, ctx, ea.db, &ea.file) {
                     let issue_kind = match sink_kind {
                         SinkKind::Sql => IssueKind::TaintedSql,
                         _ => unreachable!("classify_method_sink only returns SinkKind::Sql"),
@@ -1345,13 +1359,15 @@ fn resolve_method_return<'a>(
             }
             if param.is_variadic {
                 for arg in call.args.iter().skip(i) {
-                    ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
+                    let Some(value) = &arg.value else { continue };
+                    ea.check_byref_arg_purity(value, ctx, value.span);
                 }
-            } else if let Some(arg) =
+            } else if let Some(value) =
                 super::resolve_named_arg_type_index(&resolved.params, &call.args, i)
                     .and_then(|idx| call.args.get(idx))
+                    .and_then(|arg| arg.value.as_ref())
             {
-                ea.check_byref_arg_purity(&arg.value, ctx, arg.value.span);
+                ea.check_byref_arg_purity(value, ctx, value.span);
             }
         }
 
@@ -1361,10 +1377,11 @@ fn resolve_method_return<'a>(
         // "sticky" way `.=`/`??=` already treat their own result, rather
         // than leaving its taint bit untouched from whatever it happened to
         // hold before the call.
-        let any_arg_tainted = call
-            .args
-            .iter()
-            .any(|arg| is_expr_tainted(&arg.value, ctx, ea.db, &ea.file));
+        let any_arg_tainted = call.args.iter().any(|arg| {
+            arg.value
+                .as_ref()
+                .is_some_and(|v| is_expr_tainted(v, ctx, ea.db, &ea.file))
+        });
         for (i, param) in resolved.params.iter().enumerate() {
             let Some(out_ty) = param.out_ty.as_ref() else {
                 continue;
@@ -1380,7 +1397,9 @@ fn resolve_method_return<'a>(
             };
             if param.is_variadic {
                 for arg in call.args.iter().skip(i) {
-                    if let php_ast::owned::ExprKind::Variable(name) = &arg.value.kind {
+                    if let Some(php_ast::owned::ExprKind::Variable(name)) =
+                        arg.value.as_ref().map(|v| &v.kind)
+                    {
                         let var_name = name.as_ref().trim_start_matches('$');
                         ctx.set_var(var_name, out_ty.clone());
                         if any_arg_tainted {
@@ -1390,11 +1409,12 @@ fn resolve_method_return<'a>(
                         }
                     }
                 }
-            } else if let Some(arg) =
+            } else if let Some(value) =
                 super::resolve_named_arg_type_index(&resolved.params, &call.args, i)
                     .and_then(|idx| call.args.get(idx))
+                    .and_then(|arg| arg.value.as_ref())
             {
-                if let php_ast::owned::ExprKind::Variable(name) = &arg.value.kind {
+                if let php_ast::owned::ExprKind::Variable(name) = &value.kind {
                     let var_name = name.as_ref().trim_start_matches('$');
                     ctx.set_var(var_name, out_ty);
                     if any_arg_tainted {

@@ -350,11 +350,11 @@ pub fn is_expr_tainted(
                 if matches!(
                     crate::util::php_ident_lowercase(name.as_ref()).as_str(),
                     "sprintf" | "vsprintf"
-                ) && fc
-                    .args
-                    .iter()
-                    .any(|a| is_expr_tainted(&a.value, ctx, db, file))
-                {
+                ) && fc.args.iter().any(|a| {
+                    a.value
+                        .as_ref()
+                        .is_some_and(|v| is_expr_tainted(v, ctx, db, file))
+                }) {
                     return true;
                 }
                 // `compact('id')` copies `$id`'s CURRENT value into the
@@ -368,7 +368,9 @@ pub fn is_expr_tainted(
                 // bails there too).
                 if crate::util::php_ident_lowercase(name.as_ref()) == "compact"
                     && fc.args.iter().any(|a| {
-                        matches!(&a.value.kind, ExprKind::String(var_name) if ctx.is_tainted(var_name.as_ref()))
+                        a.value.as_ref().is_some_and(|v| {
+                            matches!(&v.kind, ExprKind::String(var_name) if ctx.is_tainted(var_name.as_ref()))
+                        })
                     })
                 {
                     return true;
@@ -404,11 +406,11 @@ pub fn is_expr_tainted(
                         | "str_pad"
                         | "str_rot13"
                         | "nl2br"
-                ) && fc
-                    .args
-                    .iter()
-                    .any(|a| is_expr_tainted(&a.value, ctx, db, file))
-                {
+                ) && fc.args.iter().any(|a| {
+                    a.value
+                        .as_ref()
+                        .is_some_and(|v| is_expr_tainted(v, ctx, db, file))
+                }) {
                     return true;
                 }
                 // `array_map`/`array_filter`/`array_reduce` don't need their
@@ -423,19 +425,20 @@ pub fn is_expr_tainted(
                 // take theirs at index 0.
                 let lower_name = crate::util::php_ident_lowercase(name.as_ref());
                 if lower_name == "array_map"
-                    && fc
-                        .args
-                        .iter()
-                        .skip(1)
-                        .any(|a| is_expr_tainted(&a.value, ctx, db, file))
+                    && fc.args.iter().skip(1).any(|a| {
+                        a.value
+                            .as_ref()
+                            .is_some_and(|v| is_expr_tainted(v, ctx, db, file))
+                    })
                 {
                     return true;
                 }
                 if matches!(lower_name.as_str(), "array_filter" | "array_reduce")
-                    && fc
-                        .args
-                        .first()
-                        .is_some_and(|a| is_expr_tainted(&a.value, ctx, db, file))
+                    && fc.args.first().is_some_and(|a| {
+                        a.value
+                            .as_ref()
+                            .is_some_and(|v| is_expr_tainted(v, ctx, db, file))
+                    })
                 {
                     return true;
                 }
@@ -444,10 +447,11 @@ pub fn is_expr_tainted(
                 // result is never tainted unless matched here; JSON-body web
                 // APIs are a common real-world route for this.
                 if lower_name == "json_decode"
-                    && fc
-                        .args
-                        .first()
-                        .is_some_and(|a| is_expr_tainted(&a.value, ctx, db, file))
+                    && fc.args.first().is_some_and(|a| {
+                        a.value
+                            .as_ref()
+                            .is_some_and(|v| is_expr_tainted(v, ctx, db, file))
+                    })
                 {
                     return true;
                 }

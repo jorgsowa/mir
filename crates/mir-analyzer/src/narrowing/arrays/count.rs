@@ -29,7 +29,8 @@ pub(crate) fn extract_count_arg(expr: &php_ast::owned::Expr) -> Option<ScalarArg
             || bare.eq_ignore_ascii_case("iterator_count")
         {
             if let Some(arg) = call.args.first() {
-                return ScalarArgTarget::extract(&arg.value);
+                let value = arg.value.as_ref()?;
+                return ScalarArgTarget::extract(value);
             }
         }
     }
@@ -56,7 +57,8 @@ pub(crate) fn extract_count_static_prop_arg(
             || bare.eq_ignore_ascii_case("iterator_count")
         {
             if let Some(arg) = call.args.first() {
-                return extract_static_prop_access(&arg.value, ctx, db, file);
+                let value = arg.value.as_ref()?;
+                return extract_static_prop_access(value, ctx, db, file);
             }
         }
     }
@@ -78,7 +80,8 @@ pub(crate) fn extract_array_key_first_or_last_arg(
             || bare.eq_ignore_ascii_case("array_key_last")
         {
             if let Some(arg) = call.args.first() {
-                return ScalarArgTarget::extract(&arg.value);
+                let value = arg.value.as_ref()?;
+                return ScalarArgTarget::extract(value);
             }
         }
     }
@@ -105,7 +108,8 @@ pub(crate) fn extract_array_key_first_or_last_static_prop_arg(
             || bare.eq_ignore_ascii_case("array_key_last")
         {
             if let Some(arg) = call.args.first() {
-                return extract_static_prop_access(&arg.value, ctx, db, file);
+                let value = arg.value.as_ref()?;
+                return extract_static_prop_access(value, ctx, db, file);
             }
         }
     }

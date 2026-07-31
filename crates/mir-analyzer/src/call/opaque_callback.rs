@@ -130,8 +130,10 @@ impl OwnedVisitor for OpaqueCallScanner<'_> {
                 let mut position = 0u16;
                 for arg in call.args.iter() {
                     if arg.name.is_none() && !arg.unpack {
-                        if let Some(return_type) =
-                            resolve_concrete_callback_return(self.db, self.file, &arg.value)
+                        if let Some(return_type) = arg
+                            .value
+                            .as_ref()
+                            .and_then(|v| resolve_concrete_callback_return(self.db, self.file, v))
                         {
                             self.out.push(CallArgReturn {
                                 callee: callee.clone(),

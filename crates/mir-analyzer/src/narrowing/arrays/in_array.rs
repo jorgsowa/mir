@@ -211,7 +211,9 @@ pub(crate) fn narrow_in_array_condition(
     file: &str,
 ) {
     if let Some(haystack_arg) = call.args.get(1) {
-        strip_haystack_null(&haystack_arg.value, ctx, db, file);
+        if let Some(value) = &haystack_arg.value {
+            strip_haystack_null(value, ctx, db, file);
+        }
     }
     // in_array($needle, ['a', 'b', 'c']) true →
     // narrow $needle to 'a'|'b'|'c'. Only safe when either the
@@ -226,11 +228,18 @@ pub(crate) fn narrow_in_array_condition(
     let strict = call
         .args
         .get(2)
-        .map(|a| is_truthy_bool_literal(&a.value))
+        .and_then(|a| a.value.as_ref())
+        .map(is_truthy_bool_literal)
         .unwrap_or(false);
     if let (Some(needle_arg), Some(haystack_arg)) = (call.args.first(), call.args.get(1)) {
-        if let Some(var_name) = extract_var_name(&needle_arg.value) {
-            if let Some(haystack_ty) = extract_haystack_type(&haystack_arg.value, ctx, db, file) {
+        let Some(needle_value) = &needle_arg.value else {
+            return;
+        };
+        let Some(haystack_value) = &haystack_arg.value else {
+            return;
+        };
+        if let Some(var_name) = extract_var_name(needle_value) {
+            if let Some(haystack_ty) = extract_haystack_type(haystack_value, ctx, db, file) {
                 let current = ctx.get_var(&var_name);
                 let loose_safe = strict || in_array_loose_narrowing_is_safe(&current, &haystack_ty);
                 if !current.is_mixed() && is_true && loose_safe {
@@ -255,10 +264,10 @@ pub(crate) fn narrow_in_array_condition(
                     }
                 }
             }
-        } else if let Some((obj, prop)) = extract_any_prop_access(&needle_arg.value) {
+        } else if let Some((obj, prop)) = extract_any_prop_access(needle_value) {
             // Property-access counterpart of the plain-variable case
             // above, e.g. `in_array($this->status, ['a', 'b'])`.
-            if let Some(haystack_ty) = extract_haystack_type(&haystack_arg.value, ctx, db, file) {
+            if let Some(haystack_ty) = extract_haystack_type(haystack_value, ctx, db, file) {
                 if is_true {
                     // in_array(null, $haystack) only matches loosely
                     // when the haystack contains a falsy literal (0,
@@ -292,12 +301,10 @@ pub(crate) fn narrow_in_array_condition(
                     }
                 }
             }
-        } else if let Some((fqcn, prop)) =
-            extract_static_prop_access(&needle_arg.value, ctx, db, file)
-        {
+        } else if let Some((fqcn, prop)) = extract_static_prop_access(needle_value, ctx, db, file) {
             // Static-property counterpart of the instance-property
             // case above, e.g. `in_array(self::$status, ['a', 'b'])`.
-            if let Some(haystack_ty) = extract_haystack_type(&haystack_arg.value, ctx, db, file) {
+            if let Some(haystack_ty) = extract_haystack_type(haystack_value, ctx, db, file) {
                 // No receiver-non-null propagation here, unlike the
                 // instance-property case above: a static property
                 // has no separate receiver variable whose

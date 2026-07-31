@@ -440,9 +440,9 @@ fn accumulate_class_exists_guard(
     if !then_branch_diverges(&if_stmt.then_branch) {
         return;
     }
-    if let Some(arg) = call.args.first() {
+    if let Some(value) = call.args.first().and_then(|a| a.value.as_ref()) {
         if let Some(fqcn) =
-            crate::narrowing::extract_class_fqcn_from_expr(&arg.value, None, None, None, db, file)
+            crate::narrowing::extract_class_fqcn_from_expr(value, None, None, None, db, file)
         {
             guards.insert(fqcn);
         }

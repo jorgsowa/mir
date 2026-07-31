@@ -279,7 +279,7 @@ pub(crate) fn gettype_call_arg(expr: &Expr) -> Option<&Expr> {
     {
         return None;
     }
-    call.args.first().map(|a| &a.value)
+    call.args.first().and_then(|a| a.value.as_ref())
 }
 
 /// The set of `gettype()` strings a value of type `ty` could yield, or `None`

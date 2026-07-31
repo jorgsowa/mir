@@ -251,6 +251,11 @@ pub(crate) fn apply_one_assertion(
         &variadic_args
     };
     for arg in args_to_check {
+        // A partial-application placeholder (`?`/`...`) has no expression
+        // to narrow on for this assertion — skip it.
+        let Some(arg_value) = &arg.value else {
+            continue;
+        };
         // `@psalm-assert-if-true Type $arr['key']` — the assertion
         // targets a specific key of this parameter, not the whole
         // argument. Build a shape-path target from the argument
@@ -262,16 +267,16 @@ pub(crate) fn apply_one_assertion(
         // ASSIGN instead.
         if !assertion.param_key.is_empty() {
             let path = &assertion.param_key;
-            let base = if let Some(name) = extract_var_name(&arg.value) {
+            let base = if let Some(name) = extract_var_name(arg_value) {
                 Some(ShapeBase::Var(name))
-            } else if let Some((obj, prop)) = extract_chained_prop_access(&arg.value) {
+            } else if let Some((obj, prop)) = extract_chained_prop_access(arg_value) {
                 // `extract_chained_prop_access` subsumes the bare 1-hop case
                 // (identical `(obj, prop)` for `$x->prop`) and additionally
                 // covers a 2-hop chain (`$this->a->b`) via a synthetic
                 // `"this->a"` key — see its own doc comment.
                 Some(ShapeBase::Prop(obj, prop))
             } else {
-                extract_static_prop_access(&arg.value, ctx, db, file)
+                extract_static_prop_access(arg_value, ctx, db, file)
                     .map(|(fqcn, prop)| ShapeBase::Static(fqcn, prop))
             };
             if let Some(base) = base {
@@ -292,7 +297,7 @@ pub(crate) fn apply_one_assertion(
             }
             continue;
         }
-        if let Some(var_name) = extract_var_name(&arg.value) {
+        if let Some(var_name) = extract_var_name(arg_value) {
             let ty = match template_bindings {
                 Some(b) => assertion.ty.substitute_templates(b),
                 None => assertion.ty.clone(),
@@ -304,7 +309,7 @@ pub(crate) fn apply_one_assertion(
             };
             ctx.set_var(&var_name, ty);
             applied = true;
-        } else if let Some((obj, prop)) = extract_chained_prop_access(&arg.value) {
+        } else if let Some((obj, prop)) = extract_chained_prop_access(arg_value) {
             let ty = match template_bindings {
                 Some(b) => assertion.ty.substitute_templates(b),
                 None => assertion.ty.clone(),
@@ -322,7 +327,7 @@ pub(crate) fn apply_one_assertion(
             ctx.set_prop_refined(&obj, &prop, ty);
             narrow_receiver_non_null_on_prop_match(ctx, &obj, proved_prop_non_null);
             applied = true;
-        } else if let Some((fqcn, prop)) = extract_static_prop_access(&arg.value, ctx, db, file) {
+        } else if let Some((fqcn, prop)) = extract_static_prop_access(arg_value, ctx, db, file) {
             let ty = match template_bindings {
                 Some(b) => assertion.ty.substitute_templates(b),
                 None => assertion.ty.clone(),
@@ -368,7 +373,12 @@ pub(crate) fn compute_assertion_template_bindings(
         };
     let arg_types: Vec<Type> = call_args
         .iter()
-        .map(|arg| assertion_arg_type(&arg.value, ctx, db, file))
+        .map(|arg| {
+            arg.value
+                .as_ref()
+                .map(|v| assertion_arg_type(v, ctx, db, file))
+                .unwrap_or_else(Type::mixed)
+        })
         .collect();
     let arg_names: Vec<Option<String>> = call_args
         .iter()
@@ -563,7 +573,8 @@ fn expand_literal_spread_call_args(
     if !sole.unpack {
         return None;
     }
-    let ExprKind::Array(elements) = &sole.value.kind else {
+    let sole_value = sole.value.as_ref()?;
+    let ExprKind::Array(elements) = &sole_value.kind else {
         return None;
     };
     let mut expanded = Vec::with_capacity(elements.len());
@@ -573,7 +584,7 @@ fn expand_literal_spread_call_args(
         }
         expanded.push(php_ast::owned::Arg {
             name: None,
-            value: el.value.clone(),
+            value: Some(el.value.clone()),
             unpack: false,
             by_ref: false,
             span: el.span,
