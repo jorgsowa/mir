@@ -15,6 +15,7 @@ mod color;
 mod composer;
 mod config;
 mod format;
+mod path_util;
 mod plugins;
 mod report;
 

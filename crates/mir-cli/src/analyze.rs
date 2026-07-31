@@ -11,6 +11,7 @@ use mir_analyzer::{
 };
 
 use crate::config::Config;
+use crate::path_util::strip_verbatim_prefix;
 use crate::{color, Cli, OutputFormat};
 
 // ---------------------------------------------------------------------------
@@ -60,7 +61,7 @@ pub fn run_composer_flow(
             .paths
             .first()
             .and_then(|p| p.canonicalize().ok())
-            .is_some_and(|p| p == composer_root);
+            .is_some_and(|p| strip_verbatim_prefix(&p) == strip_verbatim_prefix(composer_root));
 
     let discovered: Vec<PathBuf> = if analyze_whole_composer_project {
         let all = map.project_files();
@@ -168,7 +169,10 @@ pub fn run_plain_flow(
             } else {
                 cwd_abs.join(p)
             };
-            !ignore_dirs.iter().any(|ig| abs.starts_with(ig))
+            let abs = strip_verbatim_prefix(&abs);
+            !ignore_dirs
+                .iter()
+                .any(|ig| abs.starts_with(strip_verbatim_prefix(ig)))
         })
         .collect();
 
@@ -469,7 +473,10 @@ fn filter_ignore(
             } else {
                 base.join(p)
             };
-            !ignore_dirs.iter().any(|ig| abs.starts_with(ig))
+            let abs = strip_verbatim_prefix(&abs);
+            !ignore_dirs
+                .iter()
+                .any(|ig| abs.starts_with(strip_verbatim_prefix(ig)))
         })
         .collect()
 }
@@ -488,7 +495,10 @@ fn filter_to_dirs(files: Vec<PathBuf>, roots: &[PathBuf], base: &std::path::Path
             } else {
                 base.join(p)
             };
-            roots.iter().any(|r| abs.starts_with(r))
+            let abs = strip_verbatim_prefix(&abs);
+            roots
+                .iter()
+                .any(|r| abs.starts_with(strip_verbatim_prefix(r)))
         })
         .collect()
 }

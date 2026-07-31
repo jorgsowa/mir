@@ -5,6 +5,151 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.66.0] - 2026-07-31
+
+### Fixed
+
+- **`new $var(...)` accepts an object receiver:** `is_valid_class_name_type`
+  rejected any object-typed value, but `new $obj(...)` is valid PHP — it
+  constructs a fresh instance of `$obj`'s own runtime class, a common
+  "rethrow with a richer exception" idiom.
+- **`<projectFiles>`/`<ignoreFiles>` directory wildcards now glob-expand:**
+  `<directory name="src/*/Tests"/>` was joined to `config_base` literally
+  and matched via `starts_with`, so a `*` segment never matched
+  anything — an ignored/wildcarded directory was silently analyzed
+  anyway. `*` now expands the same way Psalm's own `glob()`-based
+  resolution does: matches within one path segment, never across `/`.
+- **`-c` with a bare relative config path resolves correctly:**
+  `Path::parent()` on a bare relative filename (`-c mir.xml`) returns
+  `Some("")`, not `None`, so the `cwd` fallback never triggered and
+  every relative `<ignoreFiles>`/`<projectFiles>` directory resolved
+  against an empty base instead.
+- **`<ignoreFiles>`/`<projectFiles>` directory matching works on
+  Windows:** `find_composer_root_for_path` canonicalizes its input,
+  which on Windows returns a `\\?\`-prefixed verbatim path; config
+  directory entries are never canonicalized, so the two path forms
+  compared unequal component-for-component and every ignore/project
+  directory check silently failed. Added a shared
+  `strip_verbatim_prefix` helper and applied it at every such
+  comparison.
+- **`<projectFiles>` directories are honored in the composer flow:**
+  `config.project_dirs` was parsed but never consulted — a whole-project
+  run always analyzed every `Psr4Map::project_files()` entry regardless
+  of `<projectFiles>`. Discovery is now intersected with the configured
+  directories.
+- **Transitive requires from files-autoload entries are followed:** a
+  files-autoload bootstrap that only dispatches to a version-gated
+  sibling implementation (the common polyfill idiom) never had that
+  sibling indexed, leaving its functions/constants invisible in the
+  default lazy-vendor mode.
+- **Vendored the missing `mongodb`, `ds`/`imagick`/`relay`/`zookeeper`,
+  and `amqp`/`memcache`/`imap`/`ldap`/`snmp`/`ssh2`/`xdebug` PECL
+  stubs:** `PhpStormStubsMap.php` already listed every entry for these
+  extensions, but their `stubs/` directories were never vendored, so
+  `build.rs`'s stub-dir set skipped them and every symbol was reported
+  undefined.
+- **Refined string atoms are subtypes of `scalar`:** `atomic_subtype`
+  had a `(refined-int-family | TLiteralString, TScalar)` arm but
+  nothing for `TNonEmptyString`/`TNumericString`/`TClassString`/
+  `TInterfaceString`/`TCallableString`/`TEnumString`/`TTraitString` —
+  every one of these is still just a string, hence a scalar, at
+  runtime.
+- **`T[]` docblock shorthand keys on `array-key`, not `int`:**
+  `parse_type_string`'s `Type[]` shorthand hardcoded an int key, but
+  Psalm/PHPStan document this as `array<array-key, Type>` — a
+  string-keyed array (`array_column()` output, a PSR-3 `$context`
+  array, `class_implements()`/`class_parents()`'s own
+  class-string-keyed result) into a `mixed[]`/`string[]`-docblocked
+  param falsely flagged.
+- **Trait-declared private/protected properties are accessible in the
+  consuming class:** `property_inaccessible` compared `self_fqcn`
+  against the trait's own FQCN, with no composition awareness — a
+  private/protected property declared on a trait was flagged
+  inaccessible from every class that uses it, even though PHP
+  copy-pastes trait members into the consuming class.
+- **Platform-dependent constants widen to their base type:** `PHP_OS`,
+  `PHP_SAPI`, `PHP_INT_SIZE`, and `DIRECTORY_SEPARATOR` carry the
+  bundled stub's single `define()` literal, so every cross-platform/SAPI
+  guard comparing against a different literal was flagged
+  `ImpossibleIdenticalComparison`.
+- **`elseif` conditions chain instead of re-deriving from the primary
+  `if`:** each `elseif`'s pre-condition context re-branched from the
+  outer `if`'s own context and re-narrowed only the primary condition,
+  discarding every earlier `elseif`'s condition outright — both its
+  assignments and its type narrowing.
+- **A body that always throws infers `never`, not `void`:**
+  `merge_return_types` returned `void` unconditionally whenever a
+  function/method/closure had no return statement, regardless of
+  whether the body could actually fall off the end.
+- **`property_exists()`/`isset()` prove a dynamic property exists:**
+  `property_exists($obj, 'x')` and `isset($obj->x)` recorded no fact at
+  all, so a later `$obj->x` read inside the guarded branch still
+  flagged `UndefinedProperty` even though the guard just proved it.
+- **A global `\Foo` intersection member resolves correctly in a
+  namespaced file:** receiver-resolution re-ran raw-source-text rules
+  on an already-canonical fqcn, so a fully-qualified global class used
+  as an intersection member got the current file's namespace wrongly
+  re-prepended.
+- **Protected property/constant access allows the owner-extends-caller
+  direction:** PHP's protected-visibility check is symmetric over the
+  class hierarchy, but the checks only tested caller-extends-owner,
+  denying an ancestor class access to a protected member declared only
+  on a descendant.
+- **Implementing a trait's abstract method may narrow its visibility:**
+  unlike an interface method or an abstract class's abstract method,
+  narrowing the visibility when implementing a directly-used trait's
+  abstract method raises no error in PHP.
+- **A transitively-composed trait's method isn't a real override
+  parent:** `own_traits` only listed a class's directly-`use`d traits,
+  so a trait composed only via another trait still looked like a real
+  ancestor, flagging `FinalMethodOverridden` comparing a flattened
+  final method against its own copy.
+- **An inaccessible property read routes through a declared `__get`:**
+  PHP invokes `__get()` instead of erroring when a private/protected
+  property is read from outside its accessible scope; property
+  resolution emitted `InaccessibleProperty` unconditionally, with no
+  check for the magic-get fallback.
+- **Offset write/unset on a readonly `ArrayAccess`-object property is
+  legal:** `$this->prop[$k] = $v` and `unset($this->prop[$k])` dispatch
+  to `offsetSet`/`offsetUnset` on the object the readonly property
+  already holds, not a reassignment of the property binding — the
+  readonly-write check now only exempts array-index writes through an
+  `ArrayAccess`-typed property.
+- **A property `@var` docblock type preserves native nullability:** a
+  `@var` refining a nullable native property hint but omitting `|null`
+  erased that nullability, the property analogue of the already-fixed
+  param-side gap.
+- **`is_callable()` narrowing makes a bare object satisfy `callable`:**
+  narrowing only filtered atoms, never transformed one into something a
+  `callable`-typed target accepts — a bare `object` value stayed typed
+  as `object` after the guard.
+- **`parse_str()`'s out-param no longer checks the incoming type:**
+  `parse_str`'s real signature places no type constraint on the
+  incoming `$result` value — reusing the same variable
+  (`parse_str($s, $s)`) is legal PHP. Switched to `@param-out`.
+- **`func_get_args()`'s synthetic param no longer skews override
+  checks:** the synthetic `...` param injected for a
+  `func_get_args()`-using method exists only to let call sites pass
+  extra positional args without a false `TooManyArguments` — counting
+  it in override param-count/by-ref comparisons flagged a child with an
+  identical real signature as having fewer parameters than the parent.
+- **A `@psalm-type` alias named after `self`/`static`/`parent` resolves
+  as the alias:** `parse_type_string` resolves these bare words to
+  keyword sentinels before any alias table exists to consult, so an
+  alias named after one of them (`@psalm-type Parent = Foo`) never
+  reached the alias-expansion arm and stayed the keyword.
+
+### Changed
+
+- PHP parser suite (`php-rs-parser`, `php-ast`, `php-lexer`,
+  `phpdoc-parser`) upgraded to 0.19.0: `php-ast` now represents PHP
+  8.6's partial-application placeholder (`?`/`...` in a call argument)
+  as `Arg::value: Option<Expr>` instead of assuming a value is always
+  present. Any placeholder argument currently raises a hard
+  `ParseError` (mir's parser always targets 8.5 internally, decoupled
+  from `--php-version`), which suppresses body-level analysis for the
+  whole file rather than crashing or misparsing.
+
 ## [0.65.0] - 2026-07-31
 
 ### Fixed
