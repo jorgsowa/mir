@@ -221,11 +221,13 @@ function ord(string $character): int {}
  * @param string $string <p>
  * The input string.
  * </p>
- * @param array &$result <p>
+ * @param mixed &$result <p>
  * If the second parameter arr is present,
  * variables are stored in this variable as array elements instead.<br/>
  * Since 7.2.0 this parameter is not optional.
  * </p>
+ * @param-out array $result A pure out-param: the incoming value is never read (the
+ * same variable can be reused, e.g. `parse_str($s, $s)`), only overwritten.
  * @return void
  */
 function parse_str(
