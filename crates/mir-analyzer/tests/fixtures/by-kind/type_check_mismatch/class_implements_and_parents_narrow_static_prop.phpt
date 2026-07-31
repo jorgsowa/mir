@@ -45,6 +45,6 @@ class Holder {
 }
 ===expect===
 MissingConstructor@8:0-8:14: Class Holder has uninitialized properties but no constructor
-PossiblyInvalidArgument@13:39-13:67: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int, string>|false' provided
-PossiblyInvalidArgument@23:40-23:69: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int, string>|false' provided
-PossiblyInvalidArgument@33:39-33:65: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int, string>|false' provided
+PossiblyInvalidArgument@13:39-13:67: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
+PossiblyInvalidArgument@23:40-23:69: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
+PossiblyInvalidArgument@33:39-33:65: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided

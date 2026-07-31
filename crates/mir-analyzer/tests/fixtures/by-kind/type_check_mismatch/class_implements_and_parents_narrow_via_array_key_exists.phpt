@@ -53,8 +53,8 @@ class HasAnimalProp {
     }
 }
 ===expect===
-PossiblyInvalidArgument@10:35-10:57: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int, string>|false' provided
-PossiblyInvalidArgument@18:36-18:58: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int, string>|false' provided
-PossiblyInvalidArgument@26:35-26:54: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int, string>|false' provided
+PossiblyInvalidArgument@10:35-10:57: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
+PossiblyInvalidArgument@18:36-18:58: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
+PossiblyInvalidArgument@26:35-26:54: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
 MissingConstructor@32:0-32:21: Class HasAnimalProp has uninitialized properties but no constructor
-PossiblyInvalidArgument@37:39-37:67: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int, string>|false' provided
+PossiblyInvalidArgument@37:39-37:67: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided

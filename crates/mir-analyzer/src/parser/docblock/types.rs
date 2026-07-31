@@ -120,11 +120,14 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         }
     }
 
-    // Array shorthand: `Type[]` or `Type[][]`
+    // Array shorthand: `Type[]` or `Type[][]` — Psalm/PHPStan document this as
+    // `array<array-key, Type>`, not `array<int, Type>`: it makes no claim about
+    // key shape, so a string-keyed array (e.g. `array_column`'s output, a
+    // PSR-3 `$context` array) must still satisfy it.
     if let Some(value_str) = s.strip_suffix("[]") {
         let value = parse_type_string(value_str);
         return Type::single(Atomic::TArray {
-            key: Box::new(Type::single(Atomic::TInt)),
+            key: Box::new(Type::array_key()),
             value: Box::new(value),
         });
     }

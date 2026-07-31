@@ -56,8 +56,8 @@ function falseBranchDoesNotNarrow(mixed $obj): void {
     }
 }
 ===expect===
-PossiblyInvalidArgument@11:35-11:54: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int, string>|false' provided
-PossiblyInvalidArgument@21:39-21:64: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int, string>|false' provided
-PossiblyInvalidArgument@32:39-32:64: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int, string>|false' provided
-PossiblyInvalidArgument@40:36-40:55: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int, string>|false' provided
+PossiblyInvalidArgument@11:35-11:54: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
+PossiblyInvalidArgument@21:39-21:64: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
+PossiblyInvalidArgument@32:39-32:64: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
+PossiblyInvalidArgument@40:36-40:55: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
 UndefinedMethod@44:8-44:26: Method Animal::onlyOnDuck() does not exist
