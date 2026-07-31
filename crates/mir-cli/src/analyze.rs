@@ -63,7 +63,20 @@ pub fn run_composer_flow(
             .is_some_and(|p| p == composer_root);
 
     let discovered: Vec<PathBuf> = if analyze_whole_composer_project {
-        map.project_files()
+        let all = map.project_files();
+        if config.project_dirs.is_empty() {
+            all
+        } else {
+            // `<projectFiles>` intersects with the composer autoload roots
+            // rather than replacing them — a dir outside every autoload root
+            // still contributes nothing, same as before this config existed.
+            let project_roots: Vec<PathBuf> = config
+                .project_dirs
+                .iter()
+                .flat_map(|d| expand_glob_dir(d, config_base))
+                .collect();
+            filter_to_dirs(all, &project_roots, composer_root)
+        }
     } else {
         discover_files(&cli.paths[0])
     };
@@ -461,6 +474,25 @@ fn filter_ignore(
         .collect()
 }
 
+/// Keep only files under one of `roots` (resolved `<projectFiles>` directories) — the
+/// inverse of `filter_ignore`'s exclude-list semantics.
+fn filter_to_dirs(files: Vec<PathBuf>, roots: &[PathBuf], base: &std::path::Path) -> Vec<PathBuf> {
+    if roots.is_empty() {
+        return files;
+    }
+    files
+        .into_iter()
+        .filter(|p| {
+            let abs = if p.is_absolute() {
+                p.clone()
+            } else {
+                base.join(p)
+            };
+            roots.iter().any(|r| abs.starts_with(r))
+        })
+        .collect()
+}
+
 fn run_with_progress(
     session: AnalysisSession,
     files: &[PathBuf],
@@ -486,6 +518,41 @@ fn run_with_progress(
         r
     } else {
         session.analyze_paths(files, &opts)
+    }
+}
+
+#[cfg(test)]
+mod filter_to_dirs_tests {
+    use super::filter_to_dirs;
+    use std::path::PathBuf;
+
+    #[test]
+    fn empty_roots_keeps_every_file() {
+        let files = vec![
+            PathBuf::from("/proj/src/A.php"),
+            PathBuf::from("/proj/lib/B.php"),
+        ];
+        assert_eq!(
+            filter_to_dirs(files.clone(), &[], &PathBuf::from("/proj")),
+            files
+        );
+    }
+
+    #[test]
+    fn keeps_only_files_under_a_configured_root() {
+        let files = vec![
+            PathBuf::from("/proj/src/A.php"),
+            PathBuf::from("/proj/lib/B.php"),
+            PathBuf::from("/proj/src/Sub/C.php"),
+        ];
+        let roots = vec![PathBuf::from("/proj/src")];
+        assert_eq!(
+            filter_to_dirs(files, &roots, &PathBuf::from("/proj")),
+            vec![
+                PathBuf::from("/proj/src/A.php"),
+                PathBuf::from("/proj/src/Sub/C.php"),
+            ]
+        );
     }
 }
 
