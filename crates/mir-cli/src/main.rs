@@ -211,7 +211,17 @@ fn load_config(cli: &Cli) -> (Config, PathBuf) {
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
     if let Some(path) = &cli.config {
-        let config_base = path
+        // Absolutize before taking `.parent()` — a bare relative filename like
+        // `mir.xml` (no directory component) has `Path::parent()` return
+        // `Some("")`, not `None`, so the `cwd` fallback below never triggered
+        // and every relative `<directory>`/`<ignoreFiles>` entry silently
+        // resolved against an empty base instead of `cwd`.
+        let abs_path = if path.is_absolute() {
+            path.clone()
+        } else {
+            cwd.join(path)
+        };
+        let config_base = abs_path
             .parent()
             .map_or_else(|| cwd.clone(), |p| p.to_path_buf());
         let config = match Config::from_file(path) {
