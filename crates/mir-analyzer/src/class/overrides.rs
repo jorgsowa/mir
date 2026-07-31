@@ -579,7 +579,18 @@ impl<'a> ClassAnalyzer<'a> {
             // the "primary" one — otherwise a class implementing two
             // interfaces with conflicting param contracts is only checked
             // against whichever interface happens to be listed first.
-            let own_params = own.params.clone();
+            // The synthetic `...` param `func_get_args()` detection injects
+            // (see `collector/mod.rs`/`function.rs`) exists only to let a
+            // call site pass more positional args than the declared list
+            // without a false TooManyArguments — it isn't part of the real,
+            // caller-visible signature, so it must not count toward any
+            // param-count/byref LSP comparison here (a func_get_args()-using
+            // ancestor would otherwise inflate its own param count and flag
+            // an override with an identical real signature as "fewer
+            // parameters than parent").
+            let is_real_param =
+                |p: &&mir_codebase::definitions::DeclaredParam| p.name.as_str() != "...";
+            let own_params: Vec<_> = own.params.iter().filter(is_real_param).cloned().collect();
             // Two ancestors (e.g. a trait and an interface implemented by the
             // same class, both declaring that trait's method) commonly share
             // byte-identical signatures — dedup by the STRUCTURAL shape of
@@ -593,7 +604,12 @@ impl<'a> ClassAnalyzer<'a> {
             let mut seen_byref_violation: HashSet<(usize, bool)> = HashSet::default();
             let mut seen_narrowing: HashSet<(usize, String, String)> = HashSet::default();
             for (anc_fqcn, anc_parent) in all_parent_methods.iter() {
-                let parent_params = anc_parent.params.clone();
+                let parent_params: Vec<_> = anc_parent
+                    .params
+                    .iter()
+                    .filter(is_real_param)
+                    .cloned()
+                    .collect();
 
                 // ---- d. Required param count must not increase -------------
                 let parent_required = parent_params
