@@ -590,6 +590,20 @@ pub(super) fn infer_const_value(
     }
 }
 
+/// A handful of core constants whose real runtime value depends on the target
+/// platform/SAPI — the bundled stub's `define()` only ever states one literal
+/// (e.g. `PHP_OS = "Linux"`, `DIRECTORY_SEPARATOR = "/"`), which would
+/// otherwise narrow the constant to that single literal and make every
+/// cross-platform/SAPI guard (`'\\' === DIRECTORY_SEPARATOR`) look
+/// "impossible". Widen to the constant's own base scalar type instead.
+fn widen_environment_dependent_constant(name: &str, inferred: Type) -> Type {
+    match name {
+        "PHP_OS" | "PHP_SAPI" | "DIRECTORY_SEPARATOR" => Type::single(Atomic::TString),
+        "PHP_INT_SIZE" => Type::single(Atomic::TInt),
+        _ => inferred,
+    }
+}
+
 /// A native scalar type hint on a class/interface/enum constant (PHP 8.3+)
 /// otherwise wins over literal inference outright, discarding precision a
 /// same-kind literal would give (`const int ID = 5;` typing as bare `int`
@@ -1761,6 +1775,7 @@ impl<'a> DefinitionCollector<'a> {
             .get(1)
             .and_then(|arg| infer_const_value(self, &arg.value.kind))
             .unwrap_or(Type::mixed());
+        let const_type = widen_environment_dependent_constant(&fqn, const_type);
         self.slice.constants.push((fqn, const_type));
     }
 
