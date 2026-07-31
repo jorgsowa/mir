@@ -442,7 +442,16 @@ impl Psr4Map {
         // Eager-load list = autoload.files entries (project + vendor). These
         // hold unbound globals (functions, constants, polyfills) that the lazy
         // FQCN-based resolver cannot reach.
-        let vendor_eager_files = read_files_autoload(&vendor_dir, root);
+        let mut vendor_eager_files = read_files_autoload(&vendor_dir, root);
+        // A files-autoload bootstrap commonly just dispatches to a sibling
+        // implementation file (the version-gated polyfill idiom: `if
+        // (PHP_VERSION_ID >= 80000) { require __DIR__.'/bootstrap80.php'; }
+        // else { require __DIR__.'/bootstrap.php'; }`) — follow those the same
+        // way `project_files()` follows a manual require reaching outside every
+        // autoload root. Unlike that call site, don't skip `vendor`-rooted
+        // targets: the starting files are themselves inside `vendor`, so their
+        // sibling requires are too.
+        expand_via_local_requires(&mut vendor_eager_files, false);
 
         Ok(Psr4Map {
             project_entries,
@@ -465,7 +474,7 @@ impl Psr4Map {
         for path in &self.project_extra_paths {
             collect_php_path(path, &mut out);
         }
-        expand_via_local_requires(&mut out);
+        expand_via_local_requires(&mut out, true);
         out
     }
 
@@ -607,10 +616,13 @@ fn collect_php_path(path: &Path, out: &mut Vec<PathBuf>) {
 /// (e.g. `require_once __DIR__ . '/../legacy/bootstrap.php'`). A bare
 /// literal with no `__DIR__` is resolved relative to the including file's
 /// own directory, the conventional meaning for this idiom in practice.
-/// Files under a `vendor` directory are skipped — those are already reached
-/// through the composer autoload machinery, and re-adding them here would
-/// double-index vendor code as project code.
-fn expand_via_local_requires(out: &mut Vec<PathBuf>) {
+/// When `skip_vendor` is set, a target resolving under a `vendor` directory is
+/// dropped — those are already reached through the composer autoload
+/// machinery, and re-adding them here would double-index vendor code as
+/// project code. Callers starting from vendor files themselves (a files-autoload
+/// bootstrap's own sibling requires) pass `false`, since every target is
+/// expected to resolve inside `vendor`.
+fn expand_via_local_requires(out: &mut Vec<PathBuf>, skip_vendor: bool) {
     let mut seen: rustc_hash::FxHashSet<PathBuf> = out.iter().cloned().collect();
     let mut queue: Vec<PathBuf> = out.clone();
     while let Some(file) = queue.pop() {
@@ -641,7 +653,7 @@ fn expand_via_local_requires(out: &mut Vec<PathBuf>) {
             if resolved.extension().and_then(|e| e.to_str()) != Some("php") {
                 continue;
             }
-            if resolved.components().any(|c| c.as_os_str() == "vendor") {
+            if skip_vendor && resolved.components().any(|c| c.as_os_str() == "vendor") {
                 continue;
             }
             if !resolved.is_file() {
@@ -1321,6 +1333,66 @@ mod tests {
         let files = map.vendor_files();
         assert_eq!(files.len(), 1);
         assert!(files[0].ends_with("bootstrap.php"));
+    }
+
+    /// Sector H4 of the real-world compatibility audit (ROADMAP.md): a
+    /// files-autoload bootstrap that only dispatches to a version-gated
+    /// sibling implementation (the common polyfill idiom) must have that
+    /// sibling followed into `vendor_eager_files()` too, or the functions it
+    /// declares are invisible to the lazy-mode analyzer.
+    #[test]
+    fn vendor_eager_files_follows_polyfill_bootstrap_require() {
+        let root = make_temp_project("vendor_eager_files_polyfill");
+        fs::write(
+            root.join("composer.json"),
+            r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+        )
+        .unwrap();
+        let vendor_dir = root.join("vendor/composer");
+        fs::create_dir_all(&vendor_dir).unwrap();
+        fs::write(
+            vendor_dir.join("installed.json"),
+            r#"{
+                "packages": [{
+                    "name": "vendor/polyfill",
+                    "autoload": { "files": ["bootstrap.php"] }
+                }]
+            }"#,
+        )
+        .unwrap();
+        let pkg_dir = root.join("vendor/vendor/polyfill");
+        fs::create_dir_all(&pkg_dir).unwrap();
+        fs::write(
+            pkg_dir.join("bootstrap.php"),
+            "<?php if (PHP_VERSION_ID >= 80000) { require_once __DIR__ . '/bootstrap80.php'; } \
+             else { require_once __DIR__ . '/bootstrap_php7.php'; }",
+        )
+        .unwrap();
+        fs::write(
+            pkg_dir.join("bootstrap80.php"),
+            "<?php function polyfill_mb_str_split() {}",
+        )
+        .unwrap();
+        fs::write(
+            pkg_dir.join("bootstrap_php7.php"),
+            "<?php function polyfill_mb_str_split_legacy() {}",
+        )
+        .unwrap();
+
+        let map = Psr4Map::from_composer(&root).unwrap();
+        let files = map.vendor_eager_files();
+        assert!(
+            files.iter().any(|p| p.ends_with("bootstrap.php")),
+            "expected bootstrap.php in {files:?}"
+        );
+        assert!(
+            files.iter().any(|p| p.ends_with("bootstrap80.php")),
+            "expected the require_once-d sibling bootstrap80.php in {files:?}"
+        );
+        assert!(
+            files.iter().any(|p| p.ends_with("bootstrap_php7.php")),
+            "expected the require_once-d sibling bootstrap_php7.php in {files:?}"
+        );
     }
 
     #[test]
