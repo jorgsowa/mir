@@ -737,7 +737,7 @@ mod tests {
             "empty string should not be a builtin"
         );
         assert!(
-            !is_builtin_function("xdebug_break"),
+            !is_builtin_function("gearman_bugreport"),
             "extension function with no vendored stub dir should not be a builtin"
         );
     }
