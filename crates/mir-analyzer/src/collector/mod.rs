@@ -395,8 +395,38 @@ where
                 if_false: expand_aliases_only(data.if_false, aliases),
             }),
         }),
+        // `parse_type_string` resolves the bare words `self`/`static`/`parent`
+        // to these keyword sentinels (empty `fqcn`, filled in later at the
+        // use site) BEFORE any alias table exists to consult — an alias
+        // named after one of them (`@psalm-type Parent = Foo`) never reaches
+        // the `TNamedObject` arm above at all. Case-insensitive: PHP's own
+        // keywords are case-insensitive, and by this point the original
+        // spelling is gone.
+        Atomic::TSelf { .. } => keyword_alias_or(atomic, "self", aliases),
+        Atomic::TParent { .. } => keyword_alias_or(atomic, "parent", aliases),
+        Atomic::TStaticObject { ref fqcn } if fqcn.as_ref().is_empty() => {
+            keyword_alias_or(atomic, "static", aliases)
+        }
         other => Type::single(other),
     }
+}
+
+/// An alias whose name case-insensitively matches `keyword` wins over the
+/// keyword's own sentinel atom; otherwise the sentinel passes through
+/// unchanged.
+fn keyword_alias_or<K>(
+    atomic: mir_types::Atomic,
+    keyword: &str,
+    aliases: &FxHashMap<K, Type>,
+) -> Type
+where
+    K: std::borrow::Borrow<str> + std::hash::Hash + Eq,
+{
+    aliases
+        .iter()
+        .find(|(k, _)| (*k).borrow().eq_ignore_ascii_case(keyword))
+        .map(|(_, v)| v.clone())
+        .unwrap_or_else(|| Type::single(atomic))
 }
 
 /// Print profiling statistics for type collection.
