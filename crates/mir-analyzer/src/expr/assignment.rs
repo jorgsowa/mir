@@ -845,11 +845,21 @@ impl<'a> ExpressionAnalyzer<'a> {
     /// implicit read for `++`/array-append, an explicit one for a keyed
     /// array write/unset) — so unlike the plain-assignment case, there's no
     /// "allowed in the declaring scope" exception to thread through here.
+    /// `is_offset_write` marks an array-index write/unset THROUGH the
+    /// property (`$this->prop[$k] = v`, `unset($this->prop[$k])`) rather than
+    /// a write to the property itself. When the property holds an
+    /// `ArrayAccess`-implementing object, that shape dispatches to
+    /// `offsetSet`/`offsetUnset` on the already-held object — a method call,
+    /// not a reassignment of the property binding — so it's legal even
+    /// though the property is readonly (PHP-verified live). A plain array
+    /// value has no such indirection: indexing into it always mutates the
+    /// property's own contents, so the check still applies there.
     pub(crate) fn check_property_readonly_write(
         &mut self,
         pa: &php_ast::owned::PropertyAccessExpr,
         ctx: &FlowState,
         span: Span,
+        is_offset_write: bool,
     ) {
         let Some(prop_name) = extract_string_from_expr(&pa.property) else {
             return;
@@ -870,7 +880,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                     crate::db::Fqcn::from_str(db, fqcn.as_ref()),
                     &prop_name,
                 ) {
-                    if prop_def.is_readonly {
+                    let dispatches_to_offset_method = is_offset_write
+                        && prop_def.ty.as_deref().is_some_and(|ty| {
+                            ty.types.iter().any(|a| {
+                                matches!(a, Atomic::TNamedObject { fqcn, .. }
+                                    if crate::expr::arrays::implements_array_access(db, fqcn))
+                            })
+                        });
+                    if prop_def.is_readonly && !dispatches_to_offset_method {
                         self.emit(
                             IssueKind::ReadonlyPropertyAssignment {
                                 class: owner.to_string(),
@@ -908,7 +925,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         match &base.kind {
             ExprKind::PropertyAccess(pa) => {
                 self.check_property_write_purity(pa, ctx, span);
-                self.check_property_readonly_write(pa, ctx, span);
+                self.check_property_readonly_write(pa, ctx, span, false);
             }
             // `array_push(self::$queue, $x)` — a static-property by-ref
             // argument mutates that property exactly as much as
@@ -2111,7 +2128,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             // be read for reference-recording, which is all
                             // this arm previously did.
                             self.check_property_write_purity(pa, ctx, span);
-                            self.check_property_readonly_write(pa, ctx, span);
+                            self.check_property_readonly_write(pa, ctx, span, true);
                             let _ = self.analyze(base, ctx);
                             break;
                         }
