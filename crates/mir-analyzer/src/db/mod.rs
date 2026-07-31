@@ -209,8 +209,8 @@ pub use self::queries::{
     class_template_params, collect_file_definitions, collect_file_definitions_uncached,
     constant_exists, declared_template_params, extends_or_implements, function_exists,
     has_unknown_ancestor, infer_file_return_types, inherited_template_bindings, is_final,
-    is_unchecked_exception, member_location, parse_file, resolve_name, ClassKind,
-    InferredFileTypes, TrackedParseResult,
+    is_unchecked_exception, member_location, parse_file, resolve_name, resolve_receiver_fqcn,
+    ClassKind, InferredFileTypes, TrackedParseResult,
 };
 pub use self::ref_index::RefIndex;
 pub use self::reference_locations::*;

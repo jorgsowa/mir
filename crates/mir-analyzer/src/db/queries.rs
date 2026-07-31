@@ -50,6 +50,23 @@ pub fn constant_exists(db: &dyn MirDatabase, fqn: &str) -> bool {
     crate::db::find_global_constant(db, here).is_some()
 }
 
+/// Resolve a type atom's already-inferred `fqcn` (`TNamedObject`/`TSelf`/
+/// `TStaticObject`/`TParent`/an intersection member) to a canonical class
+/// name for member (method/property) dispatch. Such a name is normally
+/// already canonical by construction — re-running `resolve_name`'s
+/// raw-source-text rules on it would wrongly re-prepend the current file's
+/// namespace onto an already-resolved GLOBAL (backslash-less) class name,
+/// since `resolve_name` can't tell "already resolved" apart from "bare
+/// unqualified source text". Trust the literal name first when it already
+/// names a real class; only fall back to `resolve_name` when it doesn't
+/// (e.g. a raw class-string still needing namespace-relative resolution).
+pub fn resolve_receiver_fqcn(db: &dyn MirDatabase, file: &str, fqcn: &str) -> String {
+    if class_exists(db, fqcn) {
+        return fqcn.to_string();
+    }
+    resolve_name(db, file, fqcn)
+}
+
 pub fn resolve_name(db: &dyn MirDatabase, file: &str, name: &str) -> String {
     if name.starts_with('\\') {
         return name.trim_start_matches('\\').to_string();

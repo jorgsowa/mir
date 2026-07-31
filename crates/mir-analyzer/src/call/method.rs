@@ -268,21 +268,26 @@ impl CallAnalyzer {
         // the arguments, so passing an undefined variable to an out-parameter
         // (e.g. `$this->fill($out, …)` where the method declares `&$out`) does not
         // produce a false UndefinedVariable. Mirrors the free-function path.
-        if let Some(fqcn) = obj_ty
-            .remove_null()
-            .types
-            .iter()
-            .find_map(|a| a.named_object_fqcn())
-        {
-            let fqcn_resolved = crate::db::resolve_name(ea.db, &ea.file, fqcn);
-            let fqcn_arc: Arc<str> = Arc::from(fqcn_resolved.as_str());
-            if let Some(resolved) = resolve_method_from_db(
-                ea.db,
-                &fqcn_arc,
-                &crate::util::php_ident_lowercase(method_name),
-            ) {
-                super::premark_byref_arg_vars(&resolved.params, &call.args, ctx);
+        // `named_object_fqcn()` is `None` for `TIntersection` — collect that
+        // candidate's member fqcns too so an intersection receiver isn't
+        // silently skipped (mirrors the member-lookup loop above).
+        let method_name_lower = crate::util::php_ident_lowercase(method_name);
+        let premark_resolved = obj_ty.remove_null().types.iter().find_map(|a| match a {
+            mir_types::Atomic::TIntersection { parts } => parts.iter().find_map(|part| {
+                part.types.iter().find_map(|inner| {
+                    let fqcn = inner.named_object_fqcn()?;
+                    let resolved = crate::db::resolve_receiver_fqcn(ea.db, &ea.file, fqcn);
+                    resolve_method_from_db(ea.db, &Arc::from(resolved.as_str()), &method_name_lower)
+                })
+            }),
+            _ => {
+                let fqcn = a.named_object_fqcn()?;
+                let resolved = crate::db::resolve_receiver_fqcn(ea.db, &ea.file, fqcn);
+                resolve_method_from_db(ea.db, &Arc::from(resolved.as_str()), &method_name_lower)
             }
+        });
+        if let Some(resolved) = premark_resolved {
+            super::premark_byref_arg_vars(&resolved.params, &call.args, ctx);
         }
 
         // Always analyze arguments — even when the receiver is null/mixed and we
@@ -415,7 +420,7 @@ impl CallAnalyzer {
                 _ => None,
             };
             fqcn.is_some_and(|fqcn| {
-                let resolved = crate::db::resolve_name(ea.db, &ea.file, fqcn);
+                let resolved = crate::db::resolve_receiver_fqcn(ea.db, &ea.file, fqcn);
                 let resolved: Arc<str> = Arc::from(resolved.as_str());
                 crate::db::class_exists(ea.db, &resolved)
                     && crate::db::has_method_in_chain(ea.db, &resolved, "__call")
@@ -442,7 +447,7 @@ impl CallAnalyzer {
                     fqcn,
                     type_params: receiver_type_params,
                 } => {
-                    let fqcn_resolved = crate::db::resolve_name(ea.db, &ea.file, fqcn);
+                    let fqcn_resolved = crate::db::resolve_receiver_fqcn(ea.db, &ea.file, fqcn);
                     let fqcn = &std::sync::Arc::from(fqcn_resolved.as_str());
                     let mut this_self_out = None;
                     result.merge_with(&resolve_method_return(
@@ -477,7 +482,7 @@ impl CallAnalyzer {
                 mir_types::Atomic::TSelf { fqcn }
                 | mir_types::Atomic::TStaticObject { fqcn }
                 | mir_types::Atomic::TParent { fqcn } => {
-                    let fqcn_resolved = crate::db::resolve_name(ea.db, &ea.file, fqcn);
+                    let fqcn_resolved = crate::db::resolve_receiver_fqcn(ea.db, &ea.file, fqcn);
                     let fqcn = &std::sync::Arc::from(fqcn_resolved.as_str());
                     let mut this_self_out = None;
                     result.merge_with(&resolve_method_return(
@@ -516,7 +521,8 @@ impl CallAnalyzer {
                                 type_params: receiver_type_params,
                             } = inner_atomic
                             {
-                                let fqcn_resolved = crate::db::resolve_name(ea.db, &ea.file, fqcn);
+                                let fqcn_resolved =
+                                    crate::db::resolve_receiver_fqcn(ea.db, &ea.file, fqcn);
                                 let resolved_arc = Arc::from(fqcn_resolved.as_str());
                                 if crate::db::has_method_in_chain(ea.db, &resolved_arc, method_name)
                                 {
