@@ -771,10 +771,9 @@ pub(super) fn parse_callable_syntax(s: &str) -> Option<Type> {
     let s_after_pure = strip_ascii_ci_prefix(s, "pure-").unwrap_or(s);
     let (is_closure, rest) = if let Some(rest) = strip_ascii_ci_prefix(s_after_pure, "closure") {
         (true, rest)
-    } else if let Some(rest) = strip_ascii_ci_prefix(s_after_pure, "callable") {
-        (false, rest)
     } else {
-        return None;
+        let rest = strip_ascii_ci_prefix(s_after_pure, "callable")?;
+        (false, rest)
     };
     let rest = rest.trim_start();
     if !rest.starts_with('(') {
