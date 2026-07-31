@@ -995,8 +995,7 @@ fn resolve_method_return<'a>(
         // abstract/interface method declares, so the required-param count is
         // still a reliable floor.
         let too_many_arity_unknown = resolved.is_abstract
-            || crate::db::class_kind(ea.db, &resolved.owner_fqcn)
-                .is_some_and(|k| k.is_interface);
+            || crate::db::class_kind(ea.db, &resolved.owner_fqcn).is_some_and(|k| k.is_interface);
         // Build class-level template bindings before arg-checking so we can substitute
         // template params (e.g. T → int from Box<int>) into param types. A plain
         // subclass that doesn't redeclare `@template` (`class IntBox extends

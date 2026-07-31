@@ -484,7 +484,10 @@ pub(super) fn infer_const_value(
                 let value_ty = infer_const_value(collector, &elem.value.kind)?;
                 let key = if let Some(key_expr) = &elem.key {
                     is_list = false;
-                    match infer_const_value(collector, &key_expr.kind)?.types.as_slice() {
+                    match infer_const_value(collector, &key_expr.kind)?
+                        .types
+                        .as_slice()
+                    {
                         [Atomic::TLiteralString(s)] => ArrayKey::String(s.clone()),
                         [Atomic::TLiteralInt(i)] => {
                             next_int_key = *i + 1;
@@ -2122,9 +2125,10 @@ impl<'a> DefinitionCollector<'a> {
                         // hint): strip the atoms foreign to the hint's family instead
                         // of storing the raw union.
                         let mut doc_ty = match native_ty.as_ref() {
-                            Some(n) => {
-                                preserve_native_nullability(n, resolve_docblock_scalar_conflict(n, doc_ty))
-                            }
+                            Some(n) => preserve_native_nullability(
+                                n,
+                                resolve_docblock_scalar_conflict(n, doc_ty),
+                            ),
                             None => doc_ty,
                         };
                         // Mark the type as docblock-sourced so signature checks (e.g.

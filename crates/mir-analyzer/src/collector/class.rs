@@ -186,9 +186,7 @@ impl<'a> DefinitionCollector<'a> {
                                 let ty = match resolve_doc() {
                                     Some(doc_ty) => {
                                         if native_ty.as_ref().is_some_and(|n| {
-                                            super::native_hint_wins_over_docblock_scalar(
-                                                n, &doc_ty,
-                                            )
+                                            super::native_hint_wins_over_docblock_scalar(n, &doc_ty)
                                         }) {
                                             native_ty
                                         } else {

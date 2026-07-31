@@ -518,26 +518,21 @@ impl<'a> ClassAnalyzer<'a> {
                     let compatible = compatible
                         || (had_template && !child_ret_raw.from_docblock && {
                             let bound_ret = Self::substitute_own_template_bounds(parent_ret_raw);
-                            !bound_ret.is_mixed()
-                                && !self.return_type_has_template(&bound_ret)
-                                && {
-                                    let bound_has_object =
-                                        Self::type_has_named_objects(&bound_ret)
-                                            || self.type_has_self_or_static(&bound_ret);
-                                    if child_has_object && bound_has_object {
-                                        crate::stmt::named_object_return_compatible(
-                                            child_ret, &bound_ret, self.db, child_file,
-                                        ) || crate::stmt::return_arrays_compatible(
-                                            child_ret, &bound_ret, self.db, child_file,
-                                        )
-                                    } else if child_has_object || bound_has_object {
-                                        true
-                                    } else {
-                                        Self::scalar_return_types_compatible(
-                                            child_ret, &bound_ret,
-                                        )
-                                    }
+                            !bound_ret.is_mixed() && !self.return_type_has_template(&bound_ret) && {
+                                let bound_has_object = Self::type_has_named_objects(&bound_ret)
+                                    || self.type_has_self_or_static(&bound_ret);
+                                if child_has_object && bound_has_object {
+                                    crate::stmt::named_object_return_compatible(
+                                        child_ret, &bound_ret, self.db, child_file,
+                                    ) || crate::stmt::return_arrays_compatible(
+                                        child_ret, &bound_ret, self.db, child_file,
+                                    )
+                                } else if child_has_object || bound_has_object {
+                                    true
+                                } else {
+                                    Self::scalar_return_types_compatible(child_ret, &bound_ret)
                                 }
+                            }
                         });
                     if !compatible {
                         // Primary parent uses the original message format for
