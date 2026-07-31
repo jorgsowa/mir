@@ -1,3 +1,0 @@
-[build]
-# Use all 12 cores for compilation
-jobs = 12

@@ -48,7 +48,6 @@ jobs:
         run: cargo deny check && cargo outdated --format list
 
   test:
-    needs: lint
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -59,6 +58,11 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
+
+      - name: Disable Windows Defender real-time scanning
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -72,5 +76,6 @@ jobs:
         run: cargo nextest run --workspace --profile ci
 
       - name: Doctests
+        if: runner.os == 'Linux'
         shell: bash
         run: cargo test --workspace --doc
