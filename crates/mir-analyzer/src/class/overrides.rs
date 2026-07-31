@@ -17,14 +17,17 @@ impl<'a> ClassAnalyzer<'a> {
             .map(|(k, m)| (k.clone(), m.clone()))
             .collect();
 
-        // Traits `here` directly `use`s. A class's own effective method always
-        // wins over a same-named method from one of these — whether the class
-        // body redeclares it, or the trait method is simply flattened in
-        // unopposed — so neither shape is a real "override" subject to
-        // final/static/visibility/signature compatibility checks against that
-        // trait. Verified live: PHP raises no error either way, only a real
-        // subclass later overriding the now-flattened method is checked.
-        let own_traits: HashSet<Arc<str>> = match &class {
+        // Traits composed into `here`, directly or transitively (a `use`d
+        // trait that itself `use`s another trait). A class's own effective
+        // method always wins over a same-named method from one of these —
+        // whether the class body redeclares it, or the trait method is simply
+        // flattened in unopposed — so neither shape is a real "override"
+        // subject to final/static/visibility/signature compatibility checks
+        // against that trait. Verified live: PHP raises no error either way,
+        // only a real subclass later overriding the now-flattened method is
+        // checked. Seeded with the direct `use` list; the ancestor walk below
+        // extends it to the full transitive subtree.
+        let mut own_traits: HashSet<Arc<str>> = match &class {
             crate::db::ClassLike::Class(c) => c.traits.iter().cloned().collect(),
             crate::db::ClassLike::Trait(t) => t.traits.iter().cloned().collect(),
             crate::db::ClassLike::Enum(e) => e.traits.iter().cloned().collect(),
@@ -58,6 +61,7 @@ impl<'a> ClassAnalyzer<'a> {
             else {
                 break;
             };
+            own_traits.insert(anc.clone());
             for key in t.own_methods.iter().map(|(k, _)| k.clone()) {
                 if !seen_method_keys.insert(key.clone()) {
                     continue;
