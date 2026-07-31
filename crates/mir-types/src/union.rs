@@ -757,13 +757,33 @@ impl Type {
     /// Keep all of these; only drop atoms that are definitely not callable
     /// (scalars, null, bool, etc.).
     pub fn narrow_to_callable(&self) -> Type {
-        self.filter(|t| {
+        let narrowed = self.filter(|t| {
             t.is_callable()
                 || t.is_string()
                 || t.is_array()
                 || t.is_object()
                 || matches!(t, Atomic::TMixed | Atomic::TTemplateParam { .. })
-        })
+        });
+        // A bare `object` carries no known `__invoke` signature to compare
+        // against a `callable`-typed target, so it stayed an object rather
+        // than satisfying one — represent it as a generic callable instead,
+        // matching what `is_callable()` actually proved. A `TNamedObject`
+        // keeps its own class (its real `__invoke`, if any, is more precise
+        // than a generic callable).
+        let mut result = Type::empty();
+        result.possibly_undefined = narrowed.possibly_undefined;
+        result.from_docblock = narrowed.from_docblock;
+        for atomic in narrowed.types {
+            if matches!(atomic, Atomic::TObject) {
+                result.add_type(Atomic::TCallable {
+                    params: None,
+                    return_type: None,
+                });
+            } else {
+                result.add_type(atomic);
+            }
+        }
+        result
     }
 
     /// Narrow as if `is_scalar($x)` is true (int | string | float | bool).
