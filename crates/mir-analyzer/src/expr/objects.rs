@@ -1657,12 +1657,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                         .unwrap_or(true)
                 }
                 Some(Visibility::Protected) => {
-                    // Accessible from the declaring class or a subclass
+                    // Accessible from the declaring class, a subclass, or (the
+                    // reverse direction PHP also allows) an ancestor of the
+                    // declaring class.
                     let caller = ctx.self_fqcn.as_deref().unwrap_or("");
                     if caller.is_empty() {
                         true
                     } else {
                         !crate::db::extends_or_implements(self.db, caller, owner_fqcn)
+                            && !crate::db::extends_or_implements(self.db, owner_fqcn, caller)
                             && !caller.eq_ignore_ascii_case(owner_fqcn)
                     }
                 }
@@ -1772,6 +1775,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         true
                     } else {
                         !crate::db::extends_or_implements(self.db, caller, owner_fqcn)
+                            && !crate::db::extends_or_implements(self.db, owner_fqcn, caller)
                             && !caller.eq_ignore_ascii_case(owner_fqcn)
                     }
                 }
@@ -1873,7 +1877,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if caller.is_empty() {
                     true
                 } else {
+                    // PHP's protected check is symmetric over the class
+                    // hierarchy: caller-extends-owner is the common case, but
+                    // owner-extends-caller (an ancestor class reaching into a
+                    // descendant's protected member) is equally legal.
                     !crate::db::extends_or_implements(self.db, caller, owner_fqcn)
+                        && !crate::db::extends_or_implements(self.db, owner_fqcn, caller)
                         && !caller.eq_ignore_ascii_case(owner_fqcn)
                         && !composed_in_self(caller)
                 }
