@@ -5,6 +5,103 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.65.0] - 2026-07-31
+
+### Fixed
+
+- **Promoted constructor properties honor docblock refinements like ordinary
+  params:** a promoted property only let a `@param` docblock override the
+  native hint when the hint was exactly plain `array`/`mixed`; any other
+  native scalar hint (e.g. `string`) discarded a literal-union docblock
+  refinement outright. Reuses the same priority scheme as an ordinary
+  `@param` (docblock wins by default, guarded against a scalar-family
+  conflict and a dropped native nullability).
+- **Array-index write auto-vivification on a null base:** `$data['key'] =
+  $v` (and push notation `$data[] = $v`) on a nullable array auto-vivifies
+  to a fresh array at runtime, but the widening helpers kept `null` in the
+  result unchanged, leaving a written-to nullable array nullable forever
+  after.
+- **`@param` keeps a nullable native hint's nullability:** the only
+  existing conflict guard against a docblock type overriding the native
+  hint covered scalar-family mismatches, never nullability, and never
+  non-scalar hints (object/array) at all — a `?object`/`?array` native
+  hint paired with a non-nullable `@param` silently lost its nullability,
+  producing false `ImpossibleIdenticalComparison` and `NullArgument`
+  diagnostics.
+- **Backed enum `->value` recognized in an exhaustive `match`:**
+  `Kind::Foo->value` typed as the bare backing scalar instead of its own
+  case literal, and match-exhaustiveness checking had no case at all for a
+  `->value`-shaped subject.
+- **Class-constant array literals keep their inferred element/key shape:**
+  a class-constant array literal had no inference arm at all and widened
+  to a bare `array`; a PHP 8.3 typed `const array` hint needed a second,
+  related fix so the hint didn't discard the inferred literal shape.
+- **`@psalm-assert Type $this->property` now applies at call sites:** the
+  assertion resolver only ever matched against a declared parameter name,
+  so a `$this->property` target (written from the asserting method's own
+  perspective) could never match on any method, regardless of its arg
+  count.
+- **`elseif` no longer re-narrows its own already-narrowed condition:** the
+  `elseif` branch analyzed its condition against a context already
+  narrowed by that same condition, so an earlier `&&` operand's narrowing
+  turned a real null-check further right into a false tautology.
+- **Method-override return-type covariance no longer over-compares against
+  a concretely-bound template:** a child that doesn't restate a generic
+  ancestor's docblock refinement (a common, tool-accepted idiom) is now
+  compared against the template's own declared bound instead.
+- **`array_multisort`'s lenient by-ref semantics modeled:** sort-key
+  arrays need not be lvalues, and its trailing flag/order arguments aren't
+  actually passed by reference despite sharing the stub's variadic by-ref
+  slot.
+- **Abstract/interface method arity no longer flags valid override
+  overloads:** a concrete override may add extra optional params beyond an
+  abstract/interface declaration's own signature; only `TooManyArguments`
+  was affected — `TooFewArguments` still enforces the shared required-param
+  floor.
+- **Union-typed test doubles: arity check no longer independently flags a
+  `__call`-satisfied sibling atom**, reusing the existing arity-suppression
+  mechanism.
+- **`array_map`/`array_filter` callbacks may declare fewer params than are
+  passed:** PHP always allows a callback to ignore extra invocation
+  arguments.
+- **Typed class/interface/enum constants keep literal narrowing:** a
+  native type hint on a PHP 8.3 typed constant previously discarded
+  literal inference (`positive-int`, `non-empty-string`, etc.) entirely.
+- **Arrow-function bodies are checked against their declared return
+  type:** regular closures already got this check; arrow functions never
+  did.
+- **Private/protected property access from an invalid scope is now
+  reported** (`InaccessibleProperty`, MIR0014) — method and class-constant
+  access already enforced this; property access had no equivalent check.
+- **Typed catch-all remainder recognized as an open array shape:**
+  `array{key?: T, ...array<K, V>}`'s typed remainder fell through to the
+  auto-indexed-key branch instead of marking the shape open.
+- **Docblock callable arity check no longer inverts the
+  optional-trailing-param marker:** the `=` suffix marks a param the
+  *implementing* closure may omit, not a promise that call sites always
+  omit it.
+- **Private ancestor properties exempted from redeclaration checks:** a
+  private property isn't inherited in PHP, so a same-named subclass
+  property is an independent, unrelated declaration.
+- **`MissingConstructor` no longer trusts an ancestor constructor that
+  predates a subclass's own property:** only suppressed when the resolved
+  constructor's declaring class is at or above the property-declaring
+  class in the ancestor chain.
+- **`T|callable():T` template double-binding:** a bare template
+  alternative no longer also absorbs a `callable():T`/closure argument
+  already bound through its return type.
+- **`literal-int`/`literal-string` recognized as docblock keywords:**
+  previously fell through to a bogus named-class bound, always failing a
+  genuinely-satisfying literal argument.
+
+### Performance
+
+- **`indexed_references_to` skips re-analyzing files whose text can't
+  mention the queried symbol**, even after a generation bump marked a
+  previously-committed file stale — the same needle/mention gate
+  never-committed files already got. ~370ms → ~3ms on a 1410-file
+  benchmark where every file carries one unresolved reference.
+
 ## [0.64.0] - 2026-07-30
 
 ### Added
