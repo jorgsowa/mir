@@ -136,14 +136,7 @@ pub fn run_plain_flow(
         config
             .project_dirs
             .iter()
-            .map(|d| {
-                let p = PathBuf::from(d);
-                if p.is_absolute() {
-                    p
-                } else {
-                    config_base.join(d)
-                }
-            })
+            .flat_map(|d| expand_glob_dir(d, config_base))
             .collect()
     } else {
         paths
@@ -336,15 +329,84 @@ fn resolve_ignore_dirs(config: &Config, config_base: &std::path::Path) -> Vec<Pa
     config
         .ignore_dirs
         .iter()
-        .map(|d| {
-            let p = PathBuf::from(d);
-            if p.is_absolute() {
-                p
-            } else {
-                config_base.join(d)
-            }
-        })
+        .flat_map(|d| expand_glob_dir(d, config_base))
         .collect()
+}
+
+/// Resolve a `<directory name="...">` entry (from `<projectFiles>`/`<ignoreFiles>`) to
+/// concrete on-disk directories, glob-expanding a `*` path segment the same way Psalm's
+/// own `glob()`-based resolution does — `*` matches any run of characters within a single
+/// path segment, never across a `/`. A pattern with no `*` at all is returned unexpanded
+/// (joined to `config_base` if relative) even if that path doesn't exist, matching prior
+/// behavior — but once ANY segment glob-expands, every segment (including later literal
+/// ones) is existence-checked, since a real `glob()` call would never yield a dangling path.
+fn expand_glob_dir(d: &str, config_base: &std::path::Path) -> Vec<PathBuf> {
+    if !d.contains('*') {
+        let p = PathBuf::from(d);
+        return vec![if p.is_absolute() {
+            p
+        } else {
+            config_base.join(d)
+        }];
+    }
+    let p = PathBuf::from(d);
+    let (mut current, rel): (Vec<PathBuf>, &str) = if p.is_absolute() {
+        (vec![PathBuf::from("/")], d.trim_start_matches('/'))
+    } else {
+        (vec![config_base.to_path_buf()], d)
+    };
+    for segment in rel.split('/').filter(|s| !s.is_empty()) {
+        if !segment.contains('*') {
+            current = current
+                .into_iter()
+                .map(|base| base.join(segment))
+                .filter(|p| p.is_dir())
+                .collect();
+            continue;
+        }
+        let mut next = Vec::new();
+        for base in &current {
+            let Ok(entries) = std::fs::read_dir(base) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                if !entry.file_type().is_ok_and(|t| t.is_dir()) {
+                    continue;
+                }
+                let name = entry.file_name();
+                if glob_segment_matches(segment, &name.to_string_lossy()) {
+                    next.push(entry.path());
+                }
+            }
+        }
+        current = next;
+    }
+    current
+}
+
+/// Match a single path segment (no `/`) against a glob pattern where `*` stands for any
+/// run of characters — supports any number of `*` in one segment (`*Test*`, `a*b*c`), not
+/// just the single-wildcard case Psalm's docs show as the common example.
+fn glob_segment_matches(pattern: &str, name: &str) -> bool {
+    let parts: Vec<&str> = pattern.split('*').collect();
+    if parts.len() == 1 {
+        return pattern == name;
+    }
+    let (first, last) = (parts[0], parts[parts.len() - 1]);
+    if !name.starts_with(first) || !name.ends_with(last) {
+        return false;
+    }
+    let mut rest = &name[first.len()..name.len() - last.len()];
+    for part in &parts[1..parts.len() - 1] {
+        if part.is_empty() {
+            continue;
+        }
+        match rest.find(part) {
+            Some(idx) => rest = &rest[idx + part.len()..],
+            None => return false,
+        }
+    }
+    true
 }
 
 fn collect_stub_paths(
@@ -424,5 +486,74 @@ fn run_with_progress(
         r
     } else {
         session.analyze_paths(files, &opts)
+    }
+}
+
+#[cfg(test)]
+mod glob_dir_tests {
+    use super::{expand_glob_dir, glob_segment_matches};
+    use std::path::PathBuf;
+    use tempfile::TempDir;
+
+    fn make_dirs(root: &std::path::Path, rel_dirs: &[&str]) {
+        for d in rel_dirs {
+            std::fs::create_dir_all(root.join(d)).unwrap();
+        }
+    }
+
+    #[test]
+    fn segment_wildcard_matches_any_run_of_characters() {
+        assert!(glob_segment_matches("*", "Tests"));
+        assert!(glob_segment_matches("Test*", "TestsFoo"));
+        assert!(glob_segment_matches("*Test", "FooTest"));
+        assert!(glob_segment_matches("a*b*c", "a123b456c"));
+        assert!(!glob_segment_matches("a*b*c", "a123b456"));
+        assert!(!glob_segment_matches("Foo", "Bar"));
+    }
+
+    #[test]
+    fn literal_pattern_returns_unexpanded_joined_path() {
+        let base = PathBuf::from("/project");
+        assert_eq!(expand_glob_dir("src", &base), vec![base.join("src")]);
+        // Absolute literal pattern is returned as-is, config_base ignored.
+        assert_eq!(
+            expand_glob_dir("/abs/dir", &base),
+            vec![PathBuf::from("/abs/dir")]
+        );
+    }
+
+    #[test]
+    fn single_wildcard_segment_expands_to_matching_subdirectories() {
+        let tmp = TempDir::new().unwrap();
+        make_dirs(
+            tmp.path(),
+            &["src/Module/Tests", "src/Other/Tests", "src/Other/NotTests"],
+        );
+        // A same-level FILE (not a directory) must never be treated as a wildcard match.
+        std::fs::write(tmp.path().join("src/NotADir.php"), "").unwrap();
+        let mut result = expand_glob_dir("src/*/Tests", tmp.path());
+        result.sort();
+        let mut expected = vec![
+            tmp.path().join("src/Module/Tests"),
+            tmp.path().join("src/Other/Tests"),
+        ];
+        expected.sort();
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn wildcard_with_no_matching_directories_expands_to_empty() {
+        let tmp = TempDir::new().unwrap();
+        make_dirs(tmp.path(), &["src/Module"]);
+        assert!(expand_glob_dir("src/*/Tests", tmp.path()).is_empty());
+    }
+
+    #[test]
+    fn wildcard_never_crosses_a_path_separator() {
+        let tmp = TempDir::new().unwrap();
+        // A directory literally named "Module/Tests" (impossible on a real fs, so this
+        // just confirms a single "*" segment only ever matches one path component deep).
+        make_dirs(tmp.path(), &["src/Module/Deep/Tests"]);
+        assert!(expand_glob_dir("src/*/Tests", tmp.path()).is_empty());
     }
 }
