@@ -2,8 +2,10 @@
 PHP 8.6 introduces partial function application (`?`/`...` call-argument
 placeholders), parsed by php-rs-parser 0.19 as `Arg { value: None, .. }`.
 mir's default target version is 8.5, so this correctly surfaces a
-version-gate ParseError rather than crashing or silently misparsing — mir
-doesn't model the resulting curried-closure semantics yet, but a
+version-gate ParseError rather than crashing or silently misparsing. That
+ParseError is a *hard* parse error, which also suppresses body-level
+analysis for the whole file (see
+`placeholder_parse_error_suppresses_whole_file_analysis.phpt`) — so a
 placeholder argument must not panic the analyzer or produce any diagnostic
 beyond that single, accurate ParseError.
 ===config===
