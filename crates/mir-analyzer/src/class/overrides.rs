@@ -420,10 +420,15 @@ impl<'a> ClassAnalyzer<'a> {
             }
 
             // ---- c. Visibility must not be reduced -------------------------
-            if all_parent_methods
-                .iter()
-                .any(|(_, p)| visibility_reduced(own.visibility, p.visibility))
-            {
+            // A directly-`use`d trait's ABSTRACT method is exempt: PHP-verified
+            // live, implementing `abstract public function f()` from a trait
+            // with a `protected`/`private` method raises no error — unlike the
+            // same abstract method declared on an interface or an abstract
+            // class, which does enforce the normal never-narrower rule.
+            if all_parent_methods.iter().any(|(anc, p)| {
+                !(p.is_abstract && own_traits.contains(anc))
+                    && visibility_reduced(own.visibility, p.visibility)
+            }) {
                 let mut issue = Issue::new(
                     IssueKind::OverriddenMethodAccess {
                         class: fqcn.to_string(),
