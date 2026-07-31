@@ -917,12 +917,14 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
         let non_null_ty = obj_ty.remove_null();
         let mut declaring = None;
+        let guard_key = crate::narrowing::extract_expr_guard_key(&pa.object, ctx, self.db, &self.file);
         let resolved = self.resolve_property_type(
             &non_null_ty,
             &prop_name,
             pa.property.span,
             &mut declaring,
             ctx,
+            guard_key.as_ref(),
         );
 
         // If we have a narrowed type for this property access ($var->prop,
@@ -991,12 +993,14 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
         let non_null_ty = obj_ty.remove_null();
         let mut declaring = None;
+        let guard_key = crate::narrowing::extract_expr_guard_key(&pa.object, ctx, self.db, &self.file);
         let resolved = self.resolve_property_type(
             &non_null_ty,
             &prop_name,
             pa.property.span,
             &mut declaring,
             ctx,
+            guard_key.as_ref(),
         );
 
         // If we have a narrowed type for this property access ($var?->prop,
@@ -1886,7 +1890,12 @@ impl<'a> ExpressionAnalyzer<'a> {
         span: php_ast::Span,
         declaring_class: &mut Option<Arc<str>>,
         ctx: &FlowState,
+        guard_key: Option<&Arc<str>>,
     ) -> Type {
+        let prop_guarded = guard_key.is_some_and(|key| {
+            ctx.property_exists_guards
+                .contains(&(key.clone(), Arc::from(prop_name)))
+        });
         for atomic in &obj_ty.types {
             match atomic {
                 Atomic::TNamedObject { fqcn, type_params }
@@ -2014,7 +2023,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             *declaring_class = Some((*fqcn).into());
                             return ty;
                         }
-                        if !self.in_existence_check {
+                        if !self.in_existence_check && !prop_guarded {
                             self.emit(
                                 IssueKind::UndefinedProperty {
                                     class: fqcn.to_string(),

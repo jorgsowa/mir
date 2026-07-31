@@ -284,6 +284,13 @@ pub struct FlowState {
     /// `expr_key` is a compact string like `"this->notification"` or `"foo"`.
     pub method_exists_guards: FxHashSet<(Arc<str>, Arc<str>)>,
 
+    /// `(expr_key, property_name)` pairs proven to exist via a
+    /// `property_exists($expr, 'prop')` or `isset($expr->prop)` guard. Used to
+    /// suppress `UndefinedProperty` inside guarded branches (dynamic/BC
+    /// properties not declared on the class). Same `expr_key` shape as
+    /// `method_exists_guards`.
+    pub property_exists_guards: FxHashSet<(Arc<str>, Arc<str>)>,
+
     /// Extension names proven to be loaded via an `extension_loaded('name')` guard.
     /// When non-empty, `UndefinedClass` is suppressed for any class in the guarded
     /// block — the calling code explicitly verified the extension is present.
@@ -413,6 +420,7 @@ impl FlowState {
             defined_guards: FxHashSet::default(),
             function_exists_guards: FxHashSet::default(),
             method_exists_guards: FxHashSet::default(),
+            property_exists_guards: FxHashSet::default(),
             extension_loaded_guards: FxHashSet::default(),
             prop_refined: Arc::new(FxHashMap::default()),
             readonly_initialized: Arc::new(FxHashSet::default()),
@@ -1241,6 +1249,11 @@ impl FlowState {
         result.method_exists_guards = if_ctx
             .method_exists_guards
             .intersection(&else_ctx.method_exists_guards)
+            .cloned()
+            .collect();
+        result.property_exists_guards = if_ctx
+            .property_exists_guards
+            .intersection(&else_ctx.property_exists_guards)
             .cloned()
             .collect();
         result.extension_loaded_guards = if_ctx

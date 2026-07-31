@@ -1515,6 +1515,22 @@ pub fn narrow_from_condition(
                                 }
                             }
                         }
+                        // `property_exists($obj, 'prop')` — record `(expr_key, prop)` so a
+                        // later `$obj->prop` read inside the guarded block doesn't flag
+                        // UndefinedProperty. Property names are case-sensitive in PHP
+                        // (unlike method names above), so the literal is kept as-is.
+                        if is_true && bare.eq_ignore_ascii_case("property_exists") {
+                            if let Some(expr_key) =
+                                extract_expr_guard_key(&arg_expr.value, ctx, db, file)
+                            {
+                                if let Some(prop_arg) = call.args.get(1) {
+                                    if let ExprKind::String(prop_name) = &prop_arg.value.kind {
+                                        ctx.property_exists_guards
+                                            .insert((expr_key, std::sync::Arc::from(prop_name.as_ref())));
+                                    }
+                                }
+                            }
+                        }
                     }
                 } else if matches!(
                     bare.to_ascii_lowercase().as_str(),
@@ -1888,6 +1904,14 @@ pub fn narrow_from_condition(
                         // isset() is only true when the receiver was non-null too
                         // (a null receiver's ->/?-> access is itself unset/null).
                         narrow_receiver_non_null_on_prop_match(ctx, &obj_var, true);
+                        // Also record a property-exists guard: `isset($obj->prop)`
+                        // proves `prop` is set even when it's a dynamic/BC property
+                        // undeclared on the class, so a later `$obj->prop` read
+                        // inside this guard shouldn't flag UndefinedProperty.
+                        ctx.property_exists_guards.insert((
+                            std::sync::Arc::from(obj_var.as_str()),
+                            std::sync::Arc::from(prop.as_str()),
+                        ));
                     } else if let Some((fqcn, prop)) =
                         extract_static_prop_access(var_expr, ctx, db, file)
                     {
