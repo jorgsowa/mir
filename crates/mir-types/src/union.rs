@@ -1604,6 +1604,16 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         (Atomic::TNumeric, Atomic::TScalar) => true,
         (Atomic::TTrue, Atomic::TScalar) => true,
         (Atomic::TFalse, Atomic::TScalar) => true,
+        // Every refined string atom is, at runtime, still just a `string` —
+        // and therefore a `scalar` — same as the already-covered TLiteralString
+        // and int-family refinements just above/below.
+        (Atomic::TNonEmptyString, Atomic::TScalar) => true,
+        (Atomic::TNumericString, Atomic::TScalar) => true,
+        (Atomic::TCallableString, Atomic::TScalar) => true,
+        (Atomic::TClassString(_), Atomic::TScalar) => true,
+        (Atomic::TInterfaceString(_), Atomic::TScalar) => true,
+        (Atomic::TEnumString, Atomic::TScalar) => true,
+        (Atomic::TTraitString, Atomic::TScalar) => true,
 
         // Object hierarchy (structural, no codebase)
         (Atomic::TNamedObject { .. }, Atomic::TObject) => true,
