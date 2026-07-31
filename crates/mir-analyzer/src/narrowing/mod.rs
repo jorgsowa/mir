@@ -1525,8 +1525,10 @@ pub fn narrow_from_condition(
                             {
                                 if let Some(prop_arg) = call.args.get(1) {
                                     if let ExprKind::String(prop_name) = &prop_arg.value.kind {
-                                        ctx.property_exists_guards
-                                            .insert((expr_key, std::sync::Arc::from(prop_name.as_ref())));
+                                        ctx.property_exists_guards.insert((
+                                            expr_key,
+                                            std::sync::Arc::from(prop_name.as_ref()),
+                                        ));
                                     }
                                 }
                             }

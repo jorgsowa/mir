@@ -917,7 +917,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
         let non_null_ty = obj_ty.remove_null();
         let mut declaring = None;
-        let guard_key = crate::narrowing::extract_expr_guard_key(&pa.object, ctx, self.db, &self.file);
+        let guard_key =
+            crate::narrowing::extract_expr_guard_key(&pa.object, ctx, self.db, &self.file);
         let resolved = self.resolve_property_type(
             &non_null_ty,
             &prop_name,
@@ -993,7 +994,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
         let non_null_ty = obj_ty.remove_null();
         let mut declaring = None;
-        let guard_key = crate::narrowing::extract_expr_guard_key(&pa.object, ctx, self.db, &self.file);
+        let guard_key =
+            crate::narrowing::extract_expr_guard_key(&pa.object, ctx, self.db, &self.file);
         let resolved = self.resolve_property_type(
             &non_null_ty,
             &prop_name,
