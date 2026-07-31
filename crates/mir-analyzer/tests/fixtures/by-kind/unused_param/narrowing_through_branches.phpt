@@ -1,5 +1,9 @@
 ===description===
-Type narrowing through if/elseif/else branches
+Type narrowing through if/elseif/else branches. `is_bool($value)` in the
+third arm is genuinely redundant (L19 fix): after excluding int and string,
+$value can only be bool there — previously masked because each elseif
+re-derived its context from the primary if's condition alone, discarding
+the prior elseif's own narrowing.
 ===config===
 suppress=MissingReturnType
 ===file===
@@ -44,4 +48,5 @@ function testElseAfterNarrowing(string|null $value) {
     }
 }
 ===expect===
+RedundantCondition@9:14-9:29: Condition is always true/false for type 'bool'
 UnreachableCode@13:4-13:16: Unreachable code detected

@@ -32,17 +32,48 @@ impl<'a> StatementsAnalyzer<'a> {
             self.analyze_stmt(&if_stmt.then_branch, &mut then_ctx);
         }
 
+        // Chained "every condition seen so far evaluated false" state, threaded
+        // through the whole elseif ladder (and reused below for the final
+        // `else` branch) — reaching elseif N's condition means the primary
+        // `if` AND every earlier elseif's condition already ran and were
+        // falsy, so an assignment made in any of those conditions (`if ($a =
+        // tryA()) {} elseif ($b = tryB()) {} elseif ($a || $b) {}`) must stay
+        // visible. Previously each iteration re-branched from the original
+        // `ctx` and only ever re-narrowed the PRIMARY if's condition,
+        // discarding every earlier elseif's condition (both its assignments
+        // and its narrowing) outright.
+        let mut running_ctx = ctx.branch();
+        // For `if ($x = expr())`, on the false edge the assignment was evaluated
+        // and found falsy — the write is consumed by the truthiness check. Remove
+        // the pending-write entry so that using $x only in the true branch does
+        // not trigger UnusedVariable.
+        {
+            let cond = match &if_stmt.condition.kind {
+                ExprKind::Parenthesized(inner) => inner.as_ref(),
+                _ => &if_stmt.condition,
+            };
+            if let ExprKind::Assign(a) = &cond.kind {
+                if let Some(var_name) = extract_simple_var(&a.target) {
+                    running_ctx
+                        .last_write_locs
+                        .remove(&Name::from(var_name.as_str()));
+                }
+            }
+        }
+        narrow_from_condition(
+            &if_stmt.condition,
+            &mut running_ctx,
+            false,
+            self.db,
+            &self.file,
+        );
+        // Redundancy of the outer if condition depends only on its own narrowing, not elseifs.
+        let else_unreachable_from_narrowing = running_ctx.diverges;
+
         let mut elseif_ctxs: Vec<FlowState> = vec![];
         for elseif in if_stmt.elseif_branches.iter() {
-            let mut pre_elseif = ctx.branch();
-            narrow_from_condition(
-                &if_stmt.condition,
-                &mut pre_elseif,
-                false,
-                self.db,
-                &self.file,
-            );
-            let pre_elseif_diverges = pre_elseif.diverges;
+            let pre_elseif_diverges = running_ctx.diverges;
+            let mut pre_elseif = running_ctx.clone();
 
             // Analyze the elseif condition's own expression BEFORE narrowing
             // from it (mirrors the primary `if`'s own condition analysis
@@ -102,51 +133,18 @@ impl<'a> StatementsAnalyzer<'a> {
                 self.analyze_stmt(&elseif.body, &mut branch_ctx);
             }
             elseif_ctxs.push(branch_ctx);
+
+            // Reaching the NEXT elseif (or the final `else`) means this elseif's
+            // own condition ran and was falsy — chain its false-narrowed (and
+            // assignment-tracking) state forward instead of discarding it.
+            running_ctx = elseif_false_ctx;
         }
 
-        let mut else_ctx = ctx.branch();
-        // For `if ($x = expr())`, in the false branch the assignment was evaluated
-        // and found falsy — the write is consumed by the truthiness check. Remove
-        // the pending-write entry so that using $x only in the true branch does not
-        // trigger UnusedVariable.
-        {
-            let cond = match &if_stmt.condition.kind {
-                ExprKind::Parenthesized(inner) => inner.as_ref(),
-                _ => &if_stmt.condition,
-            };
-            if let ExprKind::Assign(a) = &cond.kind {
-                if let Some(var_name) = extract_simple_var(&a.target) {
-                    else_ctx
-                        .last_write_locs
-                        .remove(&Name::from(var_name.as_str()));
-                }
-            }
-        }
-        narrow_from_condition(
-            &if_stmt.condition,
-            &mut else_ctx,
-            false,
-            self.db,
-            &self.file,
-        );
-        // Redundancy of the outer if condition depends only on its own narrowing, not elseifs.
-        let else_unreachable_from_narrowing = else_ctx.diverges;
-        // In the else branch all elseif conditions also failed — narrow them out for better
-        // type accuracy in the else body (e.g. string|array|int becomes int after is_string
-        // and is_array elseifs). Only applied when the else is itself reachable.
-        if !else_ctx.diverges {
-            for elseif in if_stmt.elseif_branches.iter() {
-                if !else_ctx.diverges {
-                    narrow_from_condition(
-                        &elseif.condition,
-                        &mut else_ctx,
-                        false,
-                        self.db,
-                        &self.file,
-                    );
-                }
-            }
-        }
+        // In the else branch every condition (the primary `if` and all elseifs)
+        // evaluated false — `running_ctx` already reflects exactly that,
+        // chained through the loop above, including any assignments made in
+        // an elseif's own condition.
+        let mut else_ctx = running_ctx;
         if !else_ctx.diverges {
             if let Some(else_branch) = &if_stmt.else_branch {
                 self.analyze_stmt(else_branch, &mut else_ctx);
