@@ -1891,6 +1891,15 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
     }
 
+    /// Whether `fqcn` (or an ancestor) declares `__get` — PHP routes a read of
+    /// an inaccessible (or non-existent) property through it instead of
+    /// fatal-erroring, so an otherwise-inaccessible property read is not
+    /// actually an error when this is true.
+    fn has_magic_get(&self, fqcn: &str) -> bool {
+        crate::db::find_method_in_chain(self.db, crate::db::Fqcn::from_str(self.db, fqcn), "__get")
+            .is_some()
+    }
+
     /// `declaring_class` is set to the FQCN of the class that declares the
     /// property when the inheritance-chain lookup resolves it — reused by the
     /// callers for symbol recording so the chain is only walked once.
@@ -1937,6 +1946,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 prop_name,
                                 ctx,
                             )
+                            && !self.has_magic_get(fqcn.as_ref())
                         {
                             self.emit(
                                 IssueKind::InaccessibleProperty {
@@ -2210,6 +2220,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 prop_name,
                                 ctx,
                             )
+                            && !self.has_magic_get(fqcn.as_ref())
                         {
                             self.emit(
                                 IssueKind::InaccessibleProperty {
