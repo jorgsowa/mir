@@ -279,12 +279,20 @@ impl<'a> DefinitionCollector<'a> {
                         .map(|s| crate::parser::docblock::parse_type_string(&s))
                         .or_else(|| {
                             prop_doc.var_type.map(|t| {
-                                self.resolve_union_doc_with_templates(
+                                let resolved = self.resolve_union_doc_with_templates(
                                     super::expand_aliases_only(t, &type_aliases),
                                     &class_template_names,
                                     &fqcn,
                                     &class_template_params,
-                                )
+                                );
+                                // A `@var` refining a nullable native hint but
+                                // omitting `|null` must not erase that
+                                // nullability — same fix point as the
+                                // promoted-property/param docblock paths.
+                                match hint_ty.as_ref() {
+                                    Some(n) => super::preserve_native_nullability(n, resolved),
+                                    None => resolved,
+                                }
                             })
                         })
                         .or_else(|| hint_ty.clone());
