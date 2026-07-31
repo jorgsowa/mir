@@ -156,8 +156,10 @@ pub fn run_plain_flow(
     };
 
     let cwd_abs = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let normalized_ignore_dirs: Vec<PathBuf> =
-        ignore_dirs.iter().map(|ig| normalize_for_compare(ig)).collect();
+    let normalized_ignore_dirs: Vec<PathBuf> = ignore_dirs
+        .iter()
+        .map(|ig| normalize_for_compare(ig))
+        .collect();
     let files: Vec<PathBuf> = scan_roots
         .iter()
         .flat_map(|p| discover_files(p))
@@ -464,7 +466,10 @@ fn filter_ignore(
     if ignore_dirs.is_empty() {
         return files;
     }
-    let ignore_dirs: Vec<PathBuf> = ignore_dirs.iter().map(|ig| normalize_for_compare(ig)).collect();
+    let ignore_dirs: Vec<PathBuf> = ignore_dirs
+        .iter()
+        .map(|ig| normalize_for_compare(ig))
+        .collect();
     files
         .into_iter()
         .filter(|p| {

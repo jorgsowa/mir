@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.66.1] - 2026-07-31
+
+### Fixed
+
+- **`<ignoreFiles>`/`<projectFiles>` directory matching works when
+  `canonicalize()` changes the path shape:** `canonicalize()` (used for the
+  composer root and target path) can resolve symlinks, 8.3 short names, or
+  on-disk casing that a plain `PathBuf::join` from a config-relative entry
+  never goes through, so `starts_with`/`==` comparisons silently failed on
+  Windows even after stripping the `\\?\` verbatim prefix. Every such
+  comparison now routes through a shared `normalize_for_compare`
+  (canonicalize-with-fallback + strip-prefix) helper.
+
 ## [0.66.0] - 2026-07-31
 
 ### Fixed
