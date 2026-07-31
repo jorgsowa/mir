@@ -4,7 +4,7 @@ extension class via use alias
 suppress=UnusedParam,UnusedFunction
 ===file===
 <?php
-use Ds\Vector;
-function f(Vector $x): void {}
+use Swoole\Coroutine;
+function f(Coroutine $x): void {}
 ===expect===
-UndefinedClass@3:11-3:17: Class Ds\Vector does not exist
+UndefinedClass@3:11-3:20: Class Swoole\Coroutine does not exist
