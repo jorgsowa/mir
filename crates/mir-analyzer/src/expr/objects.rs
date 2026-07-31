@@ -94,7 +94,11 @@ fn is_valid_class_name_type(ty: &Type) -> bool {
     // Class names must be strings or class-string types. Mixed is allowed
     // since it's already imprecise (matches the static-call path — a `mixed`
     // receiver is a Mixed* concern, not InvalidStringClass). Template params
-    // are allowed because their bound may be a class-string.
+    // are allowed because their bound may be a class-string. An object
+    // (`TNamedObject`/`TIntersection`) is also valid: `new $var(...)` accepts
+    // an object instance, creating a fresh instance of that same runtime
+    // class — verified against real PHP (`new $obj()` where `$obj` holds an
+    // object works, unrelated to `$obj` itself).
     ty.contains(|t| {
         matches!(
             t,
@@ -103,6 +107,8 @@ fn is_valid_class_name_type(ty: &Type) -> bool {
                 | Atomic::TLiteralString(_)
                 | Atomic::TMixed
                 | Atomic::TTemplateParam { .. }
+                | Atomic::TNamedObject { .. }
+                | Atomic::TIntersection { .. }
         )
     })
 }

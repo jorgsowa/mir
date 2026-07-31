@@ -1,5 +1,6 @@
 ===description===
-new with object variable should error
+new with object variable is valid PHP (constructs a fresh instance of that
+object's own runtime class) and must not error
 ===config===
 suppress=MissingReturnType
 ===file===
@@ -10,4 +11,3 @@ function test(Foo $obj) {
     new $obj();
 }
 ===expect===
-InvalidStringClass@5:8-5:12: Dynamic class instantiation requires string or class-string type, got 'Foo'
