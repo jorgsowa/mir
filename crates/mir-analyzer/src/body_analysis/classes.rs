@@ -881,7 +881,7 @@ impl<'a> BodyAnalyzer<'a> {
         sa.collect_symbols = self.collect_symbols;
         ctx.is_generator = body_has_yield(&body.stmts);
         sa.analyze_stmts(&body.stmts, &mut ctx);
-        let inferred = merge_return_types(&sa.return_types);
+        let inferred = merge_return_types(&sa.return_types, ctx.diverges);
         let inferred = if sa.yielded_types.is_empty() {
             inferred
         } else {

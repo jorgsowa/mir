@@ -1301,9 +1301,20 @@ pub(crate) fn body_has_yield(stmts: &[php_ast::owned::Stmt]) -> bool {
     false
 }
 
-pub fn merge_return_types(return_types: &[Type]) -> Type {
+/// `body_diverges` is the enclosing `FlowState::diverges` right after the body
+/// finished analysis: when true, every path through the body already exited
+/// via `throw`/`exit`/an infinite loop, so falling off the end is
+/// unreachable — the call-site value is `never` (bottom), not `void`. A
+/// function with no `return` statement that instead just runs to completion
+/// (the ordinary "no explicit return" case) still gets `void`.
+pub fn merge_return_types(return_types: &[Type], body_diverges: bool) -> Type {
     if return_types.is_empty() {
-        return Type::single(mir_types::Atomic::TVoid);
+        let atom = if body_diverges {
+            mir_types::Atomic::TNever
+        } else {
+            mir_types::Atomic::TVoid
+        };
+        return Type::single(atom);
     }
     return_types.iter().fold(Type::empty(), |mut acc, t| {
         acc.merge_with(t);

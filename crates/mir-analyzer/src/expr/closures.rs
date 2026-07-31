@@ -300,7 +300,8 @@ impl<'a> ExpressionAnalyzer<'a> {
 
         sa.collect_symbols = self.collect_symbols;
         sa.analyze_stmts(&c.body.stmts, &mut closure_ctx);
-        let inferred_return = crate::body_analysis::merge_return_types(&sa.return_types);
+        let inferred_return =
+            crate::body_analysis::merge_return_types(&sa.return_types, closure_ctx.diverges);
         // A closure containing `yield` always returns a Generator, regardless
         // of what (if anything) it `return`s — same inference as a top-level
         // function/method (see `build_generator_return_type`), which this
