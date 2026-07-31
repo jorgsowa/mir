@@ -1075,7 +1075,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                             {
                                 owner = prop_owner;
                                 if !self.in_existence_check
-                                    && self.property_inaccessible(p.visibility, owner.as_ref(), ctx)
+                                    && self.property_inaccessible(
+                                        p.visibility,
+                                        owner.as_ref(),
+                                        prop_name,
+                                        ctx,
+                                    )
                                 {
                                     self.emit(
                                         IssueKind::InaccessibleProperty {
@@ -1242,7 +1247,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                         );
                     }
                     if !self.in_existence_check
-                        && self.property_inaccessible(p.1.visibility, owner.as_ref(), ctx)
+                        && self.property_inaccessible(
+                            p.1.visibility,
+                            owner.as_ref(),
+                            prop_name,
+                            ctx,
+                        )
                     {
                         self.emit(
                             IssueKind::InaccessibleProperty {
@@ -1823,18 +1833,34 @@ impl<'a> ExpressionAnalyzer<'a> {
     /// property declared on `owner_fqcn` — same private/protected rules as
     /// the class-constant checks in `analyze_class_const_access` /
     /// `record_object_const_access` above.
+    ///
+    /// `owner_fqcn` may be a TRAIT, not a class: `find_property_in_chain`
+    /// reports whichever composition member actually declares the property,
+    /// and a trait's own FQCN never equals/extends the consuming class's
+    /// `self_fqcn` — PHP copy-pastes trait members into every consuming
+    /// class, so a private/protected trait property is accessible from
+    /// `self_fqcn` whenever that trait is actually part of its own
+    /// composition, same as if it had declared the property itself.
     fn property_inaccessible(
         &self,
         visibility: mir_codebase::definitions::Visibility,
         owner_fqcn: &str,
+        prop_name: &str,
         ctx: &FlowState,
     ) -> bool {
         use mir_codebase::definitions::Visibility;
+        let composed_in_self = |caller: &str| {
+            crate::db::property_in_own_composition(
+                self.db,
+                crate::db::Fqcn::from_str(self.db, caller),
+                prop_name,
+            )
+        };
         match visibility {
             Visibility::Private => ctx
                 .self_fqcn
                 .as_deref()
-                .map(|s| !s.eq_ignore_ascii_case(owner_fqcn))
+                .map(|s| !s.eq_ignore_ascii_case(owner_fqcn) && !composed_in_self(s))
                 .unwrap_or(true),
             Visibility::Protected => {
                 let caller = ctx.self_fqcn.as_deref().unwrap_or("");
@@ -1843,6 +1869,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 } else {
                     !crate::db::extends_or_implements(self.db, caller, owner_fqcn)
                         && !caller.eq_ignore_ascii_case(owner_fqcn)
+                        && !composed_in_self(caller)
                 }
             }
             Visibility::Public => false,
@@ -1884,7 +1911,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                             );
                         }
                         if !self.in_existence_check
-                            && self.property_inaccessible(p.visibility, owner.as_ref(), ctx)
+                            && self.property_inaccessible(
+                                p.visibility,
+                                owner.as_ref(),
+                                prop_name,
+                                ctx,
+                            )
                         {
                             self.emit(
                                 IssueKind::InaccessibleProperty {
@@ -2152,7 +2184,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                             );
                         }
                         if !self.in_existence_check
-                            && self.property_inaccessible(p.visibility, owner.as_ref(), ctx)
+                            && self.property_inaccessible(
+                                p.visibility,
+                                owner.as_ref(),
+                                prop_name,
+                                ctx,
+                            )
                         {
                             self.emit(
                                 IssueKind::InaccessibleProperty {
