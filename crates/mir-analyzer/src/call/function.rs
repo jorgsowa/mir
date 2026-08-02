@@ -1216,6 +1216,12 @@ impl CallAnalyzer {
                     "preg_split" => {
                         super::callable::preg_split_return_type(&arg_types).unwrap_or(return_ty)
                     }
+                    // count_chars: a literal $mode of 3 or 4 always returns string;
+                    // 0/1/2 always returns array — narrow away the stub's blanket union.
+                    "count_chars" => {
+                        super::callable::count_chars_return_type(&arg_types, &return_ty)
+                            .unwrap_or(return_ty)
+                    }
                     // array_search: narrow key type from haystack rather than returning string|int|false.
                     "array_search" => super::array_builtins::array_search_return_type(&arg_types)
                         .unwrap_or(return_ty),

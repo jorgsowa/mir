@@ -1218,6 +1218,44 @@ pub(crate) fn preg_split_return_type(arg_types: &[Type]) -> Option<Type> {
     Some(result)
 }
 
+/// Infer the return type of `count_chars($string, $mode)`.
+///
+/// Modes 0/1/2 always return `array`; modes 3/4 always return `string` — the
+/// stub's blanket `array|string` only applies when `$mode` isn't a literal
+/// int PHP code can pattern-match on. Falls back to the stub (`return_ty`)
+/// for any other mode value and for a non-literal `$mode`.
+pub(crate) fn count_chars_return_type(arg_types: &[Type], return_ty: &Type) -> Option<Type> {
+    // mode is the 2nd argument (index 1). When absent the default is 0.
+    let mode = match arg_types.get(1) {
+        None => 0,
+        Some(t) => match t.types.as_slice() {
+            [Atomic::TLiteralInt(mode)] => *mode,
+            _ => return None,
+        },
+    };
+    let want_array = match mode {
+        0 | 1 | 2 => true,
+        3 | 4 => false,
+        _ => return None,
+    };
+    let mut result = Type::empty();
+    for atomic in &return_ty.types {
+        let keep = if want_array {
+            atomic.is_array()
+        } else {
+            atomic.is_string()
+        };
+        if keep {
+            result.add_type(atomic.clone());
+        }
+    }
+    if result.types.is_empty() {
+        None
+    } else {
+        Some(result)
+    }
+}
+
 /// Infer the new type of the by-ref array argument after `array_push($arr, ...$vals)` or
 /// `array_unshift($arr, ...$vals)`.
 ///
