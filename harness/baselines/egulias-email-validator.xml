@@ -12,19 +12,12 @@
     </UnnecessaryVarAnnotation>
   </file>
   <file src="src/EmailParser.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->warnings = [...$localPartParser->getWarnings(), ...$this->warnings]]]></code>
-      <code><![CDATA[$this->warnings = [...$domainPartParser->getWarnings(), ...$this->warnings]]]></code>
-    </InvalidPropertyAssignment>
     <MissingPropertyType>
       <code><![CDATA[]]></code>
       <code><![CDATA[]]></code>
     </MissingPropertyType>
   </file>
   <file src="src/EmailValidator.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->warnings = $emailValidation->getWarnings()]]></code>
-    </InvalidPropertyAssignment>
     <MissingPropertyType>
       <code><![CDATA[]]></code>
       <code><![CDATA[]]></code>
@@ -32,10 +25,6 @@
     </MissingPropertyType>
   </file>
   <file src="src/MessageIDParser.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->warnings = [...$localPartParser->getWarnings(), ...$this->warnings]]]></code>
-      <code><![CDATA[$this->warnings = [...$domainPartParser->getWarnings(), ...$this->warnings]]]></code>
-    </InvalidPropertyAssignment>
     <MissingPropertyType>
       <code><![CDATA[]]></code>
       <code><![CDATA[]]></code>
@@ -142,9 +131,6 @@
     </MissingPropertyType>
   </file>
   <file src="src/Validation/MessageIDValidation.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->warnings = $parser->getWarnings()]]></code>
-    </InvalidPropertyAssignment>
     <MissingPropertyType>
       <code><![CDATA[]]></code>
       <code><![CDATA[]]></code>
@@ -172,9 +158,6 @@
     </MissingPropertyType>
   </file>
   <file src="src/Validation/RFCValidation.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->warnings = $parser->getWarnings()]]></code>
-    </InvalidPropertyAssignment>
     <MissingPropertyType>
       <code><![CDATA[]]></code>
     </MissingPropertyType>
