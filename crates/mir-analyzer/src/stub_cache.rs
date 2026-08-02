@@ -380,7 +380,13 @@ mod tests {
         let (_dir, cache) = make_cache();
         let hash = hash_source("<?php class A {}");
         let slice = StubSlice::default();
-        cache.put("/x/a.php", &hash, 8, &std::sync::Arc::new(slice), &no_issues());
+        cache.put(
+            "/x/a.php",
+            &hash,
+            8,
+            &std::sync::Arc::new(slice),
+            &no_issues(),
+        );
         cache.flush();
 
         let (got, issues) = cache.get("/x/a.php", &hash, 8).expect("hit");

@@ -1137,7 +1137,12 @@ impl AnalysisSession {
         files
             .iter()
             .filter_map(|f| db.lookup_source_file(f))
-            .flat_map(|sf| crate::db::collect_file_definitions(&db, sf).issues.as_ref().clone())
+            .flat_map(|sf| {
+                crate::db::collect_file_definitions(&db, sf)
+                    .issues
+                    .as_ref()
+                    .clone()
+            })
             .collect()
     }
 

@@ -2009,8 +2009,8 @@ impl<'a> DefinitionCollector<'a> {
             }
 
             let out_ty = doc.get_out_param_type(param_name).cloned().map(|u| {
-                let expanded = effective_aliases
-                    .map_or(u.clone(), |a| expand_aliases_only(u.clone(), a));
+                let expanded =
+                    effective_aliases.map_or(u.clone(), |a| expand_aliases_only(u.clone(), a));
                 let mut resolved = self.resolve_union_doc_with_templates(
                     expanded,
                     &template_names,

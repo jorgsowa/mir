@@ -49,7 +49,11 @@ fn body_analysis_alone_misses_backed_enum_case_type_mismatch() {
     session.ingest_file(file.clone(), Arc::from(ENUM_WITH_MISMATCHED_CASE));
 
     let parsed = php_rs_parser::parse(ENUM_WITH_MISMATCHED_CASE);
-    assert!(parsed.errors.is_empty(), "unexpected parse errors: {:?}", parsed.errors);
+    assert!(
+        parsed.errors.is_empty(),
+        "unexpected parse errors: {:?}",
+        parsed.errors
+    );
     let body_issues = FileAnalyzer::new(&session).analyze(
         file.clone(),
         ENUM_WITH_MISMATCHED_CASE,
@@ -114,8 +118,8 @@ fn collector_issues_for_two_files_sharing_identical_content_point_at_their_own_p
     session.ingest_file(file_a.clone(), Arc::from(ENUM_WITH_MISMATCHED_CASE));
     session.ingest_file(file_b.clone(), Arc::from(ENUM_WITH_MISMATCHED_CASE));
 
-    let issues_a = session.collector_issues(&[file_a.clone()]);
-    let issues_b = session.collector_issues(&[file_b.clone()]);
+    let issues_a = session.collector_issues(std::slice::from_ref(&file_a));
+    let issues_b = session.collector_issues(std::slice::from_ref(&file_b));
     assert_eq!(issues_a.len(), 1, "got {issues_a:?}");
     assert_eq!(issues_b.len(), 1, "got {issues_b:?}");
     assert_eq!(issues_a[0].location.file, file_a);

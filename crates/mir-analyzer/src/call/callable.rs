@@ -1237,7 +1237,7 @@ pub(crate) fn count_chars_return_type(arg_types: &[Type], return_ty: &Type) -> O
         },
     };
     let want_array = match mode {
-        0 | 1 | 2 => true,
+        0..=2 => true,
         3 | 4 => false,
         _ => return None,
     };

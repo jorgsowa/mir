@@ -99,7 +99,13 @@ impl ParseCache {
 
     /// Insert a parsed slice and its issues. On a genuinely new key, evicts
     /// oldest entries (FIFO) until the cache is within capacity.
-    pub fn insert(&self, hash: [u8; 32], php_v: u8, slice: Arc<StubSlice>, issues: Arc<Vec<Issue>>) {
+    pub fn insert(
+        &self,
+        hash: [u8; 32],
+        php_v: u8,
+        slice: Arc<StubSlice>,
+        issues: Arc<Vec<Issue>>,
+    ) {
         let key = (hash, php_v);
         let is_new = self
             .map
