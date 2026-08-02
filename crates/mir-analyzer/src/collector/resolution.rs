@@ -74,16 +74,29 @@ pub(super) fn resolve_type_name(
     if crate::util::is_global_builtin_docblock_class(stripped) {
         return Name::from(stripped);
     }
-    if stripped.contains('\\') {
+    if !full_qualify {
         return Name::from(stripped);
     }
-    if full_qualify {
-        resolve_name(stripped, namespace, use_aliases)
-            .as_str()
-            .into()
-    } else {
-        Name::from(stripped)
+    // A qualified name already prefixed with the current namespace has
+    // already been resolved once — e.g. spliced in from a pre-resolved
+    // `@psalm-type`/`@phpstan-type` alias value (`build_type_aliases` resolves
+    // the alias body eagerly so a cross-file `@psalm-import-type` carries its
+    // *defining* file's namespace, not the importing file's), which
+    // `resolve_union_doc_with_aliases` then re-runs FQN resolution over
+    // wholesale after substitution. Re-prepending here would double the
+    // namespace (`App\User` -> `App\App\User`). A qualified name genuinely
+    // written by the user that happens to start with the current namespace's
+    // own name is the rare case sacrificed to this guard.
+    if let Some(ns) = namespace {
+        if let Some(rest) = stripped.strip_prefix(ns.as_str()) {
+            if rest.starts_with('\\') {
+                return Name::from(stripped);
+            }
+        }
     }
+    resolve_name(stripped, namespace, use_aliases)
+        .as_str()
+        .into()
 }
 
 pub(super) fn resolve_union_inner(
