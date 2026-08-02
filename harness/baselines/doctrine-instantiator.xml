@@ -11,8 +11,5 @@
       <code><![CDATA[$reflectionClass->isInternal()]]></code>
       <code><![CDATA[$reflectionClass->getParentClass()]]></code>
     </MixedMethodCall>
-    <UnusedParam>
-      <code><![CDATA[$reflectionClass]]></code>
-    </UnusedParam>
   </file>
 </files>
