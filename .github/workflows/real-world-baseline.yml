@@ -1,0 +1,60 @@
+name: Real-world baseline
+
+# Runs mir against a set of small, popular Composer packages and fails if any
+# issue appears outside the committed baseline (harness/baselines/*.xml) — a
+# regression net for false positives on real-world code.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/**'
+      - 'harness/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/real-world-baseline.yml'
+  pull_request:
+    paths:
+      - 'crates/**'
+      - 'harness/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/real-world-baseline.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: real-world-baseline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build mir
+        run: cargo build --release -p mir-php
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer
+
+      - name: Cache package fixtures
+        id: fixture-cache
+        uses: actions/cache@v6
+        with:
+          path: harness/fixtures
+          key: real-world-fixtures-${{ hashFiles('harness/packages.php') }}
+
+      - name: Download and install fixtures
+        if: steps.fixture-cache.outputs.cache-hit != 'true'
+        run: harness/download-fixtures.php
+
+      - name: Run baseline harness
+        run: harness/run.php

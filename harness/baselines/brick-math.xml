@@ -1,0 +1,472 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<files>
+  <file src="src/BigDecimal.php">
+    <ArgumentTypeCoercion>
+      <code><![CDATA[$roundingMode]]></code>
+      <code><![CDATA[$roundingMode]]></code>
+    </ArgumentTypeCoercion>
+    <DocblockTypeContradiction>
+      <code><![CDATA[$scale < 0]]></code>
+      <code><![CDATA[$exponent < 0]]></code>
+      <code><![CDATA[$scale < 0]]></code>
+      <code><![CDATA[$n < 1]]></code>
+      <code><![CDATA[$scale < 0]]></code>
+    </DocblockTypeContradiction>
+    <ImpureMethodCall>
+      <code><![CDATA[$that->negated()]]></code>
+    </ImpureMethodCall>
+    <ImpureStaticVariable>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[$zero = new BigDecimal('0')]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[$one = new BigDecimal('1')]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[$ten = new BigDecimal('10')]]></code>
+    </ImpureStaticVariable>
+    <MethodSignatureMismatch>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+    </MethodSignatureMismatch>
+    <MissingThrowsDocblock>
+      <code><![CDATA[$mantissa->plus(BigInteger::of(1)->shiftedLeft(52))]]></code>
+      <code><![CDATA[$significand->multipliedBy(BigInteger::of(2)->power($baseExp))]]></code>
+      <code><![CDATA[$significand->multipliedBy(BigInteger::of(5)->power($absExp))]]></code>
+      <code><![CDATA[intdiv($inputScale, 2)]]></code>
+      <code><![CDATA[intdiv($inputScale, $n)]]></code>
+      <code><![CDATA[$that->compareTo($this)]]></code>
+      <code><![CDATA[$this->minus($this->getIntegralPart())]]></code>
+    </MissingThrowsDocblock>
+    <MixedReturnStatement>
+      <code><![CDATA[return $zero;]]></code>
+      <code><![CDATA[return $one;]]></code>
+      <code><![CDATA[return $ten;]]></code>
+    </MixedReturnStatement>
+    <PossiblyUndefinedVariable>
+      <code><![CDATA[$str]]></code>
+    </PossiblyUndefinedVariable>
+    <RedundantCondition>
+      <code><![CDATA[$scale < 0]]></code>
+      <code><![CDATA[$exponent < 0]]></code>
+      <code><![CDATA[$scale < 0]]></code>
+      <code><![CDATA[$n < 1]]></code>
+      <code><![CDATA[$scale < 0]]></code>
+    </RedundantCondition>
+  </file>
+  <file src="src/BigInteger.php">
+    <ArgumentTypeCoercion>
+      <code><![CDATA[$roundingMode]]></code>
+      <code><![CDATA[RoundingMode::Up]]></code>
+    </ArgumentTypeCoercion>
+    <DocblockTypeContradiction>
+      <code><![CDATA[$bitCount < 0]]></code>
+      <code><![CDATA[$exponent < 0]]></code>
+      <code><![CDATA[$n < 1]]></code>
+      <code><![CDATA[$bitIndex < 0]]></code>
+    </DocblockTypeContradiction>
+    <ImpureFunctionCall>
+      <code><![CDATA[preg_match($pattern, $number, $matches)]]></code>
+      <code><![CDATA[preg_match($pattern, $number, $matches)]]></code>
+      <code><![CDATA[array_map(BigInteger::of(...), $n)]]></code>
+      <code><![CDATA[array_map(BigInteger::of(...), $n)]]></code>
+      <code><![CDATA[hex2bin($hex)]]></code>
+      <code><![CDATA[assert($bin !== false)]]></code>
+      <code><![CDATA[hex2bin($hex)]]></code>
+      <code><![CDATA[assert($result !== false)]]></code>
+    </ImpureFunctionCall>
+    <ImpureMethodCall>
+      <code><![CDATA[$that->negated()]]></code>
+      <code><![CDATA[$this->negated()]]></code>
+      <code><![CDATA[$this->negated()]]></code>
+      <code><![CDATA[$this->negated()]]></code>
+      <code><![CDATA[$this->negated()]]></code>
+    </ImpureMethodCall>
+    <ImpureStaticVariable>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[$zero = new BigInteger('0')]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[$one = new BigInteger('1')]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[$ten = new BigInteger('10')]]></code>
+    </ImpureStaticVariable>
+    <InvalidArgument>
+      <code><![CDATA[~$bin]]></code>
+    </InvalidArgument>
+    <MethodSignatureMismatch>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+    </MethodSignatureMismatch>
+    <MissingThrowsDocblock>
+      <code><![CDATA[$number->plus(1)]]></code>
+      <code><![CDATA[intdiv($bitCount - 1, 8)]]></code>
+      <code><![CDATA[$this->negated()->minus(1)]]></code>
+      <code><![CDATA[$this->multipliedBy(BigInteger::of(2)->power($bits))]]></code>
+      <code><![CDATA[$this->quotient($operand)]]></code>
+      <code><![CDATA[$this->dividedBy($operand, RoundingMode::Up)]]></code>
+      <code><![CDATA[$this->abs()->minus(1)]]></code>
+      <code><![CDATA[$that->compareTo($this)]]></code>
+      <code><![CDATA[self::fromBase($hex, 16)->plus(1)]]></code>
+    </MissingThrowsDocblock>
+    <MixedArgument>
+      <code><![CDATA[$bytes[0]]]></code>
+    </MixedArgument>
+    <MixedReturnStatement>
+      <code><![CDATA[return $zero;]]></code>
+      <code><![CDATA[return $one;]]></code>
+      <code><![CDATA[return $ten;]]></code>
+    </MixedReturnStatement>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[count_chars($alphabet, 3)]]></code>
+      <code><![CDATA[$bytes]]></code>
+      <code><![CDATA[count_chars($alphabet, 3)]]></code>
+    </PossiblyInvalidArgument>
+    <RedundantCondition>
+      <code><![CDATA[$bitCount < 0]]></code>
+      <code><![CDATA[$exponent < 0]]></code>
+      <code><![CDATA[$n < 1]]></code>
+      <code><![CDATA[$bitIndex < 0]]></code>
+      <code><![CDATA[! is_string($randomBytes)]]></code>
+    </RedundantCondition>
+    <UnnecessaryVarAnnotation>
+      <code><![CDATA[]]></code>
+    </UnnecessaryVarAnnotation>
+  </file>
+  <file src="src/BigNumber.php">
+    <ArgumentTypeCoercion>
+      <code><![CDATA[$numerator]]></code>
+      <code><![CDATA[$denominator]]></code>
+      <code><![CDATA[new BigInteger($numerator)]]></code>
+      <code><![CDATA[new BigInteger($denominator)]]></code>
+      <code><![CDATA[$b]]></code>
+      <code><![CDATA[$a]]></code>
+      <code><![CDATA[$b]]></code>
+      <code><![CDATA[$a]]></code>
+    </ArgumentTypeCoercion>
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[$integral === null]]></code>
+      <code><![CDATA[$integral === null]]></code>
+      <code><![CDATA[$point !== null]]></code>
+      <code><![CDATA[$exponent !== null]]></code>
+    </ImpossibleIdenticalComparison>
+    <ImpureFunctionCall>
+      <code><![CDATA[assert($value instanceof static)]]></code>
+      <code><![CDATA[assert($sum instanceof static)]]></code>
+      <code><![CDATA[preg_match(self::PARSE_REGEXP_RATIONAL, $value, $matches, PREG_UNMATCHED_AS_NULL)]]></code>
+      <code><![CDATA[preg_match(self::PARSE_REGEXP_NUMERICAL, $value, $matches, PREG_UNMATCHED_AS_NULL)]]></code>
+    </ImpureFunctionCall>
+    <MissingThrowsDocblock>
+      <code><![CDATA[$a->plus($b)]]></code>
+      <code><![CDATA[$b->plus($a)]]></code>
+      <code><![CDATA[$a->plus($b)]]></code>
+      <code><![CDATA[$b->plus($a)]]></code>
+    </MissingThrowsDocblock>
+    <MixedArgument>
+      <code><![CDATA[self::PARSE_REGEXP_RATIONAL]]></code>
+      <code><![CDATA[self::PARSE_REGEXP_NUMERICAL]]></code>
+    </MixedArgument>
+    <MixedReturnStatement>
+      <code><![CDATA[return $a->plus($b);]]></code>
+    </MixedReturnStatement>
+    <RedundantCondition>
+      <code><![CDATA[$integral === null && $fractional === null]]></code>
+      <code><![CDATA[$integral === null]]></code>
+      <code><![CDATA[$exponent !== null]]></code>
+      <code><![CDATA[! is_int($scale)]]></code>
+      <code><![CDATA[$point !== null || $exponent !== null]]></code>
+    </RedundantCondition>
+    <UnreachableCode>
+      <code><![CDATA[$integral = self::cleanUp($sign, $integral);]]></code>
+    </UnreachableCode>
+  </file>
+  <file src="src/BigRational.php">
+    <ArgumentTypeCoercion>
+      <code><![CDATA[$numerator]]></code>
+      <code><![CDATA[$denominator]]></code>
+      <code><![CDATA[BigInteger::zero()]]></code>
+      <code><![CDATA[BigInteger::one()]]></code>
+      <code><![CDATA[BigInteger::one()]]></code>
+      <code><![CDATA[BigInteger::one()]]></code>
+      <code><![CDATA[BigInteger::ten()]]></code>
+      <code><![CDATA[BigInteger::one()]]></code>
+      <code><![CDATA[$this->numerator->remainder($this->denominator)]]></code>
+      <code><![CDATA[$this->denominator]]></code>
+      <code><![CDATA[$numerator]]></code>
+      <code><![CDATA[$denominator]]></code>
+      <code><![CDATA[$numerator]]></code>
+      <code><![CDATA[$denominator]]></code>
+      <code><![CDATA[$numerator]]></code>
+      <code><![CDATA[$denominator]]></code>
+      <code><![CDATA[$numerator]]></code>
+      <code><![CDATA[$denominator]]></code>
+      <code><![CDATA[$this->numerator->power($exponent)]]></code>
+      <code><![CDATA[$this->denominator->power($exponent)]]></code>
+      <code><![CDATA[$this->denominator]]></code>
+      <code><![CDATA[$this->numerator]]></code>
+      <code><![CDATA[$this->numerator->negated()]]></code>
+      <code><![CDATA[$this->denominator]]></code>
+      <code><![CDATA[RoundingMode::HalfEven]]></code>
+    </ArgumentTypeCoercion>
+    <ImpureMethodCall>
+      <code><![CDATA[$numerator->negated()]]></code>
+      <code><![CDATA[$denominator->negated()]]></code>
+      <code><![CDATA[$that->negated()]]></code>
+    </ImpureMethodCall>
+    <ImpureStaticVariable>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[$zero = new BigRational(BigInteger::zero(), BigInteger::one(), false, false)]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[$one = new BigRational(BigInteger::one(), BigInteger::one(), false, false)]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[$ten = new BigRational(BigInteger::ten(), BigInteger::one(), false, false)]]></code>
+    </ImpureStaticVariable>
+    <InvalidArgument>
+      <code><![CDATA[$roundingMode]]></code>
+    </InvalidArgument>
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->numerator = $numerator]]></code>
+      <code><![CDATA[$this->denominator = $denominator]]></code>
+      <code><![CDATA[$this->numerator = $data['numerator']]]></code>
+      <code><![CDATA[$this->denominator = $data['denominator']]]></code>
+    </InvalidPropertyAssignment>
+    <MethodSignatureMismatch>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+    </MethodSignatureMismatch>
+    <MissingThrowsDocblock>
+      <code><![CDATA[$numerator->gcd($denominator)]]></code>
+      <code><![CDATA[$numerator->quotient($gcd)]]></code>
+      <code><![CDATA[$denominator->quotient($gcd)]]></code>
+      <code><![CDATA[$this->numerator->quotient($this->denominator)]]></code>
+      <code><![CDATA[$this->numerator->remainder($this->denominator)]]></code>
+      <code><![CDATA[$this->denominator->isEqualTo($that->denominator)]]></code>
+      <code><![CDATA[$this->numerator
+            ->multipliedBy($that->denominator)]]></code>
+      <code><![CDATA[$that->numerator->multipliedBy($this->denominator)]]></code>
+      <code><![CDATA[$this->denominator->isEqualTo(1)]]></code>
+      <code><![CDATA[$this->numerator->toBigDecimal()->dividedBy($this->denominator, $scale)]]></code>
+      <code><![CDATA[$this->numerator->toBigDecimal()->dividedBy($this->denominator, $scale, $roundingMode)]]></code>
+      <code><![CDATA[$this->denominator->isEqualTo(1)]]></code>
+      <code><![CDATA[$this->numerator
+            ->toBigDecimal()
+            ->dividedBy($this->denominator, $scale, RoundingMode::HalfEven)]]></code>
+      <code><![CDATA[$numerator->quotient($denominator)]]></code>
+      <code><![CDATA[$numerator->remainder($denominator)]]></code>
+      <code><![CDATA[$remainder->multipliedBy(10)]]></code>
+      <code><![CDATA[$remainder->quotient($denominator)]]></code>
+      <code><![CDATA[$remainder->remainder($denominator)]]></code>
+    </MissingThrowsDocblock>
+    <MixedReturnStatement>
+      <code><![CDATA[return $zero;]]></code>
+      <code><![CDATA[return $one;]]></code>
+      <code><![CDATA[return $ten;]]></code>
+    </MixedReturnStatement>
+  </file>
+  <file src="src/Exception/DivisionByZeroException.php">
+    <ImpureMethodCall>
+      <code><![CDATA[parent::__construct($message)]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Exception/IntegerOverflowException.php">
+    <ImpureMethodCall>
+      <code><![CDATA[parent::__construct($message)]]></code>
+      <code><![CDATA[$value->toString()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Exception/InvalidArgumentException.php">
+    <ImpureMethodCall>
+      <code><![CDATA[parent::__construct($message)]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Exception/NegativeNumberException.php">
+    <ImpureMethodCall>
+      <code><![CDATA[parent::__construct($message)]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Exception/NoInverseException.php">
+    <ImpureMethodCall>
+      <code><![CDATA[parent::__construct($message)]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Exception/NumberFormatException.php">
+    <ImpureMethodCall>
+      <code><![CDATA[parent::__construct($message)]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Exception/RandomSourceException.php">
+    <ImpureMethodCall>
+      <code><![CDATA[parent::__construct($message, 0, $previous)]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Exception/RoundingNecessaryException.php">
+    <ImpureMethodCall>
+      <code><![CDATA[parent::__construct($message)]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Exception/UnsupportedPlatformException.php">
+    <ImpureMethodCall>
+      <code><![CDATA[parent::__construct($message)]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Internal/Calculator.php">
+    <InvalidArgument>
+      <code><![CDATA[$value]]></code>
+    </InvalidArgument>
+    <MissingThrowsDocblock>
+      <code><![CDATA[intdiv(strlen($m) - 1, $k)]]></code>
+    </MissingThrowsDocblock>
+    <MixedArgument>
+      <code><![CDATA[$number]]></code>
+      <code><![CDATA[$number[$i]]]></code>
+    </MixedArgument>
+    <MixedArrayAccess>
+      <code><![CDATA[$number[$i]]]></code>
+    </MixedArrayAccess>
+    <MixedReturnStatement>
+      <code><![CDATA[return $number;]]></code>
+    </MixedReturnStatement>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$value]]></code>
+    </PossiblyInvalidArgument>
+  </file>
+  <file src="src/Internal/Calculator/BcMathCalculator.php">
+    <MethodSignatureMismatch>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+    </MethodSignatureMismatch>
+    <MissingThrowsDocblock>
+      <code><![CDATA[bcdiv($a, $b, 0)]]></code>
+      <code><![CDATA[bcmod($a, $b, 0)]]></code>
+      <code><![CDATA[bcdiv($a, $b, 0)]]></code>
+      <code><![CDATA[bcmod($a, $b, 0)]]></code>
+    </MissingThrowsDocblock>
+  </file>
+  <file src="src/Internal/Calculator/GmpCalculator.php">
+    <MethodSignatureMismatch>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+    </MethodSignatureMismatch>
+    <MixedAssignment>
+      <code><![CDATA[$q]]></code>
+      <code><![CDATA[$r]]></code>
+      <code><![CDATA[$result = gmp_invert($x, $m)]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Internal/Calculator/NativeCalculator.php">
+    <ImpureFunctionCall>
+      <code><![CDATA[assert($carry === 0)]]></code>
+    </ImpureFunctionCall>
+    <ImpureMethodCall>
+      <code><![CDATA[$this->add($result, $line)]]></code>
+      <code><![CDATA[$this->add($q, '1' . $zeros)]]></code>
+      <code><![CDATA[$this->sub($a, $b . $zeros)]]></code>
+    </ImpureMethodCall>
+    <MethodSignatureMismatch>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+      <code><![CDATA[#[Override]]]></code>
+    </MethodSignatureMismatch>
+    <MissingThrowsDocblock>
+      <code><![CDATA[intdiv($na, $nb)]]></code>
+      <code><![CDATA[intdiv(strlen($n), 2)]]></code>
+      <code><![CDATA[intdiv($this->maxDigits, 2)]]></code>
+      <code><![CDATA[intdiv($n, $nb)]]></code>
+    </MissingThrowsDocblock>
+    <MixedReturnStatement>
+      <code><![CDATA[return $this->divQR($a, $b)[0];]]></code>
+      <code><![CDATA[return $this->divQR($a, $b)[1];]]></code>
+    </MixedReturnStatement>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$e / 2]]></code>
+    </PossiblyInvalidArgument>
+    <UnhandledMatchCondition>
+      <code><![CDATA[match (PHP_INT_SIZE) {
+            4 => 9,
+            8 => 18,
+        }]]></code>
+    </UnhandledMatchCondition>
+  </file>
+  <file src="src/Internal/CalculatorRegistry.php">
+    <ImpureStaticPropertyAccess>
+      <code><![CDATA[$instance]]></code>
+      <code><![CDATA[$instance]]></code>
+    </ImpureStaticPropertyAccess>
+    <ImpureStaticPropertyAssignment>
+      <code><![CDATA[self::$instance = self::detect()]]></code>
+    </ImpureStaticPropertyAssignment>
+    <InvalidPropertyAssignment>
+      <code><![CDATA[self::$instance = $calculator]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Internal/DecimalHelper.php">
+    <InvalidArgument>
+      <code><![CDATA[$roundingMode]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Internal/Safe.php">
+    <RedundantCondition>
+      <code><![CDATA[is_int($result)]]></code>
+      <code><![CDATA[is_int($result)]]></code>
+      <code><![CDATA[is_int($result)]]></code>
+    </RedundantCondition>
+    <UnreachableCode>
+      <code><![CDATA[throw IntegerOverflowException::nativeIntegerOverflow(sprintf('%d + %d', $a, $b));]]></code>
+      <code><![CDATA[throw IntegerOverflowException::nativeIntegerOverflow(sprintf('%d - %d', $a, $b));]]></code>
+      <code><![CDATA[throw IntegerOverflowException::nativeIntegerOverflow(sprintf('%d * %d', $a, $b));]]></code>
+    </UnreachableCode>
+  </file>
+</files>

@@ -1,0 +1,439 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<files>
+  <file src="src/Dotenv.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MixedArgument>
+      <code><![CDATA[$path]]></code>
+      <code><![CDATA[$name]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$path]]></code>
+      <code><![CDATA[$name]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Loader/Loader.php">
+    <MissingClosureReturnType>
+      <code><![CDATA[static function (array $vars, Entry $entry) use ($repository) {
+            $name = $entry->getName();
+
+            $value = $entry->getValue()->map(static function (Value $value) use ($repository) {
+                return Resolver::resolve($repository, $value);
+            });
+
+            if ($value->isDefined()) {
+                $inner = $value->get();
+                if ($repository->set($name, $inner)) {
+                    return \array_merge($vars, [$name => $inner]);
+                }
+            } else {
+                if ($repository->clear($name)) {
+                    return \array_merge($vars, [$name => null]);
+                }
+            }
+
+            return $vars;
+        }]]></code>
+      <code><![CDATA[static function (Value $value) use ($repository) {
+                return Resolver::resolve($repository, $value);
+            }]]></code>
+    </MissingClosureReturnType>
+  </file>
+  <file src="src/Loader/Resolver.php">
+    <MissingClosureReturnType>
+      <code><![CDATA[static function (string $s, int $i) use ($repository) {
+            return Str::substr($s, 0, $i).self::resolveVariable($repository, Str::substr($s, $i));
+        }]]></code>
+      <code><![CDATA[static function (array $matches) use ($repository) {
+                /** @var string */
+                return Option::fromValue($repository->get($matches[1]))->getOrElse($matches[0]);
+            }]]></code>
+    </MissingClosureReturnType>
+    <MixedArgument>
+      <code><![CDATA[$matches[1]]]></code>
+    </MixedArgument>
+  </file>
+  <file src="src/Parser/Entry.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+  </file>
+  <file src="src/Parser/EntryParser.php">
+    <MissingClosureReturnType>
+      <code><![CDATA[static function (array $parts) {
+            [$name, $value] = $parts;
+
+            return self::parseName($name)->flatMap(static function (string $name) use ($value) {
+                /** @var Result<Value|null, string> */
+                $parsedValue = $value === null ? Success::create(null) : self::parseValue($value);
+
+                return $parsedValue->map(static function (?Value $value) use ($name) {
+                    return new Entry($name, $value);
+                });
+            });
+        }]]></code>
+      <code><![CDATA[static function (string $name) use ($value) {
+                /** @var Result<Value|null, string> */
+                $parsedValue = $value === null ? Success::create(null) : self::parseValue($value);
+
+                return $parsedValue->map(static function (?Value $value) use ($name) {
+                    return new Entry($name, $value);
+                });
+            }]]></code>
+      <code><![CDATA[static function (?Value $value) use ($name) {
+                    return new Entry($name, $value);
+                }]]></code>
+      <code><![CDATA[static function () use ($line) {
+            return \array_map(static function (string $part) {
+                return \trim($part, " \n\r\t\0\x0B");
+            }, \explode('=', $line, 2));
+        }]]></code>
+      <code><![CDATA[static function (string $part) {
+                return \trim($part, " \n\r\t\0\x0B");
+            }]]></code>
+      <code><![CDATA[static function (Result $data, string $token) {
+            return $data->flatMap(static function (array $data) use ($token) {
+                return self::processToken($data[1], $token)->map(static function (array $val) use ($data) {
+                    return [$data[0]->append($val[0], $val[1]), $val[2]];
+                });
+            });
+        }]]></code>
+      <code><![CDATA[static function (array $data) use ($token) {
+                return self::processToken($data[1], $token)->map(static function (array $val) use ($data) {
+                    return [$data[0]->append($val[0], $val[1]), $val[2]];
+                });
+            }]]></code>
+      <code><![CDATA[static function (array $val) use ($data) {
+                    return [$data[0]->append($val[0], $val[1]), $val[2]];
+                }]]></code>
+      <code><![CDATA[static function (array $result) {
+            if (in_array($result[1], self::REJECT_STATES, true)) {
+                /** @var \GrahamCampbell\ResultType\Result<\Dotenv\Parser\Value, string> */
+                return Error::create('a missing closing quote');
+            }
+
+            /** @var \GrahamCampbell\ResultType\Result<\Dotenv\Parser\Value, string> */
+            return Success::create($result[0]);
+        }]]></code>
+      <code><![CDATA[static function (string $err) use ($value) {
+            return self::getErrorMessage($err, $value);
+        }]]></code>
+    </MissingClosureReturnType>
+    <MissingThrowsDocblock>
+      <code><![CDATA[]]></code>
+    </MissingThrowsDocblock>
+    <MixedArgument>
+      <code><![CDATA[$name]]></code>
+      <code><![CDATA[$value]]></code>
+      <code><![CDATA[$data[1]]]></code>
+      <code><![CDATA[self::REJECT_STATES]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$name]]></code>
+      <code><![CDATA[$value]]></code>
+    </MixedAssignment>
+    <MixedMethodCall>
+      <code><![CDATA[$data[0]->append($val[0], $val[1])]]></code>
+    </MixedMethodCall>
+  </file>
+  <file src="src/Parser/Lexer.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[]]></code>
+    </MissingThrowsDocblock>
+    <MixedArgument>
+      <code><![CDATA[$regex]]></code>
+    </MixedArgument>
+  </file>
+  <file src="src/Parser/Lines.php">
+    <MissingClosureReturnType>
+      <code><![CDATA[static function () use ($line) {
+            return self::looksLikeMultilineStop($line, true) === false;
+        }]]></code>
+      <code><![CDATA[static function (int $count) use ($started) {
+            return $started ? $count > 1 : $count >= 1;
+        }]]></code>
+    </MissingClosureReturnType>
+  </file>
+  <file src="src/Parser/Parser.php">
+    <MissingClosureReturnType>
+      <code><![CDATA[static function () {
+            return 'Could not split into separate lines.';
+        }]]></code>
+      <code><![CDATA[static function (array $lines) {
+            return self::process(Lines::process($lines));
+        }]]></code>
+      <code><![CDATA[static function (string $error) {
+            throw new InvalidFileException(\sprintf('Failed to parse dotenv file. %s', $error));
+        }]]></code>
+      <code><![CDATA[static function (Result $result, string $raw) {
+            return $result->flatMap(static function (array $entries) use ($raw) {
+                return EntryParser::parse($raw)->map(static function (Entry $entry) use ($entries) {
+                    /** @var \Dotenv\Parser\Entry[] */
+                    return \array_merge($entries, [$entry]);
+                });
+            });
+        }]]></code>
+      <code><![CDATA[static function (array $entries) use ($raw) {
+                return EntryParser::parse($raw)->map(static function (Entry $entry) use ($entries) {
+                    /** @var \Dotenv\Parser\Entry[] */
+                    return \array_merge($entries, [$entry]);
+                });
+            }]]></code>
+      <code><![CDATA[static function (Entry $entry) use ($entries) {
+                    /** @var \Dotenv\Parser\Entry[] */
+                    return \array_merge($entries, [$entry]);
+                }]]></code>
+    </MissingClosureReturnType>
+  </file>
+  <file src="src/Parser/Value.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+  </file>
+  <file src="src/Repository/Adapter/ApacheAdapter.php">
+    <MissingClosureReturnType>
+      <code><![CDATA[static function ($value) {
+            return \is_string($value) && $value !== '';
+        }]]></code>
+    </MissingClosureReturnType>
+    <MixedReturnStatement>
+      <code><![CDATA[return apache_setenv($name, $value);]]></code>
+      <code><![CDATA[return apache_setenv($name, '');]]></code>
+    </MixedReturnStatement>
+    <UndefinedFunction>
+      <code><![CDATA[apache_getenv($name)]]></code>
+      <code><![CDATA[apache_setenv($name, $value)]]></code>
+      <code><![CDATA[apache_setenv($name, '')]]></code>
+    </UndefinedFunction>
+  </file>
+  <file src="src/Repository/Adapter/ArrayAdapter.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+  </file>
+  <file src="src/Repository/Adapter/EnvConstAdapter.php">
+    <MissingClosureReturnType>
+      <code><![CDATA[static function ($value) {
+                return \is_scalar($value);
+            }]]></code>
+      <code><![CDATA[static function ($value) {
+                if ($value === false) {
+                    return 'false';
+                }
+
+                if ($value === true) {
+                    return 'true';
+                }
+
+                return (string) $value;
+            }]]></code>
+    </MissingClosureReturnType>
+    <MixedArgument>
+      <code><![CDATA[$_ENV]]></code>
+    </MixedArgument>
+    <MixedArrayAccess>
+      <code><![CDATA[$_ENV[$name]]]></code>
+    </MixedArrayAccess>
+  </file>
+  <file src="src/Repository/Adapter/GuardedWriter.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+  </file>
+  <file src="src/Repository/Adapter/ImmutableWriter.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+  </file>
+  <file src="src/Repository/Adapter/MultiReader.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+  </file>
+  <file src="src/Repository/Adapter/MultiWriter.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+  </file>
+  <file src="src/Repository/Adapter/PutenvAdapter.php">
+    <MissingClosureReturnType>
+      <code><![CDATA[static function ($value) {
+            return \is_string($value);
+        }]]></code>
+    </MissingClosureReturnType>
+  </file>
+  <file src="src/Repository/Adapter/ReplacingWriter.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+  </file>
+  <file src="src/Repository/Adapter/ServerConstAdapter.php">
+    <MissingClosureReturnType>
+      <code><![CDATA[static function ($value) {
+                return \is_scalar($value);
+            }]]></code>
+      <code><![CDATA[static function ($value) {
+                if ($value === false) {
+                    return 'false';
+                }
+
+                if ($value === true) {
+                    return 'true';
+                }
+
+                return (string) $value;
+            }]]></code>
+    </MissingClosureReturnType>
+    <MixedArgument>
+      <code><![CDATA[$_SERVER]]></code>
+    </MixedArgument>
+    <MixedArrayAccess>
+      <code><![CDATA[$_SERVER[$name]]]></code>
+    </MixedArrayAccess>
+  </file>
+  <file src="src/Repository/AdapterRepository.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+  </file>
+  <file src="src/Repository/RepositoryBuilder.php">
+    <MissingClosureReturnType>
+      <code><![CDATA[static function ($reader) {
+            return \is_string($reader) ? $reader::create() : Some::create($reader);
+        }]]></code>
+      <code><![CDATA[static function ($writer) {
+            return \is_string($writer) ? $writer::create() : Some::create($writer);
+        }]]></code>
+      <code><![CDATA[static function ($adapter) {
+            return \is_string($adapter) ? $adapter::create() : Some::create($adapter);
+        }]]></code>
+    </MissingClosureReturnType>
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MixedAssignment>
+      <code><![CDATA[$adapter]]></code>
+      <code><![CDATA[$instance = $adapter::create()]]></code>
+    </MixedAssignment>
+    <MixedMethodCall>
+      <code><![CDATA[$instance->isDefined()]]></code>
+      <code><![CDATA[$instance->get()]]></code>
+    </MixedMethodCall>
+  </file>
+  <file src="src/Store/File/Reader.php">
+    <MissingClosureReturnType>
+      <code><![CDATA[static function (string $content) use ($encoding) {
+            return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+                throw new InvalidEncodingException($error);
+            })->success();
+        }]]></code>
+      <code><![CDATA[static function (string $error) {
+                throw new InvalidEncodingException($error);
+            }]]></code>
+    </MissingClosureReturnType>
+  </file>
+  <file src="src/Store/FileStore.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+  </file>
+  <file src="src/Store/StoreBuilder.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+  </file>
+  <file src="src/Store/StringStore.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+  </file>
+  <file src="src/Util/Regex.php">
+    <MissingClosureReturnType>
+      <code><![CDATA[static function (string $subject) use ($pattern) {
+            return @\preg_match($pattern, $subject) === 1;
+        }]]></code>
+      <code><![CDATA[static function (string $subject) use ($pattern) {
+            return (int) @\preg_match_all($pattern, $subject);
+        }]]></code>
+      <code><![CDATA[static function (string $subject) use ($pattern, $callback, $limit) {
+            return (string) @\preg_replace_callback($pattern, $callback, $subject, $limit ?? -1);
+        }]]></code>
+      <code><![CDATA[static function (string $subject) use ($pattern) {
+            /** @var string[] */
+            return (array) @\preg_split($pattern, $subject);
+        }]]></code>
+    </MissingClosureReturnType>
+    <RedundantCast>
+      <code><![CDATA[@\preg_replace_callback($pattern, $callback, $subject, $limit ?? -1)]]></code>
+      <code><![CDATA[@\preg_split($pattern, $subject)]]></code>
+    </RedundantCast>
+  </file>
+  <file src="src/Util/Str.php">
+    <MixedArgument>
+      <code><![CDATA[\mb_list_encodings()]]></code>
+    </MixedArgument>
+    <MixedReturnStatement>
+      <code><![CDATA[return \mb_substr($input, $start, $length, 'UTF-8');]]></code>
+    </MixedReturnStatement>
+    <RedundantCondition>
+      <code><![CDATA[!is_string($converted)]]></code>
+    </RedundantCondition>
+  </file>
+  <file src="src/Validator.php">
+    <MissingClosureReturnType>
+      <code><![CDATA[static function (?string $value) {
+                return $value !== null;
+            }]]></code>
+      <code><![CDATA[static function (string $value) {
+                return Str::len(\trim($value, " \n\r\t\0\x0B")) > 0;
+            }]]></code>
+      <code><![CDATA[static function (string $value) {
+                return \ctype_digit($value);
+            }]]></code>
+      <code><![CDATA[static function (string $value) {
+                if ($value === '') {
+                    return false;
+                }
+
+                return \filter_var($value, \FILTER_VALIDATE_BOOLEAN, \FILTER_NULL_ON_FAILURE) !== null;
+            }]]></code>
+      <code><![CDATA[static function (string $value) use ($choices) {
+                return \in_array($value, $choices, true);
+            }]]></code>
+      <code><![CDATA[static function (string $value) use ($regex) {
+                return Regex::matches($regex, $value)->success()->getOrElse(false);
+            }]]></code>
+      <code><![CDATA[static function (?string $value) use ($callback) {
+                if ($value === null) {
+                    return true;
+                }
+
+                return $callback($value);
+            }]]></code>
+    </MissingClosureReturnType>
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+  </file>
+</files>

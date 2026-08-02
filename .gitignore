@@ -1,6 +1,7 @@
 /target
 /book
 crates/mir-analyzer/benches/fixtures/
+harness/fixtures/
 site/public/wasm/
 
 # Composer

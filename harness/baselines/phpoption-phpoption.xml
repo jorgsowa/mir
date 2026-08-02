@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<files>
+  <file src="src/PhpOption/LazyOption.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MissingThrowsDocblock>
+      <code><![CDATA[$this->option()->getIterator()]]></code>
+    </MissingThrowsDocblock>
+    <MixedArgument>
+      <code><![CDATA[$callable]]></code>
+      <code><![CDATA[$callable]]></code>
+      <code><![CDATA[$callable]]></code>
+      <code><![CDATA[$callable]]></code>
+      <code><![CDATA[$callable]]></code>
+      <code><![CDATA[$callable]]></code>
+      <code><![CDATA[$callable]]></code>
+      <code><![CDATA[$callable]]></code>
+      <code><![CDATA[$callable]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$option = call_user_func_array($this->callback, $this->arguments)]]></code>
+    </MixedAssignment>
+    <RedundantCondition>
+      <code><![CDATA[!is_callable($callback)]]></code>
+    </RedundantCondition>
+  </file>
+  <file src="src/PhpOption/None.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MissingThrowsDocblock>
+      <code><![CDATA[]]></code>
+    </MissingThrowsDocblock>
+    <MixedFunctionCall>
+      <code><![CDATA[$callable()]]></code>
+    </MixedFunctionCall>
+    <UnusedParam>
+      <code><![CDATA[$callable]]></code>
+      <code><![CDATA[$callable]]></code>
+      <code><![CDATA[$callable]]></code>
+      <code><![CDATA[$callable]]></code>
+      <code><![CDATA[$callable]]></code>
+      <code><![CDATA[$callable]]></code>
+      <code><![CDATA[$value]]></code>
+      <code><![CDATA[$value]]></code>
+      <code><![CDATA[$callable]]></code>
+      <code><![CDATA[$callable]]></code>
+    </UnusedParam>
+  </file>
+  <file src="src/PhpOption/Option.php">
+    <MissingClosureReturnType>
+      <code><![CDATA[static function () use ($callback, $arguments, $noneValue) {
+            /** @var mixed */
+            $return = call_user_func_array($callback, $arguments);
+
+            if ($return === $noneValue) {
+                return None::create();
+            }
+
+            return new Some($return);
+        }]]></code>
+      <code><![CDATA[static function () use ($value, $noneValue) {
+                /** @var mixed */
+                $return = $value();
+
+                if ($return instanceof self) {
+                    return $return;
+                } else {
+                    return self::fromValue($return, $noneValue);
+                }
+            }]]></code>
+      <code><![CDATA[static function () use ($callback, $noneValue) {
+            /** @var array<int, mixed> */
+            $args = func_get_args();
+
+            $reduced_args = array_reduce(
+                $args,
+                /** @param bool $status */
+                static function ($status, self $o) {
+                    return $o->isEmpty() ? true : $status;
+                },
+                false
+            );
+            // if at least one parameter is empty, return None
+            if ($reduced_args) {
+                return None::create();
+            }
+
+            $args = array_map(
+                /** @return T */
+                static function (self $o) {
+                    // it is safe to do so because the fold above checked
+                    // that all arguments are of type Some
+                    /** @var T */
+                    return $o->get();
+                },
+                $args
+            );
+
+            return self::ensure(call_user_func_array($callback, $args), $noneValue);
+        }]]></code>
+      <code><![CDATA[static function ($status, self $o) {
+                    return $o->isEmpty() ? true : $status;
+                }]]></code>
+    </MissingClosureReturnType>
+    <MixedAssignment>
+      <code><![CDATA[$return = call_user_func_array($callback, $arguments)]]></code>
+      <code><![CDATA[$return = $value()]]></code>
+    </MixedAssignment>
+    <MixedFunctionCall>
+      <code><![CDATA[$value()]]></code>
+    </MixedFunctionCall>
+    <UndefinedDocblockClass>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </UndefinedDocblockClass>
+  </file>
+  <file src="src/PhpOption/Some.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MixedAssignment>
+      <code><![CDATA[$rs = $callable($this->value)]]></code>
+    </MixedAssignment>
+    <MixedFunctionCall>
+      <code><![CDATA[$callable($this->value)]]></code>
+      <code><![CDATA[$callable($this->value)]]></code>
+      <code><![CDATA[$callable($this->value)]]></code>
+      <code><![CDATA[$callable($this->value)]]></code>
+      <code><![CDATA[$callable($this->value)]]></code>
+      <code><![CDATA[$callable($initialValue, $this->value)]]></code>
+      <code><![CDATA[$callable($this->value, $initialValue)]]></code>
+    </MixedFunctionCall>
+    <UnusedParam>
+      <code><![CDATA[$default]]></code>
+      <code><![CDATA[$callable]]></code>
+      <code><![CDATA[$ex]]></code>
+      <code><![CDATA[$else]]></code>
+    </UnusedParam>
+  </file>
+</files>

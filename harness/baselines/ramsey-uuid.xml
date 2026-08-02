@@ -1,0 +1,784 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<files>
+  <file src="src/Builder/BuilderCollection.php">
+    <MixedAssignment>
+      <code><![CDATA[$data = unserialize($serialized, [
+            'allowed_classes' => [
+                BrickMathCalculator::class,
+                GenericNumberConverter::class,
+                GenericTimeConverter::class,
+                GuidBuilder::class,
+                NonstandardUuidBuilder::class,
+                PhpTimeConverter::class,
+                Rfc4122UuidBuilder::class,
+            ],
+        ])]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Builder/DegradedUuidBuilder.php">
+    <DeprecatedClass>
+      <code><![CDATA[DegradedTimeConverter]]></code>
+      <code><![CDATA[DegradedUuid]]></code>
+    </DeprecatedClass>
+    <ImpureFunctionCall>
+      <code><![CDATA[new DegradedUuid(new Rfc4122Fields($bytes), $this->numberConverter, $codec, $this->timeConverter)]]></code>
+    </ImpureFunctionCall>
+    <MethodSignatureMismatch>
+      <code><![CDATA[public function build(CodecInterface $codec, string $bytes): UuidInterface]]></code>
+    </MethodSignatureMismatch>
+  </file>
+  <file src="src/Builder/FallbackBuilder.php">
+    <ImpureFunctionCall>
+      <code><![CDATA[new BuilderNotFoundException(
+            'Could not find a suitable builder for the provided codec and fields',
+            0,
+            $lastBuilderException,
+        )]]></code>
+    </ImpureFunctionCall>
+  </file>
+  <file src="src/Codec/GuidStringCodec.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->getBytes($encodedUuid)]]></code>
+      <code><![CDATA[$this->getBuilder()]]></code>
+      <code><![CDATA[$this->swapBytes($bytes)]]></code>
+      <code><![CDATA[parent::decode(bin2hex($bytes))]]></code>
+    </ImpureMethodCall>
+    <MethodSignatureMismatch>
+      <code><![CDATA[public function encode(UuidInterface $uuid): string]]></code>
+      <code><![CDATA[public function decode(string $encodedUuid): UuidInterface]]></code>
+      <code><![CDATA[public function decodeBytes(string $bytes): UuidInterface]]></code>
+    </MethodSignatureMismatch>
+  </file>
+  <file src="src/Codec/OrderedTimeCodec.php">
+    <ImpureMethodCall>
+      <code><![CDATA[parent::decodeBytes($rearrangedBytes)]]></code>
+    </ImpureMethodCall>
+    <MethodSignatureMismatch>
+      <code><![CDATA[public function encodeBinary(UuidInterface $uuid): string]]></code>
+      <code><![CDATA[public function decodeBytes(string $bytes): UuidInterface]]></code>
+    </MethodSignatureMismatch>
+  </file>
+  <file src="src/Codec/StringCodec.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->getBytes($encodedUuid)]]></code>
+    </ImpureMethodCall>
+    <MethodSignatureMismatch>
+      <code><![CDATA[public function encode(UuidInterface $uuid): string]]></code>
+      <code><![CDATA[public function encodeBinary(UuidInterface $uuid): string]]></code>
+      <code><![CDATA[public function decode(string $encodedUuid): UuidInterface]]></code>
+      <code><![CDATA[public function decodeBytes(string $bytes): UuidInterface]]></code>
+    </MethodSignatureMismatch>
+  </file>
+  <file src="src/Codec/TimestampFirstCombCodec.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->getBytes($encodedUuid)]]></code>
+      <code><![CDATA[$this->getBuilder()]]></code>
+      <code><![CDATA[$this->getBuilder()]]></code>
+    </ImpureMethodCall>
+    <MethodSignatureMismatch>
+      <code><![CDATA[public function encode(UuidInterface $uuid): string]]></code>
+      <code><![CDATA[public function encodeBinary(UuidInterface $uuid): string]]></code>
+      <code><![CDATA[public function decode(string $encodedUuid): UuidInterface]]></code>
+      <code><![CDATA[public function decodeBytes(string $bytes): UuidInterface]]></code>
+    </MethodSignatureMismatch>
+  </file>
+  <file src="src/Converter/Number/DegradedNumberConverter.php">
+    <DeprecatedClass>
+      <code><![CDATA[class DegradedNumberConverter extends BigNumberConverter]]></code>
+    </DeprecatedClass>
+  </file>
+  <file src="src/Converter/Number/GenericNumberConverter.php">
+    <ImpureFunctionCall>
+      <code><![CDATA[new IntegerObject($number)]]></code>
+    </ImpureFunctionCall>
+  </file>
+  <file src="src/Converter/Time/BigNumberTimeConverter.php">
+    <MethodSignatureMismatch>
+      <code><![CDATA[public function calculateTime(string $seconds, string $microseconds): Hexadecimal]]></code>
+      <code><![CDATA[public function convertTime(Hexadecimal $uuidTimestamp): Time]]></code>
+    </MethodSignatureMismatch>
+  </file>
+  <file src="src/Converter/Time/DegradedTimeConverter.php">
+    <DeprecatedClass>
+      <code><![CDATA[class DegradedTimeConverter extends BigNumberTimeConverter]]></code>
+    </DeprecatedClass>
+  </file>
+  <file src="src/Converter/Time/GenericTimeConverter.php">
+    <MethodSignatureMismatch>
+      <code><![CDATA[public function calculateTime(string $seconds, string $microseconds): Hexadecimal]]></code>
+      <code><![CDATA[public function convertTime(Hexadecimal $uuidTimestamp): Time]]></code>
+    </MethodSignatureMismatch>
+  </file>
+  <file src="src/Converter/Time/PhpTimeConverter.php">
+    <MethodSignatureMismatch>
+      <code><![CDATA[public function calculateTime(string $seconds, string $microseconds): Hexadecimal]]></code>
+      <code><![CDATA[public function convertTime(Hexadecimal $uuidTimestamp): Time]]></code>
+    </MethodSignatureMismatch>
+    <RedundantCondition>
+      <code><![CDATA[!is_int($uuidTime)]]></code>
+    </RedundantCondition>
+  </file>
+  <file src="src/Converter/Time/UnixTimeConverter.php">
+    <MethodSignatureMismatch>
+      <code><![CDATA[public function calculateTime(string $seconds, string $microseconds): Hexadecimal]]></code>
+      <code><![CDATA[public function convertTime(Hexadecimal $uuidTimestamp): Time]]></code>
+    </MethodSignatureMismatch>
+  </file>
+  <file src="src/DeprecatedUuidMethodsTrait.php">
+    <MixedArgument>
+      <code><![CDATA[$time->getMicroseconds()->toString()]]></code>
+      <code><![CDATA[$this->getHex()->toString()]]></code>
+      <code><![CDATA[$this->getHex()->toString()]]></code>
+      <code><![CDATA[$this->getHex()->toString()]]></code>
+      <code><![CDATA[$this->getHex()->toString()]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$time = $this->timeConverter->convertTime($this->fields->getTimestamp())]]></code>
+    </MixedAssignment>
+    <MixedMethodCall>
+      <code><![CDATA[$this->fields->getClockSeqHiAndReserved()]]></code>
+      <code><![CDATA[$this->numberConverter->fromHex($this->fields->getClockSeqHiAndReserved()->toString())]]></code>
+      <code><![CDATA[$this->fields->getClockSeqHiAndReserved()]]></code>
+      <code><![CDATA[$this->fields->getClockSeqLow()]]></code>
+      <code><![CDATA[$this->numberConverter->fromHex($this->fields->getClockSeqLow()->toString())]]></code>
+      <code><![CDATA[$this->fields->getClockSeqLow()]]></code>
+      <code><![CDATA[$this->fields->getClockSeq()]]></code>
+      <code><![CDATA[$this->numberConverter->fromHex($this->fields->getClockSeq()->toString())]]></code>
+      <code><![CDATA[$this->fields->getClockSeq()]]></code>
+      <code><![CDATA[$this->fields->getVersion()]]></code>
+      <code><![CDATA[$this->fields->getTimestamp()]]></code>
+      <code><![CDATA[$this->timeConverter->convertTime($this->fields->getTimestamp())]]></code>
+      <code><![CDATA[$time->getSeconds()]]></code>
+      <code><![CDATA[$time->getMicroseconds()]]></code>
+      <code><![CDATA[$this->fields->getTimeLow()]]></code>
+      <code><![CDATA[$this->fields->getTimeMid()]]></code>
+      <code><![CDATA[$this->fields->getTimeHiAndVersion()]]></code>
+      <code><![CDATA[$this->fields->getClockSeqHiAndReserved()]]></code>
+      <code><![CDATA[$this->fields->getClockSeqLow()]]></code>
+      <code><![CDATA[$this->fields->getNode()]]></code>
+      <code><![CDATA[$this->getHex()->toString()]]></code>
+      <code><![CDATA[$this->numberConverter->fromHex($leastSignificantHex)]]></code>
+      <code><![CDATA[$this->getHex()->toString()]]></code>
+      <code><![CDATA[$this->getHex()->toString()]]></code>
+      <code><![CDATA[$this->numberConverter->fromHex($mostSignificantHex)]]></code>
+      <code><![CDATA[$this->getHex()->toString()]]></code>
+      <code><![CDATA[$this->fields->getNode()]]></code>
+      <code><![CDATA[$this->numberConverter->fromHex($this->fields->getNode()->toString())]]></code>
+      <code><![CDATA[$this->fields->getNode()]]></code>
+      <code><![CDATA[$this->fields->getTimeHiAndVersion()]]></code>
+      <code><![CDATA[$this->numberConverter->fromHex($this->fields->getTimeHiAndVersion()->toString())]]></code>
+      <code><![CDATA[$this->fields->getTimeHiAndVersion()]]></code>
+      <code><![CDATA[$this->fields->getTimeLow()]]></code>
+      <code><![CDATA[$this->numberConverter->fromHex($this->fields->getTimeLow()->toString())]]></code>
+      <code><![CDATA[$this->fields->getTimeLow()]]></code>
+      <code><![CDATA[$this->fields->getTimeMid()]]></code>
+      <code><![CDATA[$this->numberConverter->fromHex($this->fields->getTimeMid()->toString())]]></code>
+      <code><![CDATA[$this->fields->getTimeMid()]]></code>
+      <code><![CDATA[$this->fields->getVersion()]]></code>
+      <code><![CDATA[$this->fields->getTimestamp()]]></code>
+      <code><![CDATA[$this->numberConverter->fromHex($this->fields->getTimestamp()->toString())]]></code>
+      <code><![CDATA[$this->fields->getVersion()]]></code>
+      <code><![CDATA[$this->fields->getTimestamp()]]></code>
+      <code><![CDATA[$this->fields->getVariant()]]></code>
+      <code><![CDATA[$this->fields->getVersion()]]></code>
+    </MixedMethodCall>
+    <MixedReturnStatement>
+      <code><![CDATA[return $this->numberConverter->fromHex($this->fields->getClockSeqHiAndReserved()->toString());]]></code>
+      <code><![CDATA[return $this->fields->getClockSeqHiAndReserved()->toString();]]></code>
+      <code><![CDATA[return $this->numberConverter->fromHex($this->fields->getClockSeqLow()->toString());]]></code>
+      <code><![CDATA[return $this->fields->getClockSeqLow()->toString();]]></code>
+      <code><![CDATA[return $this->numberConverter->fromHex($this->fields->getClockSeq()->toString());]]></code>
+      <code><![CDATA[return $this->fields->getClockSeq()->toString();]]></code>
+      <code><![CDATA[return $this->numberConverter;]]></code>
+      <code><![CDATA[return $this->numberConverter->fromHex($leastSignificantHex);]]></code>
+      <code><![CDATA[return $this->numberConverter->fromHex($mostSignificantHex);]]></code>
+      <code><![CDATA[return $this->numberConverter->fromHex($this->fields->getNode()->toString());]]></code>
+      <code><![CDATA[return $this->fields->getNode()->toString();]]></code>
+      <code><![CDATA[return $this->numberConverter->fromHex($this->fields->getTimeHiAndVersion()->toString());]]></code>
+      <code><![CDATA[return $this->fields->getTimeHiAndVersion()->toString();]]></code>
+      <code><![CDATA[return $this->numberConverter->fromHex($this->fields->getTimeLow()->toString());]]></code>
+      <code><![CDATA[return $this->fields->getTimeLow()->toString();]]></code>
+      <code><![CDATA[return $this->numberConverter->fromHex($this->fields->getTimeMid()->toString());]]></code>
+      <code><![CDATA[return $this->fields->getTimeMid()->toString();]]></code>
+      <code><![CDATA[return $this->numberConverter->fromHex($this->fields->getTimestamp()->toString());]]></code>
+      <code><![CDATA[return $this->fields->getTimestamp()->toString();]]></code>
+      <code><![CDATA[return $this->fields->getVariant();]]></code>
+      <code><![CDATA[return $this->fields->getVersion();]]></code>
+    </MixedReturnStatement>
+    <RedundantCast>
+      <code><![CDATA[$e->getCode()]]></code>
+    </RedundantCast>
+  </file>
+  <file src="src/FeatureSet.php">
+    <UnusedParam>
+      <code><![CDATA[$forceNoBigNumber]]></code>
+    </UnusedParam>
+  </file>
+  <file src="src/Fields/SerializableFieldsTrait.php">
+    <DirectConstructorCall>
+      <code><![CDATA[$this->__construct($data)]]></code>
+      <code><![CDATA[$this->__construct(base64_decode($data))]]></code>
+    </DirectConstructorCall>
+    <MissingThrowsDocblock>
+      <code><![CDATA[]]></code>
+    </MissingThrowsDocblock>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[base64_decode($data)]]></code>
+    </PossiblyInvalidArgument>
+  </file>
+  <file src="src/Generator/DceSecurityGenerator.php">
+    <MixedArgument>
+      <code><![CDATA[self::DOMAINS]]></code>
+    </MixedArgument>
+  </file>
+  <file src="src/Generator/DefaultNameGenerator.php">
+    <ImpureFunctionCall>
+      <code><![CDATA[new NameException(
+                message: sprintf('Unable to hash namespace and name with algorithm \'%s\'', $hashAlgorithm),
+                previous: $e,
+            )]]></code>
+    </ImpureFunctionCall>
+  </file>
+  <file src="src/Generator/DefaultTimeGenerator.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[random_int(0, 0x3fff)]]></code>
+    </MissingThrowsDocblock>
+    <RedundantCast>
+      <code><![CDATA[$exception->getCode()]]></code>
+    </RedundantCast>
+  </file>
+  <file src="src/Generator/PeclUuidNameGenerator.php">
+    <ImpureFunctionCall>
+      <code><![CDATA[new NameException(
+                sprintf('Unable to hash namespace and name with algorithm \'%s\'', $hashAlgorithm),
+            )]]></code>
+      <code><![CDATA[uuid_parse($uuid)]]></code>
+    </ImpureFunctionCall>
+    <MixedArgument>
+      <code><![CDATA[$uuid]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$uuid = match ($hashAlgorithm) {
+            'md5' => uuid_generate_md5($ns->toString(), $name), /** @phpstan-ignore possiblyImpure.functionCall */
+            'sha1' => uuid_generate_sha1($ns->toString(), $name), /** @phpstan-ignore possiblyImpure.functionCall */
+            default => throw new NameException(
+                sprintf('Unable to hash namespace and name with algorithm \'%s\'', $hashAlgorithm),
+            ),
+        }]]></code>
+    </MixedAssignment>
+    <RedundantCast>
+      <code><![CDATA[uuid_parse($uuid)]]></code>
+    </RedundantCast>
+    <UndefinedFunction>
+      <code><![CDATA[uuid_generate_md5($ns->toString(), $name)]]></code>
+      <code><![CDATA[uuid_generate_sha1($ns->toString(), $name)]]></code>
+    </UndefinedFunction>
+  </file>
+  <file src="src/Generator/PeclUuidRandomGenerator.php">
+    <MixedArgument>
+      <code><![CDATA[UUID_TYPE_RANDOM]]></code>
+    </MixedArgument>
+    <RedundantCast>
+      <code><![CDATA[uuid_parse($uuid)]]></code>
+    </RedundantCast>
+    <UnusedParam>
+      <code><![CDATA[$length]]></code>
+    </UnusedParam>
+  </file>
+  <file src="src/Generator/PeclUuidTimeGenerator.php">
+    <MixedArgument>
+      <code><![CDATA[UUID_TYPE_TIME]]></code>
+    </MixedArgument>
+    <RedundantCast>
+      <code><![CDATA[uuid_parse($uuid)]]></code>
+    </RedundantCast>
+    <UnusedParam>
+      <code><![CDATA[$node]]></code>
+      <code><![CDATA[$clockSeq]]></code>
+    </UnusedParam>
+  </file>
+  <file src="src/Generator/RandomBytesGenerator.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[random_bytes($length)]]></code>
+    </MissingThrowsDocblock>
+    <RedundantCast>
+      <code><![CDATA[$exception->getCode()]]></code>
+    </RedundantCast>
+  </file>
+  <file src="src/Generator/RandomLibAdapter.php">
+    <MixedAssignment>
+      <code><![CDATA[$generator = $factory->getHighStrengthGenerator()]]></code>
+    </MixedAssignment>
+    <MixedReturnStatement>
+      <code><![CDATA[return $this->generator->generate($length);]]></code>
+    </MixedReturnStatement>
+    <UndefinedClass>
+      <code><![CDATA[Generator]]></code>
+      <code><![CDATA[Generator]]></code>
+      <code><![CDATA[Factory]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Generator/UnixTimeGenerator.php">
+    <PropertyPossiblyUninitialized>
+      <code><![CDATA[]]></code>
+    </PropertyPossiblyUninitialized>
+    <UnusedParam>
+      <code><![CDATA[$node]]></code>
+      <code><![CDATA[$clockSeq]]></code>
+    </UnusedParam>
+  </file>
+  <file src="src/Guid/Fields.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->getTimeHiAndVersion()]]></code>
+      <code><![CDATA[$this->getTimeMid()]]></code>
+      <code><![CDATA[$this->getTimeLow()]]></code>
+      <code><![CDATA[$this->isNil()]]></code>
+      <code><![CDATA[$this->isNil()]]></code>
+      <code><![CDATA[$this->isNil()]]></code>
+      <code><![CDATA[$this->getVariant()]]></code>
+    </ImpureMethodCall>
+    <MethodSignatureMismatch>
+      <code><![CDATA[public function getBytes(): string]]></code>
+      <code><![CDATA[public function getVersion(): ?int]]></code>
+    </MethodSignatureMismatch>
+  </file>
+  <file src="src/Guid/GuidBuilder.php">
+    <ImpureFunctionCall>
+      <code><![CDATA[new Guid($this->buildFields($bytes), $this->numberConverter, $codec, $this->timeConverter)]]></code>
+      <code><![CDATA[new UnableToBuildUuidException($e->getMessage(), (int) $e->getCode(), $e)]]></code>
+      <code><![CDATA[new Fields($bytes)]]></code>
+    </ImpureFunctionCall>
+    <RedundantCast>
+      <code><![CDATA[$e->getCode()]]></code>
+    </RedundantCast>
+  </file>
+  <file src="src/Lazy/LazyUuidFromString.php">
+    <ArgumentTypeCoercion>
+      <code><![CDATA[$other]]></code>
+    </ArgumentTypeCoercion>
+    <DeprecatedMethod>
+      <code><![CDATA[($this->unwrapped ?? $this->unwrap())->getNumberConverter()]]></code>
+      <code><![CDATA[($this->unwrapped ?? $this->unwrap())->getFieldsHex()]]></code>
+      <code><![CDATA[($this->unwrapped ?? $this->unwrap())->getClockSeqHiAndReservedHex()]]></code>
+      <code><![CDATA[($this->unwrapped ?? $this->unwrap())->getClockSeqLowHex()]]></code>
+      <code><![CDATA[($this->unwrapped ?? $this->unwrap())->getClockSequenceHex()]]></code>
+      <code><![CDATA[($this->unwrapped ?? $this->unwrap())->getDateTime()]]></code>
+      <code><![CDATA[($this->unwrapped ?? $this->unwrap())->getLeastSignificantBitsHex()]]></code>
+      <code><![CDATA[($this->unwrapped ?? $this->unwrap())->getMostSignificantBitsHex()]]></code>
+      <code><![CDATA[($this->unwrapped ?? $this->unwrap())->getNodeHex()]]></code>
+      <code><![CDATA[($this->unwrapped ?? $this->unwrap())->getTimeHiAndVersionHex()]]></code>
+      <code><![CDATA[($this->unwrapped ?? $this->unwrap())->getTimeLowHex()]]></code>
+      <code><![CDATA[($this->unwrapped ?? $this->unwrap())->getTimeMidHex()]]></code>
+      <code><![CDATA[($this->unwrapped ?? $this->unwrap())->getTimestampHex()]]></code>
+      <code><![CDATA[($this->unwrapped ?? $this->unwrap())->getVariant()]]></code>
+      <code><![CDATA[($this->unwrapped ?? $this->unwrap())->getVersion()]]></code>
+      <code><![CDATA[$instance->getNumberConverter()]]></code>
+      <code><![CDATA[$instance->getNumberConverter()]]></code>
+      <code><![CDATA[$instance->getNumberConverter()]]></code>
+      <code><![CDATA[$instance->getNumberConverter()]]></code>
+      <code><![CDATA[$instance->getNumberConverter()]]></code>
+      <code><![CDATA[$instance->getNumberConverter()]]></code>
+      <code><![CDATA[$instance->getNumberConverter()]]></code>
+      <code><![CDATA[$instance->getNumberConverter()]]></code>
+      <code><![CDATA[$instance->getNumberConverter()]]></code>
+      <code><![CDATA[$instance->getNumberConverter()]]></code>
+    </DeprecatedMethod>
+    <MethodSignatureMismatch>
+      <code><![CDATA[unserialize]]></code>
+      <code><![CDATA[public function getBytes(): string]]></code>
+      <code><![CDATA[public function toString(): string]]></code>
+      <code><![CDATA[public function __toString(): string]]></code>
+    </MethodSignatureMismatch>
+    <MissingThrowsDocblock>
+      <code><![CDATA[]]></code>
+    </MissingThrowsDocblock>
+  </file>
+  <file src="src/Math/BrickMathCalculator.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->toBase($value, 16)]]></code>
+      <code><![CDATA[$this->fromBase($value->toString(), 16)]]></code>
+    </ImpureMethodCall>
+    <MethodSignatureMismatch>
+      <code><![CDATA[public function add(NumberInterface $augend, NumberInterface ...$addends): NumberInterface]]></code>
+      <code><![CDATA[public function subtract(NumberInterface $minuend, NumberInterface ...$subtrahends): NumberInterface]]></code>
+      <code><![CDATA[public function multiply(NumberInterface $multiplicand, NumberInterface ...$multipliers): NumberInterface]]></code>
+      <code><![CDATA[public function divide(]]></code>
+      <code><![CDATA[public function fromBase(string $value, int $base): IntegerObject]]></code>
+      <code><![CDATA[public function toBase(IntegerObject $value, int $base): string]]></code>
+      <code><![CDATA[public function toHexadecimal(IntegerObject $value): Hexadecimal]]></code>
+      <code><![CDATA[public function toInteger(Hexadecimal $value): IntegerObject]]></code>
+    </MethodSignatureMismatch>
+    <MissingThrowsDocblock>
+      <code><![CDATA[$sum->plus($addend->toString())]]></code>
+      <code><![CDATA[$difference->minus($subtrahend->toString())]]></code>
+      <code><![CDATA[$product->multipliedBy($multiplier->toString())]]></code>
+      <code><![CDATA[$quotient->dividedBy($divisor->toString(), $scale, $brickRounding)]]></code>
+    </MissingThrowsDocblock>
+  </file>
+  <file src="src/Math/BrickMathRoundingMode.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[constant("$class::$pascal")]]></code>
+      <code><![CDATA[constant("$class::$snake")]]></code>
+    </MissingThrowsDocblock>
+    <MixedArrayAccess>
+      <code><![CDATA[self::ROUNDING_MODE_MAP[$roundingMode]]]></code>
+      <code><![CDATA[self::ROUNDING_MODE_MAP[RoundingMode::UNNECESSARY]]]></code>
+    </MixedArrayAccess>
+    <MixedAssignment>
+      <code><![CDATA[$pascal]]></code>
+      <code><![CDATA[$snake]]></code>
+    </MixedAssignment>
+    <UndefinedDocblockClass>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </UndefinedDocblockClass>
+  </file>
+  <file src="src/Nonstandard/Fields.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->getTimeHiAndVersion()]]></code>
+      <code><![CDATA[$this->getTimeMid()]]></code>
+      <code><![CDATA[$this->getTimeLow()]]></code>
+    </ImpureMethodCall>
+    <MethodSignatureMismatch>
+      <code><![CDATA[public function getBytes(): string]]></code>
+      <code><![CDATA[public function getVersion(): ?int]]></code>
+      <code><![CDATA[public function isNil(): bool]]></code>
+    </MethodSignatureMismatch>
+  </file>
+  <file src="src/Nonstandard/UuidBuilder.php">
+    <ImpureFunctionCall>
+      <code><![CDATA[new Uuid($this->buildFields($bytes), $this->numberConverter, $codec, $this->timeConverter)]]></code>
+      <code><![CDATA[new UnableToBuildUuidException($e->getMessage(), (int) $e->getCode(), $e)]]></code>
+      <code><![CDATA[new Fields($bytes)]]></code>
+    </ImpureFunctionCall>
+    <RedundantCast>
+      <code><![CDATA[$e->getCode()]]></code>
+    </RedundantCast>
+  </file>
+  <file src="src/Nonstandard/UuidV6.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->getHex()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Provider/Dce/SystemDceSecurityProvider.php">
+    <ForbiddenCode>
+      <code><![CDATA[shell_exec('id -u')]]></code>
+      <code><![CDATA[shell_exec('id -g')]]></code>
+      <code><![CDATA[shell_exec('whoami /user /fo csv /nh')]]></code>
+      <code><![CDATA[shell_exec('net user %username% | findstr /b /i "Local Group Memberships"')]]></code>
+      <code><![CDATA[shell_exec('wmic group get name,sid | findstr /b /i ' . escapeshellarg($firstGroup))]]></code>
+    </ForbiddenCode>
+    <MissingThrowsDocblock>
+      <code><![CDATA[constant('PHP_OS')]]></code>
+    </MissingThrowsDocblock>
+    <MixedArgument>
+      <code><![CDATA[$sid]]></code>
+      <code><![CDATA[$sid]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$phpOs = constant('PHP_OS')]]></code>
+      <code><![CDATA[$sid = str_getcsv(trim((string) $response), escape: '\\')[1] ?? '']]></code>
+    </MixedAssignment>
+    <RedundantCondition>
+      <code><![CDATA[$uid instanceof IntegerObject]]></code>
+      <code><![CDATA[$uid === null]]></code>
+      <code><![CDATA[$gid instanceof IntegerObject]]></code>
+      <code><![CDATA[$gid === null]]></code>
+    </RedundantCondition>
+  </file>
+  <file src="src/Provider/Node/NodeProviderCollection.php">
+    <MixedAssignment>
+      <code><![CDATA[$data = unserialize($serialized, [
+            'allowed_classes' => [
+                Hexadecimal::class,
+                RandomNodeProvider::class,
+                StaticNodeProvider::class,
+                SystemNodeProvider::class,
+            ],
+        ])]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Provider/Node/RandomNodeProvider.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[random_bytes(6)]]></code>
+    </MissingThrowsDocblock>
+    <RedundantCast>
+      <code><![CDATA[$exception->getCode()]]></code>
+    </RedundantCast>
+  </file>
+  <file src="src/Provider/Node/SystemNodeProvider.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[constant('PHP_OS')]]></code>
+      <code><![CDATA[constant('PHP_OS')]]></code>
+    </MissingThrowsDocblock>
+    <MixedAssignment>
+      <code><![CDATA[$phpOs = constant('PHP_OS')]]></code>
+      <code><![CDATA[$phpOs = constant('PHP_OS')]]></code>
+      <code><![CDATA[$mac = reset($macs)]]></code>
+    </MixedAssignment>
+    <RedundantCondition>
+      <code><![CDATA[$node !== null]]></code>
+    </RedundantCondition>
+  </file>
+  <file src="src/Provider/Time/SystemTimeProvider.php">
+    <PossiblyInvalidArrayAccess>
+      <code><![CDATA[$time['sec']]]></code>
+      <code><![CDATA[$time['usec']]]></code>
+    </PossiblyInvalidArrayAccess>
+  </file>
+  <file src="src/Rfc4122/Fields.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->isNil()]]></code>
+      <code><![CDATA[$this->getVersion()]]></code>
+      <code><![CDATA[$this->getTimeHiAndVersion()]]></code>
+      <code><![CDATA[$this->getTimeMid()]]></code>
+      <code><![CDATA[$this->getTimeLow()]]></code>
+      <code><![CDATA[$this->getTimeMid()]]></code>
+      <code><![CDATA[$this->getTimeHiAndVersion()]]></code>
+      <code><![CDATA[$this->getTimeLow()]]></code>
+      <code><![CDATA[$this->getTimeMid()]]></code>
+      <code><![CDATA[$this->getTimeHiAndVersion()]]></code>
+      <code><![CDATA[$this->getTimeMid()]]></code>
+      <code><![CDATA[$this->getTimeLow()]]></code>
+      <code><![CDATA[$this->isNil()]]></code>
+      <code><![CDATA[$this->isNil()]]></code>
+      <code><![CDATA[$this->getVariant()]]></code>
+    </ImpureMethodCall>
+    <MethodSignatureMismatch>
+      <code><![CDATA[public function getVersion(): ?int]]></code>
+    </MethodSignatureMismatch>
+  </file>
+  <file src="src/Rfc4122/NilTrait.php">
+    <MethodSignatureMismatch>
+      <code><![CDATA[public function isNil(): bool]]></code>
+      <code><![CDATA[public function isNil(): bool]]></code>
+    </MethodSignatureMismatch>
+  </file>
+  <file src="src/Rfc4122/TimeTrait.php">
+    <MixedArgument>
+      <code><![CDATA[$time->getMicroseconds()->toString()]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$time = $this->timeConverter->convertTime($this->fields->getTimestamp())]]></code>
+    </MixedAssignment>
+    <MixedMethodCall>
+      <code><![CDATA[$this->fields->getTimestamp()]]></code>
+      <code><![CDATA[$this->timeConverter->convertTime($this->fields->getTimestamp())]]></code>
+      <code><![CDATA[$time->getSeconds()]]></code>
+      <code><![CDATA[$time->getMicroseconds()]]></code>
+    </MixedMethodCall>
+    <RedundantCast>
+      <code><![CDATA[$e->getCode()]]></code>
+    </RedundantCast>
+  </file>
+  <file src="src/Rfc4122/UuidBuilder.php">
+    <ImpureFunctionCall>
+      <code><![CDATA[new NilUuid($fields, $this->numberConverter, $codec, $this->timeConverter)]]></code>
+      <code><![CDATA[new MaxUuid($fields, $this->numberConverter, $codec, $this->timeConverter)]]></code>
+      <code><![CDATA[new UuidV1($fields, $this->numberConverter, $codec, $this->timeConverter)]]></code>
+      <code><![CDATA[new UuidV2($fields, $this->numberConverter, $codec, $this->timeConverter)]]></code>
+      <code><![CDATA[new UuidV3($fields, $this->numberConverter, $codec, $this->timeConverter)]]></code>
+      <code><![CDATA[new UuidV4($fields, $this->numberConverter, $codec, $this->timeConverter)]]></code>
+      <code><![CDATA[new UuidV5($fields, $this->numberConverter, $codec, $this->timeConverter)]]></code>
+      <code><![CDATA[new UuidV6($fields, $this->numberConverter, $codec, $this->timeConverter)]]></code>
+      <code><![CDATA[new UuidV7($fields, $this->numberConverter, $codec, $this->unixTimeConverter)]]></code>
+      <code><![CDATA[new UuidV8($fields, $this->numberConverter, $codec, $this->timeConverter)]]></code>
+      <code><![CDATA[new UnsupportedOperationException(
+                    'The UUID version in the given fields is not supported by this UUID builder',
+                )]]></code>
+      <code><![CDATA[new UnableToBuildUuidException($e->getMessage(), (int) $e->getCode(), $e)]]></code>
+      <code><![CDATA[new Fields($bytes)]]></code>
+    </ImpureFunctionCall>
+    <RedundantCast>
+      <code><![CDATA[$e->getCode()]]></code>
+    </RedundantCast>
+  </file>
+  <file src="src/Rfc4122/UuidV2.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->getFields()]]></code>
+      <code><![CDATA[$this->getLocalDomain()]]></code>
+      <code><![CDATA[$this->getFields()]]></code>
+    </ImpureMethodCall>
+    <MixedArrayAccess>
+      <code><![CDATA[Uuid::DCE_DOMAIN_NAMES[$this->getLocalDomain()]]]></code>
+    </MixedArrayAccess>
+    <MixedReturnStatement>
+      <code><![CDATA[return Uuid::DCE_DOMAIN_NAMES[$this->getLocalDomain()];]]></code>
+    </MixedReturnStatement>
+  </file>
+  <file src="src/Rfc4122/UuidV6.php">
+    <DeprecatedClass>
+      <code><![CDATA[final class UuidV6 extends NonstandardUuidV6 implements UuidInterface]]></code>
+    </DeprecatedClass>
+  </file>
+  <file src="src/Rfc4122/Validator.php">
+    <MethodSignatureMismatch>
+      <code><![CDATA[public function validate(string $uuid): bool]]></code>
+    </MethodSignatureMismatch>
+    <MixedReturnStatement>
+      <code><![CDATA[return self::VALID_PATTERN;]]></code>
+    </MixedReturnStatement>
+  </file>
+  <file src="src/Type/Decimal.php">
+    <DirectConstructorCall>
+      <code><![CDATA[$this->__construct($data)]]></code>
+    </DirectConstructorCall>
+    <ImpureMethodCall>
+      <code><![CDATA[$this->toString()]]></code>
+      <code><![CDATA[$this->toString()]]></code>
+      <code><![CDATA[$this->toString()]]></code>
+      <code><![CDATA[$this->toString()]]></code>
+      <code><![CDATA[$this->__construct($data)]]></code>
+      <code><![CDATA[$this->unserialize($data['string'])]]></code>
+    </ImpureMethodCall>
+    <MethodSignatureMismatch>
+      <code><![CDATA[public function toString(): string]]></code>
+      <code><![CDATA[public function __toString(): string]]></code>
+    </MethodSignatureMismatch>
+    <MissingThrowsDocblock>
+      <code><![CDATA[]]></code>
+    </MissingThrowsDocblock>
+  </file>
+  <file src="src/Type/Hexadecimal.php">
+    <DirectConstructorCall>
+      <code><![CDATA[$this->__construct($data)]]></code>
+    </DirectConstructorCall>
+    <ImpureMethodCall>
+      <code><![CDATA[$this->__construct($data)]]></code>
+      <code><![CDATA[$this->unserialize($data['string'])]]></code>
+    </ImpureMethodCall>
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->value = $value instanceof self ? (string) $value : $this->prepareValue($value)]]></code>
+    </InvalidPropertyAssignment>
+    <MethodSignatureMismatch>
+      <code><![CDATA[public function __toString(): string]]></code>
+    </MethodSignatureMismatch>
+    <MissingThrowsDocblock>
+      <code><![CDATA[]]></code>
+    </MissingThrowsDocblock>
+  </file>
+  <file src="src/Type/Integer.php">
+    <DirectConstructorCall>
+      <code><![CDATA[$this->__construct($data)]]></code>
+    </DirectConstructorCall>
+    <ImmutablePropertyModification>
+      <code><![CDATA[$this->isNegative = true]]></code>
+    </ImmutablePropertyModification>
+    <ImpureMethodCall>
+      <code><![CDATA[$this->__construct($data)]]></code>
+      <code><![CDATA[$this->unserialize($data['string'])]]></code>
+    </ImpureMethodCall>
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->value = $value instanceof self ? (string) $value : $this->prepareValue($value)]]></code>
+    </InvalidPropertyAssignment>
+    <MethodSignatureMismatch>
+      <code><![CDATA[public function __toString(): string]]></code>
+    </MethodSignatureMismatch>
+    <MissingThrowsDocblock>
+      <code><![CDATA[]]></code>
+    </MissingThrowsDocblock>
+  </file>
+  <file src="src/Type/Time.php">
+    <DirectConstructorCall>
+      <code><![CDATA[$this->__construct($time['seconds'], $time['microseconds'])]]></code>
+    </DirectConstructorCall>
+    <ImpureFunctionCall>
+      <code><![CDATA[json_encode($this)]]></code>
+    </ImpureFunctionCall>
+    <ImpureMethodCall>
+      <code><![CDATA[$this->toString()]]></code>
+      <code><![CDATA[$this->__construct($time['seconds'], $time['microseconds'])]]></code>
+      <code><![CDATA[$this->__construct($data['seconds'], $data['microseconds'])]]></code>
+    </ImpureMethodCall>
+    <MethodSignatureMismatch>
+      <code><![CDATA[public function toString(): string]]></code>
+      <code><![CDATA[public function __toString(): string]]></code>
+    </MethodSignatureMismatch>
+    <MissingThrowsDocblock>
+      <code><![CDATA[]]></code>
+    </MissingThrowsDocblock>
+    <MixedAssignment>
+      <code><![CDATA[$time = json_decode($data, true)]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Uuid.php">
+    <DeprecatedTrait>
+      <code><![CDATA[class Uuid implements UuidInterface]]></code>
+    </DeprecatedTrait>
+    <ImmutablePropertyModification>
+      <code><![CDATA[$this->codec = $uuid->codec]]></code>
+      <code><![CDATA[$this->numberConverter = $uuid->numberConverter]]></code>
+      <code><![CDATA[$this->fields = $uuid->fields]]></code>
+      <code><![CDATA[$this->timeConverter = $uuid->timeConverter]]></code>
+    </ImmutablePropertyModification>
+    <ImpureFunctionCall>
+      <code><![CDATA[preg_match(LazyUuidFromString::VALID_REGEX, $uuid)]]></code>
+      <code><![CDATA[new LazyUuidFromString($uuid)]]></code>
+      <code><![CDATA[assert($uuid instanceof UuidInterface)]]></code>
+      <code><![CDATA[new BadMethodCallException('The method fromHexadecimal() does not exist on the provided factory')]]></code>
+      <code><![CDATA[new UnsupportedOperationException('The provided factory does not support the uuid8() method')]]></code>
+    </ImpureFunctionCall>
+    <ImpureMethodCall>
+      <code><![CDATA[$this->toString()]]></code>
+      <code><![CDATA[$this->toString()]]></code>
+      <code><![CDATA[$this->serialize()]]></code>
+      <code><![CDATA[$this->unserialize($data['bytes'])]]></code>
+      <code><![CDATA[$this->toString()]]></code>
+      <code><![CDATA[$this->compareTo($other)]]></code>
+      <code><![CDATA[$this->toString()]]></code>
+      <code><![CDATA[$this->getHex()]]></code>
+      <code><![CDATA[$this->toString()]]></code>
+      <code><![CDATA[self::getFactory()]]></code>
+      <code><![CDATA[self::getFactory()]]></code>
+      <code><![CDATA[self::getFactory()]]></code>
+      <code><![CDATA[self::getFactory()]]></code>
+      <code><![CDATA[self::getFactory()]]></code>
+      <code><![CDATA[self::getFactory()]]></code>
+      <code><![CDATA[self::getFactory()]]></code>
+      <code><![CDATA[self::getFactory()]]></code>
+    </ImpureMethodCall>
+    <ImpureStaticPropertyAccess>
+      <code><![CDATA[$factoryReplaced]]></code>
+      <code><![CDATA[$factoryReplaced]]></code>
+    </ImpureStaticPropertyAccess>
+    <ImpureStaticPropertyAssignment>
+      <code><![CDATA[self::$factory = new UuidFactory()]]></code>
+      <code><![CDATA[self::$factoryReplaced = ($factory != new UuidFactory())]]></code>
+      <code><![CDATA[self::$factory = $factory]]></code>
+    </ImpureStaticPropertyAssignment>
+    <InvalidPropertyAssignment>
+      <code><![CDATA[self::$factory = $factory]]></code>
+    </InvalidPropertyAssignment>
+    <MethodSignatureMismatch>
+      <code><![CDATA[public function __toString(): string]]></code>
+      <code><![CDATA[public function getBytes(): string]]></code>
+      <code><![CDATA[public function toString(): string]]></code>
+    </MethodSignatureMismatch>
+    <MissingThrowsDocblock>
+      <code><![CDATA[]]></code>
+    </MissingThrowsDocblock>
+    <MixedAssignment>
+      <code><![CDATA[$uuid = $factory->fromHexadecimal($hex)]]></code>
+    </MixedAssignment>
+    <UndefinedDocblockClass>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </UndefinedDocblockClass>
+  </file>
+  <file src="src/UuidFactory.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$hex->__toString()]]></code>
+      <code><![CDATA[$this->uuidFromBytesAndVersion($bytes, Uuid::UUID_TYPE_CUSTOM)]]></code>
+      <code><![CDATA[$this->uuidFromBytesAndVersion(substr($bytes, 0, 16), $version)]]></code>
+    </ImpureMethodCall>
+    <UndefinedDocblockClass>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </UndefinedDocblockClass>
+  </file>
+  <file src="src/Validator/GenericValidator.php">
+    <MethodSignatureMismatch>
+      <code><![CDATA[public function validate(string $uuid): bool]]></code>
+    </MethodSignatureMismatch>
+  </file>
+</files>

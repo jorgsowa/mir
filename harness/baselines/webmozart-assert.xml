@@ -1,0 +1,746 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<files>
+  <file src="src/Assert.php">
+    <ImpureFunctionCall>
+      <code><![CDATA[\class_exists($value)]]></code>
+      <code><![CDATA[new ReflectionProperty($value, $property)]]></code>
+      <code><![CDATA[\is_callable($value)]]></code>
+      <code><![CDATA[\iterator_to_array($classes)]]></code>
+      <code><![CDATA[\array_map(static::valueToString(...), $values)]]></code>
+      <code><![CDATA[\array_map(static::valueToString(...), $values)]]></code>
+      <code><![CDATA[\preg_match('/^\s*$/', $value)]]></code>
+      <code><![CDATA[\setlocale(LC_CTYPE, '0')]]></code>
+      <code><![CDATA[\setlocale(LC_CTYPE, 'C')]]></code>
+      <code><![CDATA[\setlocale(LC_CTYPE, $locale)]]></code>
+      <code><![CDATA[\preg_match($pattern, $value)]]></code>
+      <code><![CDATA[\preg_match($pattern, $value, $matches, PREG_OFFSET_CAPTURE)]]></code>
+      <code><![CDATA[\preg_match('/^\p{L}+$/u', $value)]]></code>
+      <code><![CDATA[\setlocale(LC_CTYPE, '0')]]></code>
+      <code><![CDATA[\setlocale(LC_CTYPE, 'C')]]></code>
+      <code><![CDATA[\setlocale(LC_CTYPE, $locale)]]></code>
+      <code><![CDATA[\setlocale(LC_CTYPE, '0')]]></code>
+      <code><![CDATA[\setlocale(LC_CTYPE, 'C')]]></code>
+      <code><![CDATA[\setlocale(LC_CTYPE, $locale)]]></code>
+      <code><![CDATA[\setlocale(LC_CTYPE, '0')]]></code>
+      <code><![CDATA[\setlocale(LC_CTYPE, 'C')]]></code>
+      <code><![CDATA[\setlocale(LC_CTYPE, $locale)]]></code>
+      <code><![CDATA[\setlocale(LC_CTYPE, '0')]]></code>
+      <code><![CDATA[\setlocale(LC_CTYPE, 'C')]]></code>
+      <code><![CDATA[\setlocale(LC_CTYPE, $locale)]]></code>
+      <code><![CDATA[\setlocale(LC_CTYPE, '0')]]></code>
+      <code><![CDATA[\setlocale(LC_CTYPE, 'C')]]></code>
+      <code><![CDATA[\setlocale(LC_CTYPE, $locale)]]></code>
+      <code><![CDATA[\preg_match('/^urn:uuid:'.$uuid.'$/D', $value)]]></code>
+      <code><![CDATA[\preg_match('/^uuid:(?:'.$uuid.'|\{'.$uuid.'\})$/D', $value)]]></code>
+      <code><![CDATA[\preg_match('/^\{'.$uuid.'\}$/D', $value)]]></code>
+      <code><![CDATA[\preg_match('/^'.$uuid.'$/D', $value)]]></code>
+      <code><![CDATA[\enum_exists(\get_class($value))]]></code>
+      <code><![CDATA[new InvalidArgumentException($message)]]></code>
+      <code><![CDATA[\is_callable($message)]]></code>
+    </ImpureFunctionCall>
+    <ImpureMethodCall>
+      <code><![CDATA[static::strlen($value)]]></code>
+      <code><![CDATA[static::strlen($value)]]></code>
+      <code><![CDATA[static::strlen($value)]]></code>
+      <code><![CDATA[static::strlen($value)]]></code>
+      <code><![CDATA[$value->format('c')]]></code>
+    </ImpureMethodCall>
+    <InvalidReturnType>
+      <code><![CDATA[return $callable(...);]]></code>
+    </InvalidReturnType>
+    <MixedArgument>
+      <code><![CDATA[$value]]></code>
+      <code><![CDATA[$property]]></code>
+      <code><![CDATA[$property]]></code>
+      <code><![CDATA[$method]]></code>
+      <code><![CDATA[$method]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$class]]></code>
+      <code><![CDATA[$class]]></code>
+      <code><![CDATA[$class]]></code>
+    </MixedAssignment>
+    <MixedReturnStatement>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+    </MixedReturnStatement>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$locale]]></code>
+      <code><![CDATA[$locale]]></code>
+      <code><![CDATA[$locale]]></code>
+      <code><![CDATA[$locale]]></code>
+      <code><![CDATA[$locale]]></code>
+      <code><![CDATA[$locale]]></code>
+      <code><![CDATA[$message ?: 'Expected an array to contain %d elements. Got: %d.']]></code>
+    </PossiblyInvalidArgument>
+    <RedundantCondition>
+      <code><![CDATA[!\is_array($array) || !\array_is_list($array)]]></code>
+      <code><![CDATA[\count($array) > 0 && \array_is_list($array)]]></code>
+      <code><![CDATA[\is_string($callable) && \function_exists($callable)]]></code>
+      <code><![CDATA[$callable instanceof Closure]]></code>
+    </RedundantCondition>
+    <UnreachableCode>
+      <code><![CDATA[return $array;]]></code>
+    </UnreachableCode>
+  </file>
+  <file src="src/Mixin.php">
+    <InvalidReturnType>
+      <code><![CDATA[return $callable;]]></code>
+      <code><![CDATA[return $callable;]]></code>
+    </InvalidReturnType>
+    <MixedAssignment>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry]]></code>
+    </MixedAssignment>
+    <MixedReturnStatement>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $values;]]></code>
+      <code><![CDATA[return $values;]]></code>
+      <code><![CDATA[return $values;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $array;]]></code>
+      <code><![CDATA[return $array;]]></code>
+      <code><![CDATA[return $array;]]></code>
+      <code><![CDATA[return $array;]]></code>
+      <code><![CDATA[return $array;]]></code>
+      <code><![CDATA[return $array;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $array;]]></code>
+      <code><![CDATA[return $array;]]></code>
+      <code><![CDATA[return $array;]]></code>
+      <code><![CDATA[return $array;]]></code>
+      <code><![CDATA[return $array;]]></code>
+      <code><![CDATA[return $array;]]></code>
+      <code><![CDATA[return $array;]]></code>
+      <code><![CDATA[return $array;]]></code>
+      <code><![CDATA[return $array;]]></code>
+      <code><![CDATA[return $array;]]></code>
+      <code><![CDATA[return $array;]]></code>
+      <code><![CDATA[return $array;]]></code>
+      <code><![CDATA[return $array;]]></code>
+      <code><![CDATA[return $array;]]></code>
+      <code><![CDATA[return $array;]]></code>
+      <code><![CDATA[return $array;]]></code>
+      <code><![CDATA[return $array;]]></code>
+      <code><![CDATA[return $array;]]></code>
+      <code><![CDATA[return $array;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+      <code><![CDATA[return $value;]]></code>
+    </MixedReturnStatement>
+    <UndefinedDocblockClass>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </UndefinedDocblockClass>
+  </file>
+  <file src="src/PsalmPlugin.php">
+    <MixedArgument>
+      <code><![CDATA[$event->getAppearingMethodId()]]></code>
+    </MixedArgument>
+    <MixedArrayAccess>
+      <code><![CDATA[$event->getExpr()->getArgs()[0]]]></code>
+      <code><![CDATA[$event->getContext()->vars_in_scope[$varId]]]></code>
+      <code><![CDATA[$event->getContext()->vars_in_scope[$varId]]]></code>
+    </MixedArrayAccess>
+    <MixedArrayOffset>
+      <code><![CDATA[$varId]]></code>
+      <code><![CDATA[$varId]]></code>
+    </MixedArrayOffset>
+    <MixedAssignment>
+      <code><![CDATA[$firstArg = $event->getExpr()->getArgs()[0] ?? null]]></code>
+      <code><![CDATA[$varId = ExpressionIdentifier::getExtendedVarId(
+            $firstArg->value,
+            $event->getContext()->self,
+            $event->getStatementsSource()
+        )]]></code>
+      <code><![CDATA[$candidateType = $event->getContext()->vars_in_scope[$varId]]]></code>
+    </MixedAssignment>
+    <MixedMethodCall>
+      <code><![CDATA[$event->getExpr()->getArgs()]]></code>
+    </MixedMethodCall>
+    <MixedPropertyFetch>
+      <code><![CDATA[$firstArg->value]]></code>
+      <code><![CDATA[$event->getContext()->self]]></code>
+      <code><![CDATA[$event->getContext()->vars_in_scope]]></code>
+      <code><![CDATA[$event->getContext()->vars_in_scope]]></code>
+    </MixedPropertyFetch>
+    <UndefinedClass>
+      <code><![CDATA[PluginEntryPointInterface]]></code>
+      <code><![CDATA[AfterMethodCallAnalysisInterface]]></code>
+      <code><![CDATA[PluginRegistrationSocket]]></code>
+      <code><![CDATA[AfterMethodCallAnalysisEvent]]></code>
+      <code><![CDATA[ExpressionIdentifier]]></code>
+    </UndefinedClass>
+    <UnusedParam>
+      <code><![CDATA[$config]]></code>
+    </UnusedParam>
+  </file>
+</files>

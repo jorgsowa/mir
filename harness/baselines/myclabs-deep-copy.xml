@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<files>
+  <file src="src/DeepCopy/DeepCopy.php">
+    <DeprecatedClass>
+      <code><![CDATA[DateIntervalFilter]]></code>
+    </DeprecatedClass>
+    <DeprecatedMethod>
+      <code><![CDATA[$property->setAccessible(true)]]></code>
+    </DeprecatedMethod>
+    <InvalidDocblock>
+      <code><![CDATA[]]></code>
+    </InvalidDocblock>
+    <MissingClosureReturnType>
+      <code><![CDATA[function ($object) {
+                        return $this->recursiveCopy($object);
+                    }]]></code>
+      <code><![CDATA[function (array $record) use ($var) {
+                /* @var TypeMatcher $matcher */
+                $matcher = $record['matcher'];
+
+                return $matcher->matches($var);
+            }]]></code>
+    </MissingClosureReturnType>
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MixedArgument>
+      <code><![CDATA[$object]]></code>
+      <code><![CDATA[$object]]></code>
+      <code><![CDATA[$object]]></code>
+      <code><![CDATA[$object]]></code>
+    </MixedArgument>
+    <MixedArrayAccess>
+      <code><![CDATA[$item['matcher']]]></code>
+      <code><![CDATA[$item['filter']]]></code>
+    </MixedArrayAccess>
+    <MixedAssignment>
+      <code><![CDATA[$value]]></code>
+      <code><![CDATA[$item]]></code>
+      <code><![CDATA[$matcher = $item['matcher']]]></code>
+      <code><![CDATA[$filter = $item['filter']]]></code>
+      <code><![CDATA[$propertyValue = $property->getValue($object)]]></code>
+      <code><![CDATA[$matcher = $record['matcher']]]></code>
+      <code><![CDATA[$element]]></code>
+    </MixedAssignment>
+    <MixedMethodCall>
+      <code><![CDATA[$matcher->matches($var)]]></code>
+    </MixedMethodCall>
+    <MixedReturnStatement>
+      <code><![CDATA[return isset($matched) ? $matched['filter'] : null;]]></code>
+      <code><![CDATA[return $element;]]></code>
+    </MixedReturnStatement>
+  </file>
+  <file src="src/DeepCopy/Filter/ChainableFilter.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MixedArgument>
+      <code><![CDATA[$object]]></code>
+      <code><![CDATA[$property]]></code>
+      <code><![CDATA[$objectCopier]]></code>
+    </MixedArgument>
+  </file>
+  <file src="src/DeepCopy/Filter/Doctrine/DoctrineCollectionFilter.php">
+    <DeprecatedMethod>
+      <code><![CDATA[$reflectionProperty->setAccessible(true)]]></code>
+    </DeprecatedMethod>
+    <MissingClosureReturnType>
+      <code><![CDATA[function ($item) use ($objectCopier) {
+                return $objectCopier($item);
+            }]]></code>
+    </MissingClosureReturnType>
+    <MixedAssignment>
+      <code><![CDATA[$oldCollection = $reflectionProperty->getValue($object)]]></code>
+      <code><![CDATA[$newCollection = $oldCollection->map(
+            function ($item) use ($objectCopier) {
+                return $objectCopier($item);
+            }
+        )]]></code>
+    </MixedAssignment>
+    <MixedMethodCall>
+      <code><![CDATA[$oldCollection->map(
+            function ($item) use ($objectCopier) {
+                return $objectCopier($item);
+            }
+        )]]></code>
+    </MixedMethodCall>
+  </file>
+  <file src="src/DeepCopy/Filter/Doctrine/DoctrineEmptyCollectionFilter.php">
+    <DeprecatedMethod>
+      <code><![CDATA[$reflectionProperty->setAccessible(true)]]></code>
+    </DeprecatedMethod>
+    <UndefinedClass>
+      <code><![CDATA[ArrayCollection]]></code>
+    </UndefinedClass>
+    <UnusedParam>
+      <code><![CDATA[$objectCopier]]></code>
+    </UnusedParam>
+  </file>
+  <file src="src/DeepCopy/Filter/Doctrine/DoctrineProxyFilter.php">
+    <UnusedParam>
+      <code><![CDATA[$property]]></code>
+      <code><![CDATA[$objectCopier]]></code>
+    </UnusedParam>
+  </file>
+  <file src="src/DeepCopy/Filter/Filter.php">
+    <MissingReturnType>
+      <code><![CDATA[]]></code>
+    </MissingReturnType>
+  </file>
+  <file src="src/DeepCopy/Filter/KeepFilter.php">
+    <UnusedParam>
+      <code><![CDATA[$object]]></code>
+      <code><![CDATA[$property]]></code>
+      <code><![CDATA[$objectCopier]]></code>
+    </UnusedParam>
+  </file>
+  <file src="src/DeepCopy/Filter/ReplaceFilter.php">
+    <DeprecatedMethod>
+      <code><![CDATA[$reflectionProperty->setAccessible(true)]]></code>
+    </DeprecatedMethod>
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MixedAssignment>
+      <code><![CDATA[$value = call_user_func($this->callback, $reflectionProperty->getValue($object))]]></code>
+    </MixedAssignment>
+    <UnusedParam>
+      <code><![CDATA[$objectCopier]]></code>
+    </UnusedParam>
+  </file>
+  <file src="src/DeepCopy/Filter/SetNullFilter.php">
+    <DeprecatedMethod>
+      <code><![CDATA[$reflectionProperty->setAccessible(true)]]></code>
+    </DeprecatedMethod>
+    <UnusedParam>
+      <code><![CDATA[$objectCopier]]></code>
+    </UnusedParam>
+  </file>
+  <file src="src/DeepCopy/Matcher/Doctrine/DoctrineProxyMatcher.php">
+    <UndefinedClass>
+      <code><![CDATA[Proxy]]></code>
+    </UndefinedClass>
+    <UnusedParam>
+      <code><![CDATA[$property]]></code>
+    </UnusedParam>
+  </file>
+  <file src="src/DeepCopy/Matcher/PropertyMatcher.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+  </file>
+  <file src="src/DeepCopy/Matcher/PropertyNameMatcher.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <UnusedParam>
+      <code><![CDATA[$object]]></code>
+    </UnusedParam>
+  </file>
+  <file src="src/DeepCopy/Matcher/PropertyTypeMatcher.php">
+    <DeprecatedMethod>
+      <code><![CDATA[$reflectionProperty->setAccessible(true)]]></code>
+    </DeprecatedMethod>
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+  </file>
+  <file src="src/DeepCopy/TypeFilter/Date/DateIntervalFilter.php">
+    <MixedAssignment>
+      <code><![CDATA[$propertyValue]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/DeepCopy/TypeFilter/Date/DatePeriodFilter.php">
+    <MixedArgument>
+      <code><![CDATA[$options]]></code>
+      <code><![CDATA[$options]]></code>
+    </MixedArgument>
+    <PossiblyNullArgument>
+      <code><![CDATA[$recurrences]]></code>
+    </PossiblyNullArgument>
+  </file>
+  <file src="src/DeepCopy/TypeFilter/ReplaceFilter.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+  </file>
+  <file src="src/DeepCopy/TypeFilter/ShallowCopyFilter.php">
+    <MixedClone>
+      <code><![CDATA[clone $element]]></code>
+    </MixedClone>
+  </file>
+  <file src="src/DeepCopy/TypeFilter/Spl/ArrayObjectFilter.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MixedAssignment>
+      <code><![CDATA[$clone = clone $arrayObject]]></code>
+      <code><![CDATA[$v]]></code>
+    </MixedAssignment>
+    <MixedClone>
+      <code><![CDATA[clone $arrayObject]]></code>
+    </MixedClone>
+    <MixedMethodCall>
+      <code><![CDATA[$arrayObject->getArrayCopy()]]></code>
+      <code><![CDATA[$clone->offsetSet($k, $this->copier->copy($v))]]></code>
+    </MixedMethodCall>
+  </file>
+  <file src="src/DeepCopy/TypeFilter/Spl/SplDoublyLinkedListFilter.php">
+    <MissingClosureReturnType>
+      <code><![CDATA[function (SplDoublyLinkedList $list) use ($copier) {
+            // Replace each element in the list with a deep copy of itself
+            for ($i = 1; $i <= $list->count(); $i++) {
+                $copy = $copier->recursiveCopy($list->shift());
+
+                $list->push($copy);
+            }
+
+            return $list;
+        }]]></code>
+    </MissingClosureReturnType>
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MixedArgument>
+      <code><![CDATA[$newElement]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$newElement = clone $element]]></code>
+      <code><![CDATA[$copy = $copier->recursiveCopy($list->shift())]]></code>
+    </MixedAssignment>
+    <MixedClone>
+      <code><![CDATA[clone $element]]></code>
+    </MixedClone>
+    <UndefinedMethod>
+      <code><![CDATA[$copier->recursiveCopy($list->shift())]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/DeepCopy/TypeFilter/TypeFilter.php">
+    <MissingReturnType>
+      <code><![CDATA[]]></code>
+    </MissingReturnType>
+  </file>
+  <file src="src/DeepCopy/TypeMatcher/TypeMatcher.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+  </file>
+</files>
