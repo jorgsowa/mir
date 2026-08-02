@@ -29,7 +29,7 @@ jobs:
       pull-requests: write   # needed to post the comparison comment
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -49,7 +49,7 @@ jobs:
       # Cache the compiled binary so we don't rebuild it on every run.
       - name: Cache critcmp
         id: critcmp-cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cargo/bin/critcmp
           key: critcmp-${{ runner.os }}-v1
@@ -63,7 +63,7 @@ jobs:
       # invalidates the cache.
       - name: Cache Laravel fixture
         id: fixture-cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: crates/mir-analyzer/benches/fixtures
           key: laravel-fixture-${{ env.LARAVEL_FIXTURE_VERSION }}
@@ -96,7 +96,7 @@ jobs:
       - name: Restore main baseline
         if: github.event_name == 'pull_request'
         id: restore-baseline
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: target/criterion
           # Exact key won't match (PR SHA ≠ any main SHA); falls through to
@@ -128,7 +128,7 @@ jobs:
       # Push to main: persist the new baseline for future PR comparisons.
       - name: Save main baseline
         if: github.event_name == 'push'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@v6
         with:
           path: target/criterion
           key: criterion-baseline-main-${{ github.sha }}
