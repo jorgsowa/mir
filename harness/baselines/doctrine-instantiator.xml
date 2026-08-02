@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <files>
   <file src="src/Doctrine/Instantiator/Instantiator.php">
-    <InvalidThrow>
-      <code><![CDATA[]]></code>
-    </InvalidThrow>
     <MissingThrowsDocblock>
       <code><![CDATA[$this->buildFactory($className)]]></code>
     </MissingThrowsDocblock>
@@ -14,12 +11,6 @@
       <code><![CDATA[$reflectionClass->isInternal()]]></code>
       <code><![CDATA[$reflectionClass->getParentClass()]]></code>
     </MixedMethodCall>
-    <RedundantCondition>
-      <code><![CDATA[$error]]></code>
-    </RedundantCondition>
-    <UndefinedDocblockClass>
-      <code><![CDATA[]]></code>
-    </UndefinedDocblockClass>
     <UnusedParam>
       <code><![CDATA[$reflectionClass]]></code>
     </UnusedParam>
