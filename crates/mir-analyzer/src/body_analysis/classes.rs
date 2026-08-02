@@ -988,7 +988,37 @@ impl<'a> BodyAnalyzer<'a> {
             );
         }
 
-        emit_unused_params(&params, &ctx, method_name, file, all_issues);
+        // A method also declared by a parent class, interface, or trait must
+        // keep at least that many params regardless of whether this
+        // override's body happens to use them all (e.g. a no-op
+        // `NullLogger::log()` implementing `LoggerInterface::log()`) — see
+        // `emit_unused_params`'s doc comment. PHP does not enforce
+        // constructor signature compatibility, so `__construct` is exempt.
+        let contract_param_count = if method_name == "__construct" {
+            0
+        } else {
+            crate::db::class_ancestors_by_fqcn(self.db, crate::db::Fqcn::from_str(self.db, fqcn))
+                .iter()
+                .skip(1)
+                .filter_map(|anc| {
+                    crate::db::find_method_in_class(
+                        self.db,
+                        crate::db::Fqcn::from_str(self.db, anc.as_ref()),
+                        method_name,
+                    )
+                })
+                .map(|m| m.params.iter().filter(|p| p.name.as_ref() != "...").count())
+                .max()
+                .unwrap_or(0)
+        };
+        emit_unused_params(
+            &params,
+            &ctx,
+            method_name,
+            file,
+            all_issues,
+            contract_param_count,
+        );
         emit_unused_variables(&ctx, file, all_issues);
         all_issues.extend(buf.into_all_issues());
 

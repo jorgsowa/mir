@@ -49,7 +49,4 @@ function threeWayCheck(Console|File|Memory $obj): void {
     }
 }
 ===expect===
-UnusedParam@11:24-11:35: Parameter $msg is never used
-UnusedParam@15:24-15:35: Parameter $msg is never used
-UnusedParam@19:24-19:35: Parameter $key is never used
 RedundantCondition@29:14-29:39: Condition is always true/false for type 'bool'

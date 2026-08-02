@@ -21,7 +21,5 @@ class T {
     }
 }
 ===expect===
-UnusedParam@6:30-6:36: Parameter $a is never used
-UnusedParam@6:38-6:44: Parameter $b is never used
 UnusedParam@6:46-6:65: Parameter $svc is never used
 TooFewArguments@14:8-14:32: Too few arguments for configure(): expected 2, got 1

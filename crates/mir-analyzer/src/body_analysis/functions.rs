@@ -187,7 +187,7 @@ impl<'a> BodyAnalyzer<'a> {
         let body_diverges = ctx.diverges;
         drop(sa);
 
-        emit_unused_params(&params, &ctx, "", file, all_issues);
+        emit_unused_params(&params, &ctx, "", file, all_issues, 0);
         emit_unused_variables(&ctx, file, all_issues);
         all_issues.extend(buf.into_all_issues());
 
@@ -711,7 +711,7 @@ impl<'a> BodyAnalyzer<'a> {
         };
         drop(sa);
 
-        emit_unused_params(&params, &ctx, "", file, &mut issues);
+        emit_unused_params(&params, &ctx, "", file, &mut issues, 0);
         emit_unused_variables(&ctx, file, &mut issues);
         issues.extend(buf.into_all_issues());
 
@@ -895,7 +895,7 @@ impl<'a> BodyAnalyzer<'a> {
             crate::type_env::TypeEnv::new(ctx.vars.clone()),
         );
 
-        emit_unused_params(&params, &ctx, "", file, all_issues);
+        emit_unused_params(&params, &ctx, "", file, all_issues, 0);
         emit_unused_variables(&ctx, file, all_issues);
         all_issues.extend(buf.into_all_issues());
 

@@ -18,4 +18,3 @@ enum Status implements Greeter {
 }
 ===expect===
 MethodSignatureMismatch@11:4-11:58: Method Status::greet() signature mismatch: parameter $a type 'Dog' is narrower than parent type 'Animal'
-UnusedParam@11:26-11:32: Parameter $a is never used

@@ -471,21 +471,36 @@ const MAGIC_METHODS_WITH_RUNTIME_PARAMS: &[&str] = &[
     "__unserialize",
 ];
 
+/// `contract_param_count` is the highest declared param count among any
+/// parent class, interface, or trait method of this same name — an override
+/// can never drop below that many params (`check_overrides`'s own "child has
+/// fewer params than parent" rule), so a param at one of those positions
+/// can't be removed and isn't worth flagging even if this override's body
+/// doesn't read it (e.g. a no-op `NullLogger::log()` implementing
+/// `LoggerInterface::log()`). Params beyond that count were added by this
+/// override itself and are checked normally.
 pub(crate) fn emit_unused_params(
     params: &[mir_codebase::DeclaredParam],
     ctx: &crate::flow_state::FlowState,
     method_name: &str,
     file: &Arc<str>,
     issues: &mut Vec<mir_issues::Issue>,
+    contract_param_count: usize,
 ) {
     if MAGIC_METHODS_WITH_RUNTIME_PARAMS.contains(&method_name) {
         return;
     }
+    let mut real_index = 0usize;
     for p in params {
         let name = p.name.as_ref().trim_start_matches('$');
         // Skip the synthetic variadic param injected by func_get_args() detection —
         // its name "..." is not a valid PHP identifier and never appears in source.
         if name == "..." {
+            continue;
+        }
+        let index = real_index;
+        real_index += 1;
+        if index < contract_param_count {
             continue;
         }
         let name_sym = mir_types::Name::from(name);

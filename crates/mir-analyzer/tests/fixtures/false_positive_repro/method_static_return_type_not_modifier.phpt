@@ -22,7 +22,6 @@ class Carbon {
 }
 
 class CarbonImmutable extends Carbon {
-    /** @suppress UnusedParam */
     public function addDay(int $value = 1): static
     {
         return clone $this;
