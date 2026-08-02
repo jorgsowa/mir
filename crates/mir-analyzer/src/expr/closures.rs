@@ -205,17 +205,29 @@ impl<'a> ExpressionAnalyzer<'a> {
             // and skip the undefined check.
             if use_var.by_ref {
                 if !ctx.var_is_defined(name) {
-                    // Type an auto-created by-ref capture as a callable of
-                    // unknown arity: the dominant case is the self-referential
-                    // closure `$f = function () use (&$f)`, where `$f` is the
-                    // closure being assigned. This avoids spurious
-                    // MixedFunctionCall / arity errors when the body calls it.
+                    // Only the self-referential idiom
+                    // (`$f = function () use (&$f) {...}`, where this capture
+                    // shares a name with the variable the closure literal is
+                    // itself being assigned to) can safely be typed as a
+                    // callable of unknown arity. Any other undefined by-ref
+                    // capture is the equally common by-ref out-param idiom
+                    // (`set_error_handler(function () use (&$error) {
+                    // $error = ...; })`, no enclosing assignment at all) —
+                    // seeding THAT as non-nullable callable falsely claims
+                    // the value eventually assigned in the body can never be
+                    // null/falsy, misfiring RedundantCondition/InvalidThrow
+                    // at every later use. `mixed` makes no such claim.
+                    let is_self_ref = ctx.self_ref_closure_hint == Some(Name::from(name));
                     ctx.set_var(
                         name,
-                        Type::single(mir_types::Atomic::TCallable {
-                            params: None,
-                            return_type: None,
-                        }),
+                        if is_self_ref {
+                            Type::single(mir_types::Atomic::TCallable {
+                                params: None,
+                                return_type: None,
+                            })
+                        } else {
+                            Type::mixed()
+                        },
                     );
                 }
             } else if !ctx.var_is_defined(name) {

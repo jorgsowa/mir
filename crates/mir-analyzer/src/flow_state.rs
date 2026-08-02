@@ -333,6 +333,17 @@ pub struct FlowState {
     /// set, rather than risk flagging a property actually initialized by a
     /// delegating helper call it can't see into.
     pub this_escaped_to_call: bool,
+
+    /// Transient hint set by `analyze_assign` immediately before analyzing a
+    /// plain (non-by-ref) assignment's RHS, naming the LHS variable, and
+    /// cleared right after. Lets `analyze_closure` distinguish the
+    /// self-referential idiom `$f = function () use (&$f) {...}` (where an
+    /// undefined by-ref capture sharing the assignment target's name should
+    /// be seeded as callable) from the equally common by-ref out-param idiom
+    /// (`set_error_handler(function () use (&$error) { $error = ...; })`,
+    /// no enclosing assignment at all) — the two require different seed
+    /// types and were previously conflated.
+    pub self_ref_closure_hint: Option<Name>,
 }
 
 /// Pre-built superglobal initial state, shared across all FlowState instances.
@@ -426,6 +437,7 @@ impl FlowState {
             readonly_initialized: Arc::new(FxHashSet::default()),
             assigned_this_props: Arc::new(FxHashSet::default()),
             this_escaped_to_call: false,
+            self_ref_closure_hint: None,
         }
     }
 

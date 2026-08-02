@@ -371,7 +371,16 @@ impl<'a> ExpressionAnalyzer<'a> {
                 .filter(|(n, _)| *n == sym)
                 .count()
         });
+        // Let a closure literal on the RHS know which variable it's being
+        // assigned to, so `$f = function () use (&$f) {...}` can be told
+        // apart from an unrelated by-ref out-param capture — see
+        // `FlowState::self_ref_closure_hint`.
+        let prev_self_ref_hint = ctx.self_ref_closure_hint.take();
+        if a.op == AssignOp::Assign && !a.by_ref {
+            ctx.self_ref_closure_hint = target_var_name.as_deref().map(mir_types::Name::from);
+        }
         let rhs_ty = self.analyze(&a.value, ctx);
+        ctx.self_ref_closure_hint = prev_self_ref_hint;
         if rhs_ty.is_never() {
             return rhs_ty;
         }
