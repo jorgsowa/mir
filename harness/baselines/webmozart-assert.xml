@@ -45,9 +45,6 @@
       <code><![CDATA[static::strlen($value)]]></code>
       <code><![CDATA[$value->format('c')]]></code>
     </ImpureMethodCall>
-    <InvalidReturnType>
-      <code><![CDATA[return $callable(...);]]></code>
-    </InvalidReturnType>
     <MixedArgument>
       <code><![CDATA[$value]]></code>
       <code><![CDATA[$property]]></code>

@@ -96,6 +96,19 @@ pub struct ExpressionAnalyzer<'a> {
     pub(crate) plugins: Option<std::sync::Arc<mir_plugin::PluginRegistry>>,
 }
 
+/// A first-class-callable creation expression (`foo(...)`, `$x(...)`,
+/// `$obj->method(...)`, `Foo::method(...)`) always evaluates to a `Closure`
+/// instance, regardless of what the callee is — used as the fallback type
+/// wherever `callable_create_type` can't statically resolve a signature to
+/// build a fully-typed `TClosure` from (dynamic callee, dynamic method name,
+/// unresolvable receiver/class, undefined method/class, ...).
+fn bare_closure() -> Atomic {
+    Atomic::TNamedObject {
+        fqcn: mir_types::Name::from("Closure"),
+        type_params: mir_types::union::empty_type_params(),
+    }
+}
+
 impl<'a> ExpressionAnalyzer<'a> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -675,10 +688,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         ));
                     }
                 }
-                Type::single(Atomic::TCallable {
-                    params: None,
-                    return_type: None,
-                })
+                Type::single(bare_closure())
             }
 
             CallableCreateKind::Method { object, method }
@@ -695,10 +705,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         // `$obj->$name(...)` (first-class-callable form) is
                         // falsely flagged unused.
                         self.record_dynamic_member_access(&obj_ty, method.span);
-                        return Type::single(Atomic::TCallable {
-                            params: None,
-                            return_type: None,
-                        });
+                        return Type::single(bare_closure());
                     }
                 };
                 let method_name_lower = crate::util::php_ident_lowercase(method_name.as_ref());
@@ -789,10 +796,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         method.span,
                     );
                 }
-                Type::single(Atomic::TCallable {
-                    params: None,
-                    return_type: None,
-                })
+                Type::single(bare_closure())
             }
 
             CallableCreateKind::StaticMethod { class, method } => {
@@ -828,10 +832,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             self.record_dynamic_member_access(&class_ty, method.span);
                         }
                         self.analyze(method, ctx);
-                        return Type::single(Atomic::TCallable {
-                            params: None,
-                            return_type: None,
-                        });
+                        return Type::single(bare_closure());
                     }
                 };
                 let method_name_lower = crate::util::php_ident_lowercase(method_name.as_ref());
@@ -869,12 +870,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 receiver_type_params = type_params;
                                 fqcn
                             }
-                            None => {
-                                return Type::single(Atomic::TCallable {
-                                    params: None,
-                                    return_type: None,
-                                })
-                            }
+                            None => return Type::single(bare_closure()),
                         }
                     }
                 };
@@ -882,8 +878,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // class — unlike the object-derived branch above, whose fqcn
                 // already came from a resolved (thus existing) receiver type.
                 // Without this check an undefined class here silently produced
-                // a generic `TCallable` with no diagnostic at all, unlike the
-                // identical `Foo::bar()` direct-call form.
+                // no diagnostic at all, unlike the identical `Foo::bar()`
+                // direct-call form.
                 if is_named_class
                     && !matches!(fqcn.as_str(), "self" | "static" | "parent")
                     && !crate::db::class_exists(self.db, &fqcn)
@@ -894,10 +890,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         Severity::Error,
                         class.span,
                     );
-                    return Type::single(Atomic::TCallable {
-                        params: None,
-                        return_type: None,
-                    });
+                    return Type::single(bare_closure());
                 }
                 let fqcn_arc: Arc<str> = Arc::from(fqcn.as_str());
                 if is_named_class {
@@ -959,10 +952,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     &method_name,
                     method.span,
                 );
-                Type::single(Atomic::TCallable {
-                    params: None,
-                    return_type: None,
-                })
+                Type::single(bare_closure())
             }
         }
     }
