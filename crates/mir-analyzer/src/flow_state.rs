@@ -382,6 +382,43 @@ fn superglobal_assigned() -> &'static Arc<FxHashSet<Name>> {
     })
 }
 
+/// Temporarily overrides `self_fqcn`/`parent_fqcn`/`static_fqcn` on a
+/// [`FlowState`] — e.g. so a `Closure::bind`/`bindTo` closure-literal argument
+/// gets analyzed (or, for the assign-then-bind idiom, re-analyzed) against the
+/// rebound scope's class instead of its lexically enclosing one. Callers must
+/// pair [`Self::apply`] with [`Self::restore`] around exactly the analysis
+/// call the override should affect.
+pub(crate) struct ScopeOverrideGuard {
+    saved_self: Option<Arc<str>>,
+    saved_parent: Option<Arc<str>>,
+    saved_static: Option<Arc<str>>,
+}
+
+impl ScopeOverrideGuard {
+    pub(crate) fn apply(
+        ctx: &mut FlowState,
+        db: &dyn crate::db::MirDatabase,
+        scope: &Arc<str>,
+    ) -> Self {
+        let parent = crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, scope.as_ref()))
+            .and_then(|c| c.parent().cloned());
+        let saved_self = ctx.self_fqcn.replace(scope.clone());
+        let saved_parent = std::mem::replace(&mut ctx.parent_fqcn, parent);
+        let saved_static = ctx.static_fqcn.replace(scope.clone());
+        Self {
+            saved_self,
+            saved_parent,
+            saved_static,
+        }
+    }
+
+    pub(crate) fn restore(self, ctx: &mut FlowState) {
+        ctx.self_fqcn = self.saved_self;
+        ctx.parent_fqcn = self.saved_parent;
+        ctx.static_fqcn = self.saved_static;
+    }
+}
+
 impl FlowState {
     pub fn new() -> Self {
         Self {

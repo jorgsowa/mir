@@ -105,6 +105,90 @@ fn apply_post_narrow(stmt: &php_ast::owned::Stmt, annotation: &VarAnnotation, ct
     }
 }
 
+/// Detects the "assign a closure literal, then immediately rebind it" idiom:
+/// ```php
+/// $copy = function (...) use (...) { ... };
+/// return Closure::bind($copy, $newThis, Scope::class); // or `$x = ...`, or `$copy->bindTo($newThis, Scope::class)`
+/// ```
+/// and resolves the literal rebound scope, so the closure body (analyzed as
+/// part of `stmt`, the assignment) is checked against it instead of its
+/// lexically enclosing class — see `crate::call::resolve_literal_class_scope`.
+/// Deliberately narrow: only the statement immediately following the
+/// assignment is considered, so nothing in between could have reassigned the
+/// variable or invalidated the rebind.
+fn closure_var_bind_scope(
+    db: &dyn MirDatabase,
+    file: &str,
+    stmt: &php_ast::owned::Stmt,
+    next: Option<&php_ast::owned::Stmt>,
+) -> Option<Arc<str>> {
+    let StmtKind::Expression(e) = &stmt.kind else {
+        return None;
+    };
+    let ExprKind::Assign(assign) = &e.kind else {
+        return None;
+    };
+    if !matches!(&assign.op, php_ast::ast::AssignOp::Assign) {
+        return None;
+    }
+    let ExprKind::Variable(var_name) = &assign.target.kind else {
+        return None;
+    };
+    if !matches!(
+        &assign.value.kind,
+        ExprKind::Closure(_) | ExprKind::ArrowFunction(_)
+    ) {
+        return None;
+    }
+
+    let next_expr: &Expr = match &next?.kind {
+        StmtKind::Expression(e) => e,
+        StmtKind::Return(Some(e)) => e,
+        _ => return None,
+    };
+    let call_expr = match &next_expr.kind {
+        ExprKind::Assign(a) => a.value.as_ref(),
+        _ => next_expr,
+    };
+
+    match &call_expr.kind {
+        ExprKind::StaticMethodCall(smc) => {
+            let ExprKind::Identifier(class_name) = &smc.class.kind else {
+                return None;
+            };
+            if !crate::db::resolve_name(db, file, class_name).eq_ignore_ascii_case("Closure") {
+                return None;
+            }
+            let ExprKind::Identifier(method_name) = &smc.method.kind else {
+                return None;
+            };
+            if !method_name.eq_ignore_ascii_case("bind") {
+                return None;
+            }
+            let first_arg = smc.args.first()?.value.as_ref()?;
+            if !matches!(&first_arg.kind, ExprKind::Variable(v) if v == var_name) {
+                return None;
+            }
+            let scope_expr = smc.args.get(2)?.value.as_ref()?;
+            crate::call::resolve_literal_class_scope(db, file, scope_expr)
+        }
+        ExprKind::MethodCall(mc) => {
+            if !matches!(&mc.object.kind, ExprKind::Variable(v) if v == var_name) {
+                return None;
+            }
+            let ExprKind::Identifier(method_name) = &mc.method.kind else {
+                return None;
+            };
+            if !method_name.eq_ignore_ascii_case("bindTo") {
+                return None;
+            }
+            let scope_expr = mc.args.get(1)?.value.as_ref()?;
+            crate::call::resolve_literal_class_scope(db, file, scope_expr)
+        }
+        _ => None,
+    }
+}
+
 // ---------------------------------------------------------------------------
 // StatementsAnalyzer
 // ---------------------------------------------------------------------------
@@ -225,7 +309,7 @@ impl<'a> StatementsAnalyzer<'a> {
     }
 
     pub fn analyze_stmts(&mut self, stmts: &[php_ast::owned::Stmt], ctx: &mut FlowState) {
-        for stmt in stmts.iter() {
+        for (i, stmt) in stmts.iter().enumerate() {
             if ctx.diverges {
                 let (line, col_start) = self.offset_to_line_col(stmt.span.start);
                 let (line_end, col_end) = if stmt.span.start < stmt.span.end {
@@ -254,7 +338,14 @@ impl<'a> StatementsAnalyzer<'a> {
                 break;
             }
 
-            self.analyze_stmt(stmt, ctx);
+            match closure_var_bind_scope(self.db, &self.file, stmt, stmts.get(i + 1)) {
+                Some(scope) => {
+                    let guard = crate::flow_state::ScopeOverrideGuard::apply(ctx, self.db, &scope);
+                    self.analyze_stmt(stmt, ctx);
+                    guard.restore(ctx);
+                }
+                None => self.analyze_stmt(stmt, ctx),
+            }
         }
     }
 

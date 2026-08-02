@@ -12,6 +12,7 @@ pub use args::{
     spread_element_type, CheckArgsParams,
 };
 pub(crate) use function::extract_class_docblock;
+pub(crate) use static_call::resolve_literal_class_scope;
 
 pub struct CallAnalyzer;
 

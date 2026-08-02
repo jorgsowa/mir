@@ -151,6 +151,57 @@ fn extract_receiver_type_params(ty: &Type, fqcn: &str) -> Vec<Type> {
         .unwrap_or_default()
 }
 
+/// Resolve a syntactic literal class-name expression (`Foo::class` or a bare
+/// string) to a concrete, existing FQCN — the two forms real code
+/// overwhelmingly uses for `Closure::bind`'s/`bindTo`'s `$newScope` argument.
+/// Anything else (an object expression, a dynamic name) resolves to `None`;
+/// only tries to prove the class actually exists, never falls back to
+/// guessing.
+pub(crate) fn resolve_literal_class_scope(
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+    expr: &php_ast::owned::Expr,
+) -> Option<Arc<str>> {
+    let name = match &expr.kind {
+        ExprKind::ClassConstAccess(cca)
+            if matches!(&cca.member.kind, ExprKind::Identifier(id) if id.eq_ignore_ascii_case("class")) =>
+        {
+            match &cca.class.kind {
+                ExprKind::Identifier(name) => name.as_ref(),
+                _ => return None,
+            }
+        }
+        ExprKind::String(s) => s.as_ref(),
+        _ => return None,
+    };
+    let resolved = crate::db::resolve_name(db, file, name);
+    crate::db::class_exists(db, &resolved).then(|| Arc::from(resolved.as_str()))
+}
+
+/// Resolve `Closure::bind`'s third (`$newScope`) argument — see
+/// `resolve_literal_class_scope` for which shapes are recognized. An omitted
+/// arg (defaulting to `$newThis`'s class) is left unresolved.
+fn static_closure_bind_scope(ea: &ExpressionAnalyzer<'_>, call: &StaticMethodCallExpr) -> Option<Arc<str>> {
+    let scope_expr = call.args.get(2)?.value.as_ref()?;
+    resolve_literal_class_scope(ea.db, &ea.file, scope_expr)
+}
+
+/// Analyze `value` with `ctx.self_fqcn`/`parent_fqcn`/`static_fqcn` temporarily
+/// overridden to `scope` — used for the closure-literal argument of
+/// `Closure::bind`, whose body must be checked against the rebound scope
+/// rather than its lexically enclosing class (see `static_closure_bind_scope`).
+pub(crate) fn analyze_with_scope_override(
+    ea: &mut ExpressionAnalyzer<'_>,
+    value: &php_ast::owned::Expr,
+    ctx: &mut FlowState,
+    scope: &Arc<str>,
+) -> Type {
+    let guard = crate::flow_state::ScopeOverrideGuard::apply(ctx, ea.db, scope);
+    let ty = ea.analyze(value, ctx);
+    guard.restore(ctx);
+    ty
+}
+
 impl CallAnalyzer {
     pub fn analyze_static_method_call<'a>(
         ea: &mut ExpressionAnalyzer<'a>,
@@ -305,16 +356,36 @@ impl CallAnalyzer {
             super::premark_byref_arg_vars(&pre_resolved.params, &call.args, ctx);
         }
 
+        // `Closure::bind($closure, $newThis, $newScope)` rebinds not just
+        // `$this` but the lexical scope used for private/protected
+        // member-visibility checks inside the closure body (see `bind_scope`
+        // below and its use in the arg loop). The literal-class-name arg is
+        // the common, syntactically-resolvable case (`Foo::class`/`'Foo'`); a
+        // dynamic scope (an object expression, or a defaulted 2-arg call)
+        // isn't handled here — same scope as the rest of this pass.
+        let bind_scope = if fqcn_arc.as_ref() == "Closure" && method_name_lower == "bind" {
+            static_closure_bind_scope(ea, call)
+        } else {
+            None
+        };
+
         let mut sole_spread_ty: Option<Type> = None;
         let mut arg_types: Vec<Type> = Vec::with_capacity(call.args.len());
-        for arg in call.args.iter() {
+        for (i, arg) in call.args.iter().enumerate() {
             // `None` is a PHP 8.6 partial-application placeholder (`?`/`...`)
             // — not yet modeled; keep positional slots aligned with `mixed`.
             let Some(value) = &arg.value else {
                 arg_types.push(Type::mixed());
                 continue;
             };
-            let ty = ea.analyze(value, ctx);
+            let ty = if i == 0 {
+                match &bind_scope {
+                    Some(scope) => analyze_with_scope_override(ea, value, ctx, scope),
+                    None => ea.analyze(value, ctx),
+                }
+            } else {
+                ea.analyze(value, ctx)
+            };
             super::consume_arg_assignment(value, ctx);
             if arg.unpack {
                 if call.args.len() == 1 {
