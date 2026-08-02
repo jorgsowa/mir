@@ -903,7 +903,7 @@ impl<'a> StatementsAnalyzer<'a> {
 
         let catch_base = FlowState::merge_branches(&pre_ctx, try_ctx.clone(), None);
 
-        let mut non_diverging_catches: Vec<FlowState> = vec![];
+        let mut all_catches: Vec<FlowState> = vec![];
         // Resolved types caught by any EARLIER catch clause on this try — used to
         // detect a later clause that can never run because an earlier one already
         // catches the same (or a broader) type. Accumulated after each clause
@@ -1048,20 +1048,17 @@ impl<'a> StatementsAnalyzer<'a> {
                 catch_ctx.record_var_location(var_name, line, col_start, line_end, col_end);
             }
             self.analyze_stmts(&catch.body.stmts, &mut catch_ctx);
-            if !catch_ctx.diverges {
-                non_diverging_catches.push(catch_ctx);
-            }
+            all_catches.push(catch_ctx);
         }
 
-        let mut result = if non_diverging_catches.is_empty() {
-            try_ctx
-        } else {
-            let mut r = try_ctx;
-            for catch_ctx in non_diverging_catches {
-                r = FlowState::merge_branches(&pre_ctx, r, Some(catch_ctx));
-            }
-            r
-        };
+        // `merge_branches` already propagates a diverging side's reads/dead-writes
+        // onto the surviving state (see its `if_ctx.diverges`/`else_ctx.diverges`
+        // arms), so folding every catch through it — including diverging ones —
+        // is what makes a diverging catch's reads still count as uses.
+        let mut result = try_ctx;
+        for catch_ctx in all_catches {
+            result = FlowState::merge_branches(&pre_ctx, result, Some(catch_ctx));
+        }
 
         if let Some(finally_stmts) = &tc.finally {
             // `finally` runs no matter how control reaches it: the try body may
