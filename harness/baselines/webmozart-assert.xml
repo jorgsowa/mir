@@ -80,14 +80,9 @@
       <code><![CDATA[$message ?: 'Expected an array to contain %d elements. Got: %d.']]></code>
     </PossiblyInvalidArgument>
     <RedundantCondition>
-      <code><![CDATA[!\is_array($array) || !\array_is_list($array)]]></code>
-      <code><![CDATA[\count($array) > 0 && \array_is_list($array)]]></code>
       <code><![CDATA[\is_string($callable) && \function_exists($callable)]]></code>
       <code><![CDATA[$callable instanceof Closure]]></code>
     </RedundantCondition>
-    <UnreachableCode>
-      <code><![CDATA[return $array;]]></code>
-    </UnreachableCode>
   </file>
   <file src="src/Mixin.php">
     <InvalidReturnType>

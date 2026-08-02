@@ -704,14 +704,17 @@ impl Type {
         for t in &self.types {
             match t {
                 Atomic::TList { .. } | Atomic::TNonEmptyList { .. } => out.add_type(t.clone()),
-                Atomic::TArray { key, value } if matches!(key.types.as_slice(), [Atomic::TInt]) => {
+                // Guard on "key admits int" rather than "key is exactly TInt" —
+                // `is_array($mixed)` narrows an unknown key to `Type::mixed()`,
+                // which is a list candidate (the runtime shape is still unknown),
+                // unlike a key statically known to exclude int entirely (e.g. a
+                // docblock-declared `array<string, T>`), which must stay excluded.
+                Atomic::TArray { key, value } if !key.narrow_to_int().is_empty() => {
                     out.add_type(Atomic::TList {
                         value: value.clone(),
                     });
                 }
-                Atomic::TNonEmptyArray { key, value }
-                    if matches!(key.types.as_slice(), [Atomic::TInt]) =>
-                {
+                Atomic::TNonEmptyArray { key, value } if !key.narrow_to_int().is_empty() => {
                     out.add_type(Atomic::TNonEmptyList {
                         value: value.clone(),
                     });
