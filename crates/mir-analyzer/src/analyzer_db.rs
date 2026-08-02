@@ -283,18 +283,27 @@ impl AnalyzerDb {
             drop(guard);
             if let Some(cached) = cached {
                 crate::metrics::record_stub_cache_hit();
-                let slice_arc = if cached.file.as_deref() == Some(&*file) {
+                let same_path = cached.slice.file.as_deref() == Some(&*file);
+                let slice_arc = if same_path {
                     // Path matches — share the Arc directly (no data clone needed).
-                    cached
+                    cached.slice
                 } else {
                     // Different path — fix the `file` field.
-                    let mut owned = (*cached).clone();
+                    let mut owned = (*cached.slice).clone();
                     owned.file = Some(file.clone());
                     Arc::new(owned)
                 };
+                let issues = if same_path {
+                    cached.issues
+                } else {
+                    Arc::new(crate::parse_cache::patch_issue_locations(
+                        &cached.issues,
+                        &file,
+                    ))
+                };
                 let file_defs = crate::db::FileDefinitions {
                     slice: slice_arc,
-                    issues: Arc::new(Vec::new()),
+                    issues,
                 };
                 let mut write_guard = self.salsa.write();
                 write_guard.upsert_source_file_with_durability(
@@ -307,21 +316,25 @@ impl AnalyzerDb {
         }
 
         let cache_hit = self.stub_cache.as_ref().and_then(|cache| {
-            let mut slice = cache.get(&file, &content_hash, php_v)?;
+            let (mut slice, issues) = cache.get(&file, &content_hash, php_v)?;
             crate::stub_cache::prepare_for_ingest(&mut slice);
-            Some(slice)
+            Some((slice, issues))
         });
 
-        if let Some(slice) = cache_hit {
+        if let Some((slice, issues)) = cache_hit {
             crate::metrics::record_stub_cache_hit();
             let slice_arc = Arc::new(slice);
+            let issues_arc = Arc::new(issues);
             // Prime the in-process cache so later collect_file_definitions calls hit.
-            self.salsa
-                .read()
-                .prime_parse_cache(content_hash, php_v, slice_arc.clone());
+            self.salsa.read().prime_parse_cache(
+                content_hash,
+                php_v,
+                slice_arc.clone(),
+                issues_arc.clone(),
+            );
             let file_defs = crate::db::FileDefinitions {
                 slice: slice_arc,
-                issues: Arc::new(Vec::new()),
+                issues: issues_arc,
             };
             let mut guard = self.salsa.write();
             guard.upsert_source_file_with_durability(file.clone(), Arc::from(source), durability);
@@ -351,25 +364,31 @@ impl AnalyzerDb {
         mir_codebase::definitions::deduplicate_params_in_slice(&mut slice);
 
         let slice_arc = Arc::new(slice);
+        let issues_arc = Arc::new(all_issues);
 
         // Write to the caches as long as the AST parsed cleanly. Collector
         // diagnostics (docblock warnings, etc.) leave the slice complete and
         // valid, so they should not block caching — see the matching comment
         // in `db::queries::collect_file_definitions_uncached`.
         if !has_hard_parse_errors {
-            // In-process cache: prevents re-parsing in the same session.
-            self.salsa
-                .read()
-                .prime_parse_cache(content_hash, php_v, Arc::clone(&slice_arc));
+            // In-process cache: prevents re-parsing in the same session, and
+            // preserves these exact issues for a later hit (re-ingesting this
+            // same file unchanged, or a different consumer querying it).
+            self.salsa.read().prime_parse_cache(
+                content_hash,
+                php_v,
+                Arc::clone(&slice_arc),
+                Arc::clone(&issues_arc),
+            );
             // Disk cache: prevents re-parsing in future sessions.
             if let Some(cache) = &self.stub_cache {
-                cache.put(&file, &content_hash, php_v, &slice_arc);
+                cache.put(&file, &content_hash, php_v, &slice_arc, &issues_arc);
             }
         }
 
         let file_defs = crate::db::FileDefinitions {
             slice: slice_arc,
-            issues: Arc::new(all_issues),
+            issues: issues_arc,
         };
 
         // ---- Phase 2: register the salsa input under the write lock --

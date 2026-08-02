@@ -170,12 +170,6 @@ impl AnalysisSession {
         self.last_ingested_symbols
             .write()
             .insert(file.as_ref().to_string(), new_symbols.clone());
-        // Stash this ingest's collector-phase issues — see the field doc on
-        // `last_ingested_collector_issues` for why they can't just be
-        // re-queried later from the salsa layer.
-        self.last_ingested_collector_issues
-            .write()
-            .insert(file.as_ref().to_string(), file_defs.issues.clone());
 
         // Symbols removed from this file must be tracked so dependency_graph()
         // can still produce edges to files referencing the now-gone symbols.
@@ -650,7 +644,7 @@ impl AnalysisSession {
 
                     let stub = stub_cache.as_ref().and_then(|stub_cache| {
                         let hash = crate::stub_cache::hash_source(&stored_text);
-                        let mut slice = stub_cache.get(file, &hash, php_v)?;
+                        let (mut slice, _issues) = stub_cache.get(file, &hash, php_v)?;
                         crate::stub_cache::prepare_for_ingest(&mut slice);
                         let entries = crate::db::subtype_index::entries_from_slice(&slice);
                         let decls = crate::db::decls_from_slice(&slice, sf);
@@ -843,7 +837,6 @@ impl AnalysisSession {
         // Clear stale symbol tracking for this file — it's fully gone.
         self.stale_defined_symbols.write().remove(file);
         self.last_ingested_symbols.write().remove(file);
-        self.last_ingested_collector_issues.write().remove(file);
         // Declarations this file provided are gone; other prepared files may
         // now need their warm-up re-run to lazy-load replacements.
         self.forget_prepared(file);

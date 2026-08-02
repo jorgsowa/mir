@@ -186,7 +186,12 @@ impl AnalysisSession {
             let php_v = php_version.cache_byte();
             for (defs, hash, has_hard_parse_errors, _surface) in &file_defs {
                 if !*has_hard_parse_errors {
-                    guard.prime_parse_cache(*hash, php_v, Arc::clone(&defs.slice));
+                    guard.prime_parse_cache(
+                        *hash,
+                        php_v,
+                        Arc::clone(&defs.slice),
+                        Arc::clone(&defs.issues),
+                    );
                 }
             }
         }
@@ -663,7 +668,7 @@ impl AnalysisSession {
                 let src: Arc<str> = Arc::from(src);
                 let hash = hash_source(&src);
                 let cached = self.db.stub_cache.as_ref().and_then(|c| {
-                    let mut slice = c.get(&file, &hash, php_v)?;
+                    let (mut slice, _issues) = c.get(&file, &hash, php_v)?;
                     prepare_for_ingest(&mut slice);
                     Some(slice)
                 });
@@ -703,13 +708,17 @@ impl AnalysisSession {
             .map_with(db_pass1, |db, (mut entry, salsa_file)| {
                 if let Some(slice) = entry.cached.take() {
                     let slice_arc = Arc::new(slice);
-                    db.parse_cache()
-                        .insert(entry.hash, php_v, Arc::clone(&slice_arc));
+                    db.parse_cache().insert(
+                        entry.hash,
+                        php_v,
+                        Arc::clone(&slice_arc),
+                        Arc::new(Vec::new()),
+                    );
                     return (entry.file.clone(), (*slice_arc).clone());
                 }
                 let defs = collect_file_definitions(&*db, salsa_file);
                 if let Some(cache) = stub_cache.as_ref() {
-                    cache.put(&entry.file, &entry.hash, php_v, &defs.slice);
+                    cache.put(&entry.file, &entry.hash, php_v, &defs.slice, &defs.issues);
                 }
                 (entry.file.clone(), (*defs.slice).clone())
             })
