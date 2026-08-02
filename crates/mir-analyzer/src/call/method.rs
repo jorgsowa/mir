@@ -234,8 +234,10 @@ impl CallAnalyzer {
         };
 
         // Flag explicit __construct() calls.
-        // Exception: $this->__construct() inside __wakeup/__clone/__unserialize is a
+        // Exception: $this->__construct() inside __wakeup/__clone/__unserialize/unserialize is a
         // documented PHP re-initialization pattern (e.g. after unserialization or cloning).
+        // `unserialize()` (no leading double underscore) is the legacy Serializable interface
+        // method, not a magic method, but the manual documents the same re-init idiom for it.
         if method_name.eq_ignore_ascii_case("__construct") {
             let receiver_is_this = matches!(
                 &call.object.kind,
@@ -245,6 +247,7 @@ impl CallAnalyzer {
                 m.eq_ignore_ascii_case("__wakeup")
                     || m.eq_ignore_ascii_case("__clone")
                     || m.eq_ignore_ascii_case("__unserialize")
+                    || m.eq_ignore_ascii_case("unserialize")
             });
             for atomic in &obj_ty.types {
                 if let mir_types::Atomic::TNamedObject { fqcn, .. } = atomic {
