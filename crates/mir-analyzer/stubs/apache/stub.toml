@@ -1,0 +1,6 @@
+[extension]
+name        = "apache"
+version     = "2.0"
+php-min     = "7.0"
+composer    = "n/a"
+description = "Apache 2.x handler SAPI module (apache2handler) request/env functions"
