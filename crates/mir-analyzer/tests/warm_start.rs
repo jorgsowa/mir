@@ -176,7 +176,13 @@ fn warm_start_replay_reverifies_unresolved_files_after_growth() {
 
     let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
     session.ensure_all_stubs();
-    session.warm_start_files(&[(Arc::from(file_path), Arc::from(text))]);
+    let unresolved = session.warm_start_files(&[(Arc::from(file_path), Arc::from(text))]);
+    assert_eq!(
+        unresolved,
+        vec![Arc::<str>::from(file_path)],
+        "warm_start_files must report this file so a caller can proactively \
+         re-analyze it off the request path: {unresolved:?}"
+    );
 
     session.ingest_file(Arc::from("later.php"), Arc::from("<?php\nclass Later {}\n"));
 
@@ -192,6 +198,58 @@ fn warm_start_replay_reverifies_unresolved_files_after_growth() {
         refs.is_empty(),
         "an unresolved replay must be re-verified after growth, not served \
          from the stale disk-cache posting: {refs:?}"
+    );
+}
+
+/// [`AnalysisSession::warm_start_files`]'s return value distinguishes
+/// resolved from unresolved replays across a mixed batch, and excludes files
+/// with no cache hit at all (a first-ever boot, where nothing was replayed).
+#[test]
+fn warm_start_files_returns_only_unresolved_replays() {
+    let dir = create_temp_dir("warm_start_return_value");
+    let php_v = PhpVersion::LATEST.cache_byte();
+    let resolved_text = "<?php\nclass Resolved {}\n";
+    let unresolved_text = "<?php\nclass Unresolved {}\n";
+    let uncached_text = "<?php\nclass Uncached {}\n";
+
+    {
+        let disk_cache = AnalysisCache::open(dir.path(), php_v, 0);
+        disk_cache.put(
+            "resolved.php",
+            hash_content(resolved_text),
+            String::new(),
+            Arc::from(Vec::new()),
+            Arc::from(Vec::new()),
+        );
+        let unresolved_issue = mir_issues::Issue::new(
+            mir_issues::IssueKind::UndefinedClass {
+                name: "App\\Other".into(),
+            },
+            mir_issues::Location::new(Arc::from("unresolved.php"), 1, 1, 0, 1),
+        );
+        disk_cache.put(
+            "unresolved.php",
+            hash_content(unresolved_text),
+            String::new(),
+            Arc::from(vec![unresolved_issue]),
+            Arc::from(Vec::new()),
+        );
+        disk_cache.flush();
+    }
+
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    session.ensure_all_stubs();
+    let unresolved = session.warm_start_files(&[
+        (Arc::from("resolved.php"), Arc::from(resolved_text)),
+        (Arc::from("unresolved.php"), Arc::from(unresolved_text)),
+        (Arc::from("uncached.php"), Arc::from(uncached_text)),
+    ]);
+
+    assert_eq!(
+        unresolved,
+        vec![Arc::<str>::from("unresolved.php")],
+        "must include exactly the replayed-but-unresolved file, excluding both \
+         the resolved replay and the never-cached file: {unresolved:?}"
     );
 }
 

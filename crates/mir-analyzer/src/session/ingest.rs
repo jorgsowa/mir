@@ -546,9 +546,35 @@ impl AnalysisSession {
     /// [`Self::index_batch`]) if not already registered. Safe to call
     /// alongside `index_batch` in any order; both merge into the same
     /// maintained indexes.
-    pub fn warm_start_files(&self, files: &[(Arc<str>, Arc<str>)]) {
+    ///
+    /// Returns every file whose replayed postings carry an unresolved name
+    /// (`live_analyzed: false` in `RefCommit` terms) — these are seeded, but
+    /// `indexed_references_to`'s freshness pass can never treat them as
+    /// immune to growth, so the *first* query that touches one of them pays
+    /// a full `analyze_file` synchronously on the request path (measured:
+    /// ~1.3-1.5s on a distinctive static method in a 15K-file workspace).
+    /// The subset is known right here, at warm-start time — a caller with
+    /// idle time between warm-start and the first live query (e.g. an LSP
+    /// server between `indexReady` and the user's first request) can close
+    /// most of that gap by handing this list to
+    /// [`Self::reanalyze_files_cancellable`] on a background thread, the
+    /// same pattern [`Self::prefetch_imports`] uses for lazy-loaded
+    /// vendor FQCNs:
+    ///
+    /// ```ignore
+    /// let unresolved = session.warm_start_files(&files);
+    /// let s = session.clone();
+    /// std::thread::spawn(move || {
+    ///     s.reanalyze_files_cancellable(&unresolved, &crate::IndexCancel::new());
+    /// });
+    /// ```
+    ///
+    /// This only relocates cost that would otherwise land on a user-facing
+    /// query — it cannot eliminate the freshness check itself, since an
+    /// unresolved posting is workspace-generation-sensitive by design.
+    pub fn warm_start_files(&self, files: &[(Arc<str>, Arc<str>)]) -> Vec<Arc<str>> {
         let Some(cache) = self.cache.clone() else {
-            return;
+            return Vec::new();
         };
         let stub_cache = self.db.stub_cache.clone();
         let php_v = self.php_version.cache_byte();
@@ -642,6 +668,7 @@ impl AnalysisSession {
         // here, under the lock each one already required individually.
         let mut seed_decls: Vec<(crate::db::SourceFile, crate::db::FileDeclarations)> =
             Vec::with_capacity(hits.len());
+        let mut unresolved: Vec<Arc<str>> = Vec::new();
         for hit in hits {
             let WarmStartHit {
                 file,
@@ -652,6 +679,9 @@ impl AnalysisSession {
             } = hit;
             if let Some((locs, resolved)) = refs {
                 self.commit_file_refs(&file, Some(stored_text.clone()), locs, commit_gen, resolved);
+                if !resolved {
+                    unresolved.push(file.clone());
+                }
             }
             if let Some((entries, decls)) = stub {
                 {
@@ -664,6 +694,7 @@ impl AnalysisSession {
         }
 
         self.seed_workspace_index_from_warm_start(seed_decls);
+        unresolved
     }
 
     /// Seed the workspace symbol index singleton from warm-start declaration

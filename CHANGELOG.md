@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **`warm_start_files` now returns the files it couldn't fully trust:**
+  a replayed reference-posting commit whose cached issue set has an
+  unresolved name is never immune to workspace-growth invalidation, so the
+  first live query to touch such a file pays a full synchronous
+  `analyze_file` (measured ~1.3-1.5s on a distinctive static method in a
+  15K-file workspace). That subset is already known at warm-start time;
+  callers can now hand the returned list to `reanalyze_files_cancellable`
+  on a background thread (same pattern as `prefetch_imports`) so the cost
+  lands during idle time after boot instead of on the user's first request.
+
 ## [0.66.1] - 2026-07-31
 
 ### Fixed
