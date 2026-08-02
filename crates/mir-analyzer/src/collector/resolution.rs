@@ -69,6 +69,11 @@ pub(super) fn resolve_type_name(
     if find_alias(first_part, use_aliases).is_some() {
         return resolve_alias_only(stripped, use_aliases).as_str().into();
     }
+    // Checked after `use`-aliases so an explicit `use Foo\Closure;` still wins
+    // over treating a bare `Closure` as the global builtin.
+    if crate::util::is_global_builtin_docblock_class(stripped) {
+        return Name::from(stripped);
+    }
     if stripped.contains('\\') {
         return Name::from(stripped);
     }
@@ -359,7 +364,15 @@ pub(super) fn resolve_union_doc(
     namespace: &Option<String>,
     use_aliases: &FxHashMap<String, String>,
 ) -> Type {
-    resolve_union_inner(union, false, namespace, use_aliases)
+    // A bare same-namespace class name in a docblock (`@param Foo $x` inside
+    // `namespace App;`, referring to `App\Foo`) must resolve exactly like a
+    // native type hint does — `full_qualify=false` used to leave it bare
+    // specifically to avoid mis-qualifying real global classes like `Closure`
+    // against the current namespace, but that also silently left every
+    // genuine sibling-class reference unqualified. `resolve_type_name` now
+    // exempts real global builtins on its own (`is_global_builtin_class`),
+    // so qualifying here is safe.
+    resolve_union_inner(union, true, namespace, use_aliases)
 }
 
 pub(super) fn resolve_union_doc_with_aliases(

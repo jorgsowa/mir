@@ -31,3 +31,36 @@ pub(crate) fn is_superglobal_name(name: &str) -> bool {
             | "_ENV"
     )
 }
+
+/// Real global-namespace PHP classes/interfaces commonly referenced bare in
+/// **docblocks** with no explicit `use` import. Unlike a pseudo-type keyword
+/// (`array`/`iterable`/…), these are actual classes — PHP's own namespace
+/// resolution rules would require an import or a leading `\` for them in
+/// real code, but Psalm/PHPStan resolve bare docblock references to them
+/// leniently, so mir does too rather than mis-qualifying them against the
+/// current namespace (the same failure mode already fixed for `iterable`'s
+/// implicit `Traversable` member).
+///
+/// Only for docblock-type resolution — do not use this for resolving a real
+/// code reference (a type hint, `instanceof`, `Foo::class`, …), where a bare
+/// unqualified name genuinely does need the current namespace prepended,
+/// same as real PHP.
+///
+/// `Countable` is deliberately excluded: unlike these others, it's common
+/// enough as a user-redeclared interface name (a local `Countable` in a
+/// legacy/polyfill namespace) that treating it as always-global would shadow
+/// a real same-namespace declaration.
+pub(crate) fn is_global_builtin_docblock_class(name: &str) -> bool {
+    matches!(
+        name.to_ascii_lowercase().as_str(),
+        "closure"
+            | "traversable"
+            | "iterator"
+            | "iteratoraggregate"
+            | "arrayaccess"
+            | "generator"
+            | "stringable"
+            | "stdclass"
+            | "throwable"
+    )
+}

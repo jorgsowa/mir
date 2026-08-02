@@ -342,9 +342,6 @@
     </RedundantCast>
   </file>
   <file src="src/Lazy/LazyUuidFromString.php">
-    <ArgumentTypeCoercion>
-      <code><![CDATA[$other]]></code>
-    </ArgumentTypeCoercion>
     <DeprecatedMethod>
       <code><![CDATA[($this->unwrapped ?? $this->unwrap())->getNumberConverter()]]></code>
       <code><![CDATA[($this->unwrapped ?? $this->unwrap())->getFieldsHex()]]></code>
@@ -735,9 +732,6 @@
       <code><![CDATA[self::$factoryReplaced = ($factory != new UuidFactory())]]></code>
       <code><![CDATA[self::$factory = $factory]]></code>
     </ImpureStaticPropertyAssignment>
-    <InvalidPropertyAssignment>
-      <code><![CDATA[self::$factory = $factory]]></code>
-    </InvalidPropertyAssignment>
     <MethodSignatureMismatch>
       <code><![CDATA[public function __toString(): string]]></code>
       <code><![CDATA[public function getBytes(): string]]></code>
@@ -749,10 +743,6 @@
     <MixedAssignment>
       <code><![CDATA[$uuid = $factory->fromHexadecimal($hex)]]></code>
     </MixedAssignment>
-    <UndefinedDocblockClass>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </UndefinedDocblockClass>
   </file>
   <file src="src/UuidFactory.php">
     <ImpureMethodCall>
@@ -760,10 +750,6 @@
       <code><![CDATA[$this->uuidFromBytesAndVersion($bytes, Uuid::UUID_TYPE_CUSTOM)]]></code>
       <code><![CDATA[$this->uuidFromBytesAndVersion(substr($bytes, 0, 16), $version)]]></code>
     </ImpureMethodCall>
-    <UndefinedDocblockClass>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </UndefinedDocblockClass>
   </file>
   <file src="src/Validator/GenericValidator.php">
     <MethodSignatureMismatch>

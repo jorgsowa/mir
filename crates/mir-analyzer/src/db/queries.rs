@@ -67,6 +67,27 @@ pub fn resolve_receiver_fqcn(db: &dyn MirDatabase, file: &str, fqcn: &str) -> St
     resolve_name(db, file, fqcn)
 }
 
+/// Like [`resolve_name`], but for a **docblock**-derived class name: a bare
+/// real global builtin (`Closure`, `Throwable`, …) is left unqualified
+/// instead of being prepended with the current namespace, matching how
+/// Psalm/PHPStan lenently resolve these in docblocks even with no explicit
+/// `use` import — see [`crate::util::is_global_builtin_docblock_class`].
+/// An explicit `use` import for the same bare name still wins, same
+/// priority order `resolve_name` itself uses internally.
+pub fn resolve_docblock_type_name(db: &dyn MirDatabase, file: &str, name: &str) -> String {
+    if !name.contains('\\') && !name.starts_with('\\') {
+        let imports = db.file_class_imports(file);
+        let has_explicit_import = imports.get(&Name::new(name)).is_some()
+            || imports
+                .iter()
+                .any(|(alias, _)| alias.as_str().eq_ignore_ascii_case(name));
+        if !has_explicit_import && crate::util::is_global_builtin_docblock_class(name) {
+            return name.to_string();
+        }
+    }
+    resolve_name(db, file, name)
+}
+
 pub fn resolve_name(db: &dyn MirDatabase, file: &str, name: &str) -> String {
     if name.starts_with('\\') {
         return name.trim_start_matches('\\').to_string();

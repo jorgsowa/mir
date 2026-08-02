@@ -989,7 +989,7 @@ fn resolve_named_objects_in_atomic(
 ) -> Atomic {
     match atomic {
         Atomic::TNamedObject { fqcn, type_params } => {
-            let resolved = crate::db::resolve_name(db, file, fqcn.as_ref());
+            let resolved = crate::db::resolve_docblock_type_name(db, file, fqcn.as_ref());
             let type_params = type_params
                 .iter()
                 .cloned()

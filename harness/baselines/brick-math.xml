@@ -1,10 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <files>
   <file src="src/BigDecimal.php">
-    <ArgumentTypeCoercion>
-      <code><![CDATA[$roundingMode]]></code>
-      <code><![CDATA[$roundingMode]]></code>
-    </ArgumentTypeCoercion>
     <DocblockTypeContradiction>
       <code><![CDATA[$scale < 0]]></code>
       <code><![CDATA[$exponent < 0]]></code>
@@ -50,6 +46,10 @@
       <code><![CDATA[return $one;]]></code>
       <code><![CDATA[return $ten;]]></code>
     </MixedReturnStatement>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$roundingMode]]></code>
+      <code><![CDATA[$roundingMode]]></code>
+    </PossiblyInvalidArgument>
     <PossiblyUndefinedVariable>
       <code><![CDATA[$str]]></code>
     </PossiblyUndefinedVariable>
@@ -62,10 +62,6 @@
     </RedundantCondition>
   </file>
   <file src="src/BigInteger.php">
-    <ArgumentTypeCoercion>
-      <code><![CDATA[$roundingMode]]></code>
-      <code><![CDATA[RoundingMode::Up]]></code>
-    </ArgumentTypeCoercion>
     <DocblockTypeContradiction>
       <code><![CDATA[$bitCount < 0]]></code>
       <code><![CDATA[$exponent < 0]]></code>
@@ -149,16 +145,6 @@
     </UnnecessaryVarAnnotation>
   </file>
   <file src="src/BigNumber.php">
-    <ArgumentTypeCoercion>
-      <code><![CDATA[$numerator]]></code>
-      <code><![CDATA[$denominator]]></code>
-      <code><![CDATA[new BigInteger($numerator)]]></code>
-      <code><![CDATA[new BigInteger($denominator)]]></code>
-      <code><![CDATA[$b]]></code>
-      <code><![CDATA[$a]]></code>
-      <code><![CDATA[$b]]></code>
-      <code><![CDATA[$a]]></code>
-    </ArgumentTypeCoercion>
     <ImpossibleIdenticalComparison>
       <code><![CDATA[$integral === null]]></code>
       <code><![CDATA[$integral === null]]></code>
@@ -196,33 +182,6 @@
     </UnreachableCode>
   </file>
   <file src="src/BigRational.php">
-    <ArgumentTypeCoercion>
-      <code><![CDATA[$numerator]]></code>
-      <code><![CDATA[$denominator]]></code>
-      <code><![CDATA[BigInteger::zero()]]></code>
-      <code><![CDATA[BigInteger::one()]]></code>
-      <code><![CDATA[BigInteger::one()]]></code>
-      <code><![CDATA[BigInteger::one()]]></code>
-      <code><![CDATA[BigInteger::ten()]]></code>
-      <code><![CDATA[BigInteger::one()]]></code>
-      <code><![CDATA[$this->numerator->remainder($this->denominator)]]></code>
-      <code><![CDATA[$this->denominator]]></code>
-      <code><![CDATA[$numerator]]></code>
-      <code><![CDATA[$denominator]]></code>
-      <code><![CDATA[$numerator]]></code>
-      <code><![CDATA[$denominator]]></code>
-      <code><![CDATA[$numerator]]></code>
-      <code><![CDATA[$denominator]]></code>
-      <code><![CDATA[$numerator]]></code>
-      <code><![CDATA[$denominator]]></code>
-      <code><![CDATA[$this->numerator->power($exponent)]]></code>
-      <code><![CDATA[$this->denominator->power($exponent)]]></code>
-      <code><![CDATA[$this->denominator]]></code>
-      <code><![CDATA[$this->numerator]]></code>
-      <code><![CDATA[$this->numerator->negated()]]></code>
-      <code><![CDATA[$this->denominator]]></code>
-      <code><![CDATA[RoundingMode::HalfEven]]></code>
-    </ArgumentTypeCoercion>
     <ImpureMethodCall>
       <code><![CDATA[$numerator->negated()]]></code>
       <code><![CDATA[$denominator->negated()]]></code>
@@ -239,12 +198,6 @@
     <InvalidArgument>
       <code><![CDATA[$roundingMode]]></code>
     </InvalidArgument>
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->numerator = $numerator]]></code>
-      <code><![CDATA[$this->denominator = $denominator]]></code>
-      <code><![CDATA[$this->numerator = $data['numerator']]]></code>
-      <code><![CDATA[$this->denominator = $data['denominator']]]></code>
-    </InvalidPropertyAssignment>
     <MethodSignatureMismatch>
       <code><![CDATA[#[Override]]]></code>
       <code><![CDATA[#[Override]]]></code>
@@ -448,9 +401,6 @@
     <ImpureStaticPropertyAssignment>
       <code><![CDATA[self::$instance = self::detect()]]></code>
     </ImpureStaticPropertyAssignment>
-    <InvalidPropertyAssignment>
-      <code><![CDATA[self::$instance = $calculator]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Internal/DecimalHelper.php">
     <InvalidArgument>

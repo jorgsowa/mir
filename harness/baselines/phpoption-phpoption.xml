@@ -103,7 +103,6 @@
     </MixedFunctionCall>
     <UndefinedDocblockClass>
       <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
     </UndefinedDocblockClass>
   </file>
   <file src="src/PhpOption/Some.php">

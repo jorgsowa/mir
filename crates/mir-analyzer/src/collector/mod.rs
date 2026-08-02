@@ -1172,225 +1172,28 @@ impl<'a> DefinitionCollector<'a> {
                         return_type: new_return_type,
                     });
                 }
+                // `class-string<T>`/`interface-string<T>` where `T` matches a
+                // template param: leave the inner name as the bare template
+                // name, same shielding `TNamedObject` gets above — some
+                // downstream `class-string<TemplateParam>` consumers match on
+                // this literal bare name against the current template
+                // context, not a qualified FQCN.
+                mir_types::Atomic::TClassString(Some(name))
+                    if template_names.contains(name.as_ref()) =>
+                {
+                    result.add_type(atomic.clone());
+                }
+                mir_types::Atomic::TInterfaceString(Some(name))
+                    if template_names.contains(name.as_ref()) =>
+                {
+                    result.add_type(atomic.clone());
+                }
                 _ => {
                     let resolved_union = self.resolve_union_doc(Type::single(atomic.clone()));
                     for resolved_atomic in resolved_union.types {
                         result.add_type(resolved_atomic);
                     }
                 }
-            }
-        }
-        result
-    }
-
-    /// Post-resolution template substitution for method params.
-    ///
-    /// `resolve_union_doc` / `resolve_union_doc_with_aliases` use `full_qualify=false`
-    /// so bare names like `Closure` or `Countable` stay bare (correct behavior for params).
-    /// But template param names (e.g. `TRelatedModel`) also stay bare — they need a second
-    /// pass to become `TTemplateParam`. This function does ONLY that conversion without
-    /// touching qualification, so it is safe to call after `resolve_union_doc`.
-    fn substitute_template_params(
-        &self,
-        ty: Type,
-        template_names: &rustc_hash::FxHashSet<String>,
-        template_params: &[TemplateParam],
-        defining_entity: &str,
-    ) -> Type {
-        let mut result = Type::empty();
-        result.possibly_undefined = ty.possibly_undefined;
-        result.from_docblock = ty.from_docblock;
-        for atomic in ty.types {
-            match &atomic {
-                mir_types::Atomic::TNamedObject { fqcn, type_params }
-                    if type_params.is_empty() && template_names.contains(fqcn.as_ref()) =>
-                {
-                    let bound = template_params
-                        .iter()
-                        .find(|tp| tp.name.as_ref() == fqcn.as_ref())
-                        .and_then(|tp| tp.bound.as_deref().cloned())
-                        .unwrap_or_else(Type::mixed);
-                    result.add_type(mir_types::Atomic::TTemplateParam {
-                        name: *fqcn,
-                        as_type: Box::new(bound),
-                        defining_entity: defining_entity.into(),
-                    });
-                }
-                mir_types::Atomic::TNamedObject { fqcn, type_params }
-                    if !type_params.is_empty() =>
-                {
-                    let new_params: Vec<Type> = type_params
-                        .iter()
-                        .map(|p| {
-                            self.substitute_template_params(
-                                p.clone(),
-                                template_names,
-                                template_params,
-                                defining_entity,
-                            )
-                        })
-                        .collect();
-                    result.add_type(mir_types::Atomic::TNamedObject {
-                        fqcn: *fqcn,
-                        type_params: mir_types::union::vec_to_type_params(new_params),
-                    });
-                }
-                mir_types::Atomic::TIntersection { parts } => {
-                    let new_parts: Vec<Type> = parts
-                        .iter()
-                        .map(|p| {
-                            self.substitute_template_params(
-                                p.clone(),
-                                template_names,
-                                template_params,
-                                defining_entity,
-                            )
-                        })
-                        .collect();
-                    result.add_type(mir_types::Atomic::TIntersection {
-                        parts: mir_types::union::vec_to_type_params(new_parts),
-                    });
-                }
-                mir_types::Atomic::TArray { key, value } => {
-                    result.add_type(mir_types::Atomic::TArray {
-                        key: Box::new(self.substitute_template_params(
-                            *key.clone(),
-                            template_names,
-                            template_params,
-                            defining_entity,
-                        )),
-                        value: Box::new(self.substitute_template_params(
-                            *value.clone(),
-                            template_names,
-                            template_params,
-                            defining_entity,
-                        )),
-                    });
-                }
-                mir_types::Atomic::TNonEmptyArray { key, value } => {
-                    result.add_type(mir_types::Atomic::TNonEmptyArray {
-                        key: Box::new(self.substitute_template_params(
-                            *key.clone(),
-                            template_names,
-                            template_params,
-                            defining_entity,
-                        )),
-                        value: Box::new(self.substitute_template_params(
-                            *value.clone(),
-                            template_names,
-                            template_params,
-                            defining_entity,
-                        )),
-                    });
-                }
-                mir_types::Atomic::TList { value } => {
-                    result.add_type(mir_types::Atomic::TList {
-                        value: Box::new(self.substitute_template_params(
-                            *value.clone(),
-                            template_names,
-                            template_params,
-                            defining_entity,
-                        )),
-                    });
-                }
-                mir_types::Atomic::TNonEmptyList { value } => {
-                    result.add_type(mir_types::Atomic::TNonEmptyList {
-                        value: Box::new(self.substitute_template_params(
-                            *value.clone(),
-                            template_names,
-                            template_params,
-                            defining_entity,
-                        )),
-                    });
-                }
-                mir_types::Atomic::TKeyedArray {
-                    properties,
-                    is_open,
-                    is_list,
-                } => {
-                    let mut new_props = properties.clone();
-                    for prop in new_props.values_mut() {
-                        prop.ty = self.substitute_template_params(
-                            prop.ty.clone(),
-                            template_names,
-                            template_params,
-                            defining_entity,
-                        );
-                    }
-                    result.add_type(mir_types::Atomic::TKeyedArray {
-                        properties: new_props,
-                        is_open: *is_open,
-                        is_list: *is_list,
-                    });
-                }
-                mir_types::Atomic::TClosure { data } => {
-                    let new_params = data
-                        .params
-                        .iter()
-                        .map(|p| {
-                            let mut p = p.clone();
-                            p.ty = p.ty.as_ref().map(|t| {
-                                mir_types::compact::SimpleType::from_union(
-                                    self.substitute_template_params(
-                                        t.to_union(),
-                                        template_names,
-                                        template_params,
-                                        defining_entity,
-                                    ),
-                                )
-                            });
-                            p
-                        })
-                        .collect();
-                    result.add_type(mir_types::Atomic::TClosure {
-                        data: Box::new(mir_types::atomic::ClosureData {
-                            params: new_params,
-                            return_type: self.substitute_template_params(
-                                data.return_type.clone(),
-                                template_names,
-                                template_params,
-                                defining_entity,
-                            ),
-                            this_type: data.this_type.clone(),
-                        }),
-                    });
-                }
-                mir_types::Atomic::TCallable {
-                    params,
-                    return_type,
-                } => {
-                    let new_params = params.as_ref().map(|ps| {
-                        ps.iter()
-                            .map(|p| {
-                                let mut p = p.clone();
-                                p.ty = p.ty.as_ref().map(|t| {
-                                    mir_types::compact::SimpleType::from_union(
-                                        self.substitute_template_params(
-                                            t.to_union(),
-                                            template_names,
-                                            template_params,
-                                            defining_entity,
-                                        ),
-                                    )
-                                });
-                                p
-                            })
-                            .collect()
-                    });
-                    let new_return_type = return_type.as_deref().map(|t| {
-                        Box::new(self.substitute_template_params(
-                            t.clone(),
-                            template_names,
-                            template_params,
-                            defining_entity,
-                        ))
-                    });
-                    result.add_type(mir_types::Atomic::TCallable {
-                        params: new_params,
-                        return_type: new_return_type,
-                    });
-                }
-                _ => result.add_type(atomic),
             }
         }
         result
@@ -2147,19 +1950,24 @@ impl<'a> DefinitionCollector<'a> {
                 .map(|s| crate::parser::docblock::parse_type_string(&s))
                 .or_else(|| {
                     doc.get_param_type(param_name).cloned().map(|u| {
-                        // Use full_qualify=false resolution (same as before) so bare
-                        // names like `Closure` stay bare and don't get namespaced.
-                        // After that, run a template-only substitution pass to convert
-                        // bare names matching class/method template params (e.g. TRelatedModel)
-                        // into TTemplateParam without touching other names.
-                        let resolved = effective_aliases
-                            .map(|a| self.resolve_union_doc_with_aliases(u.clone(), a))
-                            .unwrap_or_else(|| self.resolve_union_doc(u));
-                        let doc_ty = self.substitute_template_params(
-                            resolved,
+                        // Expand type aliases first (no FQN change), then run
+                        // template-aware resolution — same order as @return
+                        // below, so a bare name matching a class/method
+                        // template param (e.g. `TRelatedModel`) becomes a
+                        // TTemplateParam, and any other bare class name (e.g.
+                        // a same-namespace sibling class) is FQN-qualified
+                        // instead of left relative. A separate `full_qualify
+                        // =false` + post-hoc `substitute_template_params` pass
+                        // used to run here instead, which qualified nothing —
+                        // real global builtins like `Closure` are now
+                        // exempted directly in `resolve_type_name`.
+                        let expanded = effective_aliases
+                            .map_or(u.clone(), |a| expand_aliases_only(u.clone(), a));
+                        let doc_ty = self.resolve_union_doc_with_templates(
+                            expanded,
                             &template_names,
-                            template_params_for_resolve,
                             class_fqcn,
+                            template_params_for_resolve,
                         );
                         // When the native hint is a concrete scalar and the docblock has only
                         // atoms from a different scalar family (e.g. `@param int` + `bool` hint),
@@ -2201,14 +2009,13 @@ impl<'a> DefinitionCollector<'a> {
             }
 
             let out_ty = doc.get_out_param_type(param_name).cloned().map(|u| {
-                let resolved = effective_aliases
-                    .map(|a| self.resolve_union_doc_with_aliases(u.clone(), a))
-                    .unwrap_or_else(|| self.resolve_union_doc(u));
-                let mut resolved = self.substitute_template_params(
-                    resolved,
+                let expanded = effective_aliases
+                    .map_or(u.clone(), |a| expand_aliases_only(u.clone(), a));
+                let mut resolved = self.resolve_union_doc_with_templates(
+                    expanded,
                     &template_names,
-                    template_params_for_resolve,
                     class_fqcn,
+                    template_params_for_resolve,
                 );
                 resolved.from_docblock = true;
                 Self::fill_self_static_parent(resolved, class_fqcn)
