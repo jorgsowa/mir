@@ -97,27 +97,11 @@
     <UndefinedClass>
       <code><![CDATA[ArrayCollection]]></code>
     </UndefinedClass>
-    <UnusedParam>
-      <code><![CDATA[$objectCopier]]></code>
-    </UnusedParam>
-  </file>
-  <file src="src/DeepCopy/Filter/Doctrine/DoctrineProxyFilter.php">
-    <UnusedParam>
-      <code><![CDATA[$property]]></code>
-      <code><![CDATA[$objectCopier]]></code>
-    </UnusedParam>
   </file>
   <file src="src/DeepCopy/Filter/Filter.php">
     <MissingReturnType>
       <code><![CDATA[]]></code>
     </MissingReturnType>
-  </file>
-  <file src="src/DeepCopy/Filter/KeepFilter.php">
-    <UnusedParam>
-      <code><![CDATA[$object]]></code>
-      <code><![CDATA[$property]]></code>
-      <code><![CDATA[$objectCopier]]></code>
-    </UnusedParam>
   </file>
   <file src="src/DeepCopy/Filter/ReplaceFilter.php">
     <DeprecatedMethod>
@@ -129,25 +113,16 @@
     <MixedAssignment>
       <code><![CDATA[$value = call_user_func($this->callback, $reflectionProperty->getValue($object))]]></code>
     </MixedAssignment>
-    <UnusedParam>
-      <code><![CDATA[$objectCopier]]></code>
-    </UnusedParam>
   </file>
   <file src="src/DeepCopy/Filter/SetNullFilter.php">
     <DeprecatedMethod>
       <code><![CDATA[$reflectionProperty->setAccessible(true)]]></code>
     </DeprecatedMethod>
-    <UnusedParam>
-      <code><![CDATA[$objectCopier]]></code>
-    </UnusedParam>
   </file>
   <file src="src/DeepCopy/Matcher/Doctrine/DoctrineProxyMatcher.php">
     <UndefinedClass>
       <code><![CDATA[Proxy]]></code>
     </UndefinedClass>
-    <UnusedParam>
-      <code><![CDATA[$property]]></code>
-    </UnusedParam>
   </file>
   <file src="src/DeepCopy/Matcher/PropertyMatcher.php">
     <MissingPropertyType>
@@ -159,9 +134,6 @@
     <MissingPropertyType>
       <code><![CDATA[]]></code>
     </MissingPropertyType>
-    <UnusedParam>
-      <code><![CDATA[$object]]></code>
-    </UnusedParam>
   </file>
   <file src="src/DeepCopy/Matcher/PropertyTypeMatcher.php">
     <DeprecatedMethod>

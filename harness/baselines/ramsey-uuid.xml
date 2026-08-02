@@ -281,9 +281,6 @@
     <RedundantCast>
       <code><![CDATA[uuid_parse($uuid)]]></code>
     </RedundantCast>
-    <UnusedParam>
-      <code><![CDATA[$length]]></code>
-    </UnusedParam>
   </file>
   <file src="src/Generator/PeclUuidTimeGenerator.php">
     <MixedArgument>
@@ -292,10 +289,6 @@
     <RedundantCast>
       <code><![CDATA[uuid_parse($uuid)]]></code>
     </RedundantCast>
-    <UnusedParam>
-      <code><![CDATA[$node]]></code>
-      <code><![CDATA[$clockSeq]]></code>
-    </UnusedParam>
   </file>
   <file src="src/Generator/RandomBytesGenerator.php">
     <MissingThrowsDocblock>
@@ -322,10 +315,6 @@
     <PropertyPossiblyUninitialized>
       <code><![CDATA[]]></code>
     </PropertyPossiblyUninitialized>
-    <UnusedParam>
-      <code><![CDATA[$node]]></code>
-      <code><![CDATA[$clockSeq]]></code>
-    </UnusedParam>
   </file>
   <file src="src/Guid/Fields.php">
     <ImpureMethodCall>

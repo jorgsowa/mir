@@ -37,18 +37,6 @@
     <MixedFunctionCall>
       <code><![CDATA[$callable()]]></code>
     </MixedFunctionCall>
-    <UnusedParam>
-      <code><![CDATA[$callable]]></code>
-      <code><![CDATA[$callable]]></code>
-      <code><![CDATA[$callable]]></code>
-      <code><![CDATA[$callable]]></code>
-      <code><![CDATA[$callable]]></code>
-      <code><![CDATA[$callable]]></code>
-      <code><![CDATA[$value]]></code>
-      <code><![CDATA[$value]]></code>
-      <code><![CDATA[$callable]]></code>
-      <code><![CDATA[$callable]]></code>
-    </UnusedParam>
   </file>
   <file src="src/PhpOption/Option.php">
     <MissingClosureReturnType>
@@ -134,11 +122,5 @@
       <code><![CDATA[$callable($initialValue, $this->value)]]></code>
       <code><![CDATA[$callable($this->value, $initialValue)]]></code>
     </MixedFunctionCall>
-    <UnusedParam>
-      <code><![CDATA[$default]]></code>
-      <code><![CDATA[$callable]]></code>
-      <code><![CDATA[$ex]]></code>
-      <code><![CDATA[$else]]></code>
-    </UnusedParam>
   </file>
 </files>

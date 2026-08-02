@@ -57,9 +57,6 @@
     <MissingPropertyType>
       <code><![CDATA[]]></code>
     </MissingPropertyType>
-    <UnusedParam>
-      <code><![CDATA[$openedParenthesis]]></code>
-    </UnusedParam>
   </file>
   <file src="src/Parser/DomainLiteral.php">
     <MixedArgument>
@@ -79,11 +76,6 @@
     <MixedArgument>
       <code><![CDATA[self::FWS_TYPES]]></code>
     </MixedArgument>
-  </file>
-  <file src="src/Parser/IDRightPart.php">
-    <UnusedParam>
-      <code><![CDATA[$hasComments]]></code>
-    </UnusedParam>
   </file>
   <file src="src/Parser/LocalPart.php">
     <MissingPropertyType>
@@ -135,9 +127,6 @@
     <PossiblyInvalidArgument>
       <code><![CDATA[idn_to_ascii($host, IDNA_DEFAULT, $variant)]]></code>
     </PossiblyInvalidArgument>
-    <UnusedParam>
-      <code><![CDATA[$emailLexer]]></code>
-    </UnusedParam>
     <WrongCaseMethod>
       <code><![CDATA[validateMXRecord]]></code>
     </WrongCaseMethod>
@@ -151,9 +140,6 @@
     <MissingPropertyType>
       <code><![CDATA[]]></code>
     </MissingPropertyType>
-    <UnusedParam>
-      <code><![CDATA[$emailLexer]]></code>
-    </UnusedParam>
   </file>
   <file src="src/Validation/MessageIDValidation.php">
     <InvalidPropertyAssignment>
