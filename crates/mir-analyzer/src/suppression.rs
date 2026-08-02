@@ -146,6 +146,7 @@ impl SuppressionMap {
     pub fn from_source(source: &str) -> Self {
         let raw_lines: Vec<&str> = source.lines().collect();
         let in_heredoc_body = heredoc_body_mask(&raw_lines);
+        let block_comment_open = block_comment_open_mask(&raw_lines);
         let mut map = SuppressionMap::default();
 
         for (idx, raw) in raw_lines.iter().enumerate() {
@@ -180,8 +181,12 @@ impl SuppressionMap {
                     insert_line(&mut map.lines, line_no, directive.kinds);
                 }
                 Scope::NextLine => {
-                    let (target, extra_covered_lines) =
-                        next_code_line(&raw_lines, idx, directive.skip_comments);
+                    let (target, extra_covered_lines) = next_code_line(
+                        &raw_lines,
+                        idx,
+                        directive.skip_comments,
+                        block_comment_open[idx],
+                    );
                     if track_named {
                         if let KindSet::Named(ref names) = directive.kinds {
                             // A continuation line of `target`'s own multi-line
@@ -352,6 +357,42 @@ fn is_heredoc_closing_line(line: &str, ident: &str) -> bool {
         .is_none_or(|c| !c.is_ascii_alphanumeric() && c != '_')
 }
 
+/// Per-line mask: `true` when a `/* … */` block comment (most commonly a
+/// docblock) is still open at the END of that physical line — its closing
+/// `*/` hasn't been seen yet. Lets a `NextLine` directive found on one of a
+/// docblock's own continuation lines tell whether the lines immediately
+/// following it are still the SAME comment (further tag lines, then its own
+/// closing `*/`) rather than real code or a separate, later comment.
+///
+/// Deliberately simple, matching this file's other line-based scanners: no
+/// quote-awareness, so a `/*`/`*/`-looking substring inside a string literal
+/// is out of scope.
+fn block_comment_open_mask(raw_lines: &[&str]) -> Vec<bool> {
+    let mut mask = vec![false; raw_lines.len()];
+    let mut open = false;
+    for (idx, line) in raw_lines.iter().enumerate() {
+        let bytes = line.as_bytes();
+        let mut i = 0;
+        while i < bytes.len() {
+            if open {
+                if bytes[i] == b'*' && bytes.get(i + 1) == Some(&b'/') {
+                    open = false;
+                    i += 2;
+                } else {
+                    i += 1;
+                }
+            } else if bytes[i] == b'/' && bytes.get(i + 1) == Some(&b'*') {
+                open = true;
+                i += 2;
+            } else {
+                i += 1;
+            }
+        }
+        mask[idx] = open;
+    }
+    mask
+}
+
 /// Locate a directive's target line strictly after `idx`, as a 1-based
 /// number, plus every single-line PHP 8 attribute (`#[Foo]`) line skipped
 /// along the way.
@@ -368,15 +409,36 @@ fn is_heredoc_closing_line(line: &str, ident: &str) -> bool {
 /// closing `*/`) so a directive written inside a multi-line docblock lands
 /// on the declaration that follows it. Falls back to `idx + 2` when nothing
 /// qualifies, so the directive still has a deterministic target.
-fn next_code_line(raw_lines: &[&str], idx: usize, skip_comments: bool) -> (u32, Vec<u32>) {
+///
+/// `in_open_block_comment` is whether the directive's OWN line sits inside a
+/// still-unterminated `/* … */` block comment — a multi-line docblock whose
+/// closing `*/` hasn't been seen yet. Those remaining lines (further tag
+/// lines, then the closing `*/`) can never be the target regardless of
+/// `skip_comments`, since they're still the directive's own comment, not a
+/// separate one — `skip_comments` only decides whether to also hunt past a
+/// DIFFERENT, later comment sitting between that closing `*/` and the
+/// declaration.
+fn next_code_line(
+    raw_lines: &[&str],
+    idx: usize,
+    skip_comments: bool,
+    in_open_block_comment: bool,
+) -> (u32, Vec<u32>) {
     let mut extra_covered_lines = Vec::new();
     // Net `[`/`]` depth of an in-progress multi-line attribute (`#[` opener
     // whose closing `]` is on a later line) — 0 when not currently inside
     // one. Every line consumed while this is positive is itself an
     // attribute line, same treatment the single-line case already gets.
     let mut multiline_attr_depth: i32 = 0;
+    let mut in_open_block_comment = in_open_block_comment;
     for (offset, line) in raw_lines.iter().enumerate().skip(idx + 1) {
         let trimmed = line.trim();
+        if in_open_block_comment {
+            if trimmed.contains("*/") {
+                in_open_block_comment = false;
+            }
+            continue;
+        }
         if multiline_attr_depth > 0 {
             extra_covered_lines.push(offset as u32 + 1);
             multiline_attr_depth += bracket_delta(trimmed);
@@ -642,10 +704,14 @@ fn parse_directive_with_tracking(raw: &str) -> Option<(Directive, bool)> {
     };
 
     // The "documents the following element" forms (bare `@psalm-suppress`,
-    // `@mir-ignore`, …) skip past intervening comment lines — e.g. the
-    // closing `*/` of a multi-line docblock — to reach the declaration.
-    // PHPStan's explicit `*-next-line` and bare `@phpstan-ignore` keep their
-    // literal next-non-blank-line semantics.
+    // `@mir-ignore`, …) also skip past a SEPARATE comment sitting between the
+    // directive's own comment and the declaration. PHPStan's explicit
+    // `*-next-line` and bare `@phpstan-ignore` keep literal
+    // next-non-blank-line semantics there — but the directive's own
+    // enclosing block comment (a multi-line docblock's remaining tag lines
+    // and closing `*/`) is always exited first regardless, via
+    // `next_code_line`'s `in_open_block_comment` handling, since a line still
+    // inside that comment can never be the target either way.
     let skip_comments = scope == Scope::NextLine && is_bare && !force_all;
 
     let kinds = if force_all {
