@@ -63,6 +63,22 @@ pub struct AnalysisSession {
     /// this, re-deriving "old" symbols from the (possibly pre-updated) input
     /// would miss deletions and break cross-file dependency invalidation.
     last_ingested_symbols: Arc<RwLock<HashMap<String, HashSet<Arc<str>>>>>,
+    /// Collector-phase issues (`BackedEnumCaseTypeMismatch`,
+    /// `InvalidReadonlyPropertyDeclaration`, `InvalidDocblock`, parse errors)
+    /// captured from each file's *own* [`crate::db::FileDefinitions`] at the
+    /// moment [`Self::ingest_file`] computes it.
+    ///
+    /// `collect_file_definitions` — the salsa query behind
+    /// `FileDefinitions` — has an in-process fast path keyed by content
+    /// hash, not by file: the first caller to compute a given source text
+    /// gets the real `issues`, and every later query (any file, any
+    /// consumer) for that same content hits the fast path and gets an empty
+    /// `Vec` (see `collect_file_definitions_uncached`'s cache-hit arms). Since
+    /// `ingest_file` is that first caller for practically every real edit,
+    /// re-querying the salsa layer from [`Self::collector_issues`] would
+    /// almost always observe the already-emptied cache. Stashing the issues
+    /// here at ingest time, once, sidesteps that entirely.
+    last_ingested_collector_issues: Arc<RwLock<HashMap<String, Arc<Vec<crate::Issue>>>>>,
     /// Negative cache: FQCNs that `load_class` already failed on.
     /// The value is the resolver-mapped path (when known) so eviction on
     /// `set_file_text` / `ingest_file` is a path equality check rather than
@@ -186,6 +202,7 @@ impl AnalysisSession {
             user_stub_dirs: Vec::new(),
             stale_defined_symbols: Arc::new(RwLock::new(HashMap::default())),
             last_ingested_symbols: Arc::new(RwLock::new(HashMap::default())),
+            last_ingested_collector_issues: Arc::new(RwLock::new(HashMap::default())),
             unresolvable_fqcns: Arc::new(RwLock::new(HashMap::default())),
             source_provider: Arc::new(crate::FsSourceProvider),
             pending_eager_function_files: Arc::new(parking_lot::Mutex::new(Some(Vec::new()))),

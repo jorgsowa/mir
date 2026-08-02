@@ -1113,6 +1113,33 @@ impl AnalysisSession {
         crate::class::ClassAnalyzer::with_files(&db, file_set, &file_data).analyze_all()
     }
 
+    /// Collector-phase issues (e.g. `BackedEnumCaseTypeMismatch`,
+    /// `InvalidReadonlyPropertyDeclaration`, `InvalidDocblock`, and raw parse
+    /// errors) for the given files, as of each file's last [`Self::ingest_file`].
+    ///
+    /// These are found while building a file's declaration slice
+    /// ([`crate::db::collect_file_definitions`]), before body analysis or
+    /// cross-file class checks ever run — neither [`crate::FileAnalyzer::analyze`]
+    /// nor [`Self::class_issues`] reads them, so a caller merging just those
+    /// two sources silently drops every collector-time diagnostic. Call this
+    /// alongside them to get the full picture.
+    ///
+    /// Reads a cache populated by `ingest_file` rather than re-querying
+    /// `collect_file_definitions` directly — that query's issues are only
+    /// populated for the first caller to compute a given content hash in the
+    /// session (see the field doc on `last_ingested_collector_issues`), and
+    /// `ingest_file` is normally that first caller. A file never ingested via
+    /// [`Self::ingest_file`] (e.g. one only ever reached through lazy vendor
+    /// loading) has no entry and contributes nothing.
+    pub fn collector_issues(&self, files: &[Arc<str>]) -> Vec<crate::Issue> {
+        let cache = self.last_ingested_collector_issues.read();
+        files
+            .iter()
+            .filter_map(|f| cache.get(f.as_ref()))
+            .flat_map(|issues| issues.as_ref().clone())
+            .collect()
+    }
+
     /// All declarations defined in `file` as a **hierarchical tree**.
     ///
     /// Classes/interfaces/traits/enums are returned with their methods,
