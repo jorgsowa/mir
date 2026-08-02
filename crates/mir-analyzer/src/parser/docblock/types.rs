@@ -246,7 +246,7 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
                 value: Box::new(Type::mixed()),
             });
             u.add_type(Atomic::TNamedObject {
-                fqcn: mir_types::Name::from("Traversable"),
+                fqcn: mir_types::Name::from("\\Traversable"),
                 type_params: Default::default(),
             });
             u
@@ -385,7 +385,7 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
                 value: Box::new(value.clone()),
             });
             u.add_type(Atomic::TNamedObject {
-                fqcn: mir_types::Name::from("Traversable"),
+                fqcn: mir_types::Name::from("\\Traversable"),
                 type_params: mir_types::union::vec_to_type_params(vec![key, value]),
             });
             u

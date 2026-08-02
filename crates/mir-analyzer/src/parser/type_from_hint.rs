@@ -67,7 +67,7 @@ fn builtin_type_to_union(ty: BuiltinType, context_fqcn: Option<&str>) -> Type {
                 value: Box::new(Type::mixed()),
             });
             u.add_type(Atomic::TNamedObject {
-                fqcn: mir_types::Name::from("Traversable"),
+                fqcn: mir_types::Name::from("\\Traversable"),
                 type_params: Default::default(),
             });
             u
