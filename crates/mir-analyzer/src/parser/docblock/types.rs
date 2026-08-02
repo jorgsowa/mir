@@ -1066,9 +1066,19 @@ pub(super) fn parse_var_line(s: &str) -> Option<(String, String)> {
                             }
                         }
                     }
+                } else if after.starts_with('|')
+                    || after.starts_with('&')
+                    || s[..i].trim_end().ends_with(['|', '&'])
+                {
+                    // A `|`/`&` immediately before or after this whitespace
+                    // means the type expression is continuing across it (a
+                    // spaced union/intersection like `string | null`), not a
+                    // name boundary — keep scanning rather than giving up.
+                    continue;
                 }
-                // The token right after the type isn't a name — unlike
-                // @param, @var never has one further into the description.
+                // The token right after the type isn't a name, and isn't a
+                // continuation of the type either — unlike @param, @var
+                // never has a name further into the description.
                 return None;
             }
             _ => {}
