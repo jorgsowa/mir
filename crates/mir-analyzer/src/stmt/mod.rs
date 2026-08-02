@@ -59,32 +59,48 @@ fn simple_assignment_lhs(stmt: &php_ast::owned::Stmt) -> Option<&str> {
     Some(lhs_name.trim_start_matches('$'))
 }
 
-/// Apply post-narrow: after `$x = expr()`, override the inferred type with the annotated one.
-/// Named `@var Type $x` applies only when the LHS matches. Bare `@var Type` applies to any
-/// simple assignment LHS (it annotates the statement, not a specific variable).
+/// Apply post-narrow: after `$x = expr()` or `static $x = expr;`, override the inferred type
+/// with the annotated one. Named `@var Type $x` applies only when the target name matches. Bare
+/// `@var Type` applies to a single simple LHS (it annotates the statement, not a specific
+/// variable) — for a multi-var `static $a, $b;` declaration a bare annotation is ambiguous and
+/// is skipped.
 fn apply_post_narrow(stmt: &php_ast::owned::Stmt, annotation: &VarAnnotation, ctx: &mut FlowState) {
-    let php_ast::owned::StmtKind::Expression(e) = &stmt.kind else {
-        return;
-    };
-    let php_ast::owned::ExprKind::Assign(a) = &e.kind else {
-        return;
-    };
-    if !matches!(&a.op, php_ast::ast::AssignOp::Assign) {
-        return;
-    }
-    let php_ast::owned::ExprKind::Variable(lhs_name) = &a.target.kind else {
-        return;
-    };
-    let lhs = lhs_name.trim_start_matches('$');
-    match &annotation.name {
+    let apply = |name: &str, ctx: &mut FlowState| match &annotation.name {
         Some(var_name) => {
-            if lhs == var_name.as_str() {
+            if name == var_name.as_str() {
                 ctx.set_var(var_name.as_str(), annotation.ty.clone());
             }
         }
-        None => {
-            ctx.set_var(lhs, annotation.ty.clone());
+        None => ctx.set_var(name, annotation.ty.clone()),
+    };
+
+    match &stmt.kind {
+        php_ast::owned::StmtKind::Expression(e) => {
+            let php_ast::owned::ExprKind::Assign(a) = &e.kind else {
+                return;
+            };
+            if !matches!(&a.op, php_ast::ast::AssignOp::Assign) {
+                return;
+            }
+            let php_ast::owned::ExprKind::Variable(lhs_name) = &a.target.kind else {
+                return;
+            };
+            apply(lhs_name.trim_start_matches('$'), ctx);
         }
+        php_ast::owned::StmtKind::StaticVar(vars) => {
+            if annotation.name.is_some() {
+                for sv in vars.iter() {
+                    if let Some(name) = sv.name.as_deref() {
+                        apply(name.trim_start_matches('$'), ctx);
+                    }
+                }
+            } else if let [sv] = vars.as_ref() {
+                if let Some(name) = sv.name.as_deref() {
+                    apply(name.trim_start_matches('$'), ctx);
+                }
+            }
+        }
+        _ => {}
     }
 }
 
