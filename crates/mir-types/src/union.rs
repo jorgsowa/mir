@@ -1648,6 +1648,11 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         // TNamedObject(X) satisfies self(X) / static(X) with same FQCN
         (Atomic::TNamedObject { fqcn: a, .. }, Atomic::TSelf { fqcn: b }) => a == b,
         (Atomic::TNamedObject { fqcn: a, .. }, Atomic::TStaticObject { fqcn: b }) => a == b,
+        // An enum-case literal satisfies its own bare enum type (enums are
+        // represented as TNamedObject).
+        (Atomic::TLiteralEnumCase { enum_fqcn, .. }, Atomic::TNamedObject { fqcn, .. }) => {
+            enum_fqcn == fqcn
+        }
         // Bare generic property accepts parameterized value: Box accepts Box<string>.
         // The reverse is NOT true — bare Box value does not satisfy Box<string> property
         // (invariant check). Only sup being bare (empty type_params) is the wildcard.
@@ -2178,6 +2183,32 @@ mod tests {
         let string = Type::single(Atomic::TString);
         let mixed = Type::mixed();
         assert!(string.is_subtype_structural(&mixed));
+    }
+
+    #[test]
+    fn subtype_enum_case_under_own_enum() {
+        let sub = Type::single(Atomic::TLiteralEnumCase {
+            enum_fqcn: Name::new("RoundingMode"),
+            case_name: Name::new("Unnecessary"),
+        });
+        let sup = Type::single(Atomic::TNamedObject {
+            fqcn: Name::new("RoundingMode"),
+            type_params: empty_type_params(),
+        });
+        assert!(sub.is_subtype_structural(&sup));
+    }
+
+    #[test]
+    fn enum_case_not_subtype_of_unrelated_enum() {
+        let sub = Type::single(Atomic::TLiteralEnumCase {
+            enum_fqcn: Name::new("RoundingMode"),
+            case_name: Name::new("Unnecessary"),
+        });
+        let sup = Type::single(Atomic::TNamedObject {
+            fqcn: Name::new("Suit"),
+            type_params: empty_type_params(),
+        });
+        assert!(!sub.is_subtype_structural(&sup));
     }
 
     #[test]
