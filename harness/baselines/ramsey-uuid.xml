@@ -461,12 +461,6 @@
       <code><![CDATA[$phpOs = constant('PHP_OS')]]></code>
       <code><![CDATA[$sid = str_getcsv(trim((string) $response), escape: '\\')[1] ?? '']]></code>
     </MixedAssignment>
-    <RedundantCondition>
-      <code><![CDATA[$uid instanceof IntegerObject]]></code>
-      <code><![CDATA[$uid === null]]></code>
-      <code><![CDATA[$gid instanceof IntegerObject]]></code>
-      <code><![CDATA[$gid === null]]></code>
-    </RedundantCondition>
   </file>
   <file src="src/Provider/Node/NodeProviderCollection.php">
     <MixedAssignment>
@@ -498,9 +492,6 @@
       <code><![CDATA[$phpOs = constant('PHP_OS')]]></code>
       <code><![CDATA[$mac = reset($macs)]]></code>
     </MixedAssignment>
-    <RedundantCondition>
-      <code><![CDATA[$node !== null]]></code>
-    </RedundantCondition>
   </file>
   <file src="src/Provider/Time/SystemTimeProvider.php">
     <PossiblyInvalidArrayAccess>

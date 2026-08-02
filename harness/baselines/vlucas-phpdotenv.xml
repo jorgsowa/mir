@@ -202,15 +202,6 @@
             return \is_string($value) && $value !== '';
         }]]></code>
     </MissingClosureReturnType>
-    <MixedReturnStatement>
-      <code><![CDATA[return apache_setenv($name, $value);]]></code>
-      <code><![CDATA[return apache_setenv($name, '');]]></code>
-    </MixedReturnStatement>
-    <UndefinedFunction>
-      <code><![CDATA[apache_getenv($name)]]></code>
-      <code><![CDATA[apache_setenv($name, $value)]]></code>
-      <code><![CDATA[apache_setenv($name, '')]]></code>
-    </UndefinedFunction>
   </file>
   <file src="src/Repository/Adapter/ArrayAdapter.php">
     <MissingPropertyType>
@@ -383,10 +374,6 @@
             return (array) @\preg_split($pattern, $subject);
         }]]></code>
     </MissingClosureReturnType>
-    <RedundantCast>
-      <code><![CDATA[@\preg_replace_callback($pattern, $callback, $subject, $limit ?? -1)]]></code>
-      <code><![CDATA[@\preg_split($pattern, $subject)]]></code>
-    </RedundantCast>
   </file>
   <file src="src/Util/Str.php">
     <MixedArgument>

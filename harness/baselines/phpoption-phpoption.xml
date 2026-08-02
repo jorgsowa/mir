@@ -101,9 +101,6 @@
     <MixedFunctionCall>
       <code><![CDATA[$value()]]></code>
     </MixedFunctionCall>
-    <MixedReturnStatement>
-      <code><![CDATA[return $o->get();]]></code>
-    </MixedReturnStatement>
   </file>
   <file src="src/PhpOption/Some.php">
     <MissingPropertyType>
