@@ -11,6 +11,12 @@ use php_ast::owned::{BinaryExpr, ExprKind};
 use php_ast::Span;
 use std::sync::Arc;
 
+/// Whether every member of `ty` is definitely a string — `&`/`|`/`^` (and
+/// unary `~`) return `string` instead of `int` when all operands are string.
+pub(super) fn operand_is_definitely_string(ty: &Type) -> bool {
+    !ty.types.is_empty() && !ty.is_mixed() && ty.types.iter().all(|a| a.is_string())
+}
+
 pub(super) fn operand_is_non_bitwise(ty: &Type) -> bool {
     if ty.types.is_empty() || ty.is_mixed() {
         return false;
@@ -344,8 +350,17 @@ impl<'a> ExpressionAnalyzer<'a> {
                         span,
                     );
                 }
-                infer_bitwise_range(b.op, &left_ty, &right_ty)
-                    .unwrap_or_else(|| Type::single(Atomic::TInt))
+                if matches!(
+                    b.op,
+                    BinaryOp::BitwiseAnd | BinaryOp::BitwiseOr | BinaryOp::BitwiseXor
+                ) && operand_is_definitely_string(&left_ty)
+                    && operand_is_definitely_string(&right_ty)
+                {
+                    Type::single(Atomic::TString)
+                } else {
+                    infer_bitwise_range(b.op, &left_ty, &right_ty)
+                        .unwrap_or_else(|| Type::single(Atomic::TInt))
+                }
             }
 
             BinaryOp::Pipe => right_ty,

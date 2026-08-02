@@ -1,4 +1,7 @@
-use super::binary::{operand_contains_null, operand_is_non_bitwise, operand_is_non_numeric};
+use super::binary::{
+    operand_contains_null, operand_is_definitely_string, operand_is_non_bitwise,
+    operand_is_non_numeric,
+};
 use super::helpers::{extract_simple_var, infer_int_range_arithmetic};
 use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
@@ -85,7 +88,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                         u.operand.span,
                     );
                 }
-                Type::single(Atomic::TInt)
+                if operand_is_definitely_string(&operand_ty) {
+                    Type::single(Atomic::TString)
+                } else {
+                    Type::single(Atomic::TInt)
+                }
             }
             UnaryPrefixOp::PreIncrement | UnaryPrefixOp::PreDecrement => {
                 // `++`/`--` on a property/array-index-into-property/static
