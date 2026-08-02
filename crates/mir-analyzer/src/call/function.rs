@@ -1233,8 +1233,11 @@ impl CallAnalyzer {
                     "date" | "gmdate" | "date_format" => Type::single(Atomic::TNonEmptyString),
                     // Encoding/conversion functions: strip |false from stubs — they only
                     // return false on bad input that PHP code never checks for in practice.
+                    // `falsy_stripped()` keeps a defensive `=== false`/`(string)` guard against
+                    // that stripped variant from being flagged as impossible/redundant.
                     "mb_convert_encoding" => super::callable::string_preserve_non_empty(&arg_types)
                         .or_else(|| super::callable::string_if_string_arg(&arg_types, 0))
+                        .map(Type::falsy_stripped)
                         .unwrap_or(return_ty),
                     "iconv" => {
                         // iconv($from_encoding, $to_encoding, $str) — $str is arg 2
@@ -1242,9 +1245,13 @@ impl CallAnalyzer {
                     }
                     // preg_replace/preg_replace_callback: strip |null when subject is a string.
                     // The null case only fires on a regex error, which PHP code rarely handles.
+                    // `falsy_stripped()` keeps a defensive `=== null`/`(string)` guard against
+                    // that stripped variant from being flagged as impossible/redundant.
                     "preg_replace" | "preg_replace_callback" => {
                         // subject is arg 2
-                        super::callable::string_if_string_arg(&arg_types, 2).unwrap_or(return_ty)
+                        super::callable::string_if_string_arg(&arg_types, 2)
+                            .map(Type::falsy_stripped)
+                            .unwrap_or(return_ty)
                     }
                     // substr_replace: strip |array when $string is a scalar string.
                     "substr_replace" => {

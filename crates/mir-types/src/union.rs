@@ -51,6 +51,14 @@ pub struct Type {
     pub possibly_undefined: bool,
     /// This type originated from a docblock annotation rather than inference.
     pub from_docblock: bool,
+    /// A `false`/`null` failure variant was deliberately stripped from this type
+    /// (e.g. `preg_split`'s regex-error `false`) because real code overwhelmingly
+    /// never checks for it. A defensive `=== false`/`=== null` check or a
+    /// `(string)`/`(array)` cast guarding against that exact stripped variant is
+    /// still legitimate, so the impossibility/redundancy checks (`ImpossibleIdenticalComparison`,
+    /// `RedundantCast`, the `=== null` narrowing divergence) exempt it instead of
+    /// flagging the caller's own defensive code.
+    pub falsy_stripped: bool,
 }
 
 impl Type {
@@ -61,6 +69,7 @@ impl Type {
             types: SmallVec::new(),
             possibly_undefined: false,
             from_docblock: false,
+            falsy_stripped: false,
         }
     }
 
@@ -71,6 +80,7 @@ impl Type {
             types,
             possibly_undefined: false,
             from_docblock: false,
+            falsy_stripped: false,
         }
     }
 
@@ -127,6 +137,7 @@ impl Type {
             types,
             possibly_undefined: false,
             from_docblock: false,
+            falsy_stripped: false,
         }
     }
 
@@ -915,6 +926,7 @@ impl Type {
                 types: smallvec::smallvec![Atomic::TMixed],
                 possibly_undefined: a.possibly_undefined || b.possibly_undefined,
                 from_docblock: a.from_docblock || b.from_docblock,
+                falsy_stripped: false,
             };
         }
         let mut result = a.clone();
@@ -1338,6 +1350,13 @@ impl Type {
     /// Mark this union as coming from a docblock annotation.
     pub fn from_docblock(mut self) -> Self {
         self.from_docblock = true;
+        self
+    }
+
+    /// Mark this union as having had a `false`/`null` failure variant stripped
+    /// for flow purposes (see the field doc on [`Type::falsy_stripped`]).
+    pub fn falsy_stripped(mut self) -> Self {
+        self.falsy_stripped = true;
         self
     }
 }

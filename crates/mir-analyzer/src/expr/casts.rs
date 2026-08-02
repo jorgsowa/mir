@@ -210,8 +210,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                     return folded;
                 }
-                // Check for RedundantCast when already string (non-literal)
-                if inner_ty.is_single() && inner_ty.contains(|t| t.is_string()) {
+                // Check for RedundantCast when already string (non-literal). Skipped when
+                // `falsy_stripped` — the cast is coercing away a real (but deliberately
+                // unmodelled) `false`/`null` failure variant, not a no-op.
+                if inner_ty.is_single()
+                    && inner_ty.contains(|t| t.is_string())
+                    && !inner_ty.falsy_stripped
+                {
                     self.emit(
                         IssueKind::RedundantCast {
                             from: inner_ty.to_string(),
@@ -318,7 +323,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                 Type::single(Atomic::TBool)
             }
             CastKind::Array => {
-                // Check for RedundantCast when already array
+                // Check for RedundantCast when already array. Skipped when
+                // `falsy_stripped` — the cast is coercing away a real (but deliberately
+                // unmodelled) `false`/`null` failure variant, not a no-op.
                 if inner_ty.is_single()
                     && inner_ty.contains(|t| {
                         matches!(
@@ -330,6 +337,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 | Atomic::TKeyedArray { .. }
                         )
                     })
+                    && !inner_ty.falsy_stripped
                 {
                     self.emit(
                         IssueKind::RedundantCast {

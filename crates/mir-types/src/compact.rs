@@ -29,7 +29,7 @@ impl SimpleType {
     /// Convert a Type into a SimpleType, boxing complex types.
     pub fn from_union(u: Type) -> Self {
         // Simple scalar: single atomic, no flags.
-        if !u.possibly_undefined && !u.from_docblock && u.types.len() == 1 {
+        if !u.possibly_undefined && !u.from_docblock && !u.falsy_stripped && u.types.len() == 1 {
             match &u.types[0] {
                 Atomic::TString => return Self::String,
                 Atomic::TInt => return Self::Int,

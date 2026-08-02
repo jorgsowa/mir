@@ -421,6 +421,12 @@ fn atomics_can_be_identical(left: &Atomic, right: &Atomic) -> bool {
     }
 }
 
+/// Whether `ty` is exactly the bare literal `false` or `null` — the two
+/// failure variants stub-stripping (`Type::falsy_stripped`) ever removes.
+fn is_bare_false_or_null(ty: &Type) -> bool {
+    matches!(ty.types.as_slice(), [Atomic::TFalse] | [Atomic::TNull])
+}
+
 /// Whether any atom in `left` could ever be strictly identical (`===`) to any
 /// atom in `right`.
 ///
@@ -428,6 +434,16 @@ fn atomics_can_be_identical(left: &Atomic, right: &Atomic) -> bool {
 /// empty (never/unknown) or when any atom pair has an unknown family.
 pub(crate) fn types_can_be_identical(left: &Type, right: &Type) -> bool {
     if left.types.is_empty() || right.types.is_empty() {
+        return true;
+    }
+    // A defensive `$x === false`/`=== null` check against a return value whose
+    // real failure variant was deliberately stripped (see `falsy_stripped`) is
+    // legitimate code, not a contradiction — only the stripped side's own
+    // family gets this exemption, so an unrelated `$x === false` on a genuine
+    // non-bool type still fires normally.
+    if (left.falsy_stripped && is_bare_false_or_null(right))
+        || (right.falsy_stripped && is_bare_false_or_null(left))
+    {
         return true;
     }
     left.types.iter().any(|la| {

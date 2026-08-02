@@ -1212,9 +1212,12 @@ pub(crate) fn preg_split_return_type(arg_types: &[Type]) -> Option<Type> {
     }
     // No PREG_SPLIT_NO_EMPTY → always at least one part. The false case only
     // fires on an invalid regex, which PHP code never handles in practice.
+    // `falsy_stripped()` keeps a defensive `=== false` guard against that
+    // stripped variant from being flagged as impossible.
     let result = Type::single(Atomic::TNonEmptyList {
         value: Box::new(Type::single(Atomic::TString)),
-    });
+    })
+    .falsy_stripped();
     Some(result)
 }
 

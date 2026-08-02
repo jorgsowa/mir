@@ -371,7 +371,11 @@ pub(super) fn narrow_var_null(ctx: &mut FlowState, name: &str, is_null: bool) {
     } else {
         current.remove_null()
     };
-    set_narrowed(ctx, name, &current, narrowed, true);
+    // A type with its `null` failure variant deliberately stripped (see
+    // `Type::falsy_stripped`) still allows a defensive `=== null` check against
+    // that stripped variant — an empty result here isn't a real contradiction.
+    let mark_diverges = !current.falsy_stripped;
+    set_narrowed(ctx, name, &current, narrowed, mark_diverges);
 }
 
 /// Loose-equality counterpart of `narrow_var_null`, for `$x == null`/`!= null`.
