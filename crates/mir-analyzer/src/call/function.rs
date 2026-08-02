@@ -173,9 +173,12 @@ impl CallAnalyzer {
                 if let Some(expanded) = sole_spread_ty.and_then(|t| expand_sole_spread_arg(&t)) {
                     inner_arg_spans =
                         distinct_spans_for_expansion(inner_arg_spans[0], expanded.len());
-                    inner_arg_names = vec![None; expanded.len()];
+                    inner_arg_names = expanded
+                        .iter()
+                        .map(|(name, _)| name.as_ref().map(|n| n.to_string()))
+                        .collect();
                     inner_arg_byref = vec![false; expanded.len()];
-                    inner_arg_types = expanded;
+                    inner_arg_types = expanded.into_iter().map(|(_, ty)| ty).collect();
                     has_spread = false;
                     arity_unknown = true;
                 }
@@ -480,9 +483,12 @@ impl CallAnalyzer {
         // trigger TooFew/TooManyArguments.
         if let Some(expanded) = sole_spread_ty.and_then(|t| expand_sole_spread_arg(&t)) {
             arg_spans = distinct_spans_for_expansion(arg_spans[0], expanded.len());
-            arg_names = vec![None; expanded.len()];
+            arg_names = expanded
+                .iter()
+                .map(|(name, _)| name.as_ref().map(|n| n.to_string()))
+                .collect();
             arg_can_be_byref = vec![false; expanded.len()];
-            arg_types = expanded;
+            arg_types = expanded.into_iter().map(|(_, ty)| ty).collect();
             has_spread = false;
             arity_unknown = true;
         }
