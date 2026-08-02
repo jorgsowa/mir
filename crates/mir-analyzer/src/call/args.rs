@@ -120,19 +120,28 @@ pub fn spread_element_type(db: &dyn crate::db::MirDatabase, arr_ty: &Type) -> Ty
 }
 
 /// When a call's sole argument is a spread (`f(...$arr)`) and `$arr` resolves
-/// to a literal, sequentially int-keyed (0..n-1), closed shape, return one
-/// type per element instead of the single merged [`spread_element_type`].
+/// to a literal, closed shape, return one `(name, type)` pair per element
+/// instead of the single merged [`spread_element_type`]. `name` is `Some` for
+/// a string-keyed element — PHP 8.1+ binds those by parameter name, same as
+/// a named argument (`f(...['name' => 'Bob', 'times' => 2])` behaves exactly
+/// like `f(name: 'Bob', times: 2)`) — and `None` for a sequential (0..n-1)
+/// int-keyed element, bound positionally.
 ///
 /// Without this, `needsTwoInts(...$pair)` binds the merged union of ALL of
 /// `$pair`'s element types to just the first parameter (via the existing
 /// "stop after the first arg once a spread is seen" arity logic) and never
 /// checks the remaining parameters at all — `$pair[1]` being definitely
-/// wrong-typed for `$b` went completely undetected.
+/// wrong-typed for `$b` went completely undetected. A string-keyed shape hit
+/// the same fallback and, worse, checked the merged union against the FIRST
+/// parameter regardless of which parameter each key actually names.
 ///
 /// Returns `None` (fall back to the single-merged-type behavior) for a
-/// dynamic-length array, an open shape, or a non-shape array type.
-pub fn expand_sole_spread_arg(arr_ty: &Type) -> Option<Vec<Type>> {
-    let mut per_index: Vec<Type> = Vec::new();
+/// dynamic-length array, an open shape, a non-shape array type, or a shape
+/// mixing int and string keys (ambiguous — PHP requires int keys in a
+/// named-arg spread to be sequential from 0, but resolving that precisely
+/// isn't needed by any known caller yet).
+pub fn expand_sole_spread_arg(arr_ty: &Type) -> Option<Vec<(Option<Arc<str>>, Type)>> {
+    let mut per_index: Vec<(Option<Arc<str>>, Type)> = Vec::new();
     if arr_ty.types.is_empty() {
         return None;
     }
@@ -150,18 +159,41 @@ pub fn expand_sole_spread_arg(arr_ty: &Type) -> Option<Vec<Type>> {
         else {
             return None;
         };
+        let all_string_keyed =
+            !properties.is_empty() && properties.keys().all(|k| matches!(k, ArrayKey::String(_)));
         if per_index.is_empty() {
-            for i in 0..properties.len() {
-                let prop = properties.get(&ArrayKey::Int(i as i64))?;
-                per_index.push(prop.ty.clone());
+            if all_string_keyed {
+                for (key, prop) in properties.iter() {
+                    let ArrayKey::String(name) = key else {
+                        unreachable!("all_string_keyed guarantees every key is a String")
+                    };
+                    per_index.push((Some(name.clone()), prop.ty.clone()));
+                }
+            } else {
+                for i in 0..properties.len() {
+                    let prop = properties.get(&ArrayKey::Int(i as i64))?;
+                    per_index.push((None, prop.ty.clone()));
+                }
+            }
+        } else if all_string_keyed {
+            if properties.len() != per_index.len() {
+                return None;
+            }
+            for slot in per_index.iter_mut() {
+                let name = slot.0.as_ref()?;
+                let prop = properties.get(&ArrayKey::String(name.clone()))?;
+                slot.1.merge_with(&prop.ty);
             }
         } else {
             if properties.len() != per_index.len() {
                 return None;
             }
             for (i, slot) in per_index.iter_mut().enumerate() {
+                if slot.0.is_some() {
+                    return None;
+                }
                 let prop = properties.get(&ArrayKey::Int(i as i64))?;
-                slot.merge_with(&prop.ty);
+                slot.1.merge_with(&prop.ty);
             }
         }
     }

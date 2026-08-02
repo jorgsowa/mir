@@ -550,11 +550,18 @@ impl MirDbStorage {
         *self.stub_cache.write() = Some(cache);
     }
 
-    /// Store a pre-computed `StubSlice` for a given content hash + PHP version
-    /// so that `collect_file_definitions_uncached` can skip re-parsing files
-    /// already processed by `collect_and_ingest_file` in the same session.
-    pub fn prime_parse_cache(&self, hash: [u8; 32], php_v: u8, slice: Arc<StubSlice>) {
-        self.parse_cache.insert(hash, php_v, slice);
+    /// Store a pre-computed `StubSlice` and its issues for a given content
+    /// hash + PHP version so that `collect_file_definitions_uncached` can
+    /// skip re-parsing files already processed by `collect_and_ingest_file`
+    /// in the same session — and still return the correct issues on that hit.
+    pub fn prime_parse_cache(
+        &self,
+        hash: [u8; 32],
+        php_v: u8,
+        slice: Arc<StubSlice>,
+        issues: Arc<Vec<mir_issues::Issue>>,
+    ) {
+        self.parse_cache.insert(hash, php_v, slice, issues);
     }
 
     /// Snapshot the current workspace symbol index into this db clone's

@@ -19,9 +19,11 @@
 //! ~40 entries even for large monorepos.
 //!
 //! Format: a fixed-size [`Header`] (magic + version fields + content hash)
-//! followed by a bincode 1.x-encoded [`StubSlice`]. Any header mismatch is
-//! treated as a miss so cache files survive across mir upgrades without
-//! risking type-layout corruption.
+//! followed by a bincode 1.x-encoded [`StubSlice`], followed by a bincode
+//! 1.x-encoded `Vec<Issue>` (the collector-phase issues found alongside the
+//! slice — parse errors, `BackedEnumCaseTypeMismatch`, docblock warnings,
+//! etc.). Any header mismatch is treated as a miss so cache files survive
+//! across mir upgrades without risking type-layout corruption.
 //!
 //! Writes are atomic: each shard is written to a sibling tempfile in the
 //! same directory and then renamed into place. A SIGINT mid-write therefore
@@ -33,14 +35,16 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use mir_codebase::definitions::{deduplicate_params_in_slice, StubSlice};
+use mir_issues::Issue;
 use serde::{Deserialize, Serialize};
 
 /// Magic bytes at the start of every cache entry. "MIR\x01" little-endian.
 const MAGIC: u32 = 0x0152_494D;
 /// Bumped when the on-disk header layout changes OR a serialized `StubSlice`
 /// struct changes shape (e.g. `inferred_return_type: Option<Type>` →
-/// `Option<Arc<Type>>`), so stale entries are rejected.
-const FORMAT_VERSION: u8 = 11;
+/// `Option<Arc<Type>>`), so stale entries are rejected. Also bumped whenever
+/// the trailing payload shape changes (e.g. adding the `Vec<Issue>` section).
+const FORMAT_VERSION: u8 = 12;
 
 /// Cache header. Any mismatch (magic, version, content_hash, php_version)
 /// forces the consumer to treat the entry as a miss and recompute.
@@ -76,6 +80,7 @@ struct WriteJob {
     entry_path: PathBuf,
     header: Header,
     slice: std::sync::Arc<StubSlice>,
+    issues: std::sync::Arc<Vec<Issue>>,
     seq: u64,
 }
 
@@ -124,15 +129,22 @@ impl StubSliceCache {
         self.root.join(&s[..2]).join(format!("{}.bin", s))
     }
 
-    /// Return the cached [`StubSlice`] for `path` if its stored entry matches
-    /// `(content_hash, php_version)` and the current mir version.
+    /// Return the cached [`StubSlice`] and its issues for `path` if its
+    /// stored entry matches `(content_hash, php_version)` and the current
+    /// mir version.
     ///
     /// On hit the deserialized slice has its `file` field restored from the
-    /// caller-supplied `path` (we don't trust paths from disk) and its
-    /// `is_deduped` flag is preserved as `false`; callers running in parallel
-    /// should re-run [`deduplicate_params_in_slice`] before ingest so the
-    /// serial write-lock section doesn't pay dedup costs (commit 3018a1d).
-    pub fn get(&self, path: &str, content_hash: &[u8; 32], php_version: u8) -> Option<StubSlice> {
+    /// caller-supplied `path` (we don't trust paths from disk), same for
+    /// every issue's `location.file`, and the slice's `is_deduped` flag is
+    /// preserved as `false`; callers running in parallel should re-run
+    /// [`deduplicate_params_in_slice`] before ingest so the serial
+    /// write-lock section doesn't pay dedup costs (commit 3018a1d).
+    pub fn get(
+        &self,
+        path: &str,
+        content_hash: &[u8; 32],
+        php_version: u8,
+    ) -> Option<(StubSlice, Vec<Issue>)> {
         if !self.enabled {
             return None;
         }
@@ -161,30 +173,41 @@ impl StubSliceCache {
             self.misses.fetch_add(1, Ordering::Relaxed);
             return None;
         }
-        match cfg.deserialize_from::<_, StubSlice>(&mut cursor) {
-            Ok(mut slice) => {
-                // Restore the caller's path; cached paths are not trusted.
-                slice.file = Some(std::sync::Arc::from(path));
-                self.hits.fetch_add(1, Ordering::Relaxed);
-                Some(slice)
-            }
+        let mut slice: StubSlice = match cfg.deserialize_from(&mut cursor) {
+            Ok(slice) => slice,
             Err(_) => {
                 self.misses.fetch_add(1, Ordering::Relaxed);
-                None
+                return None;
             }
+        };
+        let mut issues: Vec<Issue> = match cfg.deserialize_from(&mut cursor) {
+            Ok(issues) => issues,
+            Err(_) => {
+                self.misses.fetch_add(1, Ordering::Relaxed);
+                return None;
+            }
+        };
+        // Restore the caller's path; cached paths are not trusted.
+        slice.file = Some(std::sync::Arc::from(path));
+        let path_arc: std::sync::Arc<str> = std::sync::Arc::from(path);
+        for issue in &mut issues {
+            issue.location.file = path_arc.clone();
         }
+        self.hits.fetch_add(1, Ordering::Relaxed);
+        Some((slice, issues))
     }
 
-    /// Write `slice` to the cache. Atomic via tempfile-in-same-directory +
-    /// rename. Errors (disk full, permission denied, race with another
-    /// writer) are swallowed — the cache is an optimization, never a
-    /// correctness dependency.
+    /// Write `slice` and `issues` to the cache. Atomic via
+    /// tempfile-in-same-directory + rename. Errors (disk full, permission
+    /// denied, race with another writer) are swallowed — the cache is an
+    /// optimization, never a correctness dependency.
     pub fn put(
         &self,
         path: &str,
         content_hash: &[u8; 32],
         php_version: u8,
         slice: &std::sync::Arc<StubSlice>,
+        issues: &std::sync::Arc<Vec<Issue>>,
     ) {
         if !self.enabled {
             return;
@@ -199,6 +222,7 @@ impl StubSliceCache {
                 content_hash: *content_hash,
             },
             slice: std::sync::Arc::clone(slice),
+            issues: std::sync::Arc::clone(issues),
             seq: self.writes.fetch_add(1, Ordering::Relaxed),
         };
         let mut guard = self.writer.lock().unwrap();
@@ -264,6 +288,7 @@ fn write_entry(job: WriteJob) {
         entry_path,
         header,
         slice,
+        issues,
         seq,
     } = job;
     let Some(shard_dir) = entry_path.parent() else {
@@ -283,6 +308,14 @@ fn write_entry(job: WriteJob) {
     slice_for_disk.file = None;
     // `is_deduped` is #[serde(skip)] so it does not need stripping.
     match bincode::serialize(&slice_for_disk) {
+        Ok(body) => buf.extend_from_slice(&body),
+        Err(_) => return,
+    }
+    // Issues' `location.file` isn't stripped before serializing (unlike the
+    // slice's `file` field) — it's simpler to just always overwrite it from
+    // the caller-supplied path on read (same "don't trust disk" policy),
+    // rather than giving `Location` an optional file field solely for this.
+    match bincode::serialize(&*issues) {
         Ok(body) => buf.extend_from_slice(&body),
         Err(_) => return,
     }
@@ -323,20 +356,66 @@ mod tests {
         (dir, cache)
     }
 
+    fn no_issues() -> std::sync::Arc<Vec<Issue>> {
+        std::sync::Arc::new(Vec::new())
+    }
+
+    fn sample_issue(file: &str) -> Issue {
+        Issue::new(
+            mir_issues::IssueKind::UndefinedVariable {
+                name: "x".to_string(),
+            },
+            mir_types::Location {
+                file: std::sync::Arc::from(file),
+                line: 1,
+                line_end: 1,
+                col_start: 0,
+                col_end: 1,
+            },
+        )
+    }
+
     #[test]
     fn roundtrip_returns_equivalent_slice() {
         let (_dir, cache) = make_cache();
         let hash = hash_source("<?php class A {}");
         let slice = StubSlice::default();
-        cache.put("/x/a.php", &hash, 8, &std::sync::Arc::new(slice));
+        cache.put("/x/a.php", &hash, 8, &std::sync::Arc::new(slice), &no_issues());
         cache.flush();
 
-        let got = cache.get("/x/a.php", &hash, 8).expect("hit");
+        let (got, issues) = cache.get("/x/a.php", &hash, 8).expect("hit");
         assert_eq!(
             got.file.as_deref().map(|s| s.to_string()),
             Some("/x/a.php".to_string())
         );
+        assert!(issues.is_empty());
         assert_eq!(cache.hits(), 1);
+    }
+
+    #[test]
+    fn roundtrip_returns_equivalent_issues_with_path_patched() {
+        // Each on-disk shard is keyed by path (unlike the in-process
+        // ParseCache, which shares one entry across files with identical
+        // content) — content_hash is only a within-shard validity check. So
+        // "don't trust disk" here means: even if a serialized issue's
+        // `location.file` were something else, `get` must always overwrite
+        // it to the caller-supplied path, same as it already does for the
+        // slice's own `file` field.
+        let (_dir, cache) = make_cache();
+        let hash = hash_source("<?php $x;");
+        let issues = std::sync::Arc::new(vec![sample_issue("/different/path.php")]);
+        cache.put(
+            "/x/a.php",
+            &hash,
+            8,
+            &std::sync::Arc::new(StubSlice::default()),
+            &issues,
+        );
+        cache.flush();
+
+        let (_, got_issues) = cache.get("/x/a.php", &hash, 8).expect("hit");
+        assert_eq!(got_issues.len(), 1);
+        assert_eq!(got_issues[0].location.file.as_ref(), "/x/a.php");
     }
 
     #[test]
@@ -349,6 +428,7 @@ mod tests {
             &hash_a,
             8,
             &std::sync::Arc::new(StubSlice::default()),
+            &no_issues(),
         );
         cache.flush();
 
@@ -364,6 +444,7 @@ mod tests {
             &hash,
             8,
             &std::sync::Arc::new(StubSlice::default()),
+            &no_issues(),
         );
         cache.flush();
 
@@ -387,10 +468,16 @@ mod tests {
             file: Some(std::sync::Arc::from("/different/path.php")),
             ..Default::default()
         };
-        cache.put("/x/a.php", &hash, 8, &std::sync::Arc::new(slice));
+        cache.put(
+            "/x/a.php",
+            &hash,
+            8,
+            &std::sync::Arc::new(slice),
+            &no_issues(),
+        );
         cache.flush();
 
-        let got = cache.get("/x/a.php", &hash, 8).unwrap();
+        let (got, _) = cache.get("/x/a.php", &hash, 8).unwrap();
         assert_eq!(
             got.file.as_deref().map(|s| s.to_string()),
             Some("/x/a.php".to_string())
@@ -406,6 +493,7 @@ mod tests {
             &hash,
             8,
             &std::sync::Arc::new(StubSlice::default()),
+            &no_issues(),
         );
         cache.flush();
 
@@ -435,6 +523,7 @@ mod tests {
             &hash,
             8,
             &std::sync::Arc::new(StubSlice::default()),
+            &no_issues(),
         );
         cache.flush();
 

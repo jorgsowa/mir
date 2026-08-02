@@ -1113,6 +1113,34 @@ impl AnalysisSession {
         crate::class::ClassAnalyzer::with_files(&db, file_set, &file_data).analyze_all()
     }
 
+    /// Collector-phase issues (e.g. `BackedEnumCaseTypeMismatch`,
+    /// `InvalidReadonlyPropertyDeclaration`, `InvalidDocblock`, and raw parse
+    /// errors) for the given files.
+    ///
+    /// These are found while building a file's declaration slice
+    /// ([`crate::db::collect_file_definitions`]), before body analysis or
+    /// cross-file class checks ever run — neither [`crate::FileAnalyzer::analyze`]
+    /// nor [`Self::class_issues`] reads them, so a caller merging just those
+    /// two sources silently drops every collector-time diagnostic. Call this
+    /// alongside them to get the full picture.
+    ///
+    /// A plain snapshot read through [`crate::db::collect_file_definitions`],
+    /// same as [`Self::document_symbols`] — correct regardless of which path
+    /// put the file's text into the db (`ingest_file`, `set_file_text`, lazy
+    /// vendor load) or how many times. The parse-cache fast paths behind that
+    /// query used to zero out `issues` on any hit, including re-collecting
+    /// the *same* file after its salsa memo was invalidated; they now
+    /// preserve (and, for a genuinely different file sharing content,
+    /// re-point) the originally-computed issues instead.
+    pub fn collector_issues(&self, files: &[Arc<str>]) -> Vec<crate::Issue> {
+        let db = self.snapshot_db();
+        files
+            .iter()
+            .filter_map(|f| db.lookup_source_file(f))
+            .flat_map(|sf| crate::db::collect_file_definitions(&db, sf).issues.as_ref().clone())
+            .collect()
+    }
+
     /// All declarations defined in `file` as a **hierarchical tree**.
     ///
     /// Classes/interfaces/traits/enums are returned with their methods,

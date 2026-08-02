@@ -644,7 +644,7 @@ impl AnalysisSession {
 
                     let stub = stub_cache.as_ref().and_then(|stub_cache| {
                         let hash = crate::stub_cache::hash_source(&stored_text);
-                        let mut slice = stub_cache.get(file, &hash, php_v)?;
+                        let (mut slice, _issues) = stub_cache.get(file, &hash, php_v)?;
                         crate::stub_cache::prepare_for_ingest(&mut slice);
                         let entries = crate::db::subtype_index::entries_from_slice(&slice);
                         let decls = crate::db::decls_from_slice(&slice, sf);

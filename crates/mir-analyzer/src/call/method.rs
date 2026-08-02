@@ -997,9 +997,12 @@ fn resolve_method_return<'a>(
         if let Some(expanded) = sole_spread_ty.and_then(|t| expand_sole_spread_arg(&t)) {
             effective_arg_spans =
                 distinct_spans_for_expansion(effective_arg_spans[0], expanded.len());
-            arg_names = vec![None; expanded.len()];
+            arg_names = expanded
+                .iter()
+                .map(|(name, _)| name.as_ref().map(|n| n.to_string()))
+                .collect();
             arg_can_be_byref = vec![false; expanded.len()];
-            effective_arg_types = expanded;
+            effective_arg_types = expanded.into_iter().map(|(_, ty)| ty).collect();
             has_spread = false;
             arity_unknown = true;
         }

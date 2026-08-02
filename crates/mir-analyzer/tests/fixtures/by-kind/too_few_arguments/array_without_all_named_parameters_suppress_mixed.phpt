@@ -19,4 +19,3 @@ function processUserDataInvalid(array $data) : User {
 }
 ===expect===
 UnusedSuppress@15:0-15:0: Suppress annotation for 'MixedArgument' is never used
-PossiblyInvalidArgument@15:20-15:28: Argument $id of User::__construct() expects 'int', possibly different type 'int|string' provided

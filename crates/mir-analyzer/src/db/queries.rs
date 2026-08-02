@@ -525,21 +525,24 @@ pub fn collect_file_definitions_uncached(
         .get(&content_hash, php_version.cache_byte())
     {
         crate::metrics::record_stub_cache_hit();
-        if cached.file.as_deref() == Some(path) {
+        if cached.slice.file.as_deref() == Some(path) {
             // Path matches — share the Arc directly (no data clone needed).
             return FileDefinitions {
-                slice: cached,
-                issues: Arc::new(Vec::new()),
+                slice: cached.slice,
+                issues: cached.issues,
             };
         }
         // Different path — same source text at a different location.
-        // Must fix the `file` field before returning.
-        let mut owned = (*cached).clone();
+        // Must fix the `file` field before returning (slice and issues alike).
+        let mut owned = (*cached.slice).clone();
         owned.file = Some(path.clone());
         crate::stub_cache::prepare_for_ingest(&mut owned);
         return FileDefinitions {
             slice: Arc::new(owned),
-            issues: Arc::new(Vec::new()),
+            issues: Arc::new(crate::parse_cache::patch_issue_locations(
+                &cached.issues,
+                path,
+            )),
         };
     }
 
@@ -550,12 +553,12 @@ pub fn collect_file_definitions_uncached(
         (cache, php_v)
     });
     if let Some((cache, php_v)) = &disk_cache_state {
-        if let Some(mut slice) = cache.get(path, &content_hash, *php_v) {
+        if let Some((mut slice, issues)) = cache.get(path, &content_hash, *php_v) {
             crate::stub_cache::prepare_for_ingest(&mut slice);
             crate::metrics::record_stub_cache_hit();
             return FileDefinitions {
                 slice: Arc::new(slice),
-                issues: Arc::new(Vec::new()),
+                issues: Arc::new(issues),
             };
         }
         crate::metrics::record_stub_cache_miss();
@@ -583,6 +586,7 @@ pub fn collect_file_definitions_uncached(
     mir_codebase::definitions::deduplicate_params_in_slice(&mut slice);
 
     let slice_arc = Arc::new(slice);
+    let issues_arc = Arc::new(all_issues);
 
     // Write back to both caches as long as the AST parsed cleanly.
     //
@@ -593,21 +597,23 @@ pub fn collect_file_definitions_uncached(
     // as a docblock warning. Only hard parse errors (incomplete AST) block
     // caching.
     if !has_hard_parse_errors {
-        // In-process cache: prevents re-parsing in the same session.
+        // In-process cache: prevents re-parsing in the same session, and
+        // preserves these exact issues for a later hit.
         db.parse_cache().insert(
             content_hash,
             php_version.cache_byte(),
             Arc::clone(&slice_arc),
+            Arc::clone(&issues_arc),
         );
         // Disk cache: prevents re-parsing in future sessions.
         if let Some((cache, php_v)) = &disk_cache_state {
-            cache.put(path, &content_hash, *php_v, &slice_arc);
+            cache.put(path, &content_hash, *php_v, &slice_arc, &issues_arc);
         }
     }
 
     FileDefinitions {
         slice: slice_arc,
-        issues: Arc::new(all_issues),
+        issues: issues_arc,
     }
 }
 
