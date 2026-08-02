@@ -1,6 +1,8 @@
 use super::DefinitionCollector;
 use crate::parser::{name_to_string_owned, type_from_hint_owned};
-use mir_codebase::definitions::{wrap_template_bound, ConstantDef, InterfaceDef, TemplateParam};
+use mir_codebase::definitions::{
+    wrap_template_bound, ConstantDef, InterfaceDef, PropertyDef, TemplateParam,
+};
 use mir_types::{Atomic, Type};
 use php_ast::owned::{ClassMemberKind, InterfaceDecl};
 use std::ops::ControlFlow;
@@ -124,6 +126,7 @@ impl<'a> DefinitionCollector<'a> {
 
         let mut own_methods = mir_codebase::definitions::MemberMap::default();
         let mut own_constants = mir_codebase::definitions::MemberMap::default();
+        let mut own_properties = mir_codebase::definitions::MemberMap::default();
 
         // See `collector/class.rs` for why this runs before the loop: it lets
         // `int-mask-of<self::*>` in a method docblock below resolve against
@@ -230,11 +233,76 @@ impl<'a> DefinitionCollector<'a> {
                         },
                     );
                 }
+                ClassMemberKind::Property(p) => {
+                    let prop_doc = self.parse_docblock_from_node(p.doc_comment.as_ref());
+                    let prop_doc_span = p
+                        .doc_comment
+                        .as_ref()
+                        .map(|c| c.span.start)
+                        .unwrap_or(member.span.start);
+                    self.emit_docblock_issues(&prop_doc, prop_doc_span);
+                    if !self.version_allows(&prop_doc) {
+                        continue;
+                    }
+                    let prop_name = p.name.as_deref().unwrap_or_default();
+                    let hint_ty = self.resolve_union_opt(
+                        p.type_hint
+                            .as_ref()
+                            .map(|h| type_from_hint_owned(h, Some(&fqcn))),
+                    );
+                    let ty = self
+                        .version_attr_type_string(&p.attributes)
+                        .map(|s| crate::parser::docblock::parse_type_string(&s))
+                        .or_else(|| {
+                            prop_doc.var_type.clone().map(|t| {
+                                self.resolve_union_doc_with_templates(
+                                    super::expand_aliases_only(t, &type_aliases),
+                                    &iface_template_names,
+                                    fqcn.as_str(),
+                                    &iface_template_params,
+                                )
+                            })
+                        })
+                        .or_else(|| hint_ty.clone());
+                    own_properties.insert(
+                        Arc::from(prop_name),
+                        PropertyDef {
+                            name: Arc::from(prop_name),
+                            ty: mir_codebase::definitions::wrap_property_type(ty),
+                            native_ty: mir_codebase::definitions::wrap_property_type(hint_ty),
+                            inferred_ty: None,
+                            visibility: Self::convert_visibility(p.visibility),
+                            is_static: p.is_static,
+                            is_readonly: p.is_readonly,
+                            has_native_readonly: p.is_readonly,
+                            default: None,
+                            location: Some(self.location(member.span.start, member.span.end)),
+                            deprecated: prop_doc.deprecated.as_deref().map(Arc::from).or_else(
+                                || {
+                                    if p.attributes.iter().any(|a| {
+                                        a.name
+                                            .parts
+                                            .last()
+                                            .map(|part| {
+                                                part.as_ref().eq_ignore_ascii_case("Deprecated")
+                                            })
+                                            .unwrap_or(false)
+                                    }) {
+                                        Some(Arc::from(""))
+                                    } else {
+                                        None
+                                    }
+                                },
+                            ),
+                            has_native_type: p.type_hint.is_some(),
+                            from_docblock: false,
+                        },
+                    );
+                }
                 _ => {}
             }
         }
 
-        let mut own_properties = mir_codebase::definitions::MemberMap::default();
         self.add_docblock_members(
             &iface_doc,
             &type_aliases,
