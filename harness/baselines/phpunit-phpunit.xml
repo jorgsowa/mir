@@ -1,0 +1,2258 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<files>
+  <file src="src/Event/Dispatcher/CollectingDispatcher.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[$this->isolatedDirectDispatcher->dispatch($event)]]></code>
+    </MissingThrowsDocblock>
+  </file>
+  <file src="src/Event/Emitter/DispatchingEmitter.php">
+    <MixedAssignment>
+      <code><![CDATA[$messagePattern = $metadata[0]->messagePattern()]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Event/Events/Application/Started.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->runtime->asString()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/CustomTestMethodInvocationUsed.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->customTestMethodInvocation->className()]]></code>
+      <code><![CDATA[$this->customTestMethodInvocation->methodName()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/HookMethod/AfterLastTestMethodCalled.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->calledMethod->className()]]></code>
+      <code><![CDATA[$this->calledMethod->methodName()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/HookMethod/AfterLastTestMethodErrored.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->throwable->message()]]></code>
+      <code><![CDATA[$this->calledMethod->className()]]></code>
+      <code><![CDATA[$this->calledMethod->methodName()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/HookMethod/AfterLastTestMethodFailed.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->throwable->message()]]></code>
+      <code><![CDATA[$this->calledMethod->className()]]></code>
+      <code><![CDATA[$this->calledMethod->methodName()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/HookMethod/AfterTestMethodCalled.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->calledMethod->className()]]></code>
+      <code><![CDATA[$this->calledMethod->methodName()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/HookMethod/AfterTestMethodErrored.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->throwable->message()]]></code>
+      <code><![CDATA[$this->calledMethod->className()]]></code>
+      <code><![CDATA[$this->calledMethod->methodName()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/HookMethod/AfterTestMethodFailed.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->throwable->message()]]></code>
+      <code><![CDATA[$this->calledMethod->className()]]></code>
+      <code><![CDATA[$this->calledMethod->methodName()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/HookMethod/BeforeFirstTestMethodCalled.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->calledMethod->className()]]></code>
+      <code><![CDATA[$this->calledMethod->methodName()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/HookMethod/BeforeFirstTestMethodErrored.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->throwable->message()]]></code>
+      <code><![CDATA[$this->calledMethod->className()]]></code>
+      <code><![CDATA[$this->calledMethod->methodName()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/HookMethod/BeforeFirstTestMethodFailed.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->throwable->message()]]></code>
+      <code><![CDATA[$this->calledMethod->className()]]></code>
+      <code><![CDATA[$this->calledMethod->methodName()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/HookMethod/BeforeTestMethodCalled.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->calledMethod->className()]]></code>
+      <code><![CDATA[$this->calledMethod->methodName()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/HookMethod/BeforeTestMethodErrored.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->throwable->message()]]></code>
+      <code><![CDATA[$this->calledMethod->className()]]></code>
+      <code><![CDATA[$this->calledMethod->methodName()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/HookMethod/BeforeTestMethodFailed.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->throwable->message()]]></code>
+      <code><![CDATA[$this->calledMethod->className()]]></code>
+      <code><![CDATA[$this->calledMethod->methodName()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/HookMethod/PostConditionCalled.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->calledMethod->className()]]></code>
+      <code><![CDATA[$this->calledMethod->methodName()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/HookMethod/PostConditionErrored.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->throwable->message()]]></code>
+      <code><![CDATA[$this->calledMethod->className()]]></code>
+      <code><![CDATA[$this->calledMethod->methodName()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/HookMethod/PostConditionFailed.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->throwable->message()]]></code>
+      <code><![CDATA[$this->calledMethod->className()]]></code>
+      <code><![CDATA[$this->calledMethod->methodName()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/HookMethod/PreConditionCalled.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->calledMethod->className()]]></code>
+      <code><![CDATA[$this->calledMethod->methodName()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/HookMethod/PreConditionErrored.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->throwable->message()]]></code>
+      <code><![CDATA[$this->calledMethod->className()]]></code>
+      <code><![CDATA[$this->calledMethod->methodName()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/HookMethod/PreConditionFailed.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->throwable->message()]]></code>
+      <code><![CDATA[$this->calledMethod->className()]]></code>
+      <code><![CDATA[$this->calledMethod->methodName()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/Issue/ConsideredRisky.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->test->id()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/Issue/DeprecationTriggered.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->test->id()]]></code>
+      <code><![CDATA[$this->trigger->asString()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/Issue/ErrorTriggered.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->test->id()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/Issue/NoticeTriggered.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->test->id()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/Issue/PhpDeprecationTriggered.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->test->id()]]></code>
+      <code><![CDATA[$this->trigger->asString()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/Issue/PhpNoticeTriggered.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->test->id()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/Issue/PhpWarningTriggered.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->test->id()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/Issue/PhpunitDeprecationTriggered.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->test->id()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/Issue/PhpunitErrorTriggered.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->test->id()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/Issue/PhpunitNoticeTriggered.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->test->id()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/Issue/PhpunitWarningTriggered.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->test->id()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/Issue/WarningTriggered.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->test->id()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/Lifecycle/DataProviderMethodCalled.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->dataProviderMethod->className()]]></code>
+      <code><![CDATA[$this->dataProviderMethod->methodName()]]></code>
+      <code><![CDATA[$this->testMethod->className()]]></code>
+      <code><![CDATA[$this->testMethod->methodName()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/Lifecycle/DataProviderMethodFinished.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->testMethod->className()]]></code>
+      <code><![CDATA[$this->testMethod->methodName()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/Lifecycle/Finished.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->test->id()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/Lifecycle/PreparationErrored.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->throwable->message()]]></code>
+      <code><![CDATA[$this->test->id()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/Lifecycle/PreparationFailed.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->throwable->message()]]></code>
+      <code><![CDATA[$this->test->id()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/Lifecycle/PreparationStarted.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->test->id()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/Lifecycle/Prepared.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->test->id()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/Outcome/Errored.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->throwable->message()]]></code>
+      <code><![CDATA[$this->test->id()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/Outcome/Failed.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->throwable->message()]]></code>
+      <code><![CDATA[$this->test->id()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/Outcome/MarkedIncomplete.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->throwable->message()]]></code>
+      <code><![CDATA[$this->test->id()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/Outcome/Passed.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->test->id()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/Test/Outcome/Skipped.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->test->id()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/TestRunner/ExecutionStarted.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->testSuite->count()]]></code>
+      <code><![CDATA[$this->testSuite->count()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/TestRunner/Issue/DeprecationTriggered.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->trigger->asString()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/TestRunner/PhpDeprecationTriggered.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->trigger->asString()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/TestSuite/Filtered.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->testSuite->count()]]></code>
+      <code><![CDATA[$this->testSuite->count()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/TestSuite/Finished.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->testSuite->name()]]></code>
+      <code><![CDATA[$this->testSuite->count()]]></code>
+      <code><![CDATA[$this->testSuite->count()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/TestSuite/Loaded.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->testSuite->count()]]></code>
+      <code><![CDATA[$this->testSuite->count()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/TestSuite/Skipped.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->testSuite->name()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Events/TestSuite/Started.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->testSuite->name()]]></code>
+      <code><![CDATA[$this->testSuite->count()]]></code>
+      <code><![CDATA[$this->testSuite->count()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/TypeMap.php">
+    <PossiblyInvalidArgument>
+      <code><![CDATA[class_implements($subscriber)]]></code>
+      <code><![CDATA[class_implements($subscriberInterface)]]></code>
+      <code><![CDATA[class_implements($eventClass)]]></code>
+    </PossiblyInvalidArgument>
+  </file>
+  <file src="src/Event/Value/ComparisonFailureBuilder.php">
+    <PossiblyNullMethodCall>
+      <code><![CDATA[$t->getComparisonFailure()->getExpectedAsString()]]></code>
+      <code><![CDATA[$t->getComparisonFailure()->getExpected()]]></code>
+      <code><![CDATA[$t->getComparisonFailure()->getActualAsString()]]></code>
+      <code><![CDATA[$t->getComparisonFailure()->getActual()]]></code>
+      <code><![CDATA[$t->getComparisonFailure()->getDiff()]]></code>
+    </PossiblyNullMethodCall>
+  </file>
+  <file src="src/Event/Value/Runtime/PHP.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->extensions = $extensions]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Event/Value/Runtime/Runtime.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->php()]]></code>
+      <code><![CDATA[$this->phpunit()]]></code>
+      <code><![CDATA[$this->operatingSystem()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Value/Telemetry/Duration.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->seconds()]]></code>
+      <code><![CDATA[$this->nanoseconds()]]></code>
+      <code><![CDATA[$this->seconds()]]></code>
+      <code><![CDATA[$this->nanoseconds()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Value/Telemetry/Info.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->current->time()]]></code>
+      <code><![CDATA[$this->current->memoryUsage()]]></code>
+      <code><![CDATA[$this->current->peakMemoryUsage()]]></code>
+      <code><![CDATA[$this->current->garbageCollectorStatus()]]></code>
+      <code><![CDATA[$this->current->userCpuTime()]]></code>
+      <code><![CDATA[$this->current->systemCpuTime()]]></code>
+      <code><![CDATA[$this->current->totalCpuTime()]]></code>
+      <code><![CDATA[$this->durationSinceStart()]]></code>
+      <code><![CDATA[$this->durationSincePrevious()]]></code>
+      <code><![CDATA[$this->peakMemoryUsage()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Value/Telemetry/SystemCpuTimeMeter.php">
+    <MixedAssignment>
+      <code><![CDATA[$seconds      = $usage[$secondsKey]]]></code>
+      <code><![CDATA[$microseconds = $usage[$microsecondsKey]]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Event/Value/Telemetry/SystemGarbageCollectorStatusProvider.php">
+    <InvalidArgument>
+      <code><![CDATA[$status['running']]]></code>
+      <code><![CDATA[$status['protected']]]></code>
+      <code><![CDATA[$status['full']]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Event/Value/Telemetry/SystemStopWatch.php">
+    <MixedArgument>
+      <code><![CDATA[...hrtime()]]></code>
+    </MixedArgument>
+  </file>
+  <file src="src/Event/Value/Telemetry/SystemStopWatchWithOffset.php">
+    <MixedArgument>
+      <code><![CDATA[...hrtime()]]></code>
+    </MixedArgument>
+  </file>
+  <file src="src/Event/Value/Test/Issue/IssueTrigger.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->callee->isFirstPartyOrTest()]]></code>
+      <code><![CDATA[$this->caller->isFirstPartyOrTest()]]></code>
+      <code><![CDATA[$this->callee->isThirdPartyOrPhpunitOrPhp()]]></code>
+      <code><![CDATA[$this->caller->isThirdPartyOrPhpunitOrPhp()]]></code>
+      <code><![CDATA[$this->callee->isThirdPartyOrPhpunitOrPhp()]]></code>
+      <code><![CDATA[$this->isSelf()]]></code>
+      <code><![CDATA[$this->isDirect()]]></code>
+      <code><![CDATA[$this->isIndirect()]]></code>
+      <code><![CDATA[$this->codeAsString($this->caller)]]></code>
+      <code><![CDATA[$this->codeAsString($this->callee)]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Value/Test/Phpt.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->file()]]></code>
+      <code><![CDATA[$this->file()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Value/Test/TestCollection.php">
+    <ImpureFunctionCall>
+      <code><![CDATA[new TestCollectionIterator($this)]]></code>
+    </ImpureFunctionCall>
+  </file>
+  <file src="src/Event/Value/Test/TestData/TestDataCollection.php">
+    <PropertyTypeCoercion>
+      <code><![CDATA[$this->fromDataProvider = $fromDataProvider]]></code>
+    </PropertyTypeCoercion>
+  </file>
+  <file src="src/Event/Value/Test/TestMethod.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->testData()]]></code>
+      <code><![CDATA[$this->testData->dataFromDataProvider()]]></code>
+      <code><![CDATA[$this->name()]]></code>
+      <code><![CDATA[$this->testData->hasDataFromDataProvider()]]></code>
+      <code><![CDATA[$this->testData->dataFromDataProvider()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Event/Value/TestSuite/TestSuiteBuilder.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[$line !== false]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Event/Value/TestSuite/TestSuiteForTestClass.php">
+    <InvalidArgument>
+      <code><![CDATA[$name]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Event/Value/Throwable.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->description()]]></code>
+      <code><![CDATA[$this->stackTrace()]]></code>
+      <code><![CDATA[$this->stackTrace()]]></code>
+      <code><![CDATA[$this->hasPrevious()]]></code>
+      <code><![CDATA[$this->previous()]]></code>
+    </ImpureMethodCall>
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->previous    = $previous]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Framework/Assert.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[array_combine($keysToBeConsidered, $keysToBeConsidered)]]></code>
+    </MissingThrowsDocblock>
+  </file>
+  <file src="src/Framework/Attributes/CoversTrait.php">
+    <UndefinedDocblockClass>
+      <code><![CDATA[]]></code>
+    </UndefinedDocblockClass>
+  </file>
+  <file src="src/Framework/Attributes/UsesTrait.php">
+    <UndefinedDocblockClass>
+      <code><![CDATA[]]></code>
+    </UndefinedDocblockClass>
+  </file>
+  <file src="src/Framework/Constraint/Array/ArrayComparison.php">
+    <MixedAssignment>
+      <code><![CDATA[$value]]></code>
+      <code><![CDATA[$expectedValue]]></code>
+      <code><![CDATA[$candidate]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Framework/Constraint/Array/ArrayHasKey.php">
+    <MixedArgument>
+      <code><![CDATA[$this->key]]></code>
+    </MixedArgument>
+  </file>
+  <file src="src/Framework/Constraint/Callback.php">
+    <MixedReturnStatement>
+      <code><![CDATA[return ($this->callback)(...$other);]]></code>
+      <code><![CDATA[return ($this->callback)($other);]]></code>
+    </MixedReturnStatement>
+  </file>
+  <file src="src/Framework/Constraint/Cardinality/Count.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[$other->getIterator()]]></code>
+    </MissingThrowsDocblock>
+    <MixedArgument>
+      <code><![CDATA[$other]]></code>
+      <code><![CDATA[$e->getCode()]]></code>
+    </MixedArgument>
+  </file>
+  <file src="src/Framework/Constraint/Constraint.php">
+    <UnusedParam>
+      <code><![CDATA[$other]]></code>
+      <code><![CDATA[$other]]></code>
+      <code><![CDATA[$operator]]></code>
+      <code><![CDATA[$role]]></code>
+    </UnusedParam>
+  </file>
+  <file src="src/Framework/Constraint/IsAnything.php">
+    <UndefinedDocblockClass>
+      <code><![CDATA[]]></code>
+    </UndefinedDocblockClass>
+  </file>
+  <file src="src/Framework/Constraint/Math/IsFinite.php">
+    <MixedArgument>
+      <code><![CDATA[$other]]></code>
+    </MixedArgument>
+  </file>
+  <file src="src/Framework/Constraint/Math/IsInfinite.php">
+    <MixedArgument>
+      <code><![CDATA[$other]]></code>
+    </MixedArgument>
+  </file>
+  <file src="src/Framework/Constraint/Math/IsNan.php">
+    <MixedArgument>
+      <code><![CDATA[$other]]></code>
+    </MixedArgument>
+  </file>
+  <file src="src/Framework/Constraint/Object/ObjectEquals.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[$object->getMethod($this->method)]]></code>
+    </MissingThrowsDocblock>
+    <MixedAssignment>
+      <code><![CDATA[$result = $other->{$this->method}($this->expected)]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Framework/Constraint/Operator/LogicalNot.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[$index % 2 === 1]]></code>
+      <code><![CDATA[$negatedString !== null]]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Framework/Constraint/String/StringContains.php">
+    <MixedAssignment>
+      <code><![CDATA[$haystack = $other]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Framework/Constraint/Traversable/TraversableContainsEqual.php">
+    <MixedAssignment>
+      <code><![CDATA[$value = $this->value()]]></code>
+      <code><![CDATA[$element]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Framework/Constraint/Traversable/TraversableContainsIdentical.php">
+    <MixedAssignment>
+      <code><![CDATA[$value = $this->value()]]></code>
+      <code><![CDATA[$element]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Framework/Constraint/Traversable/TraversableContainsOnly.php">
+    <MixedAssignment>
+      <code><![CDATA[$item]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Framework/Exception/Exception.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->serializableTrace = $this->getTrace()]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Framework/ExecutionOrderDependency.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[$class->getMethod($this->methodName)]]></code>
+    </MissingThrowsDocblock>
+  </file>
+  <file src="src/Framework/MockObject/Generator/DoubledMethod.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[$parameter->getDefaultValue()]]></code>
+      <code><![CDATA[$parameter->getDefaultValue()]]></code>
+    </MissingThrowsDocblock>
+    <MixedArgument>
+      <code><![CDATA[$e->getCode()]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$defaultValue = $parameter->getDefaultValue()]]></code>
+    </MixedAssignment>
+    <PossiblyUndefinedVariable>
+      <code><![CDATA[$deprecation]]></code>
+    </PossiblyUndefinedVariable>
+  </file>
+  <file src="src/Framework/MockObject/Generator/Generator.php">
+    <InvalidArgument>
+      <code><![CDATA[$_mockClassName]]></code>
+    </InvalidArgument>
+    <MissingConstructor>
+      <code><![CDATA[final class Generator]]></code>
+    </MissingConstructor>
+    <MissingThrowsDocblock>
+      <code><![CDATA[new ReflectionClass($className)->newInstanceWithoutConstructor()]]></code>
+      <code><![CDATA[$reflector->getProperty('__phpunit_state')]]></code>
+      <code><![CDATA[$reflector->getConstructor()->invokeArgs($object, $arguments)]]></code>
+      <code><![CDATA[$class->getMethod($methodName)]]></code>
+      <code><![CDATA[$class->getMethod('__clone')]]></code>
+      <code><![CDATA[$class->getMethod($methodName)]]></code>
+      <code><![CDATA[version_compare(PHP_VERSION, '8.5', '>=')]]></code>
+    </MissingThrowsDocblock>
+    <MixedArgument>
+      <code><![CDATA[$e->getCode()]]></code>
+      <code><![CDATA[$e->getCode()]]></code>
+      <code><![CDATA[$e->getCode()]]></code>
+    </MixedArgument>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$type]]></code>
+      <code><![CDATA[$additionalInterfaces]]></code>
+    </PossiblyInvalidArgument>
+    <PossiblyNullMethodCall>
+      <code><![CDATA[$reflector->getConstructor()->invokeArgs($object, $arguments)]]></code>
+    </PossiblyNullMethodCall>
+    <RedundantCast>
+      <code><![CDATA[$method]]></code>
+      <code><![CDATA[$method]]></code>
+    </RedundantCast>
+  </file>
+  <file src="src/Framework/MockObject/MockBuilder.php">
+    <InvalidArgument>
+      <code><![CDATA[$this->type]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/Framework/MockObject/Runtime/AbstractInvocationImplementation.php">
+    <MixedArgument>
+      <code><![CDATA[$i]]></code>
+      <code><![CDATA[$i]]></code>
+    </MixedArgument>
+    <MixedArrayOffset>
+      <code><![CDATA[$i]]></code>
+      <code><![CDATA[$i]]></code>
+    </MixedArrayOffset>
+    <MixedAssignment>
+      <code><![CDATA[$returnValue = array_pop($mapping)]]></code>
+      <code><![CDATA[$i]]></code>
+      <code><![CDATA[$value]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Framework/MockObject/Runtime/Api/DoubledCloneMethod.php">
+    <MixedClone>
+      <code><![CDATA[clone $this->__phpunit_state]]></code>
+    </MixedClone>
+  </file>
+  <file src="src/Framework/MockObject/Runtime/Api/Method.php">
+    <MixedReturnStatement>
+      <code><![CDATA[return $this
+            ->__phpunit_getInvocationHandler()
+            ->expects(new AnyInvokedCount)
+            ->method($constraint)
+            ->markAsCreatedWithoutExplicitExpects();]]></code>
+    </MixedReturnStatement>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$constraint]]></code>
+    </PossiblyInvalidArgument>
+  </file>
+  <file src="src/Framework/MockObject/Runtime/Api/MockObjectApi.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[$this->__phpunit_getInvocationHandler()->verify()]]></code>
+    </MissingThrowsDocblock>
+  </file>
+  <file src="src/Framework/MockObject/Runtime/Api/ProxiedCloneMethod.php">
+    <MixedClone>
+      <code><![CDATA[clone $this->__phpunit_state]]></code>
+    </MixedClone>
+  </file>
+  <file src="src/Framework/MockObject/Runtime/InvocationHandler.php">
+    <MixedAssignment>
+      <code><![CDATA[$value = $match->invoked($invocation)]]></code>
+      <code><![CDATA[$returnValue    = $value]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Framework/MockObject/Runtime/ReturnValueGenerator.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[new ReflectionClass($testStub::class)->newInstanceWithoutConstructor()]]></code>
+      <code><![CDATA[$reflector->getProperty('__phpunit_state')]]></code>
+    </MissingThrowsDocblock>
+  </file>
+  <file src="src/Framework/MockObject/Runtime/Rule/AnyParameters.php">
+    <UndefinedDocblockClass>
+      <code><![CDATA[]]></code>
+    </UndefinedDocblockClass>
+  </file>
+  <file src="src/Framework/MockObject/Runtime/Rule/InvocationOrder.php">
+    <UnusedParam>
+      <code><![CDATA[$invocation]]></code>
+    </UnusedParam>
+  </file>
+  <file src="src/Framework/MockObject/Runtime/Rule/OrderedParameterSets.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[$parameters->apply($invocation)]]></code>
+    </MissingThrowsDocblock>
+    <MixedAssignment>
+      <code><![CDATA[$parameters]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Framework/MockObject/Runtime/Rule/Parameters.php">
+    <MixedAssignment>
+      <code><![CDATA[$parameter]]></code>
+      <code><![CDATA[$other = $invocationParameters[$i]]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Framework/MockObject/Runtime/Rule/PartiallyOrderedParameterSets.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[$parameters->apply($invocation)]]></code>
+    </MissingThrowsDocblock>
+    <MixedAssignment>
+      <code><![CDATA[$parameters]]></code>
+      <code><![CDATA[$parameters = $parameters['pinned']]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Framework/MockObject/Runtime/Rule/UnorderedParameterSets.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[$parameters->apply($invocation)]]></code>
+      <code><![CDATA[$parameters->apply($invocation)]]></code>
+    </MissingThrowsDocblock>
+    <MixedAssignment>
+      <code><![CDATA[$parameters]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Framework/MockObject/Runtime/Stub/ConsecutiveCalls.php">
+    <MixedAssignment>
+      <code><![CDATA[$value = array_shift($this->stack)]]></code>
+      <code><![CDATA[$value = $value->invoke($invocation)]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Framework/MockObject/Runtime/Stub/ReturnCallback.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+  </file>
+  <file src="src/Framework/MockObject/Runtime/Stub/ReturnValueMap.php">
+    <MixedAssignment>
+      <code><![CDATA[$map]]></code>
+      <code><![CDATA[$return = array_pop($map)]]></code>
+      <code><![CDATA[$expected]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Framework/MockObject/TestDoubleBuilder.php">
+    <MixedArgument>
+      <code><![CDATA[$e->getCode()]]></code>
+    </MixedArgument>
+  </file>
+  <file src="src/Framework/TestBuilder.php">
+    <MixedArgument>
+      <code><![CDATA[$backupSettings['backupGlobals']]]></code>
+      <code><![CDATA[$backupSettings['backupGlobalsExcludeList']]]></code>
+      <code><![CDATA[$backupSettings['backupStaticProperties']]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$backupStaticPropertiesExcludeList = $backupSettings['backupStaticPropertiesExcludeList']]]></code>
+    </MixedAssignment>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$class]]></code>
+      <code><![CDATA[$class]]></code>
+    </PossiblyInvalidArgument>
+    <UndefinedDocblockClass>
+      <code><![CDATA[]]></code>
+    </UndefinedDocblockClass>
+  </file>
+  <file src="src/Framework/TestCase.php">
+    <InvalidArgument>
+      <code><![CDATA[Event\Code\ThrowableBuilder::from($e)]]></code>
+      <code><![CDATA[Event\Code\ThrowableBuilder::from($e)]]></code>
+      <code><![CDATA[Event\Code\ThrowableBuilder::from($e)]]></code>
+      <code><![CDATA[Event\Code\ThrowableBuilder::from($_e)]]></code>
+      <code><![CDATA[Event\Code\ThrowableBuilder::from($e)]]></code>
+      <code><![CDATA[Event\Code\ThrowableBuilder::from($e)]]></code>
+      <code><![CDATA[Event\Code\ThrowableBuilder::from($e)]]></code>
+      <code><![CDATA[Event\Code\ThrowableBuilder::from($e)]]></code>
+      <code><![CDATA[Event\Code\ThrowableBuilder::from($e)]]></code>
+      <code><![CDATA[Event\Code\ThrowableBuilder::from($e)]]></code>
+      <code><![CDATA[Event\Code\ThrowableBuilder::from($exceptionRaisedDuringTearDown)]]></code>
+      <code><![CDATA[Event\Code\ThrowableBuilder::from($exception)]]></code>
+    </InvalidArgument>
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->backupEnvironmentVariables = [...$this->backupEnvironmentVariables, ...BackedUpEnvironmentVariable::create($environmentVariableName)]]]></code>
+    </InvalidPropertyAssignment>
+    <MixedArgument>
+      <code><![CDATA[$this->testResult]]></code>
+    </MixedArgument>
+    <MixedArrayAccess>
+      <code><![CDATA[$_ENV[$environmentVariableName]]]></code>
+      <code><![CDATA[$trace[0]['class']]]></code>
+      <code><![CDATA[$trace[0]['class']]]></code>
+    </MixedArrayAccess>
+    <MixedAssignment>
+      <code><![CDATA[$return]]></code>
+      <code><![CDATA[$testResult = $this->invokeTestMethod($this->methodName, $testArguments)]]></code>
+      <code><![CDATA[$returnValue = $passedTests->returnValue($dependencyTarget)]]></code>
+      <code><![CDATA[$return]]></code>
+    </MixedAssignment>
+    <PossiblyUndefinedVariable>
+      <code><![CDATA[$testResult]]></code>
+    </PossiblyUndefinedVariable>
+  </file>
+  <file src="src/Framework/TestCase/ErrorLogCapture.php">
+    <MixedArgument>
+      <code><![CDATA[$capturePath]]></code>
+      <code><![CDATA[$capturePath]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$captureHandle = tmpfile()]]></code>
+      <code><![CDATA[$capturePath = $meta['uri']]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Framework/TestCase/GlobalStateCapture.php">
+    <InvalidArgument>
+      <code><![CDATA[$class]]></code>
+      <code><![CDATA[ComparatorFactory::class]]></code>
+      <code><![CDATA[Event\Code\ThrowableBuilder::from($t)]]></code>
+      <code><![CDATA[Event\Code\ThrowableBuilder::from($t)]]></code>
+    </InvalidArgument>
+    <MixedArgument>
+      <code><![CDATA[$GLOBALS]]></code>
+    </MixedArgument>
+    <UnusedForeachValue>
+      <code><![CDATA[]]></code>
+    </UnusedForeachValue>
+  </file>
+  <file src="src/Framework/TestCase/HookMethodInvoker.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[$reflector->getMethod($methodName)]]></code>
+    </MissingThrowsDocblock>
+    <MixedArgument>
+      <code><![CDATA[$hookMethods['beforeClass']]]></code>
+      <code><![CDATA[$hookMethods['before']]]></code>
+      <code><![CDATA[$hookMethods['preCondition']]]></code>
+      <code><![CDATA[$hookMethods['postCondition']]]></code>
+      <code><![CDATA[$hookMethods['after']]]></code>
+      <code><![CDATA[$hookMethods['afterClass']]]></code>
+    </MixedArgument>
+  </file>
+  <file src="src/Framework/TestRunner/ChildProcessResultProcessor.php">
+    <MixedArgument>
+      <code><![CDATA[$childResult->events]]></code>
+      <code><![CDATA[$childResult->passedTests]]></code>
+      <code><![CDATA[$childResult->codeCoverage]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$childResult = @unserialize($serializedProcessResult)]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Framework/TestRunner/ErrorHandlerBootstrapper.php">
+    <InvalidArgument>
+      <code><![CDATA[$deprecationTriggers]]></code>
+    </InvalidArgument>
+    <MixedArgument>
+      <code><![CDATA[$method]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$function]]></code>
+      <code><![CDATA[$method]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Framework/TestRunner/SeparateProcessTestRunner.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[random_bytes(16)]]></code>
+    </MissingThrowsDocblock>
+    <PossiblyInvalidArrayAccess>
+      <code><![CDATA[$offset[0]]]></code>
+      <code><![CDATA[$offset[1]]]></code>
+    </PossiblyInvalidArrayAccess>
+  </file>
+  <file src="src/Framework/TestRunner/TestRunner.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[$this->runTestWithTimeout($test)]]></code>
+      <code><![CDATA[$test->runBare()]]></code>
+    </MissingThrowsDocblock>
+    <MixedArrayAccess>
+      <code><![CDATA[$frame['file']]]></code>
+      <code><![CDATA[$frame['line']]]></code>
+      <code><![CDATA[$frame['file']]]></code>
+      <code><![CDATA[$frame['line']]]></code>
+    </MixedArrayAccess>
+    <MixedAssignment>
+      <code><![CDATA[$frame = $trace[0]]]></code>
+    </MixedAssignment>
+    <UnusedVariable>
+      <code><![CDATA[]]></code>
+    </UnusedVariable>
+  </file>
+  <file src="src/Framework/TestStatus/TestStatus.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->asInt()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Framework/TestSuite.php">
+    <InvalidArgument>
+      <code><![CDATA[$iterator]]></code>
+      <code><![CDATA[$this->name]]></code>
+      <code><![CDATA[$this->name]]></code>
+      <code><![CDATA[$this->name]]></code>
+      <code><![CDATA[$this->name]]></code>
+      <code><![CDATA[Event\Code\ThrowableBuilder::from($t)]]></code>
+      <code><![CDATA[$this->name]]></code>
+      <code><![CDATA[Event\Code\ThrowableBuilder::from($t)]]></code>
+      <code><![CDATA[$this->name]]></code>
+      <code><![CDATA[$this->name]]></code>
+      <code><![CDATA[$this->name]]></code>
+      <code><![CDATA[$this->name]]></code>
+      <code><![CDATA[Event\Code\ThrowableBuilder::from($t)]]></code>
+      <code><![CDATA[$this->name]]></code>
+      <code><![CDATA[Event\Code\ThrowableBuilder::from($t)]]></code>
+      <code><![CDATA[$this->name]]></code>
+    </InvalidArgument>
+    <MissingThrowsDocblock>
+      <code><![CDATA[(new TestSuiteLoader)->load($filename)]]></code>
+      <code><![CDATA[$reflector->getMethod($methodName)]]></code>
+    </MissingThrowsDocblock>
+    <MixedArgument>
+      <code><![CDATA[$method]]></code>
+      <code><![CDATA[$method]]></code>
+      <code><![CDATA[$method]]></code>
+      <code><![CDATA[$method]]></code>
+      <code><![CDATA[$method]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$test = array_pop($tests)]]></code>
+      <code><![CDATA[$methods         = (new HookMethods)->hookMethods($this->name)['beforeClass']->methodNamesSortedByPriority()]]></code>
+      <code><![CDATA[$method]]></code>
+      <code><![CDATA[$methods       = (new HookMethods)->hookMethods($this->name)['afterClass']->methodNamesSortedByPriority()]]></code>
+      <code><![CDATA[$method]]></code>
+    </MixedAssignment>
+    <MixedMethodCall>
+      <code><![CDATA[$test->run()]]></code>
+      <code><![CDATA[(new HookMethods)->hookMethods($this->name)['beforeClass']->methodNamesSortedByPriority()]]></code>
+      <code><![CDATA[(new HookMethods)->hookMethods($this->name)['afterClass']->methodNamesSortedByPriority()]]></code>
+    </MixedMethodCall>
+    <NullableReturnStatement>
+      <code><![CDATA[return $this->providedTests;]]></code>
+    </NullableReturnStatement>
+    <PossiblyNullArgument>
+      <code><![CDATA[$this->providedTests]]></code>
+    </PossiblyNullArgument>
+    <RedundantCast>
+      <code><![CDATA[$filename]]></code>
+    </RedundantCast>
+    <RedundantCondition>
+      <code><![CDATA[$emitCalledEvent]]></code>
+    </RedundantCondition>
+  </file>
+  <file src="src/Logging/EventLogger.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[PHP_OS_FAMILY === 'Windows']]></code>
+      <code><![CDATA[PHP_OS_FAMILY === 'Darwin']]></code>
+    </ImpossibleIdenticalComparison>
+    <MixedArgument>
+      <code><![CDATA[$flags]]></code>
+    </MixedArgument>
+  </file>
+  <file src="src/Logging/JUnit/JunitXmlLogger.php">
+    <InvalidTemplateParam>
+      <code><![CDATA[$this->testSuites[$this->testSuiteLevel]->appendChild($testSuite)]]></code>
+      <code><![CDATA[$this->root->appendChild($testSuite)]]></code>
+      <code><![CDATA[$this->currentTestCase->appendChild($systemOut)]]></code>
+      <code><![CDATA[$this->currentTestCase->appendChild($fault)]]></code>
+      <code><![CDATA[$this->currentTestCase->appendChild($skipped)]]></code>
+    </InvalidTemplateParam>
+    <MissingThrowsDocblock>
+      <code><![CDATA[$this->document->createElement('testsuite')]]></code>
+      <code><![CDATA[$this->document->createElement(
+                'system-out',
+                Xml::prepareString($this->unexpectedOutput),
+            )]]></code>
+      <code><![CDATA[$this->document->createElement('testsuites')]]></code>
+      <code><![CDATA[$this->document->createElement(
+            $type,
+            Xml::prepareString($buffer),
+        )]]></code>
+      <code><![CDATA[$this->document->createElement('skipped')]]></code>
+      <code><![CDATA[$this->document->createElement('testcase')]]></code>
+    </MissingThrowsDocblock>
+    <MixedArgument>
+      <code><![CDATA[$event->testSuite()->file()]]></code>
+    </MixedArgument>
+    <PossiblyNullMethodCall>
+      <code><![CDATA[$this->currentTestCase->appendChild($fault)]]></code>
+    </PossiblyNullMethodCall>
+    <PropertyTypeCoercion>
+      <code><![CDATA[$this->root = $this->document->createElement('testsuites')]]></code>
+      <code><![CDATA[$this->currentTestCase = $testCase]]></code>
+    </PropertyTypeCoercion>
+  </file>
+  <file src="src/Logging/OpenTestReporting/OtrXmlLogger.php">
+    <MixedArgument>
+      <code><![CDATA[$error['message']]]></code>
+    </MixedArgument>
+  </file>
+  <file src="src/Logging/TestDox/NamePrettifier.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[$parameter->getDefaultValue()]]></code>
+      <code><![CDATA[$reflector->invokeArgs(null, $arguments)]]></code>
+    </MissingThrowsDocblock>
+    <MixedArgument>
+      <code><![CDATA[$matches[1]]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$value = $providedDataValues[$parameter->getName()]]]></code>
+      <code><![CDATA[$value = $providedDataValues[$i]]]></code>
+      <code><![CDATA[$value = $parameter->getDefaultValue()]]></code>
+      <code><![CDATA[$result = $reflector->invokeArgs(null, $arguments)]]></code>
+    </MixedAssignment>
+    <MixedReturnStatement>
+      <code><![CDATA[return $value->name;]]></code>
+    </MixedReturnStatement>
+    <NoInterfaceProperties>
+      <code><![CDATA[value]]></code>
+      <code><![CDATA[name]]></code>
+    </NoInterfaceProperties>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$test->dataName()]]></code>
+      <code><![CDATA[$value]]></code>
+      <code><![CDATA[$position]]></code>
+    </PossiblyInvalidArgument>
+  </file>
+  <file src="src/Logging/TestDox/TestResult/TestResultCollection.php">
+    <ImpureFunctionCall>
+      <code><![CDATA[new TestResultCollectionIterator($this)]]></code>
+    </ImpureFunctionCall>
+  </file>
+  <file src="src/Metadata/Api/DataProvider.php">
+    <MixedArgument>
+      <code><![CDATA[$key]]></code>
+      <code><![CDATA[$key]]></code>
+      <code><![CDATA[$key]]></code>
+      <code><![CDATA[$key]]></code>
+      <code><![CDATA[$key]]></code>
+      <code><![CDATA[$key]]></code>
+    </MixedArgument>
+    <MixedArrayOffset>
+      <code><![CDATA[$key]]></code>
+      <code><![CDATA[$key]]></code>
+    </MixedArrayOffset>
+    <MixedAssignment>
+      <code><![CDATA[$data = $className::$methodName()]]></code>
+      <code><![CDATA[$value]]></code>
+      <code><![CDATA[$data     = $callable()]]></code>
+      <code><![CDATA[$value]]></code>
+      <code><![CDATA[$value         = $_testWith->data()]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Metadata/Api/HookMethods.php">
+    <MixedArgument>
+      <code><![CDATA[$hookMethods['beforeClass']]]></code>
+      <code><![CDATA[$hookMethods['afterClass']]]></code>
+      <code><![CDATA[$hookMethods['before']]]></code>
+      <code><![CDATA[$hookMethods['preCondition']]]></code>
+      <code><![CDATA[$hookMethods['postCondition']]]></code>
+      <code><![CDATA[$hookMethods['after']]]></code>
+    </MixedArgument>
+    <UndefinedDocblockClass>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </UndefinedDocblockClass>
+  </file>
+  <file src="src/Metadata/Api/Requirements.php">
+    <MixedArgument>
+      <code><![CDATA[$environmentVariables]]></code>
+    </MixedArgument>
+    <MixedArrayAccess>
+      <code><![CDATA[$environmentVariables[$environmentVariableName]]]></code>
+      <code><![CDATA[$environmentVariables[$environmentVariableName]]]></code>
+    </MixedArrayAccess>
+    <MixedAssignment>
+      <code><![CDATA[$environmentVariables    = $_ENV]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Metadata/CoversTrait.php">
+    <UndefinedDocblockClass>
+      <code><![CDATA[]]></code>
+    </UndefinedDocblockClass>
+  </file>
+  <file src="src/Metadata/MetadataCollection.php">
+    <ImpureFunctionCall>
+      <code><![CDATA[new MetadataCollectionIterator($this)]]></code>
+    </ImpureFunctionCall>
+    <ImpureMethodCall>
+      <code><![CDATA[$this->count()]]></code>
+      <code><![CDATA[$this->count()]]></code>
+      <code><![CDATA[$this->asArray()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Metadata/Parser/AttributeParser.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[$line !== false]]></code>
+    </ImpossibleIdenticalComparison>
+    <MixedAssignment>
+      <code><![CDATA[$attributeInstance = $attribute->newInstance()]]></code>
+      <code><![CDATA[$attributeInstance = $attribute->newInstance()]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Metadata/UsesTrait.php">
+    <UndefinedDocblockClass>
+      <code><![CDATA[]]></code>
+    </UndefinedDocblockClass>
+  </file>
+  <file src="src/Metadata/Version/ComparisonRequirement.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->operator->asString()]]></code>
+      <code><![CDATA[$this->operator->asString()]]></code>
+    </ImpureMethodCall>
+    <MissingThrowsDocblock>
+      <code><![CDATA[version_compare($version, $this->version, $this->operator->asString())]]></code>
+    </MissingThrowsDocblock>
+  </file>
+  <file src="src/Metadata/Version/ConstraintRequirement.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->sanitize($version)]]></code>
+      <code><![CDATA[$this->constraint->complies(
+            new Version($this->sanitize($version)),
+        )]]></code>
+      <code><![CDATA[$this->constraint->asString()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/Runner/BackedUpEnvironmentVariable.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[$this->from === self::FROM_GETENV]]></code>
+    </ImpossibleIdenticalComparison>
+    <InvalidArgument>
+      <code><![CDATA[self::FROM_SUPERGLOBAL]]></code>
+      <code><![CDATA[self::FROM_GETENV]]></code>
+    </InvalidArgument>
+    <MixedArgument>
+      <code><![CDATA[$superglobalValue]]></code>
+    </MixedArgument>
+    <MixedArrayAccess>
+      <code><![CDATA[$_ENV[$name]]]></code>
+      <code><![CDATA[$_ENV[$name]]]></code>
+      <code><![CDATA[$_ENV[$name]]]></code>
+      <code><![CDATA[$_ENV[$this->name]]]></code>
+    </MixedArrayAccess>
+    <MixedAssignment>
+      <code><![CDATA[$superglobalValue = $_ENV[$name]]]></code>
+    </MixedAssignment>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$getenv]]></code>
+    </PossiblyInvalidArgument>
+  </file>
+  <file src="src/Runner/Baseline/Generator.php">
+    <ArgumentTypeCoercion>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+      <code><![CDATA[$this]]></code>
+    </ArgumentTypeCoercion>
+  </file>
+  <file src="src/Runner/Baseline/Issue.php">
+    <MixedArgument>
+      <code><![CDATA[$lines[$key]]]></code>
+    </MixedArgument>
+  </file>
+  <file src="src/Runner/Baseline/Subscriber/TestTriggeredDeprecationSubscriber.php">
+    <UndefinedMethod>
+      <code><![CDATA[$this->generator()->testTriggeredIssue($event)]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Runner/Baseline/Subscriber/TestTriggeredNoticeSubscriber.php">
+    <UndefinedMethod>
+      <code><![CDATA[$this->generator()->testTriggeredIssue($event)]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Runner/Baseline/Subscriber/TestTriggeredPhpDeprecationSubscriber.php">
+    <UndefinedMethod>
+      <code><![CDATA[$this->generator()->testTriggeredIssue($event)]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Runner/Baseline/Subscriber/TestTriggeredPhpNoticeSubscriber.php">
+    <UndefinedMethod>
+      <code><![CDATA[$this->generator()->testTriggeredIssue($event)]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Runner/Baseline/Subscriber/TestTriggeredPhpWarningSubscriber.php">
+    <UndefinedMethod>
+      <code><![CDATA[$this->generator()->testTriggeredIssue($event)]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Runner/Baseline/Subscriber/TestTriggeredWarningSubscriber.php">
+    <UndefinedMethod>
+      <code><![CDATA[$this->generator()->testTriggeredIssue($event)]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/Runner/CodeCoverage.php">
+    <InternalMethod>
+      <code><![CDATA[$this->codeCoverage()->driverInformation()]]></code>
+    </InternalMethod>
+    <MixedAssignment>
+      <code><![CDATA[$lines]]></code>
+      <code><![CDATA[$lineStatus]]></code>
+    </MixedAssignment>
+    <PossiblyNullMethodCall>
+      <code><![CDATA[$this->test->status()]]></code>
+      <code><![CDATA[$this->codeCoverage->validate($covers)]]></code>
+      <code><![CDATA[$this->test->valueObjectForEvents()]]></code>
+      <code><![CDATA[$this->codeCoverage->validate($uses)]]></code>
+      <code><![CDATA[$this->test->valueObjectForEvents()]]></code>
+      <code><![CDATA[$this->codeCoverage->stop($append, $status, $covers, $uses, $time)]]></code>
+    </PossiblyNullMethodCall>
+    <UnusedVariable>
+      <code><![CDATA[]]></code>
+    </UnusedVariable>
+  </file>
+  <file src="src/Runner/ErrorHandler.php">
+    <InvalidArgument>
+      <code><![CDATA[$trace]]></code>
+      <code><![CDATA[$trace]]></code>
+    </InvalidArgument>
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->issueTriggerResolvers = [new DefaultIssueTriggerResolver]]]></code>
+    </InvalidPropertyAssignment>
+    <MissingThrowsDocblock>
+      <code><![CDATA[]]></code>
+    </MissingThrowsDocblock>
+    <MixedArgument>
+      <code><![CDATA[$this->deprecationTriggers['functions']]]></code>
+      <code><![CDATA[$this->deprecationTriggers['methods']]]></code>
+      <code><![CDATA[$frame['file']]]></code>
+    </MixedArgument>
+    <MixedArrayAccess>
+      <code><![CDATA[$trace[++$i]['class']]]></code>
+    </MixedArrayAccess>
+    <MixedAssignment>
+      <code><![CDATA[$errorFile = $deprecationFrame['file']]]></code>
+      <code><![CDATA[$errorLine = $deprecationFrame['line']]]></code>
+    </MixedAssignment>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$errorFile]]></code>
+      <code><![CDATA[$errorFile]]></code>
+      <code><![CDATA[$errorFile]]></code>
+      <code><![CDATA[$errorFile]]></code>
+      <code><![CDATA[$errorFile]]></code>
+      <code><![CDATA[$errorFile]]></code>
+      <code><![CDATA[$errorFile]]></code>
+      <code><![CDATA[$errorFile]]></code>
+      <code><![CDATA[$errorFile]]></code>
+      <code><![CDATA[$errorFile]]></code>
+      <code><![CDATA[$errorFile]]></code>
+      <code><![CDATA[$errorFile]]></code>
+      <code><![CDATA[$errorFile]]></code>
+      <code><![CDATA[$errorFile]]></code>
+      <code><![CDATA[$errorFile]]></code>
+      <code><![CDATA[$errorFile]]></code>
+      <code><![CDATA[$errorFile]]></code>
+      <code><![CDATA[$errorFile]]></code>
+      <code><![CDATA[$errorFile]]></code>
+      <code><![CDATA[$errorFile]]></code>
+    </PossiblyInvalidArgument>
+    <RedundantCondition>
+      <code><![CDATA[$position !== null]]></code>
+      <code><![CDATA[!is_callable($handler)]]></code>
+      <code><![CDATA[$invalidErrorHandlerStack]]></code>
+      <code><![CDATA[$handler instanceof self]]></code>
+      <code><![CDATA[$position === null]]></code>
+      <code><![CDATA[$handler instanceof self]]></code>
+    </RedundantCondition>
+    <UndefinedDocblockClass>
+      <code><![CDATA[]]></code>
+    </UndefinedDocblockClass>
+    <UnreachableCode>
+      <code><![CDATA[return array_slice($handlers, $position + 1);]]></code>
+    </UnreachableCode>
+    <UnusedForeachValue>
+      <code><![CDATA[]]></code>
+    </UnusedForeachValue>
+    <UnusedParam>
+      <code><![CDATA[$messages]]></code>
+    </UnusedParam>
+  </file>
+  <file src="src/Runner/Extension/ExtensionBootstrapper.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[new ReflectionClass($className)->newInstance()]]></code>
+    </MissingThrowsDocblock>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[class_implements($className)]]></code>
+    </PossiblyInvalidArgument>
+  </file>
+  <file src="src/Runner/Filter/GroupFilterIterator.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->groupTests = $groupTests]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Runner/Filter/TestIdFilterIterator.php">
+    <MixedMethodCall>
+      <code><![CDATA[$test->valueObjectForEvents()->id()]]></code>
+    </MixedMethodCall>
+  </file>
+  <file src="src/Runner/IssueTriggerResolver/DefaultResolver.php">
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$callee]]></code>
+      <code><![CDATA[$caller]]></code>
+    </PossiblyInvalidArgument>
+  </file>
+  <file src="src/Runner/Phpt/Parser.php">
+    <MixedArgument>
+      <code><![CDATA[$line]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$line]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Runner/Phpt/Renderer.php">
+    <MixedArgument>
+      <code><![CDATA[$files['job']]]></code>
+    </MixedArgument>
+  </file>
+  <file src="src/Runner/Phpt/TestCase.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[$sideEffect === SideEffect::STANDARD_OUTPUT]]></code>
+      <code><![CDATA[$sideEffect === SideEffect::INPUT_OUTPUT]]></code>
+    </ImpossibleIdenticalComparison>
+    <InvalidArgument>
+      <code><![CDATA[[]]]></code>
+    </InvalidArgument>
+    <InvalidReturnType>
+      <code><![CDATA[return [[
+                'file' => $realFile,
+                'line' => 1,
+            ]];]]></code>
+      <code><![CDATA[return [
+                    [
+                        'file' => $externalRealPath,
+                        'line' => 1,
+                    ],
+                    [
+                        'file' => $realFile,
+                        'line' => $this->sectionOffset($sections, $section . '_EXTERNAL_offset') + 1,
+                    ],
+                ];]]></code>
+      <code><![CDATA[return [
+                        [
+                            'file' => $realFile,
+                            'line' => $offset,
+                        ],
+                    ];]]></code>
+      <code><![CDATA[return [
+            [
+                'file' => $realFile,
+                'line' => 1,
+            ],
+        ];]]></code>
+    </InvalidReturnType>
+    <MixedArgument>
+      <code><![CDATA[$files['coverage']]]></code>
+      <code><![CDATA[$files['coverage']]]></code>
+      <code><![CDATA[$file]]></code>
+      <code><![CDATA[$files['coverage']]]></code>
+    </MixedArgument>
+    <MixedArrayAccess>
+      <code><![CDATA[$frame['file']]]></code>
+      <code><![CDATA[$frame['file']]]></code>
+      <code><![CDATA[$frame['line']]]></code>
+      <code><![CDATA[$frame['line']]]></code>
+      <code><![CDATA[$frame['type']]]></code>
+      <code><![CDATA[$frame['type']]]></code>
+      <code><![CDATA[$frame['function']]]></code>
+    </MixedArrayAccess>
+    <MixedAssignment>
+      <code><![CDATA[$frame]]></code>
+      <code><![CDATA[$file = $frame['file']]]></code>
+      <code><![CDATA[$line = $frame['line']]]></code>
+      <code><![CDATA[$type = $frame['type']]]></code>
+      <code><![CDATA[$unserialized = @unserialize(
+                $buffer,
+                [
+                    'allowed_classes' => [
+                        /** @phpstan-ignore classConstant.internalClass */
+                        RawCodeCoverageData::class,
+                    ],
+                ],
+            )]]></code>
+      <code><![CDATA[$file]]></code>
+    </MixedAssignment>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$fileExternalPath]]></code>
+      <code><![CDATA[$input]]></code>
+    </PossiblyInvalidArgument>
+    <UndefinedDocblockClass>
+      <code><![CDATA[]]></code>
+    </UndefinedDocblockClass>
+  </file>
+  <file src="src/Runner/ResultCache/DefaultResultCache.php">
+    <MixedAssignment>
+      <code><![CDATA[$data = json_decode(
+            $contents,
+            true,
+        )]]></code>
+      <code><![CDATA[$status]]></code>
+      <code><![CDATA[$time]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Runner/TestResult/Collector.php">
+    <UnusedParam>
+      <code><![CDATA[$event]]></code>
+    </UnusedParam>
+  </file>
+  <file src="src/Runner/TestResult/Issue.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->triggeringTests = [
+            $triggeringTest->id() => [
+                'test'  => $triggeringTest,
+                'count' => 1,
+            ],
+        ]]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Runner/TestResult/PassedTests.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[$this->passedTestMethods = array_merge(
+            $this->passedTestMethods,
+            $other->passedTestMethods,
+        )]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Runner/TestSuiteLoader.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[self::$declaredClasses = get_declared_classes()]]></code>
+      <code><![CDATA[self::$declaredClasses = get_declared_classes()]]></code>
+    </InvalidPropertyAssignment>
+  </file>
+  <file src="src/Runner/TestSuiteSorter.php">
+    <MixedArgument>
+      <code><![CDATA[$tests[$i]->requires()]]></code>
+    </MixedArgument>
+    <MixedMethodCall>
+      <code><![CDATA[$tests[$i]->requires()]]></code>
+      <code><![CDATA[$tests[$i]->provides()]]></code>
+    </MixedMethodCall>
+  </file>
+  <file src="src/TextUI/Application.php">
+    <InvalidArgument>
+      <code><![CDATA[$deprecationTriggers]]></code>
+    </InvalidArgument>
+    <MixedArgument>
+      <code><![CDATA[$function]]></code>
+      <code><![CDATA[$method]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$ignoreUndefinedTriggers = $configuration->source()->deprecationTriggers()['ignoreUndefinedTriggers'] ?? false]]></code>
+      <code><![CDATA[$function]]></code>
+      <code><![CDATA[$method]]></code>
+      <code><![CDATA[$composerInstall = PHPUNIT_COMPOSER_INSTALL]]></code>
+      <code><![CDATA[$classMap = require $classMapFile]]></code>
+      <code><![CDATA[$sourceCodeFile]]></code>
+    </MixedAssignment>
+    <PossiblyNullMethodCall>
+      <code><![CDATA[$t->getFile()]]></code>
+      <code><![CDATA[$t->getLine()]]></code>
+      <code><![CDATA[$t->getTraceAsString()]]></code>
+      <code><![CDATA[$t->getPrevious()]]></code>
+    </PossiblyNullMethodCall>
+  </file>
+  <file src="src/TextUI/Command/Commands/AtLeastVersionCommand.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[version_compare(Version::id(), $this->version, '>=')]]></code>
+    </MissingThrowsDocblock>
+  </file>
+  <file src="src/TextUI/Command/Commands/ListTestsAsXmlCommand.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[$test::class !== $currentTestClass]]></code>
+    </ImpossibleIdenticalComparison>
+    <MixedArgument>
+      <code><![CDATA[$testId]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$testIds]]></code>
+      <code><![CDATA[$testId]]></code>
+    </MixedAssignment>
+    <RedundantCondition>
+      <code><![CDATA[$currentTestClass !== null]]></code>
+      <code><![CDATA[$currentTestClass !== null]]></code>
+      <code><![CDATA[$currentTestClass !== null]]></code>
+    </RedundantCondition>
+  </file>
+  <file src="src/TextUI/Command/Commands/VersionCheckCommand.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[version_compare($latestVersion, $this->versionId, '>')]]></code>
+      <code><![CDATA[version_compare($latestCompatibleVersion, $this->versionId, '>')]]></code>
+    </MissingThrowsDocblock>
+  </file>
+  <file src="src/TextUI/Configuration/Builder.php">
+    <MixedArgument>
+      <code><![CDATA[$e->getCode()]]></code>
+    </MixedArgument>
+  </file>
+  <file src="src/TextUI/Configuration/Cli/Builder.php">
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$excludeGroups]]></code>
+      <code><![CDATA[$groups]]></code>
+      <code><![CDATA[$testsCovering]]></code>
+      <code><![CDATA[$testsUsing]]></code>
+      <code><![CDATA[$testsRequiringPhpExtension]]></code>
+      <code><![CDATA[$iniSettings]]></code>
+      <code><![CDATA[$testSuffixes]]></code>
+      <code><![CDATA[$coverageFilter]]></code>
+    </PossiblyInvalidArgument>
+    <PossiblyNullArgument>
+      <code><![CDATA[$option[1]]]></code>
+      <code><![CDATA[$generateBaseline]]></code>
+      <code><![CDATA[$useBaseline]]></code>
+      <code><![CDATA[$useBaseline]]></code>
+      <code><![CDATA[$option[1]]]></code>
+    </PossiblyNullArgument>
+    <PossiblyNullOperand>
+      <code><![CDATA[$generateBaseline]]></code>
+      <code><![CDATA[$useBaseline]]></code>
+    </PossiblyNullOperand>
+    <UnusedVariable>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </UnusedVariable>
+  </file>
+  <file src="src/TextUI/Configuration/Cli/Configuration.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->hasTestFilesFile()]]></code>
+      <code><![CDATA[$this->hasTestIdFile()]]></code>
+      <code><![CDATA[$this->hasTestIdFilter()]]></code>
+      <code><![CDATA[$this->hasAll()]]></code>
+      <code><![CDATA[$this->hasAtLeastVersion()]]></code>
+      <code><![CDATA[$this->hasBackupGlobals()]]></code>
+      <code><![CDATA[$this->hasBackupStaticProperties()]]></code>
+      <code><![CDATA[$this->hasBeStrictAboutChangesToGlobalState()]]></code>
+      <code><![CDATA[$this->hasBootstrap()]]></code>
+      <code><![CDATA[$this->hasCacheDirectory()]]></code>
+      <code><![CDATA[$this->hasCacheResult()]]></code>
+      <code><![CDATA[$this->hasColors()]]></code>
+      <code><![CDATA[$this->hasColumns()]]></code>
+      <code><![CDATA[$this->hasConfigurationFile()]]></code>
+      <code><![CDATA[$this->hasCoverageFilter()]]></code>
+      <code><![CDATA[$this->hasCoverageClover()]]></code>
+      <code><![CDATA[$this->hasCoverageCobertura()]]></code>
+      <code><![CDATA[$this->hasCoverageCrap4J()]]></code>
+      <code><![CDATA[$this->hasCoverageHtml()]]></code>
+      <code><![CDATA[$this->hasCoverageOpenClover()]]></code>
+      <code><![CDATA[$this->hasCoveragePhp()]]></code>
+      <code><![CDATA[$this->hasCoverageText()]]></code>
+      <code><![CDATA[$this->hasCoverageTextShowUncoveredFiles()]]></code>
+      <code><![CDATA[$this->hasCoverageTextShowOnlySummary()]]></code>
+      <code><![CDATA[$this->hasCoverageXml()]]></code>
+      <code><![CDATA[$this->hasExcludeSourceFromXmlCoverage()]]></code>
+      <code><![CDATA[$this->hasPathCoverage()]]></code>
+      <code><![CDATA[$this->hasBranchCoverage()]]></code>
+      <code><![CDATA[$this->hasDefaultTimeLimit()]]></code>
+      <code><![CDATA[$this->hasDiffContext()]]></code>
+      <code><![CDATA[$this->hasDisableCodeCoverageIgnore()]]></code>
+      <code><![CDATA[$this->hasDisableCoverageTargeting()]]></code>
+      <code><![CDATA[$this->hasDisallowTestOutput()]]></code>
+      <code><![CDATA[$this->hasEnforceTimeLimit()]]></code>
+      <code><![CDATA[$this->hasExcludeGroups()]]></code>
+      <code><![CDATA[$this->hasExecutionOrder()]]></code>
+      <code><![CDATA[$this->hasExecutionOrderDefects()]]></code>
+      <code><![CDATA[$this->hasFailOnAllIssues()]]></code>
+      <code><![CDATA[$this->hasFailOnDeprecation()]]></code>
+      <code><![CDATA[$this->hasFailOnPhpunitDeprecation()]]></code>
+      <code><![CDATA[$this->hasFailOnPhpunitNotice()]]></code>
+      <code><![CDATA[$this->hasFailOnPhpunitWarning()]]></code>
+      <code><![CDATA[$this->hasFailOnEmptyTestSuite()]]></code>
+      <code><![CDATA[$this->hasFailOnIncomplete()]]></code>
+      <code><![CDATA[$this->hasFailOnNotice()]]></code>
+      <code><![CDATA[$this->hasFailOnRisky()]]></code>
+      <code><![CDATA[$this->hasFailOnSkipped()]]></code>
+      <code><![CDATA[$this->hasFailOnWarning()]]></code>
+      <code><![CDATA[$this->hasDoNotFailOnDeprecation()]]></code>
+      <code><![CDATA[$this->hasDoNotFailOnPhpunitDeprecation()]]></code>
+      <code><![CDATA[$this->hasDoNotFailOnPhpunitNotice()]]></code>
+      <code><![CDATA[$this->hasDoNotFailOnPhpunitWarning()]]></code>
+      <code><![CDATA[$this->hasDoNotFailOnEmptyTestSuite()]]></code>
+      <code><![CDATA[$this->hasDoNotFailOnIncomplete()]]></code>
+      <code><![CDATA[$this->hasDoNotFailOnNotice()]]></code>
+      <code><![CDATA[$this->hasDoNotFailOnRisky()]]></code>
+      <code><![CDATA[$this->hasDoNotFailOnSkipped()]]></code>
+      <code><![CDATA[$this->hasDoNotFailOnWarning()]]></code>
+      <code><![CDATA[$this->hasStopOnDefect()]]></code>
+      <code><![CDATA[$this->hasStopOnDeprecation()]]></code>
+      <code><![CDATA[$this->hasSpecificDeprecationToStopOn()]]></code>
+      <code><![CDATA[$this->hasStopOnError()]]></code>
+      <code><![CDATA[$this->hasStopOnFailure()]]></code>
+      <code><![CDATA[$this->hasStopOnIncomplete()]]></code>
+      <code><![CDATA[$this->hasStopOnNotice()]]></code>
+      <code><![CDATA[$this->hasStopOnRisky()]]></code>
+      <code><![CDATA[$this->hasStopOnSkipped()]]></code>
+      <code><![CDATA[$this->hasStopOnWarning()]]></code>
+      <code><![CDATA[$this->hasExcludeFilter()]]></code>
+      <code><![CDATA[$this->hasFilter()]]></code>
+      <code><![CDATA[$this->hasGenerateBaseline()]]></code>
+      <code><![CDATA[$this->hasUseBaseline()]]></code>
+      <code><![CDATA[$this->hasGroups()]]></code>
+      <code><![CDATA[$this->hasTestsCovering()]]></code>
+      <code><![CDATA[$this->hasTestsUsing()]]></code>
+      <code><![CDATA[$this->hasTestsRequiringPhpExtension()]]></code>
+      <code><![CDATA[$this->hasIncludePath()]]></code>
+      <code><![CDATA[$this->hasIniSettings()]]></code>
+      <code><![CDATA[$this->hasJunitLogfile()]]></code>
+      <code><![CDATA[$this->hasOtrLogfile()]]></code>
+      <code><![CDATA[$this->hasIncludeGitInformation()]]></code>
+      <code><![CDATA[$this->hasListTestsXml()]]></code>
+      <code><![CDATA[$this->hasNoCoverage()]]></code>
+      <code><![CDATA[$this->hasNoExtensions()]]></code>
+      <code><![CDATA[$this->hasNoLogging()]]></code>
+      <code><![CDATA[$this->hasProcessIsolation()]]></code>
+      <code><![CDATA[$this->hasRandomOrderSeed()]]></code>
+      <code><![CDATA[$this->hasReportUselessTests()]]></code>
+      <code><![CDATA[$this->hasResolveDependencies()]]></code>
+      <code><![CDATA[$this->hasReverseList()]]></code>
+      <code><![CDATA[$this->hasStderr()]]></code>
+      <code><![CDATA[$this->hasStrictCoverage()]]></code>
+      <code><![CDATA[$this->hasRequireCoverageContribution()]]></code>
+      <code><![CDATA[$this->hasTeamcityLogfile()]]></code>
+      <code><![CDATA[$this->hasCompactPrinter()]]></code>
+      <code><![CDATA[$this->hasTeamCityPrinter()]]></code>
+      <code><![CDATA[$this->hasTestdoxHtmlFile()]]></code>
+      <code><![CDATA[$this->hasTestdoxTextFile()]]></code>
+      <code><![CDATA[$this->hasTestDoxPrinter()]]></code>
+      <code><![CDATA[$this->hasTestDoxPrinterSummary()]]></code>
+      <code><![CDATA[$this->hasTestSuffixes()]]></code>
+      <code><![CDATA[$this->hasTestSuite()]]></code>
+      <code><![CDATA[$this->hasExcludedTestSuite()]]></code>
+      <code><![CDATA[$this->hasDisplayDetailsOnAllIssues()]]></code>
+      <code><![CDATA[$this->hasDisplayDetailsOnIncompleteTests()]]></code>
+      <code><![CDATA[$this->hasDisplayDetailsOnSkippedTests()]]></code>
+      <code><![CDATA[$this->hasDisplayDetailsOnTestsThatTriggerDeprecations()]]></code>
+      <code><![CDATA[$this->hasDisplayDetailsOnPhpunitDeprecations()]]></code>
+      <code><![CDATA[$this->hasDisplayDetailsOnPhpunitNotices()]]></code>
+      <code><![CDATA[$this->hasDisplayDetailsOnTestsThatTriggerErrors()]]></code>
+      <code><![CDATA[$this->hasDisplayDetailsOnTestsThatTriggerNotices()]]></code>
+      <code><![CDATA[$this->hasDisplayDetailsOnTestsThatTriggerWarnings()]]></code>
+      <code><![CDATA[$this->hasLogEventsText()]]></code>
+      <code><![CDATA[$this->hasLogEventsVerboseText()]]></code>
+      <code><![CDATA[$this->hasExtensions()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/TextUI/Configuration/Configuration.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->hasTestFilesFile()]]></code>
+      <code><![CDATA[$this->hasConfigurationFile()]]></code>
+      <code><![CDATA[$this->hasBootstrap()]]></code>
+      <code><![CDATA[$this->hasCacheDirectory()]]></code>
+      <code><![CDATA[$this->hasCoverageCacheDirectory()]]></code>
+      <code><![CDATA[$this->hasCoverageClover()]]></code>
+      <code><![CDATA[$this->hasCoverageCobertura()]]></code>
+      <code><![CDATA[$this->hasCoverageCrap4j()]]></code>
+      <code><![CDATA[$this->hasCoverageHtml()]]></code>
+      <code><![CDATA[$this->hasCoverageOpenClover()]]></code>
+      <code><![CDATA[$this->hasCoveragePhp()]]></code>
+      <code><![CDATA[$this->hasCoverageText()]]></code>
+      <code><![CDATA[$this->hasCoverageXml()]]></code>
+      <code><![CDATA[$this->hasCoverageClover()]]></code>
+      <code><![CDATA[$this->hasCoverageCobertura()]]></code>
+      <code><![CDATA[$this->hasCoverageCrap4j()]]></code>
+      <code><![CDATA[$this->hasCoverageHtml()]]></code>
+      <code><![CDATA[$this->hasCoverageHtmlCustomCssFile()]]></code>
+      <code><![CDATA[$this->hasCoverageOpenClover()]]></code>
+      <code><![CDATA[$this->hasCoveragePhp()]]></code>
+      <code><![CDATA[$this->hasCoverageText()]]></code>
+      <code><![CDATA[$this->hasCoverageXml()]]></code>
+      <code><![CDATA[$this->hasSpecificDeprecationToStopOn()]]></code>
+      <code><![CDATA[$this->hasPharExtensionDirectory()]]></code>
+      <code><![CDATA[$this->hasLogfileTeamcity()]]></code>
+      <code><![CDATA[$this->hasLogfileJunit()]]></code>
+      <code><![CDATA[$this->hasLogfileOtr()]]></code>
+      <code><![CDATA[$this->hasLogfileTestdoxHtml()]]></code>
+      <code><![CDATA[$this->hasLogfileTestdoxText()]]></code>
+      <code><![CDATA[$this->hasLogEventsText()]]></code>
+      <code><![CDATA[$this->hasLogEventsVerboseText()]]></code>
+      <code><![CDATA[$this->hasTestsCovering()]]></code>
+      <code><![CDATA[$this->hasTestsUsing()]]></code>
+      <code><![CDATA[$this->hasTestsRequiringPhpExtension()]]></code>
+      <code><![CDATA[$this->hasFilter()]]></code>
+      <code><![CDATA[$this->hasExcludeFilter()]]></code>
+      <code><![CDATA[$this->hasTestIdFilterFile()]]></code>
+      <code><![CDATA[$this->hasTestIdFilter()]]></code>
+      <code><![CDATA[$this->hasGroups()]]></code>
+      <code><![CDATA[$this->hasExcludeGroups()]]></code>
+      <code><![CDATA[$this->hasDefaultTestSuite()]]></code>
+      <code><![CDATA[$this->hasGenerateBaseline()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/TextUI/Configuration/FileFilterMapper.php">
+    <InvalidReturnType>
+      <code><![CDATA[return $result;]]></code>
+    </InvalidReturnType>
+  </file>
+  <file src="src/TextUI/Configuration/Merger.php">
+    <MixedArgument>
+      <code><![CDATA[$xmlConfiguration->filename()]]></code>
+      <code><![CDATA[$phpSelf]]></code>
+      <code><![CDATA[$xmlConfiguration->filename()]]></code>
+    </MixedArgument>
+    <MixedArrayAccess>
+      <code><![CDATA[$_SERVER['PHP_SELF']]]></code>
+      <code><![CDATA[$_SERVER['PHP_SELF']]]></code>
+      <code><![CDATA[$_SERVER['PHP_SELF']]]></code>
+    </MixedArrayAccess>
+    <MixedAssignment>
+      <code><![CDATA[$phpSelf = $_SERVER['PHP_SELF']]]></code>
+    </MixedAssignment>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$useBaseline]]></code>
+      <code><![CDATA[$cacheDirectory]]></code>
+      <code><![CDATA[$generateBaseline]]></code>
+    </PossiblyInvalidArgument>
+    <UnusedVariable>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </UnusedVariable>
+  </file>
+  <file src="src/TextUI/Configuration/PhpHandler.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[constant($value)]]></code>
+    </MissingThrowsDocblock>
+    <MixedArrayAccess>
+      <code><![CDATA[$GLOBALS[$target]]]></code>
+      <code><![CDATA[$GLOBALS[$target]]]></code>
+      <code><![CDATA[$GLOBALS[$target]]]></code>
+      <code><![CDATA[$_ENV[$name]]]></code>
+    </MixedArrayAccess>
+    <MixedAssignment>
+      <code><![CDATA[$constantValue = constant($value)]]></code>
+      <code><![CDATA[$values = $GLOBALS[$target]]]></code>
+      <code><![CDATA[$value = $variable->value()]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/TextUI/Configuration/Registry.php">
+    <MixedAssignment>
+      <code><![CDATA[$configuration = unserialize(
+            $buffer,
+            [
+                'allowed_classes' => [
+                    Configuration::class,
+                    Php::class,
+                    ConstantCollection::class,
+                    Constant::class,
+                    IniSettingCollection::class,
+                    IniSetting::class,
+                    VariableCollection::class,
+                    Variable::class,
+                    DirectoryCollection::class,
+                    Directory::class,
+                    FileCollection::class,
+                    File::class,
+                    FilterDirectoryCollection::class,
+                    FilterDirectory::class,
+                    FilterFileCollection::class,
+                    FilterFile::class,
+                    TestDirectoryCollection::class,
+                    TestDirectory::class,
+                    TestFileCollection::class,
+                    TestFile::class,
+                    TestSuiteCollection::class,
+                    TestSuite::class,
+                    VersionComparisonOperator::class,
+                    Source::class,
+                ],
+            ],
+        )]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/TextUI/Configuration/SourceMapper.php">
+    <InvalidPropertyAssignment>
+      <code><![CDATA[self::$files = new SplObjectStorage]]></code>
+      <code><![CDATA[self::$files = new SplObjectStorage]]></code>
+    </InvalidPropertyAssignment>
+    <InvalidReturnType>
+      <code><![CDATA[return array_values($aggregated);]]></code>
+    </InvalidReturnType>
+    <MixedAssignment>
+      <code><![CDATA[$map = unserialize($content, ['allowed_classes' => false])]]></code>
+      <code><![CDATA[$included]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/TextUI/Configuration/TestSuiteBuilder.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[(new TestSuiteLoader)->load($path)]]></code>
+    </MissingThrowsDocblock>
+    <MixedArgument>
+      <code><![CDATA[$file]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$file]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/TextUI/Configuration/Value/ConstantCollection.php">
+    <ImpureFunctionCall>
+      <code><![CDATA[new ConstantCollectionIterator($this)]]></code>
+    </ImpureFunctionCall>
+  </file>
+  <file src="src/TextUI/Configuration/Value/DirectoryCollection.php">
+    <ImpureFunctionCall>
+      <code><![CDATA[new DirectoryCollectionIterator($this)]]></code>
+    </ImpureFunctionCall>
+    <ImpureMethodCall>
+      <code><![CDATA[$this->count()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/TextUI/Configuration/Value/ExtensionBootstrapCollection.php">
+    <ImpureFunctionCall>
+      <code><![CDATA[new ExtensionBootstrapCollectionIterator($this)]]></code>
+    </ImpureFunctionCall>
+  </file>
+  <file src="src/TextUI/Configuration/Value/FileCollection.php">
+    <ImpureFunctionCall>
+      <code><![CDATA[new FileCollectionIterator($this)]]></code>
+    </ImpureFunctionCall>
+  </file>
+  <file src="src/TextUI/Configuration/Value/FilterDirectoryCollection.php">
+    <ImpureFunctionCall>
+      <code><![CDATA[new FilterDirectoryCollectionIterator($this)]]></code>
+    </ImpureFunctionCall>
+  </file>
+  <file src="src/TextUI/Configuration/Value/FilterFileCollection.php">
+    <ImpureFunctionCall>
+      <code><![CDATA[new FilterFileCollectionIterator($this)]]></code>
+    </ImpureFunctionCall>
+  </file>
+  <file src="src/TextUI/Configuration/Value/GroupCollection.php">
+    <ImpureFunctionCall>
+      <code><![CDATA[new GroupCollectionIterator($this)]]></code>
+    </ImpureFunctionCall>
+  </file>
+  <file src="src/TextUI/Configuration/Value/IniSettingCollection.php">
+    <ImpureFunctionCall>
+      <code><![CDATA[new IniSettingCollectionIterator($this)]]></code>
+    </ImpureFunctionCall>
+  </file>
+  <file src="src/TextUI/Configuration/Value/Source.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->hasBaseline()]]></code>
+      <code><![CDATA[$this->hasBaseline()]]></code>
+      <code><![CDATA[$this->includeDirectories->notEmpty()]]></code>
+      <code><![CDATA[$this->includeFiles->notEmpty()]]></code>
+    </ImpureMethodCall>
+    <UndefinedDocblockClass>
+      <code><![CDATA[]]></code>
+    </UndefinedDocblockClass>
+  </file>
+  <file src="src/TextUI/Configuration/Value/TestDirectoryCollection.php">
+    <ImpureFunctionCall>
+      <code><![CDATA[new TestDirectoryCollectionIterator($this)]]></code>
+    </ImpureFunctionCall>
+    <ImpureMethodCall>
+      <code><![CDATA[$this->count()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/TextUI/Configuration/Value/TestFileCollection.php">
+    <ImpureFunctionCall>
+      <code><![CDATA[new TestFileCollectionIterator($this)]]></code>
+    </ImpureFunctionCall>
+    <ImpureMethodCall>
+      <code><![CDATA[$this->count()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/TextUI/Configuration/Value/TestSuiteCollection.php">
+    <ImpureFunctionCall>
+      <code><![CDATA[new TestSuiteCollectionIterator($this)]]></code>
+    </ImpureFunctionCall>
+    <ImpureMethodCall>
+      <code><![CDATA[$this->count()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/TextUI/Configuration/Value/VariableCollection.php">
+    <ImpureFunctionCall>
+      <code><![CDATA[new VariableCollectionIterator($this)]]></code>
+    </ImpureFunctionCall>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/CodeCoverage/CodeCoverage.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->hasClover()]]></code>
+      <code><![CDATA[$this->hasCobertura()]]></code>
+      <code><![CDATA[$this->hasCrap4j()]]></code>
+      <code><![CDATA[$this->hasHtml()]]></code>
+      <code><![CDATA[$this->hasOpenClover()]]></code>
+      <code><![CDATA[$this->hasPhp()]]></code>
+      <code><![CDATA[$this->hasText()]]></code>
+      <code><![CDATA[$this->hasXml()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/CodeCoverage/Report/Html.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->hasTarget()]]></code>
+      <code><![CDATA[$this->hasCustomCssFile()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/DefaultConfiguration.php">
+    <InvalidArgument>
+      <code><![CDATA[[
+                    'functions'               => [],
+                    'methods'                 => [],
+                    'ignoreUndefinedTriggers' => false,
+                ]]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/Groups.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->include->isEmpty()]]></code>
+      <code><![CDATA[$this->exclude->isEmpty()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/LoadedFromFileConfiguration.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->validationResult->hasValidationErrors()]]></code>
+      <code><![CDATA[$this->validationResult->asString()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/Loader.php">
+    <InvalidArgument>
+      <code><![CDATA[$deprecationTriggers]]></code>
+    </InvalidArgument>
+    <MixedArgument>
+      <code><![CDATA[$e->getCode()]]></code>
+      <code><![CDATA[$e->getCode()]]></code>
+    </MixedArgument>
+    <UnusedVariable>
+      <code><![CDATA[]]></code>
+    </UnusedVariable>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/Migration/MigrationBuilder.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[version_compare($version, $fromVersion, '<')]]></code>
+    </MissingThrowsDocblock>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/Migration/Migrations/ConvertLogTypes.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[$document->createElement($types[$type])]]></code>
+    </MissingThrowsDocblock>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$newLogNode]]></code>
+    </PossiblyInvalidArgument>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/Migration/Migrations/CoverageCloverToReport.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[$ownerDocument->createElement('clover')]]></code>
+    </MissingThrowsDocblock>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/Migration/Migrations/CoverageCrap4jToReport.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[$ownerDocument->createElement('crap4j')]]></code>
+    </MissingThrowsDocblock>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$crap4j]]></code>
+    </PossiblyInvalidArgument>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/Migration/Migrations/CoverageHtmlToReport.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[$ownerDocument->createElement('html')]]></code>
+    </MissingThrowsDocblock>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$html]]></code>
+    </PossiblyInvalidArgument>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/Migration/Migrations/CoveragePhpToReport.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[$ownerDocument->createElement('php')]]></code>
+    </MissingThrowsDocblock>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/Migration/Migrations/CoverageTextToReport.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[$ownerDocument->createElement('text')]]></code>
+    </MissingThrowsDocblock>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$text]]></code>
+    </PossiblyInvalidArgument>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/Migration/Migrations/CoverageXmlToReport.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[$ownerDocument->createElement('xml')]]></code>
+    </MissingThrowsDocblock>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/Migration/Migrations/IntroduceCoverageElement.php">
+    <InvalidTemplateParam>
+      <code><![CDATA[$documentElement->insertBefore(
+            $coverage,
+            $documentElement->firstChild,
+        )]]></code>
+    </InvalidTemplateParam>
+    <MissingThrowsDocblock>
+      <code><![CDATA[$document->createElement('coverage')]]></code>
+    </MissingThrowsDocblock>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/Migration/Migrations/LogToReportMigration.php">
+    <InvalidTemplateParam>
+      <code><![CDATA[$coverage->appendChild($document->createElement('report'))]]></code>
+    </InvalidTemplateParam>
+    <MissingThrowsDocblock>
+      <code><![CDATA[$document->createElement('report')]]></code>
+    </MissingThrowsDocblock>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/Migration/Migrations/MoveCoverageDirectoriesToSource.php">
+    <InvalidTemplateParam>
+      <code><![CDATA[$root->appendChild($source)]]></code>
+    </InvalidTemplateParam>
+    <MissingThrowsDocblock>
+      <code><![CDATA[$document->createElement('source')]]></code>
+    </MissingThrowsDocblock>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/Migration/Migrations/MoveWhitelistExcludesToCoverage.php">
+    <InvalidArgument>
+      <code><![CDATA[$whitelist->getElementsByTagName('exclude')]]></code>
+    </InvalidArgument>
+    <InvalidTemplateParam>
+      <code><![CDATA[$coverage->appendChild(
+                $document->createElement('exclude'),
+            )]]></code>
+    </InvalidTemplateParam>
+    <MissingThrowsDocblock>
+      <code><![CDATA[$document->createElement('exclude')]]></code>
+    </MissingThrowsDocblock>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/Migration/Migrations/MoveWhitelistIncludesToCoverage.php">
+    <InvalidTemplateParam>
+      <code><![CDATA[$coverage->appendChild($include)]]></code>
+    </InvalidTemplateParam>
+    <MissingThrowsDocblock>
+      <code><![CDATA[$document->createElement('include')]]></code>
+    </MissingThrowsDocblock>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/Migration/Migrations/RemoveLogTypes.php">
+    <InvalidArgument>
+      <code><![CDATA[$logging->getElementsByTagName('log')]]></code>
+    </InvalidArgument>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/PHPUnit.php">
+    <ImpureMethodCall>
+      <code><![CDATA[$this->hasCacheDirectory()]]></code>
+      <code><![CDATA[$this->hasBootstrap()]]></code>
+      <code><![CDATA[$this->hasExtensionsDirectory()]]></code>
+      <code><![CDATA[$this->hasDefaultTestSuite()]]></code>
+    </ImpureMethodCall>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/SchemaDetector/SuccessfulSchemaDetectionResult.php">
+    <UndefinedDocblockClass>
+      <code><![CDATA[]]></code>
+    </UndefinedDocblockClass>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/TestSuiteMapper.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[version_compare(PHP_VERSION, $directory->phpVersion(), $directory->phpVersionOperator()->asString())]]></code>
+      <code><![CDATA[version_compare(PHP_VERSION, $file->phpVersion(), $file->phpVersionOperator()->asString())]]></code>
+    </MissingThrowsDocblock>
+    <MixedArgument>
+      <code><![CDATA[$e->getCode()]]></code>
+    </MixedArgument>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/Validator/Validator.php">
+    <TooFewArguments>
+      <code><![CDATA[$document->schemaValidateSource($buffer)]]></code>
+    </TooFewArguments>
+  </file>
+  <file src="src/TextUI/Help.php">
+    <MixedArgument>
+      <code><![CDATA[$matches[0]]]></code>
+    </MixedArgument>
+  </file>
+  <file src="src/TextUI/Output/Default/ProgressPrinter/ProgressPrinter.php">
+    <UnusedParam>
+      <code><![CDATA[$event]]></code>
+      <code><![CDATA[$event]]></code>
+    </UnusedParam>
+  </file>
+  <file src="src/TextUI/Output/Default/ResultPrinter.php">
+    <MixedArrayOffset>
+      <code><![CDATA[$line]]></code>
+      <code><![CDATA[$line]]></code>
+    </MixedArrayOffset>
+    <MixedAssignment>
+      <code><![CDATA[$line]]></code>
+    </MixedAssignment>
+    <UndefinedMethod>
+      <code><![CDATA[$reason->file()]]></code>
+      <code><![CDATA[$reason->line()]]></code>
+    </UndefinedMethod>
+  </file>
+  <file src="src/TextUI/Output/Facade.php">
+    <PossiblyNullArgument>
+      <code><![CDATA[self::$printer]]></code>
+    </PossiblyNullArgument>
+  </file>
+  <file src="src/TextUI/Output/Printer/DefaultPrinter.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MixedAssignment>
+      <code><![CDATA[$stream = @fsockopen($tmp[0], (int) $tmp[1])]]></code>
+      <code><![CDATA[$stream = fopen($out, 'wb')]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/TextUI/Output/TestDox/ResultPrinter.php">
+    <InvalidArgument>
+      <code><![CDATA[$previousPath]]></code>
+    </InvalidArgument>
+    <MixedArgument>
+      <code><![CDATA[$line]]></code>
+      <code><![CDATA[$line]]></code>
+      <code><![CDATA[$line]]></code>
+      <code><![CDATA[$line]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$line]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/TextUI/TestRunner.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[new TestSuiteSorter($resultCache)->reorderTestsInSuite(
+                    $suite,
+                    $configuration->executionOrder(),
+                    $configuration->resolveDependencies(),
+                    $configuration->executionOrderDefects(),
+                )]]></code>
+    </MissingThrowsDocblock>
+    <RedundantCast>
+      <code><![CDATA[$t->getCode()]]></code>
+    </RedundantCast>
+  </file>
+  <file src="src/TextUI/TestSuiteFilterProcessor.php">
+    <InvalidArgument>
+      <code><![CDATA[array_map(
+                    static fn (string $name): string => '__phpunit_requires_php_extension' . $name,
+                    $configuration->testsRequiringPhpExtension(),
+                )]]></code>
+    </InvalidArgument>
+    <MixedAssignment>
+      <code><![CDATA[$line]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Util/Color.php">
+    <MixedArgument>
+      <code><![CDATA[$maxBoxWidth]]></code>
+      <code><![CDATA[$matches[0]]]></code>
+      <code><![CDATA[$matches[0]]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$maxBoxWidth = max(array_map(strlen(...), $lines))]]></code>
+      <code><![CDATA[$maxBoxWidth = min($maxBoxWidth, $columns)]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Util/ExcludeList.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[PHP_OS_FAMILY === 'Windows']]></code>
+    </ImpossibleIdenticalComparison>
+  </file>
+  <file src="src/Util/Filesystem.php">
+    <InvalidReturnType>
+      <code><![CDATA[return realpath($directory) . DIRECTORY_SEPARATOR . basename($path);]]></code>
+    </InvalidReturnType>
+  </file>
+  <file src="src/Util/Filter.php">
+    <MixedArgument>
+      <code><![CDATA[$prefix]]></code>
+      <code><![CDATA[$GLOBALS['_SERVER']['SCRIPT_NAME']]]></code>
+      <code><![CDATA[$GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST']]]></code>
+    </MixedArgument>
+    <MixedArrayAccess>
+      <code><![CDATA[$GLOBALS['_SERVER']]]></code>
+      <code><![CDATA[$GLOBALS['_SERVER']]]></code>
+      <code><![CDATA[$GLOBALS['_SERVER']]]></code>
+      <code><![CDATA[$GLOBALS['_SERVER']]]></code>
+      <code><![CDATA[$GLOBALS['_SERVER']]]></code>
+      <code><![CDATA[$GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST']]]></code>
+      <code><![CDATA[$GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST']]]></code>
+      <code><![CDATA[$GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST']]]></code>
+      <code><![CDATA[$GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST']]]></code>
+    </MixedArrayAccess>
+    <MixedAssignment>
+      <code><![CDATA[$prefix = __PHPUNIT_PHAR_ROOT__]]></code>
+    </MixedAssignment>
+    <PossiblyNullMethodCall>
+      <code><![CDATA[$t->getTrace()]]></code>
+      <code><![CDATA[$t->getFile()]]></code>
+      <code><![CDATA[$t->getLine()]]></code>
+    </PossiblyNullMethodCall>
+  </file>
+  <file src="src/Util/GlobalState.php">
+    <MixedArgument>
+      <code><![CDATA[$files[0]]]></code>
+      <code><![CDATA[$GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST']]]></code>
+      <code><![CDATA[$file]]></code>
+      <code><![CDATA[$file]]></code>
+      <code><![CDATA[$file]]></code>
+      <code><![CDATA[$file]]></code>
+    </MixedArgument>
+    <MixedArrayAccess>
+      <code><![CDATA[$GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST']]]></code>
+      <code><![CDATA[$GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST']]]></code>
+      <code><![CDATA[$GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST']]]></code>
+      <code><![CDATA[$GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST']]]></code>
+      <code><![CDATA[$GLOBALS[$superGlobalArray]]]></code>
+      <code><![CDATA[$GLOBALS[$superGlobalArray]]]></code>
+      <code><![CDATA[$GLOBALS[$superGlobalArray]]]></code>
+    </MixedArrayAccess>
+    <MixedAssignment>
+      <code><![CDATA[$file]]></code>
+      <code><![CDATA[$value]]></code>
+      <code><![CDATA[$value]]></code>
+      <code><![CDATA[$value]]></code>
+      <code><![CDATA[$value]]></code>
+      <code><![CDATA[$element]]></code>
+    </MixedAssignment>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$key]]></code>
+    </PossiblyInvalidArgument>
+  </file>
+  <file src="src/Util/Json.php">
+    <MixedAssignment>
+      <code><![CDATA[$decodedJson = json_decode($json, false)]]></code>
+      <code><![CDATA[$decodedJson = json_decode($json)]]></code>
+      <code><![CDATA[$value]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Util/PHP/JobRunner.php">
+    <MixedArrayAccess>
+      <code><![CDATA[$serverVariables['argv']]]></code>
+      <code><![CDATA[$serverVariables['argc']]]></code>
+    </MixedArrayAccess>
+    <MixedAssignment>
+      <code><![CDATA[$serverVariables = $_SERVER ?? []]]></code>
+      <code><![CDATA[$value]]></code>
+      <code><![CDATA[$mergedOutputStream = tmpfile()]]></code>
+      <code><![CDATA[$process = proc_open(
+            $this->buildCommand($job, $temporaryFile),
+            $pipeSpec,
+            $pipes,
+            null,
+            $environmentVariables,
+        )]]></code>
+    </MixedAssignment>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$temporaryFile]]></code>
+    </PossiblyInvalidArgument>
+    <UnusedForeachValue>
+      <code><![CDATA[]]></code>
+    </UnusedForeachValue>
+  </file>
+  <file src="src/Util/Sanitizer.php">
+    <MixedArgument>
+      <code><![CDATA[$matches[0]]]></code>
+    </MixedArgument>
+  </file>
+  <file src="src/Util/Test.php">
+    <MixedArrayAccess>
+      <code><![CDATA[$frame['object']]]></code>
+      <code><![CDATA[$frame['object']]]></code>
+      <code><![CDATA[$frame['object']]]></code>
+    </MixedArrayAccess>
+    <MixedAssignment>
+      <code><![CDATA[$frame]]></code>
+    </MixedAssignment>
+    <MixedReturnStatement>
+      <code><![CDATA[return $frame['object'];]]></code>
+    </MixedReturnStatement>
+  </file>
+  <file src="src/Util/ThrowableToStringMapper.php">
+    <PossiblyNullMethodCall>
+      <code><![CDATA[$t->getComparisonFailure()->getDiff()]]></code>
+    </PossiblyNullMethodCall>
+  </file>
+</files>

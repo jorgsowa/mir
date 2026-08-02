@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 // Pinned tags so every machine analyzes the same source.
 return [
-    ['slug' => 'psr-log', 'url' => 'https://github.com/php-fig/log.git', 'tag' => '3.0.2'],
+    ['slug' => 'phpunit-phpunit', 'url' => 'https://github.com/sebastianbergmann/phpunit.git', 'tag' => '13.2.6'],
     ['slug' => 'psr-container', 'url' => 'https://github.com/php-fig/container.git', 'tag' => '2.0.2'],
     ['slug' => 'webmozart-assert', 'url' => 'https://github.com/webmozarts/assert.git', 'tag' => '2.4.1'],
     ['slug' => 'myclabs-deep-copy', 'url' => 'https://github.com/myclabs/DeepCopy.git', 'tag' => '1.13.4'],
