@@ -249,6 +249,7 @@ impl<'a> StatementsAnalyzer<'a> {
         let var_annotation = self.extract_var_annotation_from(
             doc.as_deref(),
             ctx.self_fqcn.as_deref(),
+            ctx.current_method_name.as_deref(),
             ctx.current_function_fqn.as_deref(),
         );
 
@@ -832,15 +833,40 @@ impl<'a> StatementsAnalyzer<'a> {
         &mut self,
         doc: Option<&str>,
         self_fqcn: Option<&str>,
+        current_method_name: Option<&str>,
         current_function_fqn: Option<&str>,
     ) -> Option<VarAnnotation> {
         let parsed = crate::parser::DocblockParser::parse(doc?);
         let mut ty = parsed.var_type?;
+        // Template params visible at this point: the enclosing class's own
+        // (for a generic class referenced inside any of its methods) plus
+        // the current method's own (a per-method `@template`) — a bare name
+        // matching either must become a TTemplateParam, not get treated as
+        // an ordinary (and namespace-mis-qualified) class reference. E.g.
+        // `/** @var T */` inside a method of `class Box { @template T }`.
+        let mut template_names: rustc_hash::FxHashSet<String> = rustc_hash::FxHashSet::default();
+        let mut template_params: Vec<mir_codebase::definitions::TemplateParam> = Vec::new();
+        let defining_entity = self_fqcn.or(current_function_fqn).unwrap_or_default();
         if let Some(fqcn) = self_fqcn {
             if let Some(class_like) = self.cached_class_like(fqcn) {
                 let aliases = class_like.type_aliases();
                 if !aliases.is_empty() {
                     ty = crate::collector::expand_aliases_only(ty, aliases);
+                }
+                template_names.extend(
+                    class_like
+                        .template_params()
+                        .iter()
+                        .map(|tp| tp.name.to_string()),
+                );
+                template_params.extend(class_like.template_params().iter().cloned());
+                if let Some(method_name) = current_method_name {
+                    let method_name = crate::util::php_ident_lowercase(method_name);
+                    if let Some(method) = class_like.own_methods().get(method_name.as_str()) {
+                        template_names
+                            .extend(method.template_params.iter().map(|tp| tp.name.to_string()));
+                        template_params.extend(method.template_params.iter().cloned());
+                    }
                 }
             }
         } else if let Some(fqn) = current_function_fqn {
@@ -848,11 +874,25 @@ impl<'a> StatementsAnalyzer<'a> {
                 if !function.type_aliases.is_empty() {
                     ty = crate::collector::expand_aliases_only(ty, &function.type_aliases);
                 }
+                template_names.extend(
+                    function
+                        .template_params
+                        .iter()
+                        .map(|tp| tp.name.to_string()),
+                );
+                template_params.extend(function.template_params.iter().cloned());
             }
         }
         Some(VarAnnotation {
             name: parsed.var_name,
-            ty: resolve_union_for_file(ty, self.db, &self.file),
+            ty: return_type::resolve_union_for_file_with_templates(
+                ty,
+                self.db,
+                &self.file,
+                &template_names,
+                &template_params,
+                defining_entity,
+            ),
         })
     }
 

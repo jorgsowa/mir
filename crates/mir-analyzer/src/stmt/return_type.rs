@@ -399,6 +399,129 @@ pub(crate) fn resolve_union_for_file(union: Type, db: &dyn MirDatabase, file: &s
     result
 }
 
+/// Like [`resolve_union_for_file`], but for a local `@var`/`@phpstan-var`
+/// annotation inside a function/method body that may reference the
+/// enclosing function/method's own `@template` params (e.g. `/** @var T */`
+/// where `T` is bound on the containing generic method) — a bare name
+/// matching one of `template_names` becomes a `TTemplateParam` instead of
+/// being treated as an ordinary (and namespace-mis-qualified) class
+/// reference. Also resolves real global builtins (`Closure`, `Throwable`,
+/// …) leniently via [`crate::db::resolve_docblock_type_name`], same as
+/// every other docblock-type resolution path.
+pub(crate) fn resolve_union_for_file_with_templates(
+    union: Type,
+    db: &dyn MirDatabase,
+    file: &str,
+    template_names: &rustc_hash::FxHashSet<String>,
+    template_params: &[mir_codebase::definitions::TemplateParam],
+    defining_entity: &str,
+) -> Type {
+    if template_names.is_empty() {
+        return resolve_union_for_file(union, db, file);
+    }
+    let mut result = Type::empty();
+    result.possibly_undefined = union.possibly_undefined;
+    result.from_docblock = union.from_docblock;
+    for atomic in union.types {
+        let resolved = resolve_atomic_for_file_with_templates(
+            atomic,
+            db,
+            file,
+            template_names,
+            template_params,
+            defining_entity,
+        );
+        result.types.push(resolved);
+    }
+    result
+}
+
+fn resolve_atomic_for_file_with_templates(
+    atomic: Atomic,
+    db: &dyn MirDatabase,
+    file: &str,
+    template_names: &rustc_hash::FxHashSet<String>,
+    template_params: &[mir_codebase::definitions::TemplateParam],
+    defining_entity: &str,
+) -> Atomic {
+    match atomic {
+        Atomic::TNamedObject { fqcn, type_params } if type_params.is_empty() => {
+            if let Some(name) = template_names.get(fqcn.as_ref()) {
+                let bound = template_params
+                    .iter()
+                    .find(|tp| tp.name.as_ref() == name.as_str())
+                    .and_then(|tp| tp.bound.as_deref().cloned())
+                    .unwrap_or_else(Type::mixed);
+                return Atomic::TTemplateParam {
+                    name: fqcn,
+                    as_type: Box::new(bound),
+                    defining_entity: defining_entity.into(),
+                };
+            }
+            resolve_atomic_for_file(Atomic::TNamedObject { fqcn, type_params }, db, file)
+        }
+        Atomic::TNamedObject { fqcn, type_params } => {
+            let resolved = crate::db::resolve_docblock_type_name(db, file, fqcn.as_ref());
+            let new_params: Vec<Type> = type_params
+                .iter()
+                .map(|p| {
+                    resolve_union_for_file_with_templates(
+                        p.clone(),
+                        db,
+                        file,
+                        template_names,
+                        template_params,
+                        defining_entity,
+                    )
+                })
+                .collect();
+            Atomic::TNamedObject {
+                fqcn: resolved.into(),
+                type_params: mir_types::union::vec_to_type_params(new_params),
+            }
+        }
+        Atomic::TList { value } => Atomic::TList {
+            value: Box::new(resolve_union_for_file_with_templates(
+                *value,
+                db,
+                file,
+                template_names,
+                template_params,
+                defining_entity,
+            )),
+        },
+        Atomic::TNonEmptyList { value } => Atomic::TNonEmptyList {
+            value: Box::new(resolve_union_for_file_with_templates(
+                *value,
+                db,
+                file,
+                template_names,
+                template_params,
+                defining_entity,
+            )),
+        },
+        Atomic::TArray { key, value } => Atomic::TArray {
+            key: Box::new(resolve_union_for_file_with_templates(
+                *key,
+                db,
+                file,
+                template_names,
+                template_params,
+                defining_entity,
+            )),
+            value: Box::new(resolve_union_for_file_with_templates(
+                *value,
+                db,
+                file,
+                template_names,
+                template_params,
+                defining_entity,
+            )),
+        },
+        other => resolve_atomic_for_file(other, db, file),
+    }
+}
+
 fn is_resolvable_class_name(s: &str) -> bool {
     !s.is_empty()
         && s.chars()
@@ -411,7 +534,7 @@ fn resolve_atomic_for_file(atomic: Atomic, db: &dyn MirDatabase, file: &str) -> 
             if !is_resolvable_class_name(fqcn.as_ref()) {
                 return Atomic::TNamedObject { fqcn, type_params };
             }
-            let resolved = crate::db::resolve_name(db, file, fqcn.as_ref());
+            let resolved = crate::db::resolve_docblock_type_name(db, file, fqcn.as_ref());
             if type_params.is_empty() {
                 Atomic::TNamedObject {
                     fqcn: resolved.into(),

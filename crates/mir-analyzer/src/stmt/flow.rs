@@ -152,6 +152,7 @@ impl<'a> StatementsAnalyzer<'a> {
             let check_ty = if let Some(ann) = self.extract_var_annotation_from(
                 doc.as_deref(),
                 ctx.self_fqcn.as_deref(),
+                ctx.current_method_name.as_deref(),
                 ctx.current_function_fqn.as_deref(),
             ) {
                 if ann.name.is_none() {
