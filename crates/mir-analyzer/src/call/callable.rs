@@ -1230,7 +1230,10 @@ pub(crate) fn preg_split_return_type(arg_types: &[Type]) -> Option<Type> {
 /// Build `list<string>` or `list<array{0: string, 1: int}>` for `preg_match` `$matches`.
 ///
 /// When bit 256 (`PREG_OFFSET_CAPTURE`) is set in `flags`, each entry is a shape
-/// `array{0: string, 1: int}` holding the matched text and its byte offset.
+/// `array{0: string, 1: int}` holding the matched text and its byte offset. When
+/// bit 512 (`PREG_UNMATCHED_AS_NULL`) is set, unmatched subpatterns are `null`
+/// instead of `""`, so the text position of the leaf (or the array shape's `0`
+/// entry, when both flags are combined) additionally admits `null`.
 pub(crate) fn preg_match_matches_type(flags: i64) -> Type {
     Type::single(Atomic::TList {
         value: Box::new(preg_match_leaf(flags)),
@@ -1240,7 +1243,8 @@ pub(crate) fn preg_match_matches_type(flags: i64) -> Type {
 /// Build `list<list<string>>` or `list<list<array{0: string, 1: int}>>` for `preg_match_all`.
 ///
 /// `PREG_SET_ORDER` changes the ordering (sets vs. groups outer) but not the
-/// per-match element types; `PREG_OFFSET_CAPTURE` adds an int offset to each leaf.
+/// per-match element types; `PREG_OFFSET_CAPTURE` adds an int offset to each leaf,
+/// and `PREG_UNMATCHED_AS_NULL` admits `null` into the leaf's text position.
 pub(crate) fn preg_match_all_matches_type(flags: i64) -> Type {
     let inner = Type::single(Atomic::TList {
         value: Box::new(preg_match_leaf(flags)),
@@ -1252,13 +1256,20 @@ pub(crate) fn preg_match_all_matches_type(flags: i64) -> Type {
 
 fn preg_match_leaf(flags: i64) -> Type {
     const PREG_OFFSET_CAPTURE: i64 = 256;
+    const PREG_UNMATCHED_AS_NULL: i64 = 512;
+    let unmatched_as_null = flags & PREG_UNMATCHED_AS_NULL != 0;
+    let mut text_ty = Type::single(Atomic::TString);
+    if unmatched_as_null {
+        text_ty.add_type(Atomic::TNull);
+    }
     if flags & PREG_OFFSET_CAPTURE != 0 {
-        // array{0: string, 1: int}
+        // array{0: string, 1: int} — with PREG_UNMATCHED_AS_NULL, 0 also
+        // admits null (unmatched groups report offset -1).
         let mut props = indexmap::IndexMap::new();
         props.insert(
             mir_types::atomic::ArrayKey::Int(0),
             mir_types::atomic::KeyedProperty {
-                ty: Type::single(Atomic::TString),
+                ty: text_ty,
                 optional: false,
             },
         );
@@ -1275,6 +1286,6 @@ fn preg_match_leaf(flags: i64) -> Type {
             is_list: true,
         })
     } else {
-        Type::single(Atomic::TString)
+        text_ty
     }
 }
