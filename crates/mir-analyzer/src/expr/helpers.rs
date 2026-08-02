@@ -926,12 +926,21 @@ pub(crate) fn ast_params_to_fn_params_resolved(
 /// function/method declarations — except when the native hint is a concrete scalar
 /// whose family is entirely absent from the docblock type (e.g. `@param int $x` on a
 /// `bool $x` hint), in which case the native hint is the runtime truth and wins.
+///
+/// A bare name in `template_names` (the closure/arrow-fn's enclosing class's
+/// and/or method's own `@template` params) resolves to a `TTemplateParam`
+/// instead of an ordinary (and namespace-mis-qualified) class reference —
+/// same as `resolve_union_for_file_with_templates` does for a local `@var`.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn apply_doc_param_types(
     params: &mut [mir_codebase::DeclaredParam],
     ast_params: &[php_ast::owned::Param],
     doc_params: &[(String, Type)],
     db: &dyn crate::db::MirDatabase,
     file: &str,
+    template_names: &rustc_hash::FxHashSet<String>,
+    template_params: &[mir_codebase::definitions::TemplateParam],
+    defining_entity: &str,
 ) {
     if doc_params.is_empty() {
         return;
@@ -945,7 +954,14 @@ pub(crate) fn apply_doc_param_types(
         let Some((_, doc_ty)) = doc_params.iter().find(|(n, _)| n == name) else {
             continue;
         };
-        let mut doc_ty = resolve_named_objects_in_union(doc_ty.clone(), db, file);
+        let mut doc_ty = crate::stmt::resolve_union_for_file_with_templates(
+            doc_ty.clone(),
+            db,
+            file,
+            template_names,
+            template_params,
+            defining_entity,
+        );
         if let Some(native_ty) = param.ty.as_deref() {
             if crate::collector::native_hint_wins_over_docblock_scalar(native_ty, &doc_ty) {
                 continue;

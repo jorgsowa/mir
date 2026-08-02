@@ -95,6 +95,69 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
     }
 
+    /// Template params visible to a closure/arrow-function literal's OWN
+    /// leading `@param`/`@return` docblock: the enclosing class's own (for a
+    /// closure declared inside a generic class's method) plus the enclosing
+    /// method's own (a per-method `@template`), or a free function's own when
+    /// there's no enclosing class. Mirrors `stmt/mod.rs`'s
+    /// `extract_var_annotation_from`, which gathers the same context for a
+    /// bare `@var` annotation — a name matching one of these must resolve to
+    /// a `TTemplateParam` via `resolve_union_for_file_with_templates`, not an
+    /// ordinary (and namespace-mis-qualified) class reference, the same way
+    /// the closure body's own template-typed values already do.
+    fn own_doc_template_context(
+        &self,
+        ctx: &FlowState,
+    ) -> (
+        rustc_hash::FxHashSet<String>,
+        Vec<mir_codebase::definitions::TemplateParam>,
+        String,
+    ) {
+        let mut template_names: rustc_hash::FxHashSet<String> = rustc_hash::FxHashSet::default();
+        let mut template_params: Vec<mir_codebase::definitions::TemplateParam> = Vec::new();
+        let defining_entity = ctx
+            .self_fqcn
+            .as_deref()
+            .or(ctx.current_function_fqn.as_deref())
+            .unwrap_or_default()
+            .to_string();
+        if let Some(fqcn) = ctx.self_fqcn.as_deref() {
+            if let Some(class_like) =
+                crate::db::find_class_like(self.db, crate::db::Fqcn::from_str(self.db, fqcn))
+            {
+                template_names.extend(
+                    class_like
+                        .template_params()
+                        .iter()
+                        .map(|tp| tp.name.to_string()),
+                );
+                template_params.extend(class_like.template_params().iter().cloned());
+                if let Some(method_name) = ctx.current_method_name.as_deref() {
+                    let method_name = crate::util::php_ident_lowercase(method_name);
+                    if let Some(method) = class_like.own_methods().get(method_name.as_str()) {
+                        template_names.extend(
+                            method.template_params.iter().map(|tp| tp.name.to_string()),
+                        );
+                        template_params.extend(method.template_params.iter().cloned());
+                    }
+                }
+            }
+        } else if let Some(fqn) = ctx.current_function_fqn.as_deref() {
+            if let Some(function) =
+                crate::db::find_function(self.db, crate::db::Fqcn::from_str(self.db, fqn))
+            {
+                template_names.extend(
+                    function
+                        .template_params
+                        .iter()
+                        .map(|tp| tp.name.to_string()),
+                );
+                template_params.extend(function.template_params.iter().cloned());
+            }
+        }
+        (template_names, template_params, defining_entity)
+    }
+
     pub(super) fn analyze_closure(
         &mut self,
         c: &ClosureExpr,
@@ -122,8 +185,19 @@ impl<'a> ExpressionAnalyzer<'a> {
             self.db,
             &self.file,
         );
+        let (template_names, template_params, defining_entity) =
+            self.own_doc_template_context(ctx);
         if let Some(doc) = &leading_doc {
-            apply_doc_param_types(&mut params, &c.params, &doc.params, self.db, &self.file);
+            apply_doc_param_types(
+                &mut params,
+                &c.params,
+                &doc.params,
+                self.db,
+                &self.file,
+                &template_names,
+                &template_params,
+                &defining_entity,
+            );
         }
         let return_ty_hint = c
             .return_type
@@ -132,10 +206,16 @@ impl<'a> ExpressionAnalyzer<'a> {
             .map(|u| resolve_named_objects_in_union(u, self.db, &self.file))
             .or_else(|| {
                 // Fall back to `@return` docblock preceding the `function` keyword.
-                leading_doc
-                    .as_ref()
-                    .and_then(|doc| doc.return_type.clone())
-                    .map(|ty| resolve_named_objects_in_union(ty, self.db, &self.file))
+                leading_doc.as_ref().and_then(|doc| doc.return_type.clone()).map(|ty| {
+                    crate::stmt::resolve_union_for_file_with_templates(
+                        ty,
+                        self.db,
+                        &self.file,
+                        &template_names,
+                        &template_params,
+                        &defining_entity,
+                    )
+                })
             });
 
         if return_ty_hint.is_none() && self.mode == crate::expr::AnalysisMode::Full {
@@ -396,8 +476,19 @@ impl<'a> ExpressionAnalyzer<'a> {
             self.db,
             &self.file,
         );
+        let (template_names, template_params, defining_entity) =
+            self.own_doc_template_context(ctx);
         if let Some(doc) = &leading_doc {
-            apply_doc_param_types(&mut params, &af.params, &doc.params, self.db, &self.file);
+            apply_doc_param_types(
+                &mut params,
+                &af.params,
+                &doc.params,
+                self.db,
+                &self.file,
+                &template_names,
+                &template_params,
+                &defining_entity,
+            );
         }
         let return_ty_hint = af
             .return_type
@@ -407,10 +498,16 @@ impl<'a> ExpressionAnalyzer<'a> {
             .or_else(|| {
                 // Fall back to `@return` docblock preceding the `fn` keyword — mirrors
                 // the same fallback in `analyze_closure` for `function(...) {...}`.
-                leading_doc
-                    .as_ref()
-                    .and_then(|doc| doc.return_type.clone())
-                    .map(|ty| resolve_named_objects_in_union(ty, self.db, &self.file))
+                leading_doc.as_ref().and_then(|doc| doc.return_type.clone()).map(|ty| {
+                    crate::stmt::resolve_union_for_file_with_templates(
+                        ty,
+                        self.db,
+                        &self.file,
+                        &template_names,
+                        &template_params,
+                        &defining_entity,
+                    )
+                })
             });
 
         let mut arrow_ctx = crate::flow_state::FlowState::for_function(
