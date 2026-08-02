@@ -215,10 +215,6 @@
     </UnusedParam>
   </file>
   <file src="src/Fields/SerializableFieldsTrait.php">
-    <DirectConstructorCall>
-      <code><![CDATA[$this->__construct($data)]]></code>
-      <code><![CDATA[$this->__construct(base64_decode($data))]]></code>
-    </DirectConstructorCall>
     <MissingThrowsDocblock>
       <code><![CDATA[]]></code>
     </MissingThrowsDocblock>
@@ -606,9 +602,6 @@
     </MixedReturnStatement>
   </file>
   <file src="src/Type/Decimal.php">
-    <DirectConstructorCall>
-      <code><![CDATA[$this->__construct($data)]]></code>
-    </DirectConstructorCall>
     <ImpureMethodCall>
       <code><![CDATA[$this->toString()]]></code>
       <code><![CDATA[$this->toString()]]></code>
@@ -626,9 +619,6 @@
     </MissingThrowsDocblock>
   </file>
   <file src="src/Type/Hexadecimal.php">
-    <DirectConstructorCall>
-      <code><![CDATA[$this->__construct($data)]]></code>
-    </DirectConstructorCall>
     <ImpureMethodCall>
       <code><![CDATA[$this->__construct($data)]]></code>
       <code><![CDATA[$this->unserialize($data['string'])]]></code>
@@ -644,9 +634,6 @@
     </MissingThrowsDocblock>
   </file>
   <file src="src/Type/Integer.php">
-    <DirectConstructorCall>
-      <code><![CDATA[$this->__construct($data)]]></code>
-    </DirectConstructorCall>
     <ImmutablePropertyModification>
       <code><![CDATA[$this->isNegative = true]]></code>
     </ImmutablePropertyModification>
@@ -665,9 +652,6 @@
     </MissingThrowsDocblock>
   </file>
   <file src="src/Type/Time.php">
-    <DirectConstructorCall>
-      <code><![CDATA[$this->__construct($time['seconds'], $time['microseconds'])]]></code>
-    </DirectConstructorCall>
     <ImpureFunctionCall>
       <code><![CDATA[json_encode($this)]]></code>
     </ImpureFunctionCall>
