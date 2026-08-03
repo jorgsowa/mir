@@ -201,6 +201,28 @@ pub(crate) fn apply_one_assertion(
                 return true;
             }
         }
+        // `@psalm-assert-if-true Type $this` (bare, no `->`) targets the
+        // receiver itself, not a property of it — same "written from the
+        // method's own perspective" reasoning as the `this->prop` case
+        // above, but narrowing the whole variable (mirrors the plain
+        // `extract_var_name` arm further below that narrows an ordinary
+        // by-value argument).
+        if assertion.param.as_ref() == "this" {
+            let Some(obj_key) = receiver.and_then(extract_var_name) else {
+                return false;
+            };
+            let ty = match template_bindings {
+                Some(b) => assertion.ty.substitute_templates(b),
+                None => assertion.ty.clone(),
+            };
+            let ty = if assertion.negated {
+                negate_assertion_type(&ctx.get_var(&obj_key), &ty, db)
+            } else {
+                ty
+            };
+            ctx.set_var(&obj_key, ty);
+            return true;
+        }
     }
 
     let Some(index) = params.iter().position(|p| p.name == assertion.param) else {
