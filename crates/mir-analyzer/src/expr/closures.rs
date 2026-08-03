@@ -11,6 +11,27 @@ use php_ast::owned::{ArrowFunctionExpr, ClosureExpr, ExprKind, Param};
 use php_ast::Span;
 use std::sync::Arc;
 
+/// A by-ref capture (`use (&$var)`) is the same variable the closure body
+/// runs against on every invocation, including any invocation prior to this
+/// one that mutated it — so seeding it with the exact literal/narrowed type
+/// snapshotted at the closure-literal site falsely claims that value can
+/// never differ. Widens scalar literals to their base type and collapses
+/// `true`/`false` to `bool`, mirroring the `mixed` fallback already used for
+/// the undefined-capture case, but only as much as is safe for an
+/// already-typed variable.
+fn widen_byref_capture(ty: Type) -> Type {
+    let widened = widen_for_check(ty);
+    let mut out = Type::empty();
+    for atomic in widened.types {
+        let atomic = match atomic {
+            Atomic::TTrue | Atomic::TFalse => Atomic::TBool,
+            other => other,
+        };
+        out.add_type(atomic);
+    }
+    out
+}
+
 fn param_name_span(source: &str, p: &Param) -> Span {
     let Some(raw) = p.name.as_deref() else {
         return p.span;
@@ -330,7 +351,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                     );
                 }
             }
-            closure_ctx.set_var(name, ctx.get_var(name));
+            closure_ctx.set_var(
+                name,
+                if use_var.by_ref {
+                    widen_byref_capture(ctx.get_var(name))
+                } else {
+                    ctx.get_var(name)
+                },
+            );
             if ctx.is_tainted(name) {
                 closure_ctx.taint_var(name);
             }
