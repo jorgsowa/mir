@@ -33,7 +33,7 @@ class Holder {
 function orChainKeepsClosureProp(Holder $h): void {
     if ($h->x instanceof Closure || $h->x instanceof Foo) {
         if ($h->x instanceof Closure) {
-            /** @mir-check $h->x is Closure(): mixed */
+            /** @mir-check $h->x is Closure(): Foo */
             $_ = 1;
         } else {
             /** @mir-check $h->x is Foo */

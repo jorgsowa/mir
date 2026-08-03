@@ -1083,11 +1083,17 @@ pub(super) fn parse_var_line(s: &str) -> Option<(String, String)> {
                 } else if after.starts_with('|')
                     || after.starts_with('&')
                     || s[..i].trim_end().ends_with(['|', '&'])
+                    || s[..i].trim_end().ends_with(':')
                 {
                     // A `|`/`&` immediately before or after this whitespace
                     // means the type expression is continuing across it (a
                     // spaced union/intersection like `string | null`), not a
-                    // name boundary — keep scanning rather than giving up.
+                    // name boundary — keep scanning rather than giving up. A
+                    // trailing `:` means this whitespace is the space in
+                    // `callable(...): ReturnType`/`Closure(...): ReturnType`
+                    // (the return-type arrow only ever appears at depth 0,
+                    // after the signature's closing paren) — also a
+                    // continuation, not a name boundary.
                     continue;
                 }
                 // The token right after the type isn't a name, and isn't a
@@ -1279,6 +1285,22 @@ pub(super) fn extract_type_prefix(s: &str) -> &str {
             '<' | '(' | '{' => depth += 1,
             '>' | ')' | '}' => depth -= 1,
             _ if ch.is_whitespace() && depth == 0 => {
+                // A `|`/`&` immediately before or after this whitespace means
+                // the type is continuing across it (a spaced union/
+                // intersection); a trailing `:` means it's the space in
+                // `callable(...): ReturnType`/`Closure(...): ReturnType`
+                // (only ever appears at depth 0, right after the closing
+                // paren) — same continuation logic as `parse_var_line`, kept
+                // in sync since this is its nameless-form fallback.
+                let after = s[i..].trim_start();
+                let before = s[..i].trim_end();
+                if after.starts_with('|')
+                    || after.starts_with('&')
+                    || before.ends_with(['|', '&'])
+                    || before.ends_with(':')
+                {
+                    continue;
+                }
                 end = i;
                 break;
             }
