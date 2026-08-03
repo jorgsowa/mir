@@ -1661,6 +1661,8 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         (Atomic::TNamedObject { .. }, Atomic::TObject) => true,
         (Atomic::TStaticObject { .. }, Atomic::TObject) => true,
         (Atomic::TSelf { .. }, Atomic::TObject) => true,
+        // An enum-case literal is, at runtime, an object.
+        (Atomic::TLiteralEnumCase { .. }, Atomic::TObject) => true,
         // self(X) and static(X) satisfy TNamedObject(X) with same FQCN
         (Atomic::TSelf { fqcn: a }, Atomic::TNamedObject { fqcn: b, .. }) => a == b,
         (Atomic::TStaticObject { fqcn: a }, Atomic::TNamedObject { fqcn: b, .. }) => a == b,
@@ -2228,6 +2230,16 @@ mod tests {
             type_params: empty_type_params(),
         });
         assert!(!sub.is_subtype_structural(&sup));
+    }
+
+    #[test]
+    fn subtype_enum_case_under_bare_object() {
+        let sub = Type::single(Atomic::TLiteralEnumCase {
+            enum_fqcn: Name::new("RoundingMode"),
+            case_name: Name::new("Unnecessary"),
+        });
+        let sup = Type::single(Atomic::TObject);
+        assert!(sub.is_subtype_structural(&sup));
     }
 
     #[test]

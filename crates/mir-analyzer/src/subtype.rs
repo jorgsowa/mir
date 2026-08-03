@@ -337,6 +337,15 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
                     sub_iface == sup_cls
                         || extends_or_implements(db, sub_iface.as_ref(), sup_cls.as_ref())
                 }
+                // An enum-case literal satisfies a supertype named by any interface
+                // (or, since enums can't extend a class, any other named type) its
+                // declaring enum implements — e.g. a `HasLabel`-typed param/property
+                // accepting `Status::Active` when `Status implements HasLabel`.
+                // Exact-fqcn equality is already covered by the structural check above.
+                (
+                    Atomic::TLiteralEnumCase { enum_fqcn, .. },
+                    Atomic::TNamedObject { fqcn: sup_fqcn, .. },
+                ) => extends_or_implements(db, enum_fqcn.as_ref(), sup_fqcn.as_ref()),
                 _ => false,
             }
         })

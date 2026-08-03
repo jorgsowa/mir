@@ -462,6 +462,10 @@ fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -
                 fqcn
             }
             Atomic::TParent { fqcn } => fqcn,
+            // An enum-case literal's declaring enum drives the same hierarchy
+            // check below (e.g. a `UnitEnum`/`HasLabel`-typed param accepting
+            // `Status::Active` when `Status implements HasLabel`).
+            Atomic::TLiteralEnumCase { enum_fqcn, .. } => enum_fqcn,
             Atomic::TNever => return true,
             Atomic::TClosure { .. } => {
                 return param.types.iter().any(|p| match p {
