@@ -156,6 +156,29 @@ pub(crate) fn narrow_isset_shape_key(
     }
 }
 
+/// `assert($base['a']['b'] !== null)` / `if ($base['a']['b'] === null) {
+/// throw/return; }` — a null check on a literal-keyed array-offset access,
+/// same access-path shape `narrow_isset_shape_key` covers but narrowing the
+/// key's OWN value type (to/from null) rather than proving mere presence.
+/// A no-op when `var_expr` isn't a literal-keyed array-access chain at all
+/// (`collect_array_access_path` returns `None`), so callers can invoke this
+/// unconditionally as a dispatch-chain fallback.
+pub(crate) fn narrow_offset_null_by_path(
+    var_expr: &php_ast::owned::Expr,
+    ctx: &mut FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+    is_null: bool,
+) {
+    let Some((base, path)) = collect_array_access_path(var_expr, ctx, db, file) else {
+        return;
+    };
+    let current = resolve_shape_base_current_type(ctx, &base, db, file);
+    if let Some(narrowed) = narrow_shape_path_null(&current, &path, is_null) {
+        set_shape_base_narrowed(ctx, &base, current, narrowed);
+    }
+}
+
 /// Collect `(base, [key1, key2, ...])` from a chain of literal-keyed
 /// `ArrayAccess` nodes, outermost-to-innermost (`$a['x']['y']` -> `(Var("a"),
 /// [x, y])`, `$this->data['x']` -> `(Prop("this", "data"), [x])`,
@@ -365,6 +388,90 @@ fn narrow_shape_path(ty: &Type, path: &[mir_types::atomic::ArrayKey]) -> Option<
     // If every union member turned out to be an impossible closed shape, keep
     // the original type rather than narrowing to an empty union — proving
     // the branch itself unreachable is a separate concern from key narrowing.
+    if changed && !result.types.is_empty() {
+        Some(result)
+    } else {
+        None
+    }
+}
+
+/// Narrow `ty` along a shape-key access path by a null check on the key's OWN
+/// value (`M24`): unlike `narrow_shape_path` (which proves mere presence),
+/// this narrows `path`'s leaf key to/from null. Proving non-null also proves
+/// presence (an absent optional key reads as null via PHP's undefined-index-
+/// then-null semantics, same reasoning as `narrow_shape_path`'s
+/// `optional = false`), so a closed shape lacking the key entirely is
+/// excluded on the non-null side — it could only ever read as null.
+fn narrow_shape_path_null(
+    ty: &Type,
+    path: &[mir_types::atomic::ArrayKey],
+    is_null: bool,
+) -> Option<Type> {
+    let (key, rest) = path.split_first()?;
+    let mut changed = false;
+    let mut result = Type::empty();
+    for atomic in &ty.types {
+        match atomic {
+            Atomic::TKeyedArray {
+                properties,
+                is_open,
+                is_list,
+            } => {
+                let Some(prop) = properties.get(key) else {
+                    if !is_null && !*is_open {
+                        // Closed shape without this key always reads as
+                        // null — proving non-null is impossible for this
+                        // union member.
+                        changed = true;
+                    } else {
+                        result.add_type(atomic.clone());
+                    }
+                    continue;
+                };
+                if rest.is_empty() {
+                    let narrowed_ty = if is_null {
+                        prop.ty.narrow_to_null()
+                    } else {
+                        prop.ty.remove_null()
+                    };
+                    if narrowed_ty.is_empty() {
+                        // Contradiction for this union member (e.g. proving
+                        // null on a key whose declared type excludes it) —
+                        // exclude it rather than keep a stale wider type.
+                        changed = true;
+                        continue;
+                    }
+                    let mut new_props = properties.clone();
+                    if let Some(p) = new_props.get_mut(key) {
+                        p.ty = narrowed_ty;
+                        if !is_null {
+                            p.optional = false;
+                        }
+                    }
+                    changed = true;
+                    result.add_type(Atomic::TKeyedArray {
+                        properties: new_props,
+                        is_open: *is_open,
+                        is_list: *is_list,
+                    });
+                } else if let Some(deeper) = narrow_shape_path_null(&prop.ty, rest, is_null) {
+                    let mut new_props = properties.clone();
+                    if let Some(p) = new_props.get_mut(key) {
+                        p.ty = deeper;
+                    }
+                    changed = true;
+                    result.add_type(Atomic::TKeyedArray {
+                        properties: new_props,
+                        is_open: *is_open,
+                        is_list: *is_list,
+                    });
+                } else {
+                    result.add_type(atomic.clone());
+                }
+            }
+            _ => result.add_type(atomic.clone()),
+        }
+    }
     if changed && !result.types.is_empty() {
         Some(result)
     } else {

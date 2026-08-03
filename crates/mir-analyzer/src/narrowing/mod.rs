@@ -29,9 +29,9 @@ use arrays::{
     narrow_array_emptiness_condition, narrow_array_key_exists_condition,
     narrow_array_key_first_or_last_null, narrow_container_non_null_non_false,
     narrow_empty_shape_key, narrow_in_array_condition, narrow_isset_shape_key,
-    narrow_isset_shape_key_false, narrow_prop_array_key_first_or_last_null,
-    narrow_static_prop_array_key_first_or_last_null, narrow_to_haystack_values,
-    strip_haystack_null,
+    narrow_isset_shape_key_false, narrow_offset_null_by_path,
+    narrow_prop_array_key_first_or_last_null, narrow_static_prop_array_key_first_or_last_null,
+    narrow_to_haystack_values, strip_haystack_null,
 };
 pub(crate) use assertions::apply_one_assertion;
 use assertions::{
@@ -271,6 +271,8 @@ pub fn narrow_from_condition(
                     extract_static_prop_access(&b.left, ctx, db, file)
                 {
                     narrow_static_prop_null(ctx, &fqcn, &prop, db, effective_true);
+                } else {
+                    narrow_offset_null_by_path(&b.left, ctx, db, file, effective_true);
                 }
             } else if matches!(b.left.kind, ExprKind::Null) {
                 if let Some(target) = extract_array_key_first_or_last_arg(&b.right) {
@@ -311,6 +313,8 @@ pub fn narrow_from_condition(
                     extract_static_prop_access(&b.right, ctx, db, file)
                 {
                     narrow_static_prop_null(ctx, &fqcn, &prop, db, effective_true);
+                } else {
+                    narrow_offset_null_by_path(&b.right, ctx, db, file, effective_true);
                 }
             }
             // `$x === true` / `$x === false`

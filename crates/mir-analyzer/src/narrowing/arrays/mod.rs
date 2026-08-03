@@ -28,6 +28,6 @@ pub(super) use key_exists::narrow_array_key_exists_condition;
 pub(super) use shapes::{
     array_access_base_target, get_shape_path_type, narrow_array_emptiness_condition,
     narrow_container_non_null_non_false, narrow_empty_shape_key, narrow_isset_shape_key,
-    narrow_isset_shape_key_false, resolve_shape_base_current_type, set_shape_base_narrowed,
-    set_shape_path, ShapeBase,
+    narrow_isset_shape_key_false, narrow_offset_null_by_path, resolve_shape_base_current_type,
+    set_shape_base_narrowed, set_shape_path, ShapeBase,
 };
