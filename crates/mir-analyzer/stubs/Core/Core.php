@@ -1120,6 +1120,7 @@ function gc_disable(): void {}
  * @since 7.3
  */
 #[ArrayShape(["runs" => "int", "collected" => "int", "threshold" => "int", "roots" => "int", "running" => "bool", "protected" => "bool", "full" => "bool", "buffer_size" => "int", "application_time" => "float", "collector_time" => "float", "destructor_time" => "float", "free_time" => "float"])]
+#[LanguageLevelTypeAware(['8.3' => 'array{runs: int, collected: int, threshold: int, roots: int, running: bool, protected: bool, full: bool, buffer_size: int, application_time: float, collector_time: float, destructor_time: float, free_time: float}'], default: 'array{runs: int, collected: int, threshold: int, roots: int}')]
 function gc_status(): array {}
 
 /**
