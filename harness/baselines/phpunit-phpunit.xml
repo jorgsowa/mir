@@ -449,9 +449,6 @@
       <code><![CDATA[$this->hasPrevious()]]></code>
       <code><![CDATA[$this->previous()]]></code>
     </ImpureMethodCall>
-    <InvalidPropertyAssignment>
-      <code><![CDATA[$this->previous    = $previous]]></code>
-    </InvalidPropertyAssignment>
   </file>
   <file src="src/Framework/Assert.php">
     <MissingThrowsDocblock>
@@ -759,20 +756,6 @@
     </UndefinedDocblockClass>
   </file>
   <file src="src/Framework/TestCase.php">
-    <InvalidArgument>
-      <code><![CDATA[Event\Code\ThrowableBuilder::from($e)]]></code>
-      <code><![CDATA[Event\Code\ThrowableBuilder::from($e)]]></code>
-      <code><![CDATA[Event\Code\ThrowableBuilder::from($e)]]></code>
-      <code><![CDATA[Event\Code\ThrowableBuilder::from($_e)]]></code>
-      <code><![CDATA[Event\Code\ThrowableBuilder::from($e)]]></code>
-      <code><![CDATA[Event\Code\ThrowableBuilder::from($e)]]></code>
-      <code><![CDATA[Event\Code\ThrowableBuilder::from($e)]]></code>
-      <code><![CDATA[Event\Code\ThrowableBuilder::from($e)]]></code>
-      <code><![CDATA[Event\Code\ThrowableBuilder::from($e)]]></code>
-      <code><![CDATA[Event\Code\ThrowableBuilder::from($e)]]></code>
-      <code><![CDATA[Event\Code\ThrowableBuilder::from($exceptionRaisedDuringTearDown)]]></code>
-      <code><![CDATA[Event\Code\ThrowableBuilder::from($exception)]]></code>
-    </InvalidArgument>
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->backupEnvironmentVariables = [...$this->backupEnvironmentVariables, ...BackedUpEnvironmentVariable::create($environmentVariableName)]]]></code>
     </InvalidPropertyAssignment>
@@ -808,8 +791,6 @@
     <InvalidArgument>
       <code><![CDATA[$class]]></code>
       <code><![CDATA[ComparatorFactory::class]]></code>
-      <code><![CDATA[Event\Code\ThrowableBuilder::from($t)]]></code>
-      <code><![CDATA[Event\Code\ThrowableBuilder::from($t)]]></code>
     </InvalidArgument>
     <MixedArgument>
       <code><![CDATA[$GLOBALS]]></code>
@@ -892,16 +873,12 @@
       <code><![CDATA[$this->name]]></code>
       <code><![CDATA[$this->name]]></code>
       <code><![CDATA[$this->name]]></code>
-      <code><![CDATA[Event\Code\ThrowableBuilder::from($t)]]></code>
-      <code><![CDATA[$this->name]]></code>
-      <code><![CDATA[Event\Code\ThrowableBuilder::from($t)]]></code>
       <code><![CDATA[$this->name]]></code>
       <code><![CDATA[$this->name]]></code>
       <code><![CDATA[$this->name]]></code>
       <code><![CDATA[$this->name]]></code>
-      <code><![CDATA[Event\Code\ThrowableBuilder::from($t)]]></code>
       <code><![CDATA[$this->name]]></code>
-      <code><![CDATA[Event\Code\ThrowableBuilder::from($t)]]></code>
+      <code><![CDATA[$this->name]]></code>
       <code><![CDATA[$this->name]]></code>
     </InvalidArgument>
     <MissingThrowsDocblock>
@@ -1130,50 +1107,10 @@
       <code><![CDATA[$getenv]]></code>
     </PossiblyInvalidArgument>
   </file>
-  <file src="src/Runner/Baseline/Generator.php">
-    <ArgumentTypeCoercion>
-      <code><![CDATA[$this]]></code>
-      <code><![CDATA[$this]]></code>
-      <code><![CDATA[$this]]></code>
-      <code><![CDATA[$this]]></code>
-      <code><![CDATA[$this]]></code>
-      <code><![CDATA[$this]]></code>
-    </ArgumentTypeCoercion>
-  </file>
   <file src="src/Runner/Baseline/Issue.php">
     <MixedArgument>
       <code><![CDATA[$lines[$key]]]></code>
     </MixedArgument>
-  </file>
-  <file src="src/Runner/Baseline/Subscriber/TestTriggeredDeprecationSubscriber.php">
-    <UndefinedMethod>
-      <code><![CDATA[$this->generator()->testTriggeredIssue($event)]]></code>
-    </UndefinedMethod>
-  </file>
-  <file src="src/Runner/Baseline/Subscriber/TestTriggeredNoticeSubscriber.php">
-    <UndefinedMethod>
-      <code><![CDATA[$this->generator()->testTriggeredIssue($event)]]></code>
-    </UndefinedMethod>
-  </file>
-  <file src="src/Runner/Baseline/Subscriber/TestTriggeredPhpDeprecationSubscriber.php">
-    <UndefinedMethod>
-      <code><![CDATA[$this->generator()->testTriggeredIssue($event)]]></code>
-    </UndefinedMethod>
-  </file>
-  <file src="src/Runner/Baseline/Subscriber/TestTriggeredPhpNoticeSubscriber.php">
-    <UndefinedMethod>
-      <code><![CDATA[$this->generator()->testTriggeredIssue($event)]]></code>
-    </UndefinedMethod>
-  </file>
-  <file src="src/Runner/Baseline/Subscriber/TestTriggeredPhpWarningSubscriber.php">
-    <UndefinedMethod>
-      <code><![CDATA[$this->generator()->testTriggeredIssue($event)]]></code>
-    </UndefinedMethod>
-  </file>
-  <file src="src/Runner/Baseline/Subscriber/TestTriggeredWarningSubscriber.php">
-    <UndefinedMethod>
-      <code><![CDATA[$this->generator()->testTriggeredIssue($event)]]></code>
-    </UndefinedMethod>
   </file>
   <file src="src/Runner/CodeCoverage.php">
     <InternalMethod>
