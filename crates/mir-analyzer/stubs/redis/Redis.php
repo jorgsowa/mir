@@ -13,6 +13,7 @@ class Redis
     public const REDIS_ZSET = 4;
     public const REDIS_HASH = 5;
     public const REDIS_STREAM = 6;
+    public const REDIS_VECTORSET = 7;
     public const ATOMIC = 0;
     public const MULTI = 1;
     public const PIPELINE = 2;
@@ -26,6 +27,7 @@ class Redis
     public const OPT_REPLY_LITERAL = 8;
     public const OPT_COMPRESSION_LEVEL = 9;
     public const OPT_NULL_MULTIBULK_AS_NULL = 10;
+    public const OPT_PACK_IGNORE_NUMBERS = 15;
     public const SERIALIZER_NONE = 0;
     public const SERIALIZER_PHP = 1;
     public const SERIALIZER_IGBINARY = 2;
@@ -35,6 +37,7 @@ class Redis
     public const COMPRESSION_LZF = 1;
     public const COMPRESSION_ZSTD = 2;
     public const COMPRESSION_ZSTD_DEFAULT = 3;
+    public const COMPRESSION_ZSTD_MIN = -131072;
     public const COMPRESSION_ZSTD_MAX = 22;
     public const COMPRESSION_LZ4 = 3;
     public const SCAN_RETRY = 1;
@@ -2197,6 +2200,49 @@ class Redis
     public function blmove(string $src, string $dst, string $wherefrom, string $whereto, float $timeout): Redis|string|false {}
 
     /**
+     * Move one or more element from one list to another.
+     *
+     * @param string     $src       The source list.
+     * @param string     $dst       The destination list.
+     * @param string     $wherefrom Where in the source list to extract the element.
+     *                              - `Redis::LEFT`, or `Redis::RIGHT`.
+     * @param string     $whereto   Where in the destination list to put the element.
+     *                              - `Redis::LEFT`, or `Redis::RIGHT`.
+     * @param array|null $options   An array of options to modify how the command behaves.
+     *
+     * @return Redis|array|false The element(s) removed from the source list.
+     *
+     * @see https://redis.io/docs/latest/commands/lmovem/
+     *
+     * @example
+     * $redis->rPush('numbers', 'one', 'two', 'three');
+     * $redis->lmovem('numbers', 'odds', Redis::LEFT, Redis::LEFT, ['COUNT' => [2, 'BULK']]);
+     */
+    public function lmovem(string $src, string $dst, string $wherefrom, string $whereto, ?array $options = null): Redis|array|false {}
+
+    /**
+     * Move one or more element from one list to another, blocking up to a timeout until an element is available.
+     *
+     * @param string     $src       The source list.
+     * @param string     $dst       The destination list.
+     * @param string     $wherefrom Where in the source list to extract the element.
+     *                              - `Redis::LEFT`, or `Redis::RIGHT`.
+     * @param string     $whereto   Where in the destination list to put the element.
+     *                              - `Redis::LEFT`, or `Redis::RIGHT`.
+     * @param float      $timeout   How long to block for an element.
+     * @param array|null $options   An array of options to modify how the command behaves.
+     *
+     * @return Redis|array|false The element(s) removed from the source list.
+     *
+     * @see https://redis.io/docs/latest/commands/blmovem/
+     *
+     * @example
+     * $redis->rPush('numbers', 'one', 'two', 'three');
+     * $redis->blmovem('numbers', 'odds', Redis::LEFT, Redis::LEFT, 1.0, ['COUNT' => [2, 'BULK']]);
+     */
+    public function blmovem(string $src, string $dst, string $wherefrom, string $whereto, float $timeout, ?array $options = null): Redis|array|false {}
+
+    /**
      * Pop one or more elements off a list.
      *
      * @param string $key   The list to pop from.
@@ -3082,6 +3128,46 @@ class Redis
      * $redis->sInterCard(['set1', 'set2', 'set3']);
      */
     public function sintercard(array $keys, int $limit = -1): Redis|int|false {}
+
+    /**
+     * Compute the union of one or more sets and return the cardinality of the result.
+     *
+     * @param array      $keys    One or more set key names.
+     * @param array|null $options An optional array of options that modifies how the command works.
+     *
+     * @return Redis|int|false The cardinality of the union of the sets.
+     *
+     * @see https://redis.io/docs/latest/commands/sunioncard/
+     *
+     * @example
+     * $redis->sAdd('set1', 'apple', 'pear', 'banana', 'carrot');
+     * $redis->sAdd('set2', 'apple',         'banana');
+     * $redis->sAdd('set3',          'pear', 'banana');
+     *
+     * $redis->sunioncard(['set1', 'set2', 'set3']);
+     * $redis->sunioncard(['set1', 'set2'], ['LIMIT' => 2]);
+     * $redis->sunioncard(['set1', 'set2'], ['LIMIT' => 2, 'APPROX']);
+     */
+    public function sunioncard(array $keys, ?array $options = null): Redis|int|false {}
+
+    /**
+     * Compute the difference of one or more sets and return the cardinality of the result.
+     *
+     * @param array      $keys    One or more set key names.
+     * @param array|null $options An optional array of options that modifies how the command works.
+     *
+     * @return Redis|int|false The cardinality of the difference of the sets.
+     *
+     * @see https://redis.io/docs/latest/commands/sdiffcard/
+     *
+     * @example
+     * $redis->sAdd('set1', 'apple', 'pear', 'banana', 'carrot');
+     * $redis->sAdd('set2', 'apple',         'banana');
+     * $redis->sAdd('set3',          'pear', 'banana');
+     *
+     * $redis->sdiffcard(['set1', 'set2', 'set3']);
+     */
+    public function sdiffcard(array $keys, ?array $options = null): Redis|int|false {}
 
     /**
      * Perform the intersection of one or more Redis SETs, storing the result in a destination
@@ -4609,6 +4695,23 @@ class Redis
      * $redis->vlinks('embeddings', 'doc:1', true);
      */
     public function vlinks(string $key, mixed $member, bool $withscores = false): Redis|array|false {}
+
+    /**
+     * Get rate limiting information for a key using the GCRA (Generic Cell Rate Algorithm).
+     *
+     * @param string $key               The key to rate limit.
+     * @param int    $maxBurst          The maximum burst size allowed.
+     * @param int    $requestsPerPeriod The number of requests allowed per period.
+     * @param int    $period            The length of the period.
+     * @param int    $tokens            The number of tokens to consume.
+     *
+     * @return Redis|array|false An array with rate limiting information, or false on failure.
+     *
+     * @see https://redis.io/docs/latest/commands/gcra/
+     *
+     * @example $redis->gcra('user:123', 10, 100, 3600);
+     */
+    public function gcra(string $key, int $maxBurst, int $requestsPerPeriod, int $period, int $tokens = 0): Redis|array|false {}
 
     /**
      * Truncate a STREAM key in various ways.

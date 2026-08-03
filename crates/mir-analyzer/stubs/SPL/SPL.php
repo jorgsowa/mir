@@ -2125,4 +2125,12 @@ class RecursiveArrayIterator extends ArrayIterator implements RecursiveIterator
      */
     #[TentativeType]
     public function getChildren(): ?RecursiveArrayIterator {}
+
+    /**
+     * Return current array key
+     * @link https://php.net/manual/en/arrayiterator.key.php
+     * @return string|int|null The key of the current element.
+     */
+    #[TentativeType]
+    public function key(): string|int|null {}
 }

@@ -1523,6 +1523,23 @@ class Locale
     ): string|false {}
 
     /**
+     * @param string $keyword
+     * @param string|null $displayLocale
+     * @return string|false
+     * @since 8.6
+     */
+    public static function getDisplayKeyword(string $keyword, ?string $displayLocale = null): string|false {}
+
+    /**
+     * @param string $locale
+     * @param string $keyword
+     * @param string|null $displayLocale
+     * @return string|false
+     * @since 8.6
+     */
+    public static function getDisplayKeywordValue(string $locale, string $keyword, ?string $displayLocale = null): string|false {}
+
+    /**
      * (PHP 5 &gt;= 5.3.0, PECL intl &gt;= 1.0.0)<br/>
      * Returns an appropriately localized display name for language of the inputlocale
      * @link https://php.net/manual/en/locale.getdisplaylanguage.php
@@ -4519,6 +4536,39 @@ function locale_get_display_variant(
 ): string|false {}
 
 /**
+ * Returns an appropriately localized display name for the given keyword
+ * @param string $keyword <p>
+ * The keyword to return a display name for.
+ * </p>
+ * @param string|null $displayLocale <p>
+ * Optional format locale to use to display the keyword name
+ * </p>
+ * @return string|false Display name of the keyword in the format appropriate for $displayLocale,
+ * or <b>FALSE</b> on failure.
+ * @since 8.6
+ * @pure
+ */
+function locale_get_display_keyword(string $keyword, ?string $displayLocale = null): string|false {}
+
+/**
+ * Returns an appropriately localized display name for the value of the given keyword
+ * @param string $locale <p>
+ * The locale that contains the keyword value.
+ * </p>
+ * @param string $keyword <p>
+ * The keyword whose value should be returned.
+ * </p>
+ * @param string|null $displayLocale <p>
+ * Optional format locale to use to display the keyword value
+ * </p>
+ * @return string|false Display name of the keyword value in the format appropriate for $displayLocale,
+ * or <b>FALSE</b> on failure.
+ * @since 8.6
+ * @pure
+ */
+function locale_get_display_keyword_value(string $locale, string $keyword, ?string $displayLocale = null): string|false {}
+
+/**
  * (PHP 5 &gt;= 5.3.0, PECL intl &gt;= 1.0.0)<br/>
  * Returns a correctly ordered and delimited locale ID
  * @link https://php.net/manual/en/locale.composelocale.php
@@ -5253,6 +5303,17 @@ function grapheme_strripos(string $haystack, string $needle, int $offset = 0, #[
  * @pure
  */
 function grapheme_substr(string $string, int $offset, ?int $length = null, #[ElementAvailable(from: '8.5')] string $locale = ""): string|false {}
+
+/**
+ * Reverses a string on a grapheme cluster level.
+ * @param string $string <p>
+ * The input string. Must be valid UTF-8.
+ * </p>
+ * @return string|false The reversed string, or <b>FALSE</b> on failure.
+ * @since 8.6
+ * @pure
+ */
+function grapheme_strrev(string $string): string|false {}
 
 /**
  * (PHP 5 &gt;= 5.3.0, PECL intl &gt;= 1.0.0)<br/>

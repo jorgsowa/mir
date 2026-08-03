@@ -2853,3 +2853,8 @@ final class CurlShareHandle
      */
     private function __construct() {}
 }
+
+/**
+ * @since 8.6
+ */
+define('CURLINFO_SIZE_DELIVERED', 6291527);

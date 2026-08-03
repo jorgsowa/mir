@@ -166,6 +166,17 @@ class RedisSentinel
     public function masters() {}
 
     /**
+     * Return the run ID of this Sentinel instance.
+     *
+     * @return string The run id of this Sentinel instance.
+     *
+     * @example $sentinel->myid();
+     *
+     * @since   >= 5.2.0
+     */
+    public function myid(): string {}
+
+    /**
      * Ping the sentinel
      *
      * @return bool True in case of success, False in case of failure
