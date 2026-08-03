@@ -606,6 +606,23 @@ pub(super) fn literal_string_narrow_type(current: &Type, value: &str, is_value: 
             }
         }
         result
+    } else if value.is_empty() {
+        // Excluding the empty string specifically upgrades a bare `string`
+        // atom to `non-empty-string` — mirrors the `is_value=true` branch's
+        // `TNonEmptyString if !value.is_empty()` handling above. Every other
+        // atom (already-narrower string subtypes, non-string atoms) passes
+        // through unchanged: excluding "" doesn't let any of them narrow
+        // further.
+        let mut result = Type::empty();
+        result.from_docblock = current.from_docblock;
+        for t in &current.types {
+            match t {
+                Atomic::TLiteralString(s) if s.as_ref() == value => {}
+                Atomic::TString => result.add_type(Atomic::TNonEmptyString),
+                other => result.add_type(other.clone()),
+            }
+        }
+        result
     } else {
         current.filter(|t| !matches!(t, Atomic::TLiteralString(s) if s.as_ref() == value))
     }

@@ -803,7 +803,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                     contributed = true;
                     result.merge_with(value);
                 }
-                Atomic::TString | Atomic::TLiteralString(_) => {
+                Atomic::TString
+                | Atomic::TLiteralString(_)
+                | Atomic::TNonEmptyString
+                | Atomic::TNumericString
+                | Atomic::TCallableString
+                | Atomic::TClassString(_)
+                | Atomic::TInterfaceString(_)
+                | Atomic::TEnumString
+                | Atomic::TTraitString => {
                     contributed = true;
                     result.merge_with(&Type::single(Atomic::TString));
                 }
