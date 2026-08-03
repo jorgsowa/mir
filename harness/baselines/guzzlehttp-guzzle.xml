@@ -467,11 +467,6 @@
       <code><![CDATA[$options !== null]]></code>
       <code><![CDATA[$collectingTrailers]]></code>
     </RedundantCondition>
-    <UnusedParam>
-      <code><![CDATA[$options]]></code>
-      <code><![CDATA[$options]]></code>
-      <code><![CDATA[$conf]]></code>
-    </UnusedParam>
   </file>
   <file src="src/Handler/CurlHandler.php">
     <MixedArgument>
@@ -624,9 +619,6 @@
       <code><![CDATA[$failure !== null]]></code>
       <code><![CDATA[!is_int($id)]]></code>
     </RedundantCondition>
-    <UnusedParam>
-      <code><![CDATA[$options]]></code>
-    </UnusedParam>
   </file>
   <file src="src/Handler/CurlShareHandleState.php">
     <ArgumentTypeCoercion>
@@ -886,16 +878,12 @@
     <UnusedParam>
       <code><![CDATA[$params]]></code>
       <code><![CDATA[$request]]></code>
-      <code><![CDATA[$options]]></code>
       <code><![CDATA[$params]]></code>
       <code><![CDATA[$request]]></code>
-      <code><![CDATA[$options]]></code>
       <code><![CDATA[$params]]></code>
       <code><![CDATA[$request]]></code>
-      <code><![CDATA[$options]]></code>
       <code><![CDATA[$params]]></code>
       <code><![CDATA[$request]]></code>
-      <code><![CDATA[$options]]></code>
       <code><![CDATA[$params]]></code>
       <code><![CDATA[$request]]></code>
       <code><![CDATA[$params]]></code>
@@ -1295,9 +1283,6 @@
       <code><![CDATA[$uri = $request->getBody()->getMetadata('uri')]]></code>
       <code><![CDATA[$expect = $options['expect'] ?? null]]></code>
     </MixedAssignment>
-    <UnusedParam>
-      <code><![CDATA[$modify]]></code>
-    </UnusedParam>
   </file>
   <file src="src/RedirectMiddleware.php">
     <MissingClosureReturnType>
