@@ -436,11 +436,6 @@
       <code><![CDATA[$line !== false]]></code>
     </ImpossibleIdenticalComparison>
   </file>
-  <file src="src/Event/Value/TestSuite/TestSuiteForTestClass.php">
-    <InvalidArgument>
-      <code><![CDATA[$name]]></code>
-    </InvalidArgument>
-  </file>
   <file src="src/Event/Value/Throwable.php">
     <ImpureMethodCall>
       <code><![CDATA[$this->description()]]></code>
@@ -540,10 +535,6 @@
     </PossiblyUndefinedVariable>
   </file>
   <file src="src/Framework/MockObject/Generator/Generator.php">
-    <InvalidArgument>
-      <code><![CDATA[$_mockClassName]]></code>
-      <code><![CDATA[$className]]></code>
-    </InvalidArgument>
     <MissingConstructor>
       <code><![CDATA[final class Generator]]></code>
     </MissingConstructor>
@@ -568,11 +559,6 @@
       <code><![CDATA[$method]]></code>
       <code><![CDATA[$method]]></code>
     </RedundantCast>
-  </file>
-  <file src="src/Framework/MockObject/MockBuilder.php">
-    <InvalidArgument>
-      <code><![CDATA[$this->type]]></code>
-    </InvalidArgument>
   </file>
   <file src="src/Framework/MockObject/Runtime/AbstractInvocationImplementation.php">
     <MixedArgument>
@@ -733,10 +719,6 @@
     </MixedAssignment>
   </file>
   <file src="src/Framework/TestCase/GlobalStateCapture.php">
-    <InvalidArgument>
-      <code><![CDATA[$class]]></code>
-      <code><![CDATA[ComparatorFactory::class]]></code>
-    </InvalidArgument>
     <MixedArgument>
       <code><![CDATA[$GLOBALS]]></code>
     </MixedArgument>
@@ -800,17 +782,6 @@
   <file src="src/Framework/TestSuite.php">
     <InvalidArgument>
       <code><![CDATA[$iterator]]></code>
-      <code><![CDATA[$this->name]]></code>
-      <code><![CDATA[$this->name]]></code>
-      <code><![CDATA[$this->name]]></code>
-      <code><![CDATA[$this->name]]></code>
-      <code><![CDATA[$this->name]]></code>
-      <code><![CDATA[$this->name]]></code>
-      <code><![CDATA[$this->name]]></code>
-      <code><![CDATA[$this->name]]></code>
-      <code><![CDATA[$this->name]]></code>
-      <code><![CDATA[$this->name]]></code>
-      <code><![CDATA[$this->name]]></code>
     </InvalidArgument>
     <MixedArgument>
       <code><![CDATA[$method]]></code>
