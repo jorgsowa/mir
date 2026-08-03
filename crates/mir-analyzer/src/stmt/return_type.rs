@@ -106,6 +106,16 @@ pub(crate) fn named_object_return_compatible(
         };
 
         declared.types.iter().any(|declared_atom| {
+            // An invokable object satisfies a callable(...): R / Closure(...): R
+            // declared return type — same leniency `subtype::is_subtype` applies
+            // (not signature-checked, matching `call/args/types.rs`'s existing
+            // callable-argument precedent).
+            if matches!(
+                declared_atom,
+                Atomic::TCallable { .. } | Atomic::TClosure { .. }
+            ) {
+                return crate::db::has_method_in_chain(db, actual_fqcn.as_ref(), "__invoke");
+            }
             // Extract declared FQCN — also handle self/static/parent in declared type
             let declared_fqcn: &Name = match declared_atom {
                 Atomic::TNamedObject { fqcn, .. } => fqcn,

@@ -313,6 +313,38 @@ impl CallAnalyzer {
                             return_type: Some(rt),
                             ..
                         } => return *rt.clone(),
+                        // `$obj(...)` invokes `$obj`'s __invoke() — its declared
+                        // return type was never consulted here, so every
+                        // invocation-via-object fell through to `mixed` even
+                        // when __invoke() has a concrete return type (e.g. a
+                        // recursive `return $this(...)` inside __invoke()
+                        // itself). Mirrors the __invoke lookup already done
+                        // above (for arg-checking/reference recording).
+                        //
+                        // Excludes the builtin `Closure` class itself: a
+                        // structural `TClosure`/`TCallable` atom carrying the
+                        // real per-instance signature is handled by the arms
+                        // above, but a plain `Closure`-named `TNamedObject`
+                        // (the shape a flow-merge can collapse a closure value
+                        // into when unioned with another callable-shaped atom)
+                        // has no such signature attached — its stub's
+                        // `__invoke(...$_)` declares no return type at all, so
+                        // resolving it here would short-circuit the loop with
+                        // `mixed` before ever reaching a sibling atom (e.g. a
+                        // `TCallable { return_type: Some(_) }`) that actually
+                        // knows the answer.
+                        Atomic::TNamedObject { fqcn, .. }
+                            if !fqcn.as_ref().trim_start_matches('\\').eq_ignore_ascii_case(
+                                "Closure",
+                            ) =>
+                        {
+                            let fqcn_arc: Arc<str> = Arc::from(fqcn.as_ref());
+                            if let Some(resolved) =
+                                super::method::resolve_method_from_db(ea.db, &fqcn_arc, "__invoke")
+                            {
+                                return resolved.return_ty_raw;
+                            }
+                        }
                         _ => {}
                     }
                 }
