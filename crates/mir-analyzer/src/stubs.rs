@@ -459,6 +459,27 @@ pub fn is_builtin_function(name: &str) -> bool {
 }
 
 // ---------------------------------------------------------------------------
+// Builtin-constant query
+// ---------------------------------------------------------------------------
+
+/// Returns `true` if `name` is a known PHP built-in constant (`PHP_EOL`,
+/// `PHP_VERSION`, ...).
+///
+/// PHP constants are case-sensitive, so — unlike [`stub_path_for_class`]'s
+/// case-insensitive class-name lookup — this match is exact. A leading `\`
+/// (the global-namespace escape) is stripped first, same as
+/// [`stub_path_for_class`] does for class names.
+///
+/// # Example
+/// ```
+/// assert!(mir_analyzer::stubs::is_builtin_constant("PHP_EOL"));
+/// assert!(!mir_analyzer::stubs::is_builtin_constant("MY_CUSTOM_CONST"));
+/// ```
+pub fn is_builtin_constant(name: &str) -> bool {
+    stub_path_for_constant(name).is_some()
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -739,6 +760,43 @@ mod tests {
         assert!(
             !is_builtin_function("gearman_bugreport"),
             "extension function with no vendored stub dir should not be a builtin"
+        );
+    }
+
+    #[test]
+    fn is_builtin_constant_returns_true_for_known_constants() {
+        assert!(is_builtin_constant("PHP_EOL"), "PHP_EOL should be a builtin");
+        assert!(
+            is_builtin_constant("PHP_VERSION"),
+            "PHP_VERSION should be a builtin"
+        );
+    }
+
+    #[test]
+    fn is_builtin_constant_is_case_sensitive() {
+        assert!(
+            !is_builtin_constant("php_eol"),
+            "PHP constant lookup is exact-case, unlike class names"
+        );
+    }
+
+    #[test]
+    fn is_builtin_constant_strips_leading_backslash() {
+        assert!(
+            is_builtin_constant("\\PHP_EOL"),
+            "a global-namespace-escaped constant should still resolve"
+        );
+    }
+
+    #[test]
+    fn is_builtin_constant_returns_false_for_unknown_names() {
+        assert!(
+            !is_builtin_constant("MY_CUSTOM_CONST"),
+            "MY_CUSTOM_CONST should not be a builtin"
+        );
+        assert!(
+            !is_builtin_constant(""),
+            "empty string should not be a builtin"
         );
     }
 
