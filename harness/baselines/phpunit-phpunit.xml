@@ -498,9 +498,6 @@
     </UndefinedDocblockClass>
   </file>
   <file src="src/Framework/Constraint/Object/ObjectEquals.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[$object->getMethod($this->method)]]></code>
-    </MissingThrowsDocblock>
     <MixedAssignment>
       <code><![CDATA[$result = $other->{$this->method}($this->expected)]]></code>
     </MixedAssignment>
@@ -537,15 +534,7 @@
       <code><![CDATA[$this->serializableTrace = $this->getTrace()]]></code>
     </InvalidPropertyAssignment>
   </file>
-  <file src="src/Framework/ExecutionOrderDependency.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[$class->getMethod($this->methodName)]]></code>
-    </MissingThrowsDocblock>
-  </file>
   <file src="src/Framework/MockObject/Generator/DoubledMethod.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[$parameter->getDefaultValue()]]></code>
-    </MissingThrowsDocblock>
     <MixedArgument>
       <code><![CDATA[$e->getCode()]]></code>
     </MixedArgument>
@@ -565,7 +554,6 @@
       <code><![CDATA[final class Generator]]></code>
     </MissingConstructor>
     <MissingThrowsDocblock>
-      <code><![CDATA[$class->getMethod($methodName)]]></code>
       <code><![CDATA[$class->getMethod('__clone')]]></code>
       <code><![CDATA[$class->getMethod($methodName)]]></code>
       <code><![CDATA[version_compare(PHP_VERSION, '8.5', '>=')]]></code>
@@ -763,9 +751,6 @@
     </UnusedForeachValue>
   </file>
   <file src="src/Framework/TestCase/HookMethodInvoker.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[$reflector->getMethod($methodName)]]></code>
-    </MissingThrowsDocblock>
     <MixedArgument>
       <code><![CDATA[$hookMethods['beforeClass']]]></code>
       <code><![CDATA[$hookMethods['before']]]></code>
@@ -833,9 +818,6 @@
       <code><![CDATA[$this->name]]></code>
       <code><![CDATA[$this->name]]></code>
     </InvalidArgument>
-    <MissingThrowsDocblock>
-      <code><![CDATA[$reflector->getMethod($methodName)]]></code>
-    </MissingThrowsDocblock>
     <MixedArgument>
       <code><![CDATA[$method]]></code>
       <code><![CDATA[$method]]></code>
@@ -910,9 +892,6 @@
     </MixedArgument>
   </file>
   <file src="src/Logging/TestDox/NamePrettifier.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[$parameter->getDefaultValue()]]></code>
-    </MissingThrowsDocblock>
     <MixedArgument>
       <code><![CDATA[$matches[1]]]></code>
     </MixedArgument>
