@@ -163,9 +163,7 @@ pub(crate) fn resolve_literal_class_scope(
     expr: &php_ast::owned::Expr,
 ) -> Option<Arc<str>> {
     let name = match &expr.kind {
-        ExprKind::ClassConstAccess(cca)
-            if matches!(&cca.member.kind, ExprKind::Identifier(id) if id.eq_ignore_ascii_case("class")) =>
-        {
+        ExprKind::ClassConstAccess(cca) if matches!(&cca.member.kind, ExprKind::Identifier(id) if id.eq_ignore_ascii_case("class")) => {
             match &cca.class.kind {
                 ExprKind::Identifier(name) => name.as_ref(),
                 _ => return None,
@@ -181,7 +179,10 @@ pub(crate) fn resolve_literal_class_scope(
 /// Resolve `Closure::bind`'s third (`$newScope`) argument — see
 /// `resolve_literal_class_scope` for which shapes are recognized. An omitted
 /// arg (defaulting to `$newThis`'s class) is left unresolved.
-fn static_closure_bind_scope(ea: &ExpressionAnalyzer<'_>, call: &StaticMethodCallExpr) -> Option<Arc<str>> {
+fn static_closure_bind_scope(
+    ea: &ExpressionAnalyzer<'_>,
+    call: &StaticMethodCallExpr,
+) -> Option<Arc<str>> {
     let scope_expr = call.args.get(2)?.value.as_ref()?;
     resolve_literal_class_scope(ea.db, &ea.file, scope_expr)
 }

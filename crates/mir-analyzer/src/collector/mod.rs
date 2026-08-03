@@ -850,13 +850,7 @@ impl<'a> DefinitionCollector<'a> {
     /// native code references (type hints) go through `resolve_union`
     /// instead, which keeps that leniency off.
     fn resolve_type_name(&self, name: &str, full_qualify: bool) -> mir_types::Name {
-        resolution::resolve_type_name(
-            name,
-            full_qualify,
-            true,
-            &self.namespace,
-            &self.use_aliases,
-        )
+        resolution::resolve_type_name(name, full_qualify, true, &self.namespace, &self.use_aliases)
     }
 
     fn fill_self_static_parent(union: Type, class_fqcn: &str) -> Type {

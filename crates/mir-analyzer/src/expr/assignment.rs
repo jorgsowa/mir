@@ -1953,7 +1953,10 @@ impl<'a> ExpressionAnalyzer<'a> {
                             // offset-write must NOT count as a read, or
                             // `$a = []; $a[0] = 1;` with $a never read
                             // afterwards would stop being flagged.
-                            if ctx.byref_param_names.contains(&mir_types::Name::from(name_str)) {
+                            if ctx
+                                .byref_param_names
+                                .contains(&mir_types::Name::from(name_str))
+                            {
                                 ctx.read_vars.insert(mir_types::Name::from(name_str));
                                 ctx.mark_consumed(name_str);
                             }

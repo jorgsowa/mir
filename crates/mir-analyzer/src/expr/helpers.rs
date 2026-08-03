@@ -1032,7 +1032,9 @@ fn resolve_named_objects_in_atomic(
             let type_params = type_params
                 .iter()
                 .cloned()
-                .map(|tp| resolve_named_objects_in_union_inner(tp, db, file, allow_builtin_shortcut))
+                .map(|tp| {
+                    resolve_named_objects_in_union_inner(tp, db, file, allow_builtin_shortcut)
+                })
                 .collect();
             Atomic::TNamedObject {
                 fqcn: resolved.into(),

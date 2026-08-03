@@ -334,9 +334,10 @@ impl CallAnalyzer {
                         // `TCallable { return_type: Some(_) }`) that actually
                         // knows the answer.
                         Atomic::TNamedObject { fqcn, .. }
-                            if !fqcn.as_ref().trim_start_matches('\\').eq_ignore_ascii_case(
-                                "Closure",
-                            ) =>
+                            if !fqcn
+                                .as_ref()
+                                .trim_start_matches('\\')
+                                .eq_ignore_ascii_case("Closure") =>
                         {
                             let fqcn_arc: Arc<str> = Arc::from(fqcn.as_ref());
                             if let Some(resolved) =

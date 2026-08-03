@@ -1324,14 +1324,15 @@ fn resolve_method_return<'a>(
         // Check inter-procedural throws: if callee declares @throws, check if caller covers them.
         // Unchecked exceptions (RuntimeException / LogicException descendants) are skipped by
         // PHP convention — see [`is_unchecked_exception`].
-        let guarded_by_reflection_throws_guard = extract_expr_guard_key(&call.object, ctx, ea.db, &ea.file)
-            .map(|key| {
-                ctx.reflection_throws_guards.contains(&(
-                    key,
-                    Arc::from(crate::util::php_ident_lowercase(method_name).as_str()),
-                ))
-            })
-            .unwrap_or(false);
+        let guarded_by_reflection_throws_guard =
+            extract_expr_guard_key(&call.object, ctx, ea.db, &ea.file)
+                .map(|key| {
+                    ctx.reflection_throws_guards.contains(&(
+                        key,
+                        Arc::from(crate::util::php_ident_lowercase(method_name).as_str()),
+                    ))
+                })
+                .unwrap_or(false);
         for callee_throw in resolved.throws.iter() {
             if crate::db::is_unchecked_exception(ea.db, callee_throw.as_ref()) {
                 continue;

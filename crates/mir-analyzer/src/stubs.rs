@@ -765,7 +765,10 @@ mod tests {
 
     #[test]
     fn is_builtin_constant_returns_true_for_known_constants() {
-        assert!(is_builtin_constant("PHP_EOL"), "PHP_EOL should be a builtin");
+        assert!(
+            is_builtin_constant("PHP_EOL"),
+            "PHP_EOL should be a builtin"
+        );
         assert!(
             is_builtin_constant("PHP_VERSION"),
             "PHP_VERSION should be a builtin"

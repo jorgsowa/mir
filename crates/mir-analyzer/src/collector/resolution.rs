@@ -118,7 +118,15 @@ pub(super) fn resolve_union_inner(
     let types: Vec<Atomic> = union
         .types
         .into_iter()
-        .map(|a| resolve_atomic_inner(a, full_qualify, allow_builtin_shortcut, namespace, use_aliases))
+        .map(|a| {
+            resolve_atomic_inner(
+                a,
+                full_qualify,
+                allow_builtin_shortcut,
+                namespace,
+                use_aliases,
+            )
+        })
         .collect();
     let mut result = Type::from_vec(types);
     result.from_docblock = from_docblock;
@@ -134,7 +142,13 @@ pub(super) fn resolve_atomic_inner(
 ) -> Atomic {
     macro_rules! ru {
         ($t:expr) => {
-            resolve_union_inner($t, full_qualify, allow_builtin_shortcut, namespace, use_aliases)
+            resolve_union_inner(
+                $t,
+                full_qualify,
+                allow_builtin_shortcut,
+                namespace,
+                use_aliases,
+            )
         };
     }
     match atomic {
@@ -243,47 +257,47 @@ pub(super) fn resolve_atomic_inner(
         Atomic::TCallable {
             params,
             return_type,
-        } => Atomic::TCallable {
-            params: params.map(|ps| {
-                ps.iter()
-                    .map(|p| mir_types::atomic::FnParam {
-                        ty: p
-                            .ty
-                            .as_ref()
-                            .map(|t| mir_types::compact::SimpleType::from_union(ru!(t.to_union()))),
-                        out_ty: p
-                            .out_ty
-                            .as_ref()
-                            .map(|t| mir_types::compact::SimpleType::from_union(ru!(t.to_union()))),
-                        ..p.clone()
-                    })
-                    .collect::<Vec<_>>()
-                    .into_boxed_slice()
-            }),
-            return_type: return_type.map(|rt| Box::new(ru!(*rt))),
-        },
-        Atomic::TClosure { data } => Atomic::TClosure {
-            data: Box::new(mir_types::atomic::ClosureData {
-                params: data
-                    .params
-                    .iter()
-                    .map(|p| mir_types::atomic::FnParam {
-                        ty: p
-                            .ty
-                            .as_ref()
-                            .map(|t| mir_types::compact::SimpleType::from_union(ru!(t.to_union()))),
-                        out_ty: p
-                            .out_ty
-                            .as_ref()
-                            .map(|t| mir_types::compact::SimpleType::from_union(ru!(t.to_union()))),
-                        ..p.clone()
-                    })
-                    .collect::<Vec<_>>()
-                    .into_boxed_slice(),
-                return_type: ru!(data.return_type),
-                this_type: data.this_type.map(|t| ru!(t)),
-            }),
-        },
+        } => {
+            Atomic::TCallable {
+                params: params.map(|ps| {
+                    ps.iter()
+                        .map(|p| mir_types::atomic::FnParam {
+                            ty: p.ty.as_ref().map(|t| {
+                                mir_types::compact::SimpleType::from_union(ru!(t.to_union()))
+                            }),
+                            out_ty: p.out_ty.as_ref().map(|t| {
+                                mir_types::compact::SimpleType::from_union(ru!(t.to_union()))
+                            }),
+                            ..p.clone()
+                        })
+                        .collect::<Vec<_>>()
+                        .into_boxed_slice()
+                }),
+                return_type: return_type.map(|rt| Box::new(ru!(*rt))),
+            }
+        }
+        Atomic::TClosure { data } => {
+            Atomic::TClosure {
+                data: Box::new(mir_types::atomic::ClosureData {
+                    params: data
+                        .params
+                        .iter()
+                        .map(|p| mir_types::atomic::FnParam {
+                            ty: p.ty.as_ref().map(|t| {
+                                mir_types::compact::SimpleType::from_union(ru!(t.to_union()))
+                            }),
+                            out_ty: p.out_ty.as_ref().map(|t| {
+                                mir_types::compact::SimpleType::from_union(ru!(t.to_union()))
+                            }),
+                            ..p.clone()
+                        })
+                        .collect::<Vec<_>>()
+                        .into_boxed_slice(),
+                    return_type: ru!(data.return_type),
+                    this_type: data.this_type.map(|t| ru!(t)),
+                }),
+            }
+        }
         other => other,
     }
 }

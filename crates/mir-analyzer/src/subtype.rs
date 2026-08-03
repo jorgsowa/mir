@@ -214,9 +214,7 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
                 // just not signature-checked here either (matching that existing
                 // precedent, not a stricter new bar).
                 (
-                    Atomic::TNamedObject {
-                        fqcn: sub_fqcn, ..
-                    },
+                    Atomic::TNamedObject { fqcn: sub_fqcn, .. },
                     Atomic::TCallable { .. } | Atomic::TClosure { .. },
                 ) => crate::db::has_method_in_chain(db, sub_fqcn.as_ref(), "__invoke"),
                 (

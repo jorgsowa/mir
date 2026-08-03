@@ -1905,25 +1905,23 @@ pub fn narrow_from_condition(
                             _ => None,
                         };
                         if let Some(target) = throws_guard_target {
-                            let is_reflection_receiver = matches!(
-                                fqcn.trim_start_matches('\\'),
-                                "ReflectionClass" | "ReflectionObject" | "ReflectionParameter"
-                            ) || crate::db::extends_or_implements(
-                                db,
-                                &fqcn,
-                                "ReflectionClass",
-                            ) || crate::db::extends_or_implements(
-                                db,
-                                &fqcn,
-                                "ReflectionObject",
-                            ) || crate::db::extends_or_implements(
-                                db,
-                                &fqcn,
-                                "ReflectionParameter",
-                            );
+                            let is_reflection_receiver =
+                                matches!(
+                                    fqcn.trim_start_matches('\\'),
+                                    "ReflectionClass" | "ReflectionObject" | "ReflectionParameter"
+                                ) || crate::db::extends_or_implements(db, &fqcn, "ReflectionClass")
+                                    || crate::db::extends_or_implements(
+                                        db,
+                                        &fqcn,
+                                        "ReflectionObject",
+                                    )
+                                    || crate::db::extends_or_implements(
+                                        db,
+                                        &fqcn,
+                                        "ReflectionParameter",
+                                    );
                             if is_reflection_receiver {
-                                if let Some(key) =
-                                    extract_expr_guard_key(&mc.object, ctx, db, file)
+                                if let Some(key) = extract_expr_guard_key(&mc.object, ctx, db, file)
                                 {
                                     ctx.reflection_throws_guards
                                         .insert((key, std::sync::Arc::from(target)));
