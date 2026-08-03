@@ -170,7 +170,16 @@ pub(super) fn narrow_instanceof_preserving_subtypes(
                     ]),
                 });
             }
-            Atomic::TObject | Atomic::TMixed => result.add_type(narrowed_ty.clone()),
+            // `callable` legitimately includes an invokable object of ANY
+            // class (one with __invoke()) — same "could be anything"
+            // reasoning as TObject/TMixed. Deliberately excludes TClosure:
+            // Closure is a real, `final` PHP class with no user-declared
+            // ancestors, so a Closure value satisfying an unrelated class
+            // check is still genuinely impossible and correctly falls
+            // through to the catch-all below.
+            Atomic::TObject | Atomic::TMixed | Atomic::TCallable { .. } => {
+                result.add_type(narrowed_ty.clone())
+            }
             // `$x instanceof C` on an `A&B`-typed value adds C to the
             // intersection rather than replacing it — the value is still
             // guaranteed to be an A and a B, so dropping them here would
@@ -709,7 +718,16 @@ pub(super) fn narrow_strict_subclass_of(
                     ]),
                 });
             }
-            Atomic::TObject | Atomic::TMixed => result.add_type(narrowed_ty.clone()),
+            // `callable` legitimately includes an invokable object of ANY
+            // class (one with __invoke()) — same "could be anything"
+            // reasoning as TObject/TMixed. Deliberately excludes TClosure:
+            // Closure is a real, `final` PHP class with no user-declared
+            // ancestors, so a Closure value satisfying an unrelated class
+            // check is still genuinely impossible and correctly falls
+            // through to the catch-all below.
+            Atomic::TObject | Atomic::TMixed | Atomic::TCallable { .. } => {
+                result.add_type(narrowed_ty.clone())
+            }
             // `is_subclass_of($x, class_name)` on an `A&B`-typed value adds
             // class_name to the intersection rather than discarding it —
             // mirrors narrow_instanceof_preserving_subtypes's TIntersection
