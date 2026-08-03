@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <files>
   <file src="src/Client.php">
-    <DeprecatedCall>
-      <code><![CDATA[\json_encode($options['json'])]]></code>
-    </DeprecatedCall>
     <InvalidArgument>
       <code><![CDATA[$handlerOptions]]></code>
     </InvalidArgument>
@@ -1429,10 +1426,6 @@
     </TooManyArguments>
   </file>
   <file src="src/Utils.php">
-    <DeprecatedCall>
-      <code><![CDATA[\json_decode($json, $assoc, $depth, $options)]]></code>
-      <code><![CDATA[\json_encode($value, $options, $depth)]]></code>
-    </DeprecatedCall>
     <ForbiddenCode>
       <code><![CDATA[\var_dump($input)]]></code>
     </ForbiddenCode>
@@ -1466,8 +1459,12 @@
       <code><![CDATA[$key]]></code>
       <code><![CDATA[$protocol]]></code>
       <code><![CDATA[$area]]></code>
+      <code><![CDATA[$data = \json_decode($json, $assoc, $depth, $options)]]></code>
       <code><![CDATA[$errorBitSet = $info['errors'] ?? 0]]></code>
     </MixedAssignment>
+    <MixedReturnStatement>
+      <code><![CDATA[return $data;]]></code>
+    </MixedReturnStatement>
     <PossiblyInvalidArgument>
       <code><![CDATA[$errorConstant]]></code>
     </PossiblyInvalidArgument>
@@ -1482,10 +1479,6 @@
     </RedundantCondition>
   </file>
   <file src="src/functions.php">
-    <DeprecatedCall>
-      <code><![CDATA[\json_decode($json, $assoc, $depth, $options)]]></code>
-      <code><![CDATA[\json_encode($value, $options, $depth)]]></code>
-    </DeprecatedCall>
     <ForbiddenCode>
       <code><![CDATA[\var_dump($input)]]></code>
     </ForbiddenCode>
@@ -1493,6 +1486,9 @@
       <code><![CDATA[$input]]></code>
       <code><![CDATA[$input]]></code>
     </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$data = \json_decode($json, $assoc, $depth, $options)]]></code>
+    </MixedAssignment>
     <RedundantCondition>
       <code><![CDATA[$cached]]></code>
     </RedundantCondition>
