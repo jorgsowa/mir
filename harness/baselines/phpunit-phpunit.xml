@@ -1069,9 +1069,6 @@
     <MixedAssignment>
       <code><![CDATA[$superglobalValue = $_ENV[$name]]]></code>
     </MixedAssignment>
-    <PossiblyInvalidArgument>
-      <code><![CDATA[$getenv]]></code>
-    </PossiblyInvalidArgument>
   </file>
   <file src="src/Runner/Baseline/Issue.php">
     <MixedArgument>

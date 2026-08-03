@@ -1578,9 +1578,6 @@
     <ImpossibleIdenticalComparison>
       <code><![CDATA[$value !== null]]></code>
     </ImpossibleIdenticalComparison>
-    <InvalidCast>
-      <code><![CDATA[$value]]></code>
-    </InvalidCast>
     <InvalidReturnType>
       <code><![CDATA[return $multiHandler;]]></code>
       <code><![CDATA[return new CurlHandler($curlHandlerOptions);]]></code>
@@ -1616,6 +1613,9 @@
     <PossiblyNullArgument>
       <code><![CDATA[$info]]></code>
     </PossiblyNullArgument>
+    <RedundantCast>
+      <code><![CDATA[$value]]></code>
+    </RedundantCast>
     <RedundantCondition>
       <code><![CDATA[$cached]]></code>
     </RedundantCondition>
