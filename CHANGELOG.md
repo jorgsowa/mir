@@ -5,6 +5,217 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.68.0] - 2026-08-04
+
+### Added
+
+- **`is_builtin_constant` exposed:** same shape as the existing
+  `is_builtin_function`, letting a consumer (e.g. `php-lsp`) narrow
+  `textDocument/references`'s candidate scope for builtin constants
+  (`PHP_EOL`, `PHP_VERSION`, ...) the same way it already does for builtin
+  classes and functions.
+- **phpstorm-stubs synced with upstream:** new symbols merged in across
+  curl, intl, mysqli, openssl, PDO, pgsql, Phar, redis, Reflection, sockets,
+  sodium, SPL, standard, tidy, xsl, and zip, plus the new `uri` extension
+  (PHP 8.5).
+
+### Fixed
+
+- **`assert()`/`if` null-check now narrows array-offset access:**
+  `assert($arr['k'] !== null)` and `if ($arr['k'] === null) { return; }`
+  never narrowed the offset's own value the way the equivalent
+  `isset()`/property-access checks did, so a later `$arr['k']` read stayed
+  nullable and misfired `PossiblyNullArgument`.
+- **By-ref closure capture no longer widened away like the undefined-var
+  case:** `use (&$var)` binds the same variable across every invocation, so
+  seeding it with the literal type at the closure-literal site falsely
+  claimed it could never change, firing bogus `RedundantCondition` on a
+  toggled bool flag. Scalar literals now widen to their base type
+  (true/false to bool) on capture; by-value captures are unaffected.
+- **By-ref array-offset write now marks the parameter as used:** `$arr['k']
+  = v` on a by-ref parameter mutates caller-visible state through the
+  reference, but the write path never marked the base as read, flagging
+  `UnusedParam` on out-params only ever written via a nested offset
+  assignment.
+- **`**` (Pow) now types as `int|float`, not int-preserving:** PHP's `**`
+  genuinely overflows int to float at runtime (`2 ** 63` is float); it's
+  now routed through the same overflow-aware path as `/` instead of the
+  int-preserving path used for `+`/`-`/`*`. Also fixes a latent bug this
+  exposed: arithmetic/division treated an operand as "is float" whenever
+  its union merely *contained* a float atom, wrongly collapsing an
+  `int|float` result to bare `float`.
+- **`gc_status()`'s PHP 8.3 keys are now version-gated:** the bool/float
+  keys (`running`, `protected`, `full`, `buffer_size`,
+  `application_time`, `collector_time`, `destructor_time`, `free_time`)
+  were only added in PHP 8.3 — targeting an older version now correctly
+  keeps the original 4-key int-only shape.
+- **4 imprecise builtin stub return shapes tightened:** `gc_status()` gets
+  a real per-key `array{...}` shape instead of a bare `int[]`;
+  `Throwable`/`Exception::getTrace()` gets the real per-frame shape;
+  `get_declared_classes()` returns `list<class-string>` instead of
+  `string[]`; `realpath()` returns `non-empty-string|false` instead of
+  `string|false`.
+- **Trait property's explicit default no longer ignored:** trait property
+  collection hardcoded `default: None` for every non-promoted property,
+  ignoring the AST's actual default-value expression, so a class composing
+  only defaulted trait properties was flagged `MissingConstructor` even
+  though PHP never leaves them uninitialized.
+- **`instanceof`/`is_subclass_of` now narrow `callable` like
+  `TObject`/`TMixed`:** neither had an arm for a callable atom, silently
+  dropping it and treating the true branch as unreachable — but callable
+  legitimately includes an invokable object of any user class. `Closure`
+  is deliberately excluded: it's a final PHP class with no user-declared
+  ancestors, so checking it against an unrelated class stays genuinely
+  impossible.
+- **`ReflectionClass::getStartLine()` stub keeps `|false`:** its docblock
+  said `@return int`, contradicting the native `int|false` hint right
+  below it — an isolated typo (the sibling `getFileName()` already got
+  this right).
+- **`trait-string`/`enum-string` recognized as docblock type keywords:**
+  the parser had arms for `class-string`/`interface-string` but not these
+  two, falling through to the named-class catch-all and flagging
+  `UndefinedDocblockClass`. Also added to the separate gate that keeps a
+  type keyword from being namespace-qualified as if it were a class name.
+- **`@throws void` no longer stored as a bogus throw class:** both the
+  free-function and method collectors namespace-qualified every `@throws`
+  entry before checking whether it named a pseudo-type (`void`, `never`,
+  `self`, ...), so a namespaced file's bare `@throws void` became
+  `{namespace}\void`, which no longer matched the pseudo-type check and
+  was stored as a real throwable class instead of being dropped.
+- **Bare-`$this` assert-if-true now narrows the receiver:** the assertion
+  handler's special case only matched `@psalm-assert Type $this->prop`; a
+  bare `$this` assertion (no `->`) fell through to a by-name param lookup
+  that can never match, so it was silently never applied.
+- **`class`/`interface`/`callable`/`enum`/`trait-string` now satisfy
+  `non-empty-string`:** none of these atoms can ever hold the empty
+  string in real PHP, mirroring the existing `numeric-string` case.
+- **`idn_to_ascii`/`idn_to_utf8`'s `$idna_info` is now a pure out-param:**
+  the stub declared its 4th by-ref param as plain, non-nullable `array`,
+  so passing a nullable/uninitialized by-ref variable purely to receive
+  the output flagged `PossiblyNullArgument` against a type that's never
+  actually read.
+- **`@var callable(...): R` keeps its return type across a space:** the
+  docblock parser gave up at the first top-level whitespace not preceded
+  by a union/intersection continuation, so `callable(int): string`'s
+  space before the return type truncated it to an empty/mixed type.
+  `callable(int):string` (no space) already worked and still does.
+- **Invokable objects now resolve `__invoke()`'s real signature:**
+  invoking an object value (`$obj(...)`) always fell back to `mixed` for
+  the result type instead of consulting `__invoke()`'s declared return
+  type, and an invokable object never satisfied a `callable(...): R` /
+  `Closure(...): R` target for subtyping or return-type checking (only
+  for argument checking).
+- **Reflection existence-guard instance methods now cover
+  `MissingThrowsDocblock`:** `$refl->hasMethod($n)` /
+  `$param->isDefaultValueAvailable()` prove the twin throwing call
+  (`getMethod()`/`getDefaultValue()`) on the same receiver can't throw —
+  only the free-function `method_exists()`/`property_exists()` guards
+  were previously recognized, not Reflection's own instance API.
+- **`MissingThrowsDocblock` now respects a covering local `try`/`catch`:**
+  both the inter-procedural call check and the direct-throw check
+  compared only against the enclosing function's own `@throws`, never a
+  local `try`/`catch` that already catches the exception before it can
+  escape.
+- **`@phpstan-type` resolves without Psalm's `=` syntax:** real PHPStan's
+  `@phpstan-type Name Expr` has no `=` (unlike `@psalm-type Name = Expr`),
+  but both tags shared the same `split_once('=')` parse, so every
+  no-`=` `@phpstan-type` alias silently failed and cascaded into `mixed`
+  everywhere it was referenced.
+- **`\foo()` no longer resolves to a same-named in-namespace function:**
+  the leading backslash was stripped before the qualify-and-exists-check
+  ran, so a bare global call couldn't be told apart from a
+  namespace-relative one, breaking the common
+  `namespace Foo; function json_encode() { return \json_encode(...); }`
+  deprecated-wrapper idiom.
+- **Excluding `''` narrows `string` to `non-empty-string`:** the
+  exclusion branch only stripped an exact-matching literal-string atom;
+  excluding `""` specifically now also upgrades a bare `string` atom,
+  covering `$x === ''`/`$x !== ''`/`assert($x !== '')` guards. Also fixes
+  a dependent gap: string-offset access only recognized `string`/literal
+  strings, falling back to `mixed` for every other string subtype once one
+  could actually reach that position.
+- **`MissingPropertyType` now honors a `@var`/`@param` docblock type:**
+  property/promoted-param checking emitted the issue whenever there was
+  no native type hint, without checking whether a docblock already
+  resolved one.
+- **Enum-case literal now satisfies interfaces its enum implements:** a
+  prior fix only added the exact bare-enum-FQCN subtype arm; an enum-case
+  literal narrowed via `===` still flagged `InvalidArgument`/
+  `InvalidPropertyAssignment` against a param/property typed as an
+  interface the enum implements (including implicit `UnitEnum`/
+  `BackedEnum`) or bare `object`.
+- **`getenv()` no longer merges its arg-count overloads:** `getenv($name)`
+  with a non-null `$name` was typed `array|string|false` — the
+  array-of-all-vars branch only applies when `$name` is omitted/null.
+- **`PHP_OS_FAMILY` no longer widened past its stub literal:** the
+  environment-dependent-constant widening covered `PHP_OS`/`PHP_SAPI`/
+  `DIRECTORY_SEPARATOR`/`PHP_INT_SIZE` but missed this one, so
+  `PHP_OS_FAMILY === 'Windows'` flagged as always-false.
+- **Docblock-shadowed builtin now wins over the native hint for
+  storage:** the docblock-vs-native param/return/property merge preferred
+  the docblock's leniently-resolved bare builtin name (`Generator`,
+  `Closure`, ...) whenever there was no scalar-family conflict, so a
+  same-namespace class shadowing a builtin got the wrong bare name
+  persisted, reproducing a false `UndefinedMethod`.
+- **De Morgan narrowing for ANDed negated `instanceof` chains:** the
+  `&&`/`and` narrowing arm only handled the is-true case; a guard-clause
+  fall-through (`if (!$x instanceof A && !$x instanceof B) return;`)
+  applied zero narrowing, so union members never named in the chain still
+  got checked against the full, unnarrowed union.
+- **`foreach` key/value now merges across all union atoms:** foreach-type
+  inference returned on the first matching array-like atom in a union
+  instead of merging across all of them, e.g. collapsing a
+  `preg_split()===false` fallback's foreach key to a literal `0` instead
+  of widening to plain `int`.
+- **Docblock builtin leniency reconciled against a confirmed local
+  shadow:** `MismatchingDocblockReturnType`/`ParamType` compared a
+  strictly-resolved native hint against a leniently-resolved docblock
+  type, so a same-namespace class shadowing a builtin (`Generator`,
+  `Iterator`, ...) produced a false mismatch when both sides bare-named
+  it. A bare builtin-leniency name in the docblock is now rewritten to
+  its namespace-qualified form first, but only when that qualified name
+  names a real, existing local class.
+- **Same builtin-shadow bug fixed in a second resolver family:** the
+  docblock-leniency fix above had an identical twin affecting several
+  genuinely-native type-hint call sites: `array_map`/`array_filter`
+  interprocedural callback-return inference, a closure/arrow-fn's own
+  return-type hint and param hints, and return-statement checking against
+  the native hint.
+- **Same-namespace class shadowing a builtin iterator name now resolves
+  to its own FQCN:** builtin leniency for bare `Closure`/`Traversable`/
+  `Iterator`/`IteratorAggregate`/`Generator` names (meant for docblocks
+  only) was also applied to native type-hint resolution, so a
+  same-namespace class reusing one of those names had every
+  property/param/return type hint resolved to the builtin instead of the
+  local FQCN, flagging every real method as `UndefinedMethod`.
+- **Psalm-only suppress kind names now alias to mir's own `IssueKind`:**
+  a `@psalm-suppress` naming a Psalm-only check mir models under a
+  different name (`PossiblyNullReference`, `PropertyNotSetInConstructor`)
+  neither suppressed the underlying issue nor counted as used, flagging
+  `UnusedSuppress` on top of the original diagnostic.
+- **Type-omitted `@param $name` docblock line no longer parsed as a
+  type:** the parser required whitespace before `$name` to split type
+  from name; a body starting directly with `$name` (no type, valid PHPDoc
+  grammar) fell back to validating the whole body as a type and flagged
+  the variable as being in type position.
+- **`Closure::bind`/`bindTo` scope arg now feeds the closure-body
+  visibility check:** the rebind's new scope was previously discarded
+  entirely, so private-method calls inside a rebound closure body were
+  checked against the closure's lexically enclosing class instead of the
+  rebound scope. Only literal-class-name scopes are resolved; dynamic
+  scopes are left unhandled.
+- **Interface property members no longer silently dropped:** interface
+  member collection had no arm for properties, so `UnitEnum`/
+  `BackedEnum`'s native readonly `$name`/`$value` stub declarations were
+  dropped entirely — any receiver typed as one of these interfaces lost
+  property access, flagging `NoInterfaceProperties` and widening the
+  result to `mixed`.
+- **Namespace-relative qualified docblock class names resolve
+  correctly:** a docblock class name containing `\` was used verbatim
+  instead of having the current namespace prepended, so `Warning\Warning`
+  inside `namespace App;` stayed the literal (nonexistent)
+  `Warning\Warning` instead of resolving to `App\Warning\Warning`.
+
 ## [0.67.0] - 2026-08-03
 
 ### Changed
