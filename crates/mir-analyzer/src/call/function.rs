@@ -378,6 +378,7 @@ impl CallAnalyzer {
 
         // PHP resolves `foo()` as `\App\Ns\foo` first, then `\foo` if not found.
         // A leading `\` means explicit global namespace.
+        let was_bare_global_call = fn_name.starts_with('\\') && !fn_name[1..].contains('\\');
         let fn_name = fn_name
             .strip_prefix('\\')
             .map(|s: &str| s.to_string())
@@ -394,7 +395,19 @@ impl CallAnalyzer {
                 span,
             );
         }
-        let resolved_fn_name: String = {
+        let resolved_fn_name: String = if was_bare_global_call {
+            // `\foo()` unconditionally names the global-namespace function —
+            // PHP never falls back to a same-named function in the current
+            // namespace here, unlike a bare `foo()` call. Trying the
+            // namespace-qualified name first (as the bare-call path below
+            // does) would silently resolve to an unrelated in-namespace
+            // function of the same name if one happens to exist (e.g. a
+            // namespaced wrapper like `namespace App; function json_encode()
+            // { return \json_encode(...); }`), mirroring how
+            // `db::resolve_name` already short-circuits on a leading `\` for
+            // class names.
+            fn_name.clone()
+        } else {
             let imports = ea.db.file_imports(&ea.file);
             let qualified = if let Some(imported) = imports.get(&Name::new(fn_name.as_str())) {
                 imported.as_str().to_string()
