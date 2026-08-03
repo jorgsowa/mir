@@ -472,12 +472,6 @@
       <code><![CDATA[$candidate]]></code>
     </MixedAssignment>
   </file>
-  <file src="src/Framework/Constraint/Callback.php">
-    <MixedReturnStatement>
-      <code><![CDATA[return ($this->callback)(...$other);]]></code>
-      <code><![CDATA[return ($this->callback)($other);]]></code>
-    </MixedReturnStatement>
-  </file>
   <file src="src/Framework/Constraint/Cardinality/Count.php">
     <MixedArgument>
       <code><![CDATA[$other]]></code>
