@@ -60,9 +60,13 @@ impl KindSet {
             // preserving each entry's original casing (rather than
             // lowercasing at parse time) keeps `UnusedSuppress`'s message
             // quoting the text the author actually wrote.
-            KindSet::Named(set) => set
-                .iter()
-                .any(|k| k.eq_ignore_ascii_case(name) || k.eq_ignore_ascii_case(code)),
+            KindSet::Named(set) => set.iter().any(|k| {
+                k.eq_ignore_ascii_case(name)
+                    || k.eq_ignore_ascii_case(code)
+                    || alias_targets(k)
+                        .iter()
+                        .any(|t| t.eq_ignore_ascii_case(name))
+            }),
         }
     }
 
@@ -74,6 +78,46 @@ impl KindSet {
             (KindSet::Named(a), KindSet::Named(b)) => a.extend(b),
         }
     }
+}
+
+/// Third-party (Psalm/PHPStan) issue identifiers that don't match any
+/// `IssueKind::name()` verbatim because mir models the same underlying
+/// diagnostic under a different name. Without this table, a directive like
+/// `@psalm-suppress PossiblyNullReference` neither suppresses the mir issue
+/// it was meant to silence (`KindSet::matches` finds no name match) nor
+/// counts as used (`unused_named`'s `kind_matches` finds no match either) —
+/// so the real issue still fires AND the suppression itself gets flagged
+/// `UnusedSuppress`, doubling the noise instead of silencing it.
+///
+/// Each entry maps one third-party name to every mir `IssueKind::name()` it
+/// should be treated as matching. Looked up case-insensitively by both
+/// `KindSet::matches` and `unused_named`, so it applies uniformly whether the
+/// suppression ends up used for line-suppression or unused-detection.
+const ISSUE_NAME_ALIASES: &[(&str, &[&str])] = &[
+    // Psalm's `PossiblyNullReference` covers member access (property fetch OR
+    // method call) on a possibly-null receiver; mir splits that into two
+    // separate kinds by access form.
+    (
+        "PossiblyNullReference",
+        &["PossiblyNullPropertyFetch", "PossiblyNullMethodCall"],
+    ),
+    // Psalm's check for a property that isn't definitely assigned by every
+    // constructor path; mir's equivalent is named for the resulting state
+    // rather than the constructor-focused cause.
+    (
+        "PropertyNotSetInConstructor",
+        &["PropertyPossiblyUninitialized"],
+    ),
+];
+
+/// Mir `IssueKind` names that `name` (a third-party identifier) should also
+/// be treated as matching, per [`ISSUE_NAME_ALIASES`]. Empty if `name` isn't
+/// a known third-party alias.
+fn alias_targets(name: &str) -> &'static [&'static str] {
+    ISSUE_NAME_ALIASES
+        .iter()
+        .find(|(alias, _)| alias.eq_ignore_ascii_case(name))
+        .map_or(&[], |(_, targets)| *targets)
 }
 
 /// Where a directive applies, relative to the comment's own line.
@@ -244,14 +288,17 @@ impl SuppressionMap {
             .filter(|ns| {
                 let target_line = ns.report_line;
                 let kind = &ns.kind;
-                // Compare case-insensitively, same as `KindSet::matches` —
-                // a directive can name a kind in any casing.
+                // Compare case-insensitively, same as `KindSet::matches` — a
+                // directive can name a kind in any casing, and may also name
+                // a third-party (Psalm/PHPStan) identifier for a check mir
+                // models under a different name (`alias_targets`).
                 let kind_matches = |issue: &&mir_issues::Issue| {
-                    issue
-                        .kind
-                        .display_name()
-                        .eq_ignore_ascii_case(kind.as_str())
+                    let display_name = issue.kind.display_name();
+                    display_name.eq_ignore_ascii_case(kind.as_str())
                         || issue.kind.code().eq_ignore_ascii_case(kind.as_str())
+                        || alias_targets(kind.as_str())
+                            .iter()
+                            .any(|t| t.eq_ignore_ascii_case(display_name))
                 };
                 // Normal case: a SuppressionMap-suppressed issue at the report
                 // line itself, OR any other line this same directive covers
