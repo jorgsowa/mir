@@ -300,6 +300,16 @@ pub struct FlowState {
     /// `method_exists_guards`.
     pub property_exists_guards: FxHashSet<(Arc<str>, Arc<str>)>,
 
+    /// `(expr_key, throwing_method_name)` pairs proven safe via a Reflection
+    /// existence-guard *instance* method — `$refl->hasMethod($n)` guards a
+    /// same-receiver `getMethod($n)`, `$param->isDefaultValueAvailable()`
+    /// guards `getDefaultValue()`. Distinct from `method_exists_guards`
+    /// (which is about the global `method_exists()`/`property_exists()`
+    /// functions and suppresses `UndefinedMethod`/`UndefinedProperty`): this
+    /// suppresses `MissingThrowsDocblock` on the twin call, since the guard
+    /// proves it can't throw its documented `ReflectionException`.
+    pub reflection_throws_guards: FxHashSet<(Arc<str>, Arc<str>)>,
+
     /// Extension names proven to be loaded via an `extension_loaded('name')` guard.
     /// When non-empty, `UndefinedClass` is suppressed for any class in the guarded
     /// block — the calling code explicitly verified the extension is present.
@@ -479,6 +489,7 @@ impl FlowState {
             function_exists_guards: FxHashSet::default(),
             method_exists_guards: FxHashSet::default(),
             property_exists_guards: FxHashSet::default(),
+            reflection_throws_guards: FxHashSet::default(),
             extension_loaded_guards: FxHashSet::default(),
             prop_refined: Arc::new(FxHashMap::default()),
             readonly_initialized: Arc::new(FxHashSet::default()),
@@ -1313,6 +1324,11 @@ impl FlowState {
         result.property_exists_guards = if_ctx
             .property_exists_guards
             .intersection(&else_ctx.property_exists_guards)
+            .cloned()
+            .collect();
+        result.reflection_throws_guards = if_ctx
+            .reflection_throws_guards
+            .intersection(&else_ctx.reflection_throws_guards)
             .cloned()
             .collect();
         result.extension_loaded_guards = if_ctx

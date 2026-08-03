@@ -1886,6 +1886,47 @@ pub fn narrow_from_condition(
                             &mc.args, &mc.object, &resolved, ctx, is_true, db, file,
                         );
                     }
+                    // Reflection existence-guard instance methods —
+                    // `$refl->hasMethod($n)` / `$param->isDefaultValueAvailable()`
+                    // prove the twin throwing call (getMethod()/getDefaultValue())
+                    // on the SAME receiver can't throw its documented
+                    // ReflectionException. Sibling of the `method_exists()`/
+                    // `property_exists()` free-function guards above, but scoped
+                    // to Reflection's own instance API and a different
+                    // consequence (MissingThrowsDocblock, not UndefinedMethod).
+                    if is_true {
+                        let throws_guard_target = match method_name_lower.as_str() {
+                            "hasmethod" => Some("getmethod"),
+                            "isdefaultvalueavailable" => Some("getdefaultvalue"),
+                            _ => None,
+                        };
+                        if let Some(target) = throws_guard_target {
+                            let is_reflection_receiver = matches!(
+                                fqcn.trim_start_matches('\\'),
+                                "ReflectionClass" | "ReflectionObject" | "ReflectionParameter"
+                            ) || crate::db::extends_or_implements(
+                                db,
+                                &fqcn,
+                                "ReflectionClass",
+                            ) || crate::db::extends_or_implements(
+                                db,
+                                &fqcn,
+                                "ReflectionObject",
+                            ) || crate::db::extends_or_implements(
+                                db,
+                                &fqcn,
+                                "ReflectionParameter",
+                            );
+                            if is_reflection_receiver {
+                                if let Some(key) =
+                                    extract_expr_guard_key(&mc.object, ctx, db, file)
+                                {
+                                    ctx.reflection_throws_guards
+                                        .insert((key, std::sync::Arc::from(target)));
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
