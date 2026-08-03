@@ -73,8 +73,8 @@ pub(crate) fn fqcn_case_mismatch(written: &str, canonical: &str) -> Option<(Stri
     Some((w.to_string(), c.to_string()))
 }
 pub use stubs::{
-    is_builtin_function, stub_files, stub_path_for_class, ChainedClassResolver, StubClassResolver,
-    StubVfs,
+    is_builtin_constant, is_builtin_function, stub_files, stub_path_for_class,
+    ChainedClassResolver, StubClassResolver, StubVfs,
 };
 
 // ============================================================================
