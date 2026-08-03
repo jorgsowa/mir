@@ -714,23 +714,27 @@
     </MixedArgument>
   </file>
   <file src="src/Framework/TestBuilder.php">
-    <MixedArgument>
-      <code><![CDATA[$backupSettings['backupGlobals']]]></code>
-      <code><![CDATA[$backupSettings['backupGlobalsExcludeList']]]></code>
-      <code><![CDATA[$backupSettings['backupStaticProperties']]]></code>
-    </MixedArgument>
-    <MixedAssignment>
-      <code><![CDATA[$backupStaticPropertiesExcludeList = $backupSettings['backupStaticPropertiesExcludeList']]]></code>
-    </MixedAssignment>
     <PossiblyInvalidArgument>
       <code><![CDATA[$class]]></code>
       <code><![CDATA[$class]]></code>
     </PossiblyInvalidArgument>
-    <UndefinedDocblockClass>
+    <PossiblyNullArgument>
+      <code><![CDATA[$backupSettings['backupGlobals']]]></code>
+      <code><![CDATA[$backupSettings['backupStaticProperties']]]></code>
+    </PossiblyNullArgument>
+    <UnnecessaryVarAnnotation>
       <code><![CDATA[]]></code>
-    </UndefinedDocblockClass>
+    </UnnecessaryVarAnnotation>
   </file>
   <file src="src/Framework/TestCase.php">
+    <InvalidArgument>
+      <code><![CDATA[$hookMethods]]></code>
+      <code><![CDATA[$hookMethods]]></code>
+      <code><![CDATA[$hookMethods]]></code>
+      <code><![CDATA[$hookMethods]]></code>
+      <code><![CDATA[$hookMethods]]></code>
+      <code><![CDATA[$hookMethods]]></code>
+    </InvalidArgument>
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->backupEnvironmentVariables = [...$this->backupEnvironmentVariables, ...BackedUpEnvironmentVariable::create($environmentVariableName)]]]></code>
     </InvalidPropertyAssignment>
@@ -795,16 +799,9 @@
     </MixedAssignment>
   </file>
   <file src="src/Framework/TestRunner/ErrorHandlerBootstrapper.php">
-    <InvalidArgument>
+    <PossiblyInvalidArgument>
       <code><![CDATA[$deprecationTriggers]]></code>
-    </InvalidArgument>
-    <MixedArgument>
-      <code><![CDATA[$method]]></code>
-    </MixedArgument>
-    <MixedAssignment>
-      <code><![CDATA[$function]]></code>
-      <code><![CDATA[$method]]></code>
-    </MixedAssignment>
+    </PossiblyInvalidArgument>
   </file>
   <file src="src/Framework/TestRunner/SeparateProcessTestRunner.php">
     <MissingThrowsDocblock>
@@ -873,8 +870,6 @@
     </MixedAssignment>
     <MixedMethodCall>
       <code><![CDATA[$test->run()]]></code>
-      <code><![CDATA[(new HookMethods)->hookMethods($this->name)['beforeClass']->methodNamesSortedByPriority()]]></code>
-      <code><![CDATA[(new HookMethods)->hookMethods($this->name)['afterClass']->methodNamesSortedByPriority()]]></code>
     </MixedMethodCall>
     <NullableReturnStatement>
       <code><![CDATA[return $this->providedTests;]]></code>
@@ -965,20 +960,6 @@
       <code><![CDATA[$value]]></code>
       <code><![CDATA[$value         = $_testWith->data()]]></code>
     </MixedAssignment>
-  </file>
-  <file src="src/Metadata/Api/HookMethods.php">
-    <MixedArgument>
-      <code><![CDATA[$hookMethods['beforeClass']]]></code>
-      <code><![CDATA[$hookMethods['afterClass']]]></code>
-      <code><![CDATA[$hookMethods['before']]]></code>
-      <code><![CDATA[$hookMethods['preCondition']]]></code>
-      <code><![CDATA[$hookMethods['postCondition']]]></code>
-      <code><![CDATA[$hookMethods['after']]]></code>
-    </MixedArgument>
-    <UndefinedDocblockClass>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </UndefinedDocblockClass>
   </file>
   <file src="src/Metadata/Api/Requirements.php">
     <MixedArgument>
@@ -1086,28 +1067,15 @@
     </UnusedVariable>
   </file>
   <file src="src/Runner/ErrorHandler.php">
-    <InvalidArgument>
-      <code><![CDATA[$trace]]></code>
-      <code><![CDATA[$trace]]></code>
-    </InvalidArgument>
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->issueTriggerResolvers = [new DefaultIssueTriggerResolver]]]></code>
     </InvalidPropertyAssignment>
     <MissingThrowsDocblock>
       <code><![CDATA[]]></code>
     </MissingThrowsDocblock>
-    <MixedArgument>
-      <code><![CDATA[$this->deprecationTriggers['functions']]]></code>
-      <code><![CDATA[$this->deprecationTriggers['methods']]]></code>
-      <code><![CDATA[$frame['file']]]></code>
-    </MixedArgument>
     <MixedArrayAccess>
       <code><![CDATA[$trace[++$i]['class']]]></code>
     </MixedArrayAccess>
-    <MixedAssignment>
-      <code><![CDATA[$errorFile = $deprecationFrame['file']]]></code>
-      <code><![CDATA[$errorLine = $deprecationFrame['line']]]></code>
-    </MixedAssignment>
     <RedundantCondition>
       <code><![CDATA[$position !== null]]></code>
       <code><![CDATA[!is_callable($handler)]]></code>
@@ -1116,9 +1084,6 @@
       <code><![CDATA[$position === null]]></code>
       <code><![CDATA[$handler instanceof self]]></code>
     </RedundantCondition>
-    <UndefinedDocblockClass>
-      <code><![CDATA[]]></code>
-    </UndefinedDocblockClass>
     <UnreachableCode>
       <code><![CDATA[return array_slice($handlers, $position + 1);]]></code>
     </UnreachableCode>
@@ -1167,14 +1132,9 @@
       <code><![CDATA[$sideEffect === SideEffect::INPUT_OUTPUT]]></code>
     </ImpossibleIdenticalComparison>
     <InvalidArgument>
+      <code><![CDATA[$this->coverageFiles()]]></code>
       <code><![CDATA[[]]]></code>
     </InvalidArgument>
-    <MixedArgument>
-      <code><![CDATA[$files['coverage']]]></code>
-      <code><![CDATA[$files['coverage']]]></code>
-      <code><![CDATA[$file]]></code>
-      <code><![CDATA[$files['coverage']]]></code>
-    </MixedArgument>
     <MixedArrayAccess>
       <code><![CDATA[$frame['file']]]></code>
       <code><![CDATA[$frame['file']]]></code>
@@ -1198,15 +1158,11 @@
                     ],
                 ],
             )]]></code>
-      <code><![CDATA[$file]]></code>
     </MixedAssignment>
     <PossiblyInvalidArgument>
       <code><![CDATA[$fileExternalPath]]></code>
       <code><![CDATA[$input]]></code>
     </PossiblyInvalidArgument>
-    <UndefinedDocblockClass>
-      <code><![CDATA[]]></code>
-    </UndefinedDocblockClass>
   </file>
   <file src="src/Runner/ResultCache/DefaultResultCache.php">
     <MixedAssignment>
@@ -1257,21 +1213,14 @@
     </MixedMethodCall>
   </file>
   <file src="src/TextUI/Application.php">
-    <InvalidArgument>
-      <code><![CDATA[$deprecationTriggers]]></code>
-    </InvalidArgument>
-    <MixedArgument>
-      <code><![CDATA[$function]]></code>
-      <code><![CDATA[$method]]></code>
-    </MixedArgument>
     <MixedAssignment>
-      <code><![CDATA[$ignoreUndefinedTriggers = $configuration->source()->deprecationTriggers()['ignoreUndefinedTriggers'] ?? false]]></code>
-      <code><![CDATA[$function]]></code>
-      <code><![CDATA[$method]]></code>
       <code><![CDATA[$composerInstall = PHPUNIT_COMPOSER_INSTALL]]></code>
       <code><![CDATA[$classMap = require $classMapFile]]></code>
       <code><![CDATA[$sourceCodeFile]]></code>
     </MixedAssignment>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$deprecationTriggers]]></code>
+    </PossiblyInvalidArgument>
     <PossiblyNullMethodCall>
       <code><![CDATA[$t->getFile()]]></code>
       <code><![CDATA[$t->getLine()]]></code>
@@ -1658,9 +1607,6 @@
       <code><![CDATA[$this->includeDirectories->notEmpty()]]></code>
       <code><![CDATA[$this->includeFiles->notEmpty()]]></code>
     </ImpureMethodCall>
-    <UndefinedDocblockClass>
-      <code><![CDATA[]]></code>
-    </UndefinedDocblockClass>
   </file>
   <file src="src/TextUI/Configuration/Value/TestDirectoryCollection.php">
     <ImpureFunctionCall>
@@ -1709,15 +1655,6 @@
       <code><![CDATA[$this->hasCustomCssFile()]]></code>
     </ImpureMethodCall>
   </file>
-  <file src="src/TextUI/Configuration/Xml/DefaultConfiguration.php">
-    <InvalidArgument>
-      <code><![CDATA[[
-                    'functions'               => [],
-                    'methods'                 => [],
-                    'ignoreUndefinedTriggers' => false,
-                ]]]></code>
-    </InvalidArgument>
-  </file>
   <file src="src/TextUI/Configuration/Xml/Groups.php">
     <ImpureMethodCall>
       <code><![CDATA[$this->include->isEmpty()]]></code>
@@ -1731,13 +1668,13 @@
     </ImpureMethodCall>
   </file>
   <file src="src/TextUI/Configuration/Xml/Loader.php">
-    <InvalidArgument>
-      <code><![CDATA[$deprecationTriggers]]></code>
-    </InvalidArgument>
     <MixedArgument>
       <code><![CDATA[$e->getCode()]]></code>
       <code><![CDATA[$e->getCode()]]></code>
     </MixedArgument>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$deprecationTriggers]]></code>
+    </PossiblyInvalidArgument>
     <UnusedVariable>
       <code><![CDATA[]]></code>
     </UnusedVariable>
