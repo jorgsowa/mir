@@ -1216,6 +1216,10 @@ impl CallAnalyzer {
                     "preg_split" => {
                         super::callable::preg_split_return_type(&arg_types).unwrap_or(return_ty)
                     }
+                    // getenv: a non-null $name narrows away the all-vars array overload.
+                    "getenv" => {
+                        super::callable::getenv_return_type(&arg_types).unwrap_or(return_ty)
+                    }
                     // count_chars: a literal $mode of 3 or 4 always returns string;
                     // 0/1/2 always returns array — narrow away the stub's blanket union.
                     "count_chars" => {

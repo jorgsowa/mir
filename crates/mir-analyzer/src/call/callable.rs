@@ -1221,6 +1221,35 @@ pub(crate) fn preg_split_return_type(arg_types: &[Type]) -> Option<Type> {
     Some(result)
 }
 
+/// Infer the return type of `getenv($name?, $local_only?)`.
+///
+/// The stub's `array|string|false` merges two arg-count-dependent overloads:
+/// a bare or `null` `$name` returns the whole environment as an
+/// `array<string, string>` (or `false` on error), while a non-null string
+/// `$name` returns that single variable's value as a `string` (or `false` if
+/// unset) — the `array` alternative can never occur in that branch. Falls
+/// back to the stub's full union when `$name`'s nullability isn't known
+/// (e.g. a plain `?string`), since either overload could apply.
+pub(crate) fn getenv_return_type(arg_types: &[Type]) -> Option<Type> {
+    let name_ty = arg_types.first();
+    let all_null = |t: &Type| t.types.iter().all(|a| matches!(a, Atomic::TNull));
+    if name_ty.is_none_or(all_null) {
+        let mut result = Type::single(Atomic::TArray {
+            key: Box::new(Type::single(Atomic::TString)),
+            value: Box::new(Type::single(Atomic::TString)),
+        });
+        result.add_type(Atomic::TFalse);
+        return Some(result);
+    }
+    let name_ty = name_ty?;
+    if !name_ty.types.is_empty() && name_ty.types.iter().all(|a| a.is_string()) {
+        let mut result = Type::single(Atomic::TString);
+        result.add_type(Atomic::TFalse);
+        return Some(result);
+    }
+    None
+}
+
 /// Infer the return type of `count_chars($string, $mode)`.
 ///
 /// Modes 0/1/2 always return `array`; modes 3/4 always return `string` — the
