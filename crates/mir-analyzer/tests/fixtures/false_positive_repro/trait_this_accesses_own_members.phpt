@@ -18,4 +18,3 @@ class Service {
     use LockableTrait;
 }
 ===expect===
-MissingConstructor@11:0-11:15: Class Service has uninitialized properties but no constructor
