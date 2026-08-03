@@ -417,11 +417,6 @@
       <code><![CDATA[new TestCollectionIterator($this)]]></code>
     </ImpureFunctionCall>
   </file>
-  <file src="src/Event/Value/Test/TestData/TestDataCollection.php">
-    <PropertyTypeCoercion>
-      <code><![CDATA[$this->fromDataProvider = $fromDataProvider]]></code>
-    </PropertyTypeCoercion>
-  </file>
   <file src="src/Event/Value/Test/TestMethod.php">
     <ImpureMethodCall>
       <code><![CDATA[$this->testData()]]></code>
@@ -480,11 +475,6 @@
       <code><![CDATA[$operator]]></code>
       <code><![CDATA[$role]]></code>
     </UnusedParam>
-  </file>
-  <file src="src/Framework/Constraint/IsAnything.php">
-    <UndefinedDocblockClass>
-      <code><![CDATA[]]></code>
-    </UndefinedDocblockClass>
   </file>
   <file src="src/Framework/Constraint/Object/ObjectEquals.php">
     <MixedAssignment>
@@ -607,11 +597,6 @@
       <code><![CDATA[$value = $match->invoked($invocation)]]></code>
       <code><![CDATA[$returnValue    = $value]]></code>
     </MixedAssignment>
-  </file>
-  <file src="src/Framework/MockObject/Runtime/Rule/AnyParameters.php">
-    <UndefinedDocblockClass>
-      <code><![CDATA[]]></code>
-    </UndefinedDocblockClass>
   </file>
   <file src="src/Framework/MockObject/Runtime/Rule/InvocationOrder.php">
     <UnusedParam>
@@ -1710,11 +1695,6 @@
       <code><![CDATA[$this->hasExtensionsDirectory()]]></code>
       <code><![CDATA[$this->hasDefaultTestSuite()]]></code>
     </ImpureMethodCall>
-  </file>
-  <file src="src/TextUI/Configuration/Xml/SchemaDetector/SuccessfulSchemaDetectionResult.php">
-    <UndefinedDocblockClass>
-      <code><![CDATA[]]></code>
-    </UndefinedDocblockClass>
   </file>
   <file src="src/TextUI/Configuration/Xml/TestSuiteMapper.php">
     <MissingThrowsDocblock>
