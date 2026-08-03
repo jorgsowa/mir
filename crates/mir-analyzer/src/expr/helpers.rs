@@ -785,19 +785,7 @@ pub fn infer_arithmetic(left: &Type, right: &Type) -> Type {
         return merged_left;
     }
 
-    let left_is_float = left.contains(|t| {
-        matches!(
-            t,
-            Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..)
-        )
-    });
-    let right_is_float = right.contains(|t| {
-        matches!(
-            t,
-            Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..)
-        )
-    });
-    if left_is_float || right_is_float {
+    if is_definitely_float(left) || is_definitely_float(right) {
         Type::single(Atomic::TFloat)
     } else if left.contains(coerces_to_int_in_arithmetic)
         && right.contains(coerces_to_int_in_arithmetic)
@@ -811,25 +799,29 @@ pub fn infer_arithmetic(left: &Type, right: &Type) -> Type {
     }
 }
 
+/// Whether `ty` is GUARANTEED to be float at runtime — every atom is a float
+/// variant, not just "some atom is float". An `int|float` union (e.g. from
+/// `**`, which can overflow int -> float) must NOT count as "definitely
+/// float": the result could still be an int, so arithmetic/division
+/// involving it should stay `int|float`, not collapse to bare `float`.
+/// `.contains()` alone would wrongly treat "could be float" as "is float".
+fn is_definitely_float(ty: &Type) -> bool {
+    !ty.types.is_empty()
+        && ty.types.iter().all(|t| {
+            matches!(
+                t,
+                Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..)
+            )
+        })
+}
+
 /// Type of the `/` operator. Unlike `+`/`-`/`*`, `int / int` yields `int|float` in PHP
 /// because division may produce a fractional result (e.g. `5 / 2 = 2.5`).
 pub fn infer_div(left: &Type, right: &Type) -> Type {
     if left.is_mixed() || right.is_mixed() {
         return Type::mixed();
     }
-    let left_is_float = left.contains(|t| {
-        matches!(
-            t,
-            Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..)
-        )
-    });
-    let right_is_float = right.contains(|t| {
-        matches!(
-            t,
-            Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..)
-        )
-    });
-    if left_is_float || right_is_float {
+    if is_definitely_float(left) || is_definitely_float(right) {
         return Type::single(Atomic::TFloat);
     }
     let mut u = Type::empty();

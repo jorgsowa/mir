@@ -218,7 +218,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                     }
                 }
                 infer_int_range_arithmetic(&left_ty, &right_ty, b.op).unwrap_or_else(|| {
-                    if b.op == BinaryOp::Div {
+                    // `**` genuinely overflows int -> float at runtime exactly
+                    // like `/` does (`2 ** 63` is `float`, not `int`) — route
+                    // it through the same overflow-aware widening, not the
+                    // int-preserving `+`/`-`/`*` path.
+                    if matches!(b.op, BinaryOp::Div | BinaryOp::Pow) {
                         infer_div(&left_ty, &right_ty)
                     } else {
                         infer_arithmetic(&left_ty, &right_ty)
