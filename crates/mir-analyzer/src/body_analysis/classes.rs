@@ -162,7 +162,17 @@ impl<'a> BodyAnalyzer<'a> {
                 source_map,
                 all_issues,
             );
-            if self.mode == AnalysisMode::Full {
+            // A valid `@var` docblock already gives this property an explicit
+            // type even though there's no native `type_hint` —
+            // `MissingPropertyType` should only fire when there's no USABLE
+            // type annotation at all, not just no *native* one. A malformed
+            // `@var` (already flagged separately as `InvalidDocblock`) doesn't
+            // count as usable, so `MissingPropertyType` still fires for those.
+            let has_docblock_type = prop.doc_comment.as_ref().is_some_and(|c| {
+                let parsed = crate::parser::DocblockParser::parse(&c.text);
+                parsed.var_type.is_some() && parsed.invalid_annotations.is_empty()
+            });
+            if self.mode == AnalysisMode::Full && !has_docblock_type {
                 let prop_name = prop.name.as_deref().unwrap_or("").to_string();
                 let (line, col_start) =
                     crate::diagnostics::offset_to_line_col(source, member_span.start, source_map);
@@ -752,6 +762,25 @@ impl<'a> BodyAnalyzer<'a> {
         if method_name == "__construct" && self.mode == AnalysisMode::Full {
             for param in method.params.iter() {
                 if param.visibility.is_some() && param.type_hint.is_none() {
+                    // A `@param` docblock on the constructor can already give this
+                    // promoted property a resolved type even with no native hint —
+                    // same reasoning as the plain-property check above.
+                    let has_docblock_type = param
+                        .name
+                        .as_deref()
+                        .filter(|n| !n.is_empty())
+                        .and_then(|n| {
+                            crate::db::find_property_in_class(
+                                self.db,
+                                crate::db::Fqcn::from_str(self.db, fqcn),
+                                n,
+                            )
+                        })
+                        .and_then(|def| def.ty)
+                        .is_some();
+                    if has_docblock_type {
+                        continue;
+                    }
                     let prop_name = param.name.as_deref().unwrap_or("").to_string();
                     let (line, col_start) = crate::diagnostics::offset_to_line_col(
                         source,

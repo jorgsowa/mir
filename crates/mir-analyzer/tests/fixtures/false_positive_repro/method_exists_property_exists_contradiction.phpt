@@ -31,8 +31,8 @@ function methodExistsStillNarrowsObject($x): void {
     }
 }
 ===expect===
-ArgumentTypeCoercion@3:22-3:24: Argument $object_or_class of method_exists() expects 'object|string', got 'int' — coercion may fail at runtime
 RedundantCondition@3:8-3:32: Condition is always true/false for type 'bool'
-ArgumentTypeCoercion@10:24-10:26: Argument $object_or_class of property_exists() expects 'object|string', got 'int' — coercion may fail at runtime
+ArgumentTypeCoercion@3:22-3:24: Argument $object_or_class of method_exists() expects 'object|string', got 'int' — coercion may fail at runtime
 RedundantCondition@10:8-10:34: Condition is always true/false for type 'bool'
+ArgumentTypeCoercion@10:24-10:26: Argument $object_or_class of property_exists() expects 'object|string', got 'int' — coercion may fail at runtime
 PossiblyInvalidArgument@18:22-18:24: Argument $object_or_class of method_exists() expects 'object|string', possibly different type 'object|int' provided

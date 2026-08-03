@@ -21,5 +21,5 @@ function describe(ErrorA|ErrorB $error, string $dynamicClass): string {
     };
 }
 ===expect===
-UndefinedMethod@11:25-11:46: Method ErrorB::aOnlyMethod() does not exist
 MixedReturnStatement@10:4-13:6: Cannot return a mixed type from function with declared return type 'string'
+UndefinedMethod@11:25-11:46: Method ErrorB::aOnlyMethod() does not exist

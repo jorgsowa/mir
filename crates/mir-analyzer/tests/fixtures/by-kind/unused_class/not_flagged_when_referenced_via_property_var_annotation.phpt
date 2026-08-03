@@ -18,4 +18,3 @@ class Wallet {
 
 (new Wallet())->balance();
 ===expect===
-MissingPropertyType@6:4-6:18: Property Wallet::$money has no type annotation

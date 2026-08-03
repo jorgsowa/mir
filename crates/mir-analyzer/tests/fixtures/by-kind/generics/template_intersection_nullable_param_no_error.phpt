@@ -22,5 +22,5 @@ maybeCount(null);
 // this fix must not disable bound-checking for the whole pattern.
 maybeCount(new Unrelated());
 ===expect===
-InvalidArgument@14:11-14:26: Argument $value of maybeCount() expects 'T&Countable2|null', got 'Unrelated'
 InvalidTemplateParam@14:0-14:27: Template type 'T' inferred as 'Unrelated' does not satisfy bound 'Countable2'
+InvalidArgument@14:11-14:26: Argument $value of maybeCount() expects 'T&Countable2|null', got 'Unrelated'

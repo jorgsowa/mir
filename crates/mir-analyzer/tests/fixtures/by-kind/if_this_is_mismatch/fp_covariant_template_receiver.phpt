@@ -17,4 +17,3 @@ class Box {
 $b = new Box(new Dog());
 $b->onlyForAnimalBox();
 ===expect===
-MissingPropertyType@8:32-8:45: Property Box::$item has no type annotation

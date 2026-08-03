@@ -40,7 +40,5 @@ class Widget {
     }
 }
 ===expect===
-MissingPropertyType@18:4-18:19: Property Widget::$item has no type annotation
-MissingPropertyType@20:4-20:32: Property Widget::$staticItem has no type annotation
 PossiblyNullMethodCall@29:8-29:28: Cannot call method extra() on possibly null value
 PossiblyNullMethodCall@33:8-33:34: Cannot call method extra() on possibly null value

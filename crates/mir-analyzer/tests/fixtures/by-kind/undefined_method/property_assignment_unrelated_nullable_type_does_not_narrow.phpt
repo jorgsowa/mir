@@ -27,6 +27,5 @@ class Widget {
     }
 }
 ===expect===
-MissingPropertyType@12:4-12:19: Property Widget::$item has no type annotation
 InvalidPropertyAssignment@19:8-19:43: Property $item expects 'Base', cannot assign 'Other|null'
 UndefinedMethod@20:8-20:28: Method Base::extra() does not exist

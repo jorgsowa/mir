@@ -16,5 +16,5 @@ function test(array $arr): int {
     return 0;
 }
 ===expect===
-NonExistentArrayOffset@6:20-6:21: Array offset '0' does not exist
 MixedReturnStatement@6:8-6:23: Cannot return a mixed type from function with declared return type 'int'
+NonExistentArrayOffset@6:20-6:21: Array offset '0' does not exist
