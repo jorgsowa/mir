@@ -118,7 +118,13 @@ pub fn narrow_from_condition(
             narrow_from_condition(&u.operand, ctx, !is_true, db, file);
         }
 
-        // $a && $b  →  if true: narrow both; if false: no constraint
+        // $a && $b  →  if true: narrow both.
+        // If false (De Morgan): !$a || !$b, i.e. exactly the disjoint union of
+        // ($a is false) and ($a is true AND $b is false) — $a is always
+        // evaluated, $b only on the path where $a was truthy. Narrowing each
+        // path independently and merging keeps a guard-clause fall-through
+        // (`if (!$a instanceof A && !$a instanceof B) return;`) from losing
+        // the proof that at least one conjunct's negation holds.
         ExprKind::Binary(b) if b.op == BinaryOp::BooleanAnd || b.op == BinaryOp::LogicalAnd => {
             if is_true {
                 narrow_from_condition(&b.left, ctx, true, db, file);
@@ -127,6 +133,20 @@ pub fn narrow_from_condition(
                 // Promote variables from possibly_assigned to assigned for side effects in each.
                 promote_assignment_effects(&b.left, ctx, db, file);
                 promote_assignment_effects(&b.right, ctx, db, file);
+            } else {
+                let pre = ctx.branch();
+
+                let mut a_false = ctx.branch();
+                narrow_from_condition(&b.left, &mut a_false, false, db, file);
+                promote_assignment_effects(&b.left, &mut a_false, db, file);
+
+                let mut a_true_b_false = ctx.branch();
+                narrow_from_condition(&b.left, &mut a_true_b_false, true, db, file);
+                narrow_from_condition(&b.right, &mut a_true_b_false, false, db, file);
+                promote_assignment_effects(&b.left, &mut a_true_b_false, db, file);
+                promote_assignment_effects(&b.right, &mut a_true_b_false, db, file);
+
+                *ctx = FlowState::merge_branches(&pre, a_false, Some(a_true_b_false));
             }
         }
 
