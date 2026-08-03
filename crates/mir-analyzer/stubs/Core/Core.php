@@ -742,7 +742,7 @@ function restore_exception_handler(): bool {}
 /**
  * Returns an array with the name of the defined classes
  * @link https://php.net/manual/en/function.get-declared-classes.php
- * @return string[] an array of the names of the declared classes in the current script.
+ * @return list<class-string> an array of the names of the declared classes in the current script.
  * <p>
  * Note that depending on what extensions you have compiled or
  * loaded into PHP, additional classes could be present. This means that
@@ -1102,16 +1102,24 @@ function gc_disable(): void {}
 /**
  * Gets information about the garbage collector
  * @link https://php.net/manual/en/function.gc-status.php
- * @return int[] associative array with the following elements:
+ * @return array{runs: int, collected: int, threshold: int, roots: int, running: bool, protected: bool, full: bool, buffer_size: int, application_time: float, collector_time: float, destructor_time: float, free_time: float} associative array with the following elements:
  * <ul>
  * <li>"runs"</li>
  * <li>"collected"</li>
  * <li>"threshold"</li>
  * <li>"roots"</li>
+ * <li>"running"</li>
+ * <li>"protected"</li>
+ * <li>"full"</li>
+ * <li>"buffer_size"</li>
+ * <li>"application_time"</li>
+ * <li>"collector_time"</li>
+ * <li>"destructor_time"</li>
+ * <li>"free_time"</li>
  * </ul>
  * @since 7.3
  */
-#[ArrayShape(["runs" => "int", "collected" => "int", "threshold" => "int", "roots" => "int"])]
+#[ArrayShape(["runs" => "int", "collected" => "int", "threshold" => "int", "roots" => "int", "running" => "bool", "protected" => "bool", "full" => "bool", "buffer_size" => "int", "application_time" => "float", "collector_time" => "float", "destructor_time" => "float", "free_time" => "float"])]
 function gc_status(): array {}
 
 /**

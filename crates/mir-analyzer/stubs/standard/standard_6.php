@@ -1157,7 +1157,7 @@ function socket_get_status($stream): array {}
  * @param string $path <p>
  * The path being checked.
  * </p>
- * @return string|false the canonicalized absolute pathname on success. The resulting path
+ * @return non-empty-string|false the canonicalized absolute pathname on success. The resulting path
  * will have no symbolic link, '/./' or '/../' components.
  * <p>
  * realpath returns false on failure, e.g. if

@@ -237,7 +237,7 @@ interface Throwable extends Stringable
     /**
      * Gets the stack trace
      * @link https://php.net/manual/en/throwable.gettrace.php
-     * @return array <p>
+     * @return list<array{function: string, line?: int, file?: string, class?: class-string, type?: string, args?: list<mixed>, object?: object}> <p>
      * Returns the stack trace as an array in the same format as
      * {@see debug_backtrace()}.
      * </p>
@@ -365,7 +365,7 @@ class Exception implements Throwable
     /**
      * Gets the stack trace
      * @link https://php.net/manual/en/exception.gettrace.php
-     * @return array the Exception stack trace as an array.
+     * @return list<array{function: string, line?: int, file?: string, class?: class-string, type?: string, args?: list<mixed>, object?: object}> the Exception stack trace as an array.
      */
     #[Pure]
     final public function getTrace(): array {}
@@ -474,7 +474,7 @@ class Error implements Throwable
     /**
      * Gets the stack trace
      * @link https://php.net/manual/en/throwable.gettrace.php
-     * @return array <p>
+     * @return list<array{function: string, line?: int, file?: string, class?: class-string, type?: string, args?: list<mixed>, object?: object}> <p>
      * Returns the stack trace as an array in the same format as
      * {@see debug_backtrace()}.
      * </p>
