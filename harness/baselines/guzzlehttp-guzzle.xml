@@ -1426,9 +1426,6 @@
     <PossiblyInvalidArgument>
       <code><![CDATA[$errorConstant]]></code>
     </PossiblyInvalidArgument>
-    <PossiblyNullArgument>
-      <code><![CDATA[$info]]></code>
-    </PossiblyNullArgument>
     <RedundantCast>
       <code><![CDATA[$value]]></code>
     </RedundantCast>
