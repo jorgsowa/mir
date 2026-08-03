@@ -1322,7 +1322,6 @@
             }]]></code>
     </MissingClosureReturnType>
     <MixedArgument>
-      <code><![CDATA[$promise]]></code>
       <code><![CDATA[$protocols]]></code>
     </MixedArgument>
     <MixedArrayAccess>
@@ -1338,7 +1337,6 @@
       <code><![CDATA[$options['allow_redirects']['referer']]]></code>
     </MixedArrayAccess>
     <MixedAssignment>
-      <code><![CDATA[$promise = $this($nextRequest, $options)]]></code>
       <code><![CDATA[$current = $options['__redirect_count']
             ?? 0]]></code>
       <code><![CDATA[$max = $options['allow_redirects']['max']]]></code>
@@ -1364,7 +1362,6 @@
             ->then(function (ResponseInterface $response) use ($request, $options) {
                 return $this->checkRedirect($request, $options, $response);
             });]]></code>
-      <code><![CDATA[return $promise;]]></code>
     </MixedReturnStatement>
     <PossiblyInvalidArgument>
       <code><![CDATA[$modify['uri']]]></code>
@@ -1413,7 +1410,6 @@
                 $this->onFulfilled($request, $options),
                 $this->onRejected($request, $options)
             );]]></code>
-      <code><![CDATA[return $this($request, $options);]]></code>
     </MixedReturnStatement>
     <RedundantCast>
       <code><![CDATA[2 ** ($retries - 1)]]></code>
@@ -1431,11 +1427,7 @@
       <code><![CDATA[$value !== null]]></code>
     </ImpossibleIdenticalComparison>
     <InvalidReturnType>
-      <code><![CDATA[return $multiHandler;]]></code>
-      <code><![CDATA[return new CurlHandler($curlHandlerOptions);]]></code>
-      <code><![CDATA[return new CurlMultiHandler($curlMultiHandlerOptions);]]></code>
       <code><![CDATA[return $options;]]></code>
-      <code><![CDATA[return $streamHandler;]]></code>
     </InvalidReturnType>
     <MissingThrowsDocblock>
       <code><![CDATA[\intdiv($prefix, 8)]]></code>
