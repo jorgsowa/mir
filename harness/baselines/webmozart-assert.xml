@@ -62,10 +62,6 @@
       <code><![CDATA[return $value;]]></code>
       <code><![CDATA[return $value;]]></code>
       <code><![CDATA[return $value;]]></code>
-      <code><![CDATA[return $value;]]></code>
-      <code><![CDATA[return $value;]]></code>
-      <code><![CDATA[return $value;]]></code>
-      <code><![CDATA[return $value;]]></code>
     </MixedReturnStatement>
     <PossiblyInvalidArgument>
       <code><![CDATA[$locale]]></code>

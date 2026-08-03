@@ -472,11 +472,6 @@
       <code><![CDATA[$candidate]]></code>
     </MixedAssignment>
   </file>
-  <file src="src/Framework/Constraint/Array/ArrayHasKey.php">
-    <MixedArgument>
-      <code><![CDATA[$this->key]]></code>
-    </MixedArgument>
-  </file>
   <file src="src/Framework/Constraint/Callback.php">
     <MixedReturnStatement>
       <code><![CDATA[return ($this->callback)(...$other);]]></code>
@@ -505,21 +500,6 @@
       <code><![CDATA[]]></code>
     </UndefinedDocblockClass>
   </file>
-  <file src="src/Framework/Constraint/Math/IsFinite.php">
-    <MixedArgument>
-      <code><![CDATA[$other]]></code>
-    </MixedArgument>
-  </file>
-  <file src="src/Framework/Constraint/Math/IsInfinite.php">
-    <MixedArgument>
-      <code><![CDATA[$other]]></code>
-    </MixedArgument>
-  </file>
-  <file src="src/Framework/Constraint/Math/IsNan.php">
-    <MixedArgument>
-      <code><![CDATA[$other]]></code>
-    </MixedArgument>
-  </file>
   <file src="src/Framework/Constraint/Object/ObjectEquals.php">
     <MissingThrowsDocblock>
       <code><![CDATA[$object->getMethod($this->method)]]></code>
@@ -530,7 +510,6 @@
   </file>
   <file src="src/Framework/Constraint/Operator/LogicalNot.php">
     <ImpossibleIdenticalComparison>
-      <code><![CDATA[$index % 2 === 1]]></code>
       <code><![CDATA[$negatedString !== null]]></code>
     </ImpossibleIdenticalComparison>
   </file>
@@ -759,9 +738,6 @@
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->backupEnvironmentVariables = [...$this->backupEnvironmentVariables, ...BackedUpEnvironmentVariable::create($environmentVariableName)]]]></code>
     </InvalidPropertyAssignment>
-    <MixedArgument>
-      <code><![CDATA[$this->testResult]]></code>
-    </MixedArgument>
     <MixedArrayAccess>
       <code><![CDATA[$_ENV[$environmentVariableName]]]></code>
       <code><![CDATA[$trace[0]['class']]]></code>
@@ -990,18 +966,6 @@
     </ImpureFunctionCall>
   </file>
   <file src="src/Metadata/Api/DataProvider.php">
-    <MixedArgument>
-      <code><![CDATA[$key]]></code>
-      <code><![CDATA[$key]]></code>
-      <code><![CDATA[$key]]></code>
-      <code><![CDATA[$key]]></code>
-      <code><![CDATA[$key]]></code>
-      <code><![CDATA[$key]]></code>
-    </MixedArgument>
-    <MixedArrayOffset>
-      <code><![CDATA[$key]]></code>
-      <code><![CDATA[$key]]></code>
-    </MixedArrayOffset>
     <MixedAssignment>
       <code><![CDATA[$data = $className::$methodName()]]></code>
       <code><![CDATA[$value]]></code>
@@ -1009,6 +973,12 @@
       <code><![CDATA[$value]]></code>
       <code><![CDATA[$value         = $_testWith->data()]]></code>
     </MixedAssignment>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$key]]></code>
+      <code><![CDATA[$key]]></code>
+      <code><![CDATA[$key]]></code>
+      <code><![CDATA[$key]]></code>
+    </PossiblyInvalidArgument>
   </file>
   <file src="src/Metadata/Api/HookMethods.php">
     <MixedArgument>
@@ -1210,11 +1180,6 @@
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->groupTests = $groupTests]]></code>
     </InvalidPropertyAssignment>
-  </file>
-  <file src="src/Runner/Filter/TestIdFilterIterator.php">
-    <MixedMethodCall>
-      <code><![CDATA[$test->valueObjectForEvents()->id()]]></code>
-    </MixedMethodCall>
   </file>
   <file src="src/Runner/IssueTriggerResolver/DefaultResolver.php">
     <PossiblyInvalidArgument>
@@ -1997,10 +1962,6 @@
     <MixedAssignment>
       <code><![CDATA[$line]]></code>
     </MixedAssignment>
-    <UndefinedMethod>
-      <code><![CDATA[$reason->file()]]></code>
-      <code><![CDATA[$reason->line()]]></code>
-    </UndefinedMethod>
   </file>
   <file src="src/TextUI/Output/Facade.php">
     <PossiblyNullArgument>
