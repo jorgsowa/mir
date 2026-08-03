@@ -795,7 +795,7 @@ pub(crate) fn return_ty_for_body_check(
     let Some(hint) = native_hint else {
         return Some(doc_ty);
     };
-    let hint_ty = crate::expr::helpers::resolve_named_objects_in_union(
+    let hint_ty = crate::expr::helpers::resolve_named_objects_in_union_native(
         crate::parser::type_from_hint_owned(hint, self_fqcn),
         db,
         file,

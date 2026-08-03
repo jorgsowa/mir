@@ -389,11 +389,32 @@ pub(super) fn is_plain_checkable(ty: &Type) -> bool {
 /// Resolve all TNamedObject FQCNs in a Type using the codebase's file-level imports/namespace.
 /// Used to fix up `@var` annotation types that were parsed without namespace context.
 pub(crate) fn resolve_union_for_file(union: Type, db: &dyn MirDatabase, file: &str) -> Type {
+    resolve_union_for_file_inner(union, db, file, true)
+}
+
+/// Like [`resolve_union_for_file`], but for a genuinely **native** type hint
+/// (a closure/arrow-function's own declared return type, resolved fresh
+/// outside its original declaration site) rather than a docblock-derived
+/// type — no builtin-name leniency (`allow_builtin_shortcut=false`), matching
+/// real PHP's own unqualified-name resolution: a same-namespace class named
+/// e.g. `Generator` must win over the global builtin. See the sibling split
+/// in `collector::resolution` for the same distinction on the primary
+/// property/param/return type-hint path.
+pub(crate) fn resolve_union_for_file_native(union: Type, db: &dyn MirDatabase, file: &str) -> Type {
+    resolve_union_for_file_inner(union, db, file, false)
+}
+
+fn resolve_union_for_file_inner(
+    union: Type,
+    db: &dyn MirDatabase,
+    file: &str,
+    allow_builtin_shortcut: bool,
+) -> Type {
     let mut result = Type::empty();
     result.possibly_undefined = union.possibly_undefined;
     result.from_docblock = union.from_docblock;
     for atomic in union.types {
-        let resolved = resolve_atomic_for_file(atomic, db, file);
+        let resolved = resolve_atomic_for_file(atomic, db, file, allow_builtin_shortcut);
         result.types.push(resolved);
     }
     result
@@ -458,7 +479,7 @@ fn resolve_atomic_for_file_with_templates(
                     defining_entity: defining_entity.into(),
                 };
             }
-            resolve_atomic_for_file(Atomic::TNamedObject { fqcn, type_params }, db, file)
+            resolve_atomic_for_file(Atomic::TNamedObject { fqcn, type_params }, db, file, true)
         }
         Atomic::TNamedObject { fqcn, type_params } => {
             let resolved = crate::db::resolve_docblock_type_name(db, file, fqcn.as_ref());
@@ -518,7 +539,7 @@ fn resolve_atomic_for_file_with_templates(
                 defining_entity,
             )),
         },
-        other => resolve_atomic_for_file(other, db, file),
+        other => resolve_atomic_for_file(other, db, file, true),
     }
 }
 
@@ -528,13 +549,22 @@ fn is_resolvable_class_name(s: &str) -> bool {
             .all(|c| c.is_alphanumeric() || c == '_' || c == '\\')
 }
 
-fn resolve_atomic_for_file(atomic: Atomic, db: &dyn MirDatabase, file: &str) -> Atomic {
+fn resolve_atomic_for_file(
+    atomic: Atomic,
+    db: &dyn MirDatabase,
+    file: &str,
+    allow_builtin_shortcut: bool,
+) -> Atomic {
     match atomic {
         Atomic::TNamedObject { fqcn, type_params } => {
             if !is_resolvable_class_name(fqcn.as_ref()) {
                 return Atomic::TNamedObject { fqcn, type_params };
             }
-            let resolved = crate::db::resolve_docblock_type_name(db, file, fqcn.as_ref());
+            let resolved = if allow_builtin_shortcut {
+                crate::db::resolve_docblock_type_name(db, file, fqcn.as_ref())
+            } else {
+                crate::db::resolve_name(db, file, fqcn.as_ref())
+            };
             if type_params.is_empty() {
                 Atomic::TNamedObject {
                     fqcn: resolved.into(),
@@ -543,7 +573,9 @@ fn resolve_atomic_for_file(atomic: Atomic, db: &dyn MirDatabase, file: &str) -> 
             } else {
                 let new_params: Vec<mir_types::Type> = type_params
                     .iter()
-                    .map(|p| resolve_union_for_file(p.clone(), db, file))
+                    .map(|p| {
+                        resolve_union_for_file_inner(p.clone(), db, file, allow_builtin_shortcut)
+                    })
                     .collect();
                 Atomic::TNamedObject {
                     fqcn: resolved.into(),
@@ -556,14 +588,34 @@ fn resolve_atomic_for_file(atomic: Atomic, db: &dyn MirDatabase, file: &str) -> 
             Atomic::TClassString(Some(resolved.into()))
         }
         Atomic::TList { value } => Atomic::TList {
-            value: Box::new(resolve_union_for_file(*value, db, file)),
+            value: Box::new(resolve_union_for_file_inner(
+                *value,
+                db,
+                file,
+                allow_builtin_shortcut,
+            )),
         },
         Atomic::TNonEmptyList { value } => Atomic::TNonEmptyList {
-            value: Box::new(resolve_union_for_file(*value, db, file)),
+            value: Box::new(resolve_union_for_file_inner(
+                *value,
+                db,
+                file,
+                allow_builtin_shortcut,
+            )),
         },
         Atomic::TArray { key, value } => Atomic::TArray {
-            key: Box::new(resolve_union_for_file(*key, db, file)),
-            value: Box::new(resolve_union_for_file(*value, db, file)),
+            key: Box::new(resolve_union_for_file_inner(
+                *key,
+                db,
+                file,
+                allow_builtin_shortcut,
+            )),
+            value: Box::new(resolve_union_for_file_inner(
+                *value,
+                db,
+                file,
+                allow_builtin_shortcut,
+            )),
         },
         Atomic::TSelf { fqcn } if fqcn.is_empty() => {
             // Sentinel from docblock parser — leave as-is; caller handles it

@@ -1,5 +1,5 @@
 use super::helpers::{
-    apply_doc_param_types, ast_params_to_fn_params_resolved, resolve_named_objects_in_union,
+    apply_doc_param_types, ast_params_to_fn_params_resolved, resolve_named_objects_in_union_native,
 };
 use super::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
@@ -201,7 +201,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             .return_type
             .as_ref()
             .map(|h| crate::parser::type_from_hint_owned(h, ctx.self_fqcn.as_deref()))
-            .map(|u| resolve_named_objects_in_union(u, self.db, &self.file))
+            .map(|u| resolve_named_objects_in_union_native(u, self.db, &self.file))
             .or_else(|| {
                 // Fall back to `@return` docblock preceding the `function` keyword.
                 leading_doc
@@ -494,7 +494,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             .return_type
             .as_ref()
             .map(|h| crate::parser::type_from_hint_owned(h, ctx.self_fqcn.as_deref()))
-            .map(|u| resolve_named_objects_in_union(u, self.db, &self.file))
+            .map(|u| resolve_named_objects_in_union_native(u, self.db, &self.file))
             .or_else(|| {
                 // Fall back to `@return` docblock preceding the `fn` keyword — mirrors
                 // the same fallback in `analyze_closure` for `function(...) {...}`.

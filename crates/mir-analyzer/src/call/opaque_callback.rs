@@ -88,12 +88,12 @@ fn resolve_concrete_callback_return(db: &dyn MirDatabase, file: &str, expr: &Exp
         ExprKind::Closure(c) => {
             let hint = c.return_type.as_ref()?;
             let ty = type_from_hint_owned(hint, None);
-            Some(crate::stmt::resolve_union_for_file(ty, db, file))
+            Some(crate::stmt::resolve_union_for_file_native(ty, db, file))
         }
         ExprKind::ArrowFunction(a) => {
             let hint = a.return_type.as_ref()?;
             let ty = type_from_hint_owned(hint, None);
-            Some(crate::stmt::resolve_union_for_file(ty, db, file))
+            Some(crate::stmt::resolve_union_for_file_native(ty, db, file))
         }
         ExprKind::CallableCreate(cc) => {
             let CallableCreateKind::Function(target) = &cc.kind else {

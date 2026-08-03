@@ -905,7 +905,7 @@ pub(crate) fn ast_params_to_fn_params_resolved(
                 .type_hint
                 .as_ref()
                 .map(|h| crate::parser::type_from_hint_owned(h, self_fqcn))
-                .map(|u| resolve_named_objects_in_union(u, db, file));
+                .map(|u| resolve_named_objects_in_union_native(u, db, file));
             mir_codebase::DeclaredParam {
                 name: Name::new(name_str),
                 ty: mir_codebase::wrap_param_type(ty),
@@ -980,12 +980,38 @@ pub(crate) fn resolve_named_objects_in_union(
     db: &dyn crate::db::MirDatabase,
     file: &str,
 ) -> Type {
+    resolve_named_objects_in_union_inner(union, db, file, true)
+}
+
+/// Like [`resolve_named_objects_in_union`], but for a genuinely **native**
+/// type hint (a closure/arrow-function's own declared param/return type,
+/// resolved fresh outside its original declaration site) rather than a
+/// docblock-derived type — no builtin-name leniency
+/// (`allow_builtin_shortcut=false`), matching real PHP's own
+/// unqualified-name resolution: a same-namespace class named e.g.
+/// `Generator` must win over the global builtin. See the sibling split in
+/// `collector::resolution` for the same distinction on the primary
+/// property/param/return type-hint path.
+pub(crate) fn resolve_named_objects_in_union_native(
+    union: Type,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+) -> Type {
+    resolve_named_objects_in_union_inner(union, db, file, false)
+}
+
+fn resolve_named_objects_in_union_inner(
+    union: Type,
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+    allow_builtin_shortcut: bool,
+) -> Type {
     let from_docblock = union.from_docblock;
     let possibly_undefined = union.possibly_undefined;
     let types: Vec<Atomic> = union
         .types
         .into_iter()
-        .map(|a| resolve_named_objects_in_atomic(a, db, file))
+        .map(|a| resolve_named_objects_in_atomic(a, db, file, allow_builtin_shortcut))
         .collect();
     let mut result = Type::from_vec(types);
     result.from_docblock = from_docblock;
@@ -1002,14 +1028,19 @@ fn resolve_named_objects_in_atomic(
     atomic: Atomic,
     db: &dyn crate::db::MirDatabase,
     file: &str,
+    allow_builtin_shortcut: bool,
 ) -> Atomic {
     match atomic {
         Atomic::TNamedObject { fqcn, type_params } => {
-            let resolved = crate::db::resolve_docblock_type_name(db, file, fqcn.as_ref());
+            let resolved = if allow_builtin_shortcut {
+                crate::db::resolve_docblock_type_name(db, file, fqcn.as_ref())
+            } else {
+                crate::db::resolve_name(db, file, fqcn.as_ref())
+            };
             let type_params = type_params
                 .iter()
                 .cloned()
-                .map(|tp| resolve_named_objects_in_union(tp, db, file))
+                .map(|tp| resolve_named_objects_in_union_inner(tp, db, file, allow_builtin_shortcut))
                 .collect();
             Atomic::TNamedObject {
                 fqcn: resolved.into(),
@@ -1017,17 +1048,32 @@ fn resolve_named_objects_in_atomic(
             }
         }
         Atomic::TArray { key, value } => Atomic::TArray {
-            key: Box::new(resolve_named_objects_in_union(*key, db, file)),
-            value: Box::new(resolve_named_objects_in_union(*value, db, file)),
+            key: Box::new(resolve_named_objects_in_union_inner(
+                *key,
+                db,
+                file,
+                allow_builtin_shortcut,
+            )),
+            value: Box::new(resolve_named_objects_in_union_inner(
+                *value,
+                db,
+                file,
+                allow_builtin_shortcut,
+            )),
         },
         Atomic::TList { value } => Atomic::TList {
-            value: Box::new(resolve_named_objects_in_union(*value, db, file)),
+            value: Box::new(resolve_named_objects_in_union_inner(
+                *value,
+                db,
+                file,
+                allow_builtin_shortcut,
+            )),
         },
         Atomic::TIntersection { parts } => Atomic::TIntersection {
             parts: parts
                 .iter()
                 .cloned()
-                .map(|p| resolve_named_objects_in_union(p, db, file))
+                .map(|p| resolve_named_objects_in_union_inner(p, db, file, allow_builtin_shortcut))
                 .collect(),
         },
         other => other,
