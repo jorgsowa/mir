@@ -296,7 +296,18 @@ impl DocblockParser {
                 }
                 "psalm-type" | "phpstan-type" => {
                     if let Some(body_str) = body_text(&tag.body) {
-                        if let Some((name, type_expr)) = body_str.split_once('=') {
+                        // Real Psalm's `@psalm-type Name = Expr` requires the `=`;
+                        // real PHPStan's `@phpstan-type Name Expr` doesn't — split
+                        // on the first whitespace instead when there's no `=` and
+                        // this is the PHPStan spelling. A `phpstan-type` written
+                        // WITH `=` (some codebases mix conventions) still works via
+                        // the primary split.
+                        let split = body_str.split_once('=').or_else(|| {
+                            (tag.name == "phpstan-type")
+                                .then(|| body_str.split_once(char::is_whitespace))
+                                .flatten()
+                        });
+                        if let Some((name, type_expr)) = split {
                             // A generic alias name (`ListOf<T> = array<int, T>`)
                             // kept the `<T>` suffix verbatim, so even a BARE
                             // (non-parameterized) use site's lookup by the
