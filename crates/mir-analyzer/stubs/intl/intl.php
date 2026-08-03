@@ -5344,7 +5344,7 @@ function grapheme_extract(string $haystack, int $size, int $type = 0, int $offse
  * @param int $variant [optional] <p>
  * Either INTL_IDNA_VARIANT_2003 for IDNA 2003 or INTL_IDNA_VARIANT_UTS46 for UTS #46.
  * </p>
- * @param array &$idna_info [optional] <p>
+ * @param mixed &$idna_info [optional] <p>
  * This parameter can be used only if INTL_IDNA_VARIANT_UTS46 was used for variant.
  * In that case, it will be filled with an array with the keys 'result',
  * the possibly illegal result of the transformation, 'isTransitionalDifferent',
@@ -5352,6 +5352,8 @@ function grapheme_extract(string $haystack, int $size, int $type = 0, int $offse
  * either has or would have changed the result and 'errors',
  * which is an int representing a bitset of the error constants IDNA_ERROR_*.
  * </p>
+ * @param-out array $idna_info A pure out-param: the incoming value is never read, only
+ * overwritten.
  * @return string|false The ACE encoded version of the domain name or <b>FALSE</b> on failure.
  */
 function idn_to_ascii(string $domain, int $flags = IDNA_DEFAULT, int $variant = INTL_IDNA_VARIANT_UTS46, &$idna_info): string|false {}
@@ -5370,7 +5372,7 @@ function idn_to_ascii(string $domain, int $flags = IDNA_DEFAULT, int $variant = 
  * @param int $variant [optional] <p>
  * Either INTL_IDNA_VARIANT_2003 for IDNA 2003 or INTL_IDNA_VARIANT_UTS46 for UTS #46.
  * </p>
- * @param array &$idna_info [optional] <p>
+ * @param mixed &$idna_info [optional] <p>
  * This parameter can be used only if INTL_IDNA_VARIANT_UTS46 was used for variant.
  * In that case, it will be filled with an array with the keys 'result',
  * the possibly illegal result of the transformation, 'isTransitionalDifferent',
@@ -5378,6 +5380,8 @@ function idn_to_ascii(string $domain, int $flags = IDNA_DEFAULT, int $variant = 
  * either has or would have changed the result and 'errors',
  * which is an int representing a bitset of the error constants IDNA_ERROR_*.
  * </p>
+ * @param-out array $idna_info A pure out-param: the incoming value is never read, only
+ * overwritten.
  * @return string|false The UTF-8 encoded version of the domain name or <b>FALSE</b> on failure.
  * RFC 3490 4.2 states though "ToUnicode never fails. If any step fails, then the original input
  * sequence is returned immediately in that step."
