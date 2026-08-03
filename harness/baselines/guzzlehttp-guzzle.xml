@@ -497,13 +497,11 @@
       <code><![CDATA[]]></code>
       <code><![CDATA[\constant('CURLOPT_SHARE')]]></code>
       <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
       <code><![CDATA[\constant('CURLOPT_PIPEWAIT')]]></code>
       <code><![CDATA[\constant($constant)]]></code>
       <code><![CDATA[\constant($constant)]]></code>
       <code><![CDATA[\constant($constant)]]></code>
       <code><![CDATA[\constant($constant)]]></code>
-      <code><![CDATA[\constant($name)]]></code>
       <code><![CDATA[]]></code>
     </MissingThrowsDocblock>
     <MixedArgument>

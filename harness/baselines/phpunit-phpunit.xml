@@ -479,9 +479,6 @@
     </MixedReturnStatement>
   </file>
   <file src="src/Framework/Constraint/Cardinality/Count.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[$other->getIterator()]]></code>
-    </MissingThrowsDocblock>
     <MixedArgument>
       <code><![CDATA[$other]]></code>
       <code><![CDATA[$e->getCode()]]></code>
@@ -548,7 +545,6 @@
   <file src="src/Framework/MockObject/Generator/DoubledMethod.php">
     <MissingThrowsDocblock>
       <code><![CDATA[$parameter->getDefaultValue()]]></code>
-      <code><![CDATA[$parameter->getDefaultValue()]]></code>
     </MissingThrowsDocblock>
     <MixedArgument>
       <code><![CDATA[$e->getCode()]]></code>
@@ -569,9 +565,6 @@
       <code><![CDATA[final class Generator]]></code>
     </MissingConstructor>
     <MissingThrowsDocblock>
-      <code><![CDATA[new ReflectionClass($className)->newInstanceWithoutConstructor()]]></code>
-      <code><![CDATA[$reflector->getProperty('__phpunit_state')]]></code>
-      <code><![CDATA[$reflector->getConstructor()->invokeArgs($object, $arguments)]]></code>
       <code><![CDATA[$class->getMethod($methodName)]]></code>
       <code><![CDATA[$class->getMethod('__clone')]]></code>
       <code><![CDATA[$class->getMethod($methodName)]]></code>
@@ -646,12 +639,6 @@
       <code><![CDATA[$value = $match->invoked($invocation)]]></code>
       <code><![CDATA[$returnValue    = $value]]></code>
     </MixedAssignment>
-  </file>
-  <file src="src/Framework/MockObject/Runtime/ReturnValueGenerator.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[new ReflectionClass($testStub::class)->newInstanceWithoutConstructor()]]></code>
-      <code><![CDATA[$reflector->getProperty('__phpunit_state')]]></code>
-    </MissingThrowsDocblock>
   </file>
   <file src="src/Framework/MockObject/Runtime/Rule/AnyParameters.php">
     <UndefinedDocblockClass>
@@ -813,10 +800,6 @@
     </PossiblyInvalidArrayAccess>
   </file>
   <file src="src/Framework/TestRunner/TestRunner.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[$this->runTestWithTimeout($test)]]></code>
-      <code><![CDATA[$test->runBare()]]></code>
-    </MissingThrowsDocblock>
     <MixedArrayAccess>
       <code><![CDATA[$frame['file']]]></code>
       <code><![CDATA[$frame['line']]]></code>
@@ -851,7 +834,6 @@
       <code><![CDATA[$this->name]]></code>
     </InvalidArgument>
     <MissingThrowsDocblock>
-      <code><![CDATA[(new TestSuiteLoader)->load($filename)]]></code>
       <code><![CDATA[$reflector->getMethod($methodName)]]></code>
     </MissingThrowsDocblock>
     <MixedArgument>
@@ -930,7 +912,6 @@
   <file src="src/Logging/TestDox/NamePrettifier.php">
     <MissingThrowsDocblock>
       <code><![CDATA[$parameter->getDefaultValue()]]></code>
-      <code><![CDATA[$reflector->invokeArgs(null, $arguments)]]></code>
     </MissingThrowsDocblock>
     <MixedArgument>
       <code><![CDATA[$matches[1]]]></code>
@@ -1095,9 +1076,6 @@
     </UnusedParam>
   </file>
   <file src="src/Runner/Extension/ExtensionBootstrapper.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[new ReflectionClass($className)->newInstance()]]></code>
-    </MissingThrowsDocblock>
     <PossiblyInvalidArgument>
       <code><![CDATA[class_implements($className)]]></code>
     </PossiblyInvalidArgument>
@@ -1547,9 +1525,6 @@
     </MixedAssignment>
   </file>
   <file src="src/TextUI/Configuration/TestSuiteBuilder.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[(new TestSuiteLoader)->load($path)]]></code>
-    </MissingThrowsDocblock>
     <MixedArgument>
       <code><![CDATA[$file]]></code>
     </MixedArgument>
@@ -1857,14 +1832,6 @@
     </MixedAssignment>
   </file>
   <file src="src/TextUI/TestRunner.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[new TestSuiteSorter($resultCache)->reorderTestsInSuite(
-                    $suite,
-                    $configuration->executionOrder(),
-                    $configuration->resolveDependencies(),
-                    $configuration->executionOrderDefects(),
-                )]]></code>
-    </MissingThrowsDocblock>
     <RedundantCast>
       <code><![CDATA[$t->getCode()]]></code>
     </RedundantCast>

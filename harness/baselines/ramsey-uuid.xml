@@ -236,9 +236,6 @@
     </ImpureFunctionCall>
   </file>
   <file src="src/Generator/DefaultTimeGenerator.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[random_int(0, 0x3fff)]]></code>
-    </MissingThrowsDocblock>
     <RedundantCast>
       <code><![CDATA[$exception->getCode()]]></code>
     </RedundantCast>
@@ -287,9 +284,6 @@
     </RedundantCast>
   </file>
   <file src="src/Generator/RandomBytesGenerator.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[random_bytes($length)]]></code>
-    </MissingThrowsDocblock>
     <RedundantCast>
       <code><![CDATA[$exception->getCode()]]></code>
     </RedundantCast>
@@ -475,9 +469,6 @@
     </MixedAssignment>
   </file>
   <file src="src/Provider/Node/RandomNodeProvider.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[random_bytes(6)]]></code>
-    </MissingThrowsDocblock>
     <RedundantCast>
       <code><![CDATA[$exception->getCode()]]></code>
     </RedundantCast>
