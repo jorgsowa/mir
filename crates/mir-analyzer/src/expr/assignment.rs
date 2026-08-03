@@ -1939,6 +1939,24 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     span,
                                 );
                             }
+                            // `$arr['k'] = v` through a by-ref base is a write
+                            // observable by the caller through the reference —
+                            // mark the base as read/consumed, same as the
+                            // plain-`Variable`-target arm's equivalent
+                            // treatment of a whole-value overwrite
+                            // (`$x = v;` on a by-ref param). Without this, a
+                            // by-ref out-param only ever written via nested
+                            // offset assignment (a very common PHP shape,
+                            // `function f(array &$out) { $out['k'] = v; }`)
+                            // was flagged UnusedParam. Gated on byref_param_names
+                            // (not unconditional): a plain local array's
+                            // offset-write must NOT count as a read, or
+                            // `$a = []; $a[0] = 1;` with $a never read
+                            // afterwards would stop being flagged.
+                            if ctx.byref_param_names.contains(&mir_types::Name::from(name_str)) {
+                                ctx.read_vars.insert(mir_types::Name::from(name_str));
+                                ctx.mark_consumed(name_str);
+                            }
                             // Base key: innermost index in the chain (closest to $arr).
                             let base_key_opt = key_chain.last().unwrap().clone();
                             let base_key = base_key_opt.unwrap_or_else(Type::mixed);
