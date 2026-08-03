@@ -962,13 +962,7 @@
       <code><![CDATA[$position !== null]]></code>
       <code><![CDATA[!is_callable($handler)]]></code>
       <code><![CDATA[$invalidErrorHandlerStack]]></code>
-      <code><![CDATA[$handler instanceof self]]></code>
-      <code><![CDATA[$position === null]]></code>
-      <code><![CDATA[$handler instanceof self]]></code>
     </RedundantCondition>
-    <UnreachableCode>
-      <code><![CDATA[return array_slice($handlers, $position + 1);]]></code>
-    </UnreachableCode>
     <UnusedForeachValue>
       <code><![CDATA[]]></code>
     </UnusedForeachValue>
