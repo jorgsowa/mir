@@ -445,16 +445,6 @@
       <code><![CDATA[array_combine($keysToBeConsidered, $keysToBeConsidered)]]></code>
     </MissingThrowsDocblock>
   </file>
-  <file src="src/Framework/Attributes/CoversTrait.php">
-    <UndefinedDocblockClass>
-      <code><![CDATA[]]></code>
-    </UndefinedDocblockClass>
-  </file>
-  <file src="src/Framework/Attributes/UsesTrait.php">
-    <UndefinedDocblockClass>
-      <code><![CDATA[]]></code>
-    </UndefinedDocblockClass>
-  </file>
   <file src="src/Framework/Constraint/Array/ArrayComparison.php">
     <MixedAssignment>
       <code><![CDATA[$value]]></code>
@@ -883,11 +873,6 @@
       <code><![CDATA[$environmentVariables    = $_ENV]]></code>
     </MixedAssignment>
   </file>
-  <file src="src/Metadata/CoversTrait.php">
-    <UndefinedDocblockClass>
-      <code><![CDATA[]]></code>
-    </UndefinedDocblockClass>
-  </file>
   <file src="src/Metadata/MetadataCollection.php">
     <ImpureFunctionCall>
       <code><![CDATA[new MetadataCollectionIterator($this)]]></code>
@@ -906,11 +891,6 @@
       <code><![CDATA[$attributeInstance = $attribute->newInstance()]]></code>
       <code><![CDATA[$attributeInstance = $attribute->newInstance()]]></code>
     </MixedAssignment>
-  </file>
-  <file src="src/Metadata/UsesTrait.php">
-    <UndefinedDocblockClass>
-      <code><![CDATA[]]></code>
-    </UndefinedDocblockClass>
   </file>
   <file src="src/Metadata/Version/ComparisonRequirement.php">
     <ImpureMethodCall>
