@@ -191,6 +191,8 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         | "non-empty-uppercase-string" => Type::single(Atomic::TString),
         "class-string" => Type::single(Atomic::TClassString(None)),
         "interface-string" => Type::single(Atomic::TInterfaceString(None)),
+        "trait-string" => Type::single(Atomic::TTraitString),
+        "enum-string" => Type::single(Atomic::TEnumString),
         "int" | "integer" => Type::single(Atomic::TInt),
         // `literal-int`/`literal-string`: "any literal value of this kind",
         // used almost exclusively as a template bound (`@template T of

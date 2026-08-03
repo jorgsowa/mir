@@ -224,6 +224,10 @@ fn is_php_builtin_type(name: &str) -> bool {
             | "numeric-string"
             | "truthy-string"
             | "value-of"
+            | "interface-string"
+            | "trait-string"
+            | "enum-string"
+            | "callable-string"
     )
 }
 
