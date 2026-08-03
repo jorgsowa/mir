@@ -899,6 +899,22 @@ impl<'a> StatementsAnalyzer<'a> {
     pub(super) fn analyze_trycatch_stmt(&mut self, tc: &TryCatchStmt, ctx: &mut FlowState) {
         let pre_ctx = ctx.clone();
         let mut try_ctx = ctx.branch();
+        // Resolve every catch clause's types up front (before analyzing the try
+        // body) so a call inside the body that throws one of them isn't flagged
+        // MissingThrowsDocblock — this try/catch already covers it. Extends
+        // (rather than replaces) whatever was already locally caught, so
+        // coverage from an enclosing try/catch still applies inside this one.
+        if !tc.catches.is_empty() {
+            let mut caught: Vec<Arc<str>> = try_ctx.locally_caught_throws.to_vec();
+            for catch in tc.catches.iter() {
+                for catch_ty in catch.types.iter() {
+                    let raw = parser::name_to_string_owned(catch_ty);
+                    let resolved = db::resolve_name(self.db, &self.file, &raw);
+                    caught.push(Arc::from(resolved.as_str()));
+                }
+            }
+            try_ctx.locally_caught_throws = Arc::from(caught);
+        }
         self.analyze_stmts(&tc.body.stmts, &mut try_ctx);
 
         let catch_base = FlowState::merge_branches(&pre_ctx, try_ctx.clone(), None);

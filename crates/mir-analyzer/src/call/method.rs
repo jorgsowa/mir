@@ -1328,14 +1328,17 @@ fn resolve_method_return<'a>(
             if crate::db::is_unchecked_exception(ea.db, callee_throw.as_ref()) {
                 continue;
             }
-            if !ctx.fn_declared_throws.iter().any(|declared| {
+            let is_covered = |declared: &Arc<str>| {
                 declared.as_ref() == callee_throw.as_ref()
                     || crate::db::extends_or_implements(
                         ea.db,
                         callee_throw.as_ref(),
                         declared.as_ref(),
                     )
-            }) {
+            };
+            if !ctx.fn_declared_throws.iter().any(is_covered)
+                && !ctx.locally_caught_throws.iter().any(is_covered)
+            {
                 ea.emit(
                     IssueKind::MissingThrowsDocblock {
                         class: callee_throw.to_string(),

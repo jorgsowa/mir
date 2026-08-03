@@ -65,6 +65,15 @@ pub struct FlowState {
     /// Declared exception types for the current function/method (@throws).
     pub fn_declared_throws: Arc<[Arc<str>]>,
 
+    /// Exception types caught by a `try`/`catch` currently enclosing this
+    /// point — accumulates across nested try/catch (a call inside an inner
+    /// try's body is covered if EITHER the inner or an outer catch would
+    /// catch it, since an uncaught throw from the inner body propagates
+    /// outward). Consulted alongside `fn_declared_throws` when checking
+    /// `MissingThrowsDocblock`: a locally-caught exception never needs to be
+    /// declared, the same way a caller re-declaring `@throws` doesn't.
+    pub locally_caught_throws: Arc<[Arc<str>]>,
+
     /// Whether we are currently inside a loop.
     pub inside_loop: bool,
 
@@ -430,6 +439,7 @@ impl FlowState {
             static_fqcn: None,
             fn_return_type: None,
             fn_declared_throws: Arc::from([]),
+            locally_caught_throws: Arc::from([]),
             inside_loop: false,
             has_dynamic_var_def: false,
             has_dynamic_var_read: false,

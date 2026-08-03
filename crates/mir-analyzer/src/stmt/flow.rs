@@ -391,16 +391,18 @@ impl<'a> StatementsAnalyzer<'a> {
                         } else {
                             fqcn.as_ref()
                         };
+                        let throw_is_covered = |declared: &std::sync::Arc<str>| {
+                            declared.as_ref() == thrown_fqcn
+                                || crate::db::extends_or_implements(
+                                    self.db,
+                                    thrown_fqcn,
+                                    declared.as_ref(),
+                                )
+                        };
                         if !thrown_is_template_param
                             && !crate::db::is_unchecked_exception(self.db, thrown_fqcn)
-                            && !ctx.fn_declared_throws.iter().any(|declared| {
-                                declared.as_ref() == thrown_fqcn
-                                    || crate::db::extends_or_implements(
-                                        self.db,
-                                        thrown_fqcn,
-                                        declared.as_ref(),
-                                    )
-                            })
+                            && !ctx.fn_declared_throws.iter().any(throw_is_covered)
+                            && !ctx.locally_caught_throws.iter().any(throw_is_covered)
                         {
                             let (line, line_end, col_start, col_end) =
                                 self.span_to_location(stmt_span);
@@ -460,16 +462,18 @@ impl<'a> StatementsAnalyzer<'a> {
                         } else {
                             fqcn.as_ref()
                         };
+                        let throw_is_covered = |declared: &std::sync::Arc<str>| {
+                            declared.as_ref() == thrown_fqcn
+                                || crate::db::extends_or_implements(
+                                    self.db,
+                                    thrown_fqcn,
+                                    declared.as_ref(),
+                                )
+                        };
                         if !thrown_is_template_param
                             && !crate::db::is_unchecked_exception(self.db, thrown_fqcn)
-                            && !ctx.fn_declared_throws.iter().any(|declared| {
-                                declared.as_ref() == thrown_fqcn
-                                    || crate::db::extends_or_implements(
-                                        self.db,
-                                        thrown_fqcn,
-                                        declared.as_ref(),
-                                    )
-                            })
+                            && !ctx.fn_declared_throws.iter().any(throw_is_covered)
+                            && !ctx.locally_caught_throws.iter().any(throw_is_covered)
                         {
                             let (line, line_end, col_start, col_end) =
                                 self.span_to_location(stmt_span);
