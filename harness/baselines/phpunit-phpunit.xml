@@ -426,11 +426,6 @@
       <code><![CDATA[$this->testData->dataFromDataProvider()]]></code>
     </ImpureMethodCall>
   </file>
-  <file src="src/Event/Value/TestSuite/TestSuiteBuilder.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$line !== false]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
   <file src="src/Event/Value/Throwable.php">
     <ImpureMethodCall>
       <code><![CDATA[$this->description()]]></code>
@@ -884,9 +879,6 @@
     </ImpureMethodCall>
   </file>
   <file src="src/Metadata/Parser/AttributeParser.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$line !== false]]></code>
-    </ImpossibleIdenticalComparison>
     <MixedAssignment>
       <code><![CDATA[$attributeInstance = $attribute->newInstance()]]></code>
       <code><![CDATA[$attributeInstance = $attribute->newInstance()]]></code>
