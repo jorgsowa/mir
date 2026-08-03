@@ -1001,8 +1001,22 @@ pub(super) fn parse_param_line(s: &str) -> Option<(String, String)> {
     // Using first-match (not last) prevents description text that contains $var references
     // from being mistaken for the parameter name. Scanning the whole body (not just its
     // first physical line) is what lets a wrapped multi-line `array{...}`/`array<...>`
-    // shape still resolve to its `$name` — the depth tracking already keeps the shape's
-    // interior (and any newlines inside it) from being mistaken for the boundary.
+    // shape still resolve to its `$name`, and the depth tracking already keeps the
+    // shape's interior (and any newlines inside it) from being mistaken for the boundary.
+    //
+    // The type is optional in PHPDoc grammar (`@param $name description`); a body
+    // starting directly with `$`/`&$`/`...$` at depth 0 has no leading whitespace
+    // to trigger the loop below, so handle it up front with an empty type part.
+    let leading = s.strip_prefix('&').unwrap_or(s);
+    let leading = leading.strip_prefix("...").unwrap_or(leading);
+    if let Some(rest) = leading.strip_prefix('$') {
+        if let Some(name) = rest.split(char::is_whitespace).next() {
+            if !name.is_empty() {
+                return Some((String::new(), name.to_string()));
+            }
+        }
+    }
+
     let mut depth: i32 = 0;
 
     for (i, ch) in s.char_indices() {
