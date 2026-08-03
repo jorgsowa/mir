@@ -1,12 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <files>
   <file src="src/Dotenv.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MixedArgument>
       <code><![CDATA[$path]]></code>
       <code><![CDATA[$name]]></code>
@@ -56,12 +50,6 @@
     <MixedArgument>
       <code><![CDATA[$matches[1]]]></code>
     </MixedArgument>
-  </file>
-  <file src="src/Parser/Entry.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
   </file>
   <file src="src/Parser/EntryParser.php">
     <MissingClosureReturnType>
@@ -190,23 +178,12 @@
                 }]]></code>
     </MissingClosureReturnType>
   </file>
-  <file src="src/Parser/Value.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
-  </file>
   <file src="src/Repository/Adapter/ApacheAdapter.php">
     <MissingClosureReturnType>
       <code><![CDATA[static function ($value) {
             return \is_string($value) && $value !== '';
         }]]></code>
     </MissingClosureReturnType>
-  </file>
-  <file src="src/Repository/Adapter/ArrayAdapter.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
   </file>
   <file src="src/Repository/Adapter/EnvConstAdapter.php">
     <MissingClosureReturnType>
@@ -232,42 +209,12 @@
       <code><![CDATA[$_ENV[$name]]]></code>
     </MixedArrayAccess>
   </file>
-  <file src="src/Repository/Adapter/GuardedWriter.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
-  </file>
-  <file src="src/Repository/Adapter/ImmutableWriter.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
-  </file>
-  <file src="src/Repository/Adapter/MultiReader.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
-  </file>
-  <file src="src/Repository/Adapter/MultiWriter.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
-  </file>
   <file src="src/Repository/Adapter/PutenvAdapter.php">
     <MissingClosureReturnType>
       <code><![CDATA[static function ($value) {
             return \is_string($value);
         }]]></code>
     </MissingClosureReturnType>
-  </file>
-  <file src="src/Repository/Adapter/ReplacingWriter.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
   </file>
   <file src="src/Repository/Adapter/ServerConstAdapter.php">
     <MissingClosureReturnType>
@@ -293,12 +240,6 @@
       <code><![CDATA[$_SERVER[$name]]]></code>
     </MixedArrayAccess>
   </file>
-  <file src="src/Repository/AdapterRepository.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
-  </file>
   <file src="src/Repository/RepositoryBuilder.php">
     <MissingClosureReturnType>
       <code><![CDATA[static function ($reader) {
@@ -311,12 +252,6 @@
             return \is_string($adapter) ? $adapter::create() : Some::create($adapter);
         }]]></code>
     </MissingClosureReturnType>
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MixedAssignment>
       <code><![CDATA[$adapter]]></code>
       <code><![CDATA[$instance = $adapter::create()]]></code>
@@ -337,26 +272,6 @@
                 throw new InvalidEncodingException($error);
             }]]></code>
     </MissingClosureReturnType>
-  </file>
-  <file src="src/Store/FileStore.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
-  </file>
-  <file src="src/Store/StoreBuilder.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
-  </file>
-  <file src="src/Store/StringStore.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
   </file>
   <file src="src/Util/Regex.php">
     <MissingClosureReturnType>
@@ -418,9 +333,5 @@
                 return $callback($value);
             }]]></code>
     </MissingClosureReturnType>
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
   </file>
 </files>

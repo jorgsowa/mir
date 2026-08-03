@@ -1,11 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <files>
   <file src="src/PhpOption/LazyOption.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MissingThrowsDocblock>
       <code><![CDATA[$this->option()->getIterator()]]></code>
     </MissingThrowsDocblock>
@@ -28,9 +23,6 @@
     </RedundantCondition>
   </file>
   <file src="src/PhpOption/None.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MissingThrowsDocblock>
       <code><![CDATA[]]></code>
     </MissingThrowsDocblock>
@@ -103,9 +95,6 @@
     </MixedFunctionCall>
   </file>
   <file src="src/PhpOption/Some.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MixedAssignment>
       <code><![CDATA[$rs = $callable($this->value)]]></code>
     </MixedAssignment>

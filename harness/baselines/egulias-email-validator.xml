@@ -1,51 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <files>
   <file src="src/EmailLexer.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <UnnecessaryVarAnnotation>
       <code><![CDATA[]]></code>
     </UnnecessaryVarAnnotation>
-  </file>
-  <file src="src/EmailParser.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
-  </file>
-  <file src="src/EmailValidator.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
-  </file>
-  <file src="src/MessageIDParser.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
-  </file>
-  <file src="src/Parser.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
-  </file>
-  <file src="src/Parser/Comment.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
-  </file>
-  <file src="src/Parser/CommentStrategy/LocalComment.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
   </file>
   <file src="src/Parser/DomainLiteral.php">
     <MixedArgument>
@@ -55,21 +13,12 @@
       <code><![CDATA[preg_grep('/^[0-9A-Fa-f]{0,4}$/', $matchesIP, PREG_GREP_INVERT)]]></code>
     </PossiblyInvalidArgument>
   </file>
-  <file src="src/Parser/DomainPart.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
-  </file>
   <file src="src/Parser/FoldingWhiteSpace.php">
     <MixedArgument>
       <code><![CDATA[self::FWS_TYPES]]></code>
     </MixedArgument>
   </file>
   <file src="src/Parser/LocalPart.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MixedArrayAccess>
       <code><![CDATA[self::INVALID_TOKENS[$this->lexer->current->type]]]></code>
     </MixedArrayAccess>
@@ -77,16 +26,7 @@
       <code><![CDATA[$hasComments]]></code>
     </UnusedParam>
   </file>
-  <file src="src/Parser/PartParser.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
-  </file>
   <file src="src/Result/MultipleErrors.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <UnusedSuppress>
       <code><![CDATA[]]></code>
     </UnusedSuppress>
@@ -96,23 +36,7 @@
       <code><![CDATA[]]></code>
     </MissingPropertyType>
   </file>
-  <file src="src/Result/Reason/ExceptionFound.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
-  </file>
-  <file src="src/Result/Reason/UnusualElements.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
-  </file>
   <file src="src/Validation/DNSCheckValidation.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <PossiblyInvalidArgument>
       <code><![CDATA[idn_to_ascii($host, IDNA_DEFAULT, $variant)]]></code>
     </PossiblyInvalidArgument>
@@ -125,47 +49,20 @@
       <code><![CDATA[dns_get_record($host, $type)]]></code>
     </PossiblyInvalidArgument>
   </file>
-  <file src="src/Validation/Extra/SpoofCheckValidation.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
-  </file>
   <file src="src/Validation/MessageIDValidation.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <PropertyTypeCoercion>
       <code><![CDATA[$this->error = $result]]></code>
     </PropertyTypeCoercion>
   </file>
   <file src="src/Validation/MultipleValidationWithAnd.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <PossiblyNullMethodCall>
       <code><![CDATA[$validation->getError()->reason()]]></code>
       <code><![CDATA[$this->error->addReason($validation->getError()->reason())]]></code>
     </PossiblyNullMethodCall>
   </file>
-  <file src="src/Validation/NoRFCWarningsValidation.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
-  </file>
   <file src="src/Validation/RFCValidation.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <PropertyTypeCoercion>
       <code><![CDATA[$this->error = $result]]></code>
     </PropertyTypeCoercion>
-  </file>
-  <file src="src/Warning/Warning.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
   </file>
 </files>

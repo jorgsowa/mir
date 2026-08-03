@@ -18,13 +18,6 @@
                 return $matcher->matches($var);
             }]]></code>
     </MissingClosureReturnType>
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MixedArgument>
       <code><![CDATA[$object]]></code>
       <code><![CDATA[$object]]></code>
@@ -53,9 +46,6 @@
     </MixedReturnStatement>
   </file>
   <file src="src/DeepCopy/Filter/ChainableFilter.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MixedArgument>
       <code><![CDATA[$object]]></code>
       <code><![CDATA[$property]]></code>
@@ -104,9 +94,6 @@
     <DeprecatedMethod>
       <code><![CDATA[$reflectionProperty->setAccessible(true)]]></code>
     </DeprecatedMethod>
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MixedAssignment>
       <code><![CDATA[$value = call_user_func($this->callback, $reflectionProperty->getValue($object))]]></code>
     </MixedAssignment>
@@ -121,24 +108,10 @@
       <code><![CDATA[Proxy]]></code>
     </UndefinedClass>
   </file>
-  <file src="src/DeepCopy/Matcher/PropertyMatcher.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
-  </file>
-  <file src="src/DeepCopy/Matcher/PropertyNameMatcher.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
-  </file>
   <file src="src/DeepCopy/Matcher/PropertyTypeMatcher.php">
     <DeprecatedMethod>
       <code><![CDATA[$reflectionProperty->setAccessible(true)]]></code>
     </DeprecatedMethod>
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
   </file>
   <file src="src/DeepCopy/TypeFilter/Date/DateIntervalFilter.php">
     <MixedAssignment>
@@ -154,20 +127,12 @@
       <code><![CDATA[$recurrences]]></code>
     </PossiblyNullArgument>
   </file>
-  <file src="src/DeepCopy/TypeFilter/ReplaceFilter.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
-  </file>
   <file src="src/DeepCopy/TypeFilter/ShallowCopyFilter.php">
     <MixedClone>
       <code><![CDATA[clone $element]]></code>
     </MixedClone>
   </file>
   <file src="src/DeepCopy/TypeFilter/Spl/ArrayObjectFilter.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MixedAssignment>
       <code><![CDATA[$clone = clone $arrayObject]]></code>
       <code><![CDATA[$v]]></code>
@@ -211,10 +176,5 @@
     <MissingReturnType>
       <code><![CDATA[]]></code>
     </MissingReturnType>
-  </file>
-  <file src="src/DeepCopy/TypeMatcher/TypeMatcher.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
   </file>
 </files>

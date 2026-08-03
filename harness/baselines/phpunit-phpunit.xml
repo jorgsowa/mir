@@ -700,11 +700,6 @@
       <code><![CDATA[$value = $value->invoke($invocation)]]></code>
     </MixedAssignment>
   </file>
-  <file src="src/Framework/MockObject/Runtime/Stub/ReturnCallback.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
-  </file>
   <file src="src/Framework/MockObject/Runtime/Stub/ReturnValueMap.php">
     <MixedAssignment>
       <code><![CDATA[$map]]></code>
@@ -1962,9 +1957,6 @@
     </PossiblyNullArgument>
   </file>
   <file src="src/TextUI/Output/Printer/DefaultPrinter.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MixedAssignment>
       <code><![CDATA[$stream = @fsockopen($tmp[0], (int) $tmp[1])]]></code>
       <code><![CDATA[$stream = fopen($out, 'wb')]]></code>

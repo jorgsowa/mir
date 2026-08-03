@@ -1,10 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <files>
-  <file src="src/BodySummarizer.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
-  </file>
   <file src="src/Client.php">
     <DeprecatedCall>
       <code><![CDATA[\json_encode($options['json'])]]></code>
@@ -12,9 +7,6 @@
     <InvalidArgument>
       <code><![CDATA[$handlerOptions]]></code>
     </InvalidArgument>
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MissingThrowsDocblock>
       <code><![CDATA[$this->request($method, $uri, $opts)]]></code>
     </MissingThrowsDocblock>
@@ -133,10 +125,6 @@
                         && $cookie->matchesDomain($domain));
                 }]]></code>
     </MissingClosureReturnType>
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MixedArgument>
       <code><![CDATA[$cookie]]></code>
     </MixedArgument>
@@ -149,20 +137,12 @@
     </RedundantCast>
   </file>
   <file src="src/Cookie/FileCookieJar.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MixedAssignment>
       <code><![CDATA[$data = \json_decode($json, true)]]></code>
       <code><![CDATA[$cookie]]></code>
     </MixedAssignment>
   </file>
   <file src="src/Cookie/SessionCookieJar.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MixedArrayAccess>
       <code><![CDATA[$_SESSION[$this->sessionKey]]]></code>
       <code><![CDATA[$_SESSION[$this->sessionKey]]]></code>
@@ -174,11 +154,6 @@
     </MixedAssignment>
   </file>
   <file src="src/Cookie/SetCookie.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MixedArgument>
       <code><![CDATA[$data['HostOnly']]]></code>
       <code><![CDATA[$data['Name']]]></code>
@@ -234,19 +209,6 @@
     <UnnecessaryVarAnnotation>
       <code><![CDATA[]]></code>
     </UnnecessaryVarAnnotation>
-  </file>
-  <file src="src/Exception/ConnectException.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
-  </file>
-  <file src="src/Exception/RequestException.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
   </file>
   <file src="src/Handler/CurlFactory.php">
     <InvalidOperand>
@@ -330,15 +292,6 @@
             return \strlen($h);
         }]]></code>
     </MissingClosureReturnType>
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MissingThrowsDocblock>
       <code><![CDATA[\constant('CURLOPT_SHARE')]]></code>
       <code><![CDATA[\constant('CURLOPT_PIPEWAIT')]]></code>
@@ -524,10 +477,6 @@
     </UnusedParam>
   </file>
   <file src="src/Handler/CurlHandler.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MixedArgument>
       <code><![CDATA[$options['delay'] * 1000]]></code>
       <code><![CDATA[$easy->handle]]></code>
@@ -547,28 +496,6 @@
                 return $this->cancel($id, $waitToken);
             }]]></code>
     </MissingClosureReturnType>
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MissingThrowsDocblock>
       <code><![CDATA[]]></code>
       <code><![CDATA[\constant('CURLOPT_SHARE')]]></code>
@@ -710,10 +637,6 @@
     <ArgumentTypeCoercion>
       <code><![CDATA[$lock]]></code>
     </ArgumentTypeCoercion>
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MissingThrowsDocblock>
       <code><![CDATA[]]></code>
       <code><![CDATA[\constant($constant)]]></code>
@@ -729,9 +652,6 @@
     </MixedReturnStatement>
   </file>
   <file src="src/Handler/CurlVersion.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MissingThrowsDocblock>
       <code><![CDATA[\version_compare($version, self::MIN_VERSION, '>=')]]></code>
       <code><![CDATA[\version_compare($version, self::TLS_12_VERSION, '>=')]]></code>
@@ -753,21 +673,6 @@
     </MissingThrowsDocblock>
   </file>
   <file src="src/Handler/EasyHandle.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MixedArrayOffset>
       <code><![CDATA[$normalizedKeys['content-encoding']]]></code>
       <code><![CDATA[$normalizedKeys['content-encoding']]]></code>
@@ -820,13 +725,6 @@
                 return P\Create::rejectionFor($reason);
             }]]></code>
     </MissingClosureReturnType>
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MissingThrowsDocblock>
       <code><![CDATA[]]></code>
     </MissingThrowsDocblock>
@@ -891,11 +789,6 @@
             }
         }]]></code>
     </MissingClosureReturnType>
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MissingThrowsDocblock>
       <code><![CDATA[\constant('CURLAUTH_DIGEST')]]></code>
       <code><![CDATA[\constant('CURLAUTH_NTLM')]]></code>
@@ -1038,11 +931,6 @@
                 return $tuple[0] !== $remove;
             }]]></code>
     </MissingClosureReturnType>
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MixedArrayAccess>
       <code><![CDATA[$tuple[1]]]></code>
       <code><![CDATA[$tuple[0]]]></code>
@@ -1160,9 +1048,6 @@
                 return $result;
             }]]></code>
     </MissingClosureReturnType>
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MixedArgument>
       <code><![CDATA[$matches[1]]]></code>
       <code><![CDATA[$matches[1]]]></code>
@@ -1395,9 +1280,6 @@
                 $results[$k] = $v;
             }]]></code>
     </MissingClosureReturnType>
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MixedArgument>
       <code><![CDATA[$opts]]></code>
     </MixedArgument>
@@ -1414,9 +1296,6 @@
     </RedundantCondition>
   </file>
   <file src="src/PrepareBodyMiddleware.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MixedAssignment>
       <code><![CDATA[$uri = $request->getBody()->getMetadata('uri')]]></code>
       <code><![CDATA[$expect = $options['expect'] ?? null]]></code>
@@ -1447,10 +1326,6 @@
                                 ->withHeader(self::STATUS_HISTORY_HEADER, $statusHeader);
             }]]></code>
     </MissingClosureReturnType>
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MixedArgument>
       <code><![CDATA[$promise]]></code>
       <code><![CDATA[$protocols]]></code>
@@ -1527,11 +1402,6 @@
             return $this->doRetry($req, $options);
         }]]></code>
     </MissingClosureReturnType>
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
     <MixedArgument>
       <code><![CDATA[$value]]></code>
     </MixedArgument>
@@ -1557,15 +1427,6 @@
     <TooManyArguments>
       <code><![CDATA[$response]]></code>
     </TooManyArguments>
-  </file>
-  <file src="src/TransferStats.php">
-    <MissingPropertyType>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-      <code><![CDATA[]]></code>
-    </MissingPropertyType>
   </file>
   <file src="src/Utils.php">
     <DeprecatedCall>
