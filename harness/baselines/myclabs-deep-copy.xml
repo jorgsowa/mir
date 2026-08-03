@@ -7,9 +7,6 @@
     <DeprecatedMethod>
       <code><![CDATA[$property->setAccessible(true)]]></code>
     </DeprecatedMethod>
-    <InvalidDocblock>
-      <code><![CDATA[]]></code>
-    </InvalidDocblock>
     <MissingClosureReturnType>
       <code><![CDATA[function ($object) {
                         return $this->recursiveCopy($object);

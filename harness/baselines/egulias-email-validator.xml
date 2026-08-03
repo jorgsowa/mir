@@ -148,9 +148,6 @@
       <code><![CDATA[$validation->getError()->reason()]]></code>
       <code><![CDATA[$this->error->addReason($validation->getError()->reason())]]></code>
     </PossiblyNullMethodCall>
-    <UnusedSuppress>
-      <code><![CDATA[]]></code>
-    </UnusedSuppress>
   </file>
   <file src="src/Validation/NoRFCWarningsValidation.php">
     <MissingPropertyType>
