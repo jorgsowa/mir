@@ -633,10 +633,6 @@
       <code><![CDATA[$class]]></code>
       <code><![CDATA[$class]]></code>
     </PossiblyInvalidArgument>
-    <PossiblyNullArgument>
-      <code><![CDATA[$backupSettings['backupGlobals']]]></code>
-      <code><![CDATA[$backupSettings['backupStaticProperties']]]></code>
-    </PossiblyNullArgument>
     <UnnecessaryVarAnnotation>
       <code><![CDATA[]]></code>
     </UnnecessaryVarAnnotation>
@@ -1118,17 +1114,6 @@
       <code><![CDATA[$testSuffixes]]></code>
       <code><![CDATA[$coverageFilter]]></code>
     </PossiblyInvalidArgument>
-    <PossiblyNullArgument>
-      <code><![CDATA[$option[1]]]></code>
-      <code><![CDATA[$generateBaseline]]></code>
-      <code><![CDATA[$useBaseline]]></code>
-      <code><![CDATA[$useBaseline]]></code>
-      <code><![CDATA[$option[1]]]></code>
-    </PossiblyNullArgument>
-    <PossiblyNullOperand>
-      <code><![CDATA[$generateBaseline]]></code>
-      <code><![CDATA[$useBaseline]]></code>
-    </PossiblyNullOperand>
     <UnusedVariable>
       <code><![CDATA[]]></code>
       <code><![CDATA[]]></code>
