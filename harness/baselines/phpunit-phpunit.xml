@@ -510,9 +510,6 @@
     </PossiblyUndefinedVariable>
   </file>
   <file src="src/Framework/MockObject/Generator/Generator.php">
-    <MissingConstructor>
-      <code><![CDATA[final class Generator]]></code>
-    </MissingConstructor>
     <MissingThrowsDocblock>
       <code><![CDATA[$class->getMethod('__clone')]]></code>
       <code><![CDATA[$class->getMethod($methodName)]]></code>
