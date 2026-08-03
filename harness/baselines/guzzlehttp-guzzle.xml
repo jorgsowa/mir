@@ -1379,10 +1379,6 @@
     <MixedArgument>
       <code><![CDATA[$value]]></code>
     </MixedArgument>
-    <RedundantCast>
-      <code><![CDATA[2 ** ($retries - 1)]]></code>
-      <code><![CDATA[2 ** ($retries - 1)]]></code>
-    </RedundantCast>
     <TooManyArguments>
       <code><![CDATA[$response]]></code>
     </TooManyArguments>
