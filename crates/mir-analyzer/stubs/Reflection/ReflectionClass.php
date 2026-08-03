@@ -157,7 +157,8 @@ class ReflectionClass implements Reflector
      * Gets starting line number
      *
      * @link https://php.net/manual/en/reflectionclass.getstartline.php
-     * @return int The starting line number, as an integer.
+     * @return int|false The starting line number, as an integer, or false for an
+     * internal (non-user-defined) class.
      */
     #[Pure]
     #[TentativeType]
