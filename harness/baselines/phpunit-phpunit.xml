@@ -375,13 +375,6 @@
       <code><![CDATA[$microseconds = $usage[$microsecondsKey]]]></code>
     </MixedAssignment>
   </file>
-  <file src="src/Event/Value/Telemetry/SystemGarbageCollectorStatusProvider.php">
-    <InvalidArgument>
-      <code><![CDATA[$status['running']]]></code>
-      <code><![CDATA[$status['protected']]]></code>
-      <code><![CDATA[$status['full']]]></code>
-    </InvalidArgument>
-  </file>
   <file src="src/Event/Value/Telemetry/SystemStopWatch.php">
     <MixedArgument>
       <code><![CDATA[...hrtime()]]></code>
@@ -662,8 +655,6 @@
     </InvalidPropertyAssignment>
     <MixedArrayAccess>
       <code><![CDATA[$_ENV[$environmentVariableName]]]></code>
-      <code><![CDATA[$trace[0]['class']]]></code>
-      <code><![CDATA[$trace[0]['class']]]></code>
     </MixedArrayAccess>
     <MixedAssignment>
       <code><![CDATA[$return]]></code>
@@ -728,15 +719,6 @@
     </PossiblyInvalidArrayAccess>
   </file>
   <file src="src/Framework/TestRunner/TestRunner.php">
-    <MixedArrayAccess>
-      <code><![CDATA[$frame['file']]]></code>
-      <code><![CDATA[$frame['line']]]></code>
-      <code><![CDATA[$frame['file']]]></code>
-      <code><![CDATA[$frame['line']]]></code>
-    </MixedArrayAccess>
-    <MixedAssignment>
-      <code><![CDATA[$frame = $trace[0]]]></code>
-    </MixedAssignment>
     <UnusedVariable>
       <code><![CDATA[]]></code>
     </UnusedVariable>
@@ -1067,12 +1049,6 @@
         )]]></code>
     </InvalidPropertyAssignment>
   </file>
-  <file src="src/Runner/TestSuiteLoader.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[self::$declaredClasses = get_declared_classes()]]></code>
-      <code><![CDATA[self::$declaredClasses = get_declared_classes()]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="src/Runner/TestSuiteSorter.php">
     <MixedArgument>
       <code><![CDATA[$tests[$i]->requires()]]></code>
@@ -1325,11 +1301,6 @@
       <code><![CDATA[$this->hasGenerateBaseline()]]></code>
     </ImpureMethodCall>
   </file>
-  <file src="src/TextUI/Configuration/FileFilterMapper.php">
-    <InvalidReturnType>
-      <code><![CDATA[return $result;]]></code>
-    </InvalidReturnType>
-  </file>
   <file src="src/TextUI/Configuration/Merger.php">
     <MixedArgument>
       <code><![CDATA[$xmlConfiguration->filename()]]></code>
@@ -1344,9 +1315,6 @@
     <MixedAssignment>
       <code><![CDATA[$phpSelf = $_SERVER['PHP_SELF']]]></code>
     </MixedAssignment>
-    <PossiblyInvalidArgument>
-      <code><![CDATA[$cacheDirectory]]></code>
-    </PossiblyInvalidArgument>
     <UnusedVariable>
       <code><![CDATA[]]></code>
       <code><![CDATA[]]></code>
