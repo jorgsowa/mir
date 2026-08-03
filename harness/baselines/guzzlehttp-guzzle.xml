@@ -374,6 +374,7 @@
       <code><![CDATA[$h]]></code>
       <code><![CDATA[$h]]></code>
       <code><![CDATA[$h]]></code>
+      <code><![CDATA[$h]]></code>
     </MixedArgument>
     <MixedArrayAccess>
       <code><![CDATA[$options['curl']['body_as_string']]]></code>
@@ -465,7 +466,6 @@
       <code><![CDATA[$options !== null]]></code>
       <code><![CDATA[$options !== null]]></code>
       <code><![CDATA[$options !== null]]></code>
-      <code><![CDATA[$collectingTrailers]]></code>
     </RedundantCondition>
   </file>
   <file src="src/Handler/CurlHandler.php">
