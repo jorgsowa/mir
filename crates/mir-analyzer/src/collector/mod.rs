@@ -2114,6 +2114,10 @@ impl<'a> DefinitionCollector<'a> {
         let throws = doc
             .throws
             .iter()
+            // See collector/function.rs's identical filter: a pseudo-type
+            // (`@throws void` meaning "doesn't throw") must be dropped BEFORE
+            // namespace-qualifying, or it's stored as a bogus throwable class.
+            .filter(|t| !crate::diagnostics::is_pseudo_type(t))
             .map(|t| {
                 Arc::from(resolution::resolve_name(t, &self.namespace, &self.use_aliases).as_str())
             })
