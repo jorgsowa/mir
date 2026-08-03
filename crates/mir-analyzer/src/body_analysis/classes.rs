@@ -322,7 +322,8 @@ impl<'a> BodyAnalyzer<'a> {
         if method_name.is_empty() {
             return;
         }
-        let (params, return_ty, _, _) = method_chain_signature(self.db, fqcn, method_name);
+        let (params, return_ty, _, _) =
+            method_chain_signature(self.db, file.as_ref(), fqcn, method_name);
         if let Some(doc_ty) = return_ty.filter(|t| t.from_docblock) {
             if doc_ty
                 .types
@@ -779,7 +780,7 @@ impl<'a> BodyAnalyzer<'a> {
         }
 
         let (params, return_ty, template_params, declared_throws) =
-            method_chain_signature(self.db, fqcn, method_name);
+            method_chain_signature(self.db, file.as_ref(), fqcn, method_name);
 
         self.check_and_record_throws_classes(
             &declared_throws,

@@ -64,3 +64,207 @@ pub(crate) fn is_global_builtin_docblock_class(name: &str) -> bool {
             | "throwable"
     )
 }
+
+/// A docblock-derived type may carry a bare well-known-global-builtin name
+/// (`Closure`/`Traversable`/`Iterator`/`IteratorAggregate`/`ArrayAccess`/
+/// `Generator`/`Stringable`/`stdClass`/`Throwable`) purely because that
+/// leniency was applied once, at collection time (`collector::resolution`,
+/// which has no db access and so can't know whether a same-namespace class
+/// shadows the name). A native type hint has no such leniency — it always
+/// resolves strictly — so when a real class exists at the namespace-qualified
+/// name, the docblock's bare reference reads the same way the native hint
+/// does (the local shadow), not as the actual global builtin. Comparing the
+/// two without reconciling would flag a real, intentional match as
+/// `MismatchingDocblockReturnType`/`ParamType`, and storing it unreconciled
+/// would carry the same wrong name into every later flow-analysis/member-
+/// lookup consumer of a param/return/property type (P28). Only ever narrows
+/// a bare builtin name to a confirmed *existing* local class — every other
+/// docblock type is returned unchanged, so this can't mask a genuine
+/// mismatch.
+pub(crate) fn reconcile_docblock_builtin_shadow(
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+    ty: mir_types::Type,
+) -> mir_types::Type {
+    let from_docblock = ty.from_docblock;
+    let possibly_undefined = ty.possibly_undefined;
+    let types: Vec<mir_types::Atomic> = ty
+        .types
+        .into_iter()
+        .map(|a| reconcile_builtin_shadow_atomic(db, file, a))
+        .collect();
+    let mut result = mir_types::Type::from_vec(types);
+    result.from_docblock = from_docblock;
+    result.possibly_undefined = possibly_undefined;
+    result
+}
+
+fn reconcile_builtin_shadow_atomic(
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+    atomic: mir_types::Atomic,
+) -> mir_types::Atomic {
+    use mir_types::Atomic;
+    match atomic {
+        Atomic::TNamedObject { fqcn, type_params } => {
+            let fqcn = reconcile_builtin_shadow_name(db, file, fqcn);
+            let type_params = type_params
+                .iter()
+                .cloned()
+                .map(|tp| reconcile_docblock_builtin_shadow(db, file, tp))
+                .collect();
+            Atomic::TNamedObject { fqcn, type_params }
+        }
+        Atomic::TClassString(Some(cls)) => {
+            Atomic::TClassString(Some(reconcile_builtin_shadow_name(db, file, cls)))
+        }
+        Atomic::TArray { key, value } => Atomic::TArray {
+            key: Box::new(reconcile_docblock_builtin_shadow(db, file, *key)),
+            value: Box::new(reconcile_docblock_builtin_shadow(db, file, *value)),
+        },
+        Atomic::TList { value } => Atomic::TList {
+            value: Box::new(reconcile_docblock_builtin_shadow(db, file, *value)),
+        },
+        Atomic::TIntersection { parts } => Atomic::TIntersection {
+            parts: parts
+                .iter()
+                .cloned()
+                .map(|p| reconcile_docblock_builtin_shadow(db, file, p))
+                .collect(),
+        },
+        other => other,
+    }
+}
+
+fn reconcile_builtin_shadow_name(
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+    fqcn: mir_types::Name,
+) -> mir_types::Name {
+    if !is_global_builtin_docblock_class(fqcn.as_ref()) {
+        return fqcn;
+    }
+    let qualified = crate::db::resolve_name(db, file, fqcn.as_ref());
+    if qualified != fqcn.as_ref() && crate::db::class_exists(db, &qualified) {
+        mir_types::Name::from(qualified.as_str())
+    } else {
+        fqcn
+    }
+}
+
+/// Param-list counterpart of [`reconcile_docblock_builtin_shadow`] — applied
+/// to a function/method's stored `DeclaredParam` list right before it seeds
+/// body-analysis flow state, so a docblock-shadowed builtin param type
+/// doesn't carry its lenient bare name into the body's own flow tracking
+/// (P28). Skips the allocation entirely when no param's type is
+/// docblock-derived, which is the overwhelming majority case.
+pub(crate) fn reconcile_declared_params_for_body(
+    db: &dyn crate::db::MirDatabase,
+    file: &str,
+    params: std::sync::Arc<[mir_codebase::DeclaredParam]>,
+) -> std::sync::Arc<[mir_codebase::DeclaredParam]> {
+    let needs_reconcile = params
+        .iter()
+        .any(|p| p.ty.as_ref().is_some_and(|t| t.from_docblock));
+    if !needs_reconcile {
+        return params;
+    }
+    params
+        .iter()
+        .cloned()
+        .map(|mut p| {
+            if let Some(ty) = p.ty.take() {
+                if ty.from_docblock {
+                    p.ty = Some(std::sync::Arc::new(reconcile_docblock_builtin_shadow(
+                        db,
+                        file,
+                        (*ty).clone(),
+                    )));
+                } else {
+                    p.ty = Some(ty);
+                }
+            }
+            p
+        })
+        .collect::<Vec<_>>()
+        .into()
+}
+
+/// Property counterpart of [`reconcile_docblock_builtin_shadow`] (P28's
+/// class-member sibling). Unlike a param/return type, a stored `@var`
+/// property type has no `db`-resolvable file context readily at hand where
+/// it's read back (a property can be read from any file, not just its
+/// declaring one) — but `PropertyDef` already stores the property's native
+/// type hint *separately* (`native_ty`), and that native hint always
+/// resolves strictly (never leniently), so it's already the confirmed-
+/// correct FQCN whenever a same-namespace class shadows a builtin. Reconcile
+/// against it directly: no db query needed at all. Only ever narrows a bare
+/// builtin name in `ty` to `native_ty`'s FQCN for the same bare name —
+/// every other case (no native hint, non-builtin docblock name, disagreeing
+/// class names) is left exactly as collected.
+pub(crate) fn reconcile_property_ty_against_native(
+    ty: mir_types::Type,
+    native_ty: Option<&mir_types::Type>,
+) -> mir_types::Type {
+    let Some(native_ty) = native_ty else {
+        return ty;
+    };
+    let from_docblock = ty.from_docblock;
+    let possibly_undefined = ty.possibly_undefined;
+    let types: Vec<mir_types::Atomic> = ty
+        .types
+        .into_iter()
+        .map(|a| reconcile_prop_shadow_atomic(a, native_ty))
+        .collect();
+    let mut result = mir_types::Type::from_vec(types);
+    result.from_docblock = from_docblock;
+    result.possibly_undefined = possibly_undefined;
+    result
+}
+
+fn reconcile_prop_shadow_atomic(
+    atomic: mir_types::Atomic,
+    native_ty: &mir_types::Type,
+) -> mir_types::Atomic {
+    use mir_types::Atomic;
+    match atomic {
+        Atomic::TNamedObject { fqcn, type_params } => {
+            let fqcn = reconcile_prop_shadow_name(fqcn, native_ty);
+            let type_params = type_params
+                .iter()
+                .cloned()
+                .map(|tp| reconcile_property_ty_against_native(tp, Some(native_ty)))
+                .collect();
+            Atomic::TNamedObject { fqcn, type_params }
+        }
+        Atomic::TClassString(Some(cls)) => {
+            Atomic::TClassString(Some(reconcile_prop_shadow_name(cls, native_ty)))
+        }
+        other => other,
+    }
+}
+
+/// Whether `native_ty` names, at any atom, the same class `bare_name`
+/// leniently resolved to as a global builtin — i.e. a same-namespace class
+/// literally called `Generator`/`Closure`/etc., confirmed by the native
+/// hint's own strict resolution.
+fn reconcile_prop_shadow_name(
+    fqcn: mir_types::Name,
+    native_ty: &mir_types::Type,
+) -> mir_types::Name {
+    if !is_global_builtin_docblock_class(fqcn.as_ref()) {
+        return fqcn;
+    }
+    let bare_lower = fqcn.as_ref().to_ascii_lowercase();
+    let shadow = native_ty.types.iter().find_map(|atom| {
+        let candidate = match atom {
+            mir_types::Atomic::TNamedObject { fqcn: n, .. } => Some(n),
+            mir_types::Atomic::TClassString(Some(n)) => Some(n),
+            _ => None,
+        }?;
+        let candidate_bare = candidate.as_ref().rsplit('\\').next().unwrap_or("");
+        (candidate.as_ref() != fqcn.as_ref() && candidate_bare.eq_ignore_ascii_case(&bare_lower))
+            .then_some(*candidate)
+    });
+    shadow.unwrap_or(fqcn)
+}

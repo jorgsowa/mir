@@ -131,6 +131,7 @@ pub(crate) struct InferredTypes {
 #[allow(clippy::type_complexity)]
 fn method_chain_signature(
     db: &dyn MirDatabase,
+    file: &str,
     fqcn: &str,
     method_name: &str,
 ) -> (
@@ -217,6 +218,15 @@ fn method_chain_signature(
         } else {
             Arc::from(storage.throws.as_slice())
         };
+
+        // A docblock-shadowed builtin param/return type (P28) must not carry
+        // its lenient bare name into this method's stored, canonical signature
+        // as read by body-analysis flow-seeding — see
+        // `reconcile_docblock_builtin_shadow`'s doc comment. Single choke
+        // point for every `method_chain_signature` caller.
+        let return_type =
+            return_type.map(|t| crate::util::reconcile_docblock_builtin_shadow(db, file, t));
+        let params = crate::util::reconcile_declared_params_for_body(db, file, params);
 
         return (params, return_type, template_params, throws);
     }

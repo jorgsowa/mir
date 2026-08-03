@@ -1,77 +1,5 @@
 use super::*;
-use mir_types::Atomic;
-
-/// A docblock-derived type may carry a bare well-known-global-builtin name
-/// (`Closure`/`Traversable`/`Iterator`/`IteratorAggregate`/`ArrayAccess`/
-/// `Generator`/`Stringable`/`stdClass`/`Throwable`) purely because that
-/// leniency was applied once, at collection time (`collector::resolution`,
-/// which has no db access and so can't know whether a same-namespace class
-/// shadows the name). A native type hint has no such leniency — it always
-/// resolves strictly — so when a real class exists at the namespace-qualified
-/// name, the docblock's bare reference reads the same way the native hint
-/// does (the local shadow), not as the actual global builtin. Comparing the
-/// two without reconciling would flag a real, intentional match as
-/// `MismatchingDocblockReturnType`/`ParamType`. Only ever narrows a bare
-/// builtin name to a confirmed *existing* local class — every other
-/// docblock type is returned unchanged, so this can't mask a genuine
-/// mismatch.
-fn reconcile_docblock_builtin_shadow(db: &dyn MirDatabase, file: &str, ty: Type) -> Type {
-    let from_docblock = ty.from_docblock;
-    let possibly_undefined = ty.possibly_undefined;
-    let types: Vec<Atomic> = ty
-        .types
-        .into_iter()
-        .map(|a| reconcile_builtin_shadow_atomic(db, file, a))
-        .collect();
-    let mut result = Type::from_vec(types);
-    result.from_docblock = from_docblock;
-    result.possibly_undefined = possibly_undefined;
-    result
-}
-
-fn reconcile_builtin_shadow_atomic(db: &dyn MirDatabase, file: &str, atomic: Atomic) -> Atomic {
-    match atomic {
-        Atomic::TNamedObject { fqcn, type_params } => {
-            let fqcn = reconcile_builtin_shadow_name(db, file, fqcn);
-            let type_params = type_params
-                .iter()
-                .cloned()
-                .map(|tp| reconcile_docblock_builtin_shadow(db, file, tp))
-                .collect();
-            Atomic::TNamedObject { fqcn, type_params }
-        }
-        Atomic::TClassString(Some(cls)) => {
-            Atomic::TClassString(Some(reconcile_builtin_shadow_name(db, file, cls)))
-        }
-        Atomic::TArray { key, value } => Atomic::TArray {
-            key: Box::new(reconcile_docblock_builtin_shadow(db, file, *key)),
-            value: Box::new(reconcile_docblock_builtin_shadow(db, file, *value)),
-        },
-        Atomic::TList { value } => Atomic::TList {
-            value: Box::new(reconcile_docblock_builtin_shadow(db, file, *value)),
-        },
-        Atomic::TIntersection { parts } => Atomic::TIntersection {
-            parts: parts
-                .iter()
-                .cloned()
-                .map(|p| reconcile_docblock_builtin_shadow(db, file, p))
-                .collect(),
-        },
-        other => other,
-    }
-}
-
-fn reconcile_builtin_shadow_name(db: &dyn MirDatabase, file: &str, fqcn: Name) -> Name {
-    if !crate::util::is_global_builtin_docblock_class(fqcn.as_ref()) {
-        return fqcn;
-    }
-    let qualified = crate::db::resolve_name(db, file, fqcn.as_ref());
-    if qualified != fqcn.as_ref() && crate::db::class_exists(db, &qualified) {
-        Name::from(qualified.as_str())
-    } else {
-        fqcn
-    }
-}
+use crate::util::reconcile_docblock_builtin_shadow;
 
 impl<'a> BodyAnalyzer<'a> {
     #[allow(clippy::too_many_arguments)]
@@ -162,6 +90,13 @@ impl<'a> BodyAnalyzer<'a> {
                 Arc::from([]),
             ),
         };
+        // A docblock-shadowed builtin param/return type (P28) must not carry
+        // its lenient bare name into this body's own flow tracking — see
+        // `reconcile_declared_params_for_body`'s doc comment.
+        let params =
+            crate::util::reconcile_declared_params_for_body(self.db, file.as_ref(), params);
+        let return_ty =
+            return_ty.map(|t| reconcile_docblock_builtin_shadow(self.db, file.as_ref(), t));
 
         if self.mode == AnalysisMode::Full {
             self.emit_missing_fn_types(
@@ -739,6 +674,11 @@ impl<'a> BodyAnalyzer<'a> {
                 Arc::from([]),
             ),
         };
+        // See the P28 comment on the analogous block in `analyze_fn_decl`.
+        let params =
+            crate::util::reconcile_declared_params_for_body(self.db, file.as_ref(), params);
+        let return_ty =
+            return_ty.map(|t| reconcile_docblock_builtin_shadow(self.db, file.as_ref(), t));
 
         self.check_and_record_throws_classes(
             &declared_throws,
@@ -905,6 +845,11 @@ impl<'a> BodyAnalyzer<'a> {
                 Arc::from([]),
             ),
         };
+        // See the P28 comment on the analogous block in `analyze_fn_decl`.
+        let params =
+            crate::util::reconcile_declared_params_for_body(self.db, file.as_ref(), params);
+        let return_ty =
+            return_ty.map(|t| reconcile_docblock_builtin_shadow(self.db, file.as_ref(), t));
 
         self.check_and_record_throws_classes(
             &declared_throws,

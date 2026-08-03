@@ -1211,6 +1211,28 @@ pub fn find_property_in_chain<'db>(
     fqcn: Fqcn<'db>,
     name: &str,
 ) -> Option<(Arc<str>, PropertyDef)> {
+    let (owner, mut prop) = find_property_in_chain_uncached(db, fqcn, name)?;
+    // A property's `@var` docblock type may carry a bare well-known-global-
+    // builtin name purely because of `collector::resolution`'s leniency
+    // (P28's class-member sibling to P27's param/return one) — see
+    // `crate::util::reconcile_property_ty_against_native`'s doc comment.
+    // Reconciled centrally here, the single choke point every property-type
+    // consumer (flow analysis, member lookup, assignment checks) reads
+    // through.
+    if let Some(ty) = prop.ty.take() {
+        prop.ty = Some(Arc::new(crate::util::reconcile_property_ty_against_native(
+            (*ty).clone(),
+            prop.native_ty.as_deref(),
+        )));
+    }
+    Some((owner, prop))
+}
+
+fn find_property_in_chain_uncached<'db>(
+    db: &'db dyn MirDatabase,
+    fqcn: Fqcn<'db>,
+    name: &str,
+) -> Option<(Arc<str>, PropertyDef)> {
     for ancestor in class_ancestors_by_fqcn(db, fqcn).iter() {
         let here = Fqcn::new(db, Name::new(ancestor.as_ref()));
         if let Some(p) = find_property_in_class(db, here, name) {
