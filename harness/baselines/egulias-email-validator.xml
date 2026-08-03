@@ -165,16 +165,6 @@
       <code><![CDATA[$this->error = $result]]></code>
     </PropertyTypeCoercion>
   </file>
-  <file src="src/Warning/QuotedPart.php">
-    <MixedAssignment>
-      <code><![CDATA[$prevToken = $prevToken->name]]></code>
-      <code><![CDATA[$postToken = $postToken->name]]></code>
-    </MixedAssignment>
-    <NoInterfaceProperties>
-      <code><![CDATA[name]]></code>
-      <code><![CDATA[name]]></code>
-    </NoInterfaceProperties>
-  </file>
   <file src="src/Warning/Warning.php">
     <MissingPropertyType>
       <code><![CDATA[]]></code>

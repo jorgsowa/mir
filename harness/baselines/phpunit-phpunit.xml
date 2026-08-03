@@ -1001,13 +1001,6 @@
       <code><![CDATA[$value = $parameter->getDefaultValue()]]></code>
       <code><![CDATA[$result = $reflector->invokeArgs(null, $arguments)]]></code>
     </MixedAssignment>
-    <MixedReturnStatement>
-      <code><![CDATA[return $value->name;]]></code>
-    </MixedReturnStatement>
-    <NoInterfaceProperties>
-      <code><![CDATA[value]]></code>
-      <code><![CDATA[name]]></code>
-    </NoInterfaceProperties>
     <PossiblyInvalidArgument>
       <code><![CDATA[$test->dataName()]]></code>
       <code><![CDATA[$value]]></code>

@@ -209,9 +209,6 @@
     <MixedClone>
       <code><![CDATA[clone $element]]></code>
     </MixedClone>
-    <UndefinedMethod>
-      <code><![CDATA[$copier->recursiveCopy($list->shift())]]></code>
-    </UndefinedMethod>
   </file>
   <file src="src/DeepCopy/TypeFilter/TypeFilter.php">
     <MissingReturnType>
