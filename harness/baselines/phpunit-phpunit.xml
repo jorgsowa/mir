@@ -563,6 +563,7 @@
   <file src="src/Framework/MockObject/Generator/Generator.php">
     <InvalidArgument>
       <code><![CDATA[$_mockClassName]]></code>
+      <code><![CDATA[$className]]></code>
     </InvalidArgument>
     <MissingConstructor>
       <code><![CDATA[final class Generator]]></code>
@@ -964,12 +965,6 @@
       <code><![CDATA[$value]]></code>
       <code><![CDATA[$value         = $_testWith->data()]]></code>
     </MixedAssignment>
-    <PossiblyInvalidArgument>
-      <code><![CDATA[$key]]></code>
-      <code><![CDATA[$key]]></code>
-      <code><![CDATA[$key]]></code>
-      <code><![CDATA[$key]]></code>
-    </PossiblyInvalidArgument>
   </file>
   <file src="src/Metadata/Api/HookMethods.php">
     <MixedArgument>
@@ -1113,28 +1108,6 @@
       <code><![CDATA[$errorFile = $deprecationFrame['file']]]></code>
       <code><![CDATA[$errorLine = $deprecationFrame['line']]]></code>
     </MixedAssignment>
-    <PossiblyInvalidArgument>
-      <code><![CDATA[$errorFile]]></code>
-      <code><![CDATA[$errorFile]]></code>
-      <code><![CDATA[$errorFile]]></code>
-      <code><![CDATA[$errorFile]]></code>
-      <code><![CDATA[$errorFile]]></code>
-      <code><![CDATA[$errorFile]]></code>
-      <code><![CDATA[$errorFile]]></code>
-      <code><![CDATA[$errorFile]]></code>
-      <code><![CDATA[$errorFile]]></code>
-      <code><![CDATA[$errorFile]]></code>
-      <code><![CDATA[$errorFile]]></code>
-      <code><![CDATA[$errorFile]]></code>
-      <code><![CDATA[$errorFile]]></code>
-      <code><![CDATA[$errorFile]]></code>
-      <code><![CDATA[$errorFile]]></code>
-      <code><![CDATA[$errorFile]]></code>
-      <code><![CDATA[$errorFile]]></code>
-      <code><![CDATA[$errorFile]]></code>
-      <code><![CDATA[$errorFile]]></code>
-      <code><![CDATA[$errorFile]]></code>
-    </PossiblyInvalidArgument>
     <RedundantCondition>
       <code><![CDATA[$position !== null]]></code>
       <code><![CDATA[!is_callable($handler)]]></code>
@@ -1196,34 +1169,6 @@
     <InvalidArgument>
       <code><![CDATA[[]]]></code>
     </InvalidArgument>
-    <InvalidReturnType>
-      <code><![CDATA[return [[
-                'file' => $realFile,
-                'line' => 1,
-            ]];]]></code>
-      <code><![CDATA[return [
-                    [
-                        'file' => $externalRealPath,
-                        'line' => 1,
-                    ],
-                    [
-                        'file' => $realFile,
-                        'line' => $this->sectionOffset($sections, $section . '_EXTERNAL_offset') + 1,
-                    ],
-                ];]]></code>
-      <code><![CDATA[return [
-                        [
-                            'file' => $realFile,
-                            'line' => $offset,
-                        ],
-                    ];]]></code>
-      <code><![CDATA[return [
-            [
-                'file' => $realFile,
-                'line' => 1,
-            ],
-        ];]]></code>
-    </InvalidReturnType>
     <MixedArgument>
       <code><![CDATA[$files['coverage']]]></code>
       <code><![CDATA[$files['coverage']]]></code>
@@ -1581,9 +1526,7 @@
       <code><![CDATA[$phpSelf = $_SERVER['PHP_SELF']]]></code>
     </MixedAssignment>
     <PossiblyInvalidArgument>
-      <code><![CDATA[$useBaseline]]></code>
       <code><![CDATA[$cacheDirectory]]></code>
-      <code><![CDATA[$generateBaseline]]></code>
     </PossiblyInvalidArgument>
     <UnusedVariable>
       <code><![CDATA[]]></code>
@@ -2096,9 +2039,6 @@
             $environmentVariables,
         )]]></code>
     </MixedAssignment>
-    <PossiblyInvalidArgument>
-      <code><![CDATA[$temporaryFile]]></code>
-    </PossiblyInvalidArgument>
     <UnusedForeachValue>
       <code><![CDATA[]]></code>
     </UnusedForeachValue>

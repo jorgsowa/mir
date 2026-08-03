@@ -105,9 +105,6 @@
       <code><![CDATA[$that->compareTo($this)]]></code>
       <code><![CDATA[self::fromBase($hex, 16)->plus(1)]]></code>
     </MissingThrowsDocblock>
-    <MixedArgument>
-      <code><![CDATA[$bytes[0]]]></code>
-    </MixedArgument>
     <RedundantCondition>
       <code><![CDATA[$bitCount < 0]]></code>
       <code><![CDATA[$exponent < 0]]></code>
