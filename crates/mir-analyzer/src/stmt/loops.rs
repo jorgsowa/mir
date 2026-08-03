@@ -115,17 +115,28 @@ pub(crate) fn infer_foreach_types(arr_ty: &Type) -> (Type, Type) {
     if arr_ty.is_mixed() {
         return (Type::mixed(), Type::mixed());
     }
+    // Merge key/value across every array-like atom in the union instead of
+    // returning on the first match — a union like `non-empty-list<string> |
+    // array{0: string}` (e.g. a preg_split()===false fallback) must widen the
+    // key to plain `int`, not collapse to the first alternative's shape-only
+    // literal key.
+    let mut keys = Type::empty();
+    let mut values = Type::empty();
+    let mut matched = false;
     for atomic in &arr_ty.types {
         match atomic {
             Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value } => {
-                return (*key.clone(), *value.clone());
+                matched = true;
+                keys.merge_with(key);
+                values.merge_with(value);
             }
             Atomic::TList { value } | Atomic::TNonEmptyList { value } => {
-                return (Type::single(Atomic::TInt), *value.clone());
+                matched = true;
+                keys.merge_with(&Type::single(Atomic::TInt));
+                values.merge_with(value);
             }
             Atomic::TKeyedArray { properties, .. } => {
-                let mut keys = Type::empty();
-                let mut values = Type::empty();
+                matched = true;
                 for (k, prop) in properties.iter() {
                     let key_atomic = match k {
                         ArrayKey::String(s) => Atomic::TLiteralString(s.clone()),
@@ -134,23 +145,27 @@ pub(crate) fn infer_foreach_types(arr_ty: &Type) -> (Type, Type) {
                     keys.merge_with(&Type::single(key_atomic));
                     values.merge_with(&prop.ty);
                 }
-                // Empty keyed array (e.g. `$arr = []` before push) — treat both as
-                // mixed to avoid propagating Type::empty() as a variable type.
-                let keys = if keys.is_empty() { Type::mixed() } else { keys };
-                let values = if values.is_empty() {
-                    Type::mixed()
-                } else {
-                    values
-                };
-                return (keys, values);
             }
             Atomic::TString => {
-                return (Type::single(Atomic::TInt), Type::single(Atomic::TString));
+                matched = true;
+                keys.merge_with(&Type::single(Atomic::TInt));
+                values.merge_with(&Type::single(Atomic::TString));
             }
             _ => {}
         }
     }
-    (Type::mixed(), Type::mixed())
+    if !matched {
+        return (Type::mixed(), Type::mixed());
+    }
+    // Empty keyed array (e.g. `$arr = []` before push) — treat both as
+    // mixed to avoid propagating Type::empty() as a variable type.
+    let keys = if keys.is_empty() { Type::mixed() } else { keys };
+    let values = if values.is_empty() {
+        Type::mixed()
+    } else {
+        values
+    };
+    (keys, values)
 }
 
 /// Like [`infer_foreach_types`], but also resolves `foreach` over an object —
