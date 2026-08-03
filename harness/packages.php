@@ -5,7 +5,7 @@ declare(strict_types=1);
 // Pinned tags so every machine analyzes the same source.
 return [
     ['slug' => 'phpunit-phpunit', 'url' => 'https://github.com/sebastianbergmann/phpunit.git', 'tag' => '13.2.6'],
-    ['slug' => 'psr-container', 'url' => 'https://github.com/php-fig/container.git', 'tag' => '2.0.2'],
+    ['slug' => 'guzzlehttp-guzzle', 'url' => 'https://github.com/guzzle/guzzle.git', 'tag' => '7.15.2'],
     ['slug' => 'webmozart-assert', 'url' => 'https://github.com/webmozarts/assert.git', 'tag' => '2.4.1'],
     ['slug' => 'myclabs-deep-copy', 'url' => 'https://github.com/myclabs/DeepCopy.git', 'tag' => '1.13.4'],
     ['slug' => 'doctrine-instantiator', 'url' => 'https://github.com/doctrine/instantiator.git', 'tag' => '2.1.0'],

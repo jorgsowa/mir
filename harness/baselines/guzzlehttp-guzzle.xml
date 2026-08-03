@@ -1,0 +1,1639 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<files>
+  <file src="src/BodySummarizer.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+  </file>
+  <file src="src/Client.php">
+    <DeprecatedCall>
+      <code><![CDATA[\json_encode($options['json'])]]></code>
+    </DeprecatedCall>
+    <InvalidArgument>
+      <code><![CDATA[$handlerOptions]]></code>
+    </InvalidArgument>
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MissingThrowsDocblock>
+      <code><![CDATA[$this->request($method, $uri, $opts)]]></code>
+    </MissingThrowsDocblock>
+    <MixedArgument>
+      <code><![CDATA[$config['base_uri']]]></code>
+      <code><![CDATA[$uri]]></code>
+      <code><![CDATA[$opts]]></code>
+      <code><![CDATA[$uri]]></code>
+      <code><![CDATA[$opts]]></code>
+      <code><![CDATA[$headers]]></code>
+      <code><![CDATA[$options['_conditional']]]></code>
+      <code><![CDATA[$options['version'] ?? '1.1']]></code>
+      <code><![CDATA[$headers]]></code>
+      <code><![CDATA[$config['base_uri']]]></code>
+      <code><![CDATA[$this->config['headers']]]></code>
+      <code><![CDATA[$this->config['headers']]]></code>
+      <code><![CDATA[$options['auth']]]></code>
+      <code><![CDATA[$options['auth']]]></code>
+      <code><![CDATA[$options[$option]]]></code>
+      <code><![CDATA[$options[$option]]]></code>
+      <code><![CDATA[$options[$option]]]></code>
+      <code><![CDATA[$options['allow_redirects']]]></code>
+      <code><![CDATA[$options['proxy']]]></code>
+      <code><![CDATA[$options['proxy']]]></code>
+      <code><![CDATA[$options[$option]]]></code>
+      <code><![CDATA[$options[$option]]]></code>
+      <code><![CDATA[$options['headers']]]></code>
+      <code><![CDATA[$options['headers']]]></code>
+      <code><![CDATA[$headers]]></code>
+      <code><![CDATA[$options['_conditional']]]></code>
+      <code><![CDATA[$options['form_params']]]></code>
+      <code><![CDATA[$options['_conditional']]]></code>
+      <code><![CDATA[$options['multipart']]]></code>
+      <code><![CDATA[$options['_conditional']]]></code>
+      <code><![CDATA[$options['_conditional']]]></code>
+      <code><![CDATA[$value[2]]]></code>
+      <code><![CDATA[$modify['set_headers']]]></code>
+      <code><![CDATA[$options['version']]]></code>
+      <code><![CDATA[$options['_conditional']]]></code>
+    </MixedArgument>
+    <MixedArrayAccess>
+      <code><![CDATA[$options['auth'][$index]]]></code>
+      <code><![CDATA[$options['auth'][$index]]]></code>
+      <code><![CDATA[$options['auth'][$index]]]></code>
+      <code><![CDATA[$options['auth'][2]]]></code>
+      <code><![CDATA[$options['auth'][2]]]></code>
+      <code><![CDATA[$options['auth'][2]]]></code>
+      <code><![CDATA[$options['auth'][2]]]></code>
+      <code><![CDATA[$options[$option][$index]]]></code>
+      <code><![CDATA[$options[$option][$index]]]></code>
+      <code><![CDATA[$options[$option][$index]]]></code>
+      <code><![CDATA[$options[$option][$index]]]></code>
+      <code><![CDATA[$options['proxy'][$scheme]]]></code>
+      <code><![CDATA[$options['proxy'][$scheme]]]></code>
+      <code><![CDATA[$options['proxy'][$scheme]]]></code>
+      <code><![CDATA[$options['proxy']['no']]]></code>
+      <code><![CDATA[$options['proxy']['no']]]></code>
+      <code><![CDATA[$options['proxy']['no']]]></code>
+      <code><![CDATA[$options['proxy']['no']]]></code>
+      <code><![CDATA[$options['proxy']['no']]]></code>
+      <code><![CDATA[$options[$option][0]]]></code>
+      <code><![CDATA[$options[$option][0]]]></code>
+      <code><![CDATA[$options[$option][1]]]></code>
+      <code><![CDATA[$options[$option][1]]]></code>
+      <code><![CDATA[$options[$option][1]]]></code>
+      <code><![CDATA[$value[2]]]></code>
+      <code><![CDATA[$value[2]]]></code>
+      <code><![CDATA[$value[0]]]></code>
+      <code><![CDATA[$value[1]]]></code>
+      <code><![CDATA[$value[0]]]></code>
+      <code><![CDATA[$value[1]]]></code>
+      <code><![CDATA[$value[0]]]></code>
+      <code><![CDATA[$value[1]]]></code>
+    </MixedArrayAccess>
+    <MixedAssignment>
+      <code><![CDATA[$transportSharing = \array_key_exists('transport_sharing', $config) ? $config['transport_sharing'] : null]]></code>
+      <code><![CDATA[$uri = $args[0]]]></code>
+      <code><![CDATA[$opts = $args[1] ?? []]]></code>
+      <code><![CDATA[$headers = $options['headers'] ?? []]]></code>
+      <code><![CDATA[$body = $options['body'] ?? null]]></code>
+      <code><![CDATA[$v]]></code>
+      <code><![CDATA[$item]]></code>
+      <code><![CDATA[$value]]></code>
+      <code><![CDATA[$item]]></code>
+      <code><![CDATA[$part]]></code>
+      <code><![CDATA[$value]]></code>
+      <code><![CDATA[$noProxy]]></code>
+      <code><![CDATA[$item]]></code>
+      <code><![CDATA[$protocol]]></code>
+      <code><![CDATA[$handler = $options['handler']]]></code>
+      <code><![CDATA[$headers = $options['headers']]]></code>
+      <code><![CDATA[$value = $options['auth']]]></code>
+      <code><![CDATA[$value = $options['query']]]></code>
+      <code><![CDATA[$v]]></code>
+      <code><![CDATA[$value]]></code>
+      <code><![CDATA[$item]]></code>
+      <code><![CDATA[$value]]></code>
+    </MixedAssignment>
+    <MixedReturnStatement>
+      <code><![CDATA[return $this->sendAsync($request, $options)->wait();]]></code>
+      <code><![CDATA[return $this->sendAsync($request, $options)->wait();]]></code>
+      <code><![CDATA[return $this->requestAsync($method, $uri, $options)->wait();]]></code>
+      <code><![CDATA[return $value->__toString();]]></code>
+    </MixedReturnStatement>
+  </file>
+  <file src="src/Cookie/CookieJar.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[$cookie->getName() !== null]]></code>
+      <code><![CDATA[++$accepted === self::MAX_SET_COOKIE_FIELDS]]></code>
+    </ImpossibleIdenticalComparison>
+    <MissingClosureReturnType>
+      <code><![CDATA[static function (SetCookie $cookie) use ($path, $domain, $name) {
+                    return !($cookie->getDomain() !== null
+                        && $cookie->getName() === $name
+                        && $cookie->matchesPath($path)
+                        && $cookie->matchesDomain($domain));
+                }]]></code>
+    </MissingClosureReturnType>
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MixedArgument>
+      <code><![CDATA[$cookie]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$cookie]]></code>
+      <code><![CDATA[$value]]></code>
+    </MixedAssignment>
+    <RedundantCast>
+      <code><![CDATA[$cookie->getName()]]></code>
+    </RedundantCast>
+  </file>
+  <file src="src/Cookie/FileCookieJar.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MixedAssignment>
+      <code><![CDATA[$data = \json_decode($json, true)]]></code>
+      <code><![CDATA[$cookie]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Cookie/SessionCookieJar.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MixedArrayAccess>
+      <code><![CDATA[$_SESSION[$this->sessionKey]]]></code>
+      <code><![CDATA[$_SESSION[$this->sessionKey]]]></code>
+    </MixedArrayAccess>
+    <MixedAssignment>
+      <code><![CDATA[$json = $_SESSION[$this->sessionKey]]]></code>
+      <code><![CDATA[$data = \json_decode($json, true)]]></code>
+      <code><![CDATA[$cookie]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Cookie/SetCookie.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MixedArgument>
+      <code><![CDATA[$data['HostOnly']]]></code>
+      <code><![CDATA[$data['Name']]]></code>
+      <code><![CDATA[$data['Value']]]></code>
+      <code><![CDATA[$data['Domain']]]></code>
+      <code><![CDATA[$data['Path']]]></code>
+      <code><![CDATA[$data['Max-Age']]]></code>
+      <code><![CDATA[$data['Expires']]]></code>
+      <code><![CDATA[$data['Secure']]]></code>
+      <code><![CDATA[$data['Discard']]]></code>
+      <code><![CDATA[$data['HttpOnly']]]></code>
+      <code><![CDATA[$v]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$v]]></code>
+    </MixedAssignment>
+    <MixedReturnStatement>
+      <code><![CDATA[return $this->data['Name'];]]></code>
+      <code><![CDATA[return $this->data['Value'];]]></code>
+      <code><![CDATA[return $this->data['Domain'];]]></code>
+      <code><![CDATA[return $this->data['Path'];]]></code>
+      <code><![CDATA[return $this->data['Expires'];]]></code>
+      <code><![CDATA[return $this->data['Secure'];]]></code>
+      <code><![CDATA[return $this->data['Discard'];]]></code>
+      <code><![CDATA[return $this->data['HttpOnly'];]]></code>
+    </MixedReturnStatement>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$search]]></code>
+    </PossiblyInvalidArgument>
+    <RedundantCast>
+      <code><![CDATA[$name]]></code>
+      <code><![CDATA[$value]]></code>
+      <code><![CDATA[$domain]]></code>
+      <code><![CDATA[$path]]></code>
+      <code><![CDATA[$maxAge]]></code>
+      <code><![CDATA[$timestamp]]></code>
+      <code><![CDATA[$secure]]></code>
+      <code><![CDATA[$discard]]></code>
+      <code><![CDATA[$httpOnly]]></code>
+      <code><![CDATA[\end($labels)]]></code>
+    </RedundantCast>
+    <RedundantCondition>
+      <code><![CDATA[!is_string($name)]]></code>
+      <code><![CDATA[!is_string($value)]]></code>
+      <code><![CDATA[!is_string($domain) && null !== $domain]]></code>
+      <code><![CDATA[!is_string($path)]]></code>
+      <code><![CDATA[!is_int($maxAge) && null !== $maxAge]]></code>
+      <code><![CDATA[!is_int($timestamp) && !is_string($timestamp) && null !== $timestamp]]></code>
+      <code><![CDATA[!is_bool($secure)]]></code>
+      <code><![CDATA[!is_bool($discard)]]></code>
+      <code><![CDATA[!is_bool($httpOnly)]]></code>
+    </RedundantCondition>
+    <UnnecessaryVarAnnotation>
+      <code><![CDATA[]]></code>
+    </UnnecessaryVarAnnotation>
+  </file>
+  <file src="src/Exception/ConnectException.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+  </file>
+  <file src="src/Exception/RequestException.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+  </file>
+  <file src="src/Handler/CurlFactory.php">
+    <InvalidOperand>
+      <code><![CDATA[[
+            'errno' => $easy->errno,
+            'error' => \curl_error($easy->handle),
+            'appconnect_time' => \curl_getinfo($easy->handle, \CURLINFO_APPCONNECT_TIME),
+        ] + \curl_getinfo($easy->handle)]]></code>
+    </InvalidOperand>
+    <MissingClosureReturnType>
+      <code><![CDATA[static function ($ch, $fd, $length) use ($body, &$remaining) {
+                if ($remaining === 0) {
+                    return '';
+                }
+
+                $limit = $remaining === null ? $length : \min($length, $remaining);
+                $data = $body->read($limit);
+                if ($remaining !== null) {
+                    $remaining -= \strlen($data);
+                }
+
+                return $data;
+            }]]></code>
+      <code><![CDATA[static function ($resource, int $downloadSize, int $downloaded, int $uploadSize, int $uploaded) use ($progress) {
+                $progress($downloadSize, $downloaded, $uploadSize, $uploaded);
+            }]]></code>
+      <code><![CDATA[static function ($ch, $h) use (
+            $onHeaders,
+            $easy,
+            &$startingResponse,
+            &$collectingTrailers,
+            $retainTrailers
+        ) {
+            $value = \trim($h, " \n\r\t\0\x0B");
+            if ($h === "\r\n" || $h === "\n" || $h === "\r" || $h === '') {
+                if ($collectingTrailers) {
+                    // A blank line ends the trailer section; the response has
+                    // already been created.
+                    return \strlen($h);
+                }
+                $startingResponse = true;
+                try {
+                    $easy->createResponse();
+                } catch (\Throwable $e) {
+                    $easy->response = null;
+                    $easy->createResponseException = $e;
+
+                    return -1;
+                }
+                if ($onHeaders !== null) {
+                    try {
+                        $onHeaders($easy->response);
+                    } catch (\Throwable $e) {
+                        // Associate the exception with the handle and trigger
+                        // a curl header write error by returning 0.
+                        $easy->onHeadersException = $e;
+
+                        return -1;
+                    }
+                }
+            } elseif ($startingResponse || $collectingTrailers) {
+                if ($easy->response !== null && !HeaderProcessor::isStatusLineCandidate($h)) {
+                    // Trailer fields arrive through the header callback after
+                    // the body; a new header block always begins with a status
+                    // line.
+                    $collectingTrailers = true;
+
+                    if ($retainTrailers && HeaderProcessor::isValidHeaderFieldLine($h)) {
+                        $easy->trailers[] = $value;
+                    }
+                } else {
+                    $collectingTrailers = false;
+                    $easy->trailers = [];
+                    $easy->headers = [$value];
+                }
+                $startingResponse = false;
+            } else {
+                $easy->headers[] = $value;
+            }
+
+            return \strlen($h);
+        }]]></code>
+    </MissingClosureReturnType>
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MissingThrowsDocblock>
+      <code><![CDATA[\constant('CURLOPT_SHARE')]]></code>
+      <code><![CDATA[\constant('CURLOPT_PIPEWAIT')]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[\constant($name)]]></code>
+      <code><![CDATA[\constant('CURLOPT_SHARE')]]></code>
+      <code><![CDATA[\constant('CURLOPT_NOPROXY')]]></code>
+      <code><![CDATA[\constant('CURLOPT_PRE_PROXY')]]></code>
+      <code><![CDATA[\constant('CURLOPT_NOPROXY')]]></code>
+      <code><![CDATA[\constant('CURLOPT_PRE_PROXY')]]></code>
+      <code><![CDATA[\constant('CURLAUTH_NTLM_WB')]]></code>
+      <code><![CDATA[\constant('CURLOPT_SHARE')]]></code>
+      <code><![CDATA[\constant('CURLOPT_PROXYHEADER')]]></code>
+      <code><![CDATA[\constant('CURLOPT_PROXYHEADER')]]></code>
+      <code><![CDATA[\constant($constant)]]></code>
+      <code><![CDATA[\constant($constant)]]></code>
+      <code><![CDATA[\constant('CURLOPT_PREREQFUNCTION')]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[\constant($name)]]></code>
+      <code><![CDATA[\constant('CURLOPT_PRE_PROXY')]]></code>
+      <code><![CDATA[\constant('CURLOPT_NOPROXY')]]></code>
+      <code><![CDATA[\constant('CURLOPT_PROXYHEADER')]]></code>
+      <code><![CDATA[\constant('CURLOPT_HTTPPROXYTUNNEL')]]></code>
+      <code><![CDATA[\constant('CURLOPT_HTTPPROXYTUNNEL')]]></code>
+      <code><![CDATA[\constant('CURLOPT_CONNECT_TO')]]></code>
+      <code><![CDATA[\constant($name)]]></code>
+      <code><![CDATA[\constant($name)]]></code>
+      <code><![CDATA[\constant($option)]]></code>
+      <code><![CDATA[\constant($option)]]></code>
+      <code><![CDATA[\constant('CURLHEADER_SEPARATE')]]></code>
+      <code><![CDATA[\constant('CURLOPT_HEADEROPT')]]></code>
+      <code><![CDATA[\constant('CURLHEADER_SEPARATE')]]></code>
+      <code><![CDATA[\constant('CURLOPT_HEADEROPT')]]></code>
+      <code><![CDATA[\constant('CURLOPT_PROXYHEADER')]]></code>
+      <code><![CDATA[\constant('CURLOPT_PROXYHEADER')]]></code>
+      <code><![CDATA[\constant($name)]]></code>
+      <code><![CDATA[\constant('CURLOPT_PROXYHEADER')]]></code>
+      <code><![CDATA[\constant('CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE')]]></code>
+      <code><![CDATA[\constant('CURLOPT_PIPEWAIT')]]></code>
+      <code><![CDATA[\constant('CURLOPT_NOPROXY')]]></code>
+      <code><![CDATA[\constant($constant)]]></code>
+    </MissingThrowsDocblock>
+    <MixedArgument>
+      <code><![CDATA[$options['curl']]]></code>
+      <code><![CDATA[$options['curl']]]></code>
+      <code><![CDATA[$handle]]></code>
+      <code><![CDATA[$handle]]></code>
+      <code><![CDATA[$conf[$option]]]></code>
+      <code><![CDATA[$options['curl']]]></code>
+      <code><![CDATA[$options['curl']]]></code>
+      <code><![CDATA[$name]]></code>
+      <code><![CDATA[$option]]></code>
+      <code><![CDATA[$option]]></code>
+      <code><![CDATA[$options['curl']]]></code>
+      <code><![CDATA[$resource]]></code>
+      <code><![CDATA[$resource]]></code>
+      <code><![CDATA[$resource]]></code>
+      <code><![CDATA[$resource]]></code>
+      <code><![CDATA[$resource]]></code>
+      <code><![CDATA[$resource]]></code>
+      <code><![CDATA[$resource]]></code>
+      <code><![CDATA[$easy->handle]]></code>
+      <code><![CDATA[$easy->handle]]></code>
+      <code><![CDATA[$curlStats['total_time']]]></code>
+      <code><![CDATA[$curlStats]]></code>
+      <code><![CDATA[$easy->handle]]></code>
+      <code><![CDATA[$easy->handle]]></code>
+      <code><![CDATA[$easy->handle]]></code>
+      <code><![CDATA[$ctx]]></code>
+      <code><![CDATA[$ctx]]></code>
+      <code><![CDATA[$sanitizedError]]></code>
+      <code><![CDATA[$proxyParts['scheme']]]></code>
+      <code><![CDATA[$handle]]></code>
+      <code><![CDATA[$limit]]></code>
+      <code><![CDATA[$options['_headers']]]></code>
+      <code><![CDATA[$options['verify']]]></code>
+      <code><![CDATA[$options['verify']]]></code>
+      <code><![CDATA[$options['verify']]]></code>
+      <code><![CDATA[$options['verify']]]></code>
+      <code><![CDATA[$write]]></code>
+      <code><![CDATA[$line]]></code>
+      <code><![CDATA[$h]]></code>
+      <code><![CDATA[$h]]></code>
+      <code><![CDATA[$h]]></code>
+      <code><![CDATA[$h]]></code>
+    </MixedArgument>
+    <MixedArrayAccess>
+      <code><![CDATA[$options['curl']['body_as_string']]]></code>
+      <code><![CDATA[$options['curl']['body_as_string']]]></code>
+      <code><![CDATA[$options['curl']['body_as_string']]]></code>
+      <code><![CDATA[$options['proxy'][$scheme]]]></code>
+      <code><![CDATA[$options['proxy']['no']]]></code>
+      <code><![CDATA[$options['proxy']['no']]]></code>
+      <code><![CDATA[$options['proxy'][$scheme]]]></code>
+      <code><![CDATA[$curlStats['total_time']]]></code>
+      <code><![CDATA[$options['_headers'][$key]]]></code>
+      <code><![CDATA[$options['curl'][\CURLOPT_ENCODING]]]></code>
+      <code><![CDATA[$options['ssl_key'][0]]]></code>
+      <code><![CDATA[$options['ssl_key'][0]]]></code>
+      <code><![CDATA[$options['ssl_key'][1]]]></code>
+      <code><![CDATA[$options['ssl_key'][1]]]></code>
+      <code><![CDATA[$options['ssl_key'][1]]]></code>
+      <code><![CDATA[$options['ssl_key'][0]]]></code>
+    </MixedArrayAccess>
+    <MixedArrayOffset>
+      <code><![CDATA[$option]]></code>
+      <code><![CDATA[$option]]></code>
+    </MixedArrayOffset>
+    <MixedAssignment>
+      <code><![CDATA[$shareHandle = $shareHandle->handle]]></code>
+      <code><![CDATA[$handle = $this->handles ? \array_pop($this->handles) : \curl_init()]]></code>
+      <code><![CDATA[$value]]></code>
+      <code><![CDATA[$multiplex = $options['multiplex'] ?? null]]></code>
+      <code><![CDATA[$auth = $conf[\CURLOPT_HTTPAUTH]]]></code>
+      <code><![CDATA[$proxyConf = $options['proxy']]]></code>
+      <code><![CDATA[$proxyConf = $options['proxy'][$scheme]]]></code>
+      <code><![CDATA[$httpHeaders = $conf[\CURLOPT_HTTPHEADER] ?? []]]></code>
+      <code><![CDATA[$value]]></code>
+      <code><![CDATA[$_]]></code>
+      <code><![CDATA[$_]]></code>
+      <code><![CDATA[$value = \constant($constant)]]></code>
+      <code><![CDATA[$value = \constant($constant)]]></code>
+      <code><![CDATA[$resource = $easy->handle]]></code>
+      <code><![CDATA[$curlStats = \curl_getinfo($easy->handle)]]></code>
+      <code><![CDATA[$ctx = [
+            'errno' => $easy->errno,
+            'error' => \curl_error($easy->handle),
+            'appconnect_time' => \curl_getinfo($easy->handle, \CURLINFO_APPCONNECT_TIME),
+        ] + \curl_getinfo($easy->handle)]]></code>
+      <code><![CDATA[$sanitizedError = $ctx['error']]]></code>
+      <code><![CDATA[$proxy = $conf[\CURLOPT_PROXY]]]></code>
+      <code><![CDATA[$noProxy = $conf[(int) \constant('CURLOPT_NOPROXY')] ?? null]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$value = $conf[$option]]]></code>
+      <code><![CDATA[$httpHeaders = $conf[\CURLOPT_HTTPHEADER] ?? null]]></code>
+      <code><![CDATA[$header]]></code>
+      <code><![CDATA[$header]]></code>
+      <code><![CDATA[$headers = $conf[$option]]]></code>
+      <code><![CDATA[$handle]]></code>
+      <code><![CDATA[$limit = $remaining === null ? $length : \min($length, $remaining)]]></code>
+      <code><![CDATA[$values]]></code>
+      <code><![CDATA[$value]]></code>
+      <code><![CDATA[$sink = $options['sink']]]></code>
+      <code><![CDATA[$proxyConf]]></code>
+      <code><![CDATA[$cert = $options['cert']]]></code>
+      <code><![CDATA[$cert = $cert[0]]]></code>
+      <code><![CDATA[$sslKey = $options['ssl_key'][0]]]></code>
+      <code><![CDATA[$sslKey = $sslKey ?? $options['ssl_key']]]></code>
+      <code><![CDATA[$progress = $options['progress']]]></code>
+      <code><![CDATA[$cryptoMethod = $options['crypto_method'] ?? null]]></code>
+      <code><![CDATA[$cryptoMethodMax = $options['crypto_method_max'] ?? null]]></code>
+      <code><![CDATA[$line]]></code>
+      <code><![CDATA[$onHeaders = $easy->options['on_headers']]]></code>
+    </MixedAssignment>
+    <MixedFunctionCall>
+      <code><![CDATA[($easy->options['on_trailers'])(self::headersFromTrailerLines($easy->trailers), $easy->response)]]></code>
+      <code><![CDATA[($easy->options['on_stats'])($stats)]]></code>
+      <code><![CDATA[$progress($downloadSize, $downloaded, $uploadSize, $uploaded)]]></code>
+      <code><![CDATA[$onHeaders($easy->response)]]></code>
+    </MixedFunctionCall>
+    <MixedReturnStatement>
+      <code><![CDATA[return $multiplex;]]></code>
+      <code><![CDATA[return $mask;]]></code>
+    </MixedReturnStatement>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$ext]]></code>
+      <code><![CDATA[$ext]]></code>
+    </PossiblyInvalidArgument>
+    <PossiblyNullMethodCall>
+      <code><![CDATA[$easy->response->getBody()]]></code>
+    </PossiblyNullMethodCall>
+    <RedundantCondition>
+      <code><![CDATA[null === $names]]></code>
+      <code><![CDATA[$options !== null]]></code>
+      <code><![CDATA[$options !== null]]></code>
+      <code><![CDATA[$options !== null]]></code>
+      <code><![CDATA[$collectingTrailers]]></code>
+    </RedundantCondition>
+    <UnusedParam>
+      <code><![CDATA[$options]]></code>
+      <code><![CDATA[$options]]></code>
+      <code><![CDATA[$conf]]></code>
+    </UnusedParam>
+  </file>
+  <file src="src/Handler/CurlHandler.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MixedArgument>
+      <code><![CDATA[$options['delay'] * 1000]]></code>
+      <code><![CDATA[$easy->handle]]></code>
+      <code><![CDATA[$easy->handle]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$_]]></code>
+      <code><![CDATA[$transportSharing = $options['transport_sharing'] ?? null]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Handler/CurlMultiHandler.php">
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[false === $multiHandle]]></code>
+    </ImpossibleIdenticalComparison>
+    <MissingClosureReturnType>
+      <code><![CDATA[function () use ($id, $waitToken) {
+                return $this->cancel($id, $waitToken);
+            }]]></code>
+    </MissingClosureReturnType>
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MissingThrowsDocblock>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[\constant('CURLOPT_SHARE')]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[\constant('CURLOPT_PIPEWAIT')]]></code>
+      <code><![CDATA[\constant($constant)]]></code>
+      <code><![CDATA[\constant($constant)]]></code>
+      <code><![CDATA[\constant($constant)]]></code>
+      <code><![CDATA[\constant($constant)]]></code>
+      <code><![CDATA[\constant($name)]]></code>
+      <code><![CDATA[]]></code>
+    </MissingThrowsDocblock>
+    <MixedArgument>
+      <code><![CDATA[$this->_mh]]></code>
+      <code><![CDATA[$options['curl']]]></code>
+      <code><![CDATA[$options['curl']]]></code>
+      <code><![CDATA[$options['curl']]]></code>
+      <code><![CDATA[$easy->handle]]></code>
+      <code><![CDATA[$option]]></code>
+      <code><![CDATA[$option]]></code>
+      <code><![CDATA[$name]]></code>
+      <code><![CDATA[$this->_mh]]></code>
+      <code><![CDATA[$this->_mh]]></code>
+      <code><![CDATA[$easy->handle]]></code>
+      <code><![CDATA[$this->_mh]]></code>
+      <code><![CDATA[$easy->handle]]></code>
+      <code><![CDATA[$this->_mh]]></code>
+      <code><![CDATA[$handle]]></code>
+      <code><![CDATA[$easy->handle]]></code>
+      <code><![CDATA[$entry['easy']]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry['deferred']]]></code>
+      <code><![CDATA[$this->_mh]]></code>
+      <code><![CDATA[$this->_mh]]></code>
+      <code><![CDATA[$this->_mh]]></code>
+      <code><![CDATA[$this->_mh]]></code>
+      <code><![CDATA[$easy]]></code>
+      <code><![CDATA[$entry['easy']->request]]></code>
+      <code><![CDATA[$entry['easy']->response]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry['easy']]]></code>
+      <code><![CDATA[$entry]]></code>
+      <code><![CDATA[$entry['deferred']]]></code>
+      <code><![CDATA[$easy]]></code>
+      <code><![CDATA[$handle]]></code>
+      <code><![CDATA[$this->_mh]]></code>
+      <code><![CDATA[$entry['easy']]]></code>
+      <code><![CDATA[$entry['deferred']]]></code>
+      <code><![CDATA[$entry['deferred']]]></code>
+    </MixedArgument>
+    <MixedArrayAccess>
+      <code><![CDATA[$entry['easy']]]></code>
+      <code><![CDATA[$entry['deferred']]]></code>
+      <code><![CDATA[$entry['deferred']]]></code>
+      <code><![CDATA[$this->handles[$id]['wait_token']]]></code>
+      <code><![CDATA[$easy->options['delay']]]></code>
+      <code><![CDATA[$easy->options['delay']]]></code>
+      <code><![CDATA[$entry['easy']]]></code>
+      <code><![CDATA[$entry['easy']]]></code>
+      <code><![CDATA[$entry['attached']]]></code>
+      <code><![CDATA[$entry['easy']]]></code>
+      <code><![CDATA[$entry['deferred']]]></code>
+      <code><![CDATA[$entry['easy']]]></code>
+      <code><![CDATA[$entry['deferred']]]></code>
+      <code><![CDATA[$entry['deferred']]]></code>
+      <code><![CDATA[$this->handles[$id]['wait_token']]]></code>
+      <code><![CDATA[$entry['easy']]]></code>
+      <code><![CDATA[$entry['attached']]]></code>
+      <code><![CDATA[$entry['easy']]]></code>
+      <code><![CDATA[$entry['easy']]]></code>
+      <code><![CDATA[$entry['deferred']]]></code>
+      <code><![CDATA[$entry['deferred']]]></code>
+      <code><![CDATA[$entry['deferred']]]></code>
+      <code><![CDATA[$entry['deferred']]]></code>
+    </MixedArrayAccess>
+    <MixedArrayOffset>
+      <code><![CDATA[$name]]></code>
+    </MixedArrayOffset>
+    <MixedAssignment>
+      <code><![CDATA[$_]]></code>
+      <code><![CDATA[$handlerMultiplex = $options['multiplex'] ?? null]]></code>
+      <code><![CDATA[$transportSharing = $options['transport_sharing'] ?? null]]></code>
+      <code><![CDATA[$selectTimeout = $options['select_timeout']]]></code>
+      <code><![CDATA[$multiOptions = $options['options'] ?? []]]></code>
+      <code><![CDATA[$value]]></code>
+      <code><![CDATA[$multiplex = $options['multiplex'] ?? null]]></code>
+      <code><![CDATA[$pipelining = $this->options[\CURLMOPT_PIPELINING]]]></code>
+      <code><![CDATA[$_]]></code>
+      <code><![CDATA[$option = \constant($constant)]]></code>
+      <code><![CDATA[$value = $options[$name] ?? null]]></code>
+      <code><![CDATA[$option = \constant($constant)]]></code>
+      <code><![CDATA[$value]]></code>
+      <code><![CDATA[$value = \constant($constant)]]></code>
+      <code><![CDATA[$entry = $this->handles[$id]]]></code>
+      <code><![CDATA[$easy = $entry['easy']]]></code>
+      <code><![CDATA[$entry = $this->handles[$id]]]></code>
+      <code><![CDATA[$entry = $this->handles[$id]]]></code>
+      <code><![CDATA[$entry = $this->handles[$id]]]></code>
+      <code><![CDATA[$easy = $entry['easy']]]></code>
+      <code><![CDATA[$handle = $easy->handle]]></code>
+      <code><![CDATA[$entry = $this->handles[$id]]]></code>
+    </MixedAssignment>
+    <MixedMethodCall>
+      <code><![CDATA[$entry['deferred']->reject($rejection)]]></code>
+      <code><![CDATA[$entry['deferred']->reject($failure)]]></code>
+      <code><![CDATA[$entry['deferred']->reject($rejection)]]></code>
+      <code><![CDATA[$entry['deferred']->reject($e)]]></code>
+      <code><![CDATA[$entry['deferred']->resolve($result)]]></code>
+    </MixedMethodCall>
+    <MixedPropertyAssignment>
+      <code><![CDATA[$entry['easy']->errno = $done['result']]]></code>
+    </MixedPropertyAssignment>
+    <MixedPropertyFetch>
+      <code><![CDATA[$easy->handle]]></code>
+      <code><![CDATA[$easy->options]]></code>
+      <code><![CDATA[$easy->options]]></code>
+      <code><![CDATA[$entry['easy']->request]]></code>
+      <code><![CDATA[$entry['easy']->response]]></code>
+    </MixedPropertyFetch>
+    <MixedReturnStatement>
+      <code><![CDATA[return \min($this->selectTimeout, $this->secondsToNext());]]></code>
+      <code><![CDATA[return \max(0.0, $nextTime - $currentTime);]]></code>
+    </MixedReturnStatement>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$option]]></code>
+    </PossiblyInvalidArgument>
+    <RedundantCondition>
+      <code><![CDATA[null === $names]]></code>
+      <code><![CDATA[$options !== null]]></code>
+      <code><![CDATA[$failure !== null]]></code>
+      <code><![CDATA[!is_int($id)]]></code>
+    </RedundantCondition>
+    <UnusedParam>
+      <code><![CDATA[$options]]></code>
+    </UnusedParam>
+  </file>
+  <file src="src/Handler/CurlShareHandleState.php">
+    <ArgumentTypeCoercion>
+      <code><![CDATA[$lock]]></code>
+    </ArgumentTypeCoercion>
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MissingThrowsDocblock>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[\constant($constant)]]></code>
+    </MissingThrowsDocblock>
+    <MixedArgument>
+      <code><![CDATA[$handle]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$value = \constant($constant)]]></code>
+    </MixedAssignment>
+    <MixedReturnStatement>
+      <code><![CDATA[return $sharing;]]></code>
+    </MixedReturnStatement>
+  </file>
+  <file src="src/Handler/CurlVersion.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MissingThrowsDocblock>
+      <code><![CDATA[\version_compare($version, self::MIN_VERSION, '>=')]]></code>
+      <code><![CDATA[\version_compare($version, self::TLS_12_VERSION, '>=')]]></code>
+      <code><![CDATA[\version_compare($version, self::TLS_13_VERSION, '>=')]]></code>
+      <code><![CDATA[\version_compare($version, self::MULTIPLEX_VERSION, '>=')]]></code>
+      <code><![CDATA[\version_compare($version, self::HTTP_VERSION_REUSE_MATCH_VERSION, '<')]]></code>
+      <code><![CDATA[\version_compare($version, self::HTTP_VERSION_REUSE_MATCH_REGRESSION, '<')]]></code>
+      <code><![CDATA[\version_compare($version, self::HTTP_VERSION_REUSE_MATCH_RESTORED, '>=')]]></code>
+      <code><![CDATA[\version_compare($version, self::CONNECTION_CAP_VERSION, '>=')]]></code>
+      <code><![CDATA[\version_compare($version, self::REQUIRED_MULTIPLEX_VERSION, '>=')]]></code>
+      <code><![CDATA[\version_compare($versionInfo['version'], self::HTTPS_PROXY_VERSION, '>=')]]></code>
+      <code><![CDATA[\version_compare($version, self::HANDLER_SHARING_VERSION, '>=')]]></code>
+      <code><![CDATA[\version_compare($version, self::SSL_SESSION_SHARING_VERSION, '>=')]]></code>
+      <code><![CDATA[\version_compare($version, self::SHARE_CONNECTION_CACHE_VERSION, '>=')]]></code>
+      <code><![CDATA[\version_compare($version, self::PROXY_TLS_CREDENTIAL_REUSE_VERSION, '>=')]]></code>
+      <code><![CDATA[\version_compare($version, self::PROXY_CREDENTIAL_REUSE_VERSION, '>=')]]></code>
+      <code><![CDATA[\version_compare($version, self::SOCKS_PROXY_CREDENTIAL_REUSE_VERSION, '>=')]]></code>
+      <code><![CDATA[\version_compare($version, self::PROXY_HEADER_SEPARATION_VERSION, '>=')]]></code>
+    </MissingThrowsDocblock>
+  </file>
+  <file src="src/Handler/EasyHandle.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MixedArrayOffset>
+      <code><![CDATA[$normalizedKeys['content-encoding']]]></code>
+      <code><![CDATA[$normalizedKeys['content-encoding']]]></code>
+      <code><![CDATA[$normalizedKeys['content-length']]]></code>
+      <code><![CDATA[$normalizedKeys['content-length']]]></code>
+    </MixedArrayOffset>
+  </file>
+  <file src="src/Handler/HeaderProcessor.php">
+    <MixedArgument>
+      <code><![CDATA[$header]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$header]]></code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Handler/HostValidator.php">
+    <RedundantCast>
+      <code><![CDATA[$value]]></code>
+    </RedundantCast>
+  </file>
+  <file src="src/Handler/MockHandler.php">
+    <MissingClosureReturnType>
+      <code><![CDATA[function (?ResponseInterface $value) use ($request, $options) {
+                $this->invokeStats($request, $options, $value);
+                if ($this->onFulfilled) {
+                    ($this->onFulfilled)($value);
+                }
+
+                if ($value !== null && isset($options['sink'])) {
+                    $contents = (string) $value->getBody();
+                    $sink = $options['sink'];
+
+                    if (\is_resource($sink)) {
+                        \fwrite($sink, $contents);
+                    } elseif (\is_string($sink)) {
+                        \file_put_contents($sink, $contents);
+                    } elseif ($sink instanceof StreamInterface) {
+                        $sink->write($contents);
+                    }
+                }
+
+                return $value;
+            }]]></code>
+      <code><![CDATA[function ($reason) use ($request, $options) {
+                $this->invokeStats($request, $options, null, $reason);
+                if ($this->onRejected) {
+                    ($this->onRejected)($reason);
+                }
+
+                return P\Create::rejectionFor($reason);
+            }]]></code>
+    </MissingClosureReturnType>
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MissingThrowsDocblock>
+      <code><![CDATA[]]></code>
+    </MissingThrowsDocblock>
+    <MixedArgument>
+      <code><![CDATA[$response]]></code>
+      <code><![CDATA[$transferTime]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$response = \array_shift($this->queue)]]></code>
+      <code><![CDATA[$response = $response($request, $options)]]></code>
+      <code><![CDATA[$sink = $options['sink']]]></code>
+      <code><![CDATA[$value]]></code>
+      <code><![CDATA[$transferTime = $options['transfer_time'] ?? 0]]></code>
+    </MixedAssignment>
+    <MixedFunctionCall>
+      <code><![CDATA[$options['on_headers']($response)]]></code>
+      <code><![CDATA[$response($request, $options)]]></code>
+      <code><![CDATA[($options['on_stats'])($stats)]]></code>
+    </MixedFunctionCall>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$queue]]></code>
+    </PossiblyInvalidArgument>
+  </file>
+  <file src="src/Handler/StreamHandler.php">
+    <MissingClosureReturnType>
+      <code><![CDATA[static function () use ($context, $params) {
+                return \stream_context_create($context, $params);
+            }]]></code>
+      <code><![CDATA[function () use ($uri, $contextResource, $context, $options, $request) {
+                $resource = @\fopen((string) $uri, 'r', false, $contextResource);
+
+                // See https://wiki.php.net/rfc/deprecations_php_8_5#deprecate_the_http_response_header_predefined_variable
+                if (function_exists('http_get_last_response_headers')) {
+                    $http_response_header = \http_get_last_response_headers();
+                }
+
+                $this->lastHeaders = $http_response_header ?? [];
+
+                if (false === $resource) {
+                    throw new ConnectException(sprintf('Connection refused for URI %s', Psr7\Utils::redactUserInfo($uri)), $request, null, $context);
+                }
+
+                if (isset($options['read_timeout'])) {
+                    $readTimeout = $options['read_timeout'];
+                    $sec = (int) $readTimeout;
+                    $usec = ($readTimeout - $sec) * 100000;
+                    \stream_set_timeout($resource, $sec, $usec);
+                }
+
+                return $resource;
+            }]]></code>
+      <code><![CDATA[static function ($code, $a, $b, $c, $transferred, $total) use ($value) {
+                if ($code == \STREAM_NOTIFY_PROGRESS) {
+                    // The upload progress cannot be determined. Use 0 for cURL compatibility:
+                    // https://curl.se/libcurl/c/CURLOPT_PROGRESSFUNCTION.html
+                    $value($total, $transferred, 0, 0);
+                }
+            }]]></code>
+      <code><![CDATA[static function (...$args) use ($functions) {
+            foreach ($functions as $fn) {
+                $fn(...$args);
+            }
+        }]]></code>
+    </MissingClosureReturnType>
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MissingThrowsDocblock>
+      <code><![CDATA[\constant('CURLAUTH_DIGEST')]]></code>
+      <code><![CDATA[\constant('CURLAUTH_NTLM')]]></code>
+    </MissingThrowsDocblock>
+    <MixedArgument>
+      <code><![CDATA[$options['delay'] * 1000]]></code>
+      <code><![CDATA[$headers]]></code>
+      <code><![CDATA[$options['stream_context']]]></code>
+      <code><![CDATA[$options['stream_context']]]></code>
+      <code><![CDATA[$usec]]></code>
+      <code><![CDATA[$records[0]['ip']]]></code>
+      <code><![CDATA[$context['http']['header']]]></code>
+      <code><![CDATA[$options['auth'][2]]]></code>
+      <code><![CDATA[$options['curl']]]></code>
+      <code><![CDATA[$uri]]></code>
+      <code><![CDATA[$parsed['scheme']]]></code>
+    </MixedArgument>
+    <MixedArrayAccess>
+      <code><![CDATA[$encoding[0]]]></code>
+      <code><![CDATA[$encoding[0]]]></code>
+      <code><![CDATA[$methods[$method]]]></code>
+      <code><![CDATA[$options['auth'][2]]]></code>
+      <code><![CDATA[$options['auth'][2]]]></code>
+      <code><![CDATA[$records[0]['ip']]]></code>
+      <code><![CDATA[$records[0]['ip']]]></code>
+      <code><![CDATA[$records[0]['ipv6']]]></code>
+      <code><![CDATA[$records[0]['ipv6']]]></code>
+      <code><![CDATA[$options['auth'][2]]]></code>
+      <code><![CDATA[$options['auth'][2]]]></code>
+      <code><![CDATA[$options['auth'][2]]]></code>
+      <code><![CDATA[$options['curl'][\CURLOPT_HTTPAUTH]]]></code>
+      <code><![CDATA[$options['curl'][\CURLOPT_USERPWD]]]></code>
+      <code><![CDATA[$options['curl'][\CURLOPT_HTTPAUTH]]]></code>
+      <code><![CDATA[$options['ssl']['passphrase']]]></code>
+      <code><![CDATA[$options['ssl']['passphrase']]]></code>
+      <code><![CDATA[$options['http']['header']]]></code>
+      <code><![CDATA[$options['http']['header']]]></code>
+      <code><![CDATA[$options['http']['header']]]></code>
+    </MixedArrayAccess>
+    <MixedArrayOffset>
+      <code><![CDATA[$normalizedKeys['content-encoding']]]></code>
+      <code><![CDATA[$normalizedKeys['content-encoding']]]></code>
+      <code><![CDATA[$normalizedKeys['content-encoding']]]></code>
+      <code><![CDATA[$normalizedKeys['content-length']]]></code>
+      <code><![CDATA[$normalizedKeys['content-length']]]></code>
+    </MixedArrayOffset>
+    <MixedAssignment>
+      <code><![CDATA[$_]]></code>
+      <code><![CDATA[$value = $options[$capOption] ?? null]]></code>
+      <code><![CDATA[$multiplex = $options['multiplex'] ?? null]]></code>
+      <code><![CDATA[$stream]]></code>
+      <code><![CDATA[$headers]]></code>
+      <code><![CDATA[$sink = $options['sink'] ?? Psr7\Utils::tryFopen('php://temp', 'r+')]]></code>
+      <code><![CDATA[$encoding = $headers[$normalizedKeys['content-encoding']]]]></code>
+      <code><![CDATA[$resource = $callback()]]></code>
+      <code><![CDATA[$err]]></code>
+      <code><![CDATA[$value]]></code>
+      <code><![CDATA[$value]]></code>
+      <code><![CDATA[$contextResource = $this->createResource(
+            static function () use ($context, $params) {
+                return \stream_context_create($context, $params);
+            }
+        )]]></code>
+      <code><![CDATA[$resource = @\fopen((string) $uri, 'r', false, $contextResource)]]></code>
+      <code><![CDATA[$readTimeout = $options['read_timeout']]]></code>
+      <code><![CDATA[$usec = ($readTimeout - $sec) * 100000]]></code>
+      <code><![CDATA[$contextOptions]]></code>
+      <code><![CDATA[$_]]></code>
+      <code><![CDATA[$contextOptions]]></code>
+      <code><![CDATA[$_]]></code>
+      <code><![CDATA[$_]]></code>
+      <code><![CDATA[$httpAuth = \defined('CURLAUTH_DIGEST') ? \constant('CURLAUTH_DIGEST') : null]]></code>
+      <code><![CDATA[$httpAuth = \defined('CURLAUTH_NTLM') ? \constant('CURLAUTH_NTLM') : null]]></code>
+      <code><![CDATA[$passphrase = $value[1]]]></code>
+      <code><![CDATA[$value = $value[0]]]></code>
+      <code><![CDATA[$uri = $value]]></code>
+      <code><![CDATA[$uri = $value[$scheme]]]></code>
+      <code><![CDATA[$user = $parsed['user'] ?? '']]></code>
+      <code><![CDATA[$pass = $parsed['pass'] ?? '']]></code>
+      <code><![CDATA[$value = Utils::debugResource($value)]]></code>
+      <code><![CDATA[$v]]></code>
+      <code><![CDATA[$fn]]></code>
+    </MixedAssignment>
+    <MixedFunctionCall>
+      <code><![CDATA[($options['on_stats'])($stats)]]></code>
+      <code><![CDATA[$options['on_headers']($response)]]></code>
+      <code><![CDATA[$value($total, $transferred, 0, 0)]]></code>
+      <code><![CDATA[$fn(...$args)]]></code>
+    </MixedFunctionCall>
+    <NonExistentArrayOffset>
+      <code><![CDATA['header']]></code>
+      <code><![CDATA['header']]></code>
+    </NonExistentArrayOffset>
+    <RedundantCondition>
+      <code><![CDATA[$proxyAuthorizationAdded
+                && isset($options['stream_context']['http'])
+                && \is_array($options['stream_context']['http'])
+                && \array_key_exists('proxy', $options['stream_context']['http'])]]></code>
+    </RedundantCondition>
+    <UnusedParam>
+      <code><![CDATA[$params]]></code>
+      <code><![CDATA[$request]]></code>
+      <code><![CDATA[$options]]></code>
+      <code><![CDATA[$params]]></code>
+      <code><![CDATA[$request]]></code>
+      <code><![CDATA[$options]]></code>
+      <code><![CDATA[$params]]></code>
+      <code><![CDATA[$request]]></code>
+      <code><![CDATA[$options]]></code>
+      <code><![CDATA[$params]]></code>
+      <code><![CDATA[$request]]></code>
+      <code><![CDATA[$options]]></code>
+      <code><![CDATA[$params]]></code>
+      <code><![CDATA[$request]]></code>
+      <code><![CDATA[$params]]></code>
+      <code><![CDATA[$request]]></code>
+      <code><![CDATA[$options]]></code>
+      <code><![CDATA[$params]]></code>
+      <code><![CDATA[$request]]></code>
+      <code><![CDATA[$params]]></code>
+      <code><![CDATA[$request]]></code>
+      <code><![CDATA[$options]]></code>
+      <code><![CDATA[$params]]></code>
+      <code><![CDATA[$request]]></code>
+      <code><![CDATA[$options]]></code>
+      <code><![CDATA[$options]]></code>
+    </UnusedParam>
+  </file>
+  <file src="src/Handler/TlsVersion.php">
+    <MissingThrowsDocblock>
+      <code><![CDATA[\constant($constant)]]></code>
+    </MissingThrowsDocblock>
+  </file>
+  <file src="src/HandlerStack.php">
+    <MissingClosureReturnType>
+      <code><![CDATA[static function ($tuple) use ($remove) {
+                    return $tuple[1] !== $remove;
+                }]]></code>
+      <code><![CDATA[static function ($tuple) use ($remove) {
+                return $tuple[0] !== $remove;
+            }]]></code>
+    </MissingClosureReturnType>
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MixedArrayAccess>
+      <code><![CDATA[$tuple[1]]]></code>
+      <code><![CDATA[$tuple[0]]]></code>
+    </MixedArrayAccess>
+    <RedundantCondition>
+      <code><![CDATA[!is_string($remove) && !is_callable($remove)]]></code>
+      <code><![CDATA[\is_array($fn)]]></code>
+    </RedundantCondition>
+  </file>
+  <file src="src/MessageFormatter.php">
+    <MissingClosureReturnType>
+      <code><![CDATA[function (array $matches) use ($request, $response, $error, &$cache) {
+                if (isset($cache[$matches[1]])) {
+                    return $cache[$matches[1]];
+                }
+
+                $result = '';
+                switch ($matches[1]) {
+                    case 'request':
+                        $result = Psr7\Message::toString($request);
+                        break;
+                    case 'response':
+                        $result = $response ? Psr7\Message::toString($response) : '';
+                        break;
+                    case 'req_headers':
+                        $result = \trim($request->getMethod()
+                                .' '.$request->getRequestTarget(), " \n\r\t\0\x0B")
+                            .' HTTP/'.$request->getProtocolVersion()."\r\n"
+                            .$this->headers($request);
+                        break;
+                    case 'res_headers':
+                        $result = $response ?
+                            \sprintf(
+                                'HTTP/%s %d %s',
+                                $response->getProtocolVersion(),
+                                $response->getStatusCode(),
+                                $response->getReasonPhrase()
+                            )."\r\n".$this->headers($response)
+                            : 'NULL';
+                        break;
+                    case 'req_body':
+                        $result = $request->getBody()->__toString();
+                        break;
+                    case 'res_body':
+                        if (!$response instanceof ResponseInterface) {
+                            $result = 'NULL';
+                            break;
+                        }
+
+                        $body = $response->getBody();
+
+                        if (!$body->isSeekable()) {
+                            $result = 'RESPONSE_NOT_LOGGEABLE';
+                            break;
+                        }
+
+                        $result = $response->getBody()->__toString();
+                        break;
+                    case 'ts':
+                    case 'date_iso_8601':
+                        $result = \gmdate('c');
+                        break;
+                    case 'date_common_log':
+                        $result = \date('d/M/Y:H:i:s O');
+                        break;
+                    case 'method':
+                        $result = $request->getMethod();
+                        break;
+                    case 'version':
+                        $result = $request->getProtocolVersion();
+                        break;
+                    case 'uri':
+                    case 'url':
+                        $result = $request->getUri()->__toString();
+                        break;
+                    case 'target':
+                        $result = $request->getRequestTarget();
+                        break;
+                    case 'req_version':
+                        $result = $request->getProtocolVersion();
+                        break;
+                    case 'res_version':
+                        $result = $response
+                            ? $response->getProtocolVersion()
+                            : 'NULL';
+                        break;
+                    case 'host':
+                        $result = $request->getHeaderLine('Host');
+                        break;
+                    case 'hostname':
+                        $result = \gethostname();
+                        break;
+                    case 'code':
+                        $result = $response ? $response->getStatusCode() : 'NULL';
+                        break;
+                    case 'phrase':
+                        $result = $response ? $response->getReasonPhrase() : 'NULL';
+                        break;
+                    case 'error':
+                        $result = $error ? $error->getMessage() : 'NULL';
+                        break;
+                    default:
+                        // handle prefixed dynamic headers
+                        if (\strpos($matches[1], 'req_header_') === 0) {
+                            $result = $request->getHeaderLine(\substr($matches[1], 11));
+                        } elseif (\strpos($matches[1], 'res_header_') === 0) {
+                            $result = $response
+                                ? $response->getHeaderLine(\substr($matches[1], 11))
+                                : 'NULL';
+                        }
+                }
+
+                $cache[$matches[1]] = $result;
+
+                return $result;
+            }]]></code>
+    </MissingClosureReturnType>
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MixedArgument>
+      <code><![CDATA[$matches[1]]]></code>
+      <code><![CDATA[$matches[1]]]></code>
+      <code><![CDATA[$matches[1]]]></code>
+      <code><![CDATA[$matches[1]]]></code>
+    </MixedArgument>
+    <MixedArrayOffset>
+      <code><![CDATA[$matches[1]]]></code>
+      <code><![CDATA[$matches[1]]]></code>
+    </MixedArrayOffset>
+  </file>
+  <file src="src/Middleware.php">
+    <MissingClosureReturnType>
+      <code><![CDATA[static function ($request, array $options) use ($handler) {
+                if (empty($options['cookies'])) {
+                    return $handler($request, $options);
+                } elseif (!$options['cookies'] instanceof CookieJarInterface) {
+                    throw new \InvalidArgumentException('cookies must be an instance of GuzzleHttp\Cookie\CookieJarInterface');
+                }
+                $cookieJar = $options['cookies'];
+                $request = $cookieJar->withCookieHeader($request);
+
+                return $handler($request, $options)
+                    ->then(
+                        static function (ResponseInterface $response) use ($cookieJar, $request): ResponseInterface {
+                            $cookieJar->extractCookies($request, $response);
+
+                            return $response;
+                        }
+                    );
+            }]]></code>
+      <code><![CDATA[static function ($request, array $options) use ($handler, $bodySummarizer) {
+                if (empty($options['http_errors'])) {
+                    return $handler($request, $options);
+                }
+
+                return $handler($request, $options)->then(
+                    static function (ResponseInterface $response) use ($request, $bodySummarizer) {
+                        $code = $response->getStatusCode();
+                        if ($code < 400) {
+                            return $response;
+                        }
+                        throw RequestException::create($request, $response, null, [], $bodySummarizer);
+                    }
+                );
+            }]]></code>
+      <code><![CDATA[static function (ResponseInterface $response) use ($request, $bodySummarizer) {
+                        $code = $response->getStatusCode();
+                        if ($code < 400) {
+                            return $response;
+                        }
+                        throw RequestException::create($request, $response, null, [], $bodySummarizer);
+                    }]]></code>
+      <code><![CDATA[static function (RequestInterface $request, array $options) use ($handler, &$container) {
+                return $handler($request, $options)->then(
+                    static function ($value) use ($request, &$container, $options) {
+                        $container[] = [
+                            'request' => $request,
+                            'response' => $value,
+                            'error' => null,
+                            'options' => $options,
+                        ];
+
+                        return $value;
+                    },
+                    static function ($reason) use ($request, &$container, $options) {
+                        $container[] = [
+                            'request' => $request,
+                            'response' => null,
+                            'error' => $reason,
+                            'options' => $options,
+                        ];
+
+                        return P\Create::rejectionFor($reason);
+                    }
+                );
+            }]]></code>
+      <code><![CDATA[static function ($value) use ($request, &$container, $options) {
+                        $container[] = [
+                            'request' => $request,
+                            'response' => $value,
+                            'error' => null,
+                            'options' => $options,
+                        ];
+
+                        return $value;
+                    }]]></code>
+      <code><![CDATA[static function ($reason) use ($request, &$container, $options) {
+                        $container[] = [
+                            'request' => $request,
+                            'response' => null,
+                            'error' => $reason,
+                            'options' => $options,
+                        ];
+
+                        return P\Create::rejectionFor($reason);
+                    }]]></code>
+      <code><![CDATA[static function (RequestInterface $request, array $options) use ($handler, $before, $after) {
+                if ($before) {
+                    $before($request, $options);
+                }
+                $response = $handler($request, $options);
+                if ($after) {
+                    $after($request, $options, $response);
+                }
+
+                return $response;
+            }]]></code>
+      <code><![CDATA[static function (RequestInterface $request, array $options = []) use ($handler, $logger, $formatter, $logLevel) {
+                return $handler($request, $options)->then(
+                    static function ($response) use ($logger, $request, $formatter, $logLevel): ResponseInterface {
+                        $message = $formatter->format($request, $response);
+                        $logger->log($logLevel, $message);
+
+                        return $response;
+                    },
+                    static function ($reason) use ($logger, $request, $formatter): PromiseInterface {
+                        $response = $reason instanceof RequestException ? $reason->getResponse() : null;
+                        $message = $formatter->format($request, $response, P\Create::exceptionFor($reason));
+                        $logger->error($message);
+
+                        return P\Create::rejectionFor($reason);
+                    }
+                );
+            }]]></code>
+      <code><![CDATA[static function (RequestInterface $request, array $options) use ($handler, $fn) {
+                return $handler($fn($request), $options);
+            }]]></code>
+      <code><![CDATA[static function (RequestInterface $request, array $options) use ($handler, $fn) {
+                return $handler($request, $options)->then($fn);
+            }]]></code>
+    </MissingClosureReturnType>
+    <MixedArgument>
+      <code><![CDATA[$request]]></code>
+      <code><![CDATA[$response]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$cookieJar = $options['cookies']]]></code>
+      <code><![CDATA[$request = $cookieJar->withCookieHeader($request)]]></code>
+      <code><![CDATA[$response = $handler($request, $options)]]></code>
+    </MixedAssignment>
+    <MixedMethodCall>
+      <code><![CDATA[$cookieJar->withCookieHeader($request)]]></code>
+      <code><![CDATA[$cookieJar->extractCookies($request, $response)]]></code>
+      <code><![CDATA[$handler($request, $options)
+                    ->then(
+                        static function (ResponseInterface $response) use ($cookieJar, $request): ResponseInterface {
+                            $cookieJar->extractCookies($request, $response);
+
+                            return $response;
+                        }
+                    )]]></code>
+      <code><![CDATA[$handler($request, $options)->then(
+                    static function (ResponseInterface $response) use ($request, $bodySummarizer) {
+                        $code = $response->getStatusCode();
+                        if ($code < 400) {
+                            return $response;
+                        }
+                        throw RequestException::create($request, $response, null, [], $bodySummarizer);
+                    }
+                )]]></code>
+      <code><![CDATA[$handler($request, $options)->then(
+                    static function ($value) use ($request, &$container, $options) {
+                        $container[] = [
+                            'request' => $request,
+                            'response' => $value,
+                            'error' => null,
+                            'options' => $options,
+                        ];
+
+                        return $value;
+                    },
+                    static function ($reason) use ($request, &$container, $options) {
+                        $container[] = [
+                            'request' => $request,
+                            'response' => null,
+                            'error' => $reason,
+                            'options' => $options,
+                        ];
+
+                        return P\Create::rejectionFor($reason);
+                    }
+                )]]></code>
+      <code><![CDATA[$handler($request, $options)->then(
+                    static function ($response) use ($logger, $request, $formatter, $logLevel): ResponseInterface {
+                        $message = $formatter->format($request, $response);
+                        $logger->log($logLevel, $message);
+
+                        return $response;
+                    },
+                    static function ($reason) use ($logger, $request, $formatter): PromiseInterface {
+                        $response = $reason instanceof RequestException ? $reason->getResponse() : null;
+                        $message = $formatter->format($request, $response, P\Create::exceptionFor($reason));
+                        $logger->error($message);
+
+                        return P\Create::rejectionFor($reason);
+                    }
+                )]]></code>
+      <code><![CDATA[$handler($request, $options)->then($fn)]]></code>
+    </MixedMethodCall>
+    <MixedReturnStatement>
+      <code><![CDATA[return $response;]]></code>
+    </MixedReturnStatement>
+    <RedundantCondition>
+      <code><![CDATA[!\is_array($container) && !$container instanceof \ArrayAccess]]></code>
+      <code><![CDATA[!$formatter instanceof MessageFormatter && !$formatter instanceof MessageFormatterInterface]]></code>
+    </RedundantCondition>
+    <UndefinedClass>
+      <code><![CDATA[LoggerInterface]]></code>
+    </UndefinedClass>
+  </file>
+  <file src="src/Pool.php">
+    <MissingClosureReturnType>
+      <code><![CDATA[static function () use ($iterable, $client, $opts) {
+            foreach ($iterable as $key => $rfn) {
+                if ($rfn instanceof RequestInterface) {
+                    yield $key => $client->sendAsync($rfn, $opts);
+                } elseif (\is_callable($rfn)) {
+                    yield $key => $rfn($opts);
+                } else {
+                    throw new \InvalidArgumentException('Each value yielded by the iterator must be a Psr\Http\Message\RequestInterface or a callable that returns a promise that fulfills with a Psr\Http\Message\ResponseInterface object.');
+                }
+            }
+        }]]></code>
+      <code><![CDATA[static function ($v, $k) use (&$results) {
+                $results[$k] = $v;
+            }]]></code>
+      <code><![CDATA[static function ($v, $k) use (&$results, $currentFn) {
+                $currentFn($v, $k);
+                $results[$k] = $v;
+            }]]></code>
+    </MissingClosureReturnType>
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MixedArgument>
+      <code><![CDATA[$opts]]></code>
+    </MixedArgument>
+    <MixedAssignment>
+      <code><![CDATA[$opts = $config['options']]]></code>
+      <code><![CDATA[$currentFn = $options[$name]]]></code>
+    </MixedAssignment>
+    <MixedFunctionCall>
+      <code><![CDATA[$rfn($opts)]]></code>
+      <code><![CDATA[$currentFn($v, $k)]]></code>
+    </MixedFunctionCall>
+    <RedundantCondition>
+      <code><![CDATA[!\is_iterable($requests)]]></code>
+    </RedundantCondition>
+  </file>
+  <file src="src/PrepareBodyMiddleware.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MixedAssignment>
+      <code><![CDATA[$uri = $request->getBody()->getMetadata('uri')]]></code>
+      <code><![CDATA[$expect = $options['expect'] ?? null]]></code>
+    </MixedAssignment>
+    <MixedReturnStatement>
+      <code><![CDATA[return $fn($request, $options);]]></code>
+      <code><![CDATA[return $fn(Psr7\Utils::modifyRequest($request, $modify), $options);]]></code>
+    </MixedReturnStatement>
+    <UnusedParam>
+      <code><![CDATA[$modify]]></code>
+    </UnusedParam>
+  </file>
+  <file src="src/RedirectMiddleware.php">
+    <MissingClosureReturnType>
+      <code><![CDATA[function (ResponseInterface $response) use ($request, $options) {
+                return $this->checkRedirect($request, $options, $response);
+            }]]></code>
+      <code><![CDATA[static function (ResponseInterface $response) use ($uri, $statusCode) {
+                // Note that we are pushing to the front of the list as this
+                // would be an earlier response than what is currently present
+                // in the history header.
+                $historyHeader = $response->getHeader(self::HISTORY_HEADER);
+                $statusHeader = $response->getHeader(self::STATUS_HISTORY_HEADER);
+                \array_unshift($historyHeader, $uri);
+                \array_unshift($statusHeader, (string) $statusCode);
+
+                return $response->withHeader(self::HISTORY_HEADER, $historyHeader)
+                                ->withHeader(self::STATUS_HISTORY_HEADER, $statusHeader);
+            }]]></code>
+    </MissingClosureReturnType>
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MixedArgument>
+      <code><![CDATA[$promise]]></code>
+      <code><![CDATA[$protocols]]></code>
+    </MixedArgument>
+    <MixedArrayAccess>
+      <code><![CDATA[$options['allow_redirects']['max']]]></code>
+      <code><![CDATA[$options['curl'][\CURLOPT_HTTPAUTH]]]></code>
+      <code><![CDATA[$options['curl'][\CURLOPT_USERPWD]]]></code>
+      <code><![CDATA[$options['allow_redirects']['on_redirect']]]></code>
+      <code><![CDATA[$options['allow_redirects']['on_redirect']]]></code>
+      <code><![CDATA[$options['allow_redirects']['track_redirects']]]></code>
+      <code><![CDATA[$options['allow_redirects']['max']]]></code>
+      <code><![CDATA[$options['allow_redirects']['protocols']]]></code>
+      <code><![CDATA[$options['allow_redirects']['strict']]]></code>
+      <code><![CDATA[$options['allow_redirects']['referer']]]></code>
+    </MixedArrayAccess>
+    <MixedAssignment>
+      <code><![CDATA[$promise = $this($nextRequest, $options)]]></code>
+      <code><![CDATA[$current = $options['__redirect_count']
+            ?? 0]]></code>
+      <code><![CDATA[$max = $options['allow_redirects']['max']]]></code>
+      <code><![CDATA[$protocols = $options['allow_redirects']['protocols']]]></code>
+    </MixedAssignment>
+    <MixedFunctionCall>
+      <code><![CDATA[($options['allow_redirects']['on_redirect'])(
+                $request,
+                $response,
+                $nextRequest->getUri()
+            )]]></code>
+    </MixedFunctionCall>
+    <MixedMethodCall>
+      <code><![CDATA[$fn($request, $options)
+            ->then(function (ResponseInterface $response) use ($request, $options) {
+                return $this->checkRedirect($request, $options, $response);
+            })]]></code>
+    </MixedMethodCall>
+    <MixedReturnStatement>
+      <code><![CDATA[return $fn($request, $options);]]></code>
+      <code><![CDATA[return $fn($request, $options);]]></code>
+      <code><![CDATA[return $fn($request, $options)
+            ->then(function (ResponseInterface $response) use ($request, $options) {
+                return $this->checkRedirect($request, $options, $response);
+            });]]></code>
+      <code><![CDATA[return $promise;]]></code>
+    </MixedReturnStatement>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$modify['uri']]]></code>
+    </PossiblyInvalidArgument>
+  </file>
+  <file src="src/RetryMiddleware.php">
+    <MissingClosureReturnType>
+      <code><![CDATA[function ($value) use ($request, $options) {
+            if (!($this->decider)(
+                $options['retries'],
+                $request,
+                $value,
+                null
+            )) {
+                return $value;
+            }
+
+            return $this->doRetry($request, $options, $value);
+        }]]></code>
+      <code><![CDATA[function ($reason) use ($req, $options) {
+            if (!($this->decider)(
+                $options['retries'],
+                $req,
+                null,
+                $reason
+            )) {
+                return P\Create::rejectionFor($reason);
+            }
+
+            return $this->doRetry($req, $options);
+        }]]></code>
+    </MissingClosureReturnType>
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+    <MixedArgument>
+      <code><![CDATA[$value]]></code>
+    </MixedArgument>
+    <MixedMethodCall>
+      <code><![CDATA[$fn($request, $options)
+            ->then(
+                $this->onFulfilled($request, $options),
+                $this->onRejected($request, $options)
+            )]]></code>
+    </MixedMethodCall>
+    <MixedReturnStatement>
+      <code><![CDATA[return $fn($request, $options)
+            ->then(
+                $this->onFulfilled($request, $options),
+                $this->onRejected($request, $options)
+            );]]></code>
+      <code><![CDATA[return $this($request, $options);]]></code>
+    </MixedReturnStatement>
+    <RedundantCast>
+      <code><![CDATA[2 ** ($retries - 1)]]></code>
+      <code><![CDATA[2 ** ($retries - 1)]]></code>
+    </RedundantCast>
+    <TooManyArguments>
+      <code><![CDATA[$response]]></code>
+    </TooManyArguments>
+  </file>
+  <file src="src/TransferStats.php">
+    <MissingPropertyType>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+      <code><![CDATA[]]></code>
+    </MissingPropertyType>
+  </file>
+  <file src="src/Utils.php">
+    <DeprecatedCall>
+      <code><![CDATA[\json_decode($json, $assoc, $depth, $options)]]></code>
+      <code><![CDATA[\json_encode($value, $options, $depth)]]></code>
+    </DeprecatedCall>
+    <ForbiddenCode>
+      <code><![CDATA[\var_dump($input)]]></code>
+    </ForbiddenCode>
+    <ImpossibleIdenticalComparison>
+      <code><![CDATA[$value !== null]]></code>
+    </ImpossibleIdenticalComparison>
+    <InvalidCast>
+      <code><![CDATA[$value]]></code>
+    </InvalidCast>
+    <InvalidReturnType>
+      <code><![CDATA[return $multiHandler;]]></code>
+      <code><![CDATA[return new CurlHandler($curlHandlerOptions);]]></code>
+      <code><![CDATA[return new CurlMultiHandler($curlMultiHandlerOptions);]]></code>
+      <code><![CDATA[return $options;]]></code>
+      <code><![CDATA[return $streamHandler;]]></code>
+    </InvalidReturnType>
+    <MissingThrowsDocblock>
+      <code><![CDATA[\intdiv($prefix, 8)]]></code>
+      <code><![CDATA[constant($errorConstant)]]></code>
+      <code><![CDATA[]]></code>
+    </MissingThrowsDocblock>
+    <MixedArgument>
+      <code><![CDATA[$input]]></code>
+      <code><![CDATA[$input]]></code>
+      <code><![CDATA[$line]]></code>
+    </MixedArgument>
+    <MixedArrayAccess>
+      <code><![CDATA[$_SERVER[$name]]]></code>
+      <code><![CDATA[$_SERVER[$name]]]></code>
+    </MixedArrayAccess>
+    <MixedAssignment>
+      <code><![CDATA[$line]]></code>
+      <code><![CDATA[$value = $handlerOptions[$capOption] ?? null]]></code>
+      <code><![CDATA[$key]]></code>
+      <code><![CDATA[$protocol]]></code>
+      <code><![CDATA[$area]]></code>
+      <code><![CDATA[$errorBitSet = $info['errors'] ?? 0]]></code>
+    </MixedAssignment>
+    <PossiblyInvalidArgument>
+      <code><![CDATA[$errorConstant]]></code>
+    </PossiblyInvalidArgument>
+    <PossiblyNullArgument>
+      <code><![CDATA[$info]]></code>
+    </PossiblyNullArgument>
+    <RedundantCondition>
+      <code><![CDATA[$cached]]></code>
+    </RedundantCondition>
+  </file>
+  <file src="src/functions.php">
+    <DeprecatedCall>
+      <code><![CDATA[\json_decode($json, $assoc, $depth, $options)]]></code>
+      <code><![CDATA[\json_encode($value, $options, $depth)]]></code>
+    </DeprecatedCall>
+    <ForbiddenCode>
+      <code><![CDATA[\var_dump($input)]]></code>
+    </ForbiddenCode>
+    <MixedArgument>
+      <code><![CDATA[$input]]></code>
+      <code><![CDATA[$input]]></code>
+    </MixedArgument>
+    <RedundantCondition>
+      <code><![CDATA[$cached]]></code>
+    </RedundantCondition>
+  </file>
+</files>

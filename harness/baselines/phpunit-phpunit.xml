@@ -894,10 +894,6 @@
     </RedundantCondition>
   </file>
   <file src="src/Logging/EventLogger.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[PHP_OS_FAMILY === 'Windows']]></code>
-      <code><![CDATA[PHP_OS_FAMILY === 'Darwin']]></code>
-    </ImpossibleIdenticalComparison>
     <MixedArgument>
       <code><![CDATA[$flags]]></code>
     </MixedArgument>
@@ -2025,11 +2021,6 @@
       <code><![CDATA[$maxBoxWidth = max(array_map(strlen(...), $lines))]]></code>
       <code><![CDATA[$maxBoxWidth = min($maxBoxWidth, $columns)]]></code>
     </MixedAssignment>
-  </file>
-  <file src="src/Util/ExcludeList.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[PHP_OS_FAMILY === 'Windows']]></code>
-    </ImpossibleIdenticalComparison>
   </file>
   <file src="src/Util/Filesystem.php">
     <InvalidReturnType>
