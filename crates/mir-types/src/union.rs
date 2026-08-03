@@ -1619,6 +1619,14 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         // numeric-string is always non-empty (e.g. "42", "-1", "0.5") — "" is not numeric.
         (Atomic::TNumericString, Atomic::TNonEmptyString) => true,
         (Atomic::TNumericString, Atomic::TString) => true,
+        // A class/interface/callable/enum/trait name can never be the empty
+        // string in real PHP — every one of these string-subtype atoms is
+        // always non-empty, same reasoning as numeric-string above.
+        (Atomic::TClassString(_), Atomic::TNonEmptyString) => true,
+        (Atomic::TInterfaceString(_), Atomic::TNonEmptyString) => true,
+        (Atomic::TCallableString, Atomic::TNonEmptyString) => true,
+        (Atomic::TEnumString, Atomic::TNonEmptyString) => true,
+        (Atomic::TTraitString, Atomic::TNonEmptyString) => true,
         (Atomic::TClassString(_), Atomic::TString) => true,
         (Atomic::TInterfaceString(_), Atomic::TString) => true,
         // Every interface-string is a valid class-string: PHP doesn't distinguish
