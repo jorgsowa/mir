@@ -56,6 +56,7 @@ pub(super) fn resolve_alias_only(name: &str, use_aliases: &FxHashMap<String, Str
 pub(super) fn resolve_type_name(
     name: &str,
     full_qualify: bool,
+    allow_builtin_shortcut: bool,
     namespace: &Option<String>,
     use_aliases: &FxHashMap<String, String>,
 ) -> Name {
@@ -69,9 +70,16 @@ pub(super) fn resolve_type_name(
     if find_alias(first_part, use_aliases).is_some() {
         return resolve_alias_only(stripped, use_aliases).as_str().into();
     }
-    // Checked after `use`-aliases so an explicit `use Foo\Closure;` still wins
-    // over treating a bare `Closure` as the global builtin.
-    if crate::util::is_global_builtin_docblock_class(stripped) {
+    // Docblock-only leniency: a bare `Closure`/`Traversable`/`Generator`/…
+    // without a `use` import is assumed to mean the global builtin, since
+    // docblocks are commonly written without imports. A *native* type hint
+    // (or any other real code reference — `extends`, `instanceof`, …) has no
+    // such ambiguity: PHP's own name-resolution rules always qualify a bare
+    // name against the current namespace regardless of whether it happens to
+    // collide with a builtin name, so `allow_builtin_shortcut` must be false
+    // for those callers or a same-namespace class named e.g. `Generator`
+    // resolves to the wrong (builtin) FQCN.
+    if allow_builtin_shortcut && crate::util::is_global_builtin_docblock_class(stripped) {
         return Name::from(stripped);
     }
     if !full_qualify {
@@ -102,6 +110,7 @@ pub(super) fn resolve_type_name(
 pub(super) fn resolve_union_inner(
     union: Type,
     full_qualify: bool,
+    allow_builtin_shortcut: bool,
     namespace: &Option<String>,
     use_aliases: &FxHashMap<String, String>,
 ) -> Type {
@@ -109,7 +118,7 @@ pub(super) fn resolve_union_inner(
     let types: Vec<Atomic> = union
         .types
         .into_iter()
-        .map(|a| resolve_atomic_inner(a, full_qualify, namespace, use_aliases))
+        .map(|a| resolve_atomic_inner(a, full_qualify, allow_builtin_shortcut, namespace, use_aliases))
         .collect();
     let mut result = Type::from_vec(types);
     result.from_docblock = from_docblock;
@@ -119,22 +128,31 @@ pub(super) fn resolve_union_inner(
 pub(super) fn resolve_atomic_inner(
     atomic: Atomic,
     full_qualify: bool,
+    allow_builtin_shortcut: bool,
     namespace: &Option<String>,
     use_aliases: &FxHashMap<String, String>,
 ) -> Atomic {
+    macro_rules! ru {
+        ($t:expr) => {
+            resolve_union_inner($t, full_qualify, allow_builtin_shortcut, namespace, use_aliases)
+        };
+    }
     match atomic {
         Atomic::TNamedObject { fqcn, type_params } => {
-            let resolved = resolve_type_name(fqcn.as_str(), full_qualify, namespace, use_aliases);
+            let resolved = resolve_type_name(
+                fqcn.as_str(),
+                full_qualify,
+                allow_builtin_shortcut,
+                namespace,
+                use_aliases,
+            );
             if type_params.is_empty() {
                 Atomic::TNamedObject {
                     fqcn: resolved,
                     type_params,
                 }
             } else {
-                let new_params: Vec<Type> = type_params
-                    .iter()
-                    .map(|p| resolve_union_inner(p.clone(), full_qualify, namespace, use_aliases))
-                    .collect();
+                let new_params: Vec<Type> = type_params.iter().map(|p| ru!(p.clone())).collect();
                 Atomic::TNamedObject {
                     fqcn: resolved,
                     type_params: vec_to_type_params(new_params),
@@ -142,56 +160,38 @@ pub(super) fn resolve_atomic_inner(
             }
         }
         Atomic::TClassString(Some(cls)) => {
-            let resolved = resolve_type_name(cls.as_str(), full_qualify, namespace, use_aliases);
+            let resolved = resolve_type_name(
+                cls.as_str(),
+                full_qualify,
+                allow_builtin_shortcut,
+                namespace,
+                use_aliases,
+            );
             Atomic::TClassString(Some(resolved))
         }
         Atomic::TInterfaceString(Some(iface)) => {
-            let resolved = resolve_type_name(iface.as_str(), full_qualify, namespace, use_aliases);
+            let resolved = resolve_type_name(
+                iface.as_str(),
+                full_qualify,
+                allow_builtin_shortcut,
+                namespace,
+                use_aliases,
+            );
             Atomic::TInterfaceString(Some(resolved))
         }
         Atomic::TArray { key, value } => Atomic::TArray {
-            key: Box::new(resolve_union_inner(
-                *key,
-                full_qualify,
-                namespace,
-                use_aliases,
-            )),
-            value: Box::new(resolve_union_inner(
-                *value,
-                full_qualify,
-                namespace,
-                use_aliases,
-            )),
+            key: Box::new(ru!(*key)),
+            value: Box::new(ru!(*value)),
         },
         Atomic::TList { value } => Atomic::TList {
-            value: Box::new(resolve_union_inner(
-                *value,
-                full_qualify,
-                namespace,
-                use_aliases,
-            )),
+            value: Box::new(ru!(*value)),
         },
         Atomic::TNonEmptyArray { key, value } => Atomic::TNonEmptyArray {
-            key: Box::new(resolve_union_inner(
-                *key,
-                full_qualify,
-                namespace,
-                use_aliases,
-            )),
-            value: Box::new(resolve_union_inner(
-                *value,
-                full_qualify,
-                namespace,
-                use_aliases,
-            )),
+            key: Box::new(ru!(*key)),
+            value: Box::new(ru!(*value)),
         },
         Atomic::TNonEmptyList { value } => Atomic::TNonEmptyList {
-            value: Box::new(resolve_union_inner(
-                *value,
-                full_qualify,
-                namespace,
-                use_aliases,
-            )),
+            value: Box::new(ru!(*value)),
         },
         Atomic::TConditional { data } => {
             let ConditionalData {
@@ -203,19 +203,14 @@ pub(super) fn resolve_atomic_inner(
             Atomic::TConditional {
                 data: Box::new(ConditionalData {
                     param_name,
-                    subject: resolve_union_inner(subject, full_qualify, namespace, use_aliases),
-                    if_true: resolve_union_inner(if_true, full_qualify, namespace, use_aliases),
-                    if_false: resolve_union_inner(if_false, full_qualify, namespace, use_aliases),
+                    subject: ru!(subject),
+                    if_true: ru!(if_true),
+                    if_false: ru!(if_false),
                 }),
             }
         }
         Atomic::TIntersection { parts } => Atomic::TIntersection {
-            parts: vec_to_type_params(
-                parts
-                    .iter()
-                    .map(|p| resolve_union_inner(p.clone(), full_qualify, namespace, use_aliases))
-                    .collect(),
-            ),
+            parts: vec_to_type_params(parts.iter().map(|p| ru!(p.clone())).collect()),
         },
         Atomic::TKeyedArray {
             properties,
@@ -226,8 +221,7 @@ pub(super) fn resolve_atomic_inner(
                 properties
                     .into_iter()
                     .map(|(key, prop)| {
-                        let resolved_ty =
-                            resolve_union_inner(prop.ty, full_qualify, namespace, use_aliases);
+                        let resolved_ty = ru!(prop.ty);
                         (
                             key,
                             KeyedProperty {
@@ -253,35 +247,20 @@ pub(super) fn resolve_atomic_inner(
             params: params.map(|ps| {
                 ps.iter()
                     .map(|p| mir_types::atomic::FnParam {
-                        ty: p.ty.as_ref().map(|t| {
-                            mir_types::compact::SimpleType::from_union(resolve_union_inner(
-                                t.to_union(),
-                                full_qualify,
-                                namespace,
-                                use_aliases,
-                            ))
-                        }),
-                        out_ty: p.out_ty.as_ref().map(|t| {
-                            mir_types::compact::SimpleType::from_union(resolve_union_inner(
-                                t.to_union(),
-                                full_qualify,
-                                namespace,
-                                use_aliases,
-                            ))
-                        }),
+                        ty: p
+                            .ty
+                            .as_ref()
+                            .map(|t| mir_types::compact::SimpleType::from_union(ru!(t.to_union()))),
+                        out_ty: p
+                            .out_ty
+                            .as_ref()
+                            .map(|t| mir_types::compact::SimpleType::from_union(ru!(t.to_union()))),
                         ..p.clone()
                     })
                     .collect::<Vec<_>>()
                     .into_boxed_slice()
             }),
-            return_type: return_type.map(|rt| {
-                Box::new(resolve_union_inner(
-                    *rt,
-                    full_qualify,
-                    namespace,
-                    use_aliases,
-                ))
-            }),
+            return_type: return_type.map(|rt| Box::new(ru!(*rt))),
         },
         Atomic::TClosure { data } => Atomic::TClosure {
             data: Box::new(mir_types::atomic::ClosureData {
@@ -289,35 +268,20 @@ pub(super) fn resolve_atomic_inner(
                     .params
                     .iter()
                     .map(|p| mir_types::atomic::FnParam {
-                        ty: p.ty.as_ref().map(|t| {
-                            mir_types::compact::SimpleType::from_union(resolve_union_inner(
-                                t.to_union(),
-                                full_qualify,
-                                namespace,
-                                use_aliases,
-                            ))
-                        }),
-                        out_ty: p.out_ty.as_ref().map(|t| {
-                            mir_types::compact::SimpleType::from_union(resolve_union_inner(
-                                t.to_union(),
-                                full_qualify,
-                                namespace,
-                                use_aliases,
-                            ))
-                        }),
+                        ty: p
+                            .ty
+                            .as_ref()
+                            .map(|t| mir_types::compact::SimpleType::from_union(ru!(t.to_union()))),
+                        out_ty: p
+                            .out_ty
+                            .as_ref()
+                            .map(|t| mir_types::compact::SimpleType::from_union(ru!(t.to_union()))),
                         ..p.clone()
                     })
                     .collect::<Vec<_>>()
                     .into_boxed_slice(),
-                return_type: resolve_union_inner(
-                    data.return_type,
-                    full_qualify,
-                    namespace,
-                    use_aliases,
-                ),
-                this_type: data
-                    .this_type
-                    .map(|t| resolve_union_inner(t, full_qualify, namespace, use_aliases)),
+                return_type: ru!(data.return_type),
+                this_type: data.this_type.map(|t| ru!(t)),
             }),
         },
         other => other,
@@ -369,7 +333,10 @@ pub(super) fn resolve_union(
     namespace: &Option<String>,
     use_aliases: &FxHashMap<String, String>,
 ) -> Type {
-    resolve_union_inner(union, true, namespace, use_aliases)
+    // Native type hints resolve exactly like any other real code reference
+    // (`extends`, `instanceof`, …): no builtin-name leniency — a same-namespace
+    // class named e.g. `Generator` must win over the global builtin.
+    resolve_union_inner(union, true, false, namespace, use_aliases)
 }
 
 pub(super) fn resolve_union_doc(
@@ -382,10 +349,10 @@ pub(super) fn resolve_union_doc(
     // native type hint does — `full_qualify=false` used to leave it bare
     // specifically to avoid mis-qualifying real global classes like `Closure`
     // against the current namespace, but that also silently left every
-    // genuine sibling-class reference unqualified. `resolve_type_name` now
-    // exempts real global builtins on its own (`is_global_builtin_class`),
-    // so qualifying here is safe.
-    resolve_union_inner(union, true, namespace, use_aliases)
+    // genuine sibling-class reference unqualified. `resolve_type_name` exempts
+    // real global builtins on its own (`allow_builtin_shortcut=true` here) for
+    // docblocks specifically, since they're commonly written without imports.
+    resolve_union_inner(union, true, true, namespace, use_aliases)
 }
 
 pub(super) fn resolve_union_doc_with_aliases(
@@ -453,7 +420,7 @@ mod tests {
         let use_aliases = aliases(&[("Deep", "MyApp\\Deep")]);
         let ns = Some("Client".to_string());
         assert_eq!(
-            resolve_type_name("deep\\Service", true, &ns, &use_aliases).as_str(),
+            resolve_type_name("deep\\Service", true, false, &ns, &use_aliases).as_str(),
             "MyApp\\Deep\\Service"
         );
     }

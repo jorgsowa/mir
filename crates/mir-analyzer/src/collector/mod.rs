@@ -838,8 +838,19 @@ impl<'a> DefinitionCollector<'a> {
         }
     }
 
+    /// Every caller of this wrapper resolves a name that came from a
+    /// docblock tag (`@template-implements`, `@mixin`, `@psalm-import-type`,
+    /// `@require-extends`, …), so the builtin-name leniency is always on —
+    /// native code references (type hints) go through `resolve_union`
+    /// instead, which keeps that leniency off.
     fn resolve_type_name(&self, name: &str, full_qualify: bool) -> mir_types::Name {
-        resolution::resolve_type_name(name, full_qualify, &self.namespace, &self.use_aliases)
+        resolution::resolve_type_name(
+            name,
+            full_qualify,
+            true,
+            &self.namespace,
+            &self.use_aliases,
+        )
     }
 
     fn fill_self_static_parent(union: Type, class_fqcn: &str) -> Type {
@@ -941,6 +952,7 @@ impl<'a> DefinitionCollector<'a> {
                     let resolved_fqcn = resolution::resolve_type_name(
                         fqcn.as_ref(),
                         true,
+                        true,
                         &self.namespace,
                         &self.use_aliases,
                     );
@@ -970,6 +982,7 @@ impl<'a> DefinitionCollector<'a> {
                 {
                     let resolved_fqcn = resolution::resolve_type_name(
                         fqcn.as_ref(),
+                        true,
                         true,
                         &self.namespace,
                         &self.use_aliases,
