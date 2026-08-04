@@ -73,15 +73,17 @@ fn main() {
     // does real resolve-and-parse work, not just cache hits.
     let target = Name::class("Illuminate\\Support\\Str");
 
+    let gen_before = session.index_generation();
     let t0 = Instant::now();
     let refs = session
         .indexed_references_to(&target, &project_paths, false, &|| false)
         .expect("not cancelled");
     let cold_elapsed = t0.elapsed();
     eprintln!(
-        "cold indexed_references_to({target:?}): {:.3}s, {} references found",
+        "cold indexed_references_to({target:?}): {:.3}s, {} references found, {} revision bumps",
         cold_elapsed.as_secs_f64(),
-        refs.len()
+        refs.len(),
+        session.index_generation() - gen_before
     );
 
     // Same query again: every candidate file is now prepared+committed, so
@@ -141,5 +143,41 @@ fn main() {
     eprintln!(
         "subtype_files(ServiceProvider) repeat: {:.3}s avg over {n}",
         t4.elapsed().as_secs_f64() / n as f64
+    );
+
+    // Scenario: the LSP-host shape from php-lsp's references issue — only
+    // project files are registered up front; vendor stays known solely
+    // through the PSR-4 resolver and is read from disk + registered as a NEW
+    // SourceFile input per lazily-loaded class *inside* the query. Every
+    // new-file registration bumps the workspace revision, so this is the
+    // path where per-load bumps (reader cancellations) actually accumulate.
+    let psr4b = Arc::new(
+        mir_analyzer::composer::Psr4Map::from_composer(&fixture)
+            .expect("failed to load composer.json"),
+    );
+    let session2 = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4b);
+    session2.ensure_all_stubs();
+    let project_only: Vec<(Arc<str>, Arc<str>)> = project_files
+        .iter()
+        .filter_map(|p| {
+            let src = std::fs::read_to_string(p).ok()?;
+            Some((
+                Arc::<str>::from(p.to_string_lossy().as_ref()),
+                Arc::<str>::from(src),
+            ))
+        })
+        .collect();
+    session2.set_workspace_files(project_only);
+
+    let gen_before = session2.index_generation();
+    let t5 = Instant::now();
+    let refs2 = session2
+        .indexed_references_to(&target, &project_paths, false, &|| false)
+        .expect("not cancelled");
+    eprintln!(
+        "cold references, vendor-unregistered (php-lsp shape): {:.3}s, {} references, {} revision bumps",
+        t5.elapsed().as_secs_f64(),
+        refs2.len(),
+        session2.index_generation() - gen_before
     );
 }

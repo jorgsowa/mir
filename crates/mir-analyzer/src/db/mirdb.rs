@@ -260,6 +260,13 @@ pub struct MirDbStorage {
     /// O(all-files) walk the singleton exists to avoid). Diagnostic only —
     /// hosts assert warm-started sessions keep this at zero.
     workspace_index_walks: Arc<std::sync::atomic::AtomicU64>,
+    /// Open deferred-bump scopes (see `AnalysisSession::defer_revision_bumps`).
+    /// While > 0, `bump_workspace_revision` coalesces into one pending bump
+    /// flushed by the last scope to close — a pass that lazy-loads N classes
+    /// costs one salsa input write (one reader cancellation) instead of N.
+    deferred_bump_depth: Arc<std::sync::atomic::AtomicUsize>,
+    /// A bump was requested while a scope was open and is still owed.
+    deferred_bump_pending: Arc<std::sync::atomic::AtomicBool>,
 }
 
 /// Resolver-related state held outside salsa storage. Wrapped in a
@@ -301,6 +308,8 @@ impl Default for MirDbStorage {
             subtype_cache: None,
             pending_index_files: Arc::default(),
             workspace_index_walks: Arc::default(),
+            deferred_bump_depth: Arc::default(),
+            deferred_bump_pending: Arc::default(),
         };
         db.init_workspace_revision();
         db
@@ -1386,6 +1395,24 @@ impl MirDbStorage {
     /// add no files, never bump, and never touch the singleton.
     pub(crate) fn bump_workspace_revision(&mut self) {
         use salsa::Setter as _;
+        use std::sync::atomic::Ordering;
+        // Deferral is only sound while the singleton exists: without one,
+        // `find_class_like` falls back to the tracked walk keyed on this
+        // revision, and a deferred bump would leave `contains_class` blind
+        // to a class loaded moments ago in the same scope.
+        if self.deferred_bump_depth.load(Ordering::SeqCst) > 0
+            && self.workspace_symbol_index_input.read().is_some()
+        {
+            self.deferred_bump_pending.store(true, Ordering::SeqCst);
+            // Re-check: if every scope closed between the two loads, the
+            // closer may have missed our pending flag — claim it and bump
+            // here instead of leaving the generation permanently behind.
+            if self.deferred_bump_depth.load(Ordering::SeqCst) > 0
+                || !self.deferred_bump_pending.swap(false, Ordering::SeqCst)
+            {
+                return;
+            }
+        }
         let existing = *self.workspace_revision_input.read();
         match existing {
             Some(rev) => {
@@ -1399,6 +1426,21 @@ impl MirDbStorage {
         }
         self.workspace_revision_counter
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// The (depth, pending) pair backing deferred-bump scopes; shared across
+    /// db clones so a scope opened on the session handle governs bumps from
+    /// any clone.
+    pub(crate) fn revision_bump_deferral_handles(
+        &self,
+    ) -> (
+        Arc<std::sync::atomic::AtomicUsize>,
+        Arc<std::sync::atomic::AtomicBool>,
+    ) {
+        (
+            self.deferred_bump_depth.clone(),
+            self.deferred_bump_pending.clone(),
+        )
     }
 
     /// Subtract one file's declarations from the singleton without re-adding

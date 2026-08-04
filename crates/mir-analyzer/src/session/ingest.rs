@@ -315,10 +315,14 @@ impl AnalysisSession {
     where
         I: IntoIterator<Item = (Arc<str>, Arc<str>)>,
     {
+        // One revision bump for the batch, not one per registered file. The
+        // scope must close after the guard drops (the flush takes the lock).
+        let _deferred_bumps = self.defer_revision_bumps();
         let mut guard = self.db.salsa.write();
         for (file, source) in files {
             guard.upsert_source_file_with_durability(file, source, salsa::Durability::HIGH);
         }
+        drop(guard);
     }
 
     /// Build or refresh the `WorkspaceSymbolIndexSingleton` from all currently
@@ -354,6 +358,8 @@ impl AnalysisSession {
     where
         I: IntoIterator<Item = (Arc<str>, Arc<str>)>,
     {
+        // One revision bump for the batch, not one per registered file.
+        let _deferred_bumps = self.defer_revision_bumps();
         let registered_paths: Vec<Arc<str>> = {
             let mut guard = self.db.salsa.write();
             files
@@ -443,7 +449,10 @@ impl AnalysisSession {
 
         // 1. Register the chunk as HIGH-durability inputs — one short write
         //    window, then release the lock so interactive requests interleave.
+        //    One revision bump for the chunk, not one per new file: each bump
+        //    is an input write that cancels in-flight readers.
         let sources: Vec<crate::db::SourceFile> = {
+            let _deferred_bumps = self.defer_revision_bumps();
             let mut guard = self.db.salsa.write();
             files
                 .iter()

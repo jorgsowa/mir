@@ -120,11 +120,18 @@ impl AnalysisSession {
         // skip the parse + AST walk entirely — hosts on the
         // `ingest_file_prepared` write path pre-pay this per edit, making the
         // whole loop a map-lookup sweep.
-        for file in &dependents {
-            if cancel.is_cancelled() {
-                return Vec::new();
+        {
+            // One revision bump for the whole warm-up sweep instead of one per
+            // lazily-loaded class (each bump cancels every in-flight salsa
+            // reader). Closed before `commit_gen` is read below, so commits
+            // are stamped with the post-load generation as before.
+            let _deferred_bumps = self.defer_revision_bumps();
+            for file in &dependents {
+                if cancel.is_cancelled() {
+                    return Vec::new();
+                }
+                self.prepare_file_for_analysis(file);
             }
-            self.prepare_file_for_analysis(file);
         }
 
         // Phase 2b: drive each dependent through the `analyze_file` tracked

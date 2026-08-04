@@ -543,17 +543,26 @@ impl AnalysisSession {
             // execution never contends for the pool this way, so it stays
             // the safe choice here even though it forgoes the extra
             // wall-clock parallelism a large stale set could otherwise use.
-            for path in &stale {
-                loop {
-                    if should_cancel() {
-                        return None;
-                    }
-                    match salsa::Cancelled::catch(AssertUnwindSafe(|| {
-                        self.prepare_file_for_analysis(path)
-                    })) {
-                        Ok(()) => break,
-                        Err(_) if should_cancel() => return None,
-                        Err(_) => {}
+            {
+                // One revision bump for the whole warm-up loop instead of one
+                // per lazily-loaded class: each bump is a salsa input write
+                // that cancels every in-flight reader (a concurrent request's
+                // Phase 2 pass restarts per bump). The scope closes before
+                // Phase 2 reads `index_generation`, so commits below are
+                // stamped with the post-load generation as before.
+                let _deferred_bumps = self.defer_revision_bumps();
+                for path in &stale {
+                    loop {
+                        if should_cancel() {
+                            return None;
+                        }
+                        match salsa::Cancelled::catch(AssertUnwindSafe(|| {
+                            self.prepare_file_for_analysis(path)
+                        })) {
+                            Ok(()) => break,
+                            Err(_) if should_cancel() => return None,
+                            Err(_) => {}
+                        }
                     }
                 }
             }

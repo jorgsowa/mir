@@ -276,6 +276,27 @@ type CommittedRefs = Arc<RwLock<HashMap<Arc<str>, RefCommit>>>;
 /// resolver calls until it re-fills.
 const UNRESOLVABLE_CACHE_CAP: usize = 10_000;
 
+/// RAII scope from [`AnalysisSession::defer_revision_bumps`]. The last scope
+/// to close performs the one owed `bump_workspace_revision` (taking the db
+/// write lock), so generation-stamped freshness marks made after the scope
+/// see the post-load generation.
+pub(crate) struct DeferredRevisionBumps<'s> {
+    session: &'s AnalysisSession,
+    depth: Arc<std::sync::atomic::AtomicUsize>,
+    pending: Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl Drop for DeferredRevisionBumps<'_> {
+    fn drop(&mut self) {
+        use std::sync::atomic::Ordering;
+        if self.depth.fetch_sub(1, Ordering::SeqCst) == 1
+            && self.pending.swap(false, Ordering::SeqCst)
+        {
+            self.session.db.salsa.write().bump_workspace_revision();
+        }
+    }
+}
+
 impl AnalysisSession {
     /// Create a session targeting the given PHP language version.
     pub fn new(php_version: PhpVersion) -> Self {
@@ -341,6 +362,23 @@ impl AnalysisSession {
     /// Times the reference index has been locked on this session's db.
     pub fn ref_index_lock_count(&self) -> u64 {
         self.db.salsa.read().ref_index_lock_count()
+    }
+
+    /// Open a scope during which `bump_workspace_revision` calls coalesce:
+    /// a pass that lazy-loads N classes (Phase-1 warm-up, bulk registration)
+    /// performs one salsa input write when the last scope closes instead of
+    /// one per class — each such write cancels every in-flight salsa reader,
+    /// so this is what keeps a warm-up loop from restarting concurrent
+    /// queries N times. Scopes nest; the flush must not run while a db
+    /// guard is held (it takes the write lock).
+    pub(crate) fn defer_revision_bumps(&self) -> DeferredRevisionBumps<'_> {
+        let (depth, pending) = self.db.salsa.read().revision_bump_deferral_handles();
+        depth.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        DeferredRevisionBumps {
+            session: self,
+            depth,
+            pending,
+        }
     }
 
     /// Coverage/size counters for the class-mention gate index (host

@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **A warm-up pass bumped the workspace revision once per lazily-loaded
+  class, cancelling every in-flight salsa reader each time.** A cold
+  `indexed_references_to` / `reanalyze_*` pass that faults in N
+  vendor classes performed N salsa input writes, each one restarting any
+  concurrent request's parallel analysis phase (410 bumps on a
+  Laravel-fixture cold references query with unregistered vendor). Bumps
+  now coalesce per pass — the warm-up loop, a `prepare_file_for_analysis`
+  call, and each bulk-registration window (`set_workspace_files`,
+  `set_vendor_files`, `index_batch` chunks) flush one bump at scope end
+  (49 on the same query, all from the pre-index seed window). Deferral
+  only engages while the workspace symbol-index singleton exists; without
+  one, class lookups fall back to the revision-keyed tracked walk, which
+  must observe every load immediately. Results and issue output are
+  byte-identical; generation-stamped freshness semantics are unchanged
+  (commits are stamped after the pass's flush, as before).
+
 ## [0.69.0] - 2026-08-04
 
 ### Added

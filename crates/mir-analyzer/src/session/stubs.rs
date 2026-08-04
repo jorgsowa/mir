@@ -213,6 +213,10 @@ impl AnalysisSession {
                 text,
             )
         };
+        // One revision bump per prepared file instead of one per loaded
+        // class; nests under a pass-level scope (references Phase 1, the
+        // reanalyze sweep), which then coalesces the whole pass into one.
+        let _deferred_bumps = self.defer_revision_bumps();
         self.prepare_ast_for_analysis(&parsed.program, path.as_ref());
         self.mark_prepared_for_analysis(path, text, generation);
     }
