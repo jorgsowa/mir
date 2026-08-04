@@ -1262,6 +1262,42 @@ impl CallAnalyzer {
                     "preg_split" => {
                         super::callable::preg_split_return_type(&arg_types).unwrap_or(return_ty)
                     }
+                    // class_implements/class_parents/class_uses genuinely can't return
+                    // false once a preceding class_exists()/interface_exists()/etc. guard
+                    // already proved the argument's class is loaded — the stub's bare
+                    // `array|false` return only models the "class doesn't exist" case.
+                    "class_implements" | "class_parents" | "class_uses" => {
+                        let arg_value = call.args.first().and_then(|arg| arg.value.as_ref());
+                        // Literal class-name argument (`class_implements(Foo::class)`) —
+                        // matches an identical literal already proven loaded via a
+                        // preceding `class_exists(Foo::class)` guard.
+                        let literal_guarded = arg_value
+                            .and_then(|value| {
+                                crate::narrowing::extract_class_fqcn_from_expr(
+                                    value,
+                                    ctx.self_fqcn.as_deref(),
+                                    ctx.static_fqcn.as_deref(),
+                                    ctx.parent_fqcn.as_deref(),
+                                    ea.db,
+                                    &ea.file,
+                                )
+                            })
+                            .is_some_and(|fqcn| ctx.is_class_guarded(&fqcn));
+                        // Variable/property/static-property argument
+                        // (`class_implements($x)`) — matches the same receiver
+                        // already proven loaded via a preceding
+                        // `class_exists($x)`/`interface_exists($x)`/etc. guard.
+                        let expr_guarded = arg_value
+                            .and_then(|value| {
+                                crate::narrowing::extract_expr_guard_key(value, ctx, ea.db, &ea.file)
+                            })
+                            .is_some_and(|key| ctx.class_exists_guarded_exprs.contains(&key));
+                        if literal_guarded || expr_guarded {
+                            return_ty.remove_false()
+                        } else {
+                            return_ty
+                        }
+                    }
                     // getenv: a non-null $name narrows away the all-vars array overload.
                     "getenv" => {
                         super::callable::getenv_return_type(&arg_types).unwrap_or(return_ty)

@@ -1424,6 +1424,8 @@ pub fn narrow_from_condition(
                                     current.narrow_to_class_string()
                                 };
                                 set_narrowed(ctx, &var_name, &current, narrowed, true);
+                                ctx.class_exists_guarded_exprs
+                                    .insert(std::sync::Arc::from(var_name.as_str()));
                             } else if let Some((obj, prop)) = extract_any_prop_access(arg_value) {
                                 let current = resolve_prop_current_type(ctx, &obj, &prop, db, file);
                                 if !current.is_mixed() {
@@ -1437,6 +1439,9 @@ pub fn narrow_from_condition(
                                     // `class_exists(null)` etc. can never be true, so a
                                     // true result also proves `$obj` itself wasn't null.
                                     narrow_receiver_non_null_on_prop_match(ctx, &obj, true);
+                                    ctx.class_exists_guarded_exprs.insert(std::sync::Arc::from(
+                                        format!("{obj}->{prop}").as_str(),
+                                    ));
                                 }
                             } else if let Some((fqcn_recv, prop)) =
                                 extract_static_prop_access(arg_value, ctx, db, file)
@@ -1453,6 +1458,9 @@ pub fn narrow_from_condition(
                                     apply_prop_narrowed(
                                         ctx, &fqcn_recv, &prop, current, narrowed, true,
                                     );
+                                    ctx.class_exists_guarded_exprs.insert(std::sync::Arc::from(
+                                        format!("static:{fqcn_recv}::{prop}").as_str(),
+                                    ));
                                 }
                             }
                         }

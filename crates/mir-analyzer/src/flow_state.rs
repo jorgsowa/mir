@@ -279,6 +279,16 @@ pub struct FlowState {
     /// `UndefinedClass` diagnostics inside guarded branches.
     pub class_exists_guards: ClassExistsGuards,
 
+    /// `expr_key`s (same shape as `method_exists_guards`) of a variable/
+    /// property/static-property proven to hold an existing, loaded class
+    /// name via a `class_exists($x)`/`interface_exists($x)`/etc. guard —
+    /// distinct from `class_exists_guards`, which only ever records a
+    /// LITERAL class name argument (`class_exists(Foo::class)`), never a
+    /// variable's runtime value. Used to strip a spuriously-modeled `|false`
+    /// from `class_implements($x)`/`class_parents($x)`/`class_uses($x)`'s
+    /// return type once the same `$x` was already proven loaded.
+    pub class_exists_guarded_exprs: FxHashSet<Arc<str>>,
+
     /// Constant names proven to exist in this branch via a `defined('NAME')`
     /// guard. Used to suppress `UndefinedConstant` inside guarded branches.
     pub defined_guards: ClassExistsGuards,
@@ -485,6 +495,7 @@ impl FlowState {
             template_param_names: Arc::new(FxHashSet::default()),
             template_typed_params: Arc::new(FxHashSet::default()),
             class_exists_guards: FxHashSet::default(),
+            class_exists_guarded_exprs: FxHashSet::default(),
             defined_guards: FxHashSet::default(),
             function_exists_guards: FxHashSet::default(),
             method_exists_guards: FxHashSet::default(),
@@ -1304,6 +1315,11 @@ impl FlowState {
         result.class_exists_guards = if_ctx
             .class_exists_guards
             .intersection(&else_ctx.class_exists_guards)
+            .cloned()
+            .collect();
+        result.class_exists_guarded_exprs = if_ctx
+            .class_exists_guarded_exprs
+            .intersection(&else_ctx.class_exists_guarded_exprs)
             .cloned()
             .collect();
         result.defined_guards = if_ctx
