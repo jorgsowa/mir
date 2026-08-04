@@ -375,6 +375,27 @@ impl AnalysisSession {
             .collect()
     }
 
+    /// Every ancestor of `fqcn` — extended class, implemented interfaces,
+    /// used traits, transitively — most-derived first. Does not include
+    /// `fqcn` itself. Memoized per FQCN (shares `class_ancestors_by_fqcn`'s
+    /// tracked cache with member-resolution paths).
+    pub fn ancestors_of(&self, fqcn: &str) -> Vec<Arc<str>> {
+        let db = self.snapshot_db();
+        let here = crate::db::Fqcn::from_str(&db, fqcn.trim_start_matches('\\'));
+        crate::db::class_ancestors_by_fqcn(&db, here)
+            .iter()
+            .skip(1)
+            .cloned()
+            .collect()
+    }
+
+    /// Full signature for a global function, resolved by FQN.
+    pub fn function_signature(&self, fqn: &str) -> Option<Arc<crate::FunctionDef>> {
+        let db = self.snapshot_db();
+        let here = crate::db::Fqcn::from_str(&db, fqn);
+        crate::db::find_function(&db, here)
+    }
+
     /// Compute `file`'s outgoing dependency edges and persist them to the
     /// disk cache's reverse-dep graph (if configured). The in-memory graph
     /// is no longer maintained imperatively: `dependency_graph()` derives

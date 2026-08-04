@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.70.0] - 2026-08-04
+
+### Added
+
+- **`AnalysisSession::ancestors_of` exposed:** every ancestor of a class
+  (extended class, implemented interfaces, used traits, transitively),
+  most-derived first, self excluded. Wraps the already-tracked
+  `class_ancestors_by_fqcn` primitive so a host can resolve a supertype
+  chain without duplicating its own inheritance-edge index.
+- **`AnalysisSession::function_signature` exposed:** full `FunctionDef`
+  (params, return type, purity, etc.) for a global function resolved by
+  FQN, mirroring the existing `find_function` primitive at the session
+  level. `FunctionDef` is now re-exported from the crate root alongside
+  `DeclaredParam`/`TemplateParam`/`Visibility`.
+
 ## [0.69.0] - 2026-08-04
 
 ### Added

@@ -926,6 +926,33 @@ fn all_classes_and_all_functions_workspace_iteration() {
     assert!(fn_names.contains(&"gamma"));
 }
 
+#[test]
+fn ancestors_of_and_function_signature() {
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ingest_file(
+        Arc::from("ws2.php"),
+        Arc::from(
+            "<?php\n\
+             interface Greets {}\n\
+             class Base implements Greets {}\n\
+             class Child extends Base {}\n\
+             function add(int $a, int $b): int { return $a + $b; }\n",
+        ),
+    );
+
+    let ancestors = session.ancestors_of("Child");
+    let names: Vec<&str> = ancestors.iter().map(|a| a.as_ref()).collect();
+    assert!(names.contains(&"Base"));
+    assert!(names.contains(&"Greets"));
+    assert!(!names.contains(&"Child"));
+
+    let sig = session
+        .function_signature("add")
+        .expect("function_signature should resolve a known global function");
+    assert_eq!(sig.params.len(), 2);
+    assert!(session.function_signature("nope_not_a_function").is_none());
+}
+
 // Regression: bare FQN references without a `use` statement must be tracked in
 // the dependency graph so that `reanalyze_dependents` re-analyzes the referencing
 // file when the definition changes.  Currently not implemented — these tests document
