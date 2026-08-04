@@ -720,7 +720,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                         })
                     })
                 {
-                    let fqcn_resolved = crate::db::resolve_name(self.db, self.file.as_ref(), fqcn);
+                    // `fqcn` is already a canonical, resolved receiver type (from
+                    // `named_object_fqcn()`) — re-running `resolve_name`'s
+                    // raw-source-text rules on it, rather than trusting it as-is,
+                    // mis-resolves a `\GlobalClass` receiver in a namespaced file
+                    // the same way L20's other fixed call sites did (`db::resolve_receiver_fqcn`
+                    // covers exactly this).
+                    let fqcn_resolved =
+                        crate::db::resolve_receiver_fqcn(self.db, self.file.as_ref(), fqcn);
                     let fqcn_arc: Arc<str> = Arc::from(fqcn_resolved.as_str());
                     if let Some(resolved) = crate::call::method::resolve_method_from_db(
                         self.db,
