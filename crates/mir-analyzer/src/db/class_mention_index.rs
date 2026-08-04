@@ -40,21 +40,27 @@ pub struct MentionScanner {
     ac: aho_corasick::AhoCorasick,
     /// Pattern id → the (lowercased) name it matches.
     patterns: Vec<Name>,
+    /// Pattern id → whether that pattern skips the boundary check (a raw
+    /// substring needle, e.g. a call token like `->__construct` that isn't
+    /// itself a whole identifier — see [`ClassMentionIndex::add_raw_names`]).
+    raw: Vec<bool>,
 }
 
 impl MentionScanner {
-    pub(crate) fn build(epoch: u64, patterns: Vec<Name>) -> Option<Self> {
-        if patterns.is_empty() {
+    pub(crate) fn build(epoch: u64, entries: Vec<(Name, bool)>) -> Option<Self> {
+        if entries.is_empty() {
             return None;
         }
         let ac = aho_corasick::AhoCorasick::builder()
             .ascii_case_insensitive(true)
-            .build(patterns.iter().map(|n| n.as_str()))
+            .build(entries.iter().map(|(n, _)| n.as_str()))
             .ok()?;
+        let (patterns, raw): (Vec<Name>, Vec<bool>) = entries.into_iter().unzip();
         Some(Self {
             epoch,
             ac,
             patterns,
+            raw,
         })
     }
 
@@ -62,8 +68,11 @@ impl MentionScanner {
         self.epoch
     }
 
-    /// Every universe name `hay` mentions as a whole identifier, sorted for
-    /// binary search. Boundary rule matches `IdentifierNeedles::matches`.
+    /// Every universe name `hay` mentions, sorted for binary search. A
+    /// bounded pattern must appear as a whole identifier (boundary rule
+    /// matches `IdentifierNeedles::matches`); a raw pattern (see
+    /// [`ClassMentionIndex::add_raw_names`]) matches as a plain substring,
+    /// no boundary check at all.
     pub fn scan(&self, hay: &str) -> Box<[Name]> {
         let bytes = hay.as_bytes();
         let is_ident = |b: u8| b.is_ascii_alphanumeric() || b == b'_';
@@ -74,9 +83,10 @@ impl MentionScanner {
             if seen.contains(&pid) {
                 continue;
             }
-            if (m.start() == 0 || !is_ident(bytes[m.start() - 1]))
-                && (m.end() == bytes.len() || !is_ident(bytes[m.end()]))
-            {
+            let bounded_ok = self.raw[pid]
+                || ((m.start() == 0 || !is_ident(bytes[m.start() - 1]))
+                    && (m.end() == bytes.len() || !is_ident(bytes[m.end()])));
+            if bounded_ok {
                 seen.insert(pid);
                 hits.push(self.patterns[pid]);
             }
@@ -117,15 +127,28 @@ pub struct ClassMentionStats {
     pub scans_recorded: u64,
 }
 
+/// One admitted name's coverage epoch and matching mode.
+#[derive(Clone, Copy)]
+struct NameEntry {
+    /// Epoch this name (or its most recent upgrade to `raw`, see
+    /// [`ClassMentionIndex::add_raw_names`]) entered the universe.
+    epoch: u64,
+    /// Whether this needle matches as a raw substring (no boundary check)
+    /// rather than a whole identifier.
+    raw: bool,
+}
+
 /// Universe state: what names exist, since when, and the cached automaton.
 #[derive(Default)]
 struct Universe {
-    /// Bumped once per batch that adds at least one new name.
+    /// Bumped once per batch that adds at least one new name or upgrades an
+    /// existing one to `raw`.
     epoch: u64,
-    /// Lowercased short name → epoch it entered the universe. Append-only:
-    /// a name outliving its declaration only widens mention sets (the
-    /// predicate is textual, so answers stay exact).
-    names: FxHashMap<Name, u64>,
+    /// Lowercased needle → its coverage entry. Append-only: a name outliving
+    /// its declaration only widens mention sets (the predicate is textual,
+    /// so answers stay exact), and a bounded name is only ever upgraded to
+    /// raw, never downgraded.
+    names: FxHashMap<Name, NameEntry>,
     /// Cached scanner; valid while its epoch matches `epoch`.
     scanner: Option<Arc<MentionScanner>>,
 }
@@ -140,15 +163,44 @@ pub struct ClassMentionIndex {
 }
 
 impl ClassMentionIndex {
-    /// Insert lowercased short names; bumps the epoch once if any is new.
+    /// Insert lowercased short names, matched as whole identifiers.
+    /// Idempotent; bumps the epoch once if any is new.
     pub fn add_names(&self, names: impl IntoIterator<Item = Name>) {
+        self.add_names_impl(names, false);
+    }
+
+    /// Insert lowercased needles matched as a raw substring — no word-
+    /// boundary check at all — for a needle that isn't itself a whole
+    /// identifier (e.g. a call token like `->__construct`, whose preceding
+    /// byte in real usage, e.g. `$obj->__construct()`, is itself an
+    /// identifier character and would otherwise fail the boundary check
+    /// that protects [`Self::add_names`]). Shares the same universe/scanner
+    /// and per-file cache — a file scanned for a bounded name answers a raw
+    /// one for free, and vice versa. Idempotent; upgrading an existing
+    /// bounded name to raw bumps the epoch (forces a rescan) since a
+    /// same-text entry scanned before the upgrade may have rejected a match
+    /// the boundary check would have caught.
+    pub fn add_raw_names(&self, names: impl IntoIterator<Item = Name>) {
+        self.add_names_impl(names, true);
+    }
+
+    fn add_names_impl(&self, names: impl IntoIterator<Item = Name>, raw: bool) {
         let mut u = self.universe.lock();
         let next = u.epoch + 1;
         let mut added = false;
         for n in names {
-            if let std::collections::hash_map::Entry::Vacant(v) = u.names.entry(n) {
-                v.insert(next);
-                added = true;
+            match u.names.entry(n) {
+                std::collections::hash_map::Entry::Vacant(v) => {
+                    v.insert(NameEntry { epoch: next, raw });
+                    added = true;
+                }
+                std::collections::hash_map::Entry::Occupied(mut o) => {
+                    if raw && !o.get().raw {
+                        o.get_mut().raw = true;
+                        o.get_mut().epoch = next;
+                        added = true;
+                    }
+                }
             }
         }
         if added {
@@ -161,7 +213,7 @@ impl ClassMentionIndex {
     /// concurrent builder may waste one build; installs are idempotent).
     /// `None` while the universe is empty.
     pub fn scanner(&self) -> Option<Arc<MentionScanner>> {
-        let (epoch, patterns) = {
+        let (epoch, entries) = {
             let u = self.universe.lock();
             if u.names.is_empty() {
                 return None;
@@ -169,9 +221,15 @@ impl ClassMentionIndex {
             if let Some(s) = u.scanner.as_ref().filter(|s| s.epoch == u.epoch) {
                 return Some(s.clone());
             }
-            (u.epoch, u.names.keys().copied().collect::<Vec<Name>>())
+            (
+                u.epoch,
+                u.names
+                    .iter()
+                    .map(|(n, e)| (*n, e.raw))
+                    .collect::<Vec<(Name, bool)>>(),
+            )
         };
-        let scanner = Arc::new(MentionScanner::build(epoch, patterns)?);
+        let scanner = Arc::new(MentionScanner::build(epoch, entries)?);
         let mut u = self.universe.lock();
         if scanner.epoch == u.epoch {
             u.scanner = Some(scanner.clone());
@@ -182,7 +240,7 @@ impl ClassMentionIndex {
     /// Resolve `needle` (any case, short name) against the universe.
     pub fn prepare_query(&self, needle: &str) -> Option<MentionQuery> {
         let name = Name::new(needle).ascii_lowercase();
-        let added_epoch = *self.universe.lock().names.get(&name)?;
+        let added_epoch = self.universe.lock().names.get(&name)?.epoch;
         Some(MentionQuery { name, added_epoch })
     }
 
@@ -260,6 +318,73 @@ mod tests {
         assert!(s.scan("$this->saveAll();").is_empty());
         let both = s.scan("Color::save()");
         assert_eq!(both.len(), 2);
+    }
+
+    /// A raw needle (`add_raw_names`) matches as a plain substring even
+    /// when the byte immediately preceding it is an identifier character —
+    /// exactly the shape a call token like `->__construct` needs
+    /// (`$obj->__construct()`), and exactly the case the boundary check
+    /// would reject for a bounded needle.
+    #[test]
+    fn raw_needle_matches_without_a_boundary() {
+        let idx = ClassMentionIndex::default();
+        idx.add_raw_names([lc("->__construct")]);
+        let s = scanner_for(&idx);
+        assert_eq!(
+            s.scan("$obj->__construct();").as_ref(),
+            &[lc("->__construct")],
+            "the byte before the match ('j') is itself an identifier char, \
+             which a bounded needle's boundary check would reject"
+        );
+    }
+
+    /// A bounded needle sharing a scanner with a raw one still enforces its
+    /// own boundary check — raw-ness is per-pattern, not global once any
+    /// raw needle exists in the universe.
+    #[test]
+    fn raw_and_bounded_needles_coexist_in_one_scanner() {
+        let idx = ClassMentionIndex::default();
+        idx.add_names([lc("Color")]);
+        idx.add_raw_names([lc("->__construct")]);
+        let s = scanner_for(&idx);
+        let hits = s.scan("$obj->__construct(); // recolor()");
+        assert_eq!(
+            hits.as_ref(),
+            &[lc("->__construct")],
+            "the bounded needle must not match inside 'recolor' with no boundary"
+        );
+        assert_eq!(s.scan("new Color();").as_ref(), &[lc("Color")]);
+    }
+
+    /// Upgrading an existing bounded name to raw bumps the epoch, forcing a
+    /// rescan of any file cached before the upgrade — otherwise a stale
+    /// entry could answer "no match" for a real raw-only occurrence it was
+    /// scanned before the needle could ever match as raw.
+    #[test]
+    fn upgrading_a_name_to_raw_invalidates_prior_scans() {
+        let idx = ClassMentionIndex::default();
+        idx.add_names([lc("token")]);
+        let s1 = scanner_for(&idx);
+        let text: Arc<str> = Arc::from("xtoken");
+        let file: Arc<str> = Arc::from("upgrade.php");
+        // Bounded: "xtoken" has no boundary before "token", so it's a miss.
+        idx.set_file(file.clone(), text.clone(), s1.epoch(), s1.scan(&text));
+        let q = idx.prepare_query("token").unwrap();
+        assert_eq!(idx.answer(&file, &q, &text), Some(false));
+
+        idx.add_raw_names([lc("token")]);
+        let q_after = idx.prepare_query("token").unwrap();
+        assert_eq!(
+            idx.answer(&file, &q_after, &text),
+            None,
+            "the pre-upgrade scan must no longer answer for this needle"
+        );
+        let s2 = scanner_for(&idx);
+        assert_eq!(
+            s2.scan(&text).as_ref(),
+            &[lc("token")],
+            "once raw, the same text now matches with no boundary"
+        );
     }
 
     #[test]

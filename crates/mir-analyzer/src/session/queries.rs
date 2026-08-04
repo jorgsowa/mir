@@ -925,7 +925,48 @@ impl AnalysisSession {
     /// `include_trait_users` also counts `use Trait;` composition as a
     /// subtype edge (visibility-scoping semantics); leave it off for
     /// goto-implementation semantics (extends/implements only).
+    ///
+    /// Memoized per `(class_fqn, include_trait_users, files, text_revision)`
+    /// — same shape and rationale as [`Self::indexed_references_to`]'s
+    /// cache: `commit_defs_for_matching`'s freshness pass costs O(candidates)
+    /// on every call regardless of outcome, so a repeat query (e.g. a host
+    /// resolving a protected/static method's reference scope on every
+    /// code-lens refresh) would otherwise re-pay it every time.
     pub fn indexed_subtype_classes(
+        &self,
+        class_fqn: &str,
+        files: &[Arc<str>],
+        include_trait_users: bool,
+    ) -> Vec<SubtypeClassSite> {
+        let cache_key = SubtypeQueryCacheKey {
+            class_fqn: class_fqn.trim_start_matches('\\').to_ascii_lowercase(),
+            include_trait_users,
+            text_revision: self.text_revision(),
+            files_hash: hash_files(files),
+        };
+        if let Some(cached) = self.subtype_query_cache.read().get(&cache_key) {
+            self.subtype_query_cache_hits
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            return (**cached).clone();
+        }
+        let result = self.indexed_subtype_classes_uncached(class_fqn, files, include_trait_users);
+        let mut cache = self.subtype_query_cache.write();
+        let new_len = result.len();
+        let prior = self
+            .subtype_query_cache_sites
+            .fetch_add(new_len, std::sync::atomic::Ordering::Relaxed);
+        if prior + new_len > SUBTYPE_QUERY_CACHE_SITE_CAP {
+            cache.clear();
+            self.subtype_query_cache_sites
+                .store(new_len, std::sync::atomic::Ordering::Relaxed);
+        }
+        cache.insert(cache_key, Arc::new(result.clone()));
+        result
+    }
+
+    /// Uncached implementation of [`Self::indexed_subtype_classes`]. Callers
+    /// should use the memoizing wrapper.
+    fn indexed_subtype_classes_uncached(
         &self,
         class_fqn: &str,
         files: &[Arc<str>],
@@ -1649,9 +1690,9 @@ mod tests {
         use crate::db::MentionScanner;
         use std::sync::Arc;
         let universe = ["Color", "save", "ColorPicker", "Éclair", "C1", "_Wrap"];
-        let names: Vec<mir_types::Name> = universe
+        let names: Vec<(mir_types::Name, bool)> = universe
             .iter()
-            .map(|s| mir_types::Name::new(s).ascii_lowercase())
+            .map(|s| (mir_types::Name::new(s).ascii_lowercase(), false))
             .collect();
         let scanner = Arc::new(MentionScanner::build(1, names).unwrap());
         let hays = [

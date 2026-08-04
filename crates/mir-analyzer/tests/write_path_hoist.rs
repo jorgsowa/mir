@@ -314,10 +314,14 @@ fn files_mentioning_class_repeat_query_is_pure_lookup() {
 }
 
 /// A class name the universe has never seen (not declared anywhere in the
-/// workspace) conservatively returns every candidate file — the index has
-/// no basis to rule any of them out, so it must never under-report.
+/// workspace) is admitted on the spot and answered by a real scan — not a
+/// conservative "return everything" fallback. `files_mentioning_class`
+/// delegates to `files_mentioning_any`, which always admits its needles
+/// verbatim before querying, so an unrecognized needle is never a reason
+/// to skip narrowing; a file whose text simply doesn't contain the literal
+/// still correctly drops out.
 #[test]
-fn files_mentioning_class_unknown_needle_returns_every_candidate() {
+fn files_mentioning_class_unknown_needle_gets_a_real_scan() {
     let file_a: Arc<str> = Arc::from("unknown_a.php");
     let file_b: Arc<str> = Arc::from("unknown_b.php");
 
@@ -329,15 +333,116 @@ fn files_mentioning_class_unknown_needle_returns_every_candidate() {
     );
     session.ingest_file(
         file_b.clone(),
-        Arc::from("<?php\nfunction b(): int { return 2; }\n"),
+        Arc::from("<?php\nfunction b() { new NeverDeclaredAnywhere(); }\n"),
     );
 
     let files = [file_a, file_b];
     let result = session.files_mentioning_class(&files, "NeverDeclaredAnywhere");
     assert_eq!(
         result.len(),
-        2,
-        "a needle never admitted to the universe must conservatively return every file"
+        1,
+        "only the file whose text actually mentions the needle should match"
+    );
+    assert_eq!(result[0].as_ref(), "unknown_b.php");
+}
+
+/// [`AnalysisSession::files_mentioning_any`] matches a file mentioning
+/// *any* of several needles admitted verbatim (no short-name stripping) —
+/// the shape a caller narrowing by a fully-qualified literal plus a
+/// subtype closure needs, not just one declared class's bare short name.
+#[test]
+fn files_mentioning_any_matches_if_any_needle_hits() {
+    let file_a: Arc<str> = Arc::from("any_a.php");
+    let file_b: Arc<str> = Arc::from("any_b.php");
+    let file_c: Arc<str> = Arc::from("any_c.php");
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_all_stubs();
+    session.ingest_file(
+        file_a.clone(),
+        Arc::from("<?php\nfunction a() { new \\App\\Foo\\Owner(); }\n"),
+    );
+    session.ingest_file(
+        file_b.clone(),
+        Arc::from("<?php\nfunction b() { new \\App\\Foo\\OwnerChild(); }\n"),
+    );
+    session.ingest_file(
+        file_c.clone(),
+        Arc::from("<?php\nfunction c(): int { return 1; }\n"),
+    );
+
+    let files = [file_a.clone(), file_b.clone(), file_c.clone()];
+    let result = session.files_mentioning_any(
+        &files,
+        &["\\App\\Foo\\Owner", "\\App\\Foo\\OwnerChild"],
+    );
+    let mut result: Vec<&str> = result.iter().map(|f| f.as_ref()).collect();
+    result.sort_unstable();
+    assert_eq!(result, vec!["any_a.php", "any_b.php"]);
+}
+
+/// A fully-qualified literal (with namespace separators) admitted via
+/// [`AnalysisSession::files_mentioning_any`] must match under the same
+/// whole-identifier boundary rule as a short name — PHP's lexer never
+/// places a qualified name immediately adjacent to another identifier
+/// with no separator (`new App\Foo\Bar()` requires the space; `newApp\Foo\Bar`
+/// would lex as one invalid token), so the boundary check that protects
+/// short-name matches never produces a false negative for a literal FQN
+/// mention in valid source.
+#[test]
+fn files_mentioning_any_fqn_literal_needle_matches_across_boundaries() {
+    let file_a: Arc<str> = Arc::from("fqn_a.php");
+    let file_b: Arc<str> = Arc::from("fqn_b.php");
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_all_stubs();
+    session.ingest_file(
+        file_a.clone(),
+        Arc::from("<?php\nfunction a(): \\App\\Foo\\Bar { return new \\App\\Foo\\Bar(); }\n"),
+    );
+    session.ingest_file(
+        file_b.clone(),
+        Arc::from("<?php\nfunction b(): int { return 1; }\n"),
+    );
+
+    let files = [file_a.clone(), file_b.clone()];
+    let result = session.files_mentioning_any(&files, &["\\App\\Foo\\Bar"]);
+    assert_eq!(result.len(), 1, "only file_a textually mentions the literal FQN");
+    assert_eq!(result[0].as_ref(), "fqn_a.php");
+}
+
+/// Same persistent-lookup discipline as `files_mentioning_class_repeat_query_is_pure_lookup`,
+/// for the multi-needle form.
+#[test]
+fn files_mentioning_any_repeat_query_is_pure_lookup() {
+    let file_a: Arc<str> = Arc::from("any_repeat_a.php");
+    let file_b: Arc<str> = Arc::from("any_repeat_b.php");
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_all_stubs();
+    session.ingest_file(
+        file_a.clone(),
+        Arc::from("<?php\nclass AnyRepeatOwner {}\nclass AnyRepeatChild extends AnyRepeatOwner {}\n"),
+    );
+    session.ingest_file(
+        file_b.clone(),
+        Arc::from("<?php\nfunction b() { new AnyRepeatChild(); }\n"),
+    );
+
+    let files = [file_a.clone(), file_b.clone()];
+    let needles = ["AnyRepeatOwner", "AnyRepeatChild"];
+    let first = session.files_mentioning_any(&files, &needles);
+    assert_eq!(first.len(), 2);
+
+    let scans_before = session.class_mention_stats().scans_recorded;
+    assert!(scans_before > 0, "cold query must scan at least once");
+
+    let second = session.files_mentioning_any(&files, &needles);
+    assert_eq!(second.len(), 2);
+    assert_eq!(
+        session.class_mention_stats().scans_recorded,
+        scans_before,
+        "identical repeat query must not re-scan any file's text"
     );
 }
 
@@ -390,4 +495,112 @@ fn indexed_references_cache_invalidates_on_body_only_edit() {
         2,
         "the second $x->m() call site must be picked up, not served from a stale cache entry"
     );
+}
+
+/// [`AnalysisSession::indexed_subtype_classes`] gets the exact same
+/// memoization treatment as `indexed_references_to` — same rationale
+/// (`commit_defs_for_matching`'s freshness pass costs O(candidates) on
+/// every call), same tests: a repeat query is a pure lookup, and a change
+/// that adds a new subtype is still picked up, not served stale.
+#[test]
+fn indexed_subtype_classes_repeat_query_hits_cache() {
+    let file_a: Arc<str> = Arc::from("subtype_cache_a.php");
+    let file_b: Arc<str> = Arc::from("subtype_cache_b.php");
+    let src_a = "<?php\nclass SubtypeCacheBase {}\n";
+    let src_b = "<?php\nclass SubtypeCacheChild extends SubtypeCacheBase {}\n";
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_all_stubs();
+    session.ingest_file(file_a.clone(), Arc::from(src_a));
+    session.ingest_file(file_b.clone(), Arc::from(src_b));
+
+    let files = [file_a.clone(), file_b.clone()];
+    let hits_before = session.subtype_query_cache_hits();
+    let first = session.indexed_subtype_classes("SubtypeCacheBase", &files, false);
+    assert_eq!(first.len(), 1, "one direct subclass");
+    assert_eq!(
+        session.subtype_query_cache_hits(),
+        hits_before,
+        "first call must populate the cache, not hit it"
+    );
+
+    let second = session.indexed_subtype_classes("SubtypeCacheBase", &files, false);
+    assert_eq!(second.len(), 1);
+    assert_eq!(
+        session.subtype_query_cache_hits(),
+        hits_before + 1,
+        "identical repeat query must hit the memoization cache"
+    );
+}
+
+/// A newly-added subclass file must be picked up by the next query, not
+/// served from a cache entry populated before it existed.
+#[test]
+fn indexed_subtype_classes_cache_invalidates_on_new_file() {
+    let file_a: Arc<str> = Arc::from("subtype_new_a.php");
+    let file_b: Arc<str> = Arc::from("subtype_new_b.php");
+    let src_a = "<?php\nclass SubtypeNewBase {}\n";
+    let src_b = "<?php\nclass SubtypeNewChild1 extends SubtypeNewBase {}\n";
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_all_stubs();
+    session.ingest_file(file_a.clone(), Arc::from(src_a));
+    session.ingest_file(file_b.clone(), Arc::from(src_b));
+
+    let mut files = vec![file_a.clone(), file_b.clone()];
+    let before = session.indexed_subtype_classes("SubtypeNewBase", &files, false);
+    assert_eq!(before.len(), 1, "one subclass before the new file lands");
+
+    let file_c: Arc<str> = Arc::from("subtype_new_c.php");
+    session.ingest_file(
+        file_c.clone(),
+        Arc::from("<?php\nclass SubtypeNewChild2 extends SubtypeNewBase {}\n"),
+    );
+    files.push(file_c);
+
+    let after = session.indexed_subtype_classes("SubtypeNewBase", &files, false);
+    assert_eq!(
+        after.len(),
+        2,
+        "the new subclass must be picked up, not served from a stale cache entry"
+    );
+}
+
+/// The cache bounds memory by total cached SITES, not entry count — same
+/// discipline as `ref_query_cache` (see
+/// `indexed_references_cache_tracks_total_locations_not_entry_count`), for
+/// the identical reason: one entry's result size varies with how many
+/// subtypes the queried class actually has.
+#[test]
+fn indexed_subtype_classes_cache_tracks_total_sites_not_entry_count() {
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_all_stubs();
+
+    let mut expected_total = 0usize;
+    for (base, n_children) in [("SizeBaseA", 1usize), ("SizeBaseB", 2), ("SizeBaseC", 3)] {
+        let base_file: Arc<str> = Arc::from(format!("{base}_base.php"));
+        session.ingest_file(
+            base_file.clone(),
+            Arc::from(format!("<?php\nclass {base} {{}}\n")),
+        );
+        let mut files = vec![base_file];
+        for c in 0..n_children {
+            let child_file: Arc<str> = Arc::from(format!("{base}_child{c}.php"));
+            session.ingest_file(
+                child_file.clone(),
+                Arc::from(format!("<?php\nclass {base}Child{c} extends {base} {{}}\n")),
+            );
+            files.push(child_file);
+        }
+
+        let sites = session.indexed_subtype_classes(base, &files, false);
+        assert_eq!(sites.len(), n_children, "one site per direct subclass");
+        expected_total += sites.len();
+
+        assert_eq!(
+            session.subtype_query_cache_sites(),
+            expected_total,
+            "tracked total must be the sum of result lengths so far, not the entry count"
+        );
+    }
 }

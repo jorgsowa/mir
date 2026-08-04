@@ -17,8 +17,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   possible; a never-scanned or since-edited file is scanned once, and that
   scan is recorded for every needle already known to the universe, not
   just the one queried.
+- **`AnalysisSession::files_mentioning_any` exposed:** multi-needle form of
+  `files_mentioning_class` for a host resolving several candidate names at
+  once (e.g. an owner FQN plus its subtype closure) in one shared pass.
+- **`ClassMentionIndex` supports raw (no-word-bound) needles:**
+  `add_raw_names`/`add_raw_mention_needles` admit a needle that isn't
+  itself a whole identifier (e.g. a call token like `->__construct`,
+  whose preceding byte in real usage — `$obj->__construct()` — is an
+  identifier character and would otherwise fail the boundary check that
+  protects a normal needle). Shares the same universe, scanner, and
+  per-file cache as bounded needles — a file scanned for one answers the
+  other for free.
 
 ### Fixed
+
+- **`indexed_subtype_classes` re-walked every candidate file on every
+  call, even a byte-for-byte repeat.** Same shape as the
+  `indexed_references_to` fix below: `commit_defs_for_matching`'s
+  freshness pass costs O(candidates) regardless of outcome, so a host
+  resolving a protected/static method's reference scope on every
+  code-lens refresh paid that cost every time. Now memoized per
+  `(class_fqn, include_trait_users, files, text_revision)`, capped by
+  total cached sites (not entry count).
 
 - **`indexed_references_to` re-scanned every candidate on every call, even
   a byte-for-byte repeat query against unchanged state.** The freshness

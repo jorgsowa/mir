@@ -133,6 +133,20 @@ pub struct AnalysisSession {
     /// assert a warm repeat skipped the freshness scan entirely, the same
     /// way `ref_index_lock_count` proves a bounded posting lookup.
     ref_query_cache_hits: Arc<std::sync::atomic::AtomicU64>,
+    /// Memoized [`Self::indexed_subtype_classes`] results. Same rationale
+    /// and invalidation contract as `ref_query_cache`:
+    /// `commit_defs_for_matching`'s freshness pass costs O(candidates) on
+    /// every call regardless of outcome, so a repeat query (e.g. resolving
+    /// a protected/static method's reference scope on every code-lens
+    /// refresh) would otherwise re-pay it every time. Bounded by total
+    /// cached sites (`subtype_query_cache_sites`, capped at
+    /// `SUBTYPE_QUERY_CACHE_SITE_CAP`), not entry count, for the same
+    /// reason `ref_query_cache` isn't entry-count-capped.
+    subtype_query_cache: SubtypeQueryCache,
+    /// Sum of `.len()` across every `subtype_query_cache` entry.
+    subtype_query_cache_sites: Arc<std::sync::atomic::AtomicUsize>,
+    /// Hits served from `subtype_query_cache`. Diagnostic only.
+    subtype_query_cache_hits: Arc<std::sync::atomic::AtomicU64>,
 }
 
 /// Cache key for [`AnalysisSession::indexed_references_to`]'s memoization.
@@ -167,6 +181,29 @@ const REF_QUERY_CACHE_LOCATION_CAP: usize = 200_000;
 /// Memoized [`AnalysisSession::indexed_references_to`] results. See
 /// [`RefQueryCacheKey`] for the invalidation contract.
 type RefQueryCache = Arc<RwLock<HashMap<RefQueryCacheKey, Arc<Vec<(Arc<str>, crate::Range)>>>>>;
+
+/// Cache key for [`AnalysisSession::indexed_subtype_classes`]'s memoization.
+/// Same invalidation contract as [`RefQueryCacheKey`]. `class_fqn` is
+/// lowercased and leading-`\`-stripped on entry (PHP class names are
+/// case-insensitive) so two callers spelling the same class differently
+/// still share a cache entry.
+#[derive(PartialEq, Eq, Hash)]
+struct SubtypeQueryCacheKey {
+    class_fqn: String,
+    include_trait_users: bool,
+    text_revision: salsa::Revision,
+    files_hash: u64,
+}
+
+/// Cap on `subtype_query_cache`'s total cached site count, not entry count
+/// — same rationale as [`REF_QUERY_CACHE_LOCATION_CAP`]. A `SubtypeClassSite`
+/// is ~80 bytes (two `Arc<str>`, an enum, a bool, a `Range`), so 50k sites
+/// is on the order of a few MB.
+const SUBTYPE_QUERY_CACHE_SITE_CAP: usize = 50_000;
+
+/// Memoized [`AnalysisSession::indexed_subtype_classes`] results. See
+/// [`SubtypeQueryCacheKey`] for the invalidation contract.
+type SubtypeQueryCache = Arc<RwLock<HashMap<SubtypeQueryCacheKey, Arc<Vec<SubtypeClassSite>>>>>;
 
 /// Stable content hash of a candidate-file list, order-sensitive. Callers
 /// that rebuild the list identically each time (the common case — the same
@@ -266,6 +303,9 @@ impl AnalysisSession {
             ref_query_cache: Arc::new(RwLock::new(HashMap::default())),
             ref_query_cache_locations: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             ref_query_cache_hits: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            subtype_query_cache: Arc::new(RwLock::new(HashMap::default())),
+            subtype_query_cache_sites: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+            subtype_query_cache_hits: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         }
     }
 
@@ -281,6 +321,20 @@ impl AnalysisSession {
     /// byte-proportional cap rather than trusting entry count alone.
     pub fn ref_query_cache_locations(&self) -> usize {
         self.ref_query_cache_locations
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Hits served from [`Self::indexed_subtype_classes`]'s memoization
+    /// cache. Diagnostic only.
+    pub fn subtype_query_cache_hits(&self) -> u64 {
+        self.subtype_query_cache_hits
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Total cached site count across `subtype_query_cache`. Diagnostic
+    /// only — same purpose as `ref_query_cache_locations`.
+    pub fn subtype_query_cache_sites(&self) -> usize {
+        self.subtype_query_cache_sites
             .load(std::sync::atomic::Ordering::Relaxed)
     }
 
@@ -307,41 +361,70 @@ impl AnalysisSession {
     /// pays a scan, and that scan is recorded for every other name already
     /// in the universe too, not just this one.
     ///
-    /// **Scope**: the universe is populated from *declared class-like
-    /// names* (classes/interfaces/traits/enums), the same population
-    /// mir's own indexing already does as a side effect — it does not
-    /// cover function/method names or arbitrary literal needles. A
-    /// `class_name` this index has never seen (not a declared class-like
-    /// name anywhere in the workspace) conservatively returns every file
-    /// in `files`, since the index has no basis to rule any of them out.
+    /// **Scope**: the universe is seeded from *declared class-like names*
+    /// (classes/interfaces/traits/enums) — the same population mir's own
+    /// indexing already does as a side effect — but a `class_name` outside
+    /// that set is not a reason to skip narrowing: it's admitted verbatim
+    /// on the spot (see [`Self::files_mentioning_any`]) and answered by a
+    /// real scan, same as any other needle.
     pub fn files_mentioning_class(&self, files: &[Arc<str>], class_name: &str) -> Vec<Arc<str>> {
+        self.files_mentioning_any(files, &[class_name])
+    }
+
+    /// Which of `files` currently mention ANY of `needles` as a whole
+    /// identifier (case-insensitive) — the multi-needle form of
+    /// [`Self::files_mentioning_class`], for a caller resolving several
+    /// candidate names at once (e.g. an owner FQN plus its subtype
+    /// closure). Every needle is admitted into the shared universe
+    /// verbatim (no short-name stripping) before querying, so this call's
+    /// answer is never conservative on account of an unknown needle — a
+    /// file only falls back to a raw scan when it was scanned before all
+    /// of `needles` existed in the universe and hasn't been touched since;
+    /// that one scan then answers every needle in the universe at once,
+    /// not just this call's.
+    pub fn files_mentioning_any(&self, files: &[Arc<str>], needles: &[&str]) -> Vec<Arc<str>> {
         use rayon::prelude::*;
 
-        let db = self.snapshot_db();
-        let Some(query) = db.prepare_class_mention_query(class_name) else {
+        if needles.is_empty() {
             return files.to_vec();
-        };
-        // `query` resolved against a non-empty universe, so a scanner
-        // exists; only ever `None` while the universe itself is empty.
+        }
+        let db = self.snapshot_db();
+        db.add_literal_mention_names(needles.iter().copied());
+        // Just admitted every needle above, so `prepare_class_mention_query`
+        // only fails here while the universe itself is somehow still empty
+        // (unreachable: admission just grew it) — kept as a defensive
+        // fallback, not a reachable branch.
+        let queries: Vec<_> = needles
+            .iter()
+            .filter_map(|n| db.prepare_class_mention_query(n))
+            .collect();
+        if queries.is_empty() {
+            return files.to_vec();
+        }
         let Some(scanner) = db.class_mention_scanner() else {
             return files.to_vec();
         };
 
         files
             .par_iter()
-            .map_with(db, |db, f| {
+            .map_with(db, |db, f| -> Option<Arc<str>> {
                 let sf = db.lookup_source_file(f.as_ref())?;
                 let text = sf.text(&*db as &dyn MirDatabase).clone();
-                let hit = match db.class_mention_answer(f.as_ref(), &query, &text) {
-                    Some(hit) => hit,
-                    None => {
-                        let names = scanner.scan(text.as_ref());
-                        let hit = names.binary_search(&query.name).is_ok();
-                        db.set_file_class_mentions(f, &text, scanner.epoch(), names);
-                        hit
+                for q in &queries {
+                    match db.class_mention_answer(f.as_ref(), q, &text) {
+                        Some(true) => return Some(f.clone()),
+                        Some(false) => continue,
+                        None => {
+                            let names = scanner.scan(text.as_ref());
+                            let hit = queries
+                                .iter()
+                                .any(|q2| names.binary_search(&q2.name).is_ok());
+                            db.set_file_class_mentions(f, &text, scanner.epoch(), names);
+                            return hit.then(|| f.clone());
+                        }
                     }
-                };
-                hit.then(|| f.clone())
+                }
+                None
             })
             .flatten()
             .collect()

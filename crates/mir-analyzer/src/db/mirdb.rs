@@ -1068,6 +1068,40 @@ impl MirDbStorage {
         self.class_mentions.add_names(names);
     }
 
+    /// Register arbitrary literal needles verbatim (no short-name
+    /// stripping) in the same universe as [`Self::add_class_mention_names`]
+    /// — for a caller whose needle isn't a declared symbol's bare short
+    /// name (e.g. a fully-qualified literal). Idempotent; shares the same
+    /// per-file scan and cache, so a file scanned for one answers the
+    /// other for free.
+    pub fn add_literal_mention_names<'a>(&self, needles: impl IntoIterator<Item = &'a str>) {
+        let names: Vec<Name> = needles
+            .into_iter()
+            .map(|n| Name::new(n).ascii_lowercase())
+            .collect();
+        if names.is_empty() {
+            return;
+        }
+        self.class_mentions.add_names(names);
+    }
+
+    /// Register needles matched as a raw substring — no word-boundary check
+    /// — in the same universe as [`Self::add_literal_mention_names`]. For a
+    /// needle that isn't itself a whole identifier (e.g. a call token like
+    /// `->__construct`; see [`crate::db::ClassMentionIndex::add_raw_names`]
+    /// for why the boundary check would reject it in real usage). Shares
+    /// the same per-file scan and cache as every other admission path.
+    pub fn add_raw_mention_needles<'a>(&self, needles: impl IntoIterator<Item = &'a str>) {
+        let names: Vec<Name> = needles
+            .into_iter()
+            .map(|n| Name::new(n).ascii_lowercase())
+            .collect();
+        if names.is_empty() {
+            return;
+        }
+        self.class_mentions.add_raw_names(names);
+    }
+
     /// The whole-universe mention scanner for the current epoch. `None`
     /// while the universe is empty.
     pub fn class_mention_scanner(
