@@ -98,14 +98,20 @@ pub(super) fn type_fn_narrowed(
             if is_true {
                 current.narrow_to_string()
             } else {
-                current.filter(|t| !t.is_string())
+                // `TScalar` (the opaque atom a preceding `!is_scalar()` false-branch
+                // narrows onto) is also excluded here — a scalar value that has
+                // survived every OTHER `is_*` false-branch in an
+                // `is_bool()||is_int()||is_float()||is_string()` disjunction can no
+                // longer be a string either, same reasoning as `is_scalar`'s own
+                // false-branch exclusion below.
+                current.filter(|t| !t.is_string() && !matches!(t, Atomic::TScalar))
             }
         }
         "is_int" | "is_integer" | "is_long" => {
             if is_true {
                 current.narrow_to_int()
             } else {
-                current.filter(|t| !t.is_int())
+                current.filter(|t| !t.is_int() && !matches!(t, Atomic::TScalar))
             }
         }
         "is_float" | "is_double" | "is_real" => {
@@ -115,7 +121,10 @@ pub(super) fn type_fn_narrowed(
                 current.filter(|t| {
                     !matches!(
                         t,
-                        Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..)
+                        Atomic::TFloat
+                            | Atomic::TIntegralFloat
+                            | Atomic::TLiteralFloat(..)
+                            | Atomic::TScalar
                     )
                 })
             }
@@ -124,7 +133,12 @@ pub(super) fn type_fn_narrowed(
             if is_true {
                 current.narrow_to_bool()
             } else {
-                current.filter(|t| !matches!(t, Atomic::TBool | Atomic::TTrue | Atomic::TFalse))
+                current.filter(|t| {
+                    !matches!(
+                        t,
+                        Atomic::TBool | Atomic::TTrue | Atomic::TFalse | Atomic::TScalar
+                    )
+                })
             }
         }
         "is_null" => {
