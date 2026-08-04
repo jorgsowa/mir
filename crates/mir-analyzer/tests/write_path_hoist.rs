@@ -372,10 +372,8 @@ fn files_mentioning_any_matches_if_any_needle_hits() {
     );
 
     let files = [file_a.clone(), file_b.clone(), file_c.clone()];
-    let result = session.files_mentioning_any(
-        &files,
-        &["\\App\\Foo\\Owner", "\\App\\Foo\\OwnerChild"],
-    );
+    let result =
+        session.files_mentioning_any(&files, &["\\App\\Foo\\Owner", "\\App\\Foo\\OwnerChild"]);
     let mut result: Vec<&str> = result.iter().map(|f| f.as_ref()).collect();
     result.sort_unstable();
     assert_eq!(result, vec!["any_a.php", "any_b.php"]);
@@ -407,7 +405,11 @@ fn files_mentioning_any_fqn_literal_needle_matches_across_boundaries() {
 
     let files = [file_a.clone(), file_b.clone()];
     let result = session.files_mentioning_any(&files, &["\\App\\Foo\\Bar"]);
-    assert_eq!(result.len(), 1, "only file_a textually mentions the literal FQN");
+    assert_eq!(
+        result.len(),
+        1,
+        "only file_a textually mentions the literal FQN"
+    );
     assert_eq!(result[0].as_ref(), "fqn_a.php");
 }
 
@@ -422,7 +424,9 @@ fn files_mentioning_any_repeat_query_is_pure_lookup() {
     session.ensure_all_stubs();
     session.ingest_file(
         file_a.clone(),
-        Arc::from("<?php\nclass AnyRepeatOwner {}\nclass AnyRepeatChild extends AnyRepeatOwner {}\n"),
+        Arc::from(
+            "<?php\nclass AnyRepeatOwner {}\nclass AnyRepeatChild extends AnyRepeatOwner {}\n",
+        ),
     );
     session.ingest_file(
         file_b.clone(),

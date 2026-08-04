@@ -1289,7 +1289,9 @@ impl CallAnalyzer {
                         // `class_exists($x)`/`interface_exists($x)`/etc. guard.
                         let expr_guarded = arg_value
                             .and_then(|value| {
-                                crate::narrowing::extract_expr_guard_key(value, ctx, ea.db, &ea.file)
+                                crate::narrowing::extract_expr_guard_key(
+                                    value, ctx, ea.db, &ea.file,
+                                )
                             })
                             .is_some_and(|key| ctx.class_exists_guarded_exprs.contains(&key));
                         if literal_guarded || expr_guarded {
