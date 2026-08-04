@@ -124,6 +124,60 @@ fn subtract_decls(
     }
 }
 
+/// [`tier_insert`] for `class_like`, additionally maintaining
+/// `class_like_by_short_name` in lockstep: a bucket entry for `key` exists
+/// exactly as long as `key` exists in `class_like`, independent of which
+/// tier currently wins it — so this only needs to act the *first* time `key`
+/// appears (tier-driven relocations of an already-known FQCN never move it
+/// to a different short name).
+#[allow(clippy::too_many_arguments)]
+fn tier_insert_class_like(
+    map: &mut FxHashMap<Name, crate::db::SymbolLoc>,
+    counts: &mut FxHashMap<Name, u32>,
+    by_short_name: &mut FxHashMap<Name, Vec<Name>>,
+    key: Name,
+    loc: crate::db::SymbolLoc,
+    new_tier: crate::db::SymbolTier,
+    db: &dyn MirDatabase,
+    user_stubs: &rustc_hash::FxHashSet<Arc<str>>,
+) {
+    let is_new = !map.contains_key(&key);
+    tier_insert(map, counts, key, loc, new_tier, db, user_stubs);
+    if is_new {
+        let bucket = by_short_name
+            .entry(crate::db::short_name_key(key))
+            .or_default();
+        if !bucket.contains(&key) {
+            bucket.push(key);
+        }
+    }
+}
+
+/// [`subtract_decls`] for `class_like`, additionally removing `key` from its
+/// `class_like_by_short_name` bucket once it's fully gone from `class_like`
+/// (no other file still declares it) — kept if another file's entry
+/// survives the subtraction (the FQCN itself is still live, just re-homed).
+fn subtract_class_like(
+    map: &mut FxHashMap<Name, crate::db::SymbolLoc>,
+    counts: &mut FxHashMap<Name, u32>,
+    by_short_name: &mut FxHashMap<Name, Vec<Name>>,
+    entries: &[(Name, crate::db::SymbolLoc)],
+    file: SourceFile,
+) {
+    subtract_decls(map, counts, entries, file);
+    for (key, _) in entries {
+        if !map.contains_key(key) {
+            let short = crate::db::short_name_key(*key);
+            if let Some(bucket) = by_short_name.get_mut(&short) {
+                bucket.retain(|k| k != key);
+                if bucket.is_empty() {
+                    by_short_name.remove(&short);
+                }
+            }
+        }
+    }
+}
+
 #[salsa::db]
 #[derive(Clone)]
 pub struct MirDbStorage {
@@ -631,6 +685,7 @@ impl MirDbStorage {
         let mut class_like: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
         let mut functions: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
         let mut constants: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
+        let mut class_like_by_short_name: FxHashMap<Name, Vec<Name>> = FxHashMap::default();
         let mut counts = IndexDeclCounts::default();
         let mut new_snapshots: FxHashMap<SourceFile, FileDeclarations> = FxHashMap::default();
 
@@ -645,9 +700,10 @@ impl MirDbStorage {
                 let tier = symbol_tier(file, db, &user_stubs);
                 let decls = collect_file_declarations(db, file);
                 for (key, loc) in &decls.class_like {
-                    tier_insert(
+                    tier_insert_class_like(
                         &mut class_like,
                         &mut counts.class_like,
+                        &mut class_like_by_short_name,
                         *key,
                         *loc,
                         tier,
@@ -689,6 +745,7 @@ impl MirDbStorage {
             class_like: Arc::new(class_like),
             functions: Arc::new(functions),
             constants: Arc::new(constants),
+            class_like_by_short_name: Arc::new(class_like_by_short_name),
         };
         self.set_workspace_index(new_index);
     }
@@ -740,6 +797,7 @@ impl MirDbStorage {
         let mut class_like: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
         let mut functions: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
         let mut constants: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
+        let mut class_like_by_short_name: FxHashMap<Name, Vec<Name>> = FxHashMap::default();
         let mut counts = IndexDeclCounts::default();
         let mut snaps = FxHashMap::default();
         {
@@ -747,9 +805,10 @@ impl MirDbStorage {
             for (file, d) in &decls {
                 let tier = symbol_tier(*file, db, &user_stubs);
                 for (key, loc) in &d.class_like {
-                    tier_insert(
+                    tier_insert_class_like(
                         &mut class_like,
                         &mut counts.class_like,
+                        &mut class_like_by_short_name,
                         *key,
                         *loc,
                         tier,
@@ -791,6 +850,7 @@ impl MirDbStorage {
             class_like: Arc::new(class_like),
             functions: Arc::new(functions),
             constants: Arc::new(constants),
+            class_like_by_short_name: Arc::new(class_like_by_short_name),
         };
         self.set_workspace_index(new_index);
     }
@@ -822,6 +882,7 @@ impl MirDbStorage {
         let mut class_like = (*cur.class_like).clone();
         let mut functions = (*cur.functions).clone();
         let mut constants = (*cur.constants).clone();
+        let mut class_like_by_short_name = (*cur.class_like_by_short_name).clone();
         let mut counts = self.index_decl_counts.write();
         let mut to_store: Vec<(SourceFile, crate::db::FileDeclarations)> = Vec::new();
         {
@@ -833,9 +894,10 @@ impl MirDbStorage {
                 }
                 let tier = symbol_tier(*file, db, &user_stubs);
                 for (key, loc) in &d.class_like {
-                    tier_insert(
+                    tier_insert_class_like(
                         &mut class_like,
                         &mut counts.class_like,
+                        &mut class_like_by_short_name,
                         *key,
                         *loc,
                         tier,
@@ -879,6 +941,7 @@ impl MirDbStorage {
             class_like: Arc::new(class_like),
             functions: Arc::new(functions),
             constants: Arc::new(constants),
+            class_like_by_short_name: Arc::new(class_like_by_short_name),
         };
         self.set_workspace_index(new_index);
     }
@@ -923,9 +986,13 @@ impl MirDbStorage {
         let mut class_like = (*cur.class_like).clone();
         let mut functions = (*cur.functions).clone();
         let mut constants = (*cur.constants).clone();
+        let mut class_like_by_short_name = (*cur.class_like_by_short_name).clone();
         let mut counts = self.index_decl_counts.write();
 
         // Dry-run ambiguity check on the OLD decls before mutating anything.
+        // (Only the FQCN maps have a precedence concept to be ambiguous about;
+        // `class_like_by_short_name` has none — subtracting/re-adding it is
+        // always safe regardless of this outcome.)
         if let Some(old) = &old_decls {
             let ambiguous = |entries: &[(Name, SymbolLoc)],
                              map: &FxHashMap<Name, SymbolLoc>,
@@ -949,9 +1016,10 @@ impl MirDbStorage {
 
         // Subtract old decls.
         if let Some(old) = &old_decls {
-            subtract_decls(
+            subtract_class_like(
                 &mut class_like,
                 &mut counts.class_like,
+                &mut class_like_by_short_name,
                 &old.class_like,
                 file,
             );
@@ -963,9 +1031,10 @@ impl MirDbStorage {
         {
             let db: &dyn MirDatabase = &*self;
             for (key, loc) in &new_decls.class_like {
-                tier_insert(
+                tier_insert_class_like(
                     &mut class_like,
                     &mut counts.class_like,
+                    &mut class_like_by_short_name,
                     *key,
                     *loc,
                     tier,
@@ -1003,6 +1072,7 @@ impl MirDbStorage {
             class_like: Arc::new(class_like),
             functions: Arc::new(functions),
             constants: Arc::new(constants),
+            class_like_by_short_name: Arc::new(class_like_by_short_name),
         };
         self.set_workspace_index(new_index);
         true
@@ -1459,6 +1529,7 @@ impl MirDbStorage {
         let mut class_like = (*cur.class_like).clone();
         let mut functions = (*cur.functions).clone();
         let mut constants = (*cur.constants).clone();
+        let mut class_like_by_short_name = (*cur.class_like_by_short_name).clone();
         let mut counts = self.index_decl_counts.write();
 
         let ambiguous = |entries: &[(Name, crate::db::SymbolLoc)],
@@ -1476,9 +1547,10 @@ impl MirDbStorage {
         {
             return false;
         }
-        subtract_decls(
+        subtract_class_like(
             &mut class_like,
             &mut counts.class_like,
+            &mut class_like_by_short_name,
             &old.class_like,
             file,
         );
@@ -1490,6 +1562,7 @@ impl MirDbStorage {
             class_like: Arc::new(class_like),
             functions: Arc::new(functions),
             constants: Arc::new(constants),
+            class_like_by_short_name: Arc::new(class_like_by_short_name),
         };
         self.set_workspace_index(new_index);
         true

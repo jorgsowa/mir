@@ -334,6 +334,16 @@ pub struct WorkspaceSymbolIndex {
     pub functions: Arc<FxHashMap<Name, SymbolLoc>>,
     /// Constant FQN (case-sensitive Name) → location.
     pub constants: Arc<FxHashMap<Name, SymbolLoc>>,
+    /// Short class/interface/trait/enum name (lowercased, no namespace) →
+    /// every FQCN (lowercased) in `class_like` sharing it. A short name
+    /// shared across namespaces (e.g. Laravel's many `Factory` classes) is
+    /// otherwise invisible to a host that only has `class_like`'s FQCN keys —
+    /// this is what lets a host resolve/disambiguate a bare class-name token
+    /// without maintaining its own name→candidates map or falling back to a
+    /// text scan. No precedence/tier concept at this level (unlike
+    /// `class_like`): a bucket entry exists exactly as long as its FQCN
+    /// exists in `class_like`, regardless of which tier won that FQCN.
+    pub class_like_by_short_name: Arc<FxHashMap<Name, Vec<Name>>>,
 }
 
 impl PartialEq for WorkspaceSymbolIndex {
@@ -341,6 +351,22 @@ impl PartialEq for WorkspaceSymbolIndex {
         Arc::ptr_eq(&self.class_like, &other.class_like)
             && Arc::ptr_eq(&self.functions, &other.functions)
             && Arc::ptr_eq(&self.constants, &other.constants)
+            && Arc::ptr_eq(
+                &self.class_like_by_short_name,
+                &other.class_like_by_short_name,
+            )
+    }
+}
+
+/// The short-name key for an already-lowercased FQCN `Name` — the part after
+/// the last `\`, itself already lowercase (rsplit doesn't change case).
+/// Shared by every `WorkspaceSymbolIndex` build/incremental-update path so
+/// `class_like_by_short_name` stays keyed consistently everywhere.
+pub fn short_name_key(fqcn_lower: Name) -> Name {
+    let s = fqcn_lower.as_str().trim_start_matches('\\');
+    match s.rsplit_once('\\') {
+        Some((_, short)) => Name::new(short),
+        None => Name::new(s),
     }
 }
 
@@ -376,6 +402,7 @@ pub fn workspace_symbol_index(db: &dyn MirDatabase) -> WorkspaceSymbolIndex {
     let mut class_like: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
     let mut functions: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
     let mut constants: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
+    let mut class_like_by_short_name: FxHashMap<Name, Vec<Name>> = FxHashMap::default();
 
     // Native stubs have relative paths (e.g. "stubs/standard/functions.php");
     // user-analyzed files have absolute paths.  Process stubs first so that
@@ -433,10 +460,18 @@ pub fn workspace_symbol_index(db: &dyn MirDatabase) -> WorkspaceSymbolIndex {
         }
     }
 
+    for &key in class_like.keys() {
+        class_like_by_short_name
+            .entry(short_name_key(key))
+            .or_default()
+            .push(key);
+    }
+
     WorkspaceSymbolIndex {
         class_like: Arc::new(class_like),
         functions: Arc::new(functions),
         constants: Arc::new(constants),
+        class_like_by_short_name: Arc::new(class_like_by_short_name),
     }
 }
 

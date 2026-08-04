@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.71.0] - 2026-08-04
+
+### Added
+
+- **`WorkspaceSymbolIndex::class_like_by_short_name` exposed, and
+  `AnalysisSession::classes_named`:** short (unqualified) class/interface/
+  trait/enum name → every FQCN sharing it, incrementally maintained in
+  lockstep with the existing FQCN-keyed `class_like` map (no
+  rebuild-from-scratch on edit, no per-call scan). Fills a real gap: mir's
+  own indexes were FQCN-keyed only, so a host resolving a bare name from PHP
+  source with no `use`-import/namespace match (the residual case after
+  proper resolution — e.g. Laravel's many same-named `Factory`/`Request`
+  classes) had no way to enumerate candidates short of maintaining its own
+  duplicate name index or falling back to a text scan across the whole
+  workspace on every query. `class_like` itself, and FQCN-based resolution
+  in general, remain the standard, unambiguous path — this is additive, not
+  a replacement.
+
 ## [0.70.0] - 2026-08-04
 
 ### Added

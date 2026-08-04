@@ -953,6 +953,90 @@ fn ancestors_of_and_function_signature() {
     assert!(session.function_signature("nope_not_a_function").is_none());
 }
 
+#[test]
+fn classes_named_finds_every_namesake_across_namespaces() {
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ingest_file(
+        Arc::from("a.php"),
+        Arc::from("<?php\nnamespace App\\One;\nclass Factory {}\n"),
+    );
+    session.ingest_file(
+        Arc::from("b.php"),
+        Arc::from("<?php\nnamespace App\\Two;\nclass Factory {}\n"),
+    );
+    session.ingest_file(
+        Arc::from("c.php"),
+        Arc::from("<?php\nnamespace App;\nclass Unrelated {}\n"),
+    );
+
+    let mut fqcns: Vec<String> = session
+        .classes_named("Factory")
+        .into_iter()
+        .map(|(fqcn, _)| fqcn.trim_start_matches('\\').to_string())
+        .collect();
+    fqcns.sort();
+    assert_eq!(fqcns, vec!["App\\One\\Factory", "App\\Two\\Factory"]);
+
+    // Case-insensitive, matching PHP class-name semantics.
+    assert_eq!(session.classes_named("factory").len(), 2);
+    assert_eq!(session.classes_named("FACTORY").len(), 2);
+
+    // A name with only one declarer still resolves (not just multi-candidate).
+    let unrelated = session.classes_named("Unrelated");
+    assert_eq!(unrelated.len(), 1);
+    assert_eq!(unrelated[0].0.trim_start_matches('\\'), "App\\Unrelated");
+
+    assert!(session.classes_named("NoSuchClassAnywhere").is_empty());
+}
+
+#[test]
+fn classes_named_stays_correct_through_incremental_edits() {
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ingest_file(
+        Arc::from("a.php"),
+        Arc::from("<?php\nnamespace App\\One;\nclass Factory {}\n"),
+    );
+    session.ingest_file(
+        Arc::from("b.php"),
+        Arc::from("<?php\nnamespace App\\Two;\nclass Factory {}\n"),
+    );
+    assert_eq!(session.classes_named("Factory").len(), 2);
+
+    // Edit b.php so it no longer declares `Factory` at all — the bucket
+    // must drop that entry without a full rebuild (and without leaving a
+    // stale/incorrect entry behind).
+    session.ingest_file(
+        Arc::from("b.php"),
+        Arc::from("<?php\nnamespace App\\Two;\nclass Renamed {}\n"),
+    );
+    let remaining = session.classes_named("Factory");
+    assert_eq!(remaining.len(), 1);
+    assert_eq!(remaining[0].0.trim_start_matches('\\'), "App\\One\\Factory");
+    assert_eq!(session.classes_named("Renamed").len(), 1);
+
+    // Add a third file reintroducing the short name under a new FQCN.
+    session.ingest_file(
+        Arc::from("c.php"),
+        Arc::from("<?php\nnamespace App\\Three;\nclass Factory {}\n"),
+    );
+    let mut fqcns: Vec<String> = session
+        .classes_named("Factory")
+        .into_iter()
+        .map(|(fqcn, _)| fqcn.trim_start_matches('\\').to_string())
+        .collect();
+    fqcns.sort();
+    assert_eq!(fqcns, vec!["App\\One\\Factory", "App\\Three\\Factory"]);
+
+    // Delete a.php entirely — its Factory must also disappear from the bucket.
+    session.remove_source_file_input("a.php");
+    let after_removal: Vec<String> = session
+        .classes_named("Factory")
+        .into_iter()
+        .map(|(fqcn, _)| fqcn.trim_start_matches('\\').to_string())
+        .collect();
+    assert_eq!(after_removal, vec!["App\\Three\\Factory"]);
+}
+
 // Regression: bare FQN references without a `use` statement must be tracked in
 // the dependency graph so that `reanalyze_dependents` re-analyzes the referencing
 // file when the definition changes.  Currently not implemented — these tests document

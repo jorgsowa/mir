@@ -375,6 +375,37 @@ impl AnalysisSession {
             .collect()
     }
 
+    /// Every class/interface/trait/enum in the workspace whose *own* short
+    /// (unqualified) name is exactly `short_name`, each paired with its FQCN
+    /// and declaration location.
+    ///
+    /// Backed by `WorkspaceSymbolIndex::class_like_by_short_name` — an O(1)
+    /// bucket lookup, incrementally maintained in lockstep with the
+    /// FQCN-keyed `class_like` map (no rebuild-from-scratch, no per-call
+    /// scan). Use this only for a name a host cannot otherwise resolve to an
+    /// FQCN (no `use`-import match, no same-namespace match) — FQCN
+    /// resolution via [`Self::definition_of`]/[`Self::definition_of_cached`]
+    /// is the standard, unambiguous path and should always be tried first;
+    /// this exists for the residual case of a bare name with no resolution
+    /// context, where multiple unrelated classes across the workspace may
+    /// share it (e.g. Laravel's many `Factory` classes) and the caller must
+    /// disambiguate itself.
+    pub fn classes_named(&self, short_name: &str) -> Vec<(Arc<str>, Option<mir_types::Location>)> {
+        let db = self.snapshot_db();
+        let key = mir_types::Name::new(short_name).ascii_lowercase();
+        crate::db::workspace_index(&db)
+            .class_like_by_short_name
+            .get(&key)
+            .into_iter()
+            .flatten()
+            .filter_map(|fqcn_key| {
+                let here = crate::db::Fqcn::from_str(&db, fqcn_key.as_str());
+                crate::db::find_class_like(&db, here)
+                    .map(|class| (class.fqcn().clone(), class.location().cloned()))
+            })
+            .collect()
+    }
+
     /// Every ancestor of `fqcn` — extended class, implemented interfaces,
     /// used traits, transitively — most-derived first. Does not include
     /// `fqcn` itself. Memoized per FQCN (shares `class_ancestors_by_fqcn`'s
