@@ -427,6 +427,13 @@ fn is_bare_false_or_null(ty: &Type) -> bool {
     matches!(ty.types.as_slice(), [Atomic::TFalse] | [Atomic::TNull])
 }
 
+/// Whether `ty` is exactly the bare literal `null` — the only value a
+/// possibly-absent array-offset read (`Type::possibly_absent_offset`) can
+/// come back as on a miss.
+fn is_bare_null(ty: &Type) -> bool {
+    matches!(ty.types.as_slice(), [Atomic::TNull])
+}
+
 /// Whether any atom in `left` could ever be strictly identical (`===`) to any
 /// atom in `right`.
 ///
@@ -443,6 +450,16 @@ pub(crate) fn types_can_be_identical(left: &Type, right: &Type) -> bool {
     // non-bool type still fires normally.
     if (left.falsy_stripped && is_bare_false_or_null(right))
         || (right.falsy_stripped && is_bare_false_or_null(left))
+    {
+        return true;
+    }
+    // A defensive `=== null`/`!== null` check against a value read from a
+    // generic array/list offset whose key presence isn't proven (see
+    // `Type::possibly_absent_offset`) is likewise legitimate code, not a
+    // contradiction — the value's inferred type doesn't literally include
+    // `null`, but the read itself can still miss at runtime.
+    if (left.possibly_absent_offset && is_bare_null(right))
+        || (right.possibly_absent_offset && is_bare_null(left))
     {
         return true;
     }

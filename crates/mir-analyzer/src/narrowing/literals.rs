@@ -374,7 +374,10 @@ pub(super) fn narrow_var_null(ctx: &mut FlowState, name: &str, is_null: bool) {
     // A type with its `null` failure variant deliberately stripped (see
     // `Type::falsy_stripped`) still allows a defensive `=== null` check against
     // that stripped variant — an empty result here isn't a real contradiction.
-    let mark_diverges = !current.falsy_stripped;
+    // Same reasoning for `Type::possibly_absent_offset` (L3): a value read
+    // from an array offset whose key presence isn't proven can still come
+    // back `null` at runtime even though its inferred type doesn't include it.
+    let mark_diverges = !current.falsy_stripped && !current.possibly_absent_offset;
     set_narrowed(ctx, name, &current, narrowed, mark_diverges);
 }
 

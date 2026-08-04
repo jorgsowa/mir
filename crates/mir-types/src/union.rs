@@ -59,6 +59,17 @@ pub struct Type {
     /// `RedundantCast`, the `=== null` narrowing divergence) exempt it instead of
     /// flagging the caller's own defensive code.
     pub falsy_stripped: bool,
+    /// This type was read from a generic array/list offset (`$arr[$key]`)
+    /// whose key presence isn't statically provable — PHP returns `null`
+    /// (with a warning) for a missing offset, so a defensive `=== null`/
+    /// `!== null` check against it is legitimate even though the inferred
+    /// value type itself doesn't literally include `null` (adding `null`
+    /// unconditionally to every generic-array read would drown real code in
+    /// `PossiblyNull*` noise for the overwhelmingly common case where the key
+    /// really is present). The impossibility/redundancy checks
+    /// (`ImpossibleIdenticalComparison`, the `=== null` narrowing divergence)
+    /// exempt it, mirroring `falsy_stripped`.
+    pub possibly_absent_offset: bool,
 }
 
 impl Type {
@@ -70,6 +81,7 @@ impl Type {
             possibly_undefined: false,
             from_docblock: false,
             falsy_stripped: false,
+            possibly_absent_offset: false,
         }
     }
 
@@ -81,6 +93,7 @@ impl Type {
             possibly_undefined: false,
             from_docblock: false,
             falsy_stripped: false,
+            possibly_absent_offset: false,
         }
     }
 
@@ -138,6 +151,7 @@ impl Type {
             possibly_undefined: false,
             from_docblock: false,
             falsy_stripped: false,
+            possibly_absent_offset: false,
         }
     }
 
@@ -927,6 +941,7 @@ impl Type {
                 possibly_undefined: a.possibly_undefined || b.possibly_undefined,
                 from_docblock: a.from_docblock || b.from_docblock,
                 falsy_stripped: false,
+                possibly_absent_offset: false,
             };
         }
         let mut result = a.clone();
@@ -1357,6 +1372,14 @@ impl Type {
     /// for flow purposes (see the field doc on [`Type::falsy_stripped`]).
     pub fn falsy_stripped(mut self) -> Self {
         self.falsy_stripped = true;
+        self
+    }
+
+    /// Mark this union as read from a generic array/list offset whose key
+    /// presence isn't statically provable (see the field doc on
+    /// [`Type::possibly_absent_offset`]).
+    pub fn possibly_absent_offset(mut self) -> Self {
+        self.possibly_absent_offset = true;
         self
     }
 }

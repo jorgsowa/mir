@@ -60,6 +60,41 @@ fn spread_key_type(db: &dyn crate::db::MirDatabase, arr_ty: &Type) -> Type {
     }
 }
 
+/// Whether a literal array key's own family (int vs. string) is even
+/// plausibly a member of `declared_key_ty` — a coarse, lenient check (any
+/// unrecognized/open key-type atom is treated as a match) used only to decide
+/// whether a generic `array<K,V>` read counts as genuinely uncertain
+/// presence (`Type::possibly_absent_offset`, see L3) versus a key that
+/// doesn't even belong to the array's own key domain in the first place
+/// (e.g. a string key against a `preg_match()` `$matches` list — see the
+/// `TArray`/`TList` arms of `analyze_array_access`).
+fn literal_key_matches_declared_key_type(
+    key: &mir_types::atomic::ArrayKey,
+    declared_key_ty: &Type,
+) -> bool {
+    use mir_types::atomic::ArrayKey;
+
+    if declared_key_ty.is_mixed() {
+        return true;
+    }
+    let is_int = matches!(key, ArrayKey::Int(_));
+    declared_key_ty.types.iter().any(|a| match a {
+        Atomic::TInt | Atomic::TLiteralInt(_) | Atomic::TPositiveInt | Atomic::TIntRange { .. } => {
+            is_int
+        }
+        Atomic::TString
+        | Atomic::TLiteralString(_)
+        | Atomic::TNonEmptyString
+        | Atomic::TNumericString
+        | Atomic::TClassString(_)
+        | Atomic::TInterfaceString(_)
+        | Atomic::TCallableString
+        | Atomic::TEnumString
+        | Atomic::TTraitString => !is_int,
+        _ => true,
+    })
+}
+
 /// Whether `fqcn` implements `ArrayAccess`, directly or via an ancestor
 /// class/interface — `$obj[$idx]` on such a receiver is governed by the
 /// class's own `offsetGet`/`offsetSet`/`offsetExists` signatures, not the
@@ -756,6 +791,16 @@ impl<'a> ExpressionAnalyzer<'a> {
         // yield `int|string`, not just the shape arm's `int`).
         let mut result = Type::empty();
         let mut contributed = false;
+        // Whether any contributing atom was a generic `array<K,V>`/`list<T>`
+        // (as opposed to a closed/known shape) — such atoms have no per-key
+        // presence tracking at all, so a literal OR dynamic key read from one
+        // may genuinely miss at runtime (PHP's undefined-offset warning, then
+        // `null`). See `Type::possibly_absent_offset`'s doc comment (L3):
+        // marking the merged result exempts a defensive `=== null`/`!== null`
+        // check on it from the impossibility/redundancy checks, without
+        // changing the type's own member set (so every OTHER diagnostic that
+        // inspects `is_nullable()`/membership is unaffected).
+        let mut uncertain_offset = false;
         for atomic in &arr_ty.types {
             match atomic {
                 Atomic::TKeyedArray {
@@ -795,12 +840,38 @@ impl<'a> ExpressionAnalyzer<'a> {
                         }
                     }
                 }
-                Atomic::TArray { value, .. } | Atomic::TNonEmptyArray { value, .. } => {
+                Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value } => {
                     contributed = true;
+                    // A key whose own type family doesn't even match the
+                    // array's declared key type (e.g. a string key against a
+                    // `list<T>`-shaped `preg_match()` `$matches` special-cased
+                    // as a plain int-keyed list — named capture groups aren't
+                    // modeled at all, see B10) isn't a "maybe present, maybe
+                    // absent" access at all; it's a pre-existing separate
+                    // leniency this function already has (silently returning
+                    // `value`'s type regardless), and treating it as uncertain
+                    // would wrongly suppress a genuinely-precise stub type
+                    // like `preg_match`'s "always string, never null" leaf.
+                    if literal_key
+                        .as_ref()
+                        .is_none_or(|k| literal_key_matches_declared_key_type(k, key))
+                    {
+                        uncertain_offset = true;
+                    }
                     result.merge_with(value);
                 }
                 Atomic::TList { value } | Atomic::TNonEmptyList { value } => {
                     contributed = true;
+                    // Same reasoning as the `TArray` arm above — a list's key
+                    // is implicitly `int`; a string key against it is the
+                    // `preg_match()`-named-group leniency, not real presence
+                    // uncertainty.
+                    if literal_key
+                        .as_ref()
+                        .is_none_or(|k| matches!(k, mir_types::atomic::ArrayKey::Int(_)))
+                    {
+                        uncertain_offset = true;
+                    }
                     result.merge_with(value);
                 }
                 Atomic::TString
@@ -827,7 +898,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
         }
         if contributed && !result.types.is_empty() {
-            result
+            if uncertain_offset && !self.in_existence_check {
+                result.possibly_absent_offset()
+            } else {
+                result
+            }
         } else {
             Type::mixed()
         }

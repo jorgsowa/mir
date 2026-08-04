@@ -13,6 +13,10 @@ use super::super::core::{
     narrow_receiver_non_null_on_prop_match, resolve_prop_current_type,
     resolve_static_prop_current_type, ScalarArgTarget,
 };
+use super::super::instanceof_core::{
+    filter_out_instanceof_match, narrow_instanceof_preserving_subtypes,
+};
+use super::super::type_fn::type_fn_narrowed;
 use super::key_exists::{add_key_to_sealed_shapes, remove_key_from_sealed_shapes};
 
 /// Property-access counterpart of the `$arr === []`/`$arr !== []` (and loose
@@ -455,6 +459,238 @@ fn narrow_shape_path_null(
                         is_list: *is_list,
                     });
                 } else if let Some(deeper) = narrow_shape_path_null(&prop.ty, rest, is_null) {
+                    let mut new_props = properties.clone();
+                    if let Some(p) = new_props.get_mut(key) {
+                        p.ty = deeper;
+                    }
+                    changed = true;
+                    result.add_type(Atomic::TKeyedArray {
+                        properties: new_props,
+                        is_open: *is_open,
+                        is_list: *is_list,
+                    });
+                } else {
+                    result.add_type(atomic.clone());
+                }
+            }
+            _ => result.add_type(atomic.clone()),
+        }
+    }
+    if changed && !result.types.is_empty() {
+        Some(result)
+    } else {
+        None
+    }
+}
+
+/// `$base['a']['b'] instanceof ClassName` — the `instanceof` counterpart of
+/// `narrow_offset_null_by_path` (M24), extending G11 (type-guard narrowing
+/// never applying to array-offset expressions) to `instanceof`. Same
+/// literal-keyed-shape-only scope as M24: a generic `array<K,V>`/`list<T>`
+/// base has no per-key storage to narrow, so it's left untouched — same
+/// limitation `narrow_shape_path`/`narrow_shape_path_null` already have. A
+/// no-op when `var_expr` isn't a literal-keyed array-access chain at all.
+pub(crate) fn narrow_offset_instanceof_by_path(
+    var_expr: &php_ast::owned::Expr,
+    ctx: &mut FlowState,
+    db: &dyn MirDatabase,
+    file: &str,
+    class_name: &str,
+    is_true: bool,
+) {
+    let Some((base, path)) = collect_array_access_path(var_expr, ctx, db, file) else {
+        return;
+    };
+    let current = resolve_shape_base_current_type(ctx, &base, db, file);
+    if let Some(narrowed) = narrow_shape_path_instanceof(
+        &current,
+        &path,
+        class_name,
+        db,
+        &ctx.template_param_names,
+        is_true,
+    ) {
+        set_shape_base_narrowed(ctx, &base, current, narrowed);
+    }
+}
+
+/// Narrow `ty` along a shape-key access path by an `instanceof` check on the
+/// key's OWN value — same recursion/exclusion shape as `narrow_shape_path_null`,
+/// with the leaf swapped for `narrow_instanceof_preserving_subtypes`/
+/// `filter_out_instanceof_match`. A closed shape lacking the key entirely
+/// always reads as `null` (never an instance of anything), so it's excluded
+/// on the `is_true` side — the true-branch analogue of `narrow_shape_path_null`
+/// excluding a closed shape missing the key on its non-null side.
+fn narrow_shape_path_instanceof(
+    ty: &Type,
+    path: &[mir_types::atomic::ArrayKey],
+    class_name: &str,
+    db: &dyn MirDatabase,
+    template_param_names: &rustc_hash::FxHashSet<mir_types::Name>,
+    is_true: bool,
+) -> Option<Type> {
+    let (key, rest) = path.split_first()?;
+    let mut changed = false;
+    let mut result = Type::empty();
+    for atomic in &ty.types {
+        match atomic {
+            Atomic::TKeyedArray {
+                properties,
+                is_open,
+                is_list,
+            } => {
+                let Some(prop) = properties.get(key) else {
+                    if is_true && !*is_open {
+                        // Closed shape without this key always reads null —
+                        // `instanceof` is always false for it, so this union
+                        // member can't satisfy the true branch.
+                        changed = true;
+                    } else {
+                        result.add_type(atomic.clone());
+                    }
+                    continue;
+                };
+                if rest.is_empty() {
+                    let narrowed_ty = if is_true {
+                        narrow_instanceof_preserving_subtypes(
+                            &prop.ty,
+                            class_name,
+                            db,
+                            template_param_names,
+                        )
+                    } else {
+                        filter_out_instanceof_match(&prop.ty, class_name, db)
+                    };
+                    if narrowed_ty.is_empty() {
+                        changed = true;
+                        continue;
+                    }
+                    let mut new_props = properties.clone();
+                    if let Some(p) = new_props.get_mut(key) {
+                        p.ty = narrowed_ty;
+                        if is_true {
+                            p.optional = false;
+                        }
+                    }
+                    changed = true;
+                    result.add_type(Atomic::TKeyedArray {
+                        properties: new_props,
+                        is_open: *is_open,
+                        is_list: *is_list,
+                    });
+                } else if let Some(deeper) = narrow_shape_path_instanceof(
+                    &prop.ty,
+                    rest,
+                    class_name,
+                    db,
+                    template_param_names,
+                    is_true,
+                ) {
+                    let mut new_props = properties.clone();
+                    if let Some(p) = new_props.get_mut(key) {
+                        p.ty = deeper;
+                    }
+                    changed = true;
+                    result.add_type(Atomic::TKeyedArray {
+                        properties: new_props,
+                        is_open: *is_open,
+                        is_list: *is_list,
+                    });
+                } else {
+                    result.add_type(atomic.clone());
+                }
+            }
+            _ => result.add_type(atomic.clone()),
+        }
+    }
+    if changed && !result.types.is_empty() {
+        Some(result)
+    } else {
+        None
+    }
+}
+
+/// `is_string($base['a']['b'])`/`is_int(...)`/`is_null(...)`/etc. — the
+/// `is_*`/`ctype_*` type-check counterpart of `narrow_offset_instanceof_by_path`,
+/// reusing the same `type_fn_narrowed` leaf the plain-variable/property arms
+/// already share. Same literal-keyed-shape-only scope.
+pub(crate) fn narrow_offset_type_fn_by_path(
+    var_expr: &php_ast::owned::Expr,
+    ctx: &mut FlowState,
+    fn_name: &str,
+    db: &dyn MirDatabase,
+    file: &str,
+    is_true: bool,
+) {
+    let Some((base, path)) = collect_array_access_path(var_expr, ctx, db, file) else {
+        return;
+    };
+    let current = resolve_shape_base_current_type(ctx, &base, db, file);
+    if let Some(narrowed) = narrow_shape_path_type_fn(&current, &path, fn_name, db, is_true) {
+        set_shape_base_narrowed(ctx, &base, current, narrowed);
+    }
+}
+
+/// Narrow `ty` along a shape-key access path by an `is_*`/`ctype_*` type
+/// check on the key's OWN value. Mirrors `narrow_shape_path_instanceof`'s
+/// recursion/exclusion shape; a closed shape lacking the key always reads as
+/// `null`, so it can only satisfy `is_null()`'s true branch (or any other
+/// check's false branch) — the same `is_true != is_null_check` reasoning
+/// `narrow_prop_from_type_fn` already uses for property receivers.
+fn narrow_shape_path_type_fn(
+    ty: &Type,
+    path: &[mir_types::atomic::ArrayKey],
+    fn_name: &str,
+    db: &dyn MirDatabase,
+    is_true: bool,
+) -> Option<Type> {
+    let (key, rest) = path.split_first()?;
+    let is_null_check = crate::util::php_ident_lowercase(fn_name) == "is_null";
+    let proves_non_null = is_true != is_null_check;
+    let mut changed = false;
+    let mut result = Type::empty();
+    for atomic in &ty.types {
+        match atomic {
+            Atomic::TKeyedArray {
+                properties,
+                is_open,
+                is_list,
+            } => {
+                let Some(prop) = properties.get(key) else {
+                    if proves_non_null && !*is_open {
+                        // Closed shape without this key always reads null —
+                        // impossible to satisfy a check that proves non-null.
+                        changed = true;
+                    } else {
+                        result.add_type(atomic.clone());
+                    }
+                    continue;
+                };
+                if rest.is_empty() {
+                    let Some(narrowed_ty) = type_fn_narrowed(&prop.ty, fn_name, db, is_true) else {
+                        result.add_type(atomic.clone());
+                        continue;
+                    };
+                    if narrowed_ty.is_empty() {
+                        changed = true;
+                        continue;
+                    }
+                    let mut new_props = properties.clone();
+                    if let Some(p) = new_props.get_mut(key) {
+                        p.ty = narrowed_ty;
+                        if proves_non_null {
+                            p.optional = false;
+                        }
+                    }
+                    changed = true;
+                    result.add_type(Atomic::TKeyedArray {
+                        properties: new_props,
+                        is_open: *is_open,
+                        is_list: *is_list,
+                    });
+                } else if let Some(deeper) =
+                    narrow_shape_path_type_fn(&prop.ty, rest, fn_name, db, is_true)
+                {
                     let mut new_props = properties.clone();
                     if let Some(p) = new_props.get_mut(key) {
                         p.ty = deeper;

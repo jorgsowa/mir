@@ -106,13 +106,15 @@ mod interned_types {
     pub fn intern_or_wrap(union: Type) -> Arc<Type> {
         // Fast path 1: single-atomic scalar — covered by `OnceLock` constants.
         // Avoids any DashMap traffic for the most common case. Excludes
-        // `falsy_stripped` types (e.g. `preg_replace_callback`'s narrowed
-        // `string`) — the canonical singleton never carries that flag, so
-        // returning it here would silently drop it.
+        // `falsy_stripped`/`possibly_absent_offset` types (e.g.
+        // `preg_replace_callback`'s narrowed `string`, or a generic
+        // array-offset read's value type) — the canonical singleton never
+        // carries either flag, so returning it here would silently drop it.
         if union.types.len() == 1
             && !union.possibly_undefined
             && !union.from_docblock
             && !union.falsy_stripped
+            && !union.possibly_absent_offset
         {
             match &union.types[0] {
                 mir_types::Atomic::TString => return string(),

@@ -29,9 +29,10 @@ use arrays::{
     narrow_array_emptiness_condition, narrow_array_key_exists_condition,
     narrow_array_key_first_or_last_null, narrow_container_non_null_non_false,
     narrow_empty_shape_key, narrow_in_array_condition, narrow_isset_shape_key,
-    narrow_isset_shape_key_false, narrow_offset_null_by_path,
-    narrow_prop_array_key_first_or_last_null, narrow_static_prop_array_key_first_or_last_null,
-    narrow_to_haystack_values, strip_haystack_null,
+    narrow_isset_shape_key_false, narrow_offset_instanceof_by_path, narrow_offset_null_by_path,
+    narrow_offset_type_fn_by_path, narrow_prop_array_key_first_or_last_null,
+    narrow_static_prop_array_key_first_or_last_null, narrow_to_haystack_values,
+    strip_haystack_null,
 };
 pub(crate) use assertions::apply_one_assertion;
 use assertions::{
@@ -1371,6 +1372,16 @@ pub fn narrow_from_condition(
                     let class_name = crate::db::resolve_name(db, file, &raw_name);
                     narrow_static_prop_instanceof(ctx, &fqcn, &prop, &class_name, db, is_true);
                 }
+            } else if let Some(raw_name) = extract_class_name(
+                &b.right,
+                ctx.self_fqcn.as_deref(),
+                ctx.parent_fqcn.as_deref(),
+            ) {
+                // `$arr['key'] instanceof ClassName` (G11) — literal-keyed
+                // array-offset receiver, same shape-path machinery as M24's
+                // null-check fallback.
+                let class_name = crate::db::resolve_name(db, file, &raw_name);
+                narrow_offset_instanceof_by_path(&b.left, ctx, db, file, &class_name, is_true);
             }
         }
 
@@ -1874,6 +1885,10 @@ pub fn narrow_from_condition(
                         extract_static_prop_access(arg_value, ctx, db, file)
                     {
                         narrow_static_prop_from_type_fn(ctx, bare, &fqcn, &prop, db, is_true);
+                    } else {
+                        // `is_string($arr['key'])`/`is_int(...)`/etc. (G11) —
+                        // literal-keyed array-offset receiver.
+                        narrow_offset_type_fn_by_path(arg_value, ctx, bare, db, file, is_true);
                     }
                 }
             }
