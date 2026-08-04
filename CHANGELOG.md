@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.69.0] - 2026-08-04
+
+### Added
+
+- **`AnalysisSession::files_mentioning_class` exposed:** lets a host reuse
+  the persistent class-mention index (previously internal-only, used by
+  `indexed_references_to`'s own reference-query gate) instead of
+  maintaining an equivalent from-scratch text scanner for its own
+  reachability narrowing. Answers from a per-file cached mention set when
+  possible; a never-scanned or since-edited file is scanned once, and that
+  scan is recorded for every needle already known to the universe, not
+  just the one queried.
+
+### Fixed
+
+- **`indexed_references_to` re-scanned every candidate on every call, even
+  a byte-for-byte repeat query against unchanged state.** The freshness
+  pass has to check each candidate's commit status regardless of outcome,
+  so a caller re-running the same query (e.g. a host recomputing
+  reference counts on every code-lens refresh) paid that O(candidates)
+  scan on every call. Now memoized per `(symbol, files,
+  include_declaration, revision)`, keyed on salsa's own
+  `current_revision` — not a hand-rolled counter, which a host writing
+  text directly via `SourceFile::set_text` (bypassing
+  `ingest_file`/`set_file_text`) would silently bypass. Capped by total
+  cached locations (not entry count, which doesn't bound memory when one
+  entry's result size varies from a handful to thousands of locations for
+  a hot symbol).
+
 ## [0.68.0] - 2026-08-04
 
 ### Added
