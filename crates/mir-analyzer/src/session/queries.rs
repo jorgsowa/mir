@@ -1100,6 +1100,12 @@ impl AnalysisSession {
     /// Commit definitions (class edges + freshness) for every file in `files`
     /// that is stale (committed against older text) or that has never been
     /// committed and mentions one of `shorts` as a whole identifier.
+    ///
+    /// The textual gate answers from the shared per-file mention cache — the
+    /// same one `indexed_references_to`'s gate populates — so a file scanned
+    /// by either consumer answers the other with a set lookup instead of an
+    /// O(text) rescan per BFS round. A file the cache can't answer for is
+    /// scanned once against the whole name universe and recorded.
     fn commit_defs_for_matching(&self, files: &[Arc<str>], shorts: &[String]) {
         use std::panic::AssertUnwindSafe;
 
@@ -1109,36 +1115,107 @@ impl AnalysisSession {
             let guard = self.defs_committed_keys();
             guard.into_iter().collect()
         };
-        let needles = IdentifierNeedles::new(shorts);
-        let work = loop {
+        // Admit the frontier names before preparing, so every needle gets a
+        // real query (a declared class's short name is already in the
+        // universe from indexing — admission then changes nothing).
+        let (queries, mention_scanner) = {
+            let guard = self.db.salsa.read();
+            guard.add_literal_mention_names(shorts.iter().map(|s| s.as_str()));
+            let queries: Vec<_> = shorts
+                .iter()
+                .filter_map(|s| guard.prepare_class_mention_query(s))
+                .collect();
+            (queries, guard.class_mention_scanner())
+        };
+        // Admission guarantees a query per needle and a non-empty universe;
+        // anything else is a defensive fallback to the direct scan.
+        let use_mentions = queries.len() == shorts.len() && mention_scanner.is_some();
+        let needle_matcher = IdentifierNeedles::new(shorts);
+        type Work = (Arc<str>, Arc<str>, Vec<crate::db::SubtypeEntry>);
+        type MentionScanRec = (Arc<str>, Arc<str>, Box<[mir_types::Name]>);
+        let (work, scanned): (Vec<Work>, Vec<MentionScanRec>) = loop {
             let attempt = salsa::Cancelled::catch(AssertUnwindSafe(|| {
                 let db_main = self.snapshot_db();
                 files
                     .par_iter()
                     .map_with(db_main, |db, path| {
-                        let sf = db.lookup_source_file(path.as_ref())?;
+                        let Some(sf) = db.lookup_source_file(path.as_ref()) else {
+                            return (None, None);
+                        };
                         let text = sf.text(&*db as &dyn MirDatabase).clone();
                         if self.is_defs_committed(path.as_ref(), &text) {
-                            return None;
+                            return (None, None);
                         }
                         // Never-committed files must mention a frontier name;
                         // stale (previously committed) files recommit
                         // unconditionally — their classes may have re-parented.
-                        if !committed_any.contains(path.as_ref()) && !needles.matches(&text) {
-                            return None;
+                        let mut scan_rec: Option<MentionScanRec> = None;
+                        if !committed_any.contains(path.as_ref()) {
+                            let hit = if use_mentions {
+                                let mut answer = Some(false);
+                                for q in &queries {
+                                    match db.class_mention_answer(path.as_ref(), q, &text) {
+                                        Some(true) => {
+                                            answer = Some(true);
+                                            break;
+                                        }
+                                        Some(false) => {}
+                                        None => answer = None,
+                                    }
+                                }
+                                match answer {
+                                    Some(hit) => hit,
+                                    None => {
+                                        // Uncoverable entry: one scan answers
+                                        // every query and is recorded below.
+                                        let scanner = mention_scanner.as_ref().unwrap();
+                                        let names = scanner.scan(&text);
+                                        let hit = queries
+                                            .iter()
+                                            .any(|q| names.binary_search(&q.name).is_ok());
+                                        scan_rec = Some((path.clone(), text.clone(), names));
+                                        hit
+                                    }
+                                }
+                            } else {
+                                needle_matcher.matches(&text)
+                            };
+                            if !hit {
+                                return (None, scan_rec);
+                            }
                         }
                         let defs =
                             crate::db::collect_file_definitions(&*db as &dyn MirDatabase, sf);
                         let entries = crate::db::subtype_index::entries_from_slice(&defs.slice);
-                        Some((path.clone(), text, entries))
+                        (Some((path.clone(), text, entries)), scan_rec)
                     })
-                    .flatten()
                     .collect::<Vec<_>>()
             }));
             if let Ok(v) = attempt {
-                break v;
+                let mut work = Vec::new();
+                let mut scanned = Vec::new();
+                for (w, rec) in v {
+                    if let Some(w) = w {
+                        work.push(w);
+                    }
+                    if let Some(rec) = rec {
+                        scanned.push(rec);
+                    }
+                }
+                break (work, scanned);
             }
         };
+        // Record the fallback scans regardless of hit/miss: each is a
+        // complete, current mention set for its file, so the next round's
+        // (and the references gate's) checks become set lookups.
+        if let Some(scanner) = &mention_scanner {
+            if !scanned.is_empty() {
+                let guard = self.db.salsa.read();
+                for (file, text, names) in scanned {
+                    guard.set_file_class_mentions(&file, &text, scanner.epoch(), names);
+                }
+            }
+        }
         if work.is_empty() {
             return;
         }

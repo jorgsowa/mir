@@ -180,4 +180,54 @@ fn main() {
         refs2.len(),
         session2.index_generation() - gen_before
     );
+
+    // Scenario: cold subtype queries on a fully-registered, symbol-indexed,
+    // never-analyzed workspace (an LSP session right after its scan) — the
+    // `commit_defs_for_matching` gate must textually vet every
+    // never-committed candidate per BFS round, so this times that gate and
+    // counts the raw-text passes it records/skips via the mention index.
+    let psr4c = Arc::new(
+        mir_analyzer::composer::Psr4Map::from_composer(&fixture)
+            .expect("failed to load composer.json"),
+    );
+    let session3 = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4c);
+    session3.ensure_all_stubs();
+    let workspace3: Vec<(Arc<str>, Arc<str>)> = project_files
+        .iter()
+        .chain(vendor_files.iter())
+        .filter_map(|p| {
+            let src = std::fs::read_to_string(p).ok()?;
+            Some((
+                Arc::<str>::from(p.to_string_lossy().as_ref()),
+                Arc::<str>::from(src),
+            ))
+        })
+        .collect();
+    let all_paths: Vec<Arc<str>> = workspace3.iter().map(|(p, _)| p.clone()).collect();
+    session3.set_workspace_files(workspace3);
+    session3.rebuild_workspace_symbol_index();
+
+    let t6 = Instant::now();
+    let subs1 =
+        session3.indexed_subtype_classes("Illuminate\\Support\\ServiceProvider", &all_paths, false);
+    let scans1 = session3.class_mention_stats().scans_recorded;
+    eprintln!(
+        "cold indexed_subtype_classes(ServiceProvider), unanalyzed workspace: {:.3}s, {} subtypes, {} mention scans recorded",
+        t6.elapsed().as_secs_f64(),
+        subs1.len(),
+        scans1
+    );
+    let t7 = Instant::now();
+    let subs2 = session3.indexed_subtype_classes(
+        "Illuminate\\Contracts\\Support\\Arrayable",
+        &all_paths,
+        false,
+    );
+    let scans2 = session3.class_mention_stats().scans_recorded;
+    eprintln!(
+        "cold indexed_subtype_classes(Arrayable), same session: {:.3}s, {} subtypes, {} new mention scans",
+        t7.elapsed().as_secs_f64(),
+        subs2.len(),
+        scans2 - scans1
+    );
 }

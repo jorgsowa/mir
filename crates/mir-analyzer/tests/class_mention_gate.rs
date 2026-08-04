@@ -315,3 +315,92 @@ fn cold_and_warm_gate_agree_across_generated_workspace() {
     let stats = session.class_mention_stats();
     assert!(stats.files_covered >= raw.len(), "{stats:?}");
 }
+
+/// The subtype-BFS defs gate (`commit_defs_for_matching`) shares the mention
+/// cache with the references gate: a repeat subtype query against unchanged
+/// state, and a references query over the same files, must run lookup-only
+/// (no new raw-text scans) — one scan pass covers every later consumer.
+#[test]
+fn subtype_gate_shares_mention_cache_with_references_gate() {
+    let declared = [
+        (
+            "base.php",
+            "<?php\nnamespace App;\ninterface Shape { public function area(): float; }\n",
+        ),
+        (
+            "circle.php",
+            "<?php\nnamespace App;\nclass Circle implements Shape { public function area(): float { return 1.0; } }\n",
+        ),
+        (
+            "disc.php",
+            "<?php\nnamespace App;\nclass Disc extends Circle {}\n",
+        ),
+    ];
+    let raw = [
+        (
+            "uses.php",
+            "<?php\nnamespace App;\nfunction f(Shape $s): float { return $s->area(); }\n",
+        ),
+        (
+            "unrelated.php",
+            "<?php\nnamespace App;\nfunction g(): int { return 42; }\n",
+        ),
+    ];
+    let session = build_session(&declared, &raw);
+    let files: Vec<Arc<str>> = [
+        "base.php",
+        "circle.php",
+        "disc.php",
+        "uses.php",
+        "unrelated.php",
+    ]
+    .iter()
+    .map(|p| Arc::from(*p))
+    .collect();
+
+    // Cold subtype query: the gate's textual check on the two never-committed
+    // files (uses.php, unrelated.php) goes through the mention index and
+    // RECORDS its scans — the declared files are defs-committed by ingest and
+    // skip the gate entirely.
+    let cold = session.indexed_subtype_classes("App\\Shape", &files, false);
+    assert_eq!(
+        {
+            let mut v: Vec<&str> = cold.iter().map(|s| s.fqcn.as_ref()).collect();
+            v.sort();
+            v
+        },
+        vec!["App\\Circle", "App\\Disc"],
+        "BFS must find the transitive subtype through Circle"
+    );
+    let scans_after_subtype = session.class_mention_stats().scans_recorded;
+    assert_eq!(
+        scans_after_subtype, 2,
+        "the subtype gate must scan-and-record the two never-committed files \
+         exactly once across both BFS rounds"
+    );
+
+    // Different root, same candidate set, unchanged texts — lookup-only.
+    // (A different root also misses the subtype-query memo, so the gate runs.)
+    let sibling = session.indexed_subtype_classes("App\\Circle", &files, false);
+    assert_eq!(sibling.len(), 1);
+    assert_eq!(sibling[0].fqcn.as_ref(), "App\\Disc");
+    assert_eq!(
+        session.class_mention_stats().scans_recorded,
+        scans_after_subtype,
+        "a repeat subtype gate over unchanged files must answer from the mention cache"
+    );
+
+    // The references gate consumes the subtype gate's recorded scans: its
+    // candidates are all five files (ingest drops ref-commit marks), and it
+    // only scans the three the subtype gate never touched.
+    let refs = session
+        .indexed_references_to(&Name::class("App\\Shape"), &files, false, &no_cancel())
+        .expect("not cancelled");
+    assert!(!refs.is_empty(), "Shape is referenced in uses.php");
+    assert_eq!(
+        session.class_mention_stats().scans_recorded,
+        scans_after_subtype + 3,
+        "the references gate must reuse the subtype gate's two recorded scans \
+         and only scan the three defs-committed files it skipped"
+    );
+}

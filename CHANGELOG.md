@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The subtype-BFS defs gate re-scanned every never-committed file's raw
+  text per BFS round on every query.** `commit_defs_for_matching`'s
+  textual gate ("does this file mention a frontier class name") now
+  answers from the persistent per-file mention index — the same one
+  `indexed_references_to`'s gate populates — so a file scanned by either
+  consumer answers the other with a set lookup. A file the cache can't
+  answer for is scanned once against the whole name universe and
+  recorded. On the Laravel fixture (11.7k registered, symbol-indexed,
+  never-analyzed files), a second cold `indexed_subtype_classes` on a
+  different hierarchy drops from a full workspace re-scan every round to
+  zero text passes (0.020s → 0.012s); the first-ever scan pays the
+  whole-universe automaton once (0.025s → 0.052s) and pre-pays every
+  later subtype and references gate check. Results are identical.
+
 - **A warm-up pass bumped the workspace revision once per lazily-loaded
   class, cancelling every in-flight salsa reader each time.** A cold
   `indexed_references_to` / `reanalyze_*` pass that faults in N
