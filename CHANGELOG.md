@@ -5,7 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.69.0] - 2026-08-04
+
+### Added
+
+- **`AnalysisSession::files_mentioning_class` exposed:** lets a host reuse
+  the persistent class-mention index (previously internal-only, used by
+  `indexed_references_to`'s own reference-query gate) instead of
+  maintaining an equivalent from-scratch text scanner for its own
+  reachability narrowing. Answers from a per-file cached mention set when
+  possible; a never-scanned or since-edited file is scanned once, and that
+  scan is recorded for every needle already known to the universe, not
+  just the one queried.
+- **`AnalysisSession::files_mentioning_any` exposed:** multi-needle form of
+  `files_mentioning_class` for a host resolving several candidate names at
+  once (e.g. an owner FQN plus its subtype closure) in one shared pass.
+- **`ClassMentionIndex` supports raw (no-word-bound) needles:**
+  `add_raw_names`/`add_raw_mention_needles` admit a needle that isn't
+  itself a whole identifier (e.g. a call token like `->__construct`,
+  whose preceding byte in real usage — `$obj->__construct()` — is an
+  identifier character and would otherwise fail the boundary check that
+  protects a normal needle). Shares the same universe, scanner, and
+  per-file cache as bounded needles — a file scanned for one answers the
+  other for free.
 
 ### Changed
 
@@ -53,30 +75,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   must observe every load immediately. Results and issue output are
   byte-identical; generation-stamped freshness semantics are unchanged
   (commits are stamped after the pass's flush, as before).
-
-## [0.69.0] - 2026-08-04
-
-### Added
-
-- **`AnalysisSession::files_mentioning_class` exposed:** lets a host reuse
-  the persistent class-mention index (previously internal-only, used by
-  `indexed_references_to`'s own reference-query gate) instead of
-  maintaining an equivalent from-scratch text scanner for its own
-  reachability narrowing. Answers from a per-file cached mention set when
-  possible; a never-scanned or since-edited file is scanned once, and that
-  scan is recorded for every needle already known to the universe, not
-  just the one queried.
-- **`AnalysisSession::files_mentioning_any` exposed:** multi-needle form of
-  `files_mentioning_class` for a host resolving several candidate names at
-  once (e.g. an owner FQN plus its subtype closure) in one shared pass.
-- **`ClassMentionIndex` supports raw (no-word-bound) needles:**
-  `add_raw_names`/`add_raw_mention_needles` admit a needle that isn't
-  itself a whole identifier (e.g. a call token like `->__construct`,
-  whose preceding byte in real usage — `$obj->__construct()` — is an
-  identifier character and would otherwise fail the boundary check that
-  protects a normal needle). Shares the same universe, scanner, and
-  per-file cache as bounded needles — a file scanned for one answers the
-  other for free.
 
 ### Fixed
 
