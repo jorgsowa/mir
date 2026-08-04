@@ -247,10 +247,24 @@ impl<'a> StatementsAnalyzer<'a> {
         let pre = ctx.clone();
         let entry = ctx.branch();
         // Do-while always executes at least once (body before condition check)
+        let mut first_pass = true;
         let mut post = self.analyze_loop_widened(
             &pre,
             entry,
             |sa, iter| {
+                // Re-apply condition narrowing at the start of every iteration
+                // AFTER the first, mirroring `analyze_while_stmt`: re-entering the
+                // body means the PREVIOUS iteration's condition check was true,
+                // and `analyze_loop_widened`'s fixed-point merge discards
+                // narrowing between passes unless re-injected here. The very
+                // first pass must NOT narrow — the body runs unconditionally
+                // before the condition is ever checked, so treating it as
+                // already-proven-true here would wrongly flag the body
+                // unreachable when the condition is provably always-false.
+                if !first_pass {
+                    narrow_from_condition(&dw.condition, iter, true, sa.db, &sa.file);
+                }
+                first_pass = false;
                 sa.analyze_stmt(&dw.body, iter);
                 sa.expr_analyzer(iter).analyze(&dw.condition, iter);
                 sa.check_docblock_contradiction(&dw.condition, iter);
