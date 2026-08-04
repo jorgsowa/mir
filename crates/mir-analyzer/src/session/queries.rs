@@ -293,7 +293,59 @@ impl AnalysisSession {
     /// `should_cancel` follows [`Self::references_to_in_files_cancellable`]'s
     /// contract: polled at phase boundaries and between cancellation retries;
     /// `true` aborts with `None`.
+    ///
+    /// Memoized per `(symbol, files, include_declaration, text_revision)` —
+    /// see [`RefQueryCacheKey`]. The freshness scan below still costs
+    /// O(candidates) even when every candidate is already committed (it has
+    /// to check), so a caller re-running the same query against unchanged
+    /// state (e.g. a host recomputing reference counts for a code-lens
+    /// refresh) would otherwise re-pay that scan on every call; this makes
+    /// the repeat a single hashmap lookup instead.
     pub fn indexed_references_to(
+        &self,
+        symbol: &crate::Name,
+        files: &[Arc<str>],
+        include_declaration: bool,
+        should_cancel: &(dyn Fn() -> bool + Sync),
+    ) -> Option<Vec<(Arc<str>, crate::Range)>> {
+        // No `should_cancel()` check here: a cache hit does no analysis
+        // work, so there's nothing to cancel, and calling it would consume
+        // one of the caller's cancellation-probe invocations before the
+        // uncached path's own checks ever run (some callers, e.g.
+        // `session_sweep_persists_postings_for_next_launch`, count these to
+        // prove a warm query needed no re-analysis).
+        let cache_key = RefQueryCacheKey {
+            symbol: symbol.codebase_key(),
+            include_declaration,
+            text_revision: self.text_revision(),
+            files_hash: hash_files(files),
+        };
+        if let Some(cached) = self.ref_query_cache.read().get(&cache_key) {
+            self.ref_query_cache_hits
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            return Some((**cached).clone());
+        }
+        let result =
+            self.indexed_references_to_uncached(symbol, files, include_declaration, should_cancel)?;
+        let mut cache = self.ref_query_cache.write();
+        let new_len = result.len();
+        let prior = self
+            .ref_query_cache_locations
+            .fetch_add(new_len, std::sync::atomic::Ordering::Relaxed);
+        if prior + new_len > REF_QUERY_CACHE_LOCATION_CAP {
+            cache.clear();
+            self.ref_query_cache_locations
+                .store(new_len, std::sync::atomic::Ordering::Relaxed);
+        }
+        cache.insert(cache_key, Arc::new(result.clone()));
+        Some(result)
+    }
+
+    /// Uncached implementation of [`Self::indexed_references_to`]. Callers
+    /// should use the memoizing wrapper; this is split out only so the cache
+    /// check/populate logic doesn't have to interleave with the retry loops
+    /// below.
+    fn indexed_references_to_uncached(
         &self,
         symbol: &crate::Name,
         files: &[Arc<str>],

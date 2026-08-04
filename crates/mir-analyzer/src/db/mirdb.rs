@@ -1427,6 +1427,20 @@ impl MirDbStorage {
             .load(std::sync::atomic::Ordering::Relaxed)
     }
 
+    /// Salsa's own global input-write revision — bumps on every write to
+    /// *any* salsa input, unconditionally, regardless of which wrapper
+    /// function performed it. Deliberately not a hand-rolled counter
+    /// threaded through `upsert_source_file_with_durability`: a host that
+    /// mutates a `SourceFile` directly via its generated `set_text` setter
+    /// (e.g. one sharing this db via the converged-db integration pattern,
+    /// rather than going through `ingest_file`/`set_file_text`) would
+    /// silently bypass a bespoke counter, but can never bypass salsa's own
+    /// revision bump — it's baked into every input write. Exposed via
+    /// [`crate::AnalysisSession::text_revision`].
+    pub fn current_revision(&self) -> salsa::Revision {
+        salsa::plumbing::current_revision(self)
+    }
+
     /// Number of source files currently registered.
     pub fn source_file_count(&self) -> usize {
         self.source_files.len()

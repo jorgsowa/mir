@@ -111,6 +111,76 @@ pub struct AnalysisSession {
     /// depend only on the file's own text, so a pointer-equal entry is
     /// always exact (no cross-file drift).
     defs_committed: CommittedTexts,
+    /// Memoized [`Self::indexed_references_to`] results. See
+    /// [`RefQueryCacheKey`] for the invalidation contract. Without this, a
+    /// repeat query against an unchanged candidate set still re-pays the
+    /// O(candidates) freshness scan on every call — cheap per file, but
+    /// measured at tens of MB / seconds of churn for a widely-referenced
+    /// symbol queried repeatedly (e.g. a host recomputing code-lens
+    /// reference counts on every request). Bounded by total cached
+    /// LOCATIONS (`ref_query_cache_locations`, capped at
+    /// `REF_QUERY_CACHE_LOCATION_CAP`), not entry count — a per-entry cap
+    /// would not bound memory here, since one entry's `Vec` scales with how
+    /// many times its symbol is referenced (a handful for a typical method,
+    /// thousands for a hot one like `Str::class`'s), so a fixed entry count
+    /// gives no fixed byte ceiling. Cleared wholesale on overflow, same
+    /// trade-off as the other simple caches in this module.
+    ref_query_cache: RefQueryCache,
+    /// Sum of `.len()` across every `ref_query_cache` entry, kept in
+    /// lockstep with it. See the field doc above.
+    ref_query_cache_locations: Arc<std::sync::atomic::AtomicUsize>,
+    /// Hits served from `ref_query_cache`. Diagnostic only — lets tests
+    /// assert a warm repeat skipped the freshness scan entirely, the same
+    /// way `ref_index_lock_count` proves a bounded posting lookup.
+    ref_query_cache_hits: Arc<std::sync::atomic::AtomicU64>,
+}
+
+/// Cache key for [`AnalysisSession::indexed_references_to`]'s memoization.
+///
+/// `text_revision` (not [`AnalysisSession::index_generation`]) is the
+/// correct epoch here: a body-only edit never bumps the workspace
+/// generation (by design — see `bump_workspace_revision`'s doc comment) but
+/// can still move, add, or remove a reference location, so keying on the
+/// coarser generation would serve stale locations after such an edit.
+/// `files_hash` guards against a caller narrowing/widening the candidate
+/// scope between calls for the same symbol at the same revision (e.g. a
+/// different reference-scope plan) — a coincidental hash collision would
+/// only cause a wrong cache HIT, so this hashes full content, not just
+/// length/pointers.
+#[derive(PartialEq, Eq, Hash)]
+struct RefQueryCacheKey {
+    symbol: String,
+    include_declaration: bool,
+    text_revision: salsa::Revision,
+    files_hash: u64,
+}
+
+/// Cap on `ref_query_cache`'s total cached reference-location count (summed
+/// across every entry), not entry count — see the field doc on
+/// `ref_query_cache`. Each location is `(Arc<str>, Range)`, ~24 bytes plus a
+/// refcount bump on an already-allocated path string (no new string data),
+/// so 200k locations is on the order of a few MB — a small, fixed ceiling
+/// regardless of how skewed the query distribution is (many small entries or
+/// a few huge ones for hot symbols cost the same worst case).
+const REF_QUERY_CACHE_LOCATION_CAP: usize = 200_000;
+
+/// Memoized [`AnalysisSession::indexed_references_to`] results. See
+/// [`RefQueryCacheKey`] for the invalidation contract.
+type RefQueryCache = Arc<RwLock<HashMap<RefQueryCacheKey, Arc<Vec<(Arc<str>, crate::Range)>>>>>;
+
+/// Stable content hash of a candidate-file list, order-sensitive. Callers
+/// that rebuild the list identically each time (the common case — the same
+/// scope-narrowing query re-run against unchanged state) still hash equal;
+/// a genuinely different list (different content OR order) safely misses
+/// rather than risking a wrong hit.
+fn hash_files(files: &[Arc<str>]) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = rustc_hash::FxHasher::default();
+    files.len().hash(&mut hasher);
+    for f in files {
+        f.hash(&mut hasher);
+    }
+    hasher.finish()
 }
 
 /// FQCN → optional resolver-mapped path. See the field doc on
@@ -193,7 +263,25 @@ impl AnalysisSession {
             prepare_generation: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             ref_committed: Arc::new(RwLock::new(HashMap::default())),
             defs_committed: Arc::new(RwLock::new(HashMap::default())),
+            ref_query_cache: Arc::new(RwLock::new(HashMap::default())),
+            ref_query_cache_locations: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+            ref_query_cache_hits: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         }
+    }
+
+    /// Hits served from [`Self::indexed_references_to`]'s memoization cache.
+    /// Diagnostic only — see the field doc on `ref_query_cache_hits`.
+    pub fn ref_query_cache_hits(&self) -> u64 {
+        self.ref_query_cache_hits
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Total cached reference-location count across `ref_query_cache`.
+    /// Diagnostic only — lets tests/hosts assert the cache stays under its
+    /// byte-proportional cap rather than trusting entry count alone.
+    pub fn ref_query_cache_locations(&self) -> usize {
+        self.ref_query_cache_locations
+            .load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// Times the reference index has been locked on this session's db.
@@ -205,6 +293,58 @@ impl AnalysisSession {
     /// metrics and memory-bound checks).
     pub fn class_mention_stats(&self) -> crate::db::ClassMentionStats {
         self.db.salsa.read().class_mention_stats()
+    }
+
+    /// Which of `files` currently mention `class_name` as a whole
+    /// identifier (case-insensitive) — the same persistent, incrementally-
+    /// maintained mechanism [`Self::indexed_references_to`]'s own gate uses
+    /// internally (see `db::class_mention_index`'s doc comment), exposed so
+    /// a host doesn't need to re-implement an equivalent from-scratch text
+    /// scan for its own narrowing (e.g. a reachability pre-filter ahead of
+    /// a references/code-lens query). A file already scanned against a
+    /// universe that included `class_name` answers via an O(log n) lookup
+    /// with no text pass at all; only a never-scanned or since-edited file
+    /// pays a scan, and that scan is recorded for every other name already
+    /// in the universe too, not just this one.
+    ///
+    /// **Scope**: the universe is populated from *declared class-like
+    /// names* (classes/interfaces/traits/enums), the same population
+    /// mir's own indexing already does as a side effect — it does not
+    /// cover function/method names or arbitrary literal needles. A
+    /// `class_name` this index has never seen (not a declared class-like
+    /// name anywhere in the workspace) conservatively returns every file
+    /// in `files`, since the index has no basis to rule any of them out.
+    pub fn files_mentioning_class(&self, files: &[Arc<str>], class_name: &str) -> Vec<Arc<str>> {
+        use rayon::prelude::*;
+
+        let db = self.snapshot_db();
+        let Some(query) = db.prepare_class_mention_query(class_name) else {
+            return files.to_vec();
+        };
+        // `query` resolved against a non-empty universe, so a scanner
+        // exists; only ever `None` while the universe itself is empty.
+        let Some(scanner) = db.class_mention_scanner() else {
+            return files.to_vec();
+        };
+
+        files
+            .par_iter()
+            .map_with(db, |db, f| {
+                let sf = db.lookup_source_file(f.as_ref())?;
+                let text = sf.text(&*db as &dyn MirDatabase).clone();
+                let hit = match db.class_mention_answer(f.as_ref(), &query, &text) {
+                    Some(hit) => hit,
+                    None => {
+                        let names = scanner.scan(text.as_ref());
+                        let hit = names.binary_search(&query.name).is_ok();
+                        db.set_file_class_mentions(f, &text, scanner.epoch(), names);
+                        hit
+                    }
+                };
+                hit.then(|| f.clone())
+            })
+            .flatten()
+            .collect()
     }
 
     /// Whether `file`'s reference postings are exact for `current_text` at

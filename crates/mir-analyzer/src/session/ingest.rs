@@ -378,6 +378,21 @@ impl AnalysisSession {
         self.db.salsa.read().workspace_revision_value()
     }
 
+    /// The text-write epoch — salsa's own global revision, which bumps on
+    /// every source-file add, edit, or removal (any input write at all),
+    /// unlike [`Self::index_generation`] which only bumps on file
+    /// add/remove/declaration changes (a body-only edit deliberately leaves
+    /// it unchanged, to avoid over-invalidating workspace-enumeration
+    /// queries). A cache of a per-file or per-query *result* — as opposed to
+    /// declaration-shape state — must key on this instead: any text write
+    /// can move or add/remove a reference location within that file, even
+    /// when no declaration changed. See `MirDbStorage::current_revision`'s
+    /// doc comment for why this must be salsa's own revision rather than a
+    /// hand-rolled counter.
+    pub fn text_revision(&self) -> salsa::Revision {
+        self.db.salsa.read().current_revision()
+    }
+
     /// Index one bounded chunk of `(path, text)` files — the chunked background
     /// indexing primitive.
     ///
