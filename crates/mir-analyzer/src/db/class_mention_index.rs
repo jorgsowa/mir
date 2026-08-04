@@ -1,23 +1,26 @@
-//! Class-name mention index: file → the declared class-like short names its
-//! raw text mentions as whole identifiers.
+//! Mention index: file → the universe names its raw text mentions. The
+//! universe holds declared class-like short names (seeded by indexing),
+//! literal needles admitted at query time (member/function names), and raw
+//! call tokens (`->__construct`), so it is the single implementation of the
+//! textual gates.
 //!
-//! The reference-query gate in `indexed_references_to` admits a
-//! never-committed file only when its text mentions the queried symbol's
-//! name — previously a fresh Aho-Corasick pass over every candidate's raw
-//! text on *every* query. This index memoizes that purely textual predicate:
-//! a file scanned once (against the whole known-name universe) answers all
-//! later single-needle gates with an O(log n) set lookup instead of an
-//! O(text) scan.
+//! The reference-query and subtype-BFS gates admit a never-committed file
+//! only when its text mentions a queried needle — previously a fresh
+//! Aho-Corasick pass over every candidate's raw text on *every* query. This
+//! index memoizes that purely textual predicate: a file scanned once
+//! (against the whole universe) answers all later gates with an O(log n)
+//! set lookup instead of an O(text) scan.
 //!
 //! Correctness model — the index can only ever say what a raw scan would:
 //! - An entry is keyed to its source text by `Arc` identity; an edit
 //!   self-invalidates it (the reader falls back to a raw scan).
 //! - The name universe is append-only within a session; each name records
 //!   the epoch it entered. An entry scanned at epoch E answers only needles
-//!   added at or before E — a class declared later falls back to the raw
+//!   added at or before E — a name admitted later falls back to the raw
 //!   scan until the file is rescanned (which any later scan upgrades).
-//! - Scan semantics are byte-identical to `IdentifierNeedles::matches`
-//!   (whole identifier, ASCII-case-insensitive).
+//! - Bounded-needle scan semantics match `mentions_identifier` (the test
+//!   oracle in `session/queries.rs`): whole identifier,
+//!   ASCII-case-insensitive. Raw needles skip the boundary check.
 //!
 //! Concurrency: per-file entries live in a sharded `DashMap` (the gate loop
 //! reads one entry per candidate from many rayon workers at once — a single
@@ -70,7 +73,7 @@ impl MentionScanner {
 
     /// Every universe name `hay` mentions, sorted for binary search. A
     /// bounded pattern must appear as a whole identifier (boundary rule
-    /// matches `IdentifierNeedles::matches`); a raw pattern (see
+    /// matches the `mentions_identifier` test oracle); a raw pattern (see
     /// [`ClassMentionIndex::add_raw_names`]) matches as a plain substring,
     /// no boundary check at all.
     pub fn scan(&self, hay: &str) -> Box<[Name]> {

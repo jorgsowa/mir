@@ -153,9 +153,11 @@ fn measure_mention_index() {
     let warm_other = t.elapsed();
     let (a3, b3) = alloc_snapshot();
 
-    // Pass 4 — baseline: a needle outside the universe takes the pre-index
-    // path verbatim (per-file `IdentifierNeedles` raw scan, no recording).
-    // This is what EVERY query paid before the index existed.
+    // Pass 4 — novel needle: admitted to the universe at query time, which
+    // epoch-invalidates every prior recording for itself, so each covered
+    // file pays one whole-universe rescan and re-records. This is the
+    // once-per-new-needle cost (the pre-index gate paid a scan like this on
+    // EVERY query, novel needle or not).
     let (a3b, b3b) = alloc_snapshot();
     let t = Instant::now();
     let r4 = session
@@ -166,15 +168,36 @@ fn measure_mention_index() {
             &never,
         )
         .unwrap();
-    let baseline = t.elapsed();
+    let novel = t.elapsed();
     let (a4, b4) = alloc_snapshot();
     eprintln!(
-        "raw-scan baseline (needle outside universe): {baseline:>10.2?}   allocs {:>10}  bytes {:>12}",
+        "novel needle (admit + rescan + re-record):   {novel:>10.2?}   allocs {:>10}  bytes {:>12}",
         a4 - a3b,
         b4 - b3b
     );
 
-    assert!(r1.is_empty() && r2.is_empty() && r3.is_empty() && r4.is_empty());
+    // Pass 5 — the amortization: the same once-novel needle is now covered;
+    // the gate must run lookup-only (zero new scans). Uses a different files
+    // slice (drop one path) so the ref-query memo misses and the gate runs.
+    let scans_before_repeat = session.class_mention_stats().scans_recorded;
+    let t = Instant::now();
+    let r5 = session
+        .indexed_references_to(
+            &mir_analyzer::Name::class("Probe\\ZzzNotDeclaredAnywhere"),
+            &paths[..paths.len() - 1],
+            false,
+            &never,
+        )
+        .unwrap();
+    let novel_repeat = t.elapsed();
+    eprintln!("novel needle repeat (lookup-only):           {novel_repeat:>10.2?}");
+    assert_eq!(
+        session.class_mention_stats().scans_recorded,
+        scans_before_repeat,
+        "repeat query on a now-covered needle must not rescan"
+    );
+
+    assert!(r1.is_empty() && r2.is_empty() && r3.is_empty() && r4.is_empty() && r5.is_empty());
 
     let stats = session.class_mention_stats();
     // Entry cost model: Name is 8 bytes; FileMentions ≈ text Arc ptr (8) +

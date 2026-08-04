@@ -230,4 +230,83 @@ fn main() {
         subs2.len(),
         scans2 - scans1
     );
+
+    // Scenario: member-symbol references (method name + owner short name
+    // needles) on the same session. The method name is novel to the mention
+    // universe, so the first query pays the once-per-needle recording pass;
+    // the post-edit repeat (memo missed — revision moved) is the steady
+    // state an editor lives in.
+    let m_target = Name::method("Illuminate\\Support\\Str", "studly");
+    let t8 = Instant::now();
+    let mrefs = session3
+        .indexed_references_to(&m_target, &all_paths, false, &|| false)
+        .expect("not cancelled");
+    let scans3 = session3.class_mention_stats().scans_recorded;
+    eprintln!(
+        "cold references(Str::studly), novel member needle: {:.3}s, {} references, {} new mention scans",
+        t8.elapsed().as_secs_f64(),
+        mrefs.len(),
+        scans3 - scans2
+    );
+
+    let edited = all_paths[0].clone();
+    let edited_text: Arc<str> = {
+        let orig = std::fs::read_to_string(edited.as_ref()).expect("read edited file");
+        Arc::from(format!("{orig}\n// bench edit\n").as_str())
+    };
+    session3.set_file_text(edited.clone(), edited_text);
+    let t9 = Instant::now();
+    let mrefs2 = session3
+        .indexed_references_to(&m_target, &all_paths, false, &|| false)
+        .expect("not cancelled");
+    let scans4 = session3.class_mention_stats().scans_recorded;
+    eprintln!(
+        "references(Str::studly) after one file edit: {:.3}s, {} references, {} new mention scans",
+        t9.elapsed().as_secs_f64(),
+        mrefs2.len(),
+        scans4 - scans3
+    );
+
+    // Scenario: constructor references — the gate carries the two raw call
+    // tokens (`->__construct`/`::__construct`) alongside the class needle.
+    // Project scope keeps the admitted-candidate analysis bounded.
+    let c_target = Name::method("Illuminate\\Support\\Str", "__construct");
+    let t10 = Instant::now();
+    let crefs = session3
+        .indexed_references_to(&c_target, &project_paths, false, &|| false)
+        .expect("not cancelled");
+    let scans5 = session3.class_mention_stats().scans_recorded;
+    eprintln!(
+        "cold references(Str::__construct), raw needles: {:.3}s, {} references, {} new mention scans",
+        t10.elapsed().as_secs_f64(),
+        crefs.len(),
+        scans5 - scans4
+    );
+    let t11 = Instant::now();
+    let crefs2 = session3
+        .indexed_references_to(
+            &c_target,
+            &project_paths[..project_paths.len() - 1],
+            false,
+            &|| false,
+        )
+        .expect("not cancelled");
+    let scans6 = session3.class_mention_stats().scans_recorded;
+    eprintln!(
+        "references(Str::__construct) repeat (memo missed): {:.3}s, {} references, {} new mention scans",
+        t11.elapsed().as_secs_f64(),
+        crefs2.len(),
+        scans6 - scans5
+    );
+
+    let stats = session3.class_mention_stats();
+    eprintln!(
+        "mention index footprint: {} universe names | {} files covered | {} mentions (~{:.1} MB entries) | scanner {:.1} MB | {} scans recorded",
+        stats.universe_names,
+        stats.files_covered,
+        stats.total_mentions,
+        (stats.total_mentions * 8 + stats.files_covered * 64) as f64 / 1e6,
+        stats.scanner_bytes as f64 / 1e6,
+        stats.scans_recorded
+    );
 }

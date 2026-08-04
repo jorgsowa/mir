@@ -404,3 +404,140 @@ fn subtype_gate_shares_mention_cache_with_references_gate() {
          and only scan the three defs-committed files it skipped"
     );
 }
+
+/// Member-symbol gates (two needles: member name + owner short name) answer
+/// from the mention index: the member name is admitted at query time, the
+/// first query pays one rescan of covered files (epoch), and repeats run
+/// lookup-only. Results must be exact throughout.
+#[test]
+fn member_gate_admits_needle_and_amortizes_to_lookups() {
+    let declared = [(
+        "widget.php",
+        "<?php\nnamespace App;\nclass Widget {\n    public function render(): void {}\n    public function resize(): void {}\n}\n",
+    )];
+    let raw = [
+        (
+            "uses_render.php",
+            "<?php\nnamespace App;\nfunction f(Widget $w): void { $w->render(); }\n",
+        ),
+        (
+            "uses_resize.php",
+            "<?php\nnamespace App;\nfunction g(Widget $w): void { $w->resize(); }\n",
+        ),
+        (
+            "unrelated.php",
+            "<?php\nnamespace App;\nfunction h(): int { return 1; }\n",
+        ),
+    ];
+    let session = build_session(&declared, &raw);
+    let files: Vec<Arc<str>> = [
+        "widget.php",
+        "uses_render.php",
+        "uses_resize.php",
+        "unrelated.php",
+    ]
+    .iter()
+    .map(|p| Arc::from(*p))
+    .collect();
+
+    let render = Name::method("App\\Widget", "render");
+    let refs = session
+        .indexed_references_to(&render, &files, false, &no_cancel())
+        .expect("not cancelled");
+    assert_eq!(
+        refs_files(&refs),
+        vec!["uses_render.php"],
+        "render() call site must be found"
+    );
+    let scans_a = session.class_mention_stats().scans_recorded;
+    assert!(scans_a > 0, "cold member gate must scan-and-record");
+
+    // Repeat with a smaller slice (misses the ref-query memo, so the gate
+    // runs): now lookup-only.
+    let repeat = session
+        .indexed_references_to(&render, &files[..3], false, &no_cancel())
+        .expect("not cancelled");
+    assert_eq!(refs_files(&repeat), vec!["uses_render.php"]);
+    assert_eq!(
+        session.class_mention_stats().scans_recorded,
+        scans_a,
+        "repeat member query must answer from the mention cache"
+    );
+
+    // A different member name is novel to the universe: covered files rescan
+    // once (epoch), results stay exact, and its repeat is lookup-only again.
+    let resize = Name::method("App\\Widget", "resize");
+    let refs2 = session
+        .indexed_references_to(&resize, &files, false, &no_cancel())
+        .expect("not cancelled");
+    assert_eq!(refs_files(&refs2), vec!["uses_resize.php"]);
+    let scans_b = session.class_mention_stats().scans_recorded;
+    assert!(
+        scans_b > scans_a,
+        "a novel needle must force a fresh recording pass"
+    );
+    let repeat2 = session
+        .indexed_references_to(&resize, &files[..3], false, &no_cancel())
+        .expect("not cancelled");
+    assert_eq!(refs_files(&repeat2), vec!["uses_resize.php"]);
+    assert_eq!(
+        session.class_mention_stats().scans_recorded,
+        scans_b,
+        "repeat on a now-covered novel needle must not rescan"
+    );
+}
+
+/// Constructor gates carry raw (unbounded) needles — `->__construct` /
+/// `::__construct` — through the same index: a file naming neither the class
+/// nor a whole-identifier needle but containing a call token is still
+/// admitted, and repeats run lookup-only.
+#[test]
+fn constructor_gate_raw_needles_via_mention_index() {
+    let declared = [(
+        "gadget.php",
+        "<?php\nnamespace App;\nclass Gadget { public function __construct() {} }\n",
+    )];
+    let raw = [
+        (
+            "makes_gadget.php",
+            "<?php\nnamespace App;\nfunction make(): Gadget { return new Gadget(); }\n",
+        ),
+        (
+            // Names no class and no whole-identifier needle; only the raw
+            // call token can admit it.
+            "raw_token_only.php",
+            "<?php\nfunction reinit(object $o): void { $o->__construct(); }\n",
+        ),
+        ("unrelated.php", "<?php\nfunction n(): int { return 2; }\n"),
+    ];
+    let session = build_session(&declared, &raw);
+    let files: Vec<Arc<str>> = [
+        "gadget.php",
+        "makes_gadget.php",
+        "raw_token_only.php",
+        "unrelated.php",
+    ]
+    .iter()
+    .map(|p| Arc::from(*p))
+    .collect();
+
+    let ctor = Name::method("App\\Gadget", "__construct");
+    let refs = session
+        .indexed_references_to(&ctor, &files, false, &no_cancel())
+        .expect("not cancelled");
+    assert!(
+        refs_files(&refs).contains(&"makes_gadget.php"),
+        "the `new Gadget()` site must be found; got {refs:?}"
+    );
+    let scans = session.class_mention_stats().scans_recorded;
+
+    let repeat = session
+        .indexed_references_to(&ctor, &files[..3], false, &no_cancel())
+        .expect("not cancelled");
+    assert_eq!(refs_files(&repeat), refs_files(&refs));
+    assert_eq!(
+        session.class_mention_stats().scans_recorded,
+        scans,
+        "repeat constructor query must answer raw needles from the mention cache"
+    );
+}

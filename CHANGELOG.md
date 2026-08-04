@@ -7,7 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
+### Changed
+
+- **The mention index is now the single implementation of the reference-
+  and subtype-gate textual predicate; `IdentifierNeedles` is deleted.**
+  Member/function/constant reference gates (previously raw-scanned on
+  every query — the mention path only covered single known class-name
+  needles) admit their needles at query time, and constructor gates route
+  their `->__construct`/`::__construct` raw tokens through the same
+  universe instead of building a per-query automaton. Cost model on a
+  12.7k-file corpus: identical results and RSS; universe grows by one
+  entry per distinct queried symbol name (+2 raw tokens per session,
+  ~16 bytes each plus the interned string); a needle new to the universe
+  pays one recording pass over uncovered candidates (66ms, transient
+  allocation churn — the old gate paid its scan on *every* query
+  instead), after which repeats are lookup-only (2.6ms) and the
+  recordings also answer the subtype-BFS gate.
 
 - **The subtype-BFS defs gate re-scanned every never-committed file's raw
   text per BFS round on every query.** `commit_defs_for_matching`'s

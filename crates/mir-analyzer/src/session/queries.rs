@@ -379,36 +379,37 @@ impl AnalysisSession {
         // Same discipline as `commit_defs_for_matching` on the defs index.
         //
         let gate = self.reference_gate(symbol);
-        let needles: Vec<String> = gate.idents.clone();
-        let needle_matcher = IdentifierNeedles::new(&needles);
-        // Raw substring needles (constructor call tokens) — matched with no
-        // word bounds, so they get a plain automaton instead of the
-        // identifier matcher. `None` when the gate has no raw needles.
-        let raw_matcher: Option<aho_corasick::AhoCorasick> = if gate.raw.is_empty() {
-            None
-        } else {
-            aho_corasick::AhoCorasick::builder()
-                .ascii_case_insensitive(true)
-                .build(&gate.raw)
-                .ok()
-        };
-        // Single-needle gates whose needle is a known class-like short name
-        // answer from the mention index instead of rescanning raw text: the
-        // gate predicate is purely textual, so a recorded mention set is
-        // exactly equivalent. Files the index can't answer for are scanned
-        // once against the whole name universe and recorded, so the next
-        // query's gate is a set lookup. With raw needles present, a
-        // negative mention answer is not conclusive — the raw scan below
-        // still gets its say.
-        let (mention_query, mention_scanner) = if needles.len() == 1 {
+        // The whole gate — identifier needles and raw call tokens alike —
+        // answers from the persistent mention index: every needle is admitted
+        // (a declared class-like short name is already in the universe;
+        // member/function names and the two `__construct` call tokens enter
+        // verbatim), so a recorded mention set answers with lookups and only
+        // a never-scanned or since-edited file pays one scan against the
+        // whole universe, recorded for every later consumer (including the
+        // subtype-BFS gate). A needle new to the universe epoch-invalidates
+        // older recordings for itself only — the first query on it rescans
+        // uncovered files once, the same cost the per-query scan paid every
+        // time before.
+        let has_needles = !gate.idents.is_empty() || !gate.raw.is_empty();
+        let (mention_queries, mention_scanner) = if has_needles {
             let guard = self.db.salsa.read();
-            match guard.prepare_class_mention_query(&needles[0]) {
-                Some(q) => (Some(q), guard.class_mention_scanner()),
-                None => (None, None),
-            }
+            guard.add_literal_mention_names(gate.idents.iter().map(|s| s.as_str()));
+            guard.add_raw_mention_needles(gate.raw.iter().map(|s| s.as_str()));
+            let queries: Vec<_> = gate
+                .idents
+                .iter()
+                .chain(gate.raw.iter())
+                .filter_map(|s| guard.prepare_class_mention_query(s))
+                .collect();
+            (queries, guard.class_mention_scanner())
         } else {
-            (None, None)
+            (Vec::new(), None)
         };
+        // Admission guarantees a query per needle and a non-empty universe;
+        // anything else is defensive — the gate then admits every candidate
+        // (analyze rather than skip, the conservative direction).
+        let gate_complete = mention_queries.len() == gate.idents.len() + gate.raw.len()
+            && mention_scanner.is_some();
         let committed_any: rustc_hash::FxHashSet<Arc<str>> =
             self.ref_committed_keys().into_iter().collect();
         type MentionScanRec = (Arc<str>, Arc<str>, Box<[mir_types::Name]>);
@@ -434,41 +435,34 @@ impl AnalysisSession {
                         {
                             return (Some(f.clone()), None);
                         }
-                        let raw_hit = || {
-                            raw_matcher
-                                .as_ref()
-                                .is_some_and(|m| m.is_match(text.as_ref()))
-                        };
-                        if !needles.is_empty() {
-                            match (&mention_query, &mention_scanner) {
-                                (Some(q), scanner_opt) => {
-                                    match db.class_mention_answer(f.as_ref(), q, text) {
-                                        Some(true) => {}
-                                        Some(false) => {
-                                            if !raw_hit() {
-                                                return (None, None);
-                                            }
-                                        }
-                                        None => match scanner_opt {
-                                            Some(scanner) => {
-                                                let names = scanner.scan(text);
-                                                let hit = names.binary_search(&q.name).is_ok()
-                                                    || raw_hit();
-                                                let rec = (f.clone(), text.clone(), names);
-                                                return (hit.then(|| f.clone()), Some(rec));
-                                            }
-                                            None => {
-                                                if !needle_matcher.matches(text) && !raw_hit() {
-                                                    return (None, None);
-                                                }
-                                            }
-                                        },
+                        if has_needles && gate_complete {
+                            // Any needle answering `true` admits the file; an
+                            // unanswerable one forces the single recorded
+                            // scan, which settles every needle at once.
+                            let mut answer = Some(false);
+                            for q in &mention_queries {
+                                match db.class_mention_answer(f.as_ref(), q, text) {
+                                    Some(true) => {
+                                        answer = Some(true);
+                                        break;
                                     }
+                                    Some(false) => {}
+                                    None => answer = None,
                                 }
-                                (None, _) => {
-                                    if !needle_matcher.matches(text) && !raw_hit() {
-                                        return (None, None);
-                                    }
+                            }
+                            match answer {
+                                Some(true) => {}
+                                Some(false) => return (None, None),
+                                None => {
+                                    let scanner = mention_scanner
+                                        .as_ref()
+                                        .expect("gate_complete implies a scanner");
+                                    let names = scanner.scan(text);
+                                    let hit = mention_queries
+                                        .iter()
+                                        .any(|q| names.binary_search(&q.name).is_ok());
+                                    let rec = (f.clone(), text.clone(), names);
+                                    return (hit.then(|| f.clone()), Some(rec));
                                 }
                             }
                         }
@@ -1128,9 +1122,9 @@ impl AnalysisSession {
             (queries, guard.class_mention_scanner())
         };
         // Admission guarantees a query per needle and a non-empty universe;
-        // anything else is a defensive fallback to the direct scan.
+        // anything else is defensive — the gate then admits every candidate
+        // (recommit rather than skip, the conservative direction).
         let use_mentions = queries.len() == shorts.len() && mention_scanner.is_some();
-        let needle_matcher = IdentifierNeedles::new(shorts);
         type Work = (Arc<str>, Arc<str>, Vec<crate::db::SubtypeEntry>);
         type MentionScanRec = (Arc<str>, Arc<str>, Box<[mir_types::Name]>);
         let (work, scanned): (Vec<Work>, Vec<MentionScanRec>) = loop {
@@ -1150,35 +1144,31 @@ impl AnalysisSession {
                         // stale (previously committed) files recommit
                         // unconditionally — their classes may have re-parented.
                         let mut scan_rec: Option<MentionScanRec> = None;
-                        if !committed_any.contains(path.as_ref()) {
-                            let hit = if use_mentions {
-                                let mut answer = Some(false);
-                                for q in &queries {
-                                    match db.class_mention_answer(path.as_ref(), q, &text) {
-                                        Some(true) => {
-                                            answer = Some(true);
-                                            break;
-                                        }
-                                        Some(false) => {}
-                                        None => answer = None,
+                        if use_mentions && !committed_any.contains(path.as_ref()) {
+                            let mut answer = Some(false);
+                            for q in &queries {
+                                match db.class_mention_answer(path.as_ref(), q, &text) {
+                                    Some(true) => {
+                                        answer = Some(true);
+                                        break;
                                     }
+                                    Some(false) => {}
+                                    None => answer = None,
                                 }
-                                match answer {
-                                    Some(hit) => hit,
-                                    None => {
-                                        // Uncoverable entry: one scan answers
-                                        // every query and is recorded below.
-                                        let scanner = mention_scanner.as_ref().unwrap();
-                                        let names = scanner.scan(&text);
-                                        let hit = queries
-                                            .iter()
-                                            .any(|q| names.binary_search(&q.name).is_ok());
-                                        scan_rec = Some((path.clone(), text.clone(), names));
-                                        hit
-                                    }
+                            }
+                            let hit = match answer {
+                                Some(hit) => hit,
+                                None => {
+                                    // Uncoverable entry: one scan answers
+                                    // every query and is recorded below.
+                                    let scanner = mention_scanner.as_ref().unwrap();
+                                    let names = scanner.scan(&text);
+                                    let hit = queries
+                                        .iter()
+                                        .any(|q| names.binary_search(&q.name).is_ok());
+                                    scan_rec = Some((path.clone(), text.clone(), names));
+                                    hit
                                 }
-                            } else {
-                                needle_matcher.matches(&text)
                             };
                             if !hit {
                                 return (None, scan_rec);
@@ -1580,57 +1570,17 @@ fn identifier_char_col(
     None
 }
 
-/// Compiled multi-needle form of [`mentions_identifier`]: one SIMD-backed
-/// pass over the text for the whole needle set instead of one byte scan per
-/// needle. Identical semantics — whole-identifier, ASCII-case-insensitive.
-/// Build once per sweep and share across the rayon workers; matters when a
-/// subtype BFS round carries dozens of frontier names across an
-/// O(workspace) candidate scan.
-pub(crate) struct IdentifierNeedles {
-    /// `None` when the needle set is empty or the automaton failed to build
-    /// (pattern-set limits — unreachable for identifier words); the fallback
-    /// then rescans per needle so behavior never changes, only speed.
-    ac: Option<aho_corasick::AhoCorasick>,
-    needles: Vec<String>,
-}
-
-impl IdentifierNeedles {
-    pub(crate) fn new(needles: &[String]) -> Self {
-        let kept: Vec<String> = needles.iter().filter(|n| !n.is_empty()).cloned().collect();
-        let ac = if kept.is_empty() {
-            None
-        } else {
-            aho_corasick::AhoCorasick::builder()
-                .ascii_case_insensitive(true)
-                .build(&kept)
-                .ok()
-        };
-        Self { ac, needles: kept }
-    }
-
-    /// Whether `hay` mentions any needle as a whole identifier. Overlapping
-    /// iteration enumerates every occurrence of every needle, so the word-
-    /// boundary filter sees exactly the candidates the per-needle scans would.
-    pub(crate) fn matches(&self, hay: &str) -> bool {
-        let Some(ac) = &self.ac else {
-            return self.needles.iter().any(|n| mentions_identifier(hay, n));
-        };
-        let bytes = hay.as_bytes();
-        let is_ident = |b: u8| b.is_ascii_alphanumeric() || b == b'_';
-        ac.find_overlapping_iter(hay).any(|m| {
-            (m.start() == 0 || !is_ident(bytes[m.start() - 1]))
-                && (m.end() == bytes.len() || !is_ident(bytes[m.end()]))
-        })
-    }
-}
-
 /// Whether `hay` mentions `needle` as a whole identifier (ASCII word
 /// boundaries; conservative near multibyte text). ASCII-case-insensitive:
 /// PHP class, function, and method names are case-insensitive, so `new
 /// COLOR()` must count as mentioning `Color`; for the case-sensitive kinds
 /// (constants, properties) folding only widens the candidate superset.
-/// Gates the completeness passes so they never analyze files that cannot
-/// name the symbol.
+///
+/// Test-only semantic oracle: the production gates (references freshness,
+/// subtype-BFS defs commit) answer this predicate through the persistent
+/// `ClassMentionIndex`; the parity test below pins the scanner to these
+/// exact boundary and case semantics.
+#[cfg(test)]
 fn mentions_identifier(hay: &str, needle: &str) -> bool {
     let hay = hay.as_bytes();
     let needle = needle.as_bytes();
@@ -1733,46 +1683,11 @@ mod tests {
     }
 
     #[test]
-    fn identifier_needles_match_per_needle_scans_exactly() {
-        let hays = [
-            "$this->save();",
-            "new COLOR()",
-            "use App\\Color as Paint;",
-            "$this->saveAll();",
-            "return $unsaved;",
-            "no occurrence",
-            "function xÉclairFoo() {}",
-            "implements Éclair {}",
-            "save",
-            "Color save",
-            "colorsave savecolor",
-            "",
-        ];
-        let needle_sets: [&[&str]; 4] = [
-            &["save"],
-            &["Color", "save"],
-            &["Éclair", "color", "occurrence"],
-            &[],
-        ];
-        for needles in needle_sets {
-            let owned: Vec<String> = needles.iter().map(|s| s.to_string()).collect();
-            let compiled = IdentifierNeedles::new(&owned);
-            for hay in hays {
-                assert_eq!(
-                    compiled.matches(hay),
-                    owned.iter().any(|n| mentions_identifier(hay, n)),
-                    "needles {owned:?} on {hay:?}"
-                );
-            }
-        }
-    }
-
-    #[test]
     fn mention_scanner_membership_equals_per_needle_scans() {
-        // The mention index replaces `IdentifierNeedles::matches` on the
-        // reference gate, so scanner membership must equal the raw per-needle
-        // predicate for every (hay, needle) pair — same boundary and case
-        // semantics.
+        // The mention index is the sole implementation of the gates' textual
+        // predicate, so scanner membership must equal the reference
+        // per-needle predicate for every (hay, needle) pair — same boundary
+        // and case semantics.
         use crate::db::MentionScanner;
         use std::sync::Arc;
         let universe = ["Color", "save", "ColorPicker", "Éclair", "C1", "_Wrap"];
