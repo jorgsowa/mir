@@ -399,6 +399,17 @@ impl AnalysisSession {
         self.db.salsa.read().current_revision()
     }
 
+    /// The combined generation the session's memo caches key on: salsa's
+    /// text revision plus the off-salsa subtype-edge epoch. The epoch covers
+    /// what the revision can't — subtype edges and anonymous-class `impl:`
+    /// postings committed *within* one revision (e.g. a subtype BFS
+    /// admitting a file the reference gate skipped), which change a member
+    /// query's hierarchy fan-out without any text write.
+    pub(crate) fn query_cache_generation(&self) -> (salsa::Revision, u64) {
+        let guard = self.db.salsa.read();
+        (guard.current_revision(), guard.subtype_edges_epoch())
+    }
+
     /// Index one bounded chunk of `(path, text)` files — the chunked background
     /// indexing primitive.
     ///

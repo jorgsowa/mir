@@ -65,8 +65,13 @@ impl RefIndex {
     /// Append a batch of reference locations. Per-entry deduplicated against
     /// the existing locations of the same symbol, preserving insertion order
     /// (mirrors the legacy `commit_reference_locations_batch` semantics).
-    pub fn append_batch(&mut self, locs: Vec<RefLoc>) {
+    /// Returns whether the batch touched any anonymous-class subtype posting
+    /// (`impl:`/`implshort:`) — those participate in subtype queries, so the
+    /// caller bumps the subtype-edge epoch for them.
+    pub fn append_batch(&mut self, locs: Vec<RefLoc>) -> bool {
+        let mut touched_impl = false;
         for loc in locs {
+            touched_impl |= loc.symbol_key.starts_with("impl");
             let file_id = self.intern(&loc.file);
             self.file_symbols
                 .entry(file_id)
@@ -82,6 +87,7 @@ impl RefIndex {
                 entry.push(tuple);
             }
         }
+        touched_impl
     }
 
     /// Remove every reference recorded as appearing in `file`. O(degree):
@@ -120,10 +126,19 @@ impl RefIndex {
     /// with one already in `by_symbol`. Scanning the full per-symbol vector
     /// each time made committing a hot symbol (one referenced by many files)
     /// quadratic in the number of referencing files.
-    pub fn set_file_refs(&mut self, file: &str, locs: Vec<RefLoc>) {
+    ///
+    /// Returns whether the replace touched any anonymous-class subtype
+    /// posting (`impl:`/`implshort:`), before or after — same contract as
+    /// [`Self::append_batch`].
+    pub fn set_file_refs(&mut self, file: &str, locs: Vec<RefLoc>) -> bool {
+        let mut touched_impl = self
+            .lookup(file)
+            .and_then(|id| self.file_symbols.get(&id))
+            .is_some_and(|keys| keys.iter().any(|k| k.starts_with("impl")));
         self.clear_file(file);
         let mut seen: FxHashSet<(Arc<str>, LocTuple)> = FxHashSet::default();
         for loc in locs {
+            touched_impl |= loc.symbol_key.starts_with("impl");
             let file_id = self.intern(&loc.file);
             let tuple = (file_id, loc.line, loc.col_start, loc.col_end);
             if !seen.insert((loc.symbol_key.clone(), tuple)) {
@@ -142,6 +157,7 @@ impl RefIndex {
                 .or_default()
                 .push(tuple);
         }
+        touched_impl
     }
 
     /// All locations of one symbol: `(file, line, col_start, col_end)`.

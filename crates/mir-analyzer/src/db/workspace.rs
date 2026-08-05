@@ -253,8 +253,11 @@ impl SymbolLoc {
     }
 }
 
-/// Precedence tier for a symbol declaration, mirroring the 3-pass priority of
-/// the full [`crate::db::MirDbStorage::rebuild_workspace_symbol_index`]:
+/// Precedence tier for a symbol declaration. The imperative build paths
+/// (full rebuild, seed, incremental merge) drive it through `tier_insert`;
+/// the tracked `workspace_symbol_index` fallback encodes the same rule as
+/// ordered passes (equivalence pinned by
+/// `tracked_walk_matches_imperative_rebuild`):
 ///
 /// 1. `NativeStub` — built-in PHP stub files (`path` starts with `stubs/`);
 ///    first-write-wins among themselves.
@@ -404,9 +407,14 @@ pub fn workspace_symbol_index(db: &dyn MirDatabase) -> WorkspaceSymbolIndex {
     let mut constants: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
     let mut class_like_by_short_name: FxHashMap<Name, Vec<Name>> = FxHashMap::default();
 
-    // Native stubs have relative paths (e.g. "stubs/standard/functions.php");
-    // user-analyzed files have absolute paths.  Process stubs first so that
-    // user-defined symbols can unconditionally overwrite same-named builtins.
+    // Same precedence as `tier_insert` (native stub < user file < user
+    // stub; native ties keep the first, non-native ties the last),
+    // expressed as three ordered passes so a host that never populates the
+    // singleton (this walk re-runs per workspace-revision bump) pays plain
+    // map inserts — no per-symbol declarer counts, no per-collision tier
+    // lookups. Equivalence with the imperative `tier_insert` builder is
+    // pinned by `tracked_walk_matches_imperative_rebuild` below, not kept
+    // by hand.
     let user_stub_set: std::collections::HashSet<_> =
         db.user_stub_source_files().into_iter().collect();
     let (native_stubs, user_files): (Vec<SourceFile>, Vec<SourceFile>) = files
@@ -514,6 +522,104 @@ pub fn workspace_global_vars(db: &dyn MirDatabase) -> GlobalVarMap {
         }
     }
     GlobalVarMap(Arc::new(out))
+}
+
+#[cfg(test)]
+mod builder_equivalence_tests {
+    use super::*;
+    use std::sync::Arc;
+
+    /// The tracked fallback and the imperative `tier_insert` rebuild encode
+    /// the same precedence (native stub < user file < user stub) in two
+    /// shapes — ordered passes vs per-insert tier checks. Pin equality of
+    /// all four maps on a fixture that collides every tier pair, so the two
+    /// encodings can't drift apart.
+    #[test]
+    fn tracked_walk_matches_imperative_rebuild() {
+        let mut db = crate::db::MirDbStorage::default();
+        let native =
+            "<?php\nclass Dup {}\nclass StubOnly {}\nfunction dup_fn() {}\nconst DUP = 1;\n";
+        let native2 = "<?php\nclass Dup {}\n"; // native/native tie: first wins
+        let user1 =
+            "<?php\nclass Dup {}\nclass UserOnly {}\nfunction dup_fn() {}\nconst DUP = 2;\n";
+        let user2 = "<?php\nnamespace App;\nclass Dup {}\n"; // same short name, other namespace
+        let ustub = "<?php\nclass Dup {}\nfunction dup_fn() {}\n";
+        db.upsert_source_file_with_durability(
+            Arc::from("stubs/std.php"),
+            Arc::from(native),
+            salsa::Durability::HIGH,
+        );
+        db.upsert_source_file_with_durability(
+            Arc::from("stubs/extra.php"),
+            Arc::from(native2),
+            salsa::Durability::HIGH,
+        );
+        db.upsert_source_file_with_durability(
+            Arc::from("user1.php"),
+            Arc::from(user1),
+            salsa::Durability::LOW,
+        );
+        db.upsert_source_file_with_durability(
+            Arc::from("app.php"),
+            Arc::from(user2),
+            salsa::Durability::LOW,
+        );
+        db.upsert_source_file_with_durability(
+            Arc::from("mystub.php"),
+            Arc::from(ustub),
+            salsa::Durability::LOW,
+        );
+        db.register_user_stub_path(Arc::from("mystub.php"));
+
+        // Tracked walk first (no singleton yet), then the imperative rebuild.
+        let tracked = workspace_symbol_index(&db).clone();
+        db.rebuild_workspace_symbol_index();
+        let rebuilt = workspace_index(&db).clone();
+
+        fn maps_equal(a: &FxHashMap<Name, SymbolLoc>, b: &FxHashMap<Name, SymbolLoc>) -> bool {
+            a.len() == b.len() && a.iter().all(|(k, v)| b.get(k) == Some(v))
+        }
+        assert!(
+            maps_equal(&tracked.class_like, &rebuilt.class_like),
+            "class_like maps differ"
+        );
+        assert!(
+            maps_equal(&tracked.functions, &rebuilt.functions),
+            "functions maps differ"
+        );
+        assert!(
+            maps_equal(&tracked.constants, &rebuilt.constants),
+            "constants maps differ"
+        );
+        // Bucket order is build-path-specific; compare as sets per key.
+        assert_eq!(
+            tracked.class_like_by_short_name.len(),
+            rebuilt.class_like_by_short_name.len()
+        );
+        for (short, fqcns) in tracked.class_like_by_short_name.iter() {
+            let a: std::collections::HashSet<_> = fqcns.iter().collect();
+            let b: std::collections::HashSet<_> = rebuilt
+                .class_like_by_short_name
+                .get(short)
+                .expect("bucket missing from imperative build")
+                .iter()
+                .collect();
+            assert_eq!(a, b, "short-name bucket {short:?} differs");
+        }
+
+        // Both must have applied the tier rule, not just agreed with each
+        // other: the user stub wins `Dup`/`dup_fn`, the user file wins `DUP`.
+        let dup = tracked.class_like.get(&Name::new("dup")).copied().unwrap();
+        assert_eq!(dup.file().path(&db).as_ref(), "mystub.php");
+        let dup_fn = tracked
+            .functions
+            .get(&Name::new("dup_fn"))
+            .copied()
+            .unwrap();
+        assert_eq!(dup_fn.file().path(&db).as_ref(), "mystub.php");
+        let dup_const = tracked.constants.get(&Name::new("DUP")).copied().unwrap();
+        assert_eq!(dup_const.file().path(&db).as_ref(), "user1.php");
+    }
 }
 
 #[cfg(test)]

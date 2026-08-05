@@ -5,10 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.71.0] - 2026-08-04
+## [0.70.0] - 2026-08-05
 
 ### Added
 
+- **`AnalysisSession::ancestors_of` exposed:** every ancestor of a class
+  (extended class, implemented interfaces, used traits, transitively),
+  most-derived first, self excluded. Wraps the already-tracked
+  `class_ancestors_by_fqcn` primitive so a host can resolve a supertype
+  chain without duplicating its own inheritance-edge index.
+- **`AnalysisSession::function_signature` exposed:** full `FunctionDef`
+  (params, return type, purity, etc.) for a global function resolved by
+  FQN, mirroring the existing `find_function` primitive at the session
+  level. `FunctionDef` is now re-exported from the crate root alongside
+  `DeclaredParam`/`TemplateParam`/`Visibility`.
 - **`WorkspaceSymbolIndex::class_like_by_short_name` exposed, and
   `AnalysisSession::classes_named`:** short (unqualified) class/interface/
   trait/enum name → every FQCN sharing it, incrementally maintained in
@@ -23,20 +33,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in general, remain the standard, unambiguous path — this is additive, not
   a replacement.
 
-## [0.70.0] - 2026-08-04
+### Fixed
 
-### Added
+- **Query-memo staleness across off-salsa subtype-edge commits:**
+  `indexed_references_to` / `indexed_subtype_classes` memoized per text
+  revision, but subtype edges and anonymous-class `impl:` postings are
+  committed off-salsa — a member-references result cached before a subtype
+  query committed a gate-invisible file's edge kept serving the smaller
+  hierarchy fan-out for the rest of the revision. Both cache keys now carry
+  a subtype-edge epoch that bumps only on real edge changes (unchanged
+  recommits from background sweeps compare equal and don't churn it).
 
-- **`AnalysisSession::ancestors_of` exposed:** every ancestor of a class
-  (extended class, implemented interfaces, used traits, transitively),
-  most-derived first, self excluded. Wraps the already-tracked
-  `class_ancestors_by_fqcn` primitive so a host can resolve a supertype
-  chain without duplicating its own inheritance-edge index.
-- **`AnalysisSession::function_signature` exposed:** full `FunctionDef`
-  (params, return type, purity, etc.) for a global function resolved by
-  FQN, mirroring the existing `find_function` primitive at the session
-  level. `FunctionDef` is now re-exported from the crate root alongside
-  `DeclaredParam`/`TemplateParam`/`Visibility`.
+### Changed
+
+- **Query memo caches evict dead generations eagerly:** old-generation keys
+  (heap strings, unreachable once the text revision or edge epoch moves)
+  previously accumulated until the value-cap overflow clear; the first
+  insert at a newer generation now drops them wholesale.
+- **One workspace-symbol-index precedence rule:** the tracked
+  `workspace_symbol_index` fallback now drives the same tier-aware insert
+  helpers as the imperative rebuild/seed/incremental-merge paths, instead
+  of a parallel 3-pass implementation that had to be kept equivalent by
+  hand.
+- **`parse_file` keeps `lru = 256`, now with receipts:** measured on the
+  Laravel fixture, raising the cap to 65536 moved neither wall time nor
+  peak RSS on the cold reference query or the cold CLI batch; the small
+  cap bounds steady-state memory for free. The Phase-1 warm-up loop also
+  stays serial: re-tested with coalesced revision bumps in place, the
+  rayon variant still deadlocks under `concurrent_reference_cancel`.
 
 ## [0.69.0] - 2026-08-04
 

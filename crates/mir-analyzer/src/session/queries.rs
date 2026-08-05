@@ -290,9 +290,8 @@ impl AnalysisSession {
     /// `include_declaration`, the symbol's declaration name span is appended
     /// when it lies inside the scope.
     ///
-    /// `should_cancel` follows [`Self::references_to_in_files_cancellable`]'s
-    /// contract: polled at phase boundaries and between cancellation retries;
-    /// `true` aborts with `None`.
+    /// `should_cancel` is polled at phase boundaries and between
+    /// cancellation retries; `true` aborts with `None`.
     ///
     /// Memoized per `(symbol, files, include_declaration, text_revision)` —
     /// see [`RefQueryCacheKey`]. The freshness scan below still costs
@@ -317,7 +316,7 @@ impl AnalysisSession {
         let cache_key = RefQueryCacheKey {
             symbol: symbol.codebase_key(),
             include_declaration,
-            text_revision: self.text_revision(),
+            generation: self.query_cache_generation(),
             files_hash: hash_files(files),
         };
         if let Some(cached) = self.ref_query_cache.read().get(&cache_key) {
@@ -327,17 +326,31 @@ impl AnalysisSession {
         }
         let result =
             self.indexed_references_to_uncached(symbol, files, include_declaration, should_cancel)?;
+        if self.query_cache_generation() != cache_key.generation {
+            // The generation moved while computing (an edit, or a defs
+            // commit growing the subtype index — possibly this query's own).
+            // The key can never be looked up again, so don't cache it; the
+            // next identical query recomputes once against settled state
+            // and caches then.
+            return Some(result);
+        }
         let mut cache = self.ref_query_cache.write();
+        if !cache.advance_to(cache_key.generation, || {
+            self.ref_query_cache_locations
+                .store(0, std::sync::atomic::Ordering::Relaxed);
+        }) {
+            return Some(result);
+        }
         let new_len = result.len();
         let prior = self
             .ref_query_cache_locations
             .fetch_add(new_len, std::sync::atomic::Ordering::Relaxed);
         if prior + new_len > REF_QUERY_CACHE_LOCATION_CAP {
-            cache.clear();
+            cache.map.clear();
             self.ref_query_cache_locations
                 .store(new_len, std::sync::atomic::Ordering::Relaxed);
         }
-        cache.insert(cache_key, Arc::new(result.clone()));
+        cache.map.insert(cache_key, Arc::new(result.clone()));
         Some(result)
     }
 
@@ -517,8 +530,9 @@ impl AnalysisSession {
             // only narrows what a single cancellation discards from "the
             // whole query so far" to "the one file that was mid-flight".
             //
-            // Tried and reverted: running this loop itself in parallel
-            // (rayon, both per-file and whole-batch retry variants). Each
+            // Tried and reverted TWICE: running this loop itself in parallel
+            // (rayon; per-file and whole-batch retry variants, and again as
+            // a `try_for_each` after the deferred-bump scope landed). Each
             // file's warm-up is individually safe under concurrent access
             // (every shared registry it touches — `prepared_files`,
             // `unresolvable_fqcns`, `pending_eager_function_files`, the
@@ -526,17 +540,20 @@ impl AnalysisSession {
             // `concurrent_reference_cancel` stress test (sustained
             // multi-thread writers + a background indexer, both hammering
             // the same db while several readers each run this phase
-            // concurrently) both parallel variants deadlocked: CPU usage
-            // dropped to ~0 while wall time kept climbing, the signature of
-            // several OS threads parked on a lock rather than making
-            // progress — most likely the fixed-size rayon pool getting
-            // saturated with workers blocked on `with_db_mut`'s `RwLock`
-            // write lock (an OS-level block, invisible to rayon's
-            // cooperative scheduler) while the thread that would release it
-            // is itself queued waiting for a free pool worker. Serial
-            // execution never contends for the pool this way, so it stays
-            // the safe choice here even though it forgoes the extra
-            // wall-clock parallelism a large stale set could otherwise use.
+            // concurrently) every parallel variant deadlocks: CPU usage
+            // drops to ~0 while wall time keeps climbing — OS threads parked
+            // on a lock, most likely the fixed-size rayon pool saturated
+            // with workers blocked on `with_db_mut`'s `RwLock` write lock
+            // (an OS-level block, invisible to rayon's cooperative
+            // scheduler) while the thread that would release it is itself
+            // queued waiting for a free pool worker. Coalescing the
+            // per-load revision bumps into one per pass (the deferred scope
+            // below) did NOT fix it — the re-attempt hung the same way
+            // (>590s for a ~5s test), so the cancellation storm was not the
+            // trigger. Serial execution never contends for the pool this
+            // way, so it stays the safe choice here even though it forgoes
+            // the extra wall-clock parallelism a large stale set could
+            // otherwise use.
             {
                 // One revision bump for the whole warm-up loop instead of one
                 // per lazily-loaded class: each bump is a salsa input write
@@ -944,7 +961,7 @@ impl AnalysisSession {
         let cache_key = SubtypeQueryCacheKey {
             class_fqn: class_fqn.trim_start_matches('\\').to_ascii_lowercase(),
             include_trait_users,
-            text_revision: self.text_revision(),
+            generation: self.query_cache_generation(),
             files_hash: hash_files(files),
         };
         if let Some(cached) = self.subtype_query_cache.read().get(&cache_key) {
@@ -953,17 +970,31 @@ impl AnalysisSession {
             return (**cached).clone();
         }
         let result = self.indexed_subtype_classes_uncached(class_fqn, files, include_trait_users);
+        if self.query_cache_generation() != cache_key.generation {
+            // The generation moved while computing (an edit, or a defs
+            // commit growing the subtype index — possibly this query's own).
+            // The key can never be looked up again, so don't cache it; the
+            // next identical query recomputes once against settled state
+            // and caches then.
+            return result;
+        }
         let mut cache = self.subtype_query_cache.write();
+        if !cache.advance_to(cache_key.generation, || {
+            self.subtype_query_cache_sites
+                .store(0, std::sync::atomic::Ordering::Relaxed);
+        }) {
+            return result;
+        }
         let new_len = result.len();
         let prior = self
             .subtype_query_cache_sites
             .fetch_add(new_len, std::sync::atomic::Ordering::Relaxed);
         if prior + new_len > SUBTYPE_QUERY_CACHE_SITE_CAP {
-            cache.clear();
+            cache.map.clear();
             self.subtype_query_cache_sites
                 .store(new_len, std::sync::atomic::Ordering::Relaxed);
         }
-        cache.insert(cache_key, Arc::new(result.clone()));
+        cache.map.insert(cache_key, Arc::new(result.clone()));
         result
     }
 

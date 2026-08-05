@@ -493,6 +493,13 @@ impl Eq for TrackedParseResult {}
 /// "parse once, never re-ask," so eviction is effectively free; for LSP
 /// the working set is small. Without the cap, parsing 12k files would
 /// pin ~1–4 GB of owned AST for the whole session.
+///
+/// A cold reference pass re-asks past this cap (Phase 1 warm-up parses,
+/// Phase 2 `analyze_file` re-parses whatever was evicted), but the re-parse
+/// runs inside the rayon-parallel Phase 2: measured on the Laravel fixture
+/// (11.6k registered files, `Illuminate\Support\Str` cold query and cold
+/// CLI batch), `lru = 65536` moved neither wall time (within noise) nor
+/// peak RSS. Keep the small cap — it bounds steady-state memory for free.
 #[salsa::tracked(lru = 256)]
 pub fn parse_file(db: &dyn MirDatabase, file: SourceFile) -> TrackedParseResult {
     let text = file.text(db);

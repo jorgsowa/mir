@@ -237,12 +237,17 @@ fn indexed_references_repeat_query_hits_cache() {
 /// hot symbol. Three distinct symbols with deliberately different result
 /// sizes (1, 2, 3 locations) prove the tracked total is the *sum of result
 /// lengths*, not the entry count (which would read 3 after all three).
+///
+/// Entries are revision-scoped: each ingest below moves the text revision,
+/// which evicts the previous generation's (now-unreachable) keys, so during
+/// the setup loop the tracked total is the *current* revision's sum only.
+/// The cross-symbol accumulation is asserted at a fixed revision at the end.
 #[test]
 fn indexed_references_cache_tracks_total_locations_not_entry_count() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
-    let mut expected_total = 0usize;
+    let mut file_sets: Vec<(&str, usize, Vec<Arc<str>>)> = Vec::new();
     for (base, n_callers) in [("SizeA", 1usize), ("SizeB", 2), ("SizeC", 3)] {
         let base_file: Arc<str> = Arc::from(format!("{base}_base.php"));
         session.ingest_file(
@@ -268,14 +273,32 @@ fn indexed_references_cache_tracks_total_locations_not_entry_count() {
             .indexed_references_to(&sym, &files, false, &|| false)
             .expect("query not cancelled");
         assert_eq!(refs.len(), n_callers, "one call site per caller file");
-        expected_total += refs.len();
-
         assert_eq!(
             session.ref_query_cache_locations(),
-            expected_total,
-            "tracked total must be the sum of result lengths so far, not the entry count"
+            n_callers,
+            "later-revision insert must evict the dead prior generation, \
+             leaving only the current revision's locations"
         );
+        file_sets.push((base, n_callers, files));
     }
+
+    // No further ingests: all three queries land at one revision and
+    // accumulate. 1 + 2 + 3 = 6 locations across 3 entries proves the
+    // tracked total is the sum of result lengths, not the entry count.
+    let mut expected_total = 0usize;
+    for (base, n_callers, files) in &file_sets {
+        let sym = mir_analyzer::Name::method(*base, "m");
+        let refs = session
+            .indexed_references_to(&sym, files, false, &|| false)
+            .expect("query not cancelled");
+        assert_eq!(refs.len(), *n_callers);
+        expected_total += refs.len();
+    }
+    assert_eq!(
+        session.ref_query_cache_locations(),
+        expected_total,
+        "tracked total must be the sum of result lengths, not the entry count"
+    );
 }
 
 /// [`AnalysisSession::files_mentioning_class`] answers from the persistent
@@ -501,6 +524,102 @@ fn indexed_references_cache_invalidates_on_body_only_edit() {
     );
 }
 
+/// A subtype-edge commit made by a *subtype* query must invalidate a
+/// member-references result cached at the same text revision. The reference
+/// gate can skip a file whose text mentions neither the member nor the
+/// owner's short name, leaving its subtype edge uncommitted — the cached
+/// hierarchy fan-out is then smaller than what a subtype BFS (whose needles
+/// walk the frontier's short names) later discovers. Edge commits happen
+/// off-salsa, so the text revision alone cannot see them; the subtype-edge
+/// epoch in the cache key is what evicts the stale entry.
+#[test]
+fn references_cache_invalidates_when_subtype_query_grows_hierarchy() {
+    let base: Arc<str> = Arc::from("epoch_base.php");
+    let mid: Arc<str> = Arc::from("epoch_mid.php");
+    let child: Arc<str> = Arc::from("epoch_child.php");
+    let grandchild: Arc<str> = Arc::from("epoch_grandchild.php");
+    let caller: Arc<str> = Arc::from("epoch_caller.php");
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ensure_all_stubs();
+    session.ingest_file(
+        base.clone(),
+        Arc::from("<?php\nclass EpochBase { public function m(): int { return 1; } }\n"),
+    );
+    session.ingest_file(
+        mid.clone(),
+        Arc::from("<?php\nclass EpochMid extends EpochBase {}\n"),
+    );
+    // Registered without ingestion: no defs commit, so the EpochMid ←
+    // EpochChild edge stays unknown until some query's gate admits this
+    // file. Its text mentions neither `m` nor `EpochBase`, so the
+    // references gate never does — only the subtype BFS's `EpochMid`
+    // frontier needle can.
+    session.set_file_text(
+        child.clone(),
+        Arc::from("<?php\nclass EpochChild extends EpochMid {}\n"),
+    );
+    // Overrides m(): the call site below resolves its owner to
+    // EpochGrandchild, so the references query can only reach it through
+    // the subtype fan-out — which the missing EpochChild edge severs.
+    session.ingest_file(
+        grandchild.clone(),
+        Arc::from(
+            "<?php\nclass EpochGrandchild extends EpochChild { public function m(): int { return 2; } }\n",
+        ),
+    );
+    session.ingest_file(
+        caller.clone(),
+        Arc::from("<?php\nfunction epoch_go(EpochGrandchild $g): int { return $g->m(); }\n"),
+    );
+
+    let files = [
+        base.clone(),
+        mid.clone(),
+        child.clone(),
+        grandchild.clone(),
+        caller.clone(),
+    ];
+    // Throwaway query so `settle_workspace_index` absorbs the mirror write
+    // now: the queries under test then run at ONE text revision, and only
+    // the edge epoch distinguishes their cache generations.
+    let _ = session.indexed_references_to(
+        &mir_analyzer::Name::method("EpochBase", "nope"),
+        &files,
+        false,
+        &|| false,
+    );
+
+    let sym = mir_analyzer::Name::method("EpochBase", "m");
+    let cold = session
+        .indexed_references_to(&sym, &files, false, &|| false)
+        .expect("query not cancelled");
+    assert!(
+        cold.is_empty(),
+        "EpochChild edge uncommitted: the $g->m() call site posts under \
+         meth:EpochGrandchild::m, unreachable through the severed \
+         hierarchy; got {cold:?}"
+    );
+
+    let subs = session.indexed_subtype_classes("EpochBase", &files, false);
+    assert_eq!(
+        subs.len(),
+        3,
+        "mid + child + grandchild expected, got {subs:?}"
+    );
+
+    let warm = session
+        .indexed_references_to(&sym, &files, false, &|| false)
+        .expect("query not cancelled");
+    assert_eq!(
+        warm.len(),
+        1,
+        "the grown hierarchy must reach the $g->m() call site; a stale \
+         same-revision cache hit would still be empty"
+    );
+    assert_eq!(warm[0].0, caller);
+}
+
 /// [`AnalysisSession::indexed_subtype_classes`] gets the exact same
 /// memoization treatment as `indexed_references_to` — same rationale
 /// (`commit_defs_for_matching`'s freshness pass costs O(candidates) on
@@ -575,12 +694,17 @@ fn indexed_subtype_classes_cache_invalidates_on_new_file() {
 /// `indexed_references_cache_tracks_total_locations_not_entry_count`), for
 /// the identical reason: one entry's result size varies with how many
 /// subtypes the queried class actually has.
+///
+/// Entries are revision-scoped: each ingest below moves the text revision,
+/// which evicts the previous generation's (now-unreachable) keys, so during
+/// the setup loop the tracked total is the *current* revision's sum only.
+/// The cross-symbol accumulation is asserted at a fixed revision at the end.
 #[test]
 fn indexed_subtype_classes_cache_tracks_total_sites_not_entry_count() {
     let session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
-    let mut expected_total = 0usize;
+    let mut file_sets: Vec<(&str, usize, Vec<Arc<str>>)> = Vec::new();
     for (base, n_children) in [("SizeBaseA", 1usize), ("SizeBaseB", 2), ("SizeBaseC", 3)] {
         let base_file: Arc<str> = Arc::from(format!("{base}_base.php"));
         session.ingest_file(
@@ -599,12 +723,27 @@ fn indexed_subtype_classes_cache_tracks_total_sites_not_entry_count() {
 
         let sites = session.indexed_subtype_classes(base, &files, false);
         assert_eq!(sites.len(), n_children, "one site per direct subclass");
-        expected_total += sites.len();
-
         assert_eq!(
             session.subtype_query_cache_sites(),
-            expected_total,
-            "tracked total must be the sum of result lengths so far, not the entry count"
+            n_children,
+            "later-revision insert must evict the dead prior generation, \
+             leaving only the current revision's sites"
         );
+        file_sets.push((base, n_children, files));
     }
+
+    // No further ingests: all three queries land at one revision and
+    // accumulate. 1 + 2 + 3 = 6 sites across 3 entries proves the tracked
+    // total is the sum of result lengths, not the entry count.
+    let mut expected_total = 0usize;
+    for (base, n_children, files) in &file_sets {
+        let sites = session.indexed_subtype_classes(base, files, false);
+        assert_eq!(sites.len(), *n_children);
+        expected_total += sites.len();
+    }
+    assert_eq!(
+        session.subtype_query_cache_sites(),
+        expected_total,
+        "tracked total must be the sum of result lengths, not the entry count"
+    );
 }

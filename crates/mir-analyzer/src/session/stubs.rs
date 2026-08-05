@@ -191,7 +191,7 @@ impl AnalysisSession {
     ///
     /// This is the write-path home of the warm-up: hosts call it (via
     /// [`Self::ingest_file_prepared`]) when text lands, so read paths
-    /// (`references_to_in_files`, `reanalyze_files_cancellable`) find every
+    /// (`indexed_references_to`, `reanalyze_files_cancellable`) find every
     /// candidate prepared and stay pure. Loading mutates salsa inputs, so the
     /// parse snapshot is scoped and dropped before the warm-up runs — callers
     /// must not hold a live snapshot across this call.

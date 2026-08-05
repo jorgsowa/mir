@@ -32,7 +32,7 @@ pub enum ClassLikeKind {
 }
 
 /// One class-like declaration as recorded in the index.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SubtypeEntry {
     /// Display-form FQCN (as collected, no leading `\`).
     pub fqcn: Arc<str>,
@@ -138,11 +138,23 @@ pub struct SubtypeIndex {
 }
 
 impl SubtypeIndex {
-    /// Replace `file`'s class-like declarations wholesale.
-    pub fn set_file_classes(&mut self, file: &Arc<str>, entries: Vec<SubtypeEntry>) {
+    /// Replace `file`'s class-like declarations wholesale. Returns whether
+    /// the index changed — a recommit of identical entries is a no-op, so
+    /// callers can key epoch bumps on real edge changes only.
+    pub fn set_file_classes(&mut self, file: &Arc<str>, entries: Vec<SubtypeEntry>) -> bool {
+        match self.by_file.get(file.as_ref()) {
+            Some(old)
+                if old.len() == entries.len()
+                    && old.iter().zip(&entries).all(|(a, b)| a.as_ref() == b) =>
+            {
+                return false;
+            }
+            None if entries.is_empty() => return false,
+            _ => {}
+        }
         self.clear_file(file.as_ref());
         if entries.is_empty() {
-            return;
+            return true;
         }
         let mut stored: Vec<Arc<SubtypeEntry>> = Vec::with_capacity(entries.len());
         for entry in entries {
@@ -161,12 +173,14 @@ impl SubtypeIndex {
             stored.push(entry);
         }
         self.by_file.insert(file.clone(), stored);
+        true
     }
 
-    /// Remove every declaration recorded for `file`.
-    pub fn clear_file(&mut self, file: &str) {
+    /// Remove every declaration recorded for `file`. Returns whether the
+    /// index held (and dropped) any entry for it.
+    pub fn clear_file(&mut self, file: &str) -> bool {
         let Some(old) = self.by_file.remove(file) else {
-            return;
+            return false;
         };
         for entry in old {
             let child_key = edge_key(&entry.fqcn);
@@ -197,6 +211,7 @@ impl SubtypeIndex {
                 }
             }
         }
+        true
     }
 
     /// Transitive subtypes of `fqcn` (excluding `fqcn` itself), BFS over the

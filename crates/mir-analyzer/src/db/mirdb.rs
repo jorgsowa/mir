@@ -314,6 +314,14 @@ pub struct MirDbStorage {
     /// O(all-files) walk the singleton exists to avoid). Diagnostic only —
     /// hosts assert warm-started sessions keep this at zero.
     workspace_index_walks: Arc<std::sync::atomic::AtomicU64>,
+    /// Monotonic counter of subtype-edge mutations — class-like edge
+    /// commits/clears ([`Self::set_file_class_edges`]) and anonymous-class
+    /// `impl:`/`implshort:` posting commits. These mutate query-visible
+    /// state off-salsa, so the session's revision-keyed memo caches include
+    /// this epoch in their keys: a result cached before an edge lands
+    /// (e.g. a member-references hierarchy fan-out) must not outlive it
+    /// within one salsa revision. Unchanged recommits don't bump.
+    subtype_edges_epoch: Arc<std::sync::atomic::AtomicU64>,
     /// Open deferred-bump scopes (see `AnalysisSession::defer_revision_bumps`).
     /// While > 0, `bump_workspace_revision` coalesces into one pending bump
     /// flushed by the last scope to close — a pass that lazy-loads N classes
@@ -362,6 +370,7 @@ impl Default for MirDbStorage {
             subtype_cache: None,
             pending_index_files: Arc::default(),
             workspace_index_walks: Arc::default(),
+            subtype_edges_epoch: Arc::default(),
             deferred_bump_depth: Arc::default(),
             deferred_bump_pending: Arc::default(),
         };
@@ -691,9 +700,10 @@ impl MirDbStorage {
 
         // Single pass over all files. Tier-aware insertion (native stub <
         // user file < user stub) makes the result independent of iteration
-        // order for distinct symbols and matches the 3-pass precedence of the
-        // tracked `workspace_symbol_index` query — the incremental merge path
-        // reuses the exact same `tier_insert` rule.
+        // order for distinct symbols and matches the tracked
+        // `workspace_symbol_index` fallback's 3-pass precedence — pinned by
+        // `tracked_walk_matches_imperative_rebuild`, not kept by hand. The
+        // incremental merge paths reuse the exact same `tier_insert` rule.
         {
             let db: &dyn MirDatabase = &*self;
             for &file in files.iter() {
@@ -1109,7 +1119,9 @@ impl MirDbStorage {
         if locs.is_empty() {
             return;
         }
-        self.locked_ref_index().append_batch(locs);
+        if self.locked_ref_index().append_batch(locs) {
+            self.bump_subtype_edges_epoch();
+        }
     }
 
     /// Replace `file`'s reference locations wholesale (clear + append) in
@@ -1119,7 +1131,9 @@ impl MirDbStorage {
     /// recorded by nested on-demand inference) are appended without
     /// clearing those files.
     pub fn set_file_reference_locations(&self, file: &str, locs: Vec<RefLoc>) {
-        self.locked_ref_index().set_file_refs(file, locs);
+        if self.locked_ref_index().set_file_refs(file, locs) {
+            self.bump_subtype_edges_epoch();
+        }
     }
 
     /// Replace `file`'s class-like declarations in the subtype edge index.
@@ -1131,7 +1145,20 @@ impl MirDbStorage {
         entries: Vec<crate::db::subtype_index::SubtypeEntry>,
     ) {
         self.add_class_mention_names(entries.iter().map(|e| e.fqcn.as_ref()));
-        self.subtype_index.lock().set_file_classes(file, entries);
+        if self.subtype_index.lock().set_file_classes(file, entries) {
+            self.bump_subtype_edges_epoch();
+        }
+    }
+
+    /// See the field doc on `subtype_edges_epoch`.
+    pub fn subtype_edges_epoch(&self) -> u64 {
+        self.subtype_edges_epoch
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    fn bump_subtype_edges_epoch(&self) {
+        self.subtype_edges_epoch
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Register class-like FQCNs (any case/form) in the mention-name
@@ -1239,7 +1266,9 @@ impl MirDbStorage {
 
     /// Drop `file`'s class-like declarations from the subtype edge index.
     pub fn clear_file_class_edges(&self, file: &str) {
-        self.subtype_index.lock().clear_file(file);
+        if self.subtype_index.lock().clear_file(file) {
+            self.bump_subtype_edges_epoch();
+        }
     }
 
     /// Transitive subtypes of `fqcn` from the maintained edge index.

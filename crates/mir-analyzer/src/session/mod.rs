@@ -89,7 +89,7 @@ pub struct AnalysisSession {
     /// the entry is live while the file's input text is pointer-equal to `text`
     /// (a text edit self-invalidates) and `generation` matches
     /// [`Self::prepare_generation`]. Lets the per-request Phase-1 warm-up in
-    /// `references_to_in_files` / `reanalyze_dependents` skip the serial
+    /// `indexed_references_to` / `reanalyze_dependents` skip the serial
     /// parse + AST walk for files already faulted in.
     prepared_files: PreparedFilesCache,
     /// Bumped whenever previously loaded declarations may have been removed
@@ -151,21 +151,28 @@ pub struct AnalysisSession {
 
 /// Cache key for [`AnalysisSession::indexed_references_to`]'s memoization.
 ///
-/// `text_revision` (not [`AnalysisSession::index_generation`]) is the
-/// correct epoch here: a body-only edit never bumps the workspace
-/// generation (by design — see `bump_workspace_revision`'s doc comment) but
-/// can still move, add, or remove a reference location, so keying on the
-/// coarser generation would serve stale locations after such an edit.
+/// `generation`'s revision half is salsa's text revision, not
+/// [`AnalysisSession::index_generation`]: a body-only edit never bumps the
+/// workspace generation (by design — see `bump_workspace_revision`'s doc
+/// comment) but can still move, add, or remove a reference location, so
+/// keying on the coarser generation would serve stale locations after such
+/// an edit.
 /// `files_hash` guards against a caller narrowing/widening the candidate
 /// scope between calls for the same symbol at the same revision (e.g. a
 /// different reference-scope plan) — a coincidental hash collision would
 /// only cause a wrong cache HIT, so this hashes full content, not just
 /// length/pointers.
+///
+/// `generation` also carries the subtype-edge epoch (see
+/// [`AnalysisSession::query_cache_generation`]): a member query's hierarchy
+/// fan-out reads the subtype index, which another query's defs commit can
+/// grow without moving the text revision — the epoch keeps such an entry
+/// from being served after its fan-out went stale.
 #[derive(PartialEq, Eq, Hash)]
 struct RefQueryCacheKey {
     symbol: String,
     include_declaration: bool,
-    text_revision: salsa::Revision,
+    generation: (salsa::Revision, u64),
     files_hash: u64,
 }
 
@@ -180,7 +187,53 @@ const REF_QUERY_CACHE_LOCATION_CAP: usize = 200_000;
 
 /// Memoized [`AnalysisSession::indexed_references_to`] results. See
 /// [`RefQueryCacheKey`] for the invalidation contract.
-type RefQueryCache = Arc<RwLock<HashMap<RefQueryCacheKey, Arc<Vec<(Arc<str>, crate::Range)>>>>>;
+type RefQueryCache =
+    Arc<RwLock<RevisionedMap<RefQueryCacheKey, Arc<Vec<(Arc<str>, crate::Range)>>>>>;
+
+/// A memo map whose keys embed the generation — `(text revision,
+/// subtype-edge epoch)`, see [`AnalysisSession::query_cache_generation`] —
+/// they were computed at. Once the generation moves, old keys can never be
+/// looked up again, so the first insert at a newer generation drops them
+/// wholesale — without this, dead keys (heap `String`s) accumulate until
+/// the value-cap overflow clear.
+struct RevisionedMap<K, V> {
+    generation: Option<(salsa::Revision, u64)>,
+    map: HashMap<K, V>,
+}
+
+impl<K, V> Default for RevisionedMap<K, V> {
+    fn default() -> Self {
+        Self {
+            generation: None,
+            map: HashMap::default(),
+        }
+    }
+}
+
+impl<K: std::hash::Hash + Eq, V> RevisionedMap<K, V> {
+    fn get(&self, key: &K) -> Option<&V> {
+        self.map.get(key)
+    }
+
+    /// Prepare for an insert keyed at `generation`. Rolls the map forward
+    /// (dropping the dead generation) when `generation` is newer than the
+    /// resident one, running `on_clear` so the caller can zero its
+    /// lockstep size counter. Returns `false` when `generation` is older —
+    /// such a key can never hit again, so the caller should skip caching.
+    /// Both components are monotonic, so lexicographic order is sound.
+    fn advance_to(&mut self, generation: (salsa::Revision, u64), on_clear: impl FnOnce()) -> bool {
+        match self.generation {
+            Some(g) if g == generation => true,
+            Some(g) if g > generation => false,
+            _ => {
+                self.map.clear();
+                self.generation = Some(generation);
+                on_clear();
+                true
+            }
+        }
+    }
+}
 
 /// Cache key for [`AnalysisSession::indexed_subtype_classes`]'s memoization.
 /// Same invalidation contract as [`RefQueryCacheKey`]. `class_fqn` is
@@ -191,7 +244,7 @@ type RefQueryCache = Arc<RwLock<HashMap<RefQueryCacheKey, Arc<Vec<(Arc<str>, cra
 struct SubtypeQueryCacheKey {
     class_fqn: String,
     include_trait_users: bool,
-    text_revision: salsa::Revision,
+    generation: (salsa::Revision, u64),
     files_hash: u64,
 }
 
@@ -203,7 +256,8 @@ const SUBTYPE_QUERY_CACHE_SITE_CAP: usize = 50_000;
 
 /// Memoized [`AnalysisSession::indexed_subtype_classes`] results. See
 /// [`SubtypeQueryCacheKey`] for the invalidation contract.
-type SubtypeQueryCache = Arc<RwLock<HashMap<SubtypeQueryCacheKey, Arc<Vec<SubtypeClassSite>>>>>;
+type SubtypeQueryCache =
+    Arc<RwLock<RevisionedMap<SubtypeQueryCacheKey, Arc<Vec<SubtypeClassSite>>>>>;
 
 /// Stable content hash of a candidate-file list, order-sensitive. Callers
 /// that rebuild the list identically each time (the common case — the same
@@ -321,10 +375,10 @@ impl AnalysisSession {
             prepare_generation: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             ref_committed: Arc::new(RwLock::new(HashMap::default())),
             defs_committed: Arc::new(RwLock::new(HashMap::default())),
-            ref_query_cache: Arc::new(RwLock::new(HashMap::default())),
+            ref_query_cache: Arc::new(RwLock::new(RevisionedMap::default())),
             ref_query_cache_locations: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             ref_query_cache_hits: Arc::new(std::sync::atomic::AtomicU64::new(0)),
-            subtype_query_cache: Arc::new(RwLock::new(HashMap::default())),
+            subtype_query_cache: Arc::new(RwLock::new(RevisionedMap::default())),
             subtype_query_cache_sites: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             subtype_query_cache_hits: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         }
