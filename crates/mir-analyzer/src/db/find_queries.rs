@@ -36,6 +36,43 @@ fn def_at<T>(defs: &[Arc<T>], idx: u32) -> Option<Arc<T>> {
     defs.get(idx as usize).cloned()
 }
 
+fn analyzed_source_files(
+    db: &dyn MirDatabase,
+    analyzed_files: &rustc_hash::FxHashSet<Arc<str>>,
+) -> Vec<SourceFile> {
+    let mut files: Vec<SourceFile> = if analyzed_files.is_empty() {
+        db.all_source_files()
+    } else {
+        analyzed_files
+            .iter()
+            .filter_map(|p| db.lookup_source_file(p))
+            .collect()
+    };
+    // Iterate files in a stable order so the FQCN sort below — which is stable
+    // and therefore preserves input order on equal keys — yields a fully
+    // deterministic result even when two files declare the same class name.
+    files.sort_by_key(|a| a.path(db));
+    files
+}
+
+fn collect_analyzed_defs<T, U>(
+    db: &dyn MirDatabase,
+    analyzed_files: &rustc_hash::FxHashSet<Arc<str>>,
+    defs_of: impl Fn(&mir_codebase::definitions::StubSlice) -> &[Arc<T>],
+    map: impl Fn(Arc<T>) -> U,
+    fqcn_of: impl Fn(&T) -> &Arc<str>,
+) -> Vec<(Arc<str>, U)> {
+    let mut out = Vec::new();
+    for sf in analyzed_source_files(db, analyzed_files) {
+        let defs = collect_file_definitions(db, sf);
+        for def in defs_of(&defs.slice) {
+            out.push((fqcn_of(def.as_ref()).clone(), map(def.clone())));
+        }
+    }
+    out.sort_by(|a, b| a.0.cmp(&b.0));
+    out
+}
+
 /// Tagged union over the four PHP class-like kinds. The result type of
 /// composite `find_class_like` so callers receive a single response that
 /// covers `class` / `interface` / `trait` / `enum`.
@@ -446,28 +483,13 @@ pub fn analyzed_class_defs(
     db: &dyn MirDatabase,
     analyzed_files: &rustc_hash::FxHashSet<Arc<str>>,
 ) -> Vec<(Arc<str>, ClassLike)> {
-    let mut files: Vec<SourceFile> = if analyzed_files.is_empty() {
-        db.all_source_files()
-    } else {
-        analyzed_files
-            .iter()
-            .filter_map(|p| db.lookup_source_file(p))
-            .collect()
-    };
-    // Iterate files in a stable order so the FQCN sort below — which is stable
-    // and therefore preserves input order on equal keys — yields a fully
-    // deterministic result even when two files declare the same class name.
-    files.sort_by_key(|a| a.path(db));
-
-    let mut out: Vec<(Arc<str>, ClassLike)> = Vec::new();
-    for sf in files {
-        let defs = collect_file_definitions(db, sf);
-        for class in defs.slice.classes.iter() {
-            out.push((class.fqcn.clone(), ClassLike::Class(class.clone())));
-        }
-    }
-    out.sort_by(|a, b| a.0.cmp(&b.0));
-    out
+    collect_analyzed_defs(
+        db,
+        analyzed_files,
+        |slice| &slice.classes,
+        ClassLike::Class,
+        |class| &class.fqcn,
+    )
 }
 
 /// Like [`analyzed_class_defs`] but returns interface definitions from
@@ -476,24 +498,13 @@ pub fn analyzed_interface_defs(
     db: &dyn MirDatabase,
     analyzed_files: &rustc_hash::FxHashSet<Arc<str>>,
 ) -> Vec<(Arc<str>, Arc<mir_codebase::definitions::InterfaceDef>)> {
-    let mut files: Vec<SourceFile> = if analyzed_files.is_empty() {
-        db.all_source_files()
-    } else {
-        analyzed_files
-            .iter()
-            .filter_map(|p| db.lookup_source_file(p))
-            .collect()
-    };
-    files.sort_by_key(|a| a.path(db));
-    let mut out = Vec::new();
-    for sf in files {
-        let defs = collect_file_definitions(db, sf);
-        for iface in defs.slice.interfaces.iter() {
-            out.push((iface.fqcn.clone(), iface.clone()));
-        }
-    }
-    out.sort_by(|a, b| a.0.cmp(&b.0));
-    out
+    collect_analyzed_defs(
+        db,
+        analyzed_files,
+        |slice| &slice.interfaces,
+        |iface| iface,
+        |iface| &iface.fqcn,
+    )
 }
 
 /// Like [`analyzed_interface_defs`] but returns enum definitions from analyzed files.
@@ -501,48 +512,26 @@ pub fn analyzed_enum_defs(
     db: &dyn MirDatabase,
     analyzed_files: &rustc_hash::FxHashSet<Arc<str>>,
 ) -> Vec<(Arc<str>, Arc<mir_codebase::definitions::EnumDef>)> {
-    let mut files: Vec<SourceFile> = if analyzed_files.is_empty() {
-        db.all_source_files()
-    } else {
-        analyzed_files
-            .iter()
-            .filter_map(|p| db.lookup_source_file(p))
-            .collect()
-    };
-    files.sort_by_key(|a| a.path(db));
-    let mut out = Vec::new();
-    for sf in files {
-        let defs = collect_file_definitions(db, sf);
-        for e in defs.slice.enums.iter() {
-            out.push((e.fqcn.clone(), e.clone()));
-        }
-    }
-    out.sort_by(|a, b| a.0.cmp(&b.0));
-    out
+    collect_analyzed_defs(
+        db,
+        analyzed_files,
+        |slice| &slice.enums,
+        |e| e,
+        |e| &e.fqcn,
+    )
 }
 
 pub fn analyzed_trait_defs(
     db: &dyn MirDatabase,
     analyzed_files: &rustc_hash::FxHashSet<Arc<str>>,
 ) -> Vec<(Arc<str>, Arc<mir_codebase::definitions::TraitDef>)> {
-    let mut files: Vec<SourceFile> = if analyzed_files.is_empty() {
-        db.all_source_files()
-    } else {
-        analyzed_files
-            .iter()
-            .filter_map(|p| db.lookup_source_file(p))
-            .collect()
-    };
-    files.sort_by_key(|a| a.path(db));
-    let mut out = Vec::new();
-    for sf in files {
-        let defs = collect_file_definitions(db, sf);
-        for t in defs.slice.traits.iter() {
-            out.push((t.fqcn.clone(), t.clone()));
-        }
-    }
-    out.sort_by(|a, b| a.0.cmp(&b.0));
-    out
+    collect_analyzed_defs(
+        db,
+        analyzed_files,
+        |slice| &slice.traits,
+        |t| t,
+        |t| &t.fqcn,
+    )
 }
 
 #[salsa::tracked]
