@@ -22,6 +22,20 @@ use rustc_hash::FxHashMap;
 
 use crate::db::{collect_file_definitions, source_file_for_fqcn, Fqcn, MirDatabase, SourceFile};
 
+fn find_named_def<'a, T>(
+    defs: &'a [Arc<T>],
+    target: &str,
+    name_of: impl Fn(&T) -> &Arc<str>,
+) -> Option<Arc<T>> {
+    defs.iter()
+        .find(|def| name_of(def.as_ref()).eq_ignore_ascii_case(target))
+        .cloned()
+}
+
+fn def_at<T>(defs: &[Arc<T>], idx: u32) -> Option<Arc<T>> {
+    defs.get(idx as usize).cloned()
+}
+
 /// Tagged union over the four PHP class-like kinds. The result type of
 /// composite `find_class_like` so callers receive a single response that
 /// covers `class` / `interface` / `trait` / `enum`.
@@ -346,12 +360,7 @@ pub fn class_in_file<'db>(
     fqcn: Fqcn<'db>,
 ) -> Option<Arc<ClassDef>> {
     let defs = collect_file_definitions(db, file);
-    let target = fqcn.name(db);
-    defs.slice
-        .classes
-        .iter()
-        .find(|c| c.fqcn.eq_ignore_ascii_case(target.as_ref()))
-        .cloned()
+    find_named_def(&defs.slice.classes, fqcn.name(db).as_ref(), |c| &c.fqcn)
 }
 
 /// Locate an `interface` named `fqcn` defined in `file`.
@@ -362,12 +371,7 @@ pub fn interface_in_file<'db>(
     fqcn: Fqcn<'db>,
 ) -> Option<Arc<InterfaceDef>> {
     let defs = collect_file_definitions(db, file);
-    let target = fqcn.name(db);
-    defs.slice
-        .interfaces
-        .iter()
-        .find(|i| i.fqcn.eq_ignore_ascii_case(target.as_ref()))
-        .cloned()
+    find_named_def(&defs.slice.interfaces, fqcn.name(db).as_ref(), |i| &i.fqcn)
 }
 
 /// Locate a `trait` named `fqcn` defined in `file`.
@@ -378,12 +382,7 @@ pub fn trait_in_file<'db>(
     fqcn: Fqcn<'db>,
 ) -> Option<Arc<TraitDef>> {
     let defs = collect_file_definitions(db, file);
-    let target = fqcn.name(db);
-    defs.slice
-        .traits
-        .iter()
-        .find(|t| t.fqcn.eq_ignore_ascii_case(target.as_ref()))
-        .cloned()
+    find_named_def(&defs.slice.traits, fqcn.name(db).as_ref(), |t| &t.fqcn)
 }
 
 /// Locate an `enum` named `fqcn` defined in `file`.
@@ -394,12 +393,7 @@ pub fn enum_in_file<'db>(
     fqcn: Fqcn<'db>,
 ) -> Option<Arc<EnumDef>> {
     let defs = collect_file_definitions(db, file);
-    let target = fqcn.name(db);
-    defs.slice
-        .enums
-        .iter()
-        .find(|e| e.fqcn.eq_ignore_ascii_case(target.as_ref()))
-        .cloned()
+    find_named_def(&defs.slice.enums, fqcn.name(db).as_ref(), |e| &e.fqcn)
 }
 
 /// Locate a function named `fqn` defined in `file`.
@@ -410,12 +404,7 @@ pub fn function_in_file<'db>(
     fqn: Fqcn<'db>,
 ) -> Option<Arc<FunctionDef>> {
     let defs = collect_file_definitions(db, file);
-    let target = fqn.name(db);
-    defs.slice
-        .functions
-        .iter()
-        .find(|f| f.fqn.eq_ignore_ascii_case(target.as_ref()))
-        .cloned()
+    find_named_def(&defs.slice.functions, fqn.name(db).as_ref(), |f| &f.fqn)
 }
 
 /// Locate a global constant `fqn` defined in `file`. Returns
@@ -440,7 +429,7 @@ pub fn global_constant_in_file<'db>(
 #[salsa::tracked]
 pub fn class_def_at(db: &dyn MirDatabase, file: SourceFile, idx: u32) -> Option<Arc<ClassDef>> {
     let defs = collect_file_definitions(db, file);
-    defs.slice.classes.get(idx as usize).cloned()
+    def_at(&defs.slice.classes, idx)
 }
 
 /// Plain classes (not interfaces/traits/enums) defined in `analyzed_files`,
@@ -563,19 +552,19 @@ pub fn interface_def_at(
     idx: u32,
 ) -> Option<Arc<InterfaceDef>> {
     let defs = collect_file_definitions(db, file);
-    defs.slice.interfaces.get(idx as usize).cloned()
+    def_at(&defs.slice.interfaces, idx)
 }
 
 #[salsa::tracked]
 pub fn trait_def_at(db: &dyn MirDatabase, file: SourceFile, idx: u32) -> Option<Arc<TraitDef>> {
     let defs = collect_file_definitions(db, file);
-    defs.slice.traits.get(idx as usize).cloned()
+    def_at(&defs.slice.traits, idx)
 }
 
 #[salsa::tracked]
 pub fn enum_def_at(db: &dyn MirDatabase, file: SourceFile, idx: u32) -> Option<Arc<EnumDef>> {
     let defs = collect_file_definitions(db, file);
-    defs.slice.enums.get(idx as usize).cloned()
+    def_at(&defs.slice.enums, idx)
 }
 
 #[salsa::tracked]
@@ -585,7 +574,7 @@ pub fn function_def_at(
     idx: u32,
 ) -> Option<Arc<FunctionDef>> {
     let defs = collect_file_definitions(db, file);
-    defs.slice.functions.get(idx as usize).cloned()
+    def_at(&defs.slice.functions, idx)
 }
 
 /// Composite: resolve `fqcn` to its defining file, then locate any
