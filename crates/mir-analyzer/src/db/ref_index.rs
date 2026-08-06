@@ -322,6 +322,54 @@ mod tests {
     }
 
     #[test]
+    fn append_batch_keeps_one_referencer_per_file_symbol_edge() {
+        let mut idx = RefIndex::default();
+        idx.append_batch(vec![
+            loc("fn:foo", "a.php", 1),
+            loc("fn:foo", "a.php", 2),
+            loc("fn:foo", "a.php", 3),
+        ]);
+        assert_eq!(idx.locations_of("fn:foo").len(), 3);
+        assert_eq!(idx.referencers_of("fn:foo"), vec![Arc::<str>::from("a.php")]);
+    }
+
+    #[test]
+    fn append_batch_across_multiple_calls_does_not_duplicate_referencers() {
+        let mut idx = RefIndex::default();
+        idx.append_batch(vec![loc("fn:foo", "a.php", 1)]);
+        idx.append_batch(vec![loc("fn:foo", "a.php", 2)]);
+        idx.append_batch(vec![loc("fn:foo", "a.php", 3)]);
+        assert_eq!(idx.locations_of("fn:foo").len(), 3);
+        assert_eq!(idx.referencers_of("fn:foo"), vec![Arc::<str>::from("a.php")]);
+    }
+
+    #[test]
+    fn clear_file_preserves_other_referencers_without_duplicates() {
+        let mut idx = RefIndex::default();
+        idx.append_batch(vec![
+            loc("fn:foo", "a.php", 1),
+            loc("fn:foo", "a.php", 2),
+            loc("fn:foo", "b.php", 3),
+            loc("fn:foo", "c.php", 4),
+        ]);
+        idx.clear_file("a.php");
+        let mut refs = idx.referencers_of("fn:foo");
+        refs.sort();
+        assert_eq!(refs, vec![Arc::<str>::from("b.php"), Arc::from("c.php")]);
+    }
+
+    #[test]
+    fn set_file_refs_recommit_churn_keeps_referencers_unique() {
+        let mut idx = RefIndex::default();
+        idx.set_file_refs("a.php", vec![loc("fn:foo", "a.php", 1)]);
+        idx.set_file_refs("a.php", vec![loc("fn:foo", "a.php", 2)]);
+        idx.set_file_refs("a.php", vec![loc("fn:foo", "a.php", 3)]);
+        idx.set_file_refs("a.php", vec![loc("fn:foo", "a.php", 4), loc("fn:foo", "a.php", 5)]);
+        assert_eq!(idx.locations_of("fn:foo").len(), 2);
+        assert_eq!(idx.referencers_of("fn:foo"), vec![Arc::<str>::from("a.php")]);
+    }
+
+    #[test]
     fn set_file_refs_hot_symbol_across_many_files() {
         // One symbol referenced by many files — the case that used to be
         // quadratic. Views must stay exact and replace-on-recommit must work.
