@@ -136,10 +136,10 @@ pub fn infer_scope(
     file: SourceFile,
     scope: ScopeKey,
 ) -> Arc<ScopeInferenceResult> {
-    let path = file.path(db);
-    let text = file.text(db);
-    let parsed_file = super::queries::parse_file(db, file);
-    let parsed = &*parsed_file.0;
+    let prepared = super::queries::prepare_analysis_file(db, file);
+    let path = &prepared.path;
+    let text = &prepared.text;
+    let parsed = prepared.parse_result();
 
     let empty = || {
         Arc::new(ScopeInferenceResult {
@@ -148,12 +148,11 @@ pub fn infer_scope(
         })
     };
 
-    if parsed.errors.iter().any(crate::parser::is_hard_parse_error) {
+    if prepared.has_hard_parse_errors {
         return empty();
     }
 
-    let php_version = super::queries::db_php_version(db);
-    let driver = BodyAnalyzer::new(db, php_version);
+    let driver = BodyAnalyzer::new(db, prepared.php_version);
 
     let mut issues: Vec<Issue> = Vec::new();
     let mut symbols: Vec<crate::symbol::ResolvedSymbol> = Vec::new();

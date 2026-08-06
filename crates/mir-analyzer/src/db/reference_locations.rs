@@ -119,13 +119,9 @@ pub(crate) fn issues_have_unresolved_names(issues: &[Issue]) -> bool {
 /// per-scope merge on next read.
 #[salsa::tracked(lru = 16384)]
 pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile) -> Arc<AnalyzeOutput> {
-    let path = file.path(db);
-    let text = file.text(db);
-
+    let prepared = super::queries::prepare_analysis_file(db, file);
     let mut issues: Vec<Issue> = Vec::new();
-
-    let parsed_file = super::queries::parse_file(db, file);
-    let parsed = &*parsed_file.0;
+    let parsed = prepared.parse_result();
 
     for err in &parsed.errors {
         if crate::parser::is_spurious_reserved_class_error(err) {
@@ -133,8 +129,8 @@ pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile) -> Arc<AnalyzeOutput
         }
         issues.push(crate::parser::parse_error_to_issue(
             err,
-            path,
-            text,
+            &prepared.path,
+            &prepared.text,
             &parsed.source_map,
         ));
     }
@@ -142,9 +138,8 @@ pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile) -> Arc<AnalyzeOutput
     // Run full analysis unless there are hard parse errors. ForbiddenWarning
     // diagnostics are non-fatal and leave the AST complete, so analysis can
     // still proceed.
-    let has_hard_parse_errors = parsed.errors.iter().any(crate::parser::is_hard_parse_error);
     let mut ref_locs: Vec<RefLoc> = Vec::new();
-    if !has_hard_parse_errors {
+    if !prepared.has_hard_parse_errors {
         let (scope_issues, scope_refs) = super::scopes::analyze_file_per_scope(db, file);
         issues.extend(scope_issues);
 

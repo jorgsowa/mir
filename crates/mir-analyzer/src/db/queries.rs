@@ -732,24 +732,61 @@ pub fn db_php_version(db: &dyn MirDatabase) -> crate::php_version::PhpVersion {
         .unwrap_or(crate::php_version::PhpVersion::LATEST)
 }
 
-#[salsa::tracked(cycle_fn = infer_file_return_types_cycle, cycle_initial = infer_file_return_types_initial)]
-pub fn infer_file_return_types(db: &dyn MirDatabase, file: SourceFile) -> InferredFileTypes {
+/// Shared setup for file-scoped Salsa analysis queries.
+///
+/// Several tracked queries open-code the same sequence:
+///
+/// - load `file.path(db)` / `file.text(db)`
+/// - load `parse_file(db, file)`
+/// - compute the configured PHP version
+/// - gate on hard parse errors
+///
+/// Centralizing that setup keeps the query family behavior aligned and makes
+/// future parse/version changes land in one place.
+#[derive(Clone)]
+pub struct PreparedAnalysisFile {
+    pub path: Arc<str>,
+    pub text: Arc<str>,
+    pub parsed: TrackedParseResult,
+    pub php_version: crate::php_version::PhpVersion,
+    pub has_hard_parse_errors: bool,
+}
+
+impl PreparedAnalysisFile {
+    pub fn parse_result(&self) -> &php_rs_parser::ParseResult {
+        &self.parsed.0
+    }
+}
+
+pub fn prepare_analysis_file(db: &dyn MirDatabase, file: SourceFile) -> PreparedAnalysisFile {
     let path = file.path(db);
     let text = file.text(db);
-    let php_version = db_php_version(db);
+    let parsed = parse_file(db, file);
+    let has_hard_parse_errors = parsed.0.errors.iter().any(crate::parser::is_hard_parse_error);
 
-    let parsed_file = parse_file(db, file);
-    let parsed = &*parsed_file.0;
+    PreparedAnalysisFile {
+        path: path.clone(),
+        text: text.clone(),
+        parsed: parsed.clone(),
+        php_version: db_php_version(db),
+        has_hard_parse_errors,
+    }
+}
 
-    if parsed.errors.iter().any(crate::parser::is_hard_parse_error) {
+#[salsa::tracked(cycle_fn = infer_file_return_types_cycle, cycle_initial = infer_file_return_types_initial)]
+pub fn infer_file_return_types(db: &dyn MirDatabase, file: SourceFile) -> InferredFileTypes {
+    let prepared = prepare_analysis_file(db, file);
+    let parsed = prepared.parse_result();
+
+    if prepared.has_hard_parse_errors {
         return InferredFileTypes::empty();
     }
 
-    let driver = crate::body_analysis::BodyAnalyzer::new_inference_only(db, php_version);
+    let driver = crate::body_analysis::BodyAnalyzer::new_inference_only(db, prepared.php_version);
     driver.analyze_bodies(
         &parsed.program,
-        path.clone(),
-        text.as_ref(),
+        prepared.path.clone(),
+        prepared.text.as_ref(),
         &parsed.source_map,
     );
     let inferred = driver.take_inferred_types();

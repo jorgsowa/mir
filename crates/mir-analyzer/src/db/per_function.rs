@@ -91,20 +91,21 @@ pub fn infer_function(
     file: SourceFile,
     fn_fqn: Arc<str>,
 ) -> Option<Arc<FunctionInferenceResult>> {
-    let path = file.path(db);
-    let text = file.text(db);
-    let php_version = crate::db::queries::db_php_version(db);
+    let prepared = crate::db::queries::prepare_analysis_file(db, file);
+    let parsed = prepared.parse_result();
 
-    let parsed_file = crate::db::parse_file(db, file);
-    let parsed = &*parsed_file.0;
-
-    if parsed.errors.iter().any(crate::parser::is_hard_parse_error) {
+    if prepared.has_hard_parse_errors {
         return None;
     }
 
-    let decl = find_function_decl(&parsed.program, db, path.as_ref(), fn_fqn.as_ref())?;
+    let decl = find_function_decl(&parsed.program, db, prepared.path.as_ref(), fn_fqn.as_ref())?;
 
-    let driver = crate::body_analysis::BodyAnalyzer::new(db, php_version);
-    let result = driver.analyze_fn_decl_pure(decl, path, text.as_ref(), &parsed.source_map);
+    let driver = crate::body_analysis::BodyAnalyzer::new(db, prepared.php_version);
+    let result = driver.analyze_fn_decl_pure(
+        decl,
+        &prepared.path,
+        prepared.text.as_ref(),
+        &parsed.source_map,
+    );
     Some(Arc::new(result))
 }
