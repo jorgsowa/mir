@@ -18,6 +18,7 @@
 use std::sync::Arc;
 
 use rustc_hash::{FxHashMap, FxHashSet};
+use smallvec::SmallVec;
 
 use super::reference_locations::RefLoc;
 
@@ -39,8 +40,12 @@ pub struct RefIndex {
     by_symbol: FxHashMap<Arc<str>, Vec<LocTuple>>,
     /// Forward view: file → set of symbol keys it references.
     file_symbols: FxHashMap<FileNo, FxHashSet<Arc<str>>>,
-    /// Reverse view: symbol key → set of files referencing it.
-    referencers: FxHashMap<Arc<str>, FxHashSet<FileNo>>,
+    /// Reverse view: symbol key → compact list of files referencing it.
+    ///
+    /// Membership is driven by `file_symbols`: writers only append when a
+    /// file/symbol edge is first seen, so this can stay as a deduplicated
+    /// inline vector instead of paying hash-set overhead per symbol bucket.
+    referencers: FxHashMap<Arc<str>, SmallVec<[FileNo; 4]>>,
 }
 
 impl RefIndex {
@@ -73,14 +78,17 @@ impl RefIndex {
         for loc in locs {
             touched_impl |= loc.symbol_key.starts_with("impl");
             let file_id = self.intern(&loc.file);
-            self.file_symbols
+            let is_new_edge = self
+                .file_symbols
                 .entry(file_id)
                 .or_default()
                 .insert(loc.symbol_key.clone());
-            self.referencers
-                .entry(loc.symbol_key.clone())
-                .or_default()
-                .insert(file_id);
+            if is_new_edge {
+                self.referencers
+                    .entry(loc.symbol_key.clone())
+                    .or_default()
+                    .push(file_id);
+            }
             let entry = self.by_symbol.entry(loc.symbol_key).or_default();
             let tuple = (file_id, loc.line, loc.col_start, loc.col_end);
             if !entry.contains(&tuple) {
@@ -107,7 +115,7 @@ impl RefIndex {
                 }
             }
             if let Some(refs) = self.referencers.get_mut(key) {
-                refs.remove(&file_id);
+                refs.retain(|f| *f != file_id);
                 if refs.is_empty() {
                     self.referencers.remove(key);
                 }
@@ -144,14 +152,17 @@ impl RefIndex {
             if !seen.insert((loc.symbol_key.clone(), tuple)) {
                 continue;
             }
-            self.file_symbols
+            let is_new_edge = self
+                .file_symbols
                 .entry(file_id)
                 .or_default()
                 .insert(loc.symbol_key.clone());
-            self.referencers
-                .entry(loc.symbol_key.clone())
-                .or_default()
-                .insert(file_id);
+            if is_new_edge {
+                self.referencers
+                    .entry(loc.symbol_key.clone())
+                    .or_default()
+                    .push(file_id);
+            }
             self.by_symbol
                 .entry(loc.symbol_key)
                 .or_default()
