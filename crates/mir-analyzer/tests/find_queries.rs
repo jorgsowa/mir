@@ -17,9 +17,9 @@ use mir_types::Name;
 
 use mir_analyzer::db::{
     class_ancestors_by_fqcn, class_in_file, find_class_constant_in_chain,
-    find_class_constant_in_class, find_class_like, find_function, find_method_in_chain,
-    find_method_in_class, find_property_in_chain, find_property_in_class, function_in_file,
-    ClassLike, Fqcn,
+    find_class_constant_in_class, find_class_like, find_function, find_global_constant,
+    find_method_in_chain, find_method_in_class, find_property_in_chain, find_property_in_class,
+    function_in_file, ClassLike, Fqcn,
 };
 use mir_analyzer::{AnalysisSession, ClassResolver, PhpVersion};
 
@@ -139,6 +139,23 @@ fn find_function_finds_via_resolver() {
         "find_function must resolve and extract in one call"
     );
     assert_eq!(func.unwrap().fqn.as_ref(), "App\\greet");
+}
+
+#[test]
+fn find_global_constant_finds_via_workspace_index() {
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.set_file_text(
+        Arc::from("/proj/constants.php"),
+        Arc::from("<?php\nnamespace App;\nconst ANSWER = 42;\n"),
+    );
+
+    let db = session.snapshot_db();
+    let fqn = Fqcn::new(&db, Name::new("App\\ANSWER"));
+    let constant = find_global_constant(&db, fqn);
+    assert!(
+        constant.is_some(),
+        "find_global_constant must resolve through the workspace index"
+    );
 }
 
 #[test]

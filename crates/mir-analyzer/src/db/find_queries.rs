@@ -20,7 +20,10 @@ use mir_codebase::definitions::{
 use mir_types::{Atomic, Name, Type};
 use rustc_hash::FxHashMap;
 
-use crate::db::{collect_file_definitions, source_file_for_fqcn, Fqcn, MirDatabase, SourceFile};
+use crate::db::{
+    collect_file_definitions, source_file_for_fqcn, Fqcn, MirDatabase, SourceFile, SymbolLoc,
+    WorkspaceSymbolIndex,
+};
 
 fn find_named_def<'a, T>(
     defs: &'a [Arc<T>],
@@ -71,6 +74,46 @@ fn collect_analyzed_defs<T, U>(
     }
     out.sort_by(|a, b| a.0.cmp(&b.0));
     out
+}
+
+fn workspace_symbol_loc(
+    db: &dyn MirDatabase,
+    lookup: impl Fn(&WorkspaceSymbolIndex) -> Option<SymbolLoc>,
+) -> Option<SymbolLoc> {
+    match db.frozen_workspace_index() {
+        Some(frozen) => lookup(frozen),
+        None => lookup(crate::db::workspace_index(db)),
+    }
+}
+
+fn class_like_from_loc(db: &dyn MirDatabase, loc: SymbolLoc) -> Option<ClassLike> {
+    match loc {
+        SymbolLoc::Class { file, idx } => class_def_at(db, file, idx as u32)
+            .clone()
+            .map(ClassLike::Class),
+        SymbolLoc::Interface { file, idx } => interface_def_at(db, file, idx as u32)
+            .clone()
+            .map(ClassLike::Interface),
+        SymbolLoc::Trait { file, idx } => trait_def_at(db, file, idx as u32)
+            .clone()
+            .map(ClassLike::Trait),
+        SymbolLoc::Enum { file, idx } => enum_def_at(db, file, idx as u32)
+            .clone()
+            .map(ClassLike::Enum),
+        SymbolLoc::Function { .. } | SymbolLoc::Constant { .. } => None,
+    }
+}
+
+fn global_constant_type_at(
+    db: &dyn MirDatabase,
+    file: SourceFile,
+    idx: usize,
+) -> Option<Arc<mir_types::Type>> {
+    let defs = collect_file_definitions(db, file);
+    defs.slice
+        .constants
+        .get(idx)
+        .map(|(_, ty)| Arc::new(ty.clone()))
 }
 
 /// Tagged union over the four PHP class-like kinds. The result type of
@@ -512,13 +555,7 @@ pub fn analyzed_enum_defs(
     db: &dyn MirDatabase,
     analyzed_files: &rustc_hash::FxHashSet<Arc<str>>,
 ) -> Vec<(Arc<str>, Arc<mir_codebase::definitions::EnumDef>)> {
-    collect_analyzed_defs(
-        db,
-        analyzed_files,
-        |slice| &slice.enums,
-        |e| e,
-        |e| &e.fqcn,
-    )
+    collect_analyzed_defs(db, analyzed_files, |slice| &slice.enums, |e| e, |e| &e.fqcn)
 }
 
 pub fn analyzed_trait_defs(
@@ -577,7 +614,6 @@ pub fn function_def_at(
 /// `set_file_text` or `set_workspace_files`), but definition collection
 /// happens on demand inside salsa.
 pub fn find_class_like<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option<ClassLike> {
-    use crate::db::SymbolLoc;
     // O(1) HashMap lookup in the workspace symbol index, then a per-(file, idx)
     // salsa-memoized fetch of the Arc<Storage>.
     //
@@ -590,46 +626,22 @@ pub fn find_class_like<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option
     // to avoid cloning the singleton's three Arcs on every call; fall back to
     // the live index on the canonical/open-file db. `.copied()` ends the borrow
     // before the `*_def_at` salsa calls below.
-    let loc = match db.frozen_workspace_index() {
-        Some(frozen) => frozen.class_like.get(&key).copied(),
-        None => crate::db::workspace_index(db).class_like.get(&key).copied(),
-    }?;
-    match loc {
-        SymbolLoc::Class { file, idx } => class_def_at(db, file, idx as u32)
-            .clone()
-            .map(ClassLike::Class),
-        SymbolLoc::Interface { file, idx } => interface_def_at(db, file, idx as u32)
-            .clone()
-            .map(ClassLike::Interface),
-        SymbolLoc::Trait { file, idx } => trait_def_at(db, file, idx as u32)
-            .clone()
-            .map(ClassLike::Trait),
-        SymbolLoc::Enum { file, idx } => enum_def_at(db, file, idx as u32)
-            .clone()
-            .map(ClassLike::Enum),
-        SymbolLoc::Function { .. } | SymbolLoc::Constant { .. } => None,
-    }
+    workspace_symbol_loc(db, |index| index.class_like.get(&key).copied())
+        .and_then(|loc| class_like_from_loc(db, loc))
 }
 
 /// The file a class-like symbol is declared in, if known.
 pub fn class_like_decl_file(db: &dyn MirDatabase, fqcn: Fqcn<'_>) -> Option<Arc<str>> {
     let key = fqcn.name(db).ascii_lowercase();
-    let loc = match db.frozen_workspace_index() {
-        Some(frozen) => frozen.class_like.get(&key).copied(),
-        None => crate::db::workspace_index(db).class_like.get(&key).copied(),
-    }?;
+    let loc = workspace_symbol_loc(db, |index| index.class_like.get(&key).copied())?;
     Some(loc.file().path(db).clone())
 }
 
 /// Composite: resolve `fqn` to its defining file, then locate the
 /// function within it.
 pub fn find_function<'db>(db: &'db dyn MirDatabase, fqn: Fqcn<'db>) -> Option<Arc<FunctionDef>> {
-    use crate::db::SymbolLoc;
     let key = fqn.name(db).ascii_lowercase();
-    let loc = match db.frozen_workspace_index() {
-        Some(frozen) => frozen.functions.get(&key).copied(),
-        None => crate::db::workspace_index(db).functions.get(&key).copied(),
-    };
+    let loc = workspace_symbol_loc(db, |index| index.functions.get(&key).copied());
     let SymbolLoc::Function { file, idx } = loc? else {
         return None;
     };
@@ -642,17 +654,12 @@ pub fn find_global_constant<'db>(
     db: &'db dyn MirDatabase,
     fqn: Fqcn<'db>,
 ) -> Option<Arc<mir_types::Type>> {
-    use crate::db::SymbolLoc;
     // Constants are keyed case-sensitively (raw name), unlike class_like/functions.
     let key = fqn.name(db);
-    let const_loc = match db.frozen_workspace_index() {
-        Some(frozen) => frozen.constants.get(key).copied(),
-        None => crate::db::workspace_index(db).constants.get(key).copied(),
-    };
+    let const_loc = workspace_symbol_loc(db, |index| index.constants.get(key).copied());
     if let Some(SymbolLoc::Constant { file, idx }) = const_loc {
-        let defs = collect_file_definitions(db, file);
-        if let Some((_, ty)) = defs.slice.constants.get(idx) {
-            return Some(Arc::new(ty.clone()));
+        if let Some(ty) = global_constant_type_at(db, file, idx) {
+            return Some(ty);
         }
     }
     let file = source_file_for_fqcn(db, fqn)?;
