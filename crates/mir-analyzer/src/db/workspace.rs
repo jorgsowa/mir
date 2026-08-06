@@ -361,6 +361,22 @@ impl PartialEq for WorkspaceSymbolIndex {
     }
 }
 
+/// Pure constructor shared by every path that materializes a fresh
+/// [`WorkspaceSymbolIndex`] from already-built maps.
+pub fn build_workspace_symbol_index(
+    class_like: FxHashMap<Name, SymbolLoc>,
+    functions: FxHashMap<Name, SymbolLoc>,
+    constants: FxHashMap<Name, SymbolLoc>,
+    class_like_by_short_name: FxHashMap<Name, Vec<Name>>,
+) -> WorkspaceSymbolIndex {
+    WorkspaceSymbolIndex {
+        class_like: Arc::new(class_like),
+        functions: Arc::new(functions),
+        constants: Arc::new(constants),
+        class_like_by_short_name: Arc::new(class_like_by_short_name),
+    }
+}
+
 /// The short-name key for an already-lowercased FQCN `Name` — the part after
 /// the last `\`, itself already lowercase (rsplit doesn't change case).
 /// Shared by every `WorkspaceSymbolIndex` build/incremental-update path so
@@ -475,12 +491,7 @@ pub fn workspace_symbol_index(db: &dyn MirDatabase) -> WorkspaceSymbolIndex {
             .push(key);
     }
 
-    WorkspaceSymbolIndex {
-        class_like: Arc::new(class_like),
-        functions: Arc::new(functions),
-        constants: Arc::new(constants),
-        class_like_by_short_name: Arc::new(class_like_by_short_name),
-    }
+    build_workspace_symbol_index(class_like, functions, constants, class_like_by_short_name)
 }
 
 // ---------------------------------------------------------------------------

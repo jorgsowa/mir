@@ -684,8 +684,8 @@ impl MirDbStorage {
     /// `ingest_file` that detects a declaration change.
     pub fn rebuild_workspace_symbol_index(&mut self) {
         use crate::db::{
-            collect_file_declarations, FileDeclarations, IndexDeclCounts, SymbolLoc,
-            WorkspaceSymbolIndex,
+            build_workspace_symbol_index, collect_file_declarations, FileDeclarations,
+            IndexDeclCounts, SymbolLoc,
         };
 
         let files = self.all_source_files();
@@ -751,12 +751,12 @@ impl MirDbStorage {
         *self.index_decl_counts.write() = counts;
         self.add_class_mention_names(class_like.keys().map(|k| k.as_str()));
 
-        let new_index = WorkspaceSymbolIndex {
-            class_like: Arc::new(class_like),
-            functions: Arc::new(functions),
-            constants: Arc::new(constants),
-            class_like_by_short_name: Arc::new(class_like_by_short_name),
-        };
+        let new_index = build_workspace_symbol_index(
+            class_like,
+            functions,
+            constants,
+            class_like_by_short_name,
+        );
         self.set_workspace_index(new_index);
     }
 
@@ -856,12 +856,12 @@ impl MirDbStorage {
         }
         *self.file_decl_snapshots.write() = snaps;
         *self.index_decl_counts.write() = counts;
-        let new_index = crate::db::WorkspaceSymbolIndex {
-            class_like: Arc::new(class_like),
-            functions: Arc::new(functions),
-            constants: Arc::new(constants),
-            class_like_by_short_name: Arc::new(class_like_by_short_name),
-        };
+        let new_index = crate::db::build_workspace_symbol_index(
+            class_like,
+            functions,
+            constants,
+            class_like_by_short_name,
+        );
         self.set_workspace_index(new_index);
     }
 
@@ -947,12 +947,12 @@ impl MirDbStorage {
                 snaps.insert(file, d);
             }
         }
-        let new_index = crate::db::WorkspaceSymbolIndex {
-            class_like: Arc::new(class_like),
-            functions: Arc::new(functions),
-            constants: Arc::new(constants),
-            class_like_by_short_name: Arc::new(class_like_by_short_name),
-        };
+        let new_index = crate::db::build_workspace_symbol_index(
+            class_like,
+            functions,
+            constants,
+            class_like_by_short_name,
+        );
         self.set_workspace_index(new_index);
     }
 
@@ -1078,12 +1078,12 @@ impl MirDbStorage {
         drop(counts);
         self.file_decl_snapshots.write().insert(file, new_decls);
 
-        let new_index = crate::db::WorkspaceSymbolIndex {
-            class_like: Arc::new(class_like),
-            functions: Arc::new(functions),
-            constants: Arc::new(constants),
-            class_like_by_short_name: Arc::new(class_like_by_short_name),
-        };
+        let new_index = crate::db::build_workspace_symbol_index(
+            class_like,
+            functions,
+            constants,
+            class_like_by_short_name,
+        );
         self.set_workspace_index(new_index);
         true
     }
@@ -1587,12 +1587,12 @@ impl MirDbStorage {
         subtract_decls(&mut constants, &mut counts.constants, &old.constants, file);
         drop(counts);
 
-        let new_index = crate::db::WorkspaceSymbolIndex {
-            class_like: Arc::new(class_like),
-            functions: Arc::new(functions),
-            constants: Arc::new(constants),
-            class_like_by_short_name: Arc::new(class_like_by_short_name),
-        };
+        let new_index = crate::db::build_workspace_symbol_index(
+            class_like,
+            functions,
+            constants,
+            class_like_by_short_name,
+        );
         self.set_workspace_index(new_index);
         true
     }
