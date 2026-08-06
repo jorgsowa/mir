@@ -597,13 +597,13 @@ impl AnalysisSession {
                     let mut db_main = self.snapshot_db();
                     db_main.freeze_workspace_index();
                     stale
-                        .par_iter()
-                        .map_with(db_main, |db, path| {
-                            let sf = db.lookup_source_file(path.as_ref())?;
-                            let text = sf.text(&*db as &dyn MirDatabase).clone();
-                            let out = crate::db::analyze_file(&*db as &dyn MirDatabase, sf).clone();
+                        .iter()
+                        .filter_map(|path| {
+                            let sf = db_main.lookup_source_file(path.as_ref())?;
+                            let text = sf.text(&db_main as &dyn MirDatabase).clone();
+                            let out = crate::db::analyze_file(&db_main as &dyn MirDatabase, sf).clone();
                             let defs =
-                                crate::db::collect_file_definitions(&*db as &dyn MirDatabase, sf);
+                                crate::db::collect_file_definitions(&db_main as &dyn MirDatabase, sf);
                             let entries = crate::db::subtype_index::entries_from_slice(&defs.slice);
                             // Stage the disk-cache write only when the commit
                             // below will rewrite postings (see the sweep in
@@ -612,7 +612,7 @@ impl AnalysisSession {
                                 None
                             } else {
                                 self.stage_ref_cache_put(
-                                    &*db as &dyn MirDatabase,
+                                    &db_main as &dyn MirDatabase,
                                     sf,
                                     path.as_ref(),
                                     &text,
@@ -623,12 +623,11 @@ impl AnalysisSession {
                             // (pure; committed serially below), skipped when
                             // the file already holds a current scan.
                             let mentions = mention_scanner.as_ref().and_then(|s| {
-                                (!db.class_mentions_current(path.as_ref(), &text, s.epoch()))
+                                (!db_main.class_mentions_current(path.as_ref(), &text, s.epoch()))
                                     .then(|| s.scan(&text))
                             });
                             Some((path.clone(), text, out, entries, put, mentions))
                         })
-                        .flatten()
                         .collect::<Vec<_>>()
                 }));
                 match attempt {

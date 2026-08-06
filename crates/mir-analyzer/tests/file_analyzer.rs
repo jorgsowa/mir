@@ -1184,6 +1184,52 @@ function caller2(): string { return helper(); }
     );
 }
 
+/// Cold indexed references must not analyze stale candidates in parallel.
+/// Real workspaces can contain files whose inferred return types recurse
+/// through other files; fanning those cold `analyze_file` queries across
+/// worker snapshots can make salsa merge the same cycle at different
+/// iterations and panic. The API should settle the postings without exposing
+/// that internal cycle handling to callers.
+#[test]
+fn indexed_references_to_handles_recursive_inference_candidates() {
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut files = Vec::new();
+    for i in 0..8 {
+        let next = (i + 1) % 8;
+        let file: Arc<str> = Arc::from(format!("/proj/cycle{i}.php"));
+        let src = format!(
+            "<?php
+namespace App;
+class C{i} {{
+    public function save(): void {{}}
+    public function peer() {{ return (new C{next}())->peer(); }}
+    public function go(): void {{ $this->peer()->save(); }}
+}}
+"
+        );
+        session.ingest_file(file.clone(), Arc::from(src));
+        files.push(file);
+    }
+
+    let refs = session
+        .indexed_references_to(
+            &mir_analyzer::Name::method("App\\C0", "save"),
+            &files,
+            false,
+            &|| false,
+        )
+        .expect("uncancelled recursive candidate query should complete");
+    let repeat = session
+        .indexed_references_to(
+            &mir_analyzer::Name::method("App\\C0", "save"),
+            &files,
+            false,
+            &|| false,
+        )
+        .expect("warm repeat should also complete");
+    assert_eq!(refs, repeat);
+}
+
 /// A file committed via `FileAnalyzer::analyze` before a class it
 /// references gets registered elsewhere must be re-verified once that class
 /// exists, even though its own text never changes.
