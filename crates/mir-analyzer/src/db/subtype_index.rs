@@ -124,20 +124,55 @@ pub fn entries_from_slice(slice: &mir_codebase::definitions::StubSlice) -> Vec<S
 
 /// Declaring entries for one FQCN: `(file, entry)` pairs. More than one file
 /// can declare the same FQCN (duplicated symbol); keep all, keyed by file.
-type DeclSites = Vec<(Arc<str>, Arc<SubtypeEntry>)>;
+type EntryId = u32;
+type DeclSites = Vec<EntryId>;
+
+#[derive(Debug)]
+struct StoredSubtypeEntry {
+    file: Arc<str>,
+    child_key: Arc<str>,
+    entry: SubtypeEntry,
+}
 
 #[derive(Default, Debug)]
 pub struct SubtypeIndex {
     /// parent (lowercased FQCN) → children (lowercased FQCN). Edge origin
     /// (extends/implements vs trait use) lives on the child's entry.
     children: FxHashMap<Arc<str>, FxHashSet<Arc<str>>>,
+    /// Canonical declaration payloads. Secondary indexes store only ids into
+    /// this arena so the same declaration body is not retained twice.
+    entries: Vec<Option<StoredSubtypeEntry>>,
+    free_entry_ids: Vec<EntryId>,
     /// file → class-likes it declared at last commit.
-    by_file: FxHashMap<Arc<str>, Vec<Arc<SubtypeEntry>>>,
+    by_file: FxHashMap<Arc<str>, Vec<EntryId>>,
     /// class (lowercased FQCN) → declaring entries.
     decls: FxHashMap<Arc<str>, DeclSites>,
 }
 
 impl SubtypeIndex {
+    fn alloc_entry(&mut self, file: Arc<str>, entry: SubtypeEntry) -> EntryId {
+        let child_key = edge_key(&entry.fqcn);
+        let stored = StoredSubtypeEntry {
+            file,
+            child_key,
+            entry,
+        };
+        if let Some(id) = self.free_entry_ids.pop() {
+            self.entries[id as usize] = Some(stored);
+            id
+        } else {
+            let id = self.entries.len() as EntryId;
+            self.entries.push(Some(stored));
+            id
+        }
+    }
+
+    fn entry(&self, id: EntryId) -> &StoredSubtypeEntry {
+        self.entries[id as usize]
+            .as_ref()
+            .expect("subtype index entry id must be live")
+    }
+
     /// Replace `file`'s class-like declarations wholesale. Returns whether
     /// the index changed — a recommit of identical entries is a no-op, so
     /// callers can key epoch bumps on real edge changes only.
@@ -145,7 +180,10 @@ impl SubtypeIndex {
         match self.by_file.get(file.as_ref()) {
             Some(old)
                 if old.len() == entries.len()
-                    && old.iter().zip(&entries).all(|(a, b)| a.as_ref() == b) =>
+                    && old
+                        .iter()
+                        .zip(&entries)
+                        .all(|(id, next)| &self.entry(*id).entry == next) =>
             {
                 return false;
             }
@@ -156,21 +194,30 @@ impl SubtypeIndex {
         if entries.is_empty() {
             return true;
         }
-        let mut stored: Vec<Arc<SubtypeEntry>> = Vec::with_capacity(entries.len());
+        let mut stored: Vec<EntryId> = Vec::with_capacity(entries.len());
         for entry in entries {
-            let entry = Arc::new(entry);
-            let child_key = edge_key(&entry.fqcn);
-            for parent in entry.supers.iter().chain(entry.trait_supers.iter()) {
+            let id = self.alloc_entry(file.clone(), entry);
+            let (child_key, parents): (Arc<str>, Vec<Arc<str>>) = {
+                let stored_entry = self.entry(id);
+                (
+                    stored_entry.child_key.clone(),
+                    stored_entry
+                        .entry
+                        .supers
+                        .iter()
+                        .chain(stored_entry.entry.trait_supers.iter())
+                        .cloned()
+                        .collect(),
+                )
+            };
+            for parent in &parents {
                 self.children
                     .entry(parent.clone())
                     .or_default()
                     .insert(child_key.clone());
             }
-            self.decls
-                .entry(child_key)
-                .or_default()
-                .push((file.clone(), entry.clone()));
-            stored.push(entry);
+            self.decls.entry(child_key).or_default().push(id);
+            stored.push(id);
         }
         self.by_file.insert(file.clone(), stored);
         true
@@ -182,25 +229,32 @@ impl SubtypeIndex {
         let Some(old) = self.by_file.remove(file) else {
             return false;
         };
-        for entry in old {
-            let child_key = edge_key(&entry.fqcn);
+        for id in old {
+            let (child_key, supers, trait_supers) = {
+                let stored = self.entry(id);
+                (
+                    stored.child_key.clone(),
+                    stored.entry.supers.to_vec(),
+                    stored.entry.trait_supers.to_vec(),
+                )
+            };
             // Drop the child edge only when no other file still declares a
             // class-like with the same FQCN and the same parent.
             if let Some(sites) = self.decls.get_mut(&child_key) {
-                sites.retain(|(f, _)| f.as_ref() != file);
+                sites.retain(|site_id| *site_id != id);
                 if sites.is_empty() {
                     self.decls.remove(&child_key);
                 }
             }
-            let still_declared: Vec<&Arc<SubtypeEntry>> = self
-                .decls
-                .get(&child_key)
-                .map(|sites| sites.iter().map(|(_, e)| e).collect())
-                .unwrap_or_default();
-            for parent in entry.supers.iter().chain(entry.trait_supers.iter()) {
+            let still_declared: Vec<EntryId> =
+                self.decls.get(&child_key).cloned().unwrap_or_default();
+            for parent in supers.iter().chain(trait_supers.iter()) {
                 let survives = still_declared
                     .iter()
-                    .any(|e| e.supers.contains(parent) || e.trait_supers.contains(parent));
+                    .map(|site_id| &self.entry(*site_id).entry)
+                    .any(|entry| {
+                        entry.supers.contains(parent) || entry.trait_supers.contains(parent)
+                    });
                 if !survives {
                     if let Some(set) = self.children.get_mut(parent) {
                         set.remove(&child_key);
@@ -210,6 +264,8 @@ impl SubtypeIndex {
                     }
                 }
             }
+            self.entries[id as usize] = None;
+            self.free_entry_ids.push(id);
         }
         true
     }
@@ -242,7 +298,9 @@ impl SubtypeIndex {
                 // subtype and must not be descended into from here; it stays
                 // unvisited so a qualifying edge elsewhere can still reach it.
                 let mut qualifies = false;
-                for (file, entry) in sites {
+                for id in sites {
+                    let stored = self.entry(*id);
+                    let entry = &stored.entry;
                     let via_super = entry.supers.contains(&parent);
                     let via_trait = include_trait_users && entry.trait_supers.contains(&parent);
                     if !via_super && !via_trait {
@@ -253,7 +311,7 @@ impl SubtypeIndex {
                         fqcn: entry.fqcn.clone(),
                         kind: entry.kind,
                         is_abstract: entry.is_abstract,
-                        file: file.clone(),
+                        file: stored.file.clone(),
                         location: entry.location.clone(),
                     });
                 }
