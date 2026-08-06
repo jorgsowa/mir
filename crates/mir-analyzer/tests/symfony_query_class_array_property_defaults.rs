@@ -18,7 +18,11 @@ fn symfony_query_class_array_property_defaults() {
     let defaults = class_array_property_defaults(&db, router);
     let properties: BTreeSet<&str> = defaults.iter().map(|d| d.property.as_ref()).collect();
     assert!(
-        properties.is_superset(&BTreeSet::from(["cache", "expressionLanguageProviders", "options"])),
+        properties.is_superset(&BTreeSet::from([
+            "cache",
+            "expressionLanguageProviders",
+            "options"
+        ])),
         "Router should expose its array-typed defaulted properties"
     );
     assert!(

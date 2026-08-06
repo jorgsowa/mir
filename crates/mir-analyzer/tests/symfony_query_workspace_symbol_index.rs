@@ -42,9 +42,9 @@ fn symfony_query_workspace_symbol_index() {
         "the Request short-name bucket should resolve to Symfony\\Component\\HttpFoundation\\Request"
     );
     assert!(
-        index
-            .class_like
-            .contains_key(&Name::new("Symfony\\Component\\HttpFoundation\\Request").ascii_lowercase()),
+        index.class_like.contains_key(
+            &Name::new("Symfony\\Component\\HttpFoundation\\Request").ascii_lowercase()
+        ),
         "workspace class-like index should contain Request by its lowered FQCN key"
     );
     assert!(

@@ -16,7 +16,11 @@ fn symfony_query_file_scopes() {
         .lookup_source_file(fx.request_stack.as_ref())
         .expect("RequestStack file");
     let scopes = file_scopes(&db, file);
-    assert_eq!(scopes.len(), 1, "RequestStack should contribute one class-like scope");
+    assert_eq!(
+        scopes.len(),
+        1,
+        "RequestStack should contribute one class-like scope"
+    );
     assert!(
         scopes.iter().any(|scope| matches!(
             scope,
@@ -26,7 +30,9 @@ fn symfony_query_file_scopes() {
         "RequestStack class scope should be discoverable"
     );
     assert!(
-        !scopes.iter().any(|scope| matches!(scope, ScopeKey::FileHeader)),
+        !scopes
+            .iter()
+            .any(|scope| matches!(scope, ScopeKey::FileHeader)),
         "file_scopes should not duplicate the file header as a class-like scope entry"
     );
 }

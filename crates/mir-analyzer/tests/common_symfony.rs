@@ -3,8 +3,8 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use mir_analyzer::db::{Fqcn, MirDatabase};
 use mir_analyzer::composer::Psr4Map;
+use mir_analyzer::db::{Fqcn, MirDatabase};
 use mir_analyzer::{AnalysisSession, IndexCancel, IndexParallelism, PhpVersion};
 use mir_types::Name;
 
@@ -61,7 +61,8 @@ fn chunked<T>(items: &[T], size: usize) -> impl Iterator<Item = &[T]> {
 
 pub fn load_full_symfony_fixture() -> Option<FullSymfonyFixture> {
     let root = fixture_root()?;
-    let psr4 = Psr4Map::from_composer(&root).expect("full Symfony fixture must have a valid composer.json");
+    let psr4 = Psr4Map::from_composer(&root)
+        .expect("full Symfony fixture must have a valid composer.json");
 
     let mut files = psr4.project_files();
     let vendor_files = psr4.all_vendor_files();
@@ -90,17 +91,18 @@ pub fn load_full_symfony_fixture() -> Option<FullSymfonyFixture> {
     session.finalize_index();
 
     let request = arc_path(root.join("src/Symfony/Component/HttpFoundation/Request.php"));
-    let request_stack = arc_path(root.join("src/Symfony/Component/HttpFoundation/RequestStack.php"));
-    let parameter_bag = arc_path(root.join("src/Symfony/Component/HttpFoundation/ParameterBag.php"));
+    let request_stack =
+        arc_path(root.join("src/Symfony/Component/HttpFoundation/RequestStack.php"));
+    let parameter_bag =
+        arc_path(root.join("src/Symfony/Component/HttpFoundation/ParameterBag.php"));
     let input_bag = arc_path(root.join("src/Symfony/Component/HttpFoundation/InputBag.php"));
     let uri_signer = arc_path(root.join("src/Symfony/Component/HttpFoundation/UriSigner.php"));
     let string_functions =
         arc_path(root.join("src/Symfony/Component/String/Resources/functions.php"));
     let ascii_slugger =
         arc_path(root.join("src/Symfony/Component/String/Slugger/AsciiSlugger.php"));
-    let session_interface = arc_path(
-        root.join("src/Symfony/Component/HttpFoundation/Session/SessionInterface.php"),
-    );
+    let session_interface =
+        arc_path(root.join("src/Symfony/Component/HttpFoundation/Session/SessionInterface.php"));
     let compiled_url_matcher_trait = arc_path(
         root.join("src/Symfony/Component/Routing/Matcher/Dumper/CompiledUrlMatcherTrait.php"),
     );

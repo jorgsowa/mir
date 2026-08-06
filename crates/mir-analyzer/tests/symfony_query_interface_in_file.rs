@@ -29,8 +29,14 @@ fn symfony_query_interface_in_file() {
         "Symfony\\Component\\HttpFoundation\\Session\\SessionInterface"
     );
     assert_eq!(found.short_name.as_ref(), "SessionInterface");
-    assert!(found.extends.is_empty(), "SessionInterface should not extend other interfaces here");
-    assert!(found.own_constants.is_empty(), "SessionInterface should not declare constants");
+    assert!(
+        found.extends.is_empty(),
+        "SessionInterface should not extend other interfaces here"
+    );
+    assert!(
+        found.own_constants.is_empty(),
+        "SessionInterface should not declare constants"
+    );
     assert!(
         found.location.is_some(),
         "SessionInterface should retain a declaration location"

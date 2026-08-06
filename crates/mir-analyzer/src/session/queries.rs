@@ -601,9 +601,12 @@ impl AnalysisSession {
                         .filter_map(|path| {
                             let sf = db_main.lookup_source_file(path.as_ref())?;
                             let text = sf.text(&db_main as &dyn MirDatabase).clone();
-                            let out = crate::db::analyze_file(&db_main as &dyn MirDatabase, sf).clone();
-                            let defs =
-                                crate::db::collect_file_definitions(&db_main as &dyn MirDatabase, sf);
+                            let out =
+                                crate::db::analyze_file(&db_main as &dyn MirDatabase, sf).clone();
+                            let defs = crate::db::collect_file_definitions(
+                                &db_main as &dyn MirDatabase,
+                                sf,
+                            );
                             let entries = crate::db::subtype_index::entries_from_slice(&defs.slice);
                             // Stage the disk-cache write only when the commit
                             // below will rewrite postings (see the sweep in

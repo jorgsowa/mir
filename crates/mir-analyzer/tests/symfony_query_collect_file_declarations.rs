@@ -12,9 +12,15 @@ fn symfony_query_collect_file_declarations() {
     };
 
     let db = fx.session.snapshot_db();
-    let file = db.lookup_source_file(fx.request.as_ref()).expect("Request file");
+    let file = db
+        .lookup_source_file(fx.request.as_ref())
+        .expect("Request file");
     let decls = collect_file_declarations(&db, file);
-    assert_eq!(decls.class_like.len(), 1, "Request.php should export one class-like symbol");
+    assert_eq!(
+        decls.class_like.len(),
+        1,
+        "Request.php should export one class-like symbol"
+    );
     assert!(
         decls.functions.is_empty(),
         "Request.php should not export free functions"
@@ -27,7 +33,10 @@ fn symfony_query_collect_file_declarations() {
         decls.class_like[0].0.as_str(),
         "symfony\\component\\httpfoundation\\request"
     );
-    assert_eq!(decls.class_like[0].1.file().path(&db).as_ref(), fx.request.as_ref());
+    assert_eq!(
+        decls.class_like[0].1.file().path(&db).as_ref(),
+        fx.request.as_ref()
+    );
     assert!(
         matches!(
             decls.class_like[0].1,

@@ -36,6 +36,10 @@ fn symfony_query_file_structural_deps() {
             .any(|p| p.ends_with("Exception/SessionNotFoundException.php")),
         "RequestStack should structurally depend on SessionNotFoundException"
     );
-    assert_eq!(dep_set.len(), deps.len(), "structural deps should already be deduplicated");
+    assert_eq!(
+        dep_set.len(),
+        deps.len(),
+        "structural deps should already be deduplicated"
+    );
     assert!(!dep_set.contains(fx.request_stack.as_ref()));
 }

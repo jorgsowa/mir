@@ -29,10 +29,7 @@ fn symfony_query_infer_function() {
         "infer_function should surface u()'s return type"
     );
     assert_eq!(
-        inferred
-            .return_type
-            .as_ref()
-            .map(|t| t.to_string()),
+        inferred.return_type.as_ref().map(|t| t.to_string()),
         Some("Symfony\\Component\\String\\UnicodeString".to_string())
     );
     assert!(

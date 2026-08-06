@@ -116,7 +116,9 @@ fn symfony_query_analyze_file_false_positives() {
         "AsciiSlugger currently reports the missing external LocaleAwareInterface dependency"
     );
 
-    let router = db.lookup_source_file(fx.router.as_ref()).expect("Router file");
+    let router = db
+        .lookup_source_file(fx.router.as_ref())
+        .expect("Router file");
     let router_out = analyze_file(&db, router);
     assert!(
         router_out.issues.contains(

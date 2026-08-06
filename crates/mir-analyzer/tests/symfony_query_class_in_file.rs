@@ -12,20 +12,31 @@ fn symfony_query_class_in_file() {
     };
 
     let db = fx.session.snapshot_db();
-    let file = db.lookup_source_file(fx.request.as_ref()).expect("Request file");
+    let file = db
+        .lookup_source_file(fx.request.as_ref())
+        .expect("Request file");
     let request = fqcn(&db, "Symfony\\Component\\HttpFoundation\\Request");
     let found = class_in_file(&db, file, request)
         .clone()
         .expect("Request class");
-    assert_eq!(found.fqcn.as_ref(), "Symfony\\Component\\HttpFoundation\\Request");
+    assert_eq!(
+        found.fqcn.as_ref(),
+        "Symfony\\Component\\HttpFoundation\\Request"
+    );
     assert_eq!(found.short_name.as_ref(), "Request");
-    assert!(found.parent.is_none(), "Request should not extend another class");
+    assert!(
+        found.parent.is_none(),
+        "Request should not extend another class"
+    );
     assert!(
         found.interfaces.is_empty(),
         "Request should not declare implemented interfaces directly"
     );
     assert!(!found.is_abstract, "Request should be a concrete class");
-    assert!(!found.is_final, "Request should not be final in this Symfony fixture");
+    assert!(
+        !found.is_final,
+        "Request should not be final in this Symfony fixture"
+    );
     assert!(
         found.own_properties.contains_key("request"),
         "Request should expose the request input bag property"

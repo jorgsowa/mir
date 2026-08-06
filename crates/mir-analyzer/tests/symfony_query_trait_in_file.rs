@@ -29,7 +29,10 @@ fn symfony_query_trait_in_file() {
         "Symfony\\Component\\Routing\\Matcher\\Dumper\\CompiledUrlMatcherTrait"
     );
     assert_eq!(found.short_name.as_ref(), "CompiledUrlMatcherTrait");
-    assert!(found.traits.is_empty(), "CompiledUrlMatcherTrait should not use nested traits");
+    assert!(
+        found.traits.is_empty(),
+        "CompiledUrlMatcherTrait should not use nested traits"
+    );
     assert_eq!(
         found.own_properties.len(),
         6,

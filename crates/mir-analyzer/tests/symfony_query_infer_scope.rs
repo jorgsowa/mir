@@ -23,7 +23,11 @@ fn symfony_query_infer_scope() {
         "RequestStack header scope should analyze cleanly"
     );
     assert_eq!(header.ref_locs.len(), 2);
-    let symbols: BTreeSet<&str> = header.ref_locs.iter().map(|loc| loc.symbol_key.as_ref()).collect();
+    let symbols: BTreeSet<&str> = header
+        .ref_locs
+        .iter()
+        .map(|loc| loc.symbol_key.as_ref())
+        .collect();
     assert_eq!(
         symbols,
         BTreeSet::from([
