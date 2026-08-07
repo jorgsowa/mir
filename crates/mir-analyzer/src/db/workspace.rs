@@ -211,15 +211,14 @@ fn declaration_projection_from_slice(
     let mut constants = Vec::new();
     let mut structural_symbols = Vec::new();
 
-    let push_named_objects =
-        |out: &mut Vec<Arc<str>>, union: &mir_types::Type| {
-            out.extend(union.types.iter().filter_map(|atomic| match atomic {
-                mir_types::atomic::Atomic::TNamedObject { fqcn, .. } => {
-                    Some(Arc::<str>::from(fqcn.as_str()))
-                }
-                _ => None,
-            }));
-        };
+    let push_named_objects = |out: &mut Vec<Arc<str>>, union: &mir_types::Type| {
+        out.extend(union.types.iter().filter_map(|atomic| match atomic {
+            mir_types::atomic::Atomic::TNamedObject { fqcn, .. } => {
+                Some(Arc::<str>::from(fqcn.as_str()))
+            }
+            _ => None,
+        }));
+    };
 
     // Pre-lowercase FQCNs once at collection time and intern via Name so
     // downstream lookups (find_class_like, inferred_*_demand) can hash u64
@@ -338,7 +337,12 @@ fn declaration_projection_from_slice(
             loc: SymbolLoc::Constant { file, idx },
         });
     }
-    structural_symbols.extend(slice.imports.values().map(|fqcn| Arc::<str>::from(fqcn.as_str())));
+    structural_symbols.extend(
+        slice
+            .imports
+            .values()
+            .map(|fqcn| Arc::<str>::from(fqcn.as_str())),
+    );
 
     FileDeclarationProjection {
         class_like,

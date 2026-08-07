@@ -762,7 +762,11 @@ pub fn prepare_analysis_file(db: &dyn MirDatabase, file: SourceFile) -> Prepared
     let path = file.path(db);
     let text = file.text(db);
     let parsed = parse_file(db, file);
-    let has_hard_parse_errors = parsed.0.errors.iter().any(crate::parser::is_hard_parse_error);
+    let has_hard_parse_errors = parsed
+        .0
+        .errors
+        .iter()
+        .any(crate::parser::is_hard_parse_error);
 
     PreparedAnalysisFile {
         path: path.clone(),

@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use mir_analyzer::db::{
-    file_structural_deps, workspace_classes, workspace_symbol_index, workspace_functions,
+    file_structural_deps, workspace_classes, workspace_functions, workspace_symbol_index,
     MirDatabase,
 };
 use mir_analyzer::{discover_files, AnalysisSession, BatchOptions, PhpVersion};
@@ -85,14 +85,16 @@ fn measure_workspace_projections() {
 
     let deps_cold_start = Instant::now();
     let deps_cold = black_box(
-        files.iter()
+        files
+            .iter()
             .map(|file| file_structural_deps(&db, *file).len())
             .sum::<usize>(),
     );
     let deps_cold_elapsed = deps_cold_start.elapsed();
     let deps_warm_start = Instant::now();
     let deps_warm = black_box(
-        files.iter()
+        files
+            .iter()
             .map(|file| file_structural_deps(&db, *file).len())
             .sum::<usize>(),
     );
