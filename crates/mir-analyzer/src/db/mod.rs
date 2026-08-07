@@ -222,8 +222,9 @@ pub use self::subtype_index::{ClassLikeKind, SubtypeEntry, SubtypeIndex, Subtype
 pub use self::workspace::{
     build_workspace_symbol_index, collect_file_declarations, decls_from_slice, short_name_key,
     workspace_classes, workspace_functions, workspace_global_vars, workspace_index,
-    workspace_symbol_index, FileDeclarations, GlobalVarMap, IndexDeclCounts, SymbolLoc, SymbolTier,
-    WorkspaceRevision, WorkspaceSymbolIndex, WorkspaceSymbolIndexSingleton,
+    workspace_symbol_index, DeclaredSymbol, FileDeclarations, GlobalVarMap, IndexDeclCounts,
+    SymbolLoc, SymbolTier, WorkspaceRevision, WorkspaceSymbolIndex,
+    WorkspaceSymbolIndexSingleton,
 };
 
 // Sub-modules

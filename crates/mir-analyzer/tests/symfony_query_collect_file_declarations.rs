@@ -30,16 +30,16 @@ fn symfony_query_collect_file_declarations() {
         "Request.php should not export file-level constants"
     );
     assert_eq!(
-        decls.class_like[0].0.as_str(),
+        decls.class_like[0].key.as_str(),
         "symfony\\component\\httpfoundation\\request"
     );
     assert_eq!(
-        decls.class_like[0].1.file().path(&db).as_ref(),
+        decls.class_like[0].loc.file().path(&db).as_ref(),
         fx.request.as_ref()
     );
     assert!(
         matches!(
-            decls.class_like[0].1,
+            decls.class_like[0].loc,
             mir_analyzer::db::SymbolLoc::Class { idx: 0, .. }
         ),
         "Request.php should register its first declaration as the Request class symbol"

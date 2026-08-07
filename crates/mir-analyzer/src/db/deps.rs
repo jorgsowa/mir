@@ -17,6 +17,7 @@ use std::sync::Arc;
 use rustc_hash::FxHashSet;
 
 use super::*;
+use crate::db::workspace::structural_symbols_from_slice;
 
 /// Files that `file`'s declarations depend on. Sorted for deterministic
 /// memo equality. Self-edges are excluded.
@@ -33,142 +34,9 @@ pub fn file_structural_deps(db: &dyn MirDatabase, file: SourceFile) -> Arc<[Arc<
         }
     };
 
-    let extract_named_objects = |union: &mir_types::Type| {
-        union
-            .types
-            .iter()
-            .filter_map(|atomic| match atomic {
-                mir_types::atomic::Atomic::TNamedObject { fqcn, .. } => Some(*fqcn),
-                _ => None,
-            })
-            .collect::<Vec<_>>()
-    };
-
     let defs = crate::db::collect_file_definitions(db, file);
-
-    for fqcn in defs.slice.imports.values() {
-        add_target(fqcn.as_str());
-    }
-
-    for c in defs.slice.classes.iter() {
-        if let Some(p) = &c.parent {
-            add_target(p);
-        }
-        for iface in c.interfaces.iter() {
-            add_target(iface);
-        }
-        for tr in c.traits.iter() {
-            add_target(tr);
-        }
-        for prop in c.own_properties.values() {
-            if let Some(ty) = &prop.ty {
-                for named in extract_named_objects(ty) {
-                    add_target(named.as_ref());
-                }
-            }
-        }
-        for method in c.own_methods.values() {
-            for param in method.params.iter() {
-                if let Some(ty) = &param.ty {
-                    for named in extract_named_objects(ty.as_ref()) {
-                        add_target(named.as_ref());
-                    }
-                }
-            }
-            if let Some(rt) = method.return_type.as_deref() {
-                for named in extract_named_objects(rt) {
-                    add_target(named.as_ref());
-                }
-            }
-        }
-    }
-    for i in defs.slice.interfaces.iter() {
-        for ext in i.extends.iter() {
-            add_target(ext);
-        }
-        for prop in i.own_properties.values() {
-            if let Some(ty) = &prop.ty {
-                for named in extract_named_objects(ty) {
-                    add_target(named.as_ref());
-                }
-            }
-        }
-        for method in i.own_methods.values() {
-            for param in method.params.iter() {
-                if let Some(ty) = &param.ty {
-                    for named in extract_named_objects(ty.as_ref()) {
-                        add_target(named.as_ref());
-                    }
-                }
-            }
-            if let Some(rt) = method.return_type.as_deref() {
-                for named in extract_named_objects(rt) {
-                    add_target(named.as_ref());
-                }
-            }
-        }
-    }
-    for t in defs.slice.traits.iter() {
-        for tr in t.traits.iter() {
-            add_target(tr);
-        }
-        for prop in t.own_properties.values() {
-            if let Some(ty) = &prop.ty {
-                for named in extract_named_objects(ty) {
-                    add_target(named.as_ref());
-                }
-            }
-        }
-        for method in t.own_methods.values() {
-            for param in method.params.iter() {
-                if let Some(ty) = &param.ty {
-                    for named in extract_named_objects(ty.as_ref()) {
-                        add_target(named.as_ref());
-                    }
-                }
-            }
-            if let Some(rt) = method.return_type.as_deref() {
-                for named in extract_named_objects(rt) {
-                    add_target(named.as_ref());
-                }
-            }
-        }
-    }
-    for e in defs.slice.enums.iter() {
-        for iface in e.interfaces.iter() {
-            add_target(iface);
-        }
-        for tr in e.traits.iter() {
-            add_target(tr);
-        }
-        for method in e.own_methods.values() {
-            for param in method.params.iter() {
-                if let Some(ty) = &param.ty {
-                    for named in extract_named_objects(ty.as_ref()) {
-                        add_target(named.as_ref());
-                    }
-                }
-            }
-            if let Some(rt) = method.return_type.as_deref() {
-                for named in extract_named_objects(rt) {
-                    add_target(named.as_ref());
-                }
-            }
-        }
-    }
-    for f in defs.slice.functions.iter() {
-        for param in f.params.iter() {
-            if let Some(ty) = &param.ty {
-                for named in extract_named_objects(ty.as_ref()) {
-                    add_target(named.as_ref());
-                }
-            }
-        }
-        if let Some(rt) = f.return_type.as_deref() {
-            for named in extract_named_objects(rt) {
-                add_target(named.as_ref());
-            }
-        }
+    for symbol in structural_symbols_from_slice(&defs.slice, file).iter() {
+        add_target(symbol.as_ref());
     }
 
     let mut sorted: Vec<Arc<str>> = targets.into_iter().collect();

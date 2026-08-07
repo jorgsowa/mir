@@ -60,18 +60,9 @@ pub fn workspace_classes(db: &dyn MirDatabase) -> Arc<[Arc<str>]> {
     let files = db.all_source_files();
     let mut out: Vec<Arc<str>> = Vec::new();
     for file in files.iter() {
-        let defs = collect_file_definitions(db, *file);
-        for c in defs.slice.classes.iter() {
-            out.push(c.fqcn.clone());
-        }
-        for i in defs.slice.interfaces.iter() {
-            out.push(i.fqcn.clone());
-        }
-        for t in defs.slice.traits.iter() {
-            out.push(t.fqcn.clone());
-        }
-        for e in defs.slice.enums.iter() {
-            out.push(e.fqcn.clone());
+        let decls = collect_file_declarations(db, *file);
+        for decl in &decls.class_like {
+            out.push(decl.symbol.clone());
         }
     }
     Arc::from(out)
@@ -88,9 +79,9 @@ pub fn workspace_functions(db: &dyn MirDatabase) -> Arc<[Arc<str>]> {
     let files = db.all_source_files();
     let mut out: Vec<Arc<str>> = Vec::new();
     for file in files.iter() {
-        let defs = collect_file_definitions(db, *file);
-        for f in defs.slice.functions.iter() {
-            out.push(f.fqn.clone());
+        let decls = collect_file_declarations(db, *file);
+        for decl in &decls.functions {
+            out.push(decl.symbol.clone());
         }
     }
     Arc::from(out)
@@ -119,12 +110,14 @@ pub fn workspace_functions(db: &dyn MirDatabase) -> Arc<[Arc<str>]> {
 /// change but its set of class / function / constant names is unchanged.
 #[derive(Clone)]
 pub struct FileDeclarations {
-    /// `(lowercased_fqcn_symbol, SymbolLoc)` for every class-like symbol.
-    pub class_like: Vec<(Name, SymbolLoc)>,
-    /// `(lowercased_fqn_symbol, SymbolLoc)` for every function.
-    pub functions: Vec<(Name, SymbolLoc)>,
-    /// `(name_symbol, SymbolLoc)` for every constant (case-sensitive key).
-    pub constants: Vec<(Name, SymbolLoc)>,
+    /// Every class-like declaration, keyed case-insensitively for lookup while
+    /// preserving the original symbol for aggregation queries.
+    pub class_like: Vec<DeclaredSymbol>,
+    /// Every function declaration, keyed case-insensitively for lookup while
+    /// preserving the original symbol for aggregation queries.
+    pub functions: Vec<DeclaredSymbol>,
+    /// Every constant declaration (case-sensitive key).
+    pub constants: Vec<DeclaredSymbol>,
 }
 
 impl PartialEq for FileDeclarations {
@@ -134,20 +127,34 @@ impl PartialEq for FileDeclarations {
                 .class_like
                 .iter()
                 .zip(&other.class_like)
-                .all(|(a, b)| a.0 == b.0)
+                .all(|(a, b)| a.key == b.key)
             && self.functions.len() == other.functions.len()
             && self
                 .functions
                 .iter()
                 .zip(&other.functions)
-                .all(|(a, b)| a.0 == b.0)
+                .all(|(a, b)| a.key == b.key)
             && self.constants.len() == other.constants.len()
             && self
                 .constants
                 .iter()
                 .zip(&other.constants)
-                .all(|(a, b)| a.0 == b.0)
+                .all(|(a, b)| a.key == b.key)
     }
+}
+
+#[derive(Clone)]
+pub struct DeclaredSymbol {
+    pub key: Name,
+    pub symbol: Arc<str>,
+    pub loc: SymbolLoc,
+}
+
+struct FileDeclarationProjection {
+    class_like: Vec<DeclaredSymbol>,
+    functions: Vec<DeclaredSymbol>,
+    constants: Vec<DeclaredSymbol>,
+    structural_symbols: Vec<Arc<str>>,
 }
 
 /// Extract the declared names from one source file without exposing body
@@ -178,51 +185,166 @@ pub fn decls_from_slice(
     slice: &mir_codebase::definitions::StubSlice,
     file: SourceFile,
 ) -> FileDeclarations {
+    let projection = declaration_projection_from_slice(slice, file);
+    FileDeclarations {
+        class_like: projection.class_like,
+        functions: projection.functions,
+        constants: projection.constants,
+    }
+}
+
+pub(crate) fn structural_symbols_from_slice(
+    slice: &mir_codebase::definitions::StubSlice,
+    file: SourceFile,
+) -> Arc<[Arc<str>]> {
+    declaration_projection_from_slice(slice, file)
+        .structural_symbols
+        .into()
+}
+
+fn declaration_projection_from_slice(
+    slice: &mir_codebase::definitions::StubSlice,
+    file: SourceFile,
+) -> FileDeclarationProjection {
     let mut class_like = Vec::new();
     let mut functions = Vec::new();
     let mut constants = Vec::new();
+    let mut structural_symbols = Vec::new();
+
+    let push_named_objects =
+        |out: &mut Vec<Arc<str>>, union: &mir_types::Type| {
+            out.extend(union.types.iter().filter_map(|atomic| match atomic {
+                mir_types::atomic::Atomic::TNamedObject { fqcn, .. } => {
+                    Some(Arc::<str>::from(fqcn.as_str()))
+                }
+                _ => None,
+            }));
+        };
 
     // Pre-lowercase FQCNs once at collection time and intern via Name so
     // downstream lookups (find_class_like, inferred_*_demand) can hash u64
     // pointers instead of byte-by-byte strings.
     for (idx, c) in slice.classes.iter().enumerate() {
-        class_like.push((
-            Name::new(c.fqcn.as_ref()).ascii_lowercase(),
-            SymbolLoc::Class { file, idx },
-        ));
+        class_like.push(DeclaredSymbol {
+            key: Name::new(c.fqcn.as_ref()).ascii_lowercase(),
+            symbol: c.fqcn.clone(),
+            loc: SymbolLoc::Class { file, idx },
+        });
+        if let Some(parent) = &c.parent {
+            structural_symbols.push(parent.clone());
+        }
+        structural_symbols.extend(c.interfaces.iter().cloned());
+        structural_symbols.extend(c.traits.iter().cloned());
+        for prop in c.own_properties.values() {
+            if let Some(ty) = &prop.ty {
+                push_named_objects(&mut structural_symbols, ty);
+            }
+        }
+        for method in c.own_methods.values() {
+            for param in method.params.iter() {
+                if let Some(ty) = &param.ty {
+                    push_named_objects(&mut structural_symbols, ty.as_ref());
+                }
+            }
+            if let Some(rt) = method.return_type.as_deref() {
+                push_named_objects(&mut structural_symbols, rt);
+            }
+        }
     }
     for (idx, i) in slice.interfaces.iter().enumerate() {
-        class_like.push((
-            Name::new(i.fqcn.as_ref()).ascii_lowercase(),
-            SymbolLoc::Interface { file, idx },
-        ));
+        class_like.push(DeclaredSymbol {
+            key: Name::new(i.fqcn.as_ref()).ascii_lowercase(),
+            symbol: i.fqcn.clone(),
+            loc: SymbolLoc::Interface { file, idx },
+        });
+        structural_symbols.extend(i.extends.iter().cloned());
+        for prop in i.own_properties.values() {
+            if let Some(ty) = &prop.ty {
+                push_named_objects(&mut structural_symbols, ty);
+            }
+        }
+        for method in i.own_methods.values() {
+            for param in method.params.iter() {
+                if let Some(ty) = &param.ty {
+                    push_named_objects(&mut structural_symbols, ty.as_ref());
+                }
+            }
+            if let Some(rt) = method.return_type.as_deref() {
+                push_named_objects(&mut structural_symbols, rt);
+            }
+        }
     }
     for (idx, t) in slice.traits.iter().enumerate() {
-        class_like.push((
-            Name::new(t.fqcn.as_ref()).ascii_lowercase(),
-            SymbolLoc::Trait { file, idx },
-        ));
+        class_like.push(DeclaredSymbol {
+            key: Name::new(t.fqcn.as_ref()).ascii_lowercase(),
+            symbol: t.fqcn.clone(),
+            loc: SymbolLoc::Trait { file, idx },
+        });
+        structural_symbols.extend(t.traits.iter().cloned());
+        for prop in t.own_properties.values() {
+            if let Some(ty) = &prop.ty {
+                push_named_objects(&mut structural_symbols, ty);
+            }
+        }
+        for method in t.own_methods.values() {
+            for param in method.params.iter() {
+                if let Some(ty) = &param.ty {
+                    push_named_objects(&mut structural_symbols, ty.as_ref());
+                }
+            }
+            if let Some(rt) = method.return_type.as_deref() {
+                push_named_objects(&mut structural_symbols, rt);
+            }
+        }
     }
     for (idx, e) in slice.enums.iter().enumerate() {
-        class_like.push((
-            Name::new(e.fqcn.as_ref()).ascii_lowercase(),
-            SymbolLoc::Enum { file, idx },
-        ));
+        class_like.push(DeclaredSymbol {
+            key: Name::new(e.fqcn.as_ref()).ascii_lowercase(),
+            symbol: e.fqcn.clone(),
+            loc: SymbolLoc::Enum { file, idx },
+        });
+        structural_symbols.extend(e.interfaces.iter().cloned());
+        structural_symbols.extend(e.traits.iter().cloned());
+        for method in e.own_methods.values() {
+            for param in method.params.iter() {
+                if let Some(ty) = &param.ty {
+                    push_named_objects(&mut structural_symbols, ty.as_ref());
+                }
+            }
+            if let Some(rt) = method.return_type.as_deref() {
+                push_named_objects(&mut structural_symbols, rt);
+            }
+        }
     }
     for (idx, f) in slice.functions.iter().enumerate() {
-        functions.push((
-            Name::new(f.fqn.as_ref()).ascii_lowercase(),
-            SymbolLoc::Function { file, idx },
-        ));
+        functions.push(DeclaredSymbol {
+            key: Name::new(f.fqn.as_ref()).ascii_lowercase(),
+            symbol: f.fqn.clone(),
+            loc: SymbolLoc::Function { file, idx },
+        });
+        for param in f.params.iter() {
+            if let Some(ty) = &param.ty {
+                push_named_objects(&mut structural_symbols, ty.as_ref());
+            }
+        }
+        if let Some(rt) = f.return_type.as_deref() {
+            push_named_objects(&mut structural_symbols, rt);
+        }
     }
     for (idx, (name, _)) in slice.constants.iter().enumerate() {
-        constants.push((Name::new(name.as_ref()), SymbolLoc::Constant { file, idx }));
+        constants.push(DeclaredSymbol {
+            key: Name::new(name.as_ref()),
+            symbol: name.clone(),
+            loc: SymbolLoc::Constant { file, idx },
+        });
     }
+    structural_symbols.extend(slice.imports.values().map(|fqcn| Arc::<str>::from(fqcn.as_str())));
 
-    FileDeclarations {
+    FileDeclarationProjection {
         class_like,
         functions,
         constants,
+        structural_symbols,
     }
 }
 
@@ -442,14 +564,14 @@ pub fn workspace_symbol_index(db: &dyn MirDatabase) -> WorkspaceSymbolIndex {
     // don't propagate to this index.
     for file in &native_stubs {
         let decls = collect_file_declarations(db, *file);
-        for (key, loc) in &decls.class_like {
-            class_like.entry(*key).or_insert(*loc);
+        for decl in &decls.class_like {
+            class_like.entry(decl.key).or_insert(decl.loc);
         }
-        for (key, loc) in &decls.functions {
-            functions.entry(*key).or_insert(*loc);
+        for decl in &decls.functions {
+            functions.entry(decl.key).or_insert(decl.loc);
         }
-        for (key, loc) in &decls.constants {
-            constants.entry(*key).or_insert(*loc);
+        for decl in &decls.constants {
+            constants.entry(decl.key).or_insert(decl.loc);
         }
     }
 
@@ -459,28 +581,28 @@ pub fn workspace_symbol_index(db: &dyn MirDatabase) -> WorkspaceSymbolIndex {
             continue; // handled in pass 3
         }
         let decls = collect_file_declarations(db, *file);
-        for &(key, loc) in &decls.class_like {
-            class_like.insert(key, loc);
+        for decl in &decls.class_like {
+            class_like.insert(decl.key, decl.loc);
         }
-        for &(key, loc) in &decls.functions {
-            functions.insert(key, loc);
+        for decl in &decls.functions {
+            functions.insert(decl.key, decl.loc);
         }
-        for &(key, loc) in &decls.constants {
-            constants.insert(key, loc);
+        for decl in &decls.constants {
+            constants.insert(decl.key, decl.loc);
         }
     }
 
     // Pass 3: user stubs overwrite everything.
     for file in &user_stub_set {
         let decls = collect_file_declarations(db, *file);
-        for &(key, loc) in &decls.class_like {
-            class_like.insert(key, loc);
+        for decl in &decls.class_like {
+            class_like.insert(decl.key, decl.loc);
         }
-        for &(key, loc) in &decls.functions {
-            functions.insert(key, loc);
+        for decl in &decls.functions {
+            functions.insert(decl.key, decl.loc);
         }
-        for &(key, loc) in &decls.constants {
-            constants.insert(key, loc);
+        for decl in &decls.constants {
+            constants.insert(decl.key, decl.loc);
         }
     }
 
@@ -671,9 +793,10 @@ mod decl_projection_tests {
         ];
         for (t, p) in pairs {
             assert_eq!(t.len(), p.len());
-            for ((tn, tl), (pn, pl)) in t.iter().zip(p.iter()) {
-                assert_eq!(tn, pn);
-                assert!(tl == pl, "SymbolLoc drift for {tn:?}");
+            for (td, pd) in t.iter().zip(p.iter()) {
+                assert_eq!(td.key, pd.key);
+                assert_eq!(td.symbol, pd.symbol);
+                assert!(td.loc == pd.loc, "SymbolLoc drift for {:?}", td.key);
             }
         }
         assert_eq!(tracked.class_like.len(), 5, "I, T, E, C, D expected");

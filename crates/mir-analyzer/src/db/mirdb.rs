@@ -104,11 +104,11 @@ fn tier_insert(
 fn subtract_decls(
     map: &mut FxHashMap<Name, crate::db::SymbolLoc>,
     counts: &mut FxHashMap<Name, u32>,
-    entries: &[(Name, crate::db::SymbolLoc)],
+    entries: &[crate::db::DeclaredSymbol],
     file: SourceFile,
 ) {
-    for (key, _) in entries {
-        let remaining = match counts.get_mut(key) {
+    for decl in entries {
+        let remaining = match counts.get_mut(&decl.key) {
             Some(c) => {
                 *c = c.saturating_sub(1);
                 *c
@@ -116,9 +116,9 @@ fn subtract_decls(
             None => 0,
         };
         if remaining == 0 {
-            counts.remove(key);
-            if map.get(key).map(|l| l.file()) == Some(file) {
-                map.remove(key);
+            counts.remove(&decl.key);
+            if map.get(&decl.key).map(|l| l.file()) == Some(file) {
+                map.remove(&decl.key);
             }
         }
     }
@@ -161,15 +161,15 @@ fn subtract_class_like(
     map: &mut FxHashMap<Name, crate::db::SymbolLoc>,
     counts: &mut FxHashMap<Name, u32>,
     by_short_name: &mut FxHashMap<Name, Vec<Name>>,
-    entries: &[(Name, crate::db::SymbolLoc)],
+    entries: &[crate::db::DeclaredSymbol],
     file: SourceFile,
 ) {
     subtract_decls(map, counts, entries, file);
-    for (key, _) in entries {
-        if !map.contains_key(key) {
-            let short = crate::db::short_name_key(*key);
+    for decl in entries {
+        if !map.contains_key(&decl.key) {
+            let short = crate::db::short_name_key(decl.key);
             if let Some(bucket) = by_short_name.get_mut(&short) {
-                bucket.retain(|k| k != key);
+                bucket.retain(|k| k != &decl.key);
                 if bucket.is_empty() {
                     by_short_name.remove(&short);
                 }
@@ -709,35 +709,35 @@ impl MirDbStorage {
             for &file in files.iter() {
                 let tier = symbol_tier(file, db, &user_stubs);
                 let decls = collect_file_declarations(db, file);
-                for (key, loc) in &decls.class_like {
+                for decl in &decls.class_like {
                     tier_insert_class_like(
                         &mut class_like,
                         &mut counts.class_like,
                         &mut class_like_by_short_name,
-                        *key,
-                        *loc,
+                        decl.key,
+                        decl.loc,
                         tier,
                         db,
                         &user_stubs,
                     );
                 }
-                for (key, loc) in &decls.functions {
+                for decl in &decls.functions {
                     tier_insert(
                         &mut functions,
                         &mut counts.functions,
-                        *key,
-                        *loc,
+                        decl.key,
+                        decl.loc,
                         tier,
                         db,
                         &user_stubs,
                     );
                 }
-                for (key, loc) in &decls.constants {
+                for decl in &decls.constants {
                     tier_insert(
                         &mut constants,
                         &mut counts.constants,
-                        *key,
-                        *loc,
+                        decl.key,
+                        decl.loc,
                         tier,
                         db,
                         &user_stubs,
@@ -814,35 +814,35 @@ impl MirDbStorage {
             let db: &dyn MirDatabase = &*self;
             for (file, d) in &decls {
                 let tier = symbol_tier(*file, db, &user_stubs);
-                for (key, loc) in &d.class_like {
+                for decl in &d.class_like {
                     tier_insert_class_like(
                         &mut class_like,
                         &mut counts.class_like,
                         &mut class_like_by_short_name,
-                        *key,
-                        *loc,
+                        decl.key,
+                        decl.loc,
                         tier,
                         db,
                         &user_stubs,
                     );
                 }
-                for (key, loc) in &d.functions {
+                for decl in &d.functions {
                     tier_insert(
                         &mut functions,
                         &mut counts.functions,
-                        *key,
-                        *loc,
+                        decl.key,
+                        decl.loc,
                         tier,
                         db,
                         &user_stubs,
                     );
                 }
-                for (key, loc) in &d.constants {
+                for decl in &d.constants {
                     tier_insert(
                         &mut constants,
                         &mut counts.constants,
-                        *key,
-                        *loc,
+                        decl.key,
+                        decl.loc,
                         tier,
                         db,
                         &user_stubs,
@@ -878,7 +878,7 @@ impl MirDbStorage {
         self.add_class_mention_names(
             decls
                 .iter()
-                .flat_map(|(_, d)| d.class_like.iter().map(|(k, _)| k.as_str())),
+                .flat_map(|(_, d)| d.class_like.iter().map(|decl| decl.key.as_str())),
         );
         let Some(singleton) = *self.workspace_symbol_index_input.read() else {
             let mut snaps = self.file_decl_snapshots.write();
@@ -903,35 +903,35 @@ impl MirDbStorage {
                     continue;
                 }
                 let tier = symbol_tier(*file, db, &user_stubs);
-                for (key, loc) in &d.class_like {
+                for decl in &d.class_like {
                     tier_insert_class_like(
                         &mut class_like,
                         &mut counts.class_like,
                         &mut class_like_by_short_name,
-                        *key,
-                        *loc,
+                        decl.key,
+                        decl.loc,
                         tier,
                         db,
                         &user_stubs,
                     );
                 }
-                for (key, loc) in &d.functions {
+                for decl in &d.functions {
                     tier_insert(
                         &mut functions,
                         &mut counts.functions,
-                        *key,
-                        *loc,
+                        decl.key,
+                        decl.loc,
                         tier,
                         db,
                         &user_stubs,
                     );
                 }
-                for (key, loc) in &d.constants {
+                for decl in &d.constants {
                     tier_insert(
                         &mut constants,
                         &mut counts.constants,
-                        *key,
-                        *loc,
+                        decl.key,
+                        decl.loc,
                         tier,
                         db,
                         &user_stubs,
@@ -982,7 +982,7 @@ impl MirDbStorage {
             let db: &dyn MirDatabase = &*self;
             collect_file_declarations(db, file).clone()
         };
-        self.add_class_mention_names(new_decls.class_like.iter().map(|(k, _)| k.as_str()));
+        self.add_class_mention_names(new_decls.class_like.iter().map(|decl| decl.key.as_str()));
         if old_decls.as_ref() == Some(&new_decls) {
             return true;
         }
@@ -1004,16 +1004,16 @@ impl MirDbStorage {
         // `class_like_by_short_name` has none — subtracting/re-adding it is
         // always safe regardless of this outcome.)
         if let Some(old) = &old_decls {
-            let ambiguous = |entries: &[(Name, SymbolLoc)],
+            let ambiguous = |entries: &[crate::db::DeclaredSymbol],
                              map: &FxHashMap<Name, SymbolLoc>,
                              cnt: &FxHashMap<Name, u32>|
              -> bool {
-                entries.iter().any(|(key, _)| {
-                    let c = cnt.get(key).copied().unwrap_or(0);
+                entries.iter().any(|decl| {
+                    let c = cnt.get(&decl.key).copied().unwrap_or(0);
                     // count > 1 means another file also declares it; if this
                     // file currently owns the winning entry we can't cheaply
                     // recompute the replacement → ambiguous.
-                    c > 1 && map.get(key).map(|l| l.file()) == Some(file)
+                    c > 1 && map.get(&decl.key).map(|l| l.file()) == Some(file)
                 })
             };
             if ambiguous(&old.class_like, &class_like, &counts.class_like)
@@ -1040,35 +1040,35 @@ impl MirDbStorage {
         // Add new decls.
         {
             let db: &dyn MirDatabase = &*self;
-            for (key, loc) in &new_decls.class_like {
+            for decl in &new_decls.class_like {
                 tier_insert_class_like(
                     &mut class_like,
                     &mut counts.class_like,
                     &mut class_like_by_short_name,
-                    *key,
-                    *loc,
+                    decl.key,
+                    decl.loc,
                     tier,
                     db,
                     &user_stubs,
                 );
             }
-            for (key, loc) in &new_decls.functions {
+            for decl in &new_decls.functions {
                 tier_insert(
                     &mut functions,
                     &mut counts.functions,
-                    *key,
-                    *loc,
+                    decl.key,
+                    decl.loc,
                     tier,
                     db,
                     &user_stubs,
                 );
             }
-            for (key, loc) in &new_decls.constants {
+            for decl in &new_decls.constants {
                 tier_insert(
                     &mut constants,
                     &mut counts.constants,
-                    *key,
-                    *loc,
+                    decl.key,
+                    decl.loc,
                     tier,
                     db,
                     &user_stubs,
@@ -1561,13 +1561,13 @@ impl MirDbStorage {
         let mut class_like_by_short_name = (*cur.class_like_by_short_name).clone();
         let mut counts = self.index_decl_counts.write();
 
-        let ambiguous = |entries: &[(Name, crate::db::SymbolLoc)],
+        let ambiguous = |entries: &[crate::db::DeclaredSymbol],
                          map: &FxHashMap<Name, crate::db::SymbolLoc>,
                          cnt: &FxHashMap<Name, u32>|
          -> bool {
-            entries.iter().any(|(key, _)| {
-                cnt.get(key).copied().unwrap_or(0) > 1
-                    && map.get(key).map(|l| l.file()) == Some(file)
+            entries.iter().any(|decl| {
+                cnt.get(&decl.key).copied().unwrap_or(0) > 1
+                    && map.get(&decl.key).map(|l| l.file()) == Some(file)
             })
         };
         if ambiguous(&old.class_like, &class_like, &counts.class_like)
