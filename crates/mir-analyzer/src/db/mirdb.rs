@@ -104,11 +104,11 @@ fn tier_insert(
 fn subtract_decls(
     map: &mut FxHashMap<Name, crate::db::SymbolLoc>,
     counts: &mut FxHashMap<Name, u32>,
-    entries: &[crate::db::DeclaredSymbol],
+    entries: &[Name],
     file: SourceFile,
 ) {
-    for decl in entries {
-        let remaining = match counts.get_mut(&decl.key) {
+    for key in entries {
+        let remaining = match counts.get_mut(key) {
             Some(c) => {
                 *c = c.saturating_sub(1);
                 *c
@@ -116,9 +116,9 @@ fn subtract_decls(
             None => 0,
         };
         if remaining == 0 {
-            counts.remove(&decl.key);
-            if map.get(&decl.key).map(|l| l.file()) == Some(file) {
-                map.remove(&decl.key);
+            counts.remove(key);
+            if map.get(key).map(|l| l.file()) == Some(file) {
+                map.remove(key);
             }
         }
     }
@@ -161,15 +161,15 @@ fn subtract_class_like(
     map: &mut FxHashMap<Name, crate::db::SymbolLoc>,
     counts: &mut FxHashMap<Name, u32>,
     by_short_name: &mut FxHashMap<Name, Vec<Name>>,
-    entries: &[crate::db::DeclaredSymbol],
+    entries: &[Name],
     file: SourceFile,
 ) {
     subtract_decls(map, counts, entries, file);
-    for decl in entries {
-        if !map.contains_key(&decl.key) {
-            let short = crate::db::short_name_key(decl.key);
+    for key in entries {
+        if !map.contains_key(key) {
+            let short = crate::db::short_name_key(*key);
             if let Some(bucket) = by_short_name.get_mut(&short) {
-                bucket.retain(|k| k != &decl.key);
+                bucket.retain(|k| k != key);
                 if bucket.is_empty() {
                     by_short_name.remove(&short);
                 }
@@ -264,7 +264,7 @@ pub struct MirDbStorage {
     /// edit the snapshot comparison returns `false` and the rebuild is
     /// skipped, keeping the singleton's revision unchanged.
     file_decl_snapshots:
-        Arc<parking_lot::RwLock<FxHashMap<SourceFile, crate::db::FileDeclarations>>>,
+        Arc<parking_lot::RwLock<FxHashMap<SourceFile, super::workspace::FileDeclSnapshot>>>,
     /// Per-symbol declarer counts kept in lockstep with the workspace symbol
     /// index singleton. Lets `update_workspace_index_for_file` decide whether
     /// removing a file's declaration of a name is safe (count → 0) or ambiguous
@@ -683,9 +683,9 @@ impl MirDbStorage {
     /// `AnalysisSession::rebuild_workspace_symbol_index`, and after any
     /// `ingest_file` that detects a declaration change.
     pub fn rebuild_workspace_symbol_index(&mut self) {
+        use crate::db::workspace::FileDeclSnapshot;
         use crate::db::{
-            build_workspace_symbol_index, collect_file_declarations, FileDeclarations,
-            IndexDeclCounts, SymbolLoc,
+            build_workspace_symbol_index, collect_file_declarations, IndexDeclCounts, SymbolLoc,
         };
 
         let files = self.all_source_files();
@@ -696,7 +696,7 @@ impl MirDbStorage {
         let mut constants: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
         let mut class_like_by_short_name: FxHashMap<Name, Vec<Name>> = FxHashMap::default();
         let mut counts = IndexDeclCounts::default();
-        let mut new_snapshots: FxHashMap<SourceFile, FileDeclarations> = FxHashMap::default();
+        let mut new_snapshots: FxHashMap<SourceFile, FileDeclSnapshot> = FxHashMap::default();
 
         // Single pass over all files. Tier-aware insertion (native stub <
         // user file < user stub) makes the result independent of iteration
@@ -743,7 +743,7 @@ impl MirDbStorage {
                         &user_stubs,
                     );
                 }
-                new_snapshots.insert(file, decls.clone());
+                new_snapshots.insert(file, FileDeclSnapshot::from_decls(&decls));
             }
         }
 
@@ -852,7 +852,7 @@ impl MirDbStorage {
         }
         self.add_class_mention_names(class_like.keys().map(|k| k.as_str()));
         for (file, d) in decls {
-            snaps.insert(file, d);
+            snaps.insert(file, super::workspace::FileDeclSnapshot::from_decls(&d));
         }
         *self.file_decl_snapshots.write() = snaps;
         *self.index_decl_counts.write() = counts;
@@ -883,7 +883,9 @@ impl MirDbStorage {
         let Some(singleton) = *self.workspace_symbol_index_input.read() else {
             let mut snaps = self.file_decl_snapshots.write();
             for (file, d) in decls {
-                snaps.entry(*file).or_insert_with(|| d.clone());
+                snaps
+                    .entry(*file)
+                    .or_insert_with(|| super::workspace::FileDeclSnapshot::from_decls(d));
             }
             return;
         };
@@ -894,7 +896,7 @@ impl MirDbStorage {
         let mut constants = (*cur.constants).clone();
         let mut class_like_by_short_name = (*cur.class_like_by_short_name).clone();
         let mut counts = self.index_decl_counts.write();
-        let mut to_store: Vec<(SourceFile, crate::db::FileDeclarations)> = Vec::new();
+        let mut to_store: Vec<(SourceFile, super::workspace::FileDeclSnapshot)> = Vec::new();
         {
             let db: &dyn MirDatabase = &*self;
             let snaps = self.file_decl_snapshots.read();
@@ -937,7 +939,7 @@ impl MirDbStorage {
                         &user_stubs,
                     );
                 }
-                to_store.push((*file, d.clone()));
+                to_store.push((*file, super::workspace::FileDeclSnapshot::from_decls(d)));
             }
         }
         drop(counts);
@@ -983,7 +985,10 @@ impl MirDbStorage {
             collect_file_declarations(db, file).clone()
         };
         self.add_class_mention_names(new_decls.class_like.iter().map(|decl| decl.key.as_str()));
-        if old_decls.as_ref() == Some(&new_decls) {
+        if old_decls
+            .as_ref()
+            .is_some_and(|snapshot| snapshot.matches_decls(&new_decls))
+        {
             return true;
         }
 
@@ -1004,16 +1009,16 @@ impl MirDbStorage {
         // `class_like_by_short_name` has none — subtracting/re-adding it is
         // always safe regardless of this outcome.)
         if let Some(old) = &old_decls {
-            let ambiguous = |entries: &[crate::db::DeclaredSymbol],
+            let ambiguous = |entries: &[Name],
                              map: &FxHashMap<Name, SymbolLoc>,
                              cnt: &FxHashMap<Name, u32>|
              -> bool {
-                entries.iter().any(|decl| {
-                    let c = cnt.get(&decl.key).copied().unwrap_or(0);
+                entries.iter().any(|key| {
+                    let c = cnt.get(key).copied().unwrap_or(0);
                     // count > 1 means another file also declares it; if this
                     // file currently owns the winning entry we can't cheaply
                     // recompute the replacement → ambiguous.
-                    c > 1 && map.get(&decl.key).map(|l| l.file()) == Some(file)
+                    c > 1 && map.get(key).map(|l| l.file()) == Some(file)
                 })
             };
             if ambiguous(&old.class_like, &class_like, &counts.class_like)
@@ -1076,7 +1081,10 @@ impl MirDbStorage {
             }
         }
         drop(counts);
-        self.file_decl_snapshots.write().insert(file, new_decls);
+        self.file_decl_snapshots.write().insert(
+            file,
+            super::workspace::FileDeclSnapshot::from_decls(&new_decls),
+        );
 
         let new_index = crate::db::build_workspace_symbol_index(
             class_like,
@@ -1104,9 +1112,12 @@ impl MirDbStorage {
         };
         let mut snapshots = self.file_decl_snapshots.write();
         match snapshots.get(&file) {
-            Some(old) if *old == new_decls => false,
+            Some(old) if old.matches_decls(&new_decls) => false,
             _ => {
-                snapshots.insert(file, new_decls);
+                snapshots.insert(
+                    file,
+                    super::workspace::FileDeclSnapshot::from_decls(&new_decls),
+                );
                 true
             }
         }
@@ -1561,13 +1572,13 @@ impl MirDbStorage {
         let mut class_like_by_short_name = (*cur.class_like_by_short_name).clone();
         let mut counts = self.index_decl_counts.write();
 
-        let ambiguous = |entries: &[crate::db::DeclaredSymbol],
+        let ambiguous = |entries: &[Name],
                          map: &FxHashMap<Name, crate::db::SymbolLoc>,
                          cnt: &FxHashMap<Name, u32>|
          -> bool {
-            entries.iter().any(|decl| {
-                cnt.get(&decl.key).copied().unwrap_or(0) > 1
-                    && map.get(&decl.key).map(|l| l.file()) == Some(file)
+            entries.iter().any(|key| {
+                cnt.get(key).copied().unwrap_or(0) > 1
+                    && map.get(key).map(|l| l.file()) == Some(file)
             })
         };
         if ambiguous(&old.class_like, &class_like, &counts.class_like)

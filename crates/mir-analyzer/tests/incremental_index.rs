@@ -202,6 +202,48 @@ fn declaration_change_updates_index_incrementally() {
     );
 }
 
+/// When an edited file currently owns a duplicated symbol, the incremental
+/// subtract path must detect the ambiguity and fall back to a rebuild instead
+/// of dropping the surviving declaration from the workspace index.
+#[test]
+fn duplicate_winner_rename_preserves_surviving_symbol() {
+    let root = create_temp_dir("decl_ambiguity");
+    let app_src = root.path().join("src");
+    fs::create_dir_all(&app_src).unwrap();
+    write_composer(root.path());
+
+    let session = make_session(root.path());
+    session.ensure_all_stubs();
+    session.finalize_index();
+
+    let first: Arc<str> = Arc::from(app_src.join("First.php").to_string_lossy().as_ref());
+    let second: Arc<str> = Arc::from(app_src.join("Second.php").to_string_lossy().as_ref());
+
+    session.ingest_file(
+        first.clone(),
+        Arc::from("<?php\nnamespace App;\nclass Dup {}\n"),
+    );
+    session.ingest_file(
+        second.clone(),
+        Arc::from("<?php\nnamespace App;\nclass Dup {}\n"),
+    );
+    assert!(session.contains_class("App\\Dup"));
+
+    session.ingest_file(
+        second.clone(),
+        Arc::from("<?php\nnamespace App;\nclass Unique {}\n"),
+    );
+
+    assert!(
+        session.contains_class("App\\Dup"),
+        "fallback rebuild should preserve the surviving duplicate declaration"
+    );
+    assert!(
+        session.contains_class("App\\Unique"),
+        "edited file's replacement declaration must resolve after rebuild"
+    );
+}
+
 // ─── cancellation ─────────────────────────────────────────────────────────────
 
 /// A pre-cancelled token makes `index_batch` a no-op that reports `cancelled`.

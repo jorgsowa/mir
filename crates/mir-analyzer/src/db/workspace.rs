@@ -143,6 +143,47 @@ impl PartialEq for FileDeclarations {
     }
 }
 
+/// Compact key-only declaration snapshot for imperative workspace-index
+/// maintenance. Avoids duplicating `symbol` and `loc` payloads per file while
+/// preserving body-only edit no-op detection and incremental subtract logic.
+#[derive(Clone, Default, PartialEq, Eq, Debug)]
+pub(crate) struct FileDeclSnapshot {
+    pub class_like: Box<[Name]>,
+    pub functions: Box<[Name]>,
+    pub constants: Box<[Name]>,
+}
+
+impl FileDeclSnapshot {
+    pub fn from_decls(decls: &FileDeclarations) -> Self {
+        Self {
+            class_like: decls.class_like.iter().map(|decl| decl.key).collect(),
+            functions: decls.functions.iter().map(|decl| decl.key).collect(),
+            constants: decls.constants.iter().map(|decl| decl.key).collect(),
+        }
+    }
+
+    pub fn matches_decls(&self, decls: &FileDeclarations) -> bool {
+        self.class_like.len() == decls.class_like.len()
+            && self
+                .class_like
+                .iter()
+                .zip(&decls.class_like)
+                .all(|(key, decl)| *key == decl.key)
+            && self.functions.len() == decls.functions.len()
+            && self
+                .functions
+                .iter()
+                .zip(&decls.functions)
+                .all(|(key, decl)| *key == decl.key)
+            && self.constants.len() == decls.constants.len()
+            && self
+                .constants
+                .iter()
+                .zip(&decls.constants)
+                .all(|(key, decl)| *key == decl.key)
+    }
+}
+
 #[derive(Clone)]
 pub struct DeclaredSymbol {
     pub key: Name,
@@ -804,5 +845,79 @@ mod decl_projection_tests {
             }
         }
         assert_eq!(tracked.class_like.len(), 5, "I, T, E, C, D expected");
+    }
+
+    #[test]
+    fn file_decl_snapshot_keeps_only_keys() {
+        let mut db = crate::db::MirDbStorage::default();
+        let file_a = db.upsert_source_file_with_durability(
+            Arc::from("a.php"),
+            Arc::from("<?php\n"),
+            salsa::Durability::LOW,
+        );
+        let file_b = db.upsert_source_file_with_durability(
+            Arc::from("b.php"),
+            Arc::from("<?php\n"),
+            salsa::Durability::LOW,
+        );
+        let decls_a = FileDeclarations {
+            class_like: vec![DeclaredSymbol {
+                key: Name::new("app\\thing"),
+                symbol: Arc::from("App\\Thing"),
+                loc: SymbolLoc::Class {
+                    file: file_a,
+                    idx: 0,
+                },
+            }],
+            functions: vec![DeclaredSymbol {
+                key: Name::new("app\\run"),
+                symbol: Arc::from("App\\run"),
+                loc: SymbolLoc::Function {
+                    file: file_a,
+                    idx: 0,
+                },
+            }],
+            constants: vec![DeclaredSymbol {
+                key: Name::new("THING"),
+                symbol: Arc::from("THING"),
+                loc: SymbolLoc::Constant {
+                    file: file_a,
+                    idx: 0,
+                },
+            }],
+        };
+        let decls_b = FileDeclarations {
+            class_like: vec![DeclaredSymbol {
+                key: Name::new("app\\thing"),
+                symbol: Arc::from("DisplayOnly"),
+                loc: SymbolLoc::Trait {
+                    file: file_b,
+                    idx: 9,
+                },
+            }],
+            functions: vec![DeclaredSymbol {
+                key: Name::new("app\\run"),
+                symbol: Arc::from("DisplayOnlyFn"),
+                loc: SymbolLoc::Function {
+                    file: file_b,
+                    idx: 4,
+                },
+            }],
+            constants: vec![DeclaredSymbol {
+                key: Name::new("THING"),
+                symbol: Arc::from("DISPLAY_ONLY_CONST"),
+                loc: SymbolLoc::Constant {
+                    file: file_b,
+                    idx: 7,
+                },
+            }],
+        };
+
+        let snap_a = FileDeclSnapshot::from_decls(&decls_a);
+        let snap_b = FileDeclSnapshot::from_decls(&decls_b);
+
+        assert_eq!(snap_a, snap_b);
+        assert!(snap_a.matches_decls(&decls_a));
+        assert!(snap_a.matches_decls(&decls_b));
     }
 }
