@@ -24,6 +24,8 @@ use super::reference_locations::RefLoc;
 
 /// Interned file id, valid within one `RefIndex` instance.
 type FileNo = u32;
+/// Interned symbol id, valid within one `RefIndex` instance.
+type SymbolNo = u32;
 
 /// `(file, line, col_start, col_end)` with the file as an interned id.
 type LocTuple = (FileNo, u32, u16, u16);
@@ -34,18 +36,23 @@ pub struct RefIndex {
     path_ids: FxHashMap<Arc<str>, FileNo>,
     /// Id → path (`Arc` shared with `path_ids` keys).
     paths: Vec<Arc<str>>,
+    /// Symbol key → interned id.
+    symbol_ids: FxHashMap<Arc<str>, SymbolNo>,
+    /// Id → symbol key (`Arc` shared with `symbol_ids` keys).
+    symbols: Vec<Arc<str>>,
     /// Symbol key → `(file, line, col_start, col_end)` in insertion order,
     /// deduplicated. The id-resolved equivalent of the old
     /// `reference_locations` map.
-    by_symbol: FxHashMap<Arc<str>, Vec<LocTuple>>,
-    /// Forward view: file → set of symbol keys it references.
-    file_symbols: FxHashMap<FileNo, FxHashSet<Arc<str>>>,
-    /// Reverse view: symbol key → compact list of files referencing it.
+    by_symbol: FxHashMap<SymbolNo, Vec<LocTuple>>,
+    /// Forward view: file → set of referenced symbols.
+    file_symbols: FxHashMap<FileNo, FxHashSet<SymbolNo>>,
+    /// Reverse view: symbol → compact list of files referencing it.
     ///
-    /// Membership is driven by `file_symbols`: writers only append when a
-    /// file/symbol edge is first seen, so this can stay as a deduplicated
-    /// inline vector instead of paying hash-set overhead per symbol bucket.
-    referencers: FxHashMap<Arc<str>, SmallVec<[FileNo; 4]>>,
+    /// The relation is still intentionally indexed both ways for O(1)-ish
+    /// forward and reverse reads, but the symbol payload is no longer
+    /// duplicated across those views: all edge-bearing structures point at
+    /// one interned `SymbolNo`.
+    referencers: FxHashMap<SymbolNo, SmallVec<[FileNo; 4]>>,
 }
 
 impl RefIndex {
@@ -67,6 +74,24 @@ impl RefIndex {
         self.paths[id as usize].clone()
     }
 
+    fn intern_symbol(&mut self, symbol: &Arc<str>) -> SymbolNo {
+        if let Some(&id) = self.symbol_ids.get(symbol.as_ref()) {
+            return id;
+        }
+        let id = self.symbols.len() as SymbolNo;
+        self.symbols.push(symbol.clone());
+        self.symbol_ids.insert(symbol.clone(), id);
+        id
+    }
+
+    fn lookup_symbol(&self, symbol: &str) -> Option<SymbolNo> {
+        self.symbol_ids.get(symbol).copied()
+    }
+
+    fn symbol_of(&self, id: SymbolNo) -> Arc<str> {
+        self.symbols[id as usize].clone()
+    }
+
     /// Append a batch of reference locations. Per-entry deduplicated against
     /// the existing locations of the same symbol, preserving insertion order
     /// (mirrors the legacy `commit_reference_locations_batch` semantics).
@@ -78,18 +103,16 @@ impl RefIndex {
         for loc in locs {
             touched_impl |= loc.symbol_key.starts_with("impl");
             let file_id = self.intern(&loc.file);
+            let symbol_id = self.intern_symbol(&loc.symbol_key);
             let is_new_edge = self
                 .file_symbols
                 .entry(file_id)
                 .or_default()
-                .insert(loc.symbol_key.clone());
+                .insert(symbol_id);
             if is_new_edge {
-                self.referencers
-                    .entry(loc.symbol_key.clone())
-                    .or_default()
-                    .push(file_id);
+                self.referencers.entry(symbol_id).or_default().push(file_id);
             }
-            let entry = self.by_symbol.entry(loc.symbol_key).or_default();
+            let entry = self.by_symbol.entry(symbol_id).or_default();
             let tuple = (file_id, loc.line, loc.col_start, loc.col_end);
             if !entry.contains(&tuple) {
                 entry.push(tuple);
@@ -104,20 +127,20 @@ impl RefIndex {
         let Some(file_id) = self.lookup(file) else {
             return;
         };
-        let Some(symbol_keys) = self.file_symbols.remove(&file_id) else {
+        let Some(symbol_ids) = self.file_symbols.remove(&file_id) else {
             return;
         };
-        for key in &symbol_keys {
-            if let Some(locs) = self.by_symbol.get_mut(key) {
+        for symbol_id in &symbol_ids {
+            if let Some(locs) = self.by_symbol.get_mut(symbol_id) {
                 locs.retain(|&(f, _, _, _)| f != file_id);
                 if locs.is_empty() {
-                    self.by_symbol.remove(key);
+                    self.by_symbol.remove(symbol_id);
                 }
             }
-            if let Some(refs) = self.referencers.get_mut(key) {
+            if let Some(refs) = self.referencers.get_mut(symbol_id) {
                 refs.retain(|f| *f != file_id);
                 if refs.is_empty() {
-                    self.referencers.remove(key);
+                    self.referencers.remove(symbol_id);
                 }
             }
         }
@@ -142,39 +165,38 @@ impl RefIndex {
         let mut touched_impl = self
             .lookup(file)
             .and_then(|id| self.file_symbols.get(&id))
-            .is_some_and(|keys| keys.iter().any(|k| k.starts_with("impl")));
+            .is_some_and(|symbols| {
+                symbols
+                    .iter()
+                    .any(|&symbol_id| self.symbol_of(symbol_id).starts_with("impl"))
+            });
         self.clear_file(file);
-        let mut seen: FxHashSet<(Arc<str>, LocTuple)> = FxHashSet::default();
+        let mut seen: FxHashSet<(SymbolNo, LocTuple)> = FxHashSet::default();
         for loc in locs {
             touched_impl |= loc.symbol_key.starts_with("impl");
             let file_id = self.intern(&loc.file);
+            let symbol_id = self.intern_symbol(&loc.symbol_key);
             let tuple = (file_id, loc.line, loc.col_start, loc.col_end);
-            if !seen.insert((loc.symbol_key.clone(), tuple)) {
+            if !seen.insert((symbol_id, tuple)) {
                 continue;
             }
             let is_new_edge = self
                 .file_symbols
                 .entry(file_id)
                 .or_default()
-                .insert(loc.symbol_key.clone());
+                .insert(symbol_id);
             if is_new_edge {
-                self.referencers
-                    .entry(loc.symbol_key.clone())
-                    .or_default()
-                    .push(file_id);
+                self.referencers.entry(symbol_id).or_default().push(file_id);
             }
-            self.by_symbol
-                .entry(loc.symbol_key)
-                .or_default()
-                .push(tuple);
+            self.by_symbol.entry(symbol_id).or_default().push(tuple);
         }
         touched_impl
     }
 
     /// All locations of one symbol: `(file, line, col_start, col_end)`.
     pub fn locations_of(&self, symbol: &str) -> Vec<(Arc<str>, u32, u16, u16)> {
-        self.by_symbol
-            .get(symbol)
+        self.lookup_symbol(symbol)
+            .and_then(|symbol_id| self.by_symbol.get(&symbol_id))
             .map(|locs| {
                 locs.iter()
                     .map(|&(f, line, cs, ce)| (self.path_of(f), line, cs, ce))
@@ -185,13 +207,15 @@ impl RefIndex {
 
     /// Whether the symbol has at least one recorded reference.
     pub fn has_reference(&self, symbol: &str) -> bool {
-        self.by_symbol.get(symbol).is_some_and(|l| !l.is_empty())
+        self.lookup_symbol(symbol)
+            .and_then(|symbol_id| self.by_symbol.get(&symbol_id))
+            .is_some_and(|l| !l.is_empty())
     }
 
     /// All files referencing `symbol`.
     pub fn referencers_of(&self, symbol: &str) -> Vec<Arc<str>> {
-        self.referencers
-            .get(symbol)
+        self.lookup_symbol(symbol)
+            .and_then(|symbol_id| self.referencers.get(&symbol_id))
             .map(|files| files.iter().map(|&f| self.path_of(f)).collect())
             .unwrap_or_default()
     }
@@ -200,7 +224,7 @@ impl RefIndex {
     pub fn symbols_referenced_by(&self, file: &str) -> Vec<Arc<str>> {
         self.lookup(file)
             .and_then(|id| self.file_symbols.get(&id))
-            .map(|s| s.iter().cloned().collect())
+            .map(|symbols| symbols.iter().map(|&id| self.symbol_of(id)).collect())
             .unwrap_or_default()
     }
 
@@ -215,11 +239,11 @@ impl RefIndex {
             return Vec::new();
         };
         let mut out = Vec::new();
-        for sym in symbols {
-            if let Some(locs) = self.by_symbol.get(sym) {
+        for &symbol_id in symbols {
+            if let Some(locs) = self.by_symbol.get(&symbol_id) {
                 for &(f, line, cs, ce) in locs {
                     if f == file_id {
-                        out.push((sym.clone(), line, cs, ce));
+                        out.push((self.symbol_of(symbol_id), line, cs, ce));
                     }
                 }
             }
@@ -232,8 +256,8 @@ impl RefIndex {
         let mut pairs = Vec::new();
         for (file_id, symbols) in &self.file_symbols {
             let path = self.path_of(*file_id);
-            for sym in symbols {
-                pairs.push((path.clone(), sym.clone()));
+            for &symbol_id in symbols {
+                pairs.push((path.clone(), self.symbol_of(symbol_id)));
             }
         }
         pairs
@@ -330,7 +354,10 @@ mod tests {
             loc("fn:foo", "a.php", 3),
         ]);
         assert_eq!(idx.locations_of("fn:foo").len(), 3);
-        assert_eq!(idx.referencers_of("fn:foo"), vec![Arc::<str>::from("a.php")]);
+        assert_eq!(
+            idx.referencers_of("fn:foo"),
+            vec![Arc::<str>::from("a.php")]
+        );
     }
 
     #[test]
@@ -340,7 +367,10 @@ mod tests {
         idx.append_batch(vec![loc("fn:foo", "a.php", 2)]);
         idx.append_batch(vec![loc("fn:foo", "a.php", 3)]);
         assert_eq!(idx.locations_of("fn:foo").len(), 3);
-        assert_eq!(idx.referencers_of("fn:foo"), vec![Arc::<str>::from("a.php")]);
+        assert_eq!(
+            idx.referencers_of("fn:foo"),
+            vec![Arc::<str>::from("a.php")]
+        );
     }
 
     #[test]
@@ -364,9 +394,15 @@ mod tests {
         idx.set_file_refs("a.php", vec![loc("fn:foo", "a.php", 1)]);
         idx.set_file_refs("a.php", vec![loc("fn:foo", "a.php", 2)]);
         idx.set_file_refs("a.php", vec![loc("fn:foo", "a.php", 3)]);
-        idx.set_file_refs("a.php", vec![loc("fn:foo", "a.php", 4), loc("fn:foo", "a.php", 5)]);
+        idx.set_file_refs(
+            "a.php",
+            vec![loc("fn:foo", "a.php", 4), loc("fn:foo", "a.php", 5)],
+        );
         assert_eq!(idx.locations_of("fn:foo").len(), 2);
-        assert_eq!(idx.referencers_of("fn:foo"), vec![Arc::<str>::from("a.php")]);
+        assert_eq!(
+            idx.referencers_of("fn:foo"),
+            vec![Arc::<str>::from("a.php")]
+        );
     }
 
     #[test]
