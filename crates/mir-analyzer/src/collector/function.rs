@@ -421,7 +421,7 @@ impl DefinitionCollector<'_> {
                     None
                 }
             }),
-            is_pure: doc.is_pure,
+            is_pure: doc.is_pure || self.pure_attr(&decl.attributes),
             is_mutation_free: doc.is_mutation_free,
             is_external_mutation_free: doc.is_external_mutation_free,
             no_named_arguments: doc.no_named_arguments,

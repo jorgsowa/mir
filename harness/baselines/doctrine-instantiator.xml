@@ -4,12 +4,5 @@
     <MissingThrowsDocblock>
       <code><![CDATA[$this->buildFactory($className)]]></code>
     </MissingThrowsDocblock>
-    <MixedAssignment>
-      <code><![CDATA[$reflectionClass = $reflectionClass->getParentClass()]]></code>
-    </MixedAssignment>
-    <MixedMethodCall>
-      <code><![CDATA[$reflectionClass->isInternal()]]></code>
-      <code><![CDATA[$reflectionClass->getParentClass()]]></code>
-    </MixedMethodCall>
   </file>
 </files>
