@@ -631,7 +631,6 @@
   <file src="src/Framework/TestBuilder.php">
     <PossiblyInvalidArgument>
       <code><![CDATA[$class]]></code>
-      <code><![CDATA[$class]]></code>
     </PossiblyInvalidArgument>
     <UnnecessaryVarAnnotation>
       <code><![CDATA[]]></code>
@@ -813,7 +812,6 @@
     </MixedAssignment>
     <PossiblyInvalidArgument>
       <code><![CDATA[$test->dataName()]]></code>
-      <code><![CDATA[$value]]></code>
       <code><![CDATA[$position]]></code>
     </PossiblyInvalidArgument>
   </file>
@@ -945,11 +943,6 @@
       <code><![CDATA[$messages]]></code>
     </UnusedParam>
   </file>
-  <file src="src/Runner/Extension/ExtensionBootstrapper.php">
-    <PossiblyInvalidArgument>
-      <code><![CDATA[class_implements($className)]]></code>
-    </PossiblyInvalidArgument>
-  </file>
   <file src="src/Runner/Filter/GroupFilterIterator.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->groupTests = $groupTests]]></code>
@@ -1063,12 +1056,6 @@
     <PossiblyInvalidArgument>
       <code><![CDATA[$deprecationTriggers]]></code>
     </PossiblyInvalidArgument>
-    <PossiblyNullMethodCall>
-      <code><![CDATA[$t->getFile()]]></code>
-      <code><![CDATA[$t->getLine()]]></code>
-      <code><![CDATA[$t->getTraceAsString()]]></code>
-      <code><![CDATA[$t->getPrevious()]]></code>
-    </PossiblyNullMethodCall>
   </file>
   <file src="src/TextUI/Command/Commands/AtLeastVersionCommand.php">
     <MissingThrowsDocblock>

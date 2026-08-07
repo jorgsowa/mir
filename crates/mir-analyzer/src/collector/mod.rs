@@ -771,6 +771,21 @@ impl<'a> DefinitionCollector<'a> {
         version_attrs::type_aware(attrs, &self.use_aliases, v)
     }
 
+    /// Whether an element (function/method) is marked `#[Pure]`. Mirrors the
+    /// [`Self::deprecated_from_doc_or_attrs`]/inline deprecated handling: matches
+    /// on the last name segment so it works with both bare attrs and aliased
+    /// imports, independent of stub vs source. Stub purity (phpstorm-stubs)
+    /// flows from these attributes when a docblock tag is absent.
+    fn pure_attr(&self, attrs: &[php_ast::owned::Attribute]) -> bool {
+        attrs.iter().any(|a| {
+            a.name
+                .parts
+                .last()
+                .map(|p| p.as_ref().eq_ignore_ascii_case("Pure"))
+                .unwrap_or(false)
+        })
+    }
+
     fn parse_docblock_from_node(
         &self,
         doc_comment: Option<&php_ast::owned::Comment>,
@@ -2222,7 +2237,7 @@ impl<'a> DefinitionCollector<'a> {
                 }
             }),
             is_internal: doc.is_internal,
-            is_pure: doc.is_pure,
+            is_pure: doc.is_pure || self.pure_attr(&m.attributes),
             no_named_arguments: doc.no_named_arguments,
             is_override,
             is_virtual: false,
