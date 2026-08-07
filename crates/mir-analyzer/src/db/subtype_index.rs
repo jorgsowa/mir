@@ -38,14 +38,24 @@ pub struct SubtypeEntry {
     pub fqcn: Arc<str>,
     pub kind: ClassLikeKind,
     pub is_abstract: bool,
-    /// Direct `extends` + `implements` ancestors, lowercased resolved FQCNs.
-    pub supers: Box<[Arc<str>]>,
-    /// Direct `use TraitName;` ancestors, lowercased resolved FQCNs. Kept
-    /// separate so implementation queries can exclude trait users while
-    /// visibility-scope queries include them.
-    pub trait_supers: Box<[Arc<str>]>,
+    /// Direct parent edges, lowercased resolved FQCNs. Kept in one tagged
+    /// slice so the same logical relation is no longer retained in two field
+    /// layouts (`supers` and `trait_supers`) per declaration.
+    pub parents: Box<[ParentEdge]>,
     /// Declaration site (line 1-based, cols 0-based code points), when known.
     pub location: Option<Location>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParentRelation {
+    Super,
+    TraitUse,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParentEdge {
+    pub fqcn: Arc<str>,
+    pub relation: ParentRelation,
 }
 
 /// A resolved subtype hit returned by queries.
@@ -75,17 +85,26 @@ pub fn entries_from_slice(slice: &mir_codebase::definitions::StubSlice) -> Vec<S
     let mut out: Vec<SubtypeEntry> =
         Vec::with_capacity(slice.classes.len() + slice.interfaces.len() + slice.enums.len());
     for c in &slice.classes {
+        let mut parents: Vec<ParentEdge> =
+            Vec::with_capacity(c.parent.iter().count() + c.interfaces.len() + c.traits.len());
+        parents.extend(
+            c.parent
+                .iter()
+                .chain(c.interfaces.iter())
+                .map(|p| ParentEdge {
+                    fqcn: edge_key(p),
+                    relation: ParentRelation::Super,
+                }),
+        );
+        parents.extend(c.traits.iter().map(|p| ParentEdge {
+            fqcn: edge_key(p),
+            relation: ParentRelation::TraitUse,
+        }));
         out.push(SubtypeEntry {
             fqcn: c.fqcn.clone(),
             kind: ClassLikeKind::Class,
             is_abstract: c.is_abstract,
-            supers: c
-                .parent
-                .iter()
-                .chain(c.interfaces.iter())
-                .map(|p| edge_key(p))
-                .collect(),
-            trait_supers: c.traits.iter().map(|p| edge_key(p)).collect(),
+            parents: parents.into_boxed_slice(),
             location: c.location.clone(),
         });
     }
@@ -94,8 +113,14 @@ pub fn entries_from_slice(slice: &mir_codebase::definitions::StubSlice) -> Vec<S
             fqcn: i.fqcn.clone(),
             kind: ClassLikeKind::Interface,
             is_abstract: false,
-            supers: i.extends.iter().map(|p| edge_key(p)).collect(),
-            trait_supers: Box::default(),
+            parents: i
+                .extends
+                .iter()
+                .map(|p| ParentEdge {
+                    fqcn: edge_key(p),
+                    relation: ParentRelation::Super,
+                })
+                .collect(),
             location: i.location.clone(),
         });
     }
@@ -104,18 +129,32 @@ pub fn entries_from_slice(slice: &mir_codebase::definitions::StubSlice) -> Vec<S
             fqcn: t.fqcn.clone(),
             kind: ClassLikeKind::Trait,
             is_abstract: false,
-            supers: Box::default(),
-            trait_supers: t.traits.iter().map(|p| edge_key(p)).collect(),
+            parents: t
+                .traits
+                .iter()
+                .map(|p| ParentEdge {
+                    fqcn: edge_key(p),
+                    relation: ParentRelation::TraitUse,
+                })
+                .collect(),
             location: t.location.clone(),
         });
     }
     for e in &slice.enums {
+        let mut parents: Vec<ParentEdge> = Vec::with_capacity(e.interfaces.len() + e.traits.len());
+        parents.extend(e.interfaces.iter().map(|p| ParentEdge {
+            fqcn: edge_key(p),
+            relation: ParentRelation::Super,
+        }));
+        parents.extend(e.traits.iter().map(|p| ParentEdge {
+            fqcn: edge_key(p),
+            relation: ParentRelation::TraitUse,
+        }));
         out.push(SubtypeEntry {
             fqcn: e.fqcn.clone(),
             kind: ClassLikeKind::Enum,
             is_abstract: false,
-            supers: e.interfaces.iter().map(|p| edge_key(p)).collect(),
-            trait_supers: e.traits.iter().map(|p| edge_key(p)).collect(),
+            parents: parents.into_boxed_slice(),
             location: e.location.clone(),
         });
     }
@@ -203,10 +242,9 @@ impl SubtypeIndex {
                     stored_entry.child_key.clone(),
                     stored_entry
                         .entry
-                        .supers
+                        .parents
                         .iter()
-                        .chain(stored_entry.entry.trait_supers.iter())
-                        .cloned()
+                        .map(|edge| edge.fqcn.clone())
                         .collect(),
                 )
             };
@@ -230,13 +268,9 @@ impl SubtypeIndex {
             return false;
         };
         for id in old {
-            let (child_key, supers, trait_supers) = {
+            let (child_key, parents) = {
                 let stored = self.entry(id);
-                (
-                    stored.child_key.clone(),
-                    stored.entry.supers.to_vec(),
-                    stored.entry.trait_supers.to_vec(),
-                )
+                (stored.child_key.clone(), stored.entry.parents.to_vec())
             };
             // Drop the child edge only when no other file still declares a
             // class-like with the same FQCN and the same parent.
@@ -248,18 +282,21 @@ impl SubtypeIndex {
             }
             let still_declared: Vec<EntryId> =
                 self.decls.get(&child_key).cloned().unwrap_or_default();
-            for parent in supers.iter().chain(trait_supers.iter()) {
+            for parent in &parents {
                 let survives = still_declared
                     .iter()
                     .map(|site_id| &self.entry(*site_id).entry)
                     .any(|entry| {
-                        entry.supers.contains(parent) || entry.trait_supers.contains(parent)
+                        entry
+                            .parents
+                            .iter()
+                            .any(|edge| edge.fqcn.as_ref() == parent.fqcn.as_ref())
                     });
                 if !survives {
-                    if let Some(set) = self.children.get_mut(parent) {
+                    if let Some(set) = self.children.get_mut(&parent.fqcn) {
                         set.remove(&child_key);
                         if set.is_empty() {
-                            self.children.remove(parent);
+                            self.children.remove(&parent.fqcn);
                         }
                     }
                 }
@@ -301,9 +338,11 @@ impl SubtypeIndex {
                 for id in sites {
                     let stored = self.entry(*id);
                     let entry = &stored.entry;
-                    let via_super = entry.supers.contains(&parent);
-                    let via_trait = include_trait_users && entry.trait_supers.contains(&parent);
-                    if !via_super && !via_trait {
+                    let reaches_parent = entry.parents.iter().any(|edge| {
+                        edge.fqcn.as_ref() == parent.as_ref()
+                            && (edge.relation == ParentRelation::Super || include_trait_users)
+                    });
+                    if !reaches_parent {
                         continue;
                     }
                     qualifies = true;
@@ -376,12 +415,20 @@ mod tests {
     use super::*;
 
     fn entry(fqcn: &str, supers: &[&str], traits: &[&str]) -> SubtypeEntry {
+        let mut parents: Vec<ParentEdge> = Vec::with_capacity(supers.len() + traits.len());
+        parents.extend(supers.iter().map(|s| ParentEdge {
+            fqcn: edge_key(s),
+            relation: ParentRelation::Super,
+        }));
+        parents.extend(traits.iter().map(|s| ParentEdge {
+            fqcn: edge_key(s),
+            relation: ParentRelation::TraitUse,
+        }));
         SubtypeEntry {
             fqcn: Arc::from(fqcn),
             kind: ClassLikeKind::Class,
             is_abstract: false,
-            supers: supers.iter().map(|s| edge_key(s)).collect(),
-            trait_supers: traits.iter().map(|s| edge_key(s)).collect(),
+            parents: parents.into_boxed_slice(),
             location: None,
         }
     }
@@ -417,6 +464,23 @@ mod tests {
         idx.set_file_classes(&a, vec![entry("App\\User", &[], &["App\\Helper"])]);
         assert!(idx.subtypes_of("App\\Helper", false).is_empty());
         assert_eq!(idx.subtypes_of("App\\Helper", true).len(), 1);
+    }
+
+    #[test]
+    fn clear_file_preserves_shared_parent_relation_kind() {
+        let mut idx = SubtypeIndex::default();
+        let a: Arc<str> = Arc::from("a.php");
+        let b: Arc<str> = Arc::from("b.php");
+        idx.set_file_classes(&a, vec![entry("App\\User", &[], &["App\\Helper"])]);
+        idx.set_file_classes(&b, vec![entry("App\\User", &["App\\Helper"], &[])]);
+
+        idx.clear_file("a.php");
+        assert!(idx.subtypes_of("App\\Helper", false).len() == 1);
+        assert!(idx.subtypes_of("App\\Helper", true).len() == 1);
+
+        idx.clear_file("b.php");
+        assert!(idx.subtypes_of("App\\Helper", false).is_empty());
+        assert!(idx.subtypes_of("App\\Helper", true).is_empty());
     }
 
     #[test]
