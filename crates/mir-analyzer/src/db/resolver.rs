@@ -95,20 +95,20 @@ pub fn source_file_for_fqcn<'db>(
     // functions keyed lowercase, constants keyed case-sensitive) all read the
     // same index, so we resolve to a `Copy` `SourceFile` before the borrow ends.
     let lookup = |index: &crate::db::WorkspaceSymbolIndex| -> Option<crate::db::SourceFile> {
-        if let Some(loc) = index.class_like.get(&lower) {
+        if let Some(loc) = index.class_like_loc(lower) {
             return match loc {
                 crate::db::SymbolLoc::Class { file, .. }
                 | crate::db::SymbolLoc::Interface { file, .. }
                 | crate::db::SymbolLoc::Trait { file, .. }
-                | crate::db::SymbolLoc::Enum { file, .. } => Some(*file),
+                | crate::db::SymbolLoc::Enum { file, .. } => Some(file),
                 _ => None,
             };
         }
-        if let Some(crate::db::SymbolLoc::Function { file, .. }) = index.functions.get(&lower) {
-            return Some(*file);
+        if let Some(crate::db::SymbolLoc::Function { file, .. }) = index.function_loc(lower) {
+            return Some(file);
         }
-        if let Some(crate::db::SymbolLoc::Constant { file, .. }) = index.constants.get(name) {
-            return Some(*file);
+        if let Some(crate::db::SymbolLoc::Constant { file, .. }) = index.constant_loc(*name) {
+            return Some(file);
         }
         None
     };

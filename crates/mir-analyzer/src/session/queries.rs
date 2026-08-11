@@ -1259,9 +1259,7 @@ impl AnalysisSession {
         salsa::Cancelled::catch(AssertUnwindSafe(|| {
             let db = self.snapshot_db();
             let index = crate::db::workspace_index(&db);
-            let loc = index
-                .constants
-                .get(&mir_types::Name::from(fqn.trim_start_matches('\\')))?;
+            let loc = index.constant_loc(mir_types::Name::from(fqn.trim_start_matches('\\')))?;
             let file = loc.file().path(&db).clone();
             let sf = db.lookup_source_file(file.as_ref())?;
             let text = sf.text(&db as &dyn MirDatabase);

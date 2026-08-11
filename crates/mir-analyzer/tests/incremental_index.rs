@@ -50,7 +50,7 @@ fn indexable_files(root: &std::path::Path) -> Vec<(Arc<str>, Arc<str>)> {
 fn class_like_ptr(session: &AnalysisSession) -> usize {
     session.read(|db| {
         let idx = mir_analyzer::db::workspace_index(db);
-        Arc::as_ptr(&idx.class_like) as usize
+        idx.class_like_ptr() as usize
     })
 }
 

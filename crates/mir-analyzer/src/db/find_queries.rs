@@ -626,14 +626,14 @@ pub fn find_class_like<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option
     // to avoid cloning the singleton's three Arcs on every call; fall back to
     // the live index on the canonical/open-file db. `.copied()` ends the borrow
     // before the `*_def_at` salsa calls below.
-    workspace_symbol_loc(db, |index| index.class_like.get(&key).copied())
+    workspace_symbol_loc(db, |index| index.class_like_loc(key))
         .and_then(|loc| class_like_from_loc(db, loc))
 }
 
 /// The file a class-like symbol is declared in, if known.
 pub fn class_like_decl_file(db: &dyn MirDatabase, fqcn: Fqcn<'_>) -> Option<Arc<str>> {
     let key = fqcn.name(db).ascii_lowercase();
-    let loc = workspace_symbol_loc(db, |index| index.class_like.get(&key).copied())?;
+    let loc = workspace_symbol_loc(db, |index| index.class_like_loc(key))?;
     Some(loc.file().path(db).clone())
 }
 
@@ -641,7 +641,7 @@ pub fn class_like_decl_file(db: &dyn MirDatabase, fqcn: Fqcn<'_>) -> Option<Arc<
 /// function within it.
 pub fn find_function<'db>(db: &'db dyn MirDatabase, fqn: Fqcn<'db>) -> Option<Arc<FunctionDef>> {
     let key = fqn.name(db).ascii_lowercase();
-    let loc = workspace_symbol_loc(db, |index| index.functions.get(&key).copied());
+    let loc = workspace_symbol_loc(db, |index| index.function_loc(key));
     let SymbolLoc::Function { file, idx } = loc? else {
         return None;
     };
@@ -656,7 +656,7 @@ pub fn find_global_constant<'db>(
 ) -> Option<Arc<mir_types::Type>> {
     // Constants are keyed case-sensitively (raw name), unlike class_like/functions.
     let key = fqn.name(db);
-    let const_loc = workspace_symbol_loc(db, |index| index.constants.get(key).copied());
+    let const_loc = workspace_symbol_loc(db, |index| index.constant_loc(*key));
     if let Some(SymbolLoc::Constant { file, idx }) = const_loc {
         if let Some(ty) = global_constant_type_at(db, file, idx) {
             return Some(ty);

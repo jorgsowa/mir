@@ -48,136 +48,6 @@ impl Clone for PendingRefLocs {
     }
 }
 
-/// Classify a file's precedence tier for the workspace symbol index.
-/// User stubs win over everything; native stub files (`stubs/…`) lose to
-/// analyzed user/vendor files.
-fn symbol_tier(
-    file: SourceFile,
-    db: &dyn MirDatabase,
-    user_stubs: &rustc_hash::FxHashSet<Arc<str>>,
-) -> crate::db::SymbolTier {
-    use crate::db::SymbolTier;
-    let path = file.path(db);
-    if user_stubs.contains(path.as_ref()) {
-        SymbolTier::UserStub
-    } else if path.starts_with("stubs/") {
-        SymbolTier::NativeStub
-    } else {
-        SymbolTier::UserFile
-    }
-}
-
-/// Tier-aware insert into one index map + declarer-count bump. Overwrites the
-/// existing entry only if the new tier outranks it (or ties at a non-native
-/// tier, where last-write-wins matches the full-rebuild `insert` semantics;
-/// native-stub ties keep the first, matching `or_insert`).
-fn tier_insert(
-    map: &mut FxHashMap<Name, crate::db::SymbolLoc>,
-    counts: &mut FxHashMap<Name, u32>,
-    key: Name,
-    loc: crate::db::SymbolLoc,
-    new_tier: crate::db::SymbolTier,
-    db: &dyn MirDatabase,
-    user_stubs: &rustc_hash::FxHashSet<Arc<str>>,
-) {
-    use crate::db::SymbolTier;
-    *counts.entry(key).or_insert(0) += 1;
-    match map.get(&key) {
-        None => {
-            map.insert(key, loc);
-        }
-        Some(existing) => {
-            let existing_tier = symbol_tier(existing.file(), db, user_stubs);
-            let overwrite = new_tier > existing_tier
-                || (new_tier == existing_tier && new_tier != SymbolTier::NativeStub);
-            if overwrite {
-                map.insert(key, loc);
-            }
-        }
-    }
-}
-
-/// Subtract one file's declarations from an index map + counts. Assumes the
-/// caller has already ruled out the ambiguous case (count > 1 while this file
-/// owns the winning entry). Removes the map entry only when no other file
-/// declares the name (count → 0) and the entry currently points at `file`.
-fn subtract_decls(
-    map: &mut FxHashMap<Name, crate::db::SymbolLoc>,
-    counts: &mut FxHashMap<Name, u32>,
-    entries: &[Name],
-    file: SourceFile,
-) {
-    for key in entries {
-        let remaining = match counts.get_mut(key) {
-            Some(c) => {
-                *c = c.saturating_sub(1);
-                *c
-            }
-            None => 0,
-        };
-        if remaining == 0 {
-            counts.remove(key);
-            if map.get(key).map(|l| l.file()) == Some(file) {
-                map.remove(key);
-            }
-        }
-    }
-}
-
-/// [`tier_insert`] for `class_like`, additionally maintaining
-/// `class_like_by_short_name` in lockstep: a bucket entry for `key` exists
-/// exactly as long as `key` exists in `class_like`, independent of which
-/// tier currently wins it — so this only needs to act the *first* time `key`
-/// appears (tier-driven relocations of an already-known FQCN never move it
-/// to a different short name).
-#[allow(clippy::too_many_arguments)]
-fn tier_insert_class_like(
-    map: &mut FxHashMap<Name, crate::db::SymbolLoc>,
-    counts: &mut FxHashMap<Name, u32>,
-    by_short_name: &mut FxHashMap<Name, Vec<Name>>,
-    key: Name,
-    loc: crate::db::SymbolLoc,
-    new_tier: crate::db::SymbolTier,
-    db: &dyn MirDatabase,
-    user_stubs: &rustc_hash::FxHashSet<Arc<str>>,
-) {
-    let is_new = !map.contains_key(&key);
-    tier_insert(map, counts, key, loc, new_tier, db, user_stubs);
-    if is_new {
-        let bucket = by_short_name
-            .entry(crate::db::short_name_key(key))
-            .or_default();
-        if !bucket.contains(&key) {
-            bucket.push(key);
-        }
-    }
-}
-
-/// [`subtract_decls`] for `class_like`, additionally removing `key` from its
-/// `class_like_by_short_name` bucket once it's fully gone from `class_like`
-/// (no other file still declares it) — kept if another file's entry
-/// survives the subtraction (the FQCN itself is still live, just re-homed).
-fn subtract_class_like(
-    map: &mut FxHashMap<Name, crate::db::SymbolLoc>,
-    counts: &mut FxHashMap<Name, u32>,
-    by_short_name: &mut FxHashMap<Name, Vec<Name>>,
-    entries: &[Name],
-    file: SourceFile,
-) {
-    subtract_decls(map, counts, entries, file);
-    for key in entries {
-        if !map.contains_key(key) {
-            let short = crate::db::short_name_key(*key);
-            if let Some(bucket) = by_short_name.get_mut(&short) {
-                bucket.retain(|k| k != key);
-                if bucket.is_empty() {
-                    by_short_name.remove(&short);
-                }
-            }
-        }
-    }
-}
-
 #[salsa::db]
 #[derive(Clone)]
 pub struct MirDbStorage {
@@ -259,19 +129,11 @@ pub struct MirDbStorage {
     /// dep list that `workspace_symbol_index` accumulates.
     workspace_symbol_index_input:
         Arc<parking_lot::RwLock<Option<crate::db::WorkspaceSymbolIndexSingleton>>>,
-    /// Per-file declaration snapshots used to detect name changes during
-    /// incremental edits. When `ingest_file` is called with a body-only
-    /// edit the snapshot comparison returns `false` and the rebuild is
-    /// skipped, keeping the singleton's revision unchanged.
+    /// Shared per-file declaration tables used both for name-change detection
+    /// and as the canonical declaration rows feeding workspace-index rebuilds
+    /// and incremental replacement.
     file_decl_snapshots:
-        Arc<parking_lot::RwLock<FxHashMap<SourceFile, super::workspace::FileDeclSnapshot>>>,
-    /// Per-symbol declarer counts kept in lockstep with the workspace symbol
-    /// index singleton. Lets `update_workspace_index_for_file` decide whether
-    /// removing a file's declaration of a name is safe (count → 0) or ambiguous
-    /// (another file still declares it → fall back to full rebuild). Rebuilt
-    /// wholesale by `rebuild_workspace_symbol_index`; maintained incrementally
-    /// by `merge_precomputed_into_workspace_index` / `update_workspace_index_for_file`.
-    index_decl_counts: Arc<parking_lot::RwLock<crate::db::IndexDeclCounts>>,
+        Arc<parking_lot::RwLock<FxHashMap<SourceFile, crate::db::FileDeclarations>>>,
     /// Frozen, borrow-only snapshot of the workspace symbol index for a
     /// single read-only analysis pass. Set ONLY on ephemeral per-pass db
     /// clones (the batch body/class passes) via [`freeze_workspace_index`];
@@ -365,7 +227,6 @@ impl Default for MirDbStorage {
             parse_cache: Arc::default(),
             workspace_symbol_index_input: Arc::default(),
             file_decl_snapshots: Arc::default(),
-            index_decl_counts: Arc::default(),
             frozen_index: None,
             subtype_cache: None,
             pending_index_files: Arc::default(),
@@ -447,10 +308,9 @@ impl MirDatabase for MirDbStorage {
         // Global variables are not indexed here — they are not FQCNs and
         // are not looked up via this method in any current caller.
         let loc = idx
-            .class_like
-            .get(&lower)
-            .or_else(|| idx.functions.get(&lower))
-            .or_else(|| idx.constants.get(&case_sensitive));
+            .class_like_loc(lower)
+            .or_else(|| idx.function_loc(lower))
+            .or_else(|| idx.constant_loc(case_sensitive));
         loc.map(|l| {
             let sf = match l {
                 SymbolLoc::Class { file, .. }
@@ -458,7 +318,7 @@ impl MirDatabase for MirDbStorage {
                 | SymbolLoc::Trait { file, .. }
                 | SymbolLoc::Enum { file, .. }
                 | SymbolLoc::Function { file, .. }
-                | SymbolLoc::Constant { file, .. } => *file,
+                | SymbolLoc::Constant { file, .. } => file,
             };
             sf.path(self)
         })
@@ -683,79 +543,66 @@ impl MirDbStorage {
     /// `AnalysisSession::rebuild_workspace_symbol_index`, and after any
     /// `ingest_file` that detects a declaration change.
     pub fn rebuild_workspace_symbol_index(&mut self) {
-        use crate::db::workspace::FileDeclSnapshot;
-        use crate::db::{
-            build_workspace_symbol_index, collect_file_declarations, IndexDeclCounts, SymbolLoc,
-        };
-
+        use crate::db::{build_workspace_symbol_index, collect_file_declarations, SymbolLoc};
         let files = self.all_source_files();
-        let user_stubs = self.user_stub_paths.read().clone();
+        let user_stubs: std::collections::HashSet<_> =
+            self.user_stub_source_files().into_iter().collect();
 
         let mut class_like: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
         let mut functions: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
         let mut constants: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
-        let mut class_like_by_short_name: FxHashMap<Name, Vec<Name>> = FxHashMap::default();
-        let mut counts = IndexDeclCounts::default();
-        let mut new_snapshots: FxHashMap<SourceFile, FileDeclSnapshot> = FxHashMap::default();
+        let mut class_like_collisions: FxHashMap<Name, Vec<SymbolLoc>> = FxHashMap::default();
+        let mut function_collisions: FxHashMap<Name, Vec<SymbolLoc>> = FxHashMap::default();
+        let mut constant_collisions: FxHashMap<Name, Vec<SymbolLoc>> = FxHashMap::default();
+        let mut new_snapshots: FxHashMap<SourceFile, crate::db::FileDeclarations> =
+            FxHashMap::default();
 
-        // Single pass over all files. Tier-aware insertion (native stub <
-        // user file < user stub) makes the result independent of iteration
-        // order for distinct symbols and matches the tracked
-        // `workspace_symbol_index` fallback's 3-pass precedence — pinned by
-        // `tracked_walk_matches_imperative_rebuild`, not kept by hand. The
-        // incremental merge paths reuse the exact same `tier_insert` rule.
-        {
-            let db: &dyn MirDatabase = &*self;
-            for &file in files.iter() {
-                let tier = symbol_tier(file, db, &user_stubs);
-                let decls = collect_file_declarations(db, file);
-                for decl in &decls.class_like {
-                    tier_insert_class_like(
-                        &mut class_like,
-                        &mut counts.class_like,
-                        &mut class_like_by_short_name,
-                        decl.key,
-                        decl.loc,
-                        tier,
-                        db,
-                        &user_stubs,
-                    );
-                }
-                for decl in &decls.functions {
-                    tier_insert(
-                        &mut functions,
-                        &mut counts.functions,
-                        decl.key,
-                        decl.loc,
-                        tier,
-                        db,
-                        &user_stubs,
-                    );
-                }
-                for decl in &decls.constants {
-                    tier_insert(
-                        &mut constants,
-                        &mut counts.constants,
-                        decl.key,
-                        decl.loc,
-                        tier,
-                        db,
-                        &user_stubs,
-                    );
-                }
-                new_snapshots.insert(file, FileDeclSnapshot::from_decls(&decls));
+        let db: &dyn MirDatabase = &*self;
+        for &file in &files {
+            let decls = collect_file_declarations(db, file);
+            for decl in decls.class_like() {
+                crate::db::workspace::insert_symbol(
+                    &mut class_like,
+                    &mut class_like_collisions,
+                    decl.lookup_key(),
+                    decl.loc,
+                    db,
+                    &user_stubs,
+                );
             }
+            for decl in decls.functions() {
+                crate::db::workspace::insert_symbol(
+                    &mut functions,
+                    &mut function_collisions,
+                    decl.lookup_key(),
+                    decl.loc,
+                    db,
+                    &user_stubs,
+                );
+            }
+            for decl in decls.constants() {
+                crate::db::workspace::insert_symbol(
+                    &mut constants,
+                    &mut constant_collisions,
+                    decl.lookup_key(),
+                    decl.loc,
+                    db,
+                    &user_stubs,
+                );
+            }
+            new_snapshots.insert(file, decls.clone());
         }
 
         *self.file_decl_snapshots.write() = new_snapshots;
-        *self.index_decl_counts.write() = counts;
         self.add_class_mention_names(class_like.keys().map(|k| k.as_str()));
 
         let new_index = build_workspace_symbol_index(
             class_like,
             functions,
             constants,
-            class_like_by_short_name,
+            class_like_collisions,
+            function_collisions,
+            constant_collisions,
         );
         self.set_workspace_index(new_index);
     }
@@ -802,65 +649,59 @@ impl MirDbStorage {
         &mut self,
         decls: Vec<(SourceFile, crate::db::FileDeclarations)>,
     ) {
-        use crate::db::{IndexDeclCounts, SymbolLoc};
-        let user_stubs = self.user_stub_paths.read().clone();
+        use crate::db::SymbolLoc;
+        let user_stubs: std::collections::HashSet<_> =
+            self.user_stub_source_files().into_iter().collect();
         let mut class_like: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
         let mut functions: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
         let mut constants: FxHashMap<Name, SymbolLoc> = FxHashMap::default();
-        let mut class_like_by_short_name: FxHashMap<Name, Vec<Name>> = FxHashMap::default();
-        let mut counts = IndexDeclCounts::default();
+        let mut class_like_collisions: FxHashMap<Name, Vec<SymbolLoc>> = FxHashMap::default();
+        let mut function_collisions: FxHashMap<Name, Vec<SymbolLoc>> = FxHashMap::default();
+        let mut constant_collisions: FxHashMap<Name, Vec<SymbolLoc>> = FxHashMap::default();
         let mut snaps = FxHashMap::default();
-        {
-            let db: &dyn MirDatabase = &*self;
-            for (file, d) in &decls {
-                let tier = symbol_tier(*file, db, &user_stubs);
-                for decl in &d.class_like {
-                    tier_insert_class_like(
-                        &mut class_like,
-                        &mut counts.class_like,
-                        &mut class_like_by_short_name,
-                        decl.key,
-                        decl.loc,
-                        tier,
-                        db,
-                        &user_stubs,
-                    );
-                }
-                for decl in &d.functions {
-                    tier_insert(
-                        &mut functions,
-                        &mut counts.functions,
-                        decl.key,
-                        decl.loc,
-                        tier,
-                        db,
-                        &user_stubs,
-                    );
-                }
-                for decl in &d.constants {
-                    tier_insert(
-                        &mut constants,
-                        &mut counts.constants,
-                        decl.key,
-                        decl.loc,
-                        tier,
-                        db,
-                        &user_stubs,
-                    );
-                }
+        let db: &dyn MirDatabase = &*self;
+        for (file, d) in &decls {
+            for decl in d.class_like() {
+                crate::db::workspace::insert_symbol(
+                    &mut class_like,
+                    &mut class_like_collisions,
+                    decl.lookup_key(),
+                    decl.loc,
+                    db,
+                    &user_stubs,
+                );
             }
+            for decl in d.functions() {
+                crate::db::workspace::insert_symbol(
+                    &mut functions,
+                    &mut function_collisions,
+                    decl.lookup_key(),
+                    decl.loc,
+                    db,
+                    &user_stubs,
+                );
+            }
+            for decl in d.constants() {
+                crate::db::workspace::insert_symbol(
+                    &mut constants,
+                    &mut constant_collisions,
+                    decl.lookup_key(),
+                    decl.loc,
+                    db,
+                    &user_stubs,
+                );
+            }
+            snaps.insert(*file, d.clone());
         }
         self.add_class_mention_names(class_like.keys().map(|k| k.as_str()));
-        for (file, d) in decls {
-            snaps.insert(file, super::workspace::FileDeclSnapshot::from_decls(&d));
-        }
         *self.file_decl_snapshots.write() = snaps;
-        *self.index_decl_counts.write() = counts;
         let new_index = crate::db::build_workspace_symbol_index(
             class_like,
             functions,
             constants,
-            class_like_by_short_name,
+            class_like_collisions,
+            function_collisions,
+            constant_collisions,
         );
         self.set_workspace_index(new_index);
     }
@@ -875,85 +716,86 @@ impl MirDbStorage {
         &mut self,
         decls: &[(SourceFile, crate::db::FileDeclarations)],
     ) {
-        self.add_class_mention_names(
-            decls
-                .iter()
-                .flat_map(|(_, d)| d.class_like.iter().map(|decl| decl.key.as_str())),
-        );
+        let mention_keys: Vec<Name> = decls
+            .iter()
+            .flat_map(|(_, d)| d.class_like().map(|decl| decl.lookup_key()))
+            .collect();
+        self.add_class_mention_names(mention_keys.iter().map(|key| key.as_str()));
         let Some(singleton) = *self.workspace_symbol_index_input.read() else {
             let mut snaps = self.file_decl_snapshots.write();
             for (file, d) in decls {
-                snaps
-                    .entry(*file)
-                    .or_insert_with(|| super::workspace::FileDeclSnapshot::from_decls(d));
+                snaps.entry(*file).or_insert_with(|| d.clone());
             }
             return;
         };
-        let user_stubs = self.user_stub_paths.read().clone();
+        let user_stubs: std::collections::HashSet<_> =
+            self.user_stub_source_files().into_iter().collect();
         let cur = singleton.index(self);
-        let mut class_like = (*cur.class_like).clone();
-        let mut functions = (*cur.functions).clone();
-        let mut constants = (*cur.constants).clone();
-        let mut class_like_by_short_name = (*cur.class_like_by_short_name).clone();
-        let mut counts = self.index_decl_counts.write();
-        let mut to_store: Vec<(SourceFile, super::workspace::FileDeclSnapshot)> = Vec::new();
+        let mut class_like = cur.class_like_map().clone();
+        let mut functions = cur.function_map().clone();
+        let mut constants = cur.constant_map().clone();
+        let mut class_like_collisions: FxHashMap<Name, Vec<SymbolLoc>> = cur
+            .class_like_collisions()
+            .iter()
+            .map(|(k, v)| (*k, v.to_vec()))
+            .collect();
+        let mut function_collisions: FxHashMap<Name, Vec<SymbolLoc>> = cur
+            .function_collisions()
+            .iter()
+            .map(|(k, v)| (*k, v.to_vec()))
+            .collect();
+        let mut constant_collisions: FxHashMap<Name, Vec<SymbolLoc>> = cur
+            .constant_collisions()
+            .iter()
+            .map(|(k, v)| (*k, v.to_vec()))
+            .collect();
+        let db: &dyn MirDatabase = &*self;
         {
-            let db: &dyn MirDatabase = &*self;
-            let snaps = self.file_decl_snapshots.read();
+            let mut snaps = self.file_decl_snapshots.write();
             for (file, d) in decls {
                 if snaps.contains_key(file) {
                     continue;
                 }
-                let tier = symbol_tier(*file, db, &user_stubs);
-                for decl in &d.class_like {
-                    tier_insert_class_like(
+                for decl in d.class_like() {
+                    crate::db::workspace::insert_symbol(
                         &mut class_like,
-                        &mut counts.class_like,
-                        &mut class_like_by_short_name,
-                        decl.key,
+                        &mut class_like_collisions,
+                        decl.lookup_key(),
                         decl.loc,
-                        tier,
                         db,
                         &user_stubs,
                     );
                 }
-                for decl in &d.functions {
-                    tier_insert(
+                for decl in d.functions() {
+                    crate::db::workspace::insert_symbol(
                         &mut functions,
-                        &mut counts.functions,
-                        decl.key,
+                        &mut function_collisions,
+                        decl.lookup_key(),
                         decl.loc,
-                        tier,
                         db,
                         &user_stubs,
                     );
                 }
-                for decl in &d.constants {
-                    tier_insert(
+                for decl in d.constants() {
+                    crate::db::workspace::insert_symbol(
                         &mut constants,
-                        &mut counts.constants,
-                        decl.key,
+                        &mut constant_collisions,
+                        decl.lookup_key(),
                         decl.loc,
-                        tier,
                         db,
                         &user_stubs,
                     );
                 }
-                to_store.push((*file, super::workspace::FileDeclSnapshot::from_decls(d)));
-            }
-        }
-        drop(counts);
-        {
-            let mut snaps = self.file_decl_snapshots.write();
-            for (file, d) in to_store {
-                snaps.insert(file, d);
+                snaps.insert(*file, d.clone());
             }
         }
         let new_index = crate::db::build_workspace_symbol_index(
             class_like,
             functions,
             constants,
-            class_like_by_short_name,
+            class_like_collisions,
+            function_collisions,
+            constant_collisions,
         );
         self.set_workspace_index(new_index);
     }
@@ -973,7 +815,8 @@ impl MirDbStorage {
         let Some(singleton) = *self.workspace_symbol_index_input.read() else {
             return false;
         };
-        let user_stubs = self.user_stub_paths.read().clone();
+        let user_stubs: std::collections::HashSet<_> =
+            self.user_stub_source_files().into_iter().collect();
         let old_decls = self.file_decl_snapshots.read().get(&file).cloned();
 
         // Compute the new declarations once. If the declared NAMES are
@@ -984,113 +827,113 @@ impl MirDbStorage {
             let db: &dyn MirDatabase = &*self;
             collect_file_declarations(db, file).clone()
         };
-        self.add_class_mention_names(new_decls.class_like.iter().map(|decl| decl.key.as_str()));
+        let mention_keys: Vec<Name> = new_decls
+            .class_like()
+            .map(|decl| decl.lookup_key())
+            .collect();
+        self.add_class_mention_names(mention_keys.iter().map(|key| key.as_str()));
         if old_decls
             .as_ref()
-            .is_some_and(|snapshot| snapshot.matches_decls(&new_decls))
+            .is_some_and(|snapshot| snapshot == &new_decls)
         {
             return true;
         }
 
-        let tier = {
-            let db: &dyn MirDatabase = &*self;
-            symbol_tier(file, db, &user_stubs)
-        };
-
         let cur = singleton.index(self);
-        let mut class_like = (*cur.class_like).clone();
-        let mut functions = (*cur.functions).clone();
-        let mut constants = (*cur.constants).clone();
-        let mut class_like_by_short_name = (*cur.class_like_by_short_name).clone();
-        let mut counts = self.index_decl_counts.write();
+        let mut class_like = cur.class_like_map().clone();
+        let mut functions = cur.function_map().clone();
+        let mut constants = cur.constant_map().clone();
+        let mut class_like_collisions: FxHashMap<Name, Vec<SymbolLoc>> = cur
+            .class_like_collisions()
+            .iter()
+            .map(|(k, v)| (*k, v.to_vec()))
+            .collect();
+        let mut function_collisions: FxHashMap<Name, Vec<SymbolLoc>> = cur
+            .function_collisions()
+            .iter()
+            .map(|(k, v)| (*k, v.to_vec()))
+            .collect();
+        let mut constant_collisions: FxHashMap<Name, Vec<SymbolLoc>> = cur
+            .constant_collisions()
+            .iter()
+            .map(|(k, v)| (*k, v.to_vec()))
+            .collect();
 
-        // Dry-run ambiguity check on the OLD decls before mutating anything.
-        // (Only the FQCN maps have a precedence concept to be ambiguous about;
-        // `class_like_by_short_name` has none — subtracting/re-adding it is
-        // always safe regardless of this outcome.)
+        let db: &dyn MirDatabase = &*self;
         if let Some(old) = &old_decls {
-            let ambiguous = |entries: &[Name],
-                             map: &FxHashMap<Name, SymbolLoc>,
-                             cnt: &FxHashMap<Name, u32>|
-             -> bool {
-                entries.iter().any(|key| {
-                    let c = cnt.get(key).copied().unwrap_or(0);
-                    // count > 1 means another file also declares it; if this
-                    // file currently owns the winning entry we can't cheaply
-                    // recompute the replacement → ambiguous.
-                    c > 1 && map.get(key).map(|l| l.file()) == Some(file)
-                })
-            };
-            if ambiguous(&old.class_like, &class_like, &counts.class_like)
-                || ambiguous(&old.functions, &functions, &counts.functions)
-                || ambiguous(&old.constants, &constants, &counts.constants)
-            {
-                return false;
-            }
-        }
-
-        // Subtract old decls.
-        if let Some(old) = &old_decls {
-            subtract_class_like(
-                &mut class_like,
-                &mut counts.class_like,
-                &mut class_like_by_short_name,
-                &old.class_like,
-                file,
-            );
-            subtract_decls(&mut functions, &mut counts.functions, &old.functions, file);
-            subtract_decls(&mut constants, &mut counts.constants, &old.constants, file);
-        }
-
-        // Add new decls.
-        {
-            let db: &dyn MirDatabase = &*self;
-            for decl in &new_decls.class_like {
-                tier_insert_class_like(
+            for decl in old.class_like() {
+                crate::db::workspace::remove_symbol(
                     &mut class_like,
-                    &mut counts.class_like,
-                    &mut class_like_by_short_name,
-                    decl.key,
+                    &mut class_like_collisions,
+                    decl.lookup_key(),
                     decl.loc,
-                    tier,
                     db,
                     &user_stubs,
                 );
             }
-            for decl in &new_decls.functions {
-                tier_insert(
+            for decl in old.functions() {
+                crate::db::workspace::remove_symbol(
                     &mut functions,
-                    &mut counts.functions,
-                    decl.key,
+                    &mut function_collisions,
+                    decl.lookup_key(),
                     decl.loc,
-                    tier,
                     db,
                     &user_stubs,
                 );
             }
-            for decl in &new_decls.constants {
-                tier_insert(
+            for decl in old.constants() {
+                crate::db::workspace::remove_symbol(
                     &mut constants,
-                    &mut counts.constants,
-                    decl.key,
+                    &mut constant_collisions,
+                    decl.lookup_key(),
                     decl.loc,
-                    tier,
                     db,
                     &user_stubs,
                 );
             }
         }
-        drop(counts);
-        self.file_decl_snapshots.write().insert(
-            file,
-            super::workspace::FileDeclSnapshot::from_decls(&new_decls),
-        );
+
+        for decl in new_decls.class_like() {
+            crate::db::workspace::insert_symbol(
+                &mut class_like,
+                &mut class_like_collisions,
+                decl.lookup_key(),
+                decl.loc,
+                db,
+                &user_stubs,
+            );
+        }
+        for decl in new_decls.functions() {
+            crate::db::workspace::insert_symbol(
+                &mut functions,
+                &mut function_collisions,
+                decl.lookup_key(),
+                decl.loc,
+                db,
+                &user_stubs,
+            );
+        }
+        for decl in new_decls.constants() {
+            crate::db::workspace::insert_symbol(
+                &mut constants,
+                &mut constant_collisions,
+                decl.lookup_key(),
+                decl.loc,
+                db,
+                &user_stubs,
+            );
+        }
+        self.file_decl_snapshots
+            .write()
+            .insert(file, new_decls.clone());
 
         let new_index = crate::db::build_workspace_symbol_index(
             class_like,
             functions,
             constants,
-            class_like_by_short_name,
+            class_like_collisions,
+            function_collisions,
+            constant_collisions,
         );
         self.set_workspace_index(new_index);
         true
@@ -1112,12 +955,9 @@ impl MirDbStorage {
         };
         let mut snapshots = self.file_decl_snapshots.write();
         match snapshots.get(&file) {
-            Some(old) if old.matches_decls(&new_decls) => false,
+            Some(old) if old == &new_decls => false,
             _ => {
-                snapshots.insert(
-                    file,
-                    super::workspace::FileDeclSnapshot::from_decls(&new_decls),
-                );
+                snapshots.insert(file, new_decls);
                 true
             }
         }
@@ -1554,9 +1394,8 @@ impl MirDbStorage {
     }
 
     /// Subtract one file's declarations from the singleton without re-adding
-    /// (used on file removal). Returns `false` (no mutation) if subtraction is
-    /// ambiguous — the caller then nulls the singleton to force a fallback
-    /// rebuild. Returns `true` if applied or if there's nothing to do.
+    /// (used on file removal). Returns `true` if applied or if there's nothing
+    /// to do.
     fn remove_file_from_workspace_index(&mut self, file: SourceFile) -> bool {
         let Some(singleton) = *self.workspace_symbol_index_input.read() else {
             return true;
@@ -1566,43 +1405,65 @@ impl MirDbStorage {
             return true; // never indexed → nothing to subtract
         };
         let cur = singleton.index(self);
-        let mut class_like = (*cur.class_like).clone();
-        let mut functions = (*cur.functions).clone();
-        let mut constants = (*cur.constants).clone();
-        let mut class_like_by_short_name = (*cur.class_like_by_short_name).clone();
-        let mut counts = self.index_decl_counts.write();
-
-        let ambiguous = |entries: &[Name],
-                         map: &FxHashMap<Name, crate::db::SymbolLoc>,
-                         cnt: &FxHashMap<Name, u32>|
-         -> bool {
-            entries.iter().any(|key| {
-                cnt.get(key).copied().unwrap_or(0) > 1
-                    && map.get(key).map(|l| l.file()) == Some(file)
-            })
-        };
-        if ambiguous(&old.class_like, &class_like, &counts.class_like)
-            || ambiguous(&old.functions, &functions, &counts.functions)
-            || ambiguous(&old.constants, &constants, &counts.constants)
-        {
-            return false;
+        let mut class_like = cur.class_like_map().clone();
+        let mut functions = cur.function_map().clone();
+        let mut constants = cur.constant_map().clone();
+        let mut class_like_collisions: FxHashMap<Name, Vec<crate::db::SymbolLoc>> = cur
+            .class_like_collisions()
+            .iter()
+            .map(|(k, v)| (*k, v.to_vec()))
+            .collect();
+        let mut function_collisions: FxHashMap<Name, Vec<crate::db::SymbolLoc>> = cur
+            .function_collisions()
+            .iter()
+            .map(|(k, v)| (*k, v.to_vec()))
+            .collect();
+        let mut constant_collisions: FxHashMap<Name, Vec<crate::db::SymbolLoc>> = cur
+            .constant_collisions()
+            .iter()
+            .map(|(k, v)| (*k, v.to_vec()))
+            .collect();
+        let user_stubs: std::collections::HashSet<_> =
+            self.user_stub_source_files().into_iter().collect();
+        let db: &dyn MirDatabase = &*self;
+        for decl in old.class_like() {
+            crate::db::workspace::remove_symbol(
+                &mut class_like,
+                &mut class_like_collisions,
+                decl.lookup_key(),
+                decl.loc,
+                db,
+                &user_stubs,
+            );
         }
-        subtract_class_like(
-            &mut class_like,
-            &mut counts.class_like,
-            &mut class_like_by_short_name,
-            &old.class_like,
-            file,
-        );
-        subtract_decls(&mut functions, &mut counts.functions, &old.functions, file);
-        subtract_decls(&mut constants, &mut counts.constants, &old.constants, file);
-        drop(counts);
+        for decl in old.functions() {
+            crate::db::workspace::remove_symbol(
+                &mut functions,
+                &mut function_collisions,
+                decl.lookup_key(),
+                decl.loc,
+                db,
+                &user_stubs,
+            );
+        }
+        for decl in old.constants() {
+            crate::db::workspace::remove_symbol(
+                &mut constants,
+                &mut constant_collisions,
+                decl.lookup_key(),
+                decl.loc,
+                db,
+                &user_stubs,
+            );
+        }
 
         let new_index = crate::db::build_workspace_symbol_index(
             class_like,
             functions,
             constants,
-            class_like_by_short_name,
+            class_like_collisions,
+            function_collisions,
+            constant_collisions,
         );
         self.set_workspace_index(new_index);
         true

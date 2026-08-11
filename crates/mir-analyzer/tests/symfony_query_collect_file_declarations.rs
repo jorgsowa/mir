@@ -17,29 +17,27 @@ fn symfony_query_collect_file_declarations() {
         .expect("Request file");
     let decls = collect_file_declarations(&db, file);
     assert_eq!(
-        decls.class_like.len(),
+        decls.class_like_len(),
         1,
         "Request.php should export one class-like symbol"
     );
     assert!(
-        decls.functions.is_empty(),
+        decls.function_len() == 0,
         "Request.php should not export free functions"
     );
     assert!(
-        decls.constants.is_empty(),
+        decls.constant_len() == 0,
         "Request.php should not export file-level constants"
     );
+    let request = decls.class_like_at(0).expect("first class-like decl");
     assert_eq!(
-        decls.class_like[0].key.as_str(),
+        request.lookup_key().as_str(),
         "symfony\\component\\httpfoundation\\request"
     );
-    assert_eq!(
-        decls.class_like[0].loc.file().path(&db).as_ref(),
-        fx.request.as_ref()
-    );
+    assert_eq!(request.loc.file().path(&db).as_ref(), fx.request.as_ref());
     assert!(
         matches!(
-            decls.class_like[0].loc,
+            request.loc,
             mir_analyzer::db::SymbolLoc::Class { idx: 0, .. }
         ),
         "Request.php should register its first declaration as the Request class symbol"

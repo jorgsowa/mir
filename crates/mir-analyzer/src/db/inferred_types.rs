@@ -39,8 +39,8 @@ impl Drop for InferGuard {
 pub fn inferred_function_return_type_demand(db: &dyn MirDatabase, fqn: &str) -> Option<Arc<Type>> {
     let idx = crate::db::workspace_index(db);
     let key = mir_types::Name::new(fqn).ascii_lowercase();
-    let sf = match idx.functions.get(&key)? {
-        SymbolLoc::Function { file, .. } => *file,
+    let sf = match idx.function_loc(key)? {
+        SymbolLoc::Function { file, .. } => file,
         _ => return None,
     };
     let path = sf.path(db).clone();
@@ -67,11 +67,11 @@ pub fn inferred_method_return_type_demand(
 ) -> Option<Arc<Type>> {
     let idx = crate::db::workspace_index(db);
     let key = mir_types::Name::new(fqcn).ascii_lowercase();
-    let sf = match idx.class_like.get(&key)? {
+    let sf = match idx.class_like_loc(key)? {
         SymbolLoc::Class { file, .. }
         | SymbolLoc::Interface { file, .. }
         | SymbolLoc::Trait { file, .. }
-        | SymbolLoc::Enum { file, .. } => *file,
+        | SymbolLoc::Enum { file, .. } => file,
         _ => return None,
     };
     let path = sf.path(db).clone();
@@ -105,11 +105,11 @@ pub fn inferred_property_type_demand(
 ) -> Option<Arc<Type>> {
     let idx = crate::db::workspace_index(db);
     let key = mir_types::Name::new(fqcn).ascii_lowercase();
-    let sf = match idx.class_like.get(&key)? {
+    let sf = match idx.class_like_loc(key)? {
         SymbolLoc::Class { file, .. }
         | SymbolLoc::Interface { file, .. }
         | SymbolLoc::Trait { file, .. }
-        | SymbolLoc::Enum { file, .. } => *file,
+        | SymbolLoc::Enum { file, .. } => file,
         _ => return None,
     };
     let path = sf.path(db).clone();

@@ -77,10 +77,10 @@ fn measure_workspace_projections() {
     let functions_warm_elapsed = functions_warm_start.elapsed();
 
     let index_cold_start = Instant::now();
-    let index_cold = black_box(workspace_symbol_index(&db).class_like.len());
+    let index_cold = black_box(workspace_symbol_index(&db).class_like_len());
     let index_cold_elapsed = index_cold_start.elapsed();
     let index_warm_start = Instant::now();
-    let index_warm = black_box(workspace_symbol_index(&db).class_like.len());
+    let index_warm = black_box(workspace_symbol_index(&db).class_like_len());
     let index_warm_elapsed = index_warm_start.elapsed();
 
     let deps_cold_start = Instant::now();
