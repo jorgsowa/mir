@@ -232,6 +232,33 @@ pub fn class_is_immutable(db: &dyn MirDatabase, fqcn: &str) -> bool {
     false
 }
 
+/// Whether `fqcn` (or any ancestor up its native `extends` chain) is a PHP 8.2+
+/// native `readonly` class. Native readonlyness enforces at the language level
+/// that no property may be reassigned after construction, so every non-constructor
+/// instance method of such an owner is mutation-free by construction — even when it
+/// lacks an explicit `@psalm-mutation-free`. Mirrors `class_is_immutable`'s ancestor
+/// walk: a child class inherits readonly-ness from its base.
+pub fn class_is_native_readonly(db: &dyn MirDatabase, fqcn: &str) -> bool {
+    let mut visited: FxHashSet<Arc<str>> = FxHashSet::default();
+    let mut current: Option<Arc<str>> = Some(Arc::from(fqcn));
+    while let Some(fqcn) = current {
+        if !visited.insert(fqcn.clone()) {
+            break;
+        }
+        let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
+        match crate::db::find_class_like(db, here) {
+            Some(crate::db::ClassLike::Class(cls)) => {
+                if cls.is_readonly {
+                    return true;
+                }
+                current = cls.parent.clone();
+            }
+            _ => break,
+        }
+    }
+    false
+}
+
 pub fn inherited_template_bindings(
     db: &dyn MirDatabase,
     fqcn: &str,

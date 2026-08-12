@@ -10,315 +10,6 @@
       <code><![CDATA[$messagePattern = $metadata[0]->messagePattern()]]></code>
     </MixedAssignment>
   </file>
-  <file src="src/Event/Events/Application/Started.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->runtime->asString()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/CustomTestMethodInvocationUsed.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->customTestMethodInvocation->className()]]></code>
-      <code><![CDATA[$this->customTestMethodInvocation->methodName()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/HookMethod/AfterLastTestMethodCalled.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->calledMethod->className()]]></code>
-      <code><![CDATA[$this->calledMethod->methodName()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/HookMethod/AfterLastTestMethodErrored.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->throwable->message()]]></code>
-      <code><![CDATA[$this->calledMethod->className()]]></code>
-      <code><![CDATA[$this->calledMethod->methodName()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/HookMethod/AfterLastTestMethodFailed.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->throwable->message()]]></code>
-      <code><![CDATA[$this->calledMethod->className()]]></code>
-      <code><![CDATA[$this->calledMethod->methodName()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/HookMethod/AfterTestMethodCalled.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->calledMethod->className()]]></code>
-      <code><![CDATA[$this->calledMethod->methodName()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/HookMethod/AfterTestMethodErrored.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->throwable->message()]]></code>
-      <code><![CDATA[$this->calledMethod->className()]]></code>
-      <code><![CDATA[$this->calledMethod->methodName()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/HookMethod/AfterTestMethodFailed.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->throwable->message()]]></code>
-      <code><![CDATA[$this->calledMethod->className()]]></code>
-      <code><![CDATA[$this->calledMethod->methodName()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/HookMethod/BeforeFirstTestMethodCalled.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->calledMethod->className()]]></code>
-      <code><![CDATA[$this->calledMethod->methodName()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/HookMethod/BeforeFirstTestMethodErrored.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->throwable->message()]]></code>
-      <code><![CDATA[$this->calledMethod->className()]]></code>
-      <code><![CDATA[$this->calledMethod->methodName()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/HookMethod/BeforeFirstTestMethodFailed.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->throwable->message()]]></code>
-      <code><![CDATA[$this->calledMethod->className()]]></code>
-      <code><![CDATA[$this->calledMethod->methodName()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/HookMethod/BeforeTestMethodCalled.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->calledMethod->className()]]></code>
-      <code><![CDATA[$this->calledMethod->methodName()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/HookMethod/BeforeTestMethodErrored.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->throwable->message()]]></code>
-      <code><![CDATA[$this->calledMethod->className()]]></code>
-      <code><![CDATA[$this->calledMethod->methodName()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/HookMethod/BeforeTestMethodFailed.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->throwable->message()]]></code>
-      <code><![CDATA[$this->calledMethod->className()]]></code>
-      <code><![CDATA[$this->calledMethod->methodName()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/HookMethod/PostConditionCalled.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->calledMethod->className()]]></code>
-      <code><![CDATA[$this->calledMethod->methodName()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/HookMethod/PostConditionErrored.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->throwable->message()]]></code>
-      <code><![CDATA[$this->calledMethod->className()]]></code>
-      <code><![CDATA[$this->calledMethod->methodName()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/HookMethod/PostConditionFailed.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->throwable->message()]]></code>
-      <code><![CDATA[$this->calledMethod->className()]]></code>
-      <code><![CDATA[$this->calledMethod->methodName()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/HookMethod/PreConditionCalled.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->calledMethod->className()]]></code>
-      <code><![CDATA[$this->calledMethod->methodName()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/HookMethod/PreConditionErrored.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->throwable->message()]]></code>
-      <code><![CDATA[$this->calledMethod->className()]]></code>
-      <code><![CDATA[$this->calledMethod->methodName()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/HookMethod/PreConditionFailed.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->throwable->message()]]></code>
-      <code><![CDATA[$this->calledMethod->className()]]></code>
-      <code><![CDATA[$this->calledMethod->methodName()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/Issue/ConsideredRisky.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->test->id()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/Issue/DeprecationTriggered.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->test->id()]]></code>
-      <code><![CDATA[$this->trigger->asString()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/Issue/ErrorTriggered.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->test->id()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/Issue/NoticeTriggered.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->test->id()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/Issue/PhpDeprecationTriggered.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->test->id()]]></code>
-      <code><![CDATA[$this->trigger->asString()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/Issue/PhpNoticeTriggered.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->test->id()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/Issue/PhpWarningTriggered.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->test->id()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/Issue/PhpunitDeprecationTriggered.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->test->id()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/Issue/PhpunitErrorTriggered.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->test->id()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/Issue/PhpunitNoticeTriggered.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->test->id()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/Issue/PhpunitWarningTriggered.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->test->id()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/Issue/WarningTriggered.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->test->id()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/Lifecycle/DataProviderMethodCalled.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->dataProviderMethod->className()]]></code>
-      <code><![CDATA[$this->dataProviderMethod->methodName()]]></code>
-      <code><![CDATA[$this->testMethod->className()]]></code>
-      <code><![CDATA[$this->testMethod->methodName()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/Lifecycle/DataProviderMethodFinished.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->testMethod->className()]]></code>
-      <code><![CDATA[$this->testMethod->methodName()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/Lifecycle/Finished.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->test->id()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/Lifecycle/PreparationErrored.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->throwable->message()]]></code>
-      <code><![CDATA[$this->test->id()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/Lifecycle/PreparationFailed.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->throwable->message()]]></code>
-      <code><![CDATA[$this->test->id()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/Lifecycle/PreparationStarted.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->test->id()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/Lifecycle/Prepared.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->test->id()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/Outcome/Errored.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->throwable->message()]]></code>
-      <code><![CDATA[$this->test->id()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/Outcome/Failed.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->throwable->message()]]></code>
-      <code><![CDATA[$this->test->id()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/Outcome/MarkedIncomplete.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->throwable->message()]]></code>
-      <code><![CDATA[$this->test->id()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/Outcome/Passed.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->test->id()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/Test/Outcome/Skipped.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->test->id()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/TestRunner/ExecutionStarted.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->testSuite->count()]]></code>
-      <code><![CDATA[$this->testSuite->count()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/TestRunner/Issue/DeprecationTriggered.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->trigger->asString()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/TestRunner/PhpDeprecationTriggered.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->trigger->asString()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/TestSuite/Filtered.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->testSuite->count()]]></code>
-      <code><![CDATA[$this->testSuite->count()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/TestSuite/Finished.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->testSuite->name()]]></code>
-      <code><![CDATA[$this->testSuite->count()]]></code>
-      <code><![CDATA[$this->testSuite->count()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/TestSuite/Loaded.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->testSuite->count()]]></code>
-      <code><![CDATA[$this->testSuite->count()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/TestSuite/Skipped.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->testSuite->name()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Events/TestSuite/Started.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->testSuite->name()]]></code>
-      <code><![CDATA[$this->testSuite->count()]]></code>
-      <code><![CDATA[$this->testSuite->count()]]></code>
-    </ImpureMethodCall>
-  </file>
   <file src="src/Event/TypeMap.php">
     <PossiblyInvalidArgument>
       <code><![CDATA[class_implements($subscriber)]]></code>
@@ -339,35 +30,6 @@
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->extensions = $extensions]]></code>
     </InvalidPropertyAssignment>
-  </file>
-  <file src="src/Event/Value/Runtime/Runtime.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->php()]]></code>
-      <code><![CDATA[$this->phpunit()]]></code>
-      <code><![CDATA[$this->operatingSystem()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Value/Telemetry/Duration.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->seconds()]]></code>
-      <code><![CDATA[$this->nanoseconds()]]></code>
-      <code><![CDATA[$this->seconds()]]></code>
-      <code><![CDATA[$this->nanoseconds()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Value/Telemetry/Info.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->current->time()]]></code>
-      <code><![CDATA[$this->current->memoryUsage()]]></code>
-      <code><![CDATA[$this->current->peakMemoryUsage()]]></code>
-      <code><![CDATA[$this->current->garbageCollectorStatus()]]></code>
-      <code><![CDATA[$this->current->userCpuTime()]]></code>
-      <code><![CDATA[$this->current->systemCpuTime()]]></code>
-      <code><![CDATA[$this->current->totalCpuTime()]]></code>
-      <code><![CDATA[$this->durationSinceStart()]]></code>
-      <code><![CDATA[$this->durationSincePrevious()]]></code>
-      <code><![CDATA[$this->peakMemoryUsage()]]></code>
-    </ImpureMethodCall>
   </file>
   <file src="src/Event/Value/Telemetry/SystemCpuTimeMeter.php">
     <MixedAssignment>
@@ -392,41 +54,12 @@
       <code><![CDATA[$this->callee->isThirdPartyOrPhpunitOrPhp()]]></code>
       <code><![CDATA[$this->caller->isThirdPartyOrPhpunitOrPhp()]]></code>
       <code><![CDATA[$this->callee->isThirdPartyOrPhpunitOrPhp()]]></code>
-      <code><![CDATA[$this->isSelf()]]></code>
-      <code><![CDATA[$this->isDirect()]]></code>
-      <code><![CDATA[$this->isIndirect()]]></code>
-      <code><![CDATA[$this->codeAsString($this->caller)]]></code>
-      <code><![CDATA[$this->codeAsString($this->callee)]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Value/Test/Phpt.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->file()]]></code>
-      <code><![CDATA[$this->file()]]></code>
     </ImpureMethodCall>
   </file>
   <file src="src/Event/Value/Test/TestCollection.php">
     <ImpureFunctionCall>
       <code><![CDATA[new TestCollectionIterator($this)]]></code>
     </ImpureFunctionCall>
-  </file>
-  <file src="src/Event/Value/Test/TestMethod.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->testData()]]></code>
-      <code><![CDATA[$this->testData->dataFromDataProvider()]]></code>
-      <code><![CDATA[$this->name()]]></code>
-      <code><![CDATA[$this->testData->hasDataFromDataProvider()]]></code>
-      <code><![CDATA[$this->testData->dataFromDataProvider()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Value/Throwable.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->description()]]></code>
-      <code><![CDATA[$this->stackTrace()]]></code>
-      <code><![CDATA[$this->stackTrace()]]></code>
-      <code><![CDATA[$this->hasPrevious()]]></code>
-      <code><![CDATA[$this->previous()]]></code>
-    </ImpureMethodCall>
   </file>
   <file src="src/Framework/Assert.php">
     <MissingThrowsDocblock>
@@ -718,11 +351,6 @@
       <code><![CDATA[]]></code>
     </UnusedVariable>
   </file>
-  <file src="src/Framework/TestStatus/TestStatus.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->asInt()]]></code>
-    </ImpureMethodCall>
-  </file>
   <file src="src/Framework/TestSuite.php">
     <InvalidArgument>
       <code><![CDATA[$iterator]]></code>
@@ -845,11 +473,6 @@
     <ImpureFunctionCall>
       <code><![CDATA[new MetadataCollectionIterator($this)]]></code>
     </ImpureFunctionCall>
-    <ImpureMethodCall>
-      <code><![CDATA[$this->count()]]></code>
-      <code><![CDATA[$this->count()]]></code>
-      <code><![CDATA[$this->asArray()]]></code>
-    </ImpureMethodCall>
   </file>
   <file src="src/Metadata/Parser/AttributeParser.php">
     <MixedAssignment>
@@ -858,17 +481,12 @@
     </MixedAssignment>
   </file>
   <file src="src/Metadata/Version/ComparisonRequirement.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->operator->asString()]]></code>
-      <code><![CDATA[$this->operator->asString()]]></code>
-    </ImpureMethodCall>
     <MissingThrowsDocblock>
       <code><![CDATA[version_compare($version, $this->version, $this->operator->asString())]]></code>
     </MissingThrowsDocblock>
   </file>
   <file src="src/Metadata/Version/ConstraintRequirement.php">
     <ImpureMethodCall>
-      <code><![CDATA[$this->sanitize($version)]]></code>
       <code><![CDATA[$this->constraint->complies(
             new Version($this->sanitize($version)),
         )]]></code>
@@ -1108,171 +726,6 @@
       <code><![CDATA[]]></code>
     </UnusedVariable>
   </file>
-  <file src="src/TextUI/Configuration/Cli/Configuration.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->hasTestFilesFile()]]></code>
-      <code><![CDATA[$this->hasTestIdFile()]]></code>
-      <code><![CDATA[$this->hasTestIdFilter()]]></code>
-      <code><![CDATA[$this->hasAll()]]></code>
-      <code><![CDATA[$this->hasAtLeastVersion()]]></code>
-      <code><![CDATA[$this->hasBackupGlobals()]]></code>
-      <code><![CDATA[$this->hasBackupStaticProperties()]]></code>
-      <code><![CDATA[$this->hasBeStrictAboutChangesToGlobalState()]]></code>
-      <code><![CDATA[$this->hasBootstrap()]]></code>
-      <code><![CDATA[$this->hasCacheDirectory()]]></code>
-      <code><![CDATA[$this->hasCacheResult()]]></code>
-      <code><![CDATA[$this->hasColors()]]></code>
-      <code><![CDATA[$this->hasColumns()]]></code>
-      <code><![CDATA[$this->hasConfigurationFile()]]></code>
-      <code><![CDATA[$this->hasCoverageFilter()]]></code>
-      <code><![CDATA[$this->hasCoverageClover()]]></code>
-      <code><![CDATA[$this->hasCoverageCobertura()]]></code>
-      <code><![CDATA[$this->hasCoverageCrap4J()]]></code>
-      <code><![CDATA[$this->hasCoverageHtml()]]></code>
-      <code><![CDATA[$this->hasCoverageOpenClover()]]></code>
-      <code><![CDATA[$this->hasCoveragePhp()]]></code>
-      <code><![CDATA[$this->hasCoverageText()]]></code>
-      <code><![CDATA[$this->hasCoverageTextShowUncoveredFiles()]]></code>
-      <code><![CDATA[$this->hasCoverageTextShowOnlySummary()]]></code>
-      <code><![CDATA[$this->hasCoverageXml()]]></code>
-      <code><![CDATA[$this->hasExcludeSourceFromXmlCoverage()]]></code>
-      <code><![CDATA[$this->hasPathCoverage()]]></code>
-      <code><![CDATA[$this->hasBranchCoverage()]]></code>
-      <code><![CDATA[$this->hasDefaultTimeLimit()]]></code>
-      <code><![CDATA[$this->hasDiffContext()]]></code>
-      <code><![CDATA[$this->hasDisableCodeCoverageIgnore()]]></code>
-      <code><![CDATA[$this->hasDisableCoverageTargeting()]]></code>
-      <code><![CDATA[$this->hasDisallowTestOutput()]]></code>
-      <code><![CDATA[$this->hasEnforceTimeLimit()]]></code>
-      <code><![CDATA[$this->hasExcludeGroups()]]></code>
-      <code><![CDATA[$this->hasExecutionOrder()]]></code>
-      <code><![CDATA[$this->hasExecutionOrderDefects()]]></code>
-      <code><![CDATA[$this->hasFailOnAllIssues()]]></code>
-      <code><![CDATA[$this->hasFailOnDeprecation()]]></code>
-      <code><![CDATA[$this->hasFailOnPhpunitDeprecation()]]></code>
-      <code><![CDATA[$this->hasFailOnPhpunitNotice()]]></code>
-      <code><![CDATA[$this->hasFailOnPhpunitWarning()]]></code>
-      <code><![CDATA[$this->hasFailOnEmptyTestSuite()]]></code>
-      <code><![CDATA[$this->hasFailOnIncomplete()]]></code>
-      <code><![CDATA[$this->hasFailOnNotice()]]></code>
-      <code><![CDATA[$this->hasFailOnRisky()]]></code>
-      <code><![CDATA[$this->hasFailOnSkipped()]]></code>
-      <code><![CDATA[$this->hasFailOnWarning()]]></code>
-      <code><![CDATA[$this->hasDoNotFailOnDeprecation()]]></code>
-      <code><![CDATA[$this->hasDoNotFailOnPhpunitDeprecation()]]></code>
-      <code><![CDATA[$this->hasDoNotFailOnPhpunitNotice()]]></code>
-      <code><![CDATA[$this->hasDoNotFailOnPhpunitWarning()]]></code>
-      <code><![CDATA[$this->hasDoNotFailOnEmptyTestSuite()]]></code>
-      <code><![CDATA[$this->hasDoNotFailOnIncomplete()]]></code>
-      <code><![CDATA[$this->hasDoNotFailOnNotice()]]></code>
-      <code><![CDATA[$this->hasDoNotFailOnRisky()]]></code>
-      <code><![CDATA[$this->hasDoNotFailOnSkipped()]]></code>
-      <code><![CDATA[$this->hasDoNotFailOnWarning()]]></code>
-      <code><![CDATA[$this->hasStopOnDefect()]]></code>
-      <code><![CDATA[$this->hasStopOnDeprecation()]]></code>
-      <code><![CDATA[$this->hasSpecificDeprecationToStopOn()]]></code>
-      <code><![CDATA[$this->hasStopOnError()]]></code>
-      <code><![CDATA[$this->hasStopOnFailure()]]></code>
-      <code><![CDATA[$this->hasStopOnIncomplete()]]></code>
-      <code><![CDATA[$this->hasStopOnNotice()]]></code>
-      <code><![CDATA[$this->hasStopOnRisky()]]></code>
-      <code><![CDATA[$this->hasStopOnSkipped()]]></code>
-      <code><![CDATA[$this->hasStopOnWarning()]]></code>
-      <code><![CDATA[$this->hasExcludeFilter()]]></code>
-      <code><![CDATA[$this->hasFilter()]]></code>
-      <code><![CDATA[$this->hasGenerateBaseline()]]></code>
-      <code><![CDATA[$this->hasUseBaseline()]]></code>
-      <code><![CDATA[$this->hasGroups()]]></code>
-      <code><![CDATA[$this->hasTestsCovering()]]></code>
-      <code><![CDATA[$this->hasTestsUsing()]]></code>
-      <code><![CDATA[$this->hasTestsRequiringPhpExtension()]]></code>
-      <code><![CDATA[$this->hasIncludePath()]]></code>
-      <code><![CDATA[$this->hasIniSettings()]]></code>
-      <code><![CDATA[$this->hasJunitLogfile()]]></code>
-      <code><![CDATA[$this->hasOtrLogfile()]]></code>
-      <code><![CDATA[$this->hasIncludeGitInformation()]]></code>
-      <code><![CDATA[$this->hasListTestsXml()]]></code>
-      <code><![CDATA[$this->hasNoCoverage()]]></code>
-      <code><![CDATA[$this->hasNoExtensions()]]></code>
-      <code><![CDATA[$this->hasNoLogging()]]></code>
-      <code><![CDATA[$this->hasProcessIsolation()]]></code>
-      <code><![CDATA[$this->hasRandomOrderSeed()]]></code>
-      <code><![CDATA[$this->hasReportUselessTests()]]></code>
-      <code><![CDATA[$this->hasResolveDependencies()]]></code>
-      <code><![CDATA[$this->hasReverseList()]]></code>
-      <code><![CDATA[$this->hasStderr()]]></code>
-      <code><![CDATA[$this->hasStrictCoverage()]]></code>
-      <code><![CDATA[$this->hasRequireCoverageContribution()]]></code>
-      <code><![CDATA[$this->hasTeamcityLogfile()]]></code>
-      <code><![CDATA[$this->hasCompactPrinter()]]></code>
-      <code><![CDATA[$this->hasTeamCityPrinter()]]></code>
-      <code><![CDATA[$this->hasTestdoxHtmlFile()]]></code>
-      <code><![CDATA[$this->hasTestdoxTextFile()]]></code>
-      <code><![CDATA[$this->hasTestDoxPrinter()]]></code>
-      <code><![CDATA[$this->hasTestDoxPrinterSummary()]]></code>
-      <code><![CDATA[$this->hasTestSuffixes()]]></code>
-      <code><![CDATA[$this->hasTestSuite()]]></code>
-      <code><![CDATA[$this->hasExcludedTestSuite()]]></code>
-      <code><![CDATA[$this->hasDisplayDetailsOnAllIssues()]]></code>
-      <code><![CDATA[$this->hasDisplayDetailsOnIncompleteTests()]]></code>
-      <code><![CDATA[$this->hasDisplayDetailsOnSkippedTests()]]></code>
-      <code><![CDATA[$this->hasDisplayDetailsOnTestsThatTriggerDeprecations()]]></code>
-      <code><![CDATA[$this->hasDisplayDetailsOnPhpunitDeprecations()]]></code>
-      <code><![CDATA[$this->hasDisplayDetailsOnPhpunitNotices()]]></code>
-      <code><![CDATA[$this->hasDisplayDetailsOnTestsThatTriggerErrors()]]></code>
-      <code><![CDATA[$this->hasDisplayDetailsOnTestsThatTriggerNotices()]]></code>
-      <code><![CDATA[$this->hasDisplayDetailsOnTestsThatTriggerWarnings()]]></code>
-      <code><![CDATA[$this->hasLogEventsText()]]></code>
-      <code><![CDATA[$this->hasLogEventsVerboseText()]]></code>
-      <code><![CDATA[$this->hasExtensions()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/TextUI/Configuration/Configuration.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->hasTestFilesFile()]]></code>
-      <code><![CDATA[$this->hasConfigurationFile()]]></code>
-      <code><![CDATA[$this->hasBootstrap()]]></code>
-      <code><![CDATA[$this->hasCacheDirectory()]]></code>
-      <code><![CDATA[$this->hasCoverageCacheDirectory()]]></code>
-      <code><![CDATA[$this->hasCoverageClover()]]></code>
-      <code><![CDATA[$this->hasCoverageCobertura()]]></code>
-      <code><![CDATA[$this->hasCoverageCrap4j()]]></code>
-      <code><![CDATA[$this->hasCoverageHtml()]]></code>
-      <code><![CDATA[$this->hasCoverageOpenClover()]]></code>
-      <code><![CDATA[$this->hasCoveragePhp()]]></code>
-      <code><![CDATA[$this->hasCoverageText()]]></code>
-      <code><![CDATA[$this->hasCoverageXml()]]></code>
-      <code><![CDATA[$this->hasCoverageClover()]]></code>
-      <code><![CDATA[$this->hasCoverageCobertura()]]></code>
-      <code><![CDATA[$this->hasCoverageCrap4j()]]></code>
-      <code><![CDATA[$this->hasCoverageHtml()]]></code>
-      <code><![CDATA[$this->hasCoverageHtmlCustomCssFile()]]></code>
-      <code><![CDATA[$this->hasCoverageOpenClover()]]></code>
-      <code><![CDATA[$this->hasCoveragePhp()]]></code>
-      <code><![CDATA[$this->hasCoverageText()]]></code>
-      <code><![CDATA[$this->hasCoverageXml()]]></code>
-      <code><![CDATA[$this->hasSpecificDeprecationToStopOn()]]></code>
-      <code><![CDATA[$this->hasPharExtensionDirectory()]]></code>
-      <code><![CDATA[$this->hasLogfileTeamcity()]]></code>
-      <code><![CDATA[$this->hasLogfileJunit()]]></code>
-      <code><![CDATA[$this->hasLogfileOtr()]]></code>
-      <code><![CDATA[$this->hasLogfileTestdoxHtml()]]></code>
-      <code><![CDATA[$this->hasLogfileTestdoxText()]]></code>
-      <code><![CDATA[$this->hasLogEventsText()]]></code>
-      <code><![CDATA[$this->hasLogEventsVerboseText()]]></code>
-      <code><![CDATA[$this->hasTestsCovering()]]></code>
-      <code><![CDATA[$this->hasTestsUsing()]]></code>
-      <code><![CDATA[$this->hasTestsRequiringPhpExtension()]]></code>
-      <code><![CDATA[$this->hasFilter()]]></code>
-      <code><![CDATA[$this->hasExcludeFilter()]]></code>
-      <code><![CDATA[$this->hasTestIdFilterFile()]]></code>
-      <code><![CDATA[$this->hasTestIdFilter()]]></code>
-      <code><![CDATA[$this->hasGroups()]]></code>
-      <code><![CDATA[$this->hasExcludeGroups()]]></code>
-      <code><![CDATA[$this->hasDefaultTestSuite()]]></code>
-      <code><![CDATA[$this->hasGenerateBaseline()]]></code>
-    </ImpureMethodCall>
-  </file>
   <file src="src/TextUI/Configuration/Merger.php">
     <MixedArgument>
       <code><![CDATA[$xmlConfiguration->filename()]]></code>
@@ -1373,9 +826,6 @@
     <ImpureFunctionCall>
       <code><![CDATA[new DirectoryCollectionIterator($this)]]></code>
     </ImpureFunctionCall>
-    <ImpureMethodCall>
-      <code><![CDATA[$this->count()]]></code>
-    </ImpureMethodCall>
   </file>
   <file src="src/TextUI/Configuration/Value/ExtensionBootstrapCollection.php">
     <ImpureFunctionCall>
@@ -1407,72 +857,25 @@
       <code><![CDATA[new IniSettingCollectionIterator($this)]]></code>
     </ImpureFunctionCall>
   </file>
-  <file src="src/TextUI/Configuration/Value/Source.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->hasBaseline()]]></code>
-      <code><![CDATA[$this->hasBaseline()]]></code>
-      <code><![CDATA[$this->includeDirectories->notEmpty()]]></code>
-      <code><![CDATA[$this->includeFiles->notEmpty()]]></code>
-    </ImpureMethodCall>
-  </file>
   <file src="src/TextUI/Configuration/Value/TestDirectoryCollection.php">
     <ImpureFunctionCall>
       <code><![CDATA[new TestDirectoryCollectionIterator($this)]]></code>
     </ImpureFunctionCall>
-    <ImpureMethodCall>
-      <code><![CDATA[$this->count()]]></code>
-    </ImpureMethodCall>
   </file>
   <file src="src/TextUI/Configuration/Value/TestFileCollection.php">
     <ImpureFunctionCall>
       <code><![CDATA[new TestFileCollectionIterator($this)]]></code>
     </ImpureFunctionCall>
-    <ImpureMethodCall>
-      <code><![CDATA[$this->count()]]></code>
-    </ImpureMethodCall>
   </file>
   <file src="src/TextUI/Configuration/Value/TestSuiteCollection.php">
     <ImpureFunctionCall>
       <code><![CDATA[new TestSuiteCollectionIterator($this)]]></code>
     </ImpureFunctionCall>
-    <ImpureMethodCall>
-      <code><![CDATA[$this->count()]]></code>
-    </ImpureMethodCall>
   </file>
   <file src="src/TextUI/Configuration/Value/VariableCollection.php">
     <ImpureFunctionCall>
       <code><![CDATA[new VariableCollectionIterator($this)]]></code>
     </ImpureFunctionCall>
-  </file>
-  <file src="src/TextUI/Configuration/Xml/CodeCoverage/CodeCoverage.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->hasClover()]]></code>
-      <code><![CDATA[$this->hasCobertura()]]></code>
-      <code><![CDATA[$this->hasCrap4j()]]></code>
-      <code><![CDATA[$this->hasHtml()]]></code>
-      <code><![CDATA[$this->hasOpenClover()]]></code>
-      <code><![CDATA[$this->hasPhp()]]></code>
-      <code><![CDATA[$this->hasText()]]></code>
-      <code><![CDATA[$this->hasXml()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/TextUI/Configuration/Xml/CodeCoverage/Report/Html.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->hasTarget()]]></code>
-      <code><![CDATA[$this->hasCustomCssFile()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/TextUI/Configuration/Xml/Groups.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->include->isEmpty()]]></code>
-      <code><![CDATA[$this->exclude->isEmpty()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/TextUI/Configuration/Xml/LoadedFromFileConfiguration.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->validationResult->hasValidationErrors()]]></code>
-      <code><![CDATA[$this->validationResult->asString()]]></code>
-    </ImpureMethodCall>
   </file>
   <file src="src/TextUI/Configuration/Xml/Loader.php">
     <MixedArgument>
@@ -1590,14 +993,6 @@
     <InvalidArgument>
       <code><![CDATA[$logging->getElementsByTagName('log')]]></code>
     </InvalidArgument>
-  </file>
-  <file src="src/TextUI/Configuration/Xml/PHPUnit.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->hasCacheDirectory()]]></code>
-      <code><![CDATA[$this->hasBootstrap()]]></code>
-      <code><![CDATA[$this->hasExtensionsDirectory()]]></code>
-      <code><![CDATA[$this->hasDefaultTestSuite()]]></code>
-    </ImpureMethodCall>
   </file>
   <file src="src/TextUI/Configuration/Xml/TestSuiteMapper.php">
     <MissingThrowsDocblock>
