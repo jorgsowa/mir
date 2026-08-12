@@ -63,7 +63,7 @@ fn measure_per_function_inference_size() {
     let class_fqcns = mir_analyzer::db::workspace_classes(&db);
     let mut n_methods = 0usize;
     for fqcn in class_fqcns.iter() {
-        let here = mir_analyzer::db::Fqcn::from_str(&db, fqcn.as_ref());
+        let here = mir_analyzer::db::Fqcn::from_str(&db, fqcn.as_str());
         if let Some(class) = mir_analyzer::db::find_class_like(&db, here) {
             n_methods += class.own_methods().len();
         }

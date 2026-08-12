@@ -32,7 +32,7 @@ fn workspace_classes_aggregates_across_files() {
 
     let db = session.snapshot_db();
     let classes = workspace_classes(&db);
-    let names: Vec<&str> = classes.iter().map(|s| s.as_ref()).collect();
+    let names: Vec<&str> = classes.iter().map(|s| s.as_str()).collect();
     assert!(names.contains(&"App\\A"));
     assert!(names.contains(&"App\\B"));
     assert!(names.contains(&"App\\IFoo"));
@@ -52,7 +52,7 @@ fn workspace_functions_aggregates_across_files() {
 
     let db = session.snapshot_db();
     let fns = workspace_functions(&db);
-    let names: Vec<&str> = fns.iter().map(|s| s.as_ref()).collect();
+    let names: Vec<&str> = fns.iter().map(|s| s.as_str()).collect();
     assert!(names.contains(&"App\\one"));
     assert!(names.contains(&"App\\two"));
 }
@@ -76,6 +76,6 @@ fn workspace_revision_bumps_on_remove() {
     session.invalidate_file("/proj/B.php");
     let db2 = session.snapshot_db();
     let classes = workspace_classes(&db2);
-    let names: Vec<&str> = classes.iter().map(|s| s.as_ref()).collect();
+    let names: Vec<&str> = classes.iter().map(|s| s.as_str()).collect();
     assert_eq!(names, vec!["App\\A"]);
 }

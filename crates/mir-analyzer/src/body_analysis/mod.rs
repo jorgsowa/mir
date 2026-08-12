@@ -252,10 +252,11 @@ fn lookup_function_node_for_decl(
     }
     crate::metrics::record_fn_short_name_scan();
     for fqn in crate::db::workspace_functions(db).iter() {
-        let short = fqn.rsplit('\\').next().unwrap_or(fqn.as_ref());
+        let fqn = fqn.as_str();
+        let short = fqn.rsplit('\\').next().unwrap_or(fqn);
         if short == fn_name {
-            if let Some(f) = try_lookup(fqn.as_ref()) {
-                return Some((fqn.clone(), f));
+            if let Some(f) = try_lookup(fqn) {
+                return Some((Arc::from(fqn), f));
             }
         }
     }

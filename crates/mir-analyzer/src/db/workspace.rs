@@ -25,41 +25,33 @@ pub struct WorkspaceRevision {
 }
 
 #[salsa::tracked]
-pub fn workspace_classes(db: &dyn MirDatabase) -> Arc<[Arc<str>]> {
+pub fn workspace_classes(db: &dyn MirDatabase) -> Arc<[Name]> {
     let rev = db
         .workspace_revision()
         .expect("WorkspaceRevision not initialized");
     let _ = rev.revision(db);
 
     let files = db.all_source_files();
-    let mut out: Vec<Arc<str>> = Vec::new();
+    let mut out: Vec<Name> = Vec::new();
     for file in files.iter() {
         let decls = collect_file_declarations(db, *file);
-        out.extend(
-            decls
-                .class_like()
-                .map(|decl| Arc::<str>::from(decl.name.as_str())),
-        );
+        out.extend(decls.class_like().map(|decl| decl.name));
     }
     Arc::from(out)
 }
 
 #[salsa::tracked]
-pub fn workspace_functions(db: &dyn MirDatabase) -> Arc<[Arc<str>]> {
+pub fn workspace_functions(db: &dyn MirDatabase) -> Arc<[Name]> {
     let rev = db
         .workspace_revision()
         .expect("WorkspaceRevision not initialized");
     let _ = rev.revision(db);
 
     let files = db.all_source_files();
-    let mut out: Vec<Arc<str>> = Vec::new();
+    let mut out: Vec<Name> = Vec::new();
     for file in files.iter() {
         let decls = collect_file_declarations(db, *file);
-        out.extend(
-            decls
-                .functions()
-                .map(|decl| Arc::<str>::from(decl.name.as_str())),
-        );
+        out.extend(decls.functions().map(|decl| decl.name));
     }
     Arc::from(out)
 }

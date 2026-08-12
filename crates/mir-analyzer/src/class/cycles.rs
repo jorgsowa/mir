@@ -4,27 +4,27 @@ impl<'a> ClassAnalyzer<'a> {
     pub(super) fn check_circular_class_inheritance(&self, issues: &mut Vec<Issue>) {
         let mut globally_done: HashSet<String> = HashSet::default();
 
-        let mut class_keys: Vec<Arc<str>> = crate::db::workspace_classes(self.db)
+        let mut class_keys: Vec<mir_types::Name> = crate::db::workspace_classes(self.db)
             .iter()
             .filter(|fqcn| {
-                let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
+                let here = crate::db::Fqcn::from_str(self.db, fqcn.as_str());
                 crate::db::find_class_like(self.db, here)
                     .map(|c| c.is_class())
                     .unwrap_or(false)
             })
-            .cloned()
+            .copied()
             .collect();
-        class_keys.sort();
+        class_keys.sort_by(|a, b| a.as_str().cmp(b.as_str()));
 
         for start_fqcn in &class_keys {
-            if globally_done.contains(start_fqcn.as_ref()) {
+            if globally_done.contains(start_fqcn.as_str()) {
                 continue;
             }
 
             // Walk the parent chain, tracking order for cycle reporting.
             let mut chain: Vec<Arc<str>> = Vec::new();
             let mut chain_set: HashSet<String> = HashSet::default();
-            let mut current: Arc<str> = start_fqcn.clone();
+            let mut current: Arc<str> = Arc::from(start_fqcn.as_str());
 
             loop {
                 if globally_done.contains(current.as_ref()) {
@@ -103,26 +103,26 @@ impl<'a> ClassAnalyzer<'a> {
     pub(super) fn check_circular_interface_inheritance(&self, issues: &mut Vec<Issue>) {
         let mut globally_done: HashSet<String> = HashSet::default();
 
-        let mut iface_keys: Vec<Arc<str>> = crate::db::workspace_classes(self.db)
+        let mut iface_keys: Vec<mir_types::Name> = crate::db::workspace_classes(self.db)
             .iter()
             .filter(|fqcn| {
-                let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
+                let here = crate::db::Fqcn::from_str(self.db, fqcn.as_str());
                 crate::db::find_class_like(self.db, here)
                     .map(|c| c.is_interface())
                     .unwrap_or(false)
             })
-            .cloned()
+            .copied()
             .collect();
-        iface_keys.sort();
+        iface_keys.sort_by(|a, b| a.as_str().cmp(b.as_str()));
 
         for start_fqcn in &iface_keys {
-            if globally_done.contains(start_fqcn.as_ref()) {
+            if globally_done.contains(start_fqcn.as_str()) {
                 continue;
             }
             let mut in_stack: Vec<Arc<str>> = Vec::new();
             let mut stack_set: HashSet<String> = HashSet::default();
             self.dfs_interface_cycle(
-                start_fqcn.clone(),
+                Arc::from(start_fqcn.as_str()),
                 &mut in_stack,
                 &mut stack_set,
                 &mut globally_done,
@@ -203,26 +203,26 @@ impl<'a> ClassAnalyzer<'a> {
     pub(super) fn check_circular_trait_composition(&self, issues: &mut Vec<Issue>) {
         let mut globally_done: HashSet<String> = HashSet::default();
 
-        let mut trait_keys: Vec<Arc<str>> = crate::db::workspace_classes(self.db)
+        let mut trait_keys: Vec<mir_types::Name> = crate::db::workspace_classes(self.db)
             .iter()
             .filter(|fqcn| {
-                let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
+                let here = crate::db::Fqcn::from_str(self.db, fqcn.as_str());
                 crate::db::find_class_like(self.db, here)
                     .map(|c| c.is_trait())
                     .unwrap_or(false)
             })
-            .cloned()
+            .copied()
             .collect();
-        trait_keys.sort();
+        trait_keys.sort_by(|a, b| a.as_str().cmp(b.as_str()));
 
         for start_fqcn in &trait_keys {
-            if globally_done.contains(start_fqcn.as_ref()) {
+            if globally_done.contains(start_fqcn.as_str()) {
                 continue;
             }
             let mut in_stack: Vec<Arc<str>> = Vec::new();
             let mut stack_set: HashSet<String> = HashSet::default();
             self.dfs_trait_cycle(
-                start_fqcn.clone(),
+                Arc::from(start_fqcn.as_str()),
                 &mut in_stack,
                 &mut stack_set,
                 &mut globally_done,

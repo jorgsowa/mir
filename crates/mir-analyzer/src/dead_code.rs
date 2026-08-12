@@ -211,12 +211,12 @@ impl<'a> DeadCodeAnalyzer<'a> {
         }
 
         // --- Non-referenced free functions ---
-        let fqns: Vec<Arc<str>> = crate::db::workspace_functions(self.db)
+        let fqns: Vec<mir_types::Name> = crate::db::workspace_functions(self.db)
             .iter()
-            .cloned()
+            .copied()
             .collect();
         for fqn in fqns {
-            let here = crate::db::Fqcn::from_str(self.db, fqn.as_ref());
+            let here = crate::db::Fqcn::from_str(self.db, fqn.as_str());
             let pulled = crate::db::find_function(self.db, here);
             let Some(f) = pulled.as_ref() else {
                 continue;

@@ -15,7 +15,7 @@ fn symfony_query_workspace_functions() {
 
     let db = fx.session.snapshot_db();
     let functions = workspace_functions(&db);
-    let names: BTreeSet<&str> = functions.iter().map(|f| f.as_ref()).collect();
+    let names: BTreeSet<&str> = functions.iter().map(|f| f.as_str()).collect();
     assert!(functions.len() > 100);
     assert!(
         names.len() > 100,

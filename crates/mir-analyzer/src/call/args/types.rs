@@ -745,20 +745,17 @@ fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -
             if !arg_fqcn.contains('\\') && !type_exists(ea, &resolved_arg) {
                 let target = arg_fqcn.as_ref();
                 for fqcn in crate::db::workspace_classes(ea.db).iter() {
-                    let here = crate::db::Fqcn::from_str(ea.db, fqcn.as_ref());
+                    let fqcn = fqcn.as_str();
+                    let here = crate::db::Fqcn::from_str(ea.db, fqcn);
                     let is_class =
                         crate::db::find_class_like(ea.db, here).is_some_and(|c| c.is_class());
                     if !is_class {
                         continue;
                     }
-                    let short_name = fqcn.rsplit('\\').next().unwrap_or(fqcn.as_ref());
+                    let short_name = fqcn.rsplit('\\').next().unwrap_or(fqcn);
                     if short_name == target
-                        && (crate::db::extends_or_implements(ea.db, fqcn.as_ref(), &resolved_param)
-                            || crate::db::extends_or_implements(
-                                ea.db,
-                                fqcn.as_ref(),
-                                param_fqcn.as_ref(),
-                            ))
+                        && (crate::db::extends_or_implements(ea.db, fqcn, &resolved_param)
+                            || crate::db::extends_or_implements(ea.db, fqcn, param_fqcn.as_ref()))
                     {
                         return true;
                     }
@@ -773,23 +770,23 @@ fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -
                 None
             };
             if let Some(iface_fqcn) = iface_key {
-                let class_fqcns: Vec<std::sync::Arc<str>> = crate::db::workspace_classes(ea.db)
+                let class_fqcns: Vec<mir_types::Name> = crate::db::workspace_classes(ea.db)
                     .iter()
                     .filter(|fqcn| {
-                        let here = crate::db::Fqcn::from_str(ea.db, fqcn.as_ref());
+                        let here = crate::db::Fqcn::from_str(ea.db, fqcn.as_str());
                         crate::db::find_class_like(ea.db, here).is_some_and(|c| c.is_class())
                     })
-                    .cloned()
+                    .copied()
                     .collect();
                 let compatible = class_fqcns.iter().any(|cls_fqcn| {
-                    crate::db::extends_or_implements(ea.db, cls_fqcn.as_ref(), iface_fqcn)
+                    crate::db::extends_or_implements(ea.db, cls_fqcn.as_str(), iface_fqcn)
                         && (crate::db::extends_or_implements(
                             ea.db,
-                            cls_fqcn.as_ref(),
+                            cls_fqcn.as_str(),
                             param_fqcn.as_ref(),
                         ) || crate::db::extends_or_implements(
                             ea.db,
-                            cls_fqcn.as_ref(),
+                            cls_fqcn.as_str(),
                             &resolved_param,
                         ))
                 });

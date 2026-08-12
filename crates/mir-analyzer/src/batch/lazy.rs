@@ -27,14 +27,14 @@ impl AnalysisSession {
                 let db_owned = self.snapshot_db();
                 let db = &db_owned;
                 for fqcn in crate::db::workspace_classes(db).iter() {
-                    if scanned.contains(fqcn.as_ref()) {
+                    if scanned.contains(fqcn.as_str()) {
                         continue;
                     }
-                    let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
+                    let here = crate::db::Fqcn::from_str(db, fqcn.as_str());
                     let Some(class) = crate::db::find_class_like(db, here) else {
                         continue;
                     };
-                    scanned.insert(fqcn.clone());
+                    scanned.insert(Arc::from(fqcn.as_str()));
                     collect_class_referenced_fqcns(&class, &mut candidates);
                 }
                 db.file_import_snapshots()

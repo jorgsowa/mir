@@ -626,7 +626,8 @@ fn build_reverse_deps(db: &dyn crate::db::MirDatabase) -> HashMap<String, HashSe
     };
 
     for fqcn in crate::db::workspace_classes(db).iter() {
-        let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
+        let fqcn = fqcn.as_str();
+        let here = crate::db::Fqcn::from_str(db, fqcn);
         let Some(class) = crate::db::find_class_like(db, here) else {
             continue;
         };
@@ -634,7 +635,7 @@ fn build_reverse_deps(db: &dyn crate::db::MirDatabase) -> HashMap<String, HashSe
             continue;
         }
         let Some(file) = db
-            .symbol_defining_file(fqcn.as_ref())
+            .symbol_defining_file(fqcn)
             .map(|f| f.as_ref().to_string())
             .or_else(|| class.location().map(|l| l.file.as_ref().to_string()))
         else {
@@ -676,12 +677,13 @@ fn build_reverse_deps(db: &dyn crate::db::MirDatabase) -> HashMap<String, HashSe
     }
 
     for fqn in crate::db::workspace_functions(db).iter() {
-        let here = crate::db::Fqcn::from_str(db, fqn.as_ref());
+        let fqn = fqn.as_str();
+        let here = crate::db::Fqcn::from_str(db, fqn);
         let Some(f) = crate::db::find_function(db, here) else {
             continue;
         };
         let Some(file) = db
-            .symbol_defining_file(fqn.as_ref())
+            .symbol_defining_file(fqn)
             .map(|f| f.as_ref().to_string())
             .or_else(|| f.location.as_ref().map(|l| l.file.as_ref().to_string()))
         else {

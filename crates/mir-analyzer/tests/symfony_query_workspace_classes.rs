@@ -15,7 +15,7 @@ fn symfony_query_workspace_classes() {
 
     let db = fx.session.snapshot_db();
     let classes = workspace_classes(&db);
-    let names: BTreeSet<&str> = classes.iter().map(|c| c.as_ref()).collect();
+    let names: BTreeSet<&str> = classes.iter().map(|c| c.as_str()).collect();
     assert!(classes.len() > 1000);
     assert!(
         names.len() > 1000,

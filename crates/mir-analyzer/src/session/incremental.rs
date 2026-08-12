@@ -355,9 +355,9 @@ impl AnalysisSession {
         crate::db::workspace_classes(&db)
             .iter()
             .filter_map(|fqcn| {
-                let here = crate::db::Fqcn::from_str(&db, fqcn.as_ref());
+                let here = crate::db::Fqcn::from_str(&db, fqcn.as_str());
                 crate::db::find_class_like(&db, here)
-                    .map(|class| (fqcn.clone(), class.location().cloned()))
+                    .map(|class| (Arc::<str>::from(fqcn.as_str()), class.location().cloned()))
             })
             .collect()
     }
@@ -369,8 +369,9 @@ impl AnalysisSession {
         crate::db::workspace_functions(&db)
             .iter()
             .filter_map(|fqn| {
-                let here = crate::db::Fqcn::from_str(&db, fqn.as_ref());
-                crate::db::find_function(&db, here).map(|f| (fqn.clone(), f.location.clone()))
+                let here = crate::db::Fqcn::from_str(&db, fqn.as_str());
+                crate::db::find_function(&db, here)
+                    .map(|f| (Arc::<str>::from(fqn.as_str()), f.location.clone()))
             })
             .collect()
     }

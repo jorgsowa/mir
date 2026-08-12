@@ -906,14 +906,14 @@ mod tests {
 
         let functions = crate::db::workspace_functions(&db);
         for symbol in functions.iter() {
-            let Some(path) = db.symbol_defining_file(symbol.as_ref()) else {
+            let Some(path) = db.symbol_defining_file(symbol.as_str()) else {
                 continue;
             };
             assert!(
                 vfs.get(path.as_ref()).is_some(),
                 "symbol '{}' points to '{}' which StubVfs cannot resolve — \
                  go-to-definition would silently break for this symbol",
-                symbol,
+                symbol.as_str(),
                 path
             );
         }
