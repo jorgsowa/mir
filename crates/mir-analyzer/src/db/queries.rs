@@ -238,25 +238,62 @@ pub fn class_is_immutable(db: &dyn MirDatabase, fqcn: &str) -> bool {
 /// instance method of such an owner is mutation-free by construction — even when it
 /// lacks an explicit `@psalm-mutation-free`. Mirrors `class_is_immutable`'s ancestor
 /// walk: a child class inherits readonly-ness from its base.
-pub fn class_is_native_readonly(db: &dyn MirDatabase, fqcn: &str) -> bool {
-    let mut visited: FxHashSet<Arc<str>> = FxHashSet::default();
-    let mut current: Option<Arc<str>> = Some(Arc::from(fqcn));
-    while let Some(fqcn) = current {
-        if !visited.insert(fqcn.clone()) {
-            break;
-        }
-        let here = crate::db::Fqcn::from_str(db, fqcn.as_ref());
-        match crate::db::find_class_like(db, here) {
-            Some(crate::db::ClassLike::Class(cls)) => {
+/// Public predicate: true when `fqcn` is a native-readonly class or a PHP enum, and thus every
+/// non-constructor method on it is mutation-free by construction. See the private helper below.
+pub fn owner_type_is_mutation_free_by_construction(
+    db: &dyn MirDatabase,
+    fqcn: &str,
+) -> bool {
+    matches!(
+        owner_mutation_free_by_construction_kind(db, fqcn),
+        Some(OwnerMutationFreeKind::NativeReadonly | OwnerMutationFreeKind::Enum)
+    )
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum OwnerMutationFreeKind {
+    /// Native `readonly` class — property reassignment forbidden after construction.
+    NativeReadonly,
+    /// PHP enum — no mutable instance properties exist by definition (enums cannot
+    /// declare non-promoted/instance state), so methods are mutation-free by construction.
+    Enum,
+}
+
+/// Whether `fqcn` is an owner type whose every non-constructor method is
+/// mutation-free *by construction*: either a native `readonly` class or a PHP enum.
+///
+/// Both kinds forbid mutating instance state after the constructor runs, so even without
+/// an explicit `@psalm-mutation-free`, calling such methods from immutable/pure contexts
+/// cannot introduce impurity. Mirrors `class_is_immutable`'s ancestor walk for classes:
+/// a non-readonly child of a readonly base is still readonly (the language rule applies),
+/// but enums are resolved as their own kind.
+fn owner_mutation_free_by_construction_kind(
+    db: &dyn MirDatabase,
+    fqcn: &str,
+) -> Option<OwnerMutationFreeKind> {
+    let here = crate::db::Fqcn::from_str(db, fqcn);
+    match crate::db::find_class_like(db, here)? {
+        ClassLike::Enum(_) => Some(OwnerMutationFreeKind::Enum),
+        // Interfaces and traits declare no instance property storage of their own.
+        ClassLike::Interface(_) | ClassLike::Trait(_) => None,
+        // A readonly class is mutation-free by construction; a non-readonly class may
+        // still be so if it (or any base along its native `extends` spine) eventually
+        // derives from a native readonly base.
+        ClassLike::Class(mut cls) => {
+            loop {
                 if cls.is_readonly {
-                    return true;
+                    return Some(OwnerMutationFreeKind::NativeReadonly);
                 }
-                current = cls.parent.clone();
+                let Some(parent_fqcn) = cls.parent.clone() else { break };
+                let here = crate::db::Fqcn::from_str(db, parent_fqcn.as_ref());
+                match crate::db::find_class_like(db, here) {
+                    Some(ClassLike::Class(pcls)) => cls = pcls,
+                    _ => return None,
+                }
             }
-            _ => break,
+            None
         }
     }
-    false
 }
 
 pub fn inherited_template_bindings(

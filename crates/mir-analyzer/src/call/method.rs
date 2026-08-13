@@ -192,14 +192,22 @@ pub(crate) fn resolve_method_from_db(
             is_static: storage.is_static,
             is_abstract: storage.is_abstract,
             is_pure: storage.is_pure,
-            // Native `readonly` classes forbid property reassignment after
-            // construction at the language level, so any non-constructor instance
-            // method of such an owner is mutation-free by construction — even when it
-            // lacks an explicit `@psalm-mutation-free`. Constructors must still be
-            // allowed to write their promoted properties.
+            // Native `readonly` classes forbid property reassignment after construction at
+            // the language level, and PHP enums have no mutable instance state by definition.
+            // For both kinds, any non-constructor instance method is mutation-free *by
+            // construction* — even without an explicit `@psalm-mutation-free`. Constructors
+            // must still be allowed to write their promoted properties.
+            //
+            // Note: we deliberately don't use the (over-broad) docblock/ancestor
+            // `class_is_immutable` predicate here; only language-enforced guarantees make a
+            // method mutation-free without an annotation. Otherwise an unannotated third-party
+            // mutable object stored in an immutable class would be wrongly treated as pure.
             is_mutation_free: storage.is_mutation_free
                 || (!storage.is_constructor
-                    && crate::db::class_is_native_readonly(db, owner_fqcn.as_ref())),
+                    && crate::db::owner_type_is_mutation_free_by_construction(
+                        db,
+                        owner_fqcn.as_ref(),
+                    )),
             is_external_mutation_free: storage.is_external_mutation_free,
             params,
             template_params,
