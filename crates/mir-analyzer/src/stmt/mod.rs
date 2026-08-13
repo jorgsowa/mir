@@ -20,6 +20,7 @@ pub(crate) use return_type::return_arrays_compatible;
 use std::sync::Arc;
 
 use crate::parser::docblock::parse_type_string;
+use crate::reference_key::ReferenceKeyCache;
 
 use php_ast::owned::{Expr, ExprKind, StmtKind};
 
@@ -238,6 +239,7 @@ pub struct StatementsAnalyzer<'a> {
         Arc<str>,
         Option<Arc<mir_codebase::definitions::FunctionDef>>,
     )>,
+    reference_key_cache: ReferenceKeyCache,
 }
 
 impl<'a> StatementsAnalyzer<'a> {
@@ -269,6 +271,7 @@ impl<'a> StatementsAnalyzer<'a> {
             plugins: mir_plugin::snapshot(),
             class_like_cache: None,
             function_cache: None,
+            reference_key_cache: ReferenceKeyCache::default(),
         }
     }
 
@@ -391,7 +394,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     } else {
                         if self.mode == AnalysisMode::Full {
                             self.db.record_reference_location(crate::db::RefLoc {
-                                symbol_key: Arc::from(format!("cls:{fqcn}")),
+                                symbol_key: self.reference_key_cache.class(fqcn.as_ref()),
                                 file: self.file.clone(),
                                 line,
                                 col_start,
@@ -778,6 +781,7 @@ impl<'a> StatementsAnalyzer<'a> {
             self.php_version,
             self.mode,
             &mut self.yielded_types,
+            &mut self.reference_key_cache,
         );
         ea.strict_types = ctx.strict_types;
         ea.collect_symbols = self.collect_symbols;
@@ -852,7 +856,7 @@ impl<'a> StatementsAnalyzer<'a> {
         let (line, col_start) = self.offset_to_line_col(span.start);
         let (line_end, col_end) = self.offset_to_line_col(span.end);
         self.db.record_reference_location(crate::db::RefLoc {
-            symbol_key: Arc::from(format!("cls:{resolved}")),
+            symbol_key: self.reference_key_cache.class(resolved),
             file: self.file.clone(),
             line,
             col_start,

@@ -746,11 +746,11 @@ impl<'a> ExpressionAnalyzer<'a> {
                     ReferenceKind::ClassReference(fqcn.clone()),
                     ty.clone(),
                 );
-                self.record_ref(Arc::from(format!("cls:{fqcn}")), n.class.span);
+                self.record_class_ref(&fqcn, n.class.span);
                 // A `new X(...)` site is also a constructor call: record it
                 // under the method key so find-references on `__construct`
                 // resolves instantiation sites without an AST re-walk.
-                self.record_ref(Arc::from(format!("meth:{fqcn}::__construct")), n.class.span);
+                self.record_method_ref(&fqcn, "__construct", n.class.span);
                 ty
             }
             _ => {
@@ -779,7 +779,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // with no go-to-definition from this call site.
                 for atomic in &ty.types {
                     if let Atomic::TClassString(Some(fqcn)) = atomic {
-                        self.record_ref(Arc::from(format!("cls:{fqcn}")), n.class.span);
+                        self.record_class_ref(fqcn, n.class.span);
                         self.record_symbol(
                             n.class.span,
                             ReferenceKind::ClassReference(Arc::from(fqcn.as_ref())),
@@ -862,7 +862,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             // Unknowable receiver — record a name-only fallback so
             // find-references on any `X::$name` can surface this access.
             if prop_name != "<dynamic>" {
-                self.record_ref(Arc::from(format!("propname:{prop_name}")), pa.property.span);
+                self.record_propname_ref(prop_name, pa.property.span);
             }
             return Type::mixed();
         }
@@ -1245,7 +1245,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         ctx: &FlowState,
     ) -> Type {
         let mut result_ty = Type::mixed();
-        self.record_ref(Arc::from(format!("cls:{resolved}")), class_expr.span);
+        self.record_class_ref(&resolved, class_expr.span);
         self.record_symbol(
             class_expr.span,
             ReferenceKind::ClassReference(resolved.clone()),
@@ -1386,7 +1386,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             }
                         }
                     }
-                    self.record_ref(Arc::from(format!("cls:{resolved}")), cca.class.span);
+                    self.record_class_ref(&resolved, cca.class.span);
                     // Without this, go-to-definition/hover on the class name inside
                     // `Foo::class` resolved nothing, unlike every other class-name
                     // position (`new Foo`, `instanceof Foo`, `Foo::method()`, …).
@@ -1634,7 +1634,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             return Type::mixed();
         }
 
-        self.record_ref(Arc::from(format!("cls:{fqcn}")), cca.class.span);
+        self.record_class_ref(&fqcn, cca.class.span);
 
         let here = crate::db::Fqcn::from_str(self.db, &fqcn);
         // Check if the class is deprecated
@@ -1764,7 +1764,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             return Type::mixed();
         }
 
-        self.record_ref(Arc::from(format!("cls:{fqcn}")), class_span);
+        self.record_class_ref(fqcn, class_span);
 
         let here = crate::db::Fqcn::from_str(self.db, fqcn);
         let found = crate::db::find_class_constant_in_chain(self.db, here, const_name);
@@ -2047,7 +2047,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         };
                         let ty = rebind_self_static_parent(ty, owner.as_ref(), &owner_type_params);
                         let ty = ty.substitute_templates(&substitution);
-                        self.record_ref(Arc::from(format!("prop:{}::{}", owner, prop_name)), span);
+                        self.record_property_ref(&owner, prop_name, span);
                         *declaring_class = Some(owner);
                         return ty;
                     }
@@ -2105,7 +2105,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     );
                     if let Some((owner, p)) = prop_result {
                         let ty = self.effective_property_ty(&owner, prop_name, &p);
-                        self.record_ref(Arc::from(format!("prop:{}::{}", owner, prop_name)), span);
+                        self.record_property_ref(&owner, prop_name, span);
                         *declaring_class = Some(owner);
                         return ty;
                     }
@@ -2113,7 +2113,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     // consuming this trait — record a per-trait marker so
                     // DeadCodeAnalyzer can credit any composing class's own
                     // private property of this name as used.
-                    self.record_ref(Arc::from(format!("traituse:{fqcn}::{prop_name}")), span);
+                    self.record_trait_use_property_ref(fqcn, prop_name, span);
                     return Type::mixed();
                 }
                 Atomic::TNamedObject { fqcn, type_params }
@@ -2263,7 +2263,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             );
                         }
                         let ty = self.effective_property_ty(&owner, prop_name, &p);
-                        self.record_ref(Arc::from(format!("prop:{}::{}", owner, prop_name)), span);
+                        self.record_property_ref(&owner, prop_name, span);
                         *declaring_class = Some(owner);
                         return ty;
                     }

@@ -142,7 +142,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             .or_else(|| resolve_pull(name_str).map(|ty| (name_str.to_string(), ty)));
 
         if let Some((fqn, ty)) = resolved {
-            self.record_ref(Arc::from(format!("gcnst:{fqn}")), expr.span);
+            self.record_global_constant_ref(&fqn, expr.span);
             self.record_symbol(
                 expr.span,
                 ReferenceKind::GlobalConstant(Arc::from(fqn.as_str())),

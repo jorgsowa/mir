@@ -13,7 +13,7 @@ use crate::expr::ExpressionAnalyzer;
 /// function/method, same as `call_user_func('name')` — record it, or a function/method
 /// reachable only through one of these builtins is falsely flagged as dead code.
 pub(crate) fn record_callable_string_ref(
-    ea: &ExpressionAnalyzer<'_>,
+    ea: &mut ExpressionAnalyzer<'_>,
     callback_ty: &Type,
     callback_span: Span,
 ) {
@@ -34,7 +34,7 @@ pub(crate) fn record_callable_string_ref(
             if let Some((owner_fqcn, method)) =
                 crate::db::find_method_respecting_precedence(ea.db, here, method_name)
             {
-                ea.record_ref(Arc::from(format!("cls:{resolved_class}")), callback_span);
+                ea.record_class_ref(&resolved_class, callback_span);
                 ea.record_ref(
                     Arc::from(format!(
                         "meth:{owner_fqcn}::{}",
@@ -49,7 +49,7 @@ pub(crate) fn record_callable_string_ref(
             let canonical_fqn: Option<Arc<str>> =
                 crate::db::find_function(ea.db, here).map(|f| f.fqn.clone());
             if let Some(canonical_fqn) = canonical_fqn {
-                ea.record_ref(Arc::from(format!("fn:{canonical_fqn}")), callback_span);
+                ea.record_function_ref(&canonical_fqn, callback_span);
             }
         }
     }

@@ -11,6 +11,7 @@ use crate::diagnostics::{
     collect_type_hint_class_refs, emit_unused_params, emit_unused_variables,
 };
 use crate::php_version::PhpVersion;
+use crate::reference_key::ReferenceKeyCache;
 use crate::symbol::ResolvedSymbol;
 
 /// Calls `f` on every file-scope statement that is **not** a control-flow
@@ -476,6 +477,7 @@ pub(crate) struct BodyAnalyzer<'a> {
     /// reference Type clones aren't built just to be discarded.
     pub(crate) collect_symbols: bool,
     inferred_types: Arc<Mutex<InferredTypes>>,
+    reference_key_cache: Arc<Mutex<ReferenceKeyCache>>,
 }
 
 impl<'a> BodyAnalyzer<'a> {
@@ -490,6 +492,7 @@ impl<'a> BodyAnalyzer<'a> {
                 methods: Vec::new(),
                 properties: Vec::new(),
             })),
+            reference_key_cache: Arc::new(Mutex::new(ReferenceKeyCache::default())),
         }
     }
 
@@ -504,6 +507,7 @@ impl<'a> BodyAnalyzer<'a> {
                 methods: Vec::new(),
                 properties: Vec::new(),
             })),
+            reference_key_cache: Arc::new(Mutex::new(ReferenceKeyCache::default())),
         }
     }
 
@@ -546,6 +550,18 @@ impl<'a> BodyAnalyzer<'a> {
         }
     }
 
+    pub(crate) fn class_ref_key(&self, fqcn: &str) -> Arc<str> {
+        self.reference_key_cache.lock().class(fqcn)
+    }
+
+    pub(crate) fn propdecl_ref_key(&self, name: &str) -> Arc<str> {
+        self.reference_key_cache.lock().propdecl(name)
+    }
+
+    pub(crate) fn constdecl_ref_key(&self, name: &str) -> Arc<str> {
+        self.reference_key_cache.lock().constant_decl(name)
+    }
+
     fn check_and_record_type_hint_classes(
         &self,
         hint: &php_ast::owned::TypeHint,
@@ -572,7 +588,7 @@ impl<'a> BodyAnalyzer<'a> {
                 let (line_end, col_end) =
                     crate::diagnostics::offset_to_line_col(source, span.end, source_map);
                 self.db.record_reference_location(crate::db::RefLoc {
-                    symbol_key: Arc::from(format!("cls:{fqcn}")),
+                    symbol_key: self.class_ref_key(fqcn.as_ref()),
                     file: file.clone(),
                     line,
                     col_start,

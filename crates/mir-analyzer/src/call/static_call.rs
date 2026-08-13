@@ -301,7 +301,7 @@ impl CallAnalyzer {
         };
 
         if is_literal_class_receiver {
-            ea.record_ref(Arc::from(format!("cls:{fqcn}")), call.class.span);
+            ea.record_class_ref(&fqcn, call.class.span);
             // Record a symbol on the class token itself so hover / go-to-definition
             // works when the cursor sits on the class name — including the
             // `self`/`parent`/`static` keywords, which `resolve_static_class`
@@ -1370,7 +1370,7 @@ impl CallAnalyzer {
             let resolved = crate::db::resolve_name(ea.db, &ea.file, name.as_ref());
             let fqcn = resolve_static_class(&resolved, ctx);
             if !matches!(fqcn.as_str(), "self" | "static" | "parent") {
-                ea.record_ref(Arc::from(format!("dyn:{fqcn}")), call.method.span);
+                ea.record_dynamic_member_ref(&fqcn, call.method.span);
             }
         } else {
             let class_ty = ea.analyze(&call.class, ctx);

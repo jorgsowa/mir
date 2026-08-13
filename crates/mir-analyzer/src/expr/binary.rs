@@ -98,7 +98,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 for atomic in &right_ty.types {
                     if let Atomic::TClassString(Some(fqcn)) = atomic {
                         let fqcn: Arc<str> = Arc::from(fqcn.as_ref());
-                        self.record_ref(Arc::from(format!("cls:{fqcn}")), b.right.span);
+                        self.record_class_ref(&fqcn, b.right.span);
                         self.record_symbol(
                             b.right.span,
                             crate::symbol::ReferenceKind::ClassReference(fqcn),
@@ -136,7 +136,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             }
                         }
                     }
-                    self.record_ref(Arc::from(format!("cls:{fqcn}")), b.right.span);
+                    self.record_class_ref(&fqcn, b.right.span);
                     self.record_symbol(
                         b.right.span,
                         crate::symbol::ReferenceKind::ClassReference(fqcn),

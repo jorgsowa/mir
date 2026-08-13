@@ -10,6 +10,7 @@ use crate::body_analysis::AnalysisMode;
 use crate::db::MirDatabase;
 use crate::flow_state::FlowState;
 use crate::php_version::PhpVersion;
+use crate::reference_key::ReferenceKeyCache;
 use crate::symbol::{ReferenceKind, ResolvedSymbol};
 
 mod arrays;
@@ -94,6 +95,7 @@ pub struct ExpressionAnalyzer<'a> {
     /// Snapshot of the installed plugin registry (`None` when no plugins are
     /// loaded — the common case, making every hook site a single check).
     pub(crate) plugins: Option<std::sync::Arc<mir_plugin::PluginRegistry>>,
+    pub(crate) reference_key_cache: &'a mut ReferenceKeyCache,
 }
 
 /// A first-class-callable creation expression (`foo(...)`, `$x(...)`,
@@ -121,6 +123,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         php_version: PhpVersion,
         mode: AnalysisMode,
         yielded_types: &'a mut Vec<(Type, Type)>,
+        reference_key_cache: &'a mut ReferenceKeyCache,
     ) -> Self {
         Self {
             db,
@@ -137,6 +140,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             in_array_access_base: false,
             yielded_types,
             plugins: mir_plugin::snapshot(),
+            reference_key_cache,
         }
     }
 
@@ -431,12 +435,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                 for name in anon_supers {
                     let resolved = crate::db::resolve_name(self.db, self.file.as_ref(), &name);
                     let lc = resolved.trim_start_matches('\\').to_ascii_lowercase();
-                    self.record_ref(Arc::from(format!("impl:{lc}")), kw_span);
+                    self.record_impl_ref(&lc, kw_span);
                     let short = lc.rsplit('\\').next().unwrap_or(&lc);
                     if short != lc {
-                        self.record_ref(Arc::from(format!("implshort:{short}")), kw_span);
+                        self.record_implshort_ref(short, kw_span);
                     } else {
-                        self.record_ref(Arc::from(format!("implshort:{lc}")), kw_span);
+                        self.record_implshort_ref(&lc, kw_span);
                     }
                 }
                 let mut sa = crate::stmt::StatementsAnalyzer::new(
@@ -492,7 +496,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         _ => resolved,
                     };
                     if !matches!(fqcn.as_str(), "self" | "static" | "parent") {
-                        self.record_ref(Arc::from(format!("dyn:{fqcn}")), member.span);
+                        self.record_dynamic_member_ref(fqcn, member.span);
                     }
                 } else {
                     let class_ty = self.analyze(class, ctx);
@@ -638,7 +642,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     let db = self.db;
                     let here = crate::db::Fqcn::from_str(db, &resolved_fqn);
                     if let Some(f) = crate::db::find_function(db, here) {
-                        self.record_ref(Arc::from(format!("fn:{}", f.fqn)), name_expr.span);
+                        self.record_function_ref(&f.fqn, name_expr.span);
                         if let Some((used, canonical)) =
                             crate::fqcn_case_mismatch(&resolved_fqn, f.fqn.as_ref())
                         {
@@ -832,7 +836,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 _ => resolved,
                             };
                             if !matches!(fqcn.as_str(), "self" | "static" | "parent") {
-                                self.record_ref(Arc::from(format!("dyn:{fqcn}")), method.span);
+                                self.record_dynamic_member_ref(fqcn, method.span);
                             }
                         } else {
                             let class_ty = self.analyze(class, ctx);
@@ -901,7 +905,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
                 let fqcn_arc: Arc<str> = Arc::from(fqcn.as_str());
                 if is_named_class {
-                    self.record_ref(Arc::from(format!("cls:{fqcn_arc}")), class.span);
+                    self.record_class_ref(fqcn_arc.as_ref(), class.span);
                 }
                 if let Some(resolved) = crate::call::method::resolve_method_from_db(
                     self.db,
@@ -1141,6 +1145,87 @@ impl<'a> ExpressionAnalyzer<'a> {
         });
     }
 
+    pub(crate) fn record_class_ref(&mut self, fqcn: impl AsRef<str>, span: php_ast::Span) {
+        let key = self.reference_key_cache.class(fqcn.as_ref());
+        self.record_ref(key, span);
+    }
+
+    pub(crate) fn record_function_ref(&mut self, fqn: impl AsRef<str>, span: php_ast::Span) {
+        let key = self.reference_key_cache.function(fqn.as_ref());
+        self.record_ref(key, span);
+    }
+
+    pub(crate) fn record_method_ref(
+        &mut self,
+        class: impl AsRef<str>,
+        name: impl AsRef<str>,
+        span: php_ast::Span,
+    ) {
+        let key = self
+            .reference_key_cache
+            .method(class.as_ref(), name.as_ref());
+        self.record_ref(key, span);
+    }
+
+    pub(crate) fn record_property_ref(
+        &mut self,
+        class: impl AsRef<str>,
+        name: impl AsRef<str>,
+        span: php_ast::Span,
+    ) {
+        let key = self
+            .reference_key_cache
+            .property(class.as_ref(), name.as_ref());
+        self.record_ref(key, span);
+    }
+
+    pub(crate) fn record_global_constant_ref(&mut self, fqn: impl AsRef<str>, span: php_ast::Span) {
+        let key = self.reference_key_cache.global_constant(fqn.as_ref());
+        self.record_ref(key, span);
+    }
+
+    pub(crate) fn record_dynamic_member_ref(
+        &mut self,
+        fqcn: impl AsRef<str>,
+        span: php_ast::Span,
+    ) {
+        let key = self.reference_key_cache.dynamic(fqcn.as_ref());
+        self.record_ref(key, span);
+    }
+
+    pub(crate) fn record_impl_ref(&mut self, fqcn: impl AsRef<str>, span: php_ast::Span) {
+        let key = self.reference_key_cache.implementation(fqcn.as_ref());
+        self.record_ref(key, span);
+    }
+
+    pub(crate) fn record_implshort_ref(
+        &mut self,
+        short_name: impl AsRef<str>,
+        span: php_ast::Span,
+    ) {
+        let key = self
+            .reference_key_cache
+            .implementation_short(short_name.as_ref());
+        self.record_ref(key, span);
+    }
+
+    pub(crate) fn record_propname_ref(&mut self, name: impl AsRef<str>, span: php_ast::Span) {
+        let key = self.reference_key_cache.propname(name.as_ref());
+        self.record_ref(key, span);
+    }
+
+    pub(crate) fn record_trait_use_property_ref(
+        &mut self,
+        class: impl AsRef<str>,
+        name: impl AsRef<str>,
+        span: php_ast::Span,
+    ) {
+        let key = self
+            .reference_key_cache
+            .trait_use_property(class.as_ref(), name.as_ref());
+        self.record_ref(key, span);
+    }
+
     /// Mark every named-object class in `obj_ty` as reached through a
     /// dynamic member access (`$obj->$name`/`$obj->$name()` where `$name`
     /// isn't a literal). The exact member touched is unknowable statically,
@@ -1150,7 +1235,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     /// members from `Unused*` once any dynamic access on it is seen —
     /// otherwise a private member reachable only dynamically (a common
     /// `__get`/`__set`-adjacent pattern) is falsely reported unused.
-    pub(crate) fn record_dynamic_member_access(&self, obj_ty: &Type, span: php_ast::Span) {
+    pub(crate) fn record_dynamic_member_access(&mut self, obj_ty: &Type, span: php_ast::Span) {
         if self.mode == AnalysisMode::InferenceOnly {
             return;
         }
@@ -1160,7 +1245,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 _ => None,
             });
             if let Some(fqcn) = fqcn {
-                self.record_ref(Arc::from(format!("dyn:{fqcn}")), span);
+                self.record_dynamic_member_ref(fqcn, span);
             }
         }
     }
@@ -1197,7 +1282,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     );
                 } else {
                     let fqcn: Arc<str> = Arc::from(resolved.as_str());
-                    self.record_ref(Arc::from(format!("cls:{fqcn}")), hint.span);
+                    self.record_class_ref(fqcn.as_ref(), hint.span);
                     self.record_symbol(
                         hint.span,
                         ReferenceKind::ClassReference(fqcn),

@@ -369,7 +369,7 @@ impl<'a> BodyAnalyzer<'a> {
                 } else {
                     if self.mode == AnalysisMode::Full {
                         self.db.record_reference_location(crate::db::RefLoc {
-                            symbol_key: Arc::from(format!("cls:{fqcn}")),
+                            symbol_key: self.class_ref_key(fqcn.as_ref()),
                             file: file.clone(),
                             line,
                             col_start,
@@ -535,7 +535,7 @@ impl<'a> BodyAnalyzer<'a> {
                     }
                     if self.mode == AnalysisMode::Full {
                         self.db.record_reference_location(crate::db::RefLoc {
-                            symbol_key: Arc::from(format!("cls:{fqcn}")),
+                            symbol_key: self.class_ref_key(fqcn.as_ref()),
                             file: file.clone(),
                             line: fn_line,
                             col_start: fn_col_start,

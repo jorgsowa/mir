@@ -562,7 +562,7 @@ impl CallAnalyzer {
                         if let Some((owner_fqcn, method)) =
                             crate::db::find_method_in_chain(ea.db, here, method_name)
                         {
-                            ea.record_ref(Arc::from(format!("cls:{resolved_class}")), value.span);
+                            ea.record_class_ref(&resolved_class, value.span);
                             ea.record_ref(
                                 Arc::from(format!(
                                     "meth:{owner_fqcn}::{}",
@@ -584,7 +584,7 @@ impl CallAnalyzer {
                         let canonical_fqn: Option<Arc<str>> =
                             crate::db::find_function(ea.db, here).map(|f| f.fqn.clone());
                         if let Some(canonical_fqn) = canonical_fqn {
-                            ea.record_ref(Arc::from(format!("fn:{canonical_fqn}")), value.span);
+                            ea.record_function_ref(&canonical_fqn, value.span);
                         }
                     }
                 }
@@ -617,7 +617,7 @@ impl CallAnalyzer {
                 if let Some(ExprKind::String(name)) = arg.value.as_ref().map(|v| &v.kind) {
                     let resolved_class = crate::db::resolve_name(ea.db, &ea.file, name.as_ref());
                     if crate::db::class_exists(ea.db, &resolved_class) {
-                        ea.record_ref(Arc::from(format!("cls:{resolved_class}")), arg.span);
+                        ea.record_class_ref(&resolved_class, arg.span);
                     }
                 }
             }
@@ -657,7 +657,7 @@ impl CallAnalyzer {
         }
 
         if let Some(resolved) = resolved {
-            ea.record_ref(Arc::from(format!("fn:{}", resolved.fqn)), call.name.span);
+            ea.record_function_ref(&resolved.fqn, call.name.span);
             let deprecated = resolved.deprecated;
             let params = resolved.params;
             let template_params = resolved.template_params;

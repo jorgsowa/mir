@@ -29,6 +29,7 @@ pub mod parse_cache;
 pub mod parser;
 pub mod php_version;
 pub mod prelude;
+pub(crate) mod reference_key;
 pub mod session;
 pub mod source_provider;
 pub(crate) mod stmt;

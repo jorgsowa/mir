@@ -512,7 +512,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             };
         let Some(fqcn) = fqcn else { return };
         if by_class_name {
-            self.record_ref(Arc::from(format!("cls:{fqcn}")), receiver_expr.span);
+            self.record_class_ref(&fqcn, receiver_expr.span);
         }
         let method_name_lower = crate::util::php_ident_lowercase(method_name);
         if let Some(resolved) =

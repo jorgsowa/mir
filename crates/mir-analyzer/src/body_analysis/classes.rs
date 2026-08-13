@@ -138,7 +138,7 @@ impl<'a> BodyAnalyzer<'a> {
                             // Property names are case-sensitive in PHP (unlike
                             // methods) — keyed as-declared, matching the
                             // `propname:` fallback's casing.
-                            symbol_key: Arc::from(format!("propdecl:{name}")),
+                            symbol_key: self.propdecl_ref_key(name),
                             file: file.clone(),
                             line,
                             col_start: col_start + 1,
@@ -227,7 +227,7 @@ impl<'a> BodyAnalyzer<'a> {
         let (_, col_end) = crate::diagnostics::offset_to_line_col(source, span.end, source_map);
         // Constant names are case-sensitive in PHP, same as properties.
         self.db.record_reference_location(crate::db::RefLoc {
-            symbol_key: Arc::from(format!("cnstdecl:{name}")),
+            symbol_key: self.constdecl_ref_key(name),
             file: file.clone(),
             line,
             col_start,
@@ -290,7 +290,7 @@ impl<'a> BodyAnalyzer<'a> {
                     ));
                 } else if self.mode == AnalysisMode::Full {
                     self.db.record_reference_location(crate::db::RefLoc {
-                        symbol_key: Arc::from(format!("cls:{cls_fqcn}")),
+                        symbol_key: self.class_ref_key(cls_fqcn.as_ref()),
                         file: file.clone(),
                         line,
                         col_start,
@@ -375,7 +375,7 @@ impl<'a> BodyAnalyzer<'a> {
                             ));
                         } else {
                             self.db.record_reference_location(crate::db::RefLoc {
-                                symbol_key: Arc::from(format!("cls:{cls_fqcn}")),
+                                symbol_key: self.class_ref_key(cls_fqcn.as_ref()),
                                 file: file.clone(),
                                 line: header_location.line,
                                 col_start: header_location.col_start,
@@ -551,7 +551,7 @@ impl<'a> BodyAnalyzer<'a> {
             ));
         } else {
             self.db.record_reference_location(crate::db::RefLoc {
-                symbol_key: Arc::from(format!("cls:{cls_fqcn}")),
+                symbol_key: self.class_ref_key(cls_fqcn.as_ref()),
                 file: location.file.clone(),
                 line: location.line,
                 col_start: location.col_start,
@@ -1440,7 +1440,7 @@ impl<'a> BodyAnalyzer<'a> {
             if self.mode == AnalysisMode::Full {
                 let loc = make_loc();
                 self.db.record_reference_location(crate::db::RefLoc {
-                    symbol_key: Arc::from(format!("cls:{trait_fqcn}")),
+                    symbol_key: self.class_ref_key(trait_fqcn.as_ref()),
                     file: loc.file.clone(),
                     line: loc.line,
                     col_start: loc.col_start,
