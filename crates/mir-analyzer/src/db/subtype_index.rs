@@ -164,20 +164,31 @@ pub fn entries_from_slice(slice: &mir_codebase::definitions::StubSlice) -> Vec<S
 /// Declaring entries for one FQCN: `(file, entry)` pairs. More than one file
 /// can declare the same FQCN (duplicated symbol); keep all, keyed by file.
 type EntryId = u32;
+type KeyId = u32;
 type DeclSites = Vec<EntryId>;
 
 #[derive(Debug)]
 struct StoredSubtypeEntry {
     file: Arc<str>,
-    child_key: Arc<str>,
-    entry: SubtypeEntry,
+    child_key: KeyId,
+    fqcn: Arc<str>,
+    kind: ClassLikeKind,
+    is_abstract: bool,
+    parents: Box<[StoredParentEdge]>,
+    location: Option<Location>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct StoredParentEdge {
+    key: KeyId,
+    relation: ParentRelation,
 }
 
 #[derive(Default, Debug)]
 pub struct SubtypeIndex {
     /// parent (lowercased FQCN) → children (lowercased FQCN). Edge origin
     /// (extends/implements vs trait use) lives on the child's entry.
-    children: FxHashMap<Arc<str>, FxHashSet<Arc<str>>>,
+    children: FxHashMap<KeyId, FxHashSet<KeyId>>,
     /// Canonical declaration payloads. Secondary indexes store only ids into
     /// this arena so the same declaration body is not retained twice.
     entries: Vec<Option<StoredSubtypeEntry>>,
@@ -185,16 +196,57 @@ pub struct SubtypeIndex {
     /// file → class-likes it declared at last commit.
     by_file: FxHashMap<Arc<str>, Vec<EntryId>>,
     /// class (lowercased FQCN) → declaring entries.
-    decls: FxHashMap<Arc<str>, DeclSites>,
+    decls: FxHashMap<KeyId, DeclSites>,
+    /// Interned lowercased FQCN keys used by the graph. Public payloads keep
+    /// display-form names, but hot subtype traversals compare and hash ids.
+    key_by_name: FxHashMap<Arc<str>, KeyId>,
+    key_names: Vec<Arc<str>>,
 }
 
 impl SubtypeIndex {
+    fn intern_edge_key(&mut self, fqcn: &str) -> KeyId {
+        let key = edge_key(fqcn);
+        if let Some(id) = self.key_by_name.get(key.as_ref()) {
+            return *id;
+        }
+        let id: KeyId = self
+            .key_names
+            .len()
+            .try_into()
+            .expect("subtype index key arena exhausted");
+        self.key_by_name.insert(key.clone(), id);
+        self.key_names.push(key);
+        id
+    }
+
+    fn lookup_edge_key(&self, fqcn: &str) -> Option<KeyId> {
+        let key = edge_key(fqcn);
+        self.key_by_name.get(key.as_ref()).copied()
+    }
+
+    fn key_name(&self, id: KeyId) -> &str {
+        self.key_names[id as usize].as_ref()
+    }
+
     fn alloc_entry(&mut self, file: Arc<str>, entry: SubtypeEntry) -> EntryId {
         let child_key = edge_key(&entry.fqcn);
+        let child_key = self.intern_edge_key(&child_key);
+        let parents: Box<[StoredParentEdge]> = entry
+            .parents
+            .iter()
+            .map(|edge| StoredParentEdge {
+                key: self.intern_edge_key(edge.fqcn.as_ref()),
+                relation: edge.relation,
+            })
+            .collect();
         let stored = StoredSubtypeEntry {
             file,
             child_key,
-            entry,
+            fqcn: entry.fqcn,
+            kind: entry.kind,
+            is_abstract: entry.is_abstract,
+            parents,
+            location: entry.location,
         };
         if let Some(id) = self.free_entry_ids.pop() {
             self.entries[id as usize] = Some(stored);
@@ -212,6 +264,19 @@ impl SubtypeIndex {
             .expect("subtype index entry id must be live")
     }
 
+    fn stored_entry_eq(&self, stored: &StoredSubtypeEntry, next: &SubtypeEntry) -> bool {
+        stored.fqcn == next.fqcn
+            && stored.kind == next.kind
+            && stored.is_abstract == next.is_abstract
+            && stored.location == next.location
+            && stored.parents.len() == next.parents.len()
+            && stored
+                .parents
+                .iter()
+                .zip(next.parents.iter())
+                .all(|(a, b)| self.key_name(a.key) == b.fqcn.as_ref() && a.relation == b.relation)
+    }
+
     /// Replace `file`'s class-like declarations wholesale. Returns whether
     /// the index changed — a recommit of identical entries is a no-op, so
     /// callers can key epoch bumps on real edge changes only.
@@ -222,7 +287,7 @@ impl SubtypeIndex {
                     && old
                         .iter()
                         .zip(&entries)
-                        .all(|(id, next)| &self.entry(*id).entry == next) =>
+                        .all(|(id, next)| self.stored_entry_eq(self.entry(*id), next)) =>
             {
                 return false;
             }
@@ -236,23 +301,15 @@ impl SubtypeIndex {
         let mut stored: Vec<EntryId> = Vec::with_capacity(entries.len());
         for entry in entries {
             let id = self.alloc_entry(file.clone(), entry);
-            let (child_key, parents): (Arc<str>, Vec<Arc<str>>) = {
+            let (child_key, parents): (KeyId, Vec<KeyId>) = {
                 let stored_entry = self.entry(id);
                 (
-                    stored_entry.child_key.clone(),
-                    stored_entry
-                        .entry
-                        .parents
-                        .iter()
-                        .map(|edge| edge.fqcn.clone())
-                        .collect(),
+                    stored_entry.child_key,
+                    stored_entry.parents.iter().map(|edge| edge.key).collect(),
                 )
             };
             for parent in &parents {
-                self.children
-                    .entry(parent.clone())
-                    .or_default()
-                    .insert(child_key.clone());
+                self.children.entry(*parent).or_default().insert(child_key);
             }
             self.decls.entry(child_key).or_default().push(id);
             stored.push(id);
@@ -270,7 +327,7 @@ impl SubtypeIndex {
         for id in old {
             let (child_key, parents) = {
                 let stored = self.entry(id);
-                (stored.child_key.clone(), stored.entry.parents.to_vec())
+                (stored.child_key, stored.parents.to_vec())
             };
             // Drop the child edge only when no other file still declares a
             // class-like with the same FQCN and the same parent.
@@ -285,18 +342,13 @@ impl SubtypeIndex {
             for parent in &parents {
                 let survives = still_declared
                     .iter()
-                    .map(|site_id| &self.entry(*site_id).entry)
-                    .any(|entry| {
-                        entry
-                            .parents
-                            .iter()
-                            .any(|edge| edge.fqcn.as_ref() == parent.fqcn.as_ref())
-                    });
+                    .map(|site_id| self.entry(*site_id))
+                    .any(|entry| entry.parents.iter().any(|edge| edge.key == parent.key));
                 if !survives {
-                    if let Some(set) = self.children.get_mut(&parent.fqcn) {
+                    if let Some(set) = self.children.get_mut(&parent.key) {
                         set.remove(&child_key);
                         if set.is_empty() {
-                            self.children.remove(&parent.fqcn);
+                            self.children.remove(&parent.key);
                         }
                     }
                 }
@@ -311,10 +363,16 @@ impl SubtypeIndex {
     /// reverse edges. `include_trait_users` controls whether an edge that
     /// exists only via `use Trait;` counts as a subtype relation.
     pub fn subtypes_of(&self, fqcn: &str, include_trait_users: bool) -> Vec<SubtypeSite> {
-        let root = edge_key(fqcn);
-        let mut visited: FxHashSet<Arc<str>> = FxHashSet::default();
-        visited.insert(root.clone());
-        let mut queue: Vec<Arc<str>> = vec![root];
+        let Some(root) = self.lookup_edge_key(fqcn) else {
+            return Vec::new();
+        };
+        self.subtypes_of_key(root, include_trait_users)
+    }
+
+    fn subtypes_of_key(&self, root: KeyId, include_trait_users: bool) -> Vec<SubtypeSite> {
+        let mut visited: FxHashSet<KeyId> = FxHashSet::default();
+        visited.insert(root);
+        let mut queue: Vec<KeyId> = vec![root];
         let mut out: Vec<SubtypeSite> = Vec::new();
         while let Some(parent) = queue.pop() {
             let Some(children) = self.children.get(&parent) else {
@@ -337,9 +395,8 @@ impl SubtypeIndex {
                 let mut qualifies = false;
                 for id in sites {
                     let stored = self.entry(*id);
-                    let entry = &stored.entry;
-                    let reaches_parent = entry.parents.iter().any(|edge| {
-                        edge.fqcn.as_ref() == parent.as_ref()
+                    let reaches_parent = stored.parents.iter().any(|edge| {
+                        edge.key == parent
                             && (edge.relation == ParentRelation::Super || include_trait_users)
                     });
                     if !reaches_parent {
@@ -347,16 +404,16 @@ impl SubtypeIndex {
                     }
                     qualifies = true;
                     out.push(SubtypeSite {
-                        fqcn: entry.fqcn.clone(),
-                        kind: entry.kind,
-                        is_abstract: entry.is_abstract,
+                        fqcn: stored.fqcn.clone(),
+                        kind: stored.kind,
+                        is_abstract: stored.is_abstract,
                         file: stored.file.clone(),
-                        location: entry.location.clone(),
+                        location: stored.location.clone(),
                     });
                 }
                 if qualifies {
-                    visited.insert(child.clone());
-                    queue.push(child.clone());
+                    visited.insert(*child);
+                    queue.push(*child);
                 }
             }
         }
@@ -385,16 +442,19 @@ impl SubtypeIndex {
         }
         let root = edge_key(fqcn);
         let short = short_name_of(&root).to_string();
-        let mut out: Vec<SubtypeSite> = Vec::new();
-        let mut alt_roots: Vec<Arc<str>> = self
+        let mut alt_roots: Vec<KeyId> = self
             .children
             .keys()
-            .filter(|k| k.as_ref() != root.as_ref() && short_name_of(k) == short)
-            .cloned()
+            .filter(|k| {
+                let key = self.key_name(**k);
+                key != root.as_ref() && short_name_of(key) == short
+            })
+            .copied()
             .collect();
-        alt_roots.sort();
+        alt_roots.sort_by(|a, b| self.key_name(*a).cmp(self.key_name(*b)));
+        let mut out: Vec<SubtypeSite> = Vec::new();
         for key in alt_roots {
-            out.extend(self.subtypes_of(&key, include_trait_users));
+            out.extend(self.subtypes_of_key(key, include_trait_users));
         }
         out.sort_by(|a, b| a.file.cmp(&b.file).then(a.fqcn.cmp(&b.fqcn)));
         out.dedup_by(|a, b| a.fqcn == b.fqcn && a.file == b.file);
@@ -406,7 +466,8 @@ impl SubtypeIndex {
     /// Used by completeness passes to decide which frontier names still need
     /// their declaring files committed.
     pub fn has_decl(&self, fqcn: &str) -> bool {
-        self.decls.contains_key(&edge_key(fqcn))
+        self.lookup_edge_key(fqcn)
+            .is_some_and(|key| self.decls.contains_key(&key))
     }
 }
 
