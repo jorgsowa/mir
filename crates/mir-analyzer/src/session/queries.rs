@@ -700,34 +700,11 @@ impl AnalysisSession {
             }
             _ => Vec::new(),
         };
-        let primary_keys: Vec<String> = match symbol {
-            crate::Name::Method { name, .. } => hierarchy
-                .iter()
-                .map(|c| format!("meth:{c}::{name}"))
-                .collect(),
-            crate::Name::Property { name, .. } => hierarchy
-                .iter()
-                .map(|c| format!("prop:{c}::{name}"))
-                .collect(),
-            crate::Name::ClassConstant { name, .. } => hierarchy
-                .iter()
-                .map(|c| format!("cnst:{c}::{name}"))
-                .collect(),
-            _ => vec![key.clone()],
-        };
-        let fallback_key: Option<String> = match symbol {
-            crate::Name::Method { name, .. } => Some(format!("methname:{name}")),
-            crate::Name::Property { name, .. } => Some(format!("propname:{name}")),
-            _ => None,
-        };
         let scope: rustc_hash::FxHashSet<&str> = files.iter().map(|f| f.as_ref()).collect();
-        let read_keys = |keys: &[String]| -> Vec<(Arc<str>, crate::Range)> {
+        let read_symbol_key = |symbol_key: &str| -> Vec<(Arc<str>, crate::Range)> {
             let guard = self.db.salsa.read();
-            let mut merged: Vec<(Arc<str>, u32, u16, u16)> = Vec::new();
-            for k in keys {
-                merged.extend(guard.reference_locations(k));
-            }
-            merged
+            guard
+                .reference_locations(symbol_key)
                 .into_iter()
                 .filter(|(file, ..)| scope.contains(file.as_ref()))
                 .map(|(file, line, col_start, col_end)| {
@@ -735,10 +712,59 @@ impl AnalysisSession {
                 })
                 .collect()
         };
-        let mut out = read_keys(&primary_keys);
+        let mut scratch_key = String::new();
+        let mut read_composed_key = |prefix: &str, middle: &str, separator: &str, suffix: &str| {
+            scratch_key.clear();
+            scratch_key.reserve(prefix.len() + middle.len() + separator.len() + suffix.len());
+            scratch_key.push_str(prefix);
+            scratch_key.push_str(middle);
+            scratch_key.push_str(separator);
+            scratch_key.push_str(suffix);
+            read_symbol_key(&scratch_key)
+        };
+        let mut out: Vec<(Arc<str>, crate::Range)> = Vec::new();
+        match symbol {
+            crate::Name::Method { name, .. } => {
+                for class in &hierarchy {
+                    out.extend(read_composed_key(
+                        "meth:",
+                        class.as_ref(),
+                        "::",
+                        name.as_ref(),
+                    ));
+                }
+            }
+            crate::Name::Property { name, .. } => {
+                for class in &hierarchy {
+                    out.extend(read_composed_key(
+                        "prop:",
+                        class.as_ref(),
+                        "::",
+                        name.as_ref(),
+                    ));
+                }
+            }
+            crate::Name::ClassConstant { name, .. } => {
+                for class in &hierarchy {
+                    out.extend(read_composed_key(
+                        "cnst:",
+                        class.as_ref(),
+                        "::",
+                        name.as_ref(),
+                    ));
+                }
+            }
+            _ => out.extend(read_symbol_key(key.as_str())),
+        }
         if out.is_empty() {
-            if let Some(fk) = fallback_key {
-                out = read_keys(std::slice::from_ref(&fk));
+            match symbol {
+                crate::Name::Method { name, .. } => {
+                    out = read_composed_key("methname:", name.as_ref(), "", "");
+                }
+                crate::Name::Property { name, .. } => {
+                    out = read_composed_key("propname:", name.as_ref(), "", "");
+                }
+                _ => {}
             }
         }
         out.sort_by(|a, b| {
@@ -762,13 +788,13 @@ impl AnalysisSession {
                         // class/trait/interface/enum analysis.
                         match symbol {
                             crate::Name::Method { name, .. } => {
-                                read_keys(&[format!("methdecl:{name}")])
+                                read_composed_key("methdecl:", name.as_ref(), "", "")
                             }
                             crate::Name::Property { name, .. } => {
-                                read_keys(&[format!("propdecl:{name}")])
+                                read_composed_key("propdecl:", name.as_ref(), "", "")
                             }
                             crate::Name::ClassConstant { name, .. } => {
-                                read_keys(&[format!("cnstdecl:{name}")])
+                                read_composed_key("cnstdecl:", name.as_ref(), "", "")
                             }
                             _ => Vec::new(),
                         }
@@ -1055,8 +1081,14 @@ impl AnalysisSession {
         let scope: rustc_hash::FxHashSet<&str> = files.iter().map(|f| f.as_ref()).collect();
         let anon: Vec<(Arc<str>, u32, u16, u16)> = {
             let guard = self.db.salsa.read();
-            let mut v = guard.reference_locations(&format!("impl:{root_lc}"));
-            v.extend(guard.reference_locations(&format!("implshort:{short_lc}")));
+            let mut key = String::with_capacity("implshort:".len() + root_lc.len());
+            key.push_str("impl:");
+            key.push_str(&root_lc);
+            let mut v = guard.reference_locations(&key);
+            key.clear();
+            key.push_str("implshort:");
+            key.push_str(&short_lc);
+            v.extend(guard.reference_locations(&key));
             v.sort();
             v.dedup();
             v
