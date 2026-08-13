@@ -421,8 +421,9 @@ impl AnalysisSession {
     /// Compute `file`'s outgoing dependency edges and persist them to the
     /// disk cache's reverse-dep graph (if configured). The in-memory graph
     /// is no longer maintained imperatively: `dependency_graph()` derives
-    /// structural edges from the memoized [`crate::db::file_structural_deps`]
-    /// tracked query, so there is no second copy to drift out of sync.
+    /// structural symbols from the memoized [`crate::db::file_structural_symbols`]
+    /// tracked query, then projects them through the workspace symbol index
+    /// alongside body-reference symbols.
     pub(super) fn update_reverse_deps_for(&self, file: &str) {
         if let Some(cache) = self.cache.as_deref() {
             let db = self.snapshot_db();
@@ -437,10 +438,10 @@ impl AnalysisSession {
     /// File dependency graph: which files depend on which other files.
     /// Used for incremental invalidation in LSP servers and build systems.
     ///
-    /// O(edges) — iterates the `file_references` forward index (file → symbol
-    /// keys it references) which is always current, then resolves each symbol
-    /// to its defining file via O(1) lookup.  Total cost is O(E) where E is the
-    /// number of (file, symbol) reference edges, vs. the old O(F × S × R) scan.
+    /// O(edges) — iterates symbol edges from the reference index and from
+    /// `file_structural_symbols`, then resolves each symbol to its defining
+    /// file via O(1) lookup. Total cost is O(E) where E is the number of
+    /// (file, symbol) edges.
     pub fn dependency_graph(&self) -> crate::DependencyGraph {
         let db = self.snapshot_db();
 
@@ -464,6 +465,16 @@ impl AnalysisSession {
             }
         }
 
+        fn symbol_defining_file_id(
+            db: &dyn crate::db::MirDatabase,
+            file_ids: &HashMap<Arc<str>, u32>,
+            symbol_key: &str,
+        ) -> Option<u32> {
+            let lookup = crate::defining_file_lookup_key(symbol_key);
+            db.symbol_defining_file(lookup)
+                .and_then(|file| file_ids.get(file.as_ref()).copied())
+        }
+
         let mut all_files: Vec<Arc<str>> = db.source_file_paths().iter().cloned().collect();
         all_files.sort();
         assert!(
@@ -480,42 +491,29 @@ impl AnalysisSession {
         let mut dependents = vec![Vec::new(); all_files.len()];
 
         for (file_id, file) in all_files.iter().enumerate() {
-            // O(degree(file)) — forward index lookup, no full-table scan.
-            let symbol_keys = db.file_referenced_symbols(file.as_ref());
             let file_id = file_id as u32;
             let mut file_deps: HashSet<u32> = HashSet::default();
-            for symbol_key in &symbol_keys {
-                let lookup = crate::defining_file_lookup_key(symbol_key);
-                if let Some(def_file) = db.symbol_defining_file(lookup) {
-                    if let Some(&def_id) = file_ids.get(def_file.as_ref()) {
-                        if def_id != file_id {
-                            file_deps.insert(def_id);
-                        }
+
+            // O(degree(file)) — forward reference-index lookup, no full-table scan.
+            for symbol_key in db.file_referenced_symbols(file.as_ref()) {
+                if let Some(def_id) = symbol_defining_file_id(&db, &file_ids, &symbol_key) {
+                    file_deps.insert(def_id);
+                }
+            }
+
+            // Declaration-level symbol edges from Salsa. These cover imports,
+            // class hierarchy edges, and type-hint-only references that never
+            // appear in file_referenced_symbols.
+            if let Some(sf) = db.lookup_source_file(file.as_ref()) {
+                for symbol in crate::db::file_structural_symbols(&db, sf).iter() {
+                    if let Some(def_id) = symbol_defining_file_id(&db, &file_ids, symbol) {
+                        file_deps.insert(def_id);
                     }
                 }
             }
+
             for dep_id in file_deps {
                 push_edge(&mut dependencies, &mut dependents, file_id, dep_id);
-            }
-        }
-
-        // Merge structural deps derived from definition collection. The
-        // forward pass above only captures bare-FQN references recorded
-        // during body analysis; `file_structural_deps` covers imports, class
-        // hierarchy (extends/implements/use), and type-hint-only references
-        // that never appear in file_referenced_symbols. The query is salsa-
-        // memoized, so the warm rebuild costs one map lookup per file rather
-        // than a definition walk — and there is no imperatively-maintained
-        // reverse map to drift out of sync with the definitions.
-        for (file_id, file) in all_files.iter().enumerate() {
-            let Some(sf) = db.lookup_source_file(file.as_ref()) else {
-                continue;
-            };
-            let file_id = file_id as u32;
-            for target in crate::db::file_structural_deps(&db, sf).iter() {
-                if let Some(&target_id) = file_ids.get(target.as_ref()) {
-                    push_edge(&mut dependencies, &mut dependents, file_id, target_id);
-                }
             }
         }
 

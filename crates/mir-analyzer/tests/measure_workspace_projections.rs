@@ -11,8 +11,8 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use mir_analyzer::db::{
-    file_structural_deps, workspace_classes, workspace_functions, workspace_symbol_index,
-    MirDatabase,
+    file_structural_deps, file_structural_symbols, workspace_classes, workspace_functions,
+    workspace_symbol_index, MirDatabase,
 };
 use mir_analyzer::{discover_files, AnalysisSession, BatchOptions, PhpVersion};
 
@@ -83,6 +83,23 @@ fn measure_workspace_projections() {
     let index_warm = black_box(workspace_symbol_index(&db).class_like_len());
     let index_warm_elapsed = index_warm_start.elapsed();
 
+    let structural_symbols_cold_start = Instant::now();
+    let structural_symbols_cold = black_box(
+        files
+            .iter()
+            .map(|file| file_structural_symbols(&db, *file).len())
+            .sum::<usize>(),
+    );
+    let structural_symbols_cold_elapsed = structural_symbols_cold_start.elapsed();
+    let structural_symbols_warm_start = Instant::now();
+    let structural_symbols_warm = black_box(
+        files
+            .iter()
+            .map(|file| file_structural_symbols(&db, *file).len())
+            .sum::<usize>(),
+    );
+    let structural_symbols_warm_elapsed = structural_symbols_warm_start.elapsed();
+
     let deps_cold_start = Instant::now();
     let deps_cold = black_box(
         files
@@ -114,6 +131,11 @@ fn measure_workspace_projections() {
         "[measure_workspace_projections] workspace_symbol_index cold={:.3}s warm={:.3}s class_like={index_cold}/{index_warm}",
         index_cold_elapsed.as_secs_f64(),
         index_warm_elapsed.as_secs_f64(),
+    );
+    eprintln!(
+        "[measure_workspace_projections] file_structural_symbols(all files) cold={:.3}s warm={:.3}s symbols={structural_symbols_cold}/{structural_symbols_warm}",
+        structural_symbols_cold_elapsed.as_secs_f64(),
+        structural_symbols_warm_elapsed.as_secs_f64(),
     );
     eprintln!(
         "[measure_workspace_projections] file_structural_deps(all files) cold={:.3}s warm={:.3}s edges={deps_cold}/{deps_warm}",

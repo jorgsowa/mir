@@ -595,8 +595,9 @@ pub(crate) fn collect_fqcns_in_atomic(a: &Atomic, out: &mut Vec<String>) {
 fn build_reverse_deps(db: &dyn crate::db::MirDatabase) -> HashMap<String, HashSet<String>> {
     let mut reverse: HashMap<String, HashSet<String>> = HashMap::default();
 
-    let mut add_edge = |symbol: &str, dependent_file: &str| {
-        if let Some(defining_file) = db.symbol_defining_file(symbol) {
+    let mut add_symbol_edge = |symbol_key: &str, dependent_file: &str| {
+        let lookup = crate::defining_file_lookup_key(symbol_key);
+        if let Some(defining_file) = db.symbol_defining_file(lookup) {
             let def = defining_file.as_ref().to_string();
             if def != dependent_file {
                 reverse
@@ -607,107 +608,16 @@ fn build_reverse_deps(db: &dyn crate::db::MirDatabase) -> HashMap<String, HashSe
         }
     };
 
-    for (file, imports) in db.file_import_snapshots() {
-        let file = file.as_ref().to_string();
-        for fqcn in imports.values() {
-            add_edge(fqcn.as_str(), &file);
-        }
-    }
-
-    let extract_named_objects = |union: &mir_types::Type| {
-        union
-            .types
-            .iter()
-            .filter_map(|atomic| match atomic {
-                mir_types::atomic::Atomic::TNamedObject { fqcn, .. } => Some(*fqcn),
-                _ => None,
-            })
-            .collect::<Vec<_>>()
-    };
-
-    for fqcn in crate::db::workspace_classes(db).iter() {
-        let fqcn = fqcn.as_str();
-        let here = crate::db::Fqcn::from_str(db, fqcn);
-        let Some(class) = crate::db::find_class_like(db, here) else {
-            continue;
-        };
-        if class.is_interface() || class.is_trait() || class.is_enum() {
-            continue;
-        }
-        let Some(file) = db
-            .symbol_defining_file(fqcn)
-            .map(|f| f.as_ref().to_string())
-            .or_else(|| class.location().map(|l| l.file.as_ref().to_string()))
-        else {
-            continue;
-        };
-
-        if let Some(parent) = class.parent() {
-            add_edge(parent.as_ref(), &file);
-        }
-        for iface in class.interfaces().iter() {
-            add_edge(iface.as_ref(), &file);
-        }
-        for tr in class.class_traits().iter() {
-            add_edge(tr.as_ref(), &file);
-        }
-        if let Some(props) = class.own_properties() {
-            for (_, p) in props.iter() {
-                if let Some(ty) = &p.ty {
-                    for named in extract_named_objects(ty) {
-                        add_edge(named.as_ref(), &file);
-                    }
-                }
-            }
-        }
-        for (_, method) in class.own_methods().iter() {
-            for param in method.params.iter() {
-                if let Some(ty) = &param.ty {
-                    for named in extract_named_objects(ty.as_ref()) {
-                        add_edge(named.as_ref(), &file);
-                    }
-                }
-            }
-            if let Some(rt) = method.return_type.as_deref() {
-                for named in extract_named_objects(rt) {
-                    add_edge(named.as_ref(), &file);
-                }
-            }
-        }
-    }
-
-    for fqn in crate::db::workspace_functions(db).iter() {
-        let fqn = fqn.as_str();
-        let here = crate::db::Fqcn::from_str(db, fqn);
-        let Some(f) = crate::db::find_function(db, here) else {
-            continue;
-        };
-        let Some(file) = db
-            .symbol_defining_file(fqn)
-            .map(|f| f.as_ref().to_string())
-            .or_else(|| f.location.as_ref().map(|l| l.file.as_ref().to_string()))
-        else {
-            continue;
-        };
-
-        for param in f.params.iter() {
-            if let Some(ty) = &param.ty {
-                for named in extract_named_objects(ty.as_ref()) {
-                    add_edge(named.as_ref(), &file);
-                }
-            }
-        }
-        if let Some(rt) = f.return_type.as_deref() {
-            for named in extract_named_objects(rt) {
-                add_edge(named.as_ref(), &file);
-            }
+    for sf in db.all_source_files() {
+        let file = sf.path(db);
+        for symbol in crate::db::file_structural_symbols(db, sf).iter() {
+            add_symbol_edge(symbol, file.as_ref());
         }
     }
 
     for (ref_file, symbol_key) in db.all_reference_location_pairs() {
         let file_str = ref_file.as_ref().to_string();
-        let lookup = crate::defining_file_lookup_key(&symbol_key);
-        add_edge(lookup, &file_str);
+        add_symbol_edge(&symbol_key, &file_str);
     }
 
     reverse

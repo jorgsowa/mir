@@ -185,7 +185,7 @@ pub use self::ancestors::*;
 pub use self::class_mention_index::{
     ClassMentionIndex, ClassMentionStats, MentionQuery, MentionScanner,
 };
-pub use self::deps::file_structural_deps;
+pub use self::deps::{file_structural_deps, file_structural_symbols};
 pub use self::find_queries::{
     analyzed_class_defs, analyzed_enum_defs, analyzed_interface_defs, analyzed_trait_defs,
     class_ancestors_by_fqcn, class_array_property_defaults, class_in_file, class_like_decl_file,

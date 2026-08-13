@@ -846,11 +846,9 @@ mod stubs;
 
 pub use queries::SubtypeClassSite;
 
-/// Compute the full set of files `file` depends on: structural edges from
-/// the memoized [`crate::db::file_structural_deps`] tracked query, plus
-/// bare-FQN references recorded during body analysis (which live in the
-/// reference index and are not visible to salsa). Self-edges are excluded.
-/// Used to persist the disk cache's reverse-dep graph.
+/// Compute the full set of files `file` depends on by projecting structural
+/// and body-reference symbols through the workspace symbol index. Self-edges
+/// are excluded. Used to persist the disk cache's reverse-dep graph.
 fn file_outgoing_dependencies(
     db: &dyn MirDatabase,
     file: &str,
@@ -859,8 +857,13 @@ fn file_outgoing_dependencies(
     let mut targets: HashSet<String> = HashSet::default();
 
     if let Some(sf) = db.lookup_source_file(file) {
-        for target in crate::db::file_structural_deps(db, sf).iter() {
-            targets.insert(target.as_ref().to_string());
+        for symbol in crate::db::file_structural_symbols(db, sf).iter() {
+            let lookup = crate::defining_file_lookup_key(symbol);
+            if let Some(defining_file) = db.symbol_defining_file(lookup) {
+                if defining_file.as_ref() != file {
+                    targets.insert(defining_file.as_ref().to_string());
+                }
+            }
         }
     }
 
