@@ -1,4 +1,5 @@
 use rustc_hash::FxHashMap;
+use std::sync::{Arc, OnceLock};
 
 pub(crate) mod analyzer_db;
 pub(crate) mod attributes;
@@ -307,18 +308,83 @@ pub struct HoverInfo {
 
 /// File dependency graph: tracks which files depend on which other files.
 /// Used for incremental invalidation in LSP servers and build systems.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct DependencyGraph {
-    /// Direct dependencies: file → [files it depends on]
-    dependencies: FxHashMap<String, Vec<String>>,
-    /// Reverse dependencies: file → [files that depend on it]
-    dependents: FxHashMap<String, Vec<String>>,
+    files: Vec<Arc<str>>,
+    file_ids: FxHashMap<Arc<str>, usize>,
+    /// Direct dependencies: file id → [file ids it depends on]
+    dependencies: Vec<Vec<usize>>,
+    /// Reverse dependencies: file id → [file ids that depend on it]
+    dependents: Vec<Vec<usize>>,
+    legacy_dependencies: OnceLock<FxHashMap<String, Vec<String>>>,
+    legacy_dependents: OnceLock<FxHashMap<String, Vec<String>>>,
+}
+
+impl Clone for DependencyGraph {
+    fn clone(&self) -> Self {
+        Self {
+            files: self.files.clone(),
+            file_ids: self.file_ids.clone(),
+            dependencies: self.dependencies.clone(),
+            dependents: self.dependents.clone(),
+            legacy_dependencies: OnceLock::new(),
+            legacy_dependents: OnceLock::new(),
+        }
+    }
 }
 
 impl DependencyGraph {
+    pub(crate) fn from_compact_parts(
+        files: Vec<Arc<str>>,
+        file_ids: FxHashMap<Arc<str>, usize>,
+        dependencies: Vec<Vec<usize>>,
+        dependents: Vec<Vec<usize>>,
+    ) -> Self {
+        Self {
+            files,
+            file_ids,
+            dependencies,
+            dependents,
+            legacy_dependencies: OnceLock::new(),
+            legacy_dependents: OnceLock::new(),
+        }
+    }
+
+    /// Number of files tracked by this graph.
+    pub fn file_count(&self) -> usize {
+        self.files.len()
+    }
+
+    /// Number of direct dependency edges.
+    pub fn dependency_edge_count(&self) -> usize {
+        self.dependencies.iter().map(Vec::len).sum()
+    }
+
+    /// Number of reverse dependency edges.
+    pub fn dependent_edge_count(&self) -> usize {
+        self.dependents.iter().map(Vec::len).sum()
+    }
+
+    fn stringify_adjacency(&self, adjacency: &[Vec<usize>]) -> FxHashMap<String, Vec<String>> {
+        adjacency
+            .iter()
+            .enumerate()
+            .filter(|(_, deps)| !deps.is_empty())
+            .map(|(file_id, deps)| {
+                (
+                    self.files[file_id].to_string(),
+                    deps.iter()
+                        .map(|&dep_id| self.files[dep_id].to_string())
+                        .collect(),
+                )
+            })
+            .collect()
+    }
+
     /// Files that `file` directly depends on (imports, parent classes, interfaces, traits).
     pub fn dependencies_of(&self, file: &str) -> &[String] {
-        self.dependencies
+        self.legacy_dependencies
+            .get_or_init(|| self.stringify_adjacency(&self.dependencies))
             .get(file)
             .map(|v| v.as_slice())
             .unwrap_or(&[])
@@ -326,7 +392,8 @@ impl DependencyGraph {
 
     /// Files that directly depend on `file` (reverse edge).
     pub fn dependents_of(&self, file: &str) -> &[String] {
-        self.dependents
+        self.legacy_dependents
+            .get_or_init(|| self.stringify_adjacency(&self.dependents))
             .get(file)
             .map(|v| v.as_slice())
             .unwrap_or(&[])
@@ -335,17 +402,20 @@ impl DependencyGraph {
     /// All files transitively depended upon by `file` (including indirect).
     pub fn transitive_dependencies(&self, file: &str) -> Vec<String> {
         let mut visited = rustc_hash::FxHashSet::default();
-        let mut queue = vec![file.to_string()];
+        let Some(&seed) = self.file_ids.get(file) else {
+            return Vec::new();
+        };
+        let mut queue = vec![seed];
         let mut result = Vec::new();
 
         while let Some(current) = queue.pop() {
-            if !visited.insert(current.clone()) {
+            if !visited.insert(current) {
                 continue;
             }
-            for dep in self.dependencies_of(&current) {
-                if !visited.contains(dep) {
-                    queue.push(dep.clone());
-                    result.push(dep.clone());
+            for &dep in &self.dependencies[current] {
+                if !visited.contains(&dep) {
+                    queue.push(dep);
+                    result.push(self.files[dep].to_string());
                 }
             }
         }
@@ -355,17 +425,20 @@ impl DependencyGraph {
     /// All files that transitively depend on `file` (reverse transitive).
     pub fn transitive_dependents(&self, file: &str) -> Vec<String> {
         let mut visited = rustc_hash::FxHashSet::default();
-        let mut queue = vec![file.to_string()];
+        let Some(&seed) = self.file_ids.get(file) else {
+            return Vec::new();
+        };
+        let mut queue = vec![seed];
         let mut result = Vec::new();
 
         while let Some(current) = queue.pop() {
-            if !visited.insert(current.clone()) {
+            if !visited.insert(current) {
                 continue;
             }
-            for dep in self.dependents_of(&current) {
-                if !visited.contains(dep) {
-                    queue.push(dep.clone());
-                    result.push(dep.clone());
+            for &dep in &self.dependents[current] {
+                if !visited.contains(&dep) {
+                    queue.push(dep);
+                    result.push(self.files[dep].to_string());
                 }
             }
         }

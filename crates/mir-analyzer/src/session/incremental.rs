@@ -445,58 +445,52 @@ impl AnalysisSession {
         let db = self.snapshot_db();
 
         fn push_edge(
-            dependencies: &mut HashMap<Arc<str>, Vec<Arc<str>>>,
-            dependents: &mut HashMap<Arc<str>, Vec<Arc<str>>>,
-            from: Arc<str>,
-            to: Arc<str>,
+            dependencies: &mut [Vec<usize>],
+            dependents: &mut [Vec<usize>],
+            from: usize,
+            to: usize,
         ) {
             if from == to {
                 return;
             }
-            dependents.entry(to.clone()).or_default().push(from.clone());
-            dependencies.entry(from).or_default().push(to);
+            dependents[to].push(from);
+            dependencies[from].push(to);
         }
 
-        fn sort_and_dedup(map: &mut HashMap<Arc<str>, Vec<Arc<str>>>) {
-            for deps in map.values_mut() {
+        fn sort_and_dedup(adjacency: &mut [Vec<usize>]) {
+            for deps in adjacency {
                 deps.sort();
                 deps.dedup();
             }
         }
 
-        fn stringify_graph(
-            graph: HashMap<Arc<str>, Vec<Arc<str>>>,
-        ) -> HashMap<String, Vec<String>> {
-            graph
-                .into_iter()
-                .map(|(file, deps)| {
-                    (
-                        file.to_string(),
-                        deps.into_iter().map(|dep| dep.to_string()).collect(),
-                    )
-                })
-                .collect()
-        }
+        let mut all_files: Vec<Arc<str>> = db.source_file_paths().iter().cloned().collect();
+        all_files.sort();
+        let file_ids: HashMap<Arc<str>, usize> = all_files
+            .iter()
+            .enumerate()
+            .map(|(id, file)| (file.clone(), id))
+            .collect();
 
-        let all_files: Vec<Arc<str>> = db.source_file_paths().iter().cloned().collect();
+        let mut dependencies = vec![Vec::new(); all_files.len()];
+        let mut dependents = vec![Vec::new(); all_files.len()];
 
-        let mut dependencies: HashMap<Arc<str>, Vec<Arc<str>>> = HashMap::default();
-        let mut dependents: HashMap<Arc<str>, Vec<Arc<str>>> = HashMap::default();
-
-        for file in &all_files {
+        for (file_id, file) in all_files.iter().enumerate() {
             // O(degree(file)) — forward index lookup, no full-table scan.
             let symbol_keys = db.file_referenced_symbols(file.as_ref());
-            let mut file_deps: HashSet<Arc<str>> = HashSet::default();
+            let mut file_deps: HashSet<usize> = HashSet::default();
             for symbol_key in &symbol_keys {
                 let lookup = crate::defining_file_lookup_key(symbol_key);
                 if let Some(def_file) = db.symbol_defining_file(lookup) {
-                    if def_file != *file {
-                        file_deps.insert(def_file);
+                    if let Some(&def_id) = file_ids.get(def_file.as_ref()) {
+                        if def_id != file_id {
+                            file_deps.insert(def_id);
+                        }
                     }
                 }
             }
-            for dep in file_deps {
-                push_edge(&mut dependencies, &mut dependents, file.clone(), dep);
+            for dep_id in file_deps {
+                push_edge(&mut dependencies, &mut dependents, file_id, dep_id);
             }
         }
 
@@ -508,17 +502,14 @@ impl AnalysisSession {
         // memoized, so the warm rebuild costs one map lookup per file rather
         // than a definition walk — and there is no imperatively-maintained
         // reverse map to drift out of sync with the definitions.
-        for file in &all_files {
+        for (file_id, file) in all_files.iter().enumerate() {
             let Some(sf) = db.lookup_source_file(file.as_ref()) else {
                 continue;
             };
             for target in crate::db::file_structural_deps(&db, sf).iter() {
-                push_edge(
-                    &mut dependencies,
-                    &mut dependents,
-                    file.clone(),
-                    target.clone(),
-                );
+                if let Some(&target_id) = file_ids.get(target.as_ref()) {
+                    push_edge(&mut dependencies, &mut dependents, file_id, target_id);
+                }
             }
         }
 
@@ -533,7 +524,9 @@ impl AnalysisSession {
             let stale = self.stale_defined_symbols.read();
             if !stale.is_empty() {
                 for (file, deleted_syms) in stale.iter() {
-                    let file: Arc<str> = Arc::from(file.as_str());
+                    let Some(&file_id) = file_ids.get(file.as_str()) else {
+                        continue;
+                    };
                     for sym in deleted_syms {
                         let lookup = crate::defining_file_lookup_key(sym);
                         // `defined_symbols()` only yields top-level FQ names
@@ -546,12 +539,9 @@ impl AnalysisSession {
                             for referencing_file in
                                 db.symbol_referencers_of(&format!("{prefix}{lookup}"))
                             {
-                                push_edge(
-                                    &mut dependencies,
-                                    &mut dependents,
-                                    referencing_file,
-                                    file.clone(),
-                                );
+                                if let Some(&ref_id) = file_ids.get(referencing_file.as_ref()) {
+                                    push_edge(&mut dependencies, &mut dependents, ref_id, file_id);
+                                }
                             }
                         }
                     }
@@ -562,9 +552,6 @@ impl AnalysisSession {
             }
         }
 
-        crate::DependencyGraph {
-            dependencies: stringify_graph(dependencies),
-            dependents: stringify_graph(dependents),
-        }
+        crate::DependencyGraph::from_compact_parts(all_files, file_ids, dependencies, dependents)
     }
 }

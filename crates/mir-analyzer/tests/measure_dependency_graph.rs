@@ -50,11 +50,12 @@ fn measure_dependency_graph() {
     session.rebuild_workspace_symbol_index();
 
     let db = session.snapshot_db();
-    let files: Vec<String> = db
+    let mut files: Vec<String> = db
         .source_file_paths()
         .iter()
         .map(|file| file.as_ref().to_string())
         .collect();
+    files.sort();
     drop(db);
 
     eprintln!(
@@ -64,35 +65,57 @@ fn measure_dependency_graph() {
         project_files.len()
     );
 
-    let mut warm_times = Vec::new();
+    let mut build_times = Vec::new();
     for iteration in 0..8 {
         let start = Instant::now();
-        let graph = black_box(session.dependency_graph());
+        black_box(session.dependency_graph());
         let elapsed = start.elapsed();
-        let dependency_edges = files
-            .iter()
-            .map(|file| graph.dependencies_of(file).len())
-            .sum::<usize>();
-        let dependent_edges = files
-            .iter()
-            .map(|file| graph.dependents_of(file).len())
-            .sum::<usize>();
         let label = if iteration == 0 { "cold" } else { "warm" };
         eprintln!(
-            "[measure_dependency_graph] {label}[{iteration}]={:.3}s dependencies={} dependents={}",
+            "[measure_dependency_graph] build_{label}[{iteration}]={:.3}s",
             elapsed.as_secs_f64(),
-            black_box(dependency_edges),
-            black_box(dependent_edges),
         );
         if iteration > 0 {
-            warm_times.push(elapsed.as_secs_f64());
+            build_times.push(elapsed.as_secs_f64());
         }
     }
-    warm_times.sort_by(|a, b| a.total_cmp(b));
+    build_times.sort_by(|a, b| a.total_cmp(b));
     eprintln!(
-        "[measure_dependency_graph] warm_median={:.3}s warm_min={:.3}s warm_max={:.3}s",
-        warm_times[warm_times.len() / 2],
-        warm_times[0],
-        warm_times[warm_times.len() - 1],
+        "[measure_dependency_graph] build_warm_median={:.3}s build_warm_min={:.3}s build_warm_max={:.3}s",
+        build_times[build_times.len() / 2],
+        build_times[0],
+        build_times[build_times.len() - 1],
+    );
+
+    let graph = session.dependency_graph();
+
+    let seeds: Vec<&String> = files.iter().take(256).collect();
+    let transitive_start = Instant::now();
+    let transitive_total = seeds
+        .iter()
+        .map(|file| graph.transitive_dependents(file).len())
+        .sum::<usize>();
+    let transitive_elapsed = transitive_start.elapsed();
+    eprintln!(
+        "[measure_dependency_graph] transitive_dependents_256={:.3}s total={}",
+        transitive_elapsed.as_secs_f64(),
+        black_box(transitive_total),
+    );
+
+    let legacy_start = Instant::now();
+    let dependency_edges = files
+        .iter()
+        .map(|file| graph.dependencies_of(file).len())
+        .sum::<usize>();
+    let dependent_edges = files
+        .iter()
+        .map(|file| graph.dependents_of(file).len())
+        .sum::<usize>();
+    let legacy_elapsed = legacy_start.elapsed();
+    eprintln!(
+        "[measure_dependency_graph] legacy_direct_access={:.3}s dependencies={} dependents={}",
+        legacy_elapsed.as_secs_f64(),
+        black_box(dependency_edges),
+        black_box(dependent_edges),
     );
 }
