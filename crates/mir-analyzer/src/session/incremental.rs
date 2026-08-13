@@ -475,7 +475,7 @@ impl AnalysisSession {
                 .and_then(|file| file_ids.get(file.as_ref()).copied())
         }
 
-        let mut all_files: Vec<Arc<str>> = db.source_file_paths().iter().cloned().collect();
+        let mut all_files: Vec<Arc<str>> = db.source_file_paths().to_vec();
         all_files.sort();
         assert!(
             u32::try_from(all_files.len()).is_ok(),

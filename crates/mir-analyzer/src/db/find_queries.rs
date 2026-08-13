@@ -25,8 +25,8 @@ use crate::db::{
     WorkspaceSymbolIndex,
 };
 
-fn find_named_def<'a, T>(
-    defs: &'a [Arc<T>],
+fn find_named_def<T>(
+    defs: &[Arc<T>],
     target: &str,
     name_of: impl Fn(&T) -> &Arc<str>,
 ) -> Option<Arc<T>> {
