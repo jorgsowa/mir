@@ -240,10 +240,7 @@ pub fn class_is_immutable(db: &dyn MirDatabase, fqcn: &str) -> bool {
 /// walk: a child class inherits readonly-ness from its base.
 /// Public predicate: true when `fqcn` is a native-readonly class or a PHP enum, and thus every
 /// non-constructor method on it is mutation-free by construction. See the private helper below.
-pub fn owner_type_is_mutation_free_by_construction(
-    db: &dyn MirDatabase,
-    fqcn: &str,
-) -> bool {
+pub fn owner_type_is_mutation_free_by_construction(db: &dyn MirDatabase, fqcn: &str) -> bool {
     matches!(
         owner_mutation_free_by_construction_kind(db, fqcn),
         Some(OwnerMutationFreeKind::NativeReadonly | OwnerMutationFreeKind::Enum)
@@ -284,7 +281,9 @@ fn owner_mutation_free_by_construction_kind(
                 if cls.is_readonly {
                     return Some(OwnerMutationFreeKind::NativeReadonly);
                 }
-                let Some(parent_fqcn) = cls.parent.clone() else { break };
+                let Some(parent_fqcn) = cls.parent.clone() else {
+                    break;
+                };
                 let here = crate::db::Fqcn::from_str(db, parent_fqcn.as_ref());
                 match crate::db::find_class_like(db, here) {
                     Some(ClassLike::Class(pcls)) => cls = pcls,

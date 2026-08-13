@@ -223,9 +223,9 @@ impl AnalysisSession {
             if issue.suppressed {
                 continue;
             }
-            let map = cache.entry(issue.location.file.clone()).or_insert_with(|| {
-                self.suppression_map_for_file(&db, &issue.location.file)
-            });
+            let map = cache
+                .entry(issue.location.file.clone())
+                .or_insert_with(|| self.suppression_map_for_file(&db, &issue.location.file));
             if let Some(map) = map.as_ref() {
                 if map.is_suppressed(
                     issue.location.line,
