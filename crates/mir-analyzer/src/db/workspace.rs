@@ -232,7 +232,6 @@ struct FileDeclarationProjection {
     class_like: Range<usize>,
     functions: Range<usize>,
     constants: Range<usize>,
-    structural_symbols: Vec<Arc<str>>,
 }
 
 #[salsa::tracked]
@@ -255,30 +254,11 @@ pub fn decls_from_slice(
     }
 }
 
-pub(crate) fn structural_symbols_from_slice(
-    slice: &mir_codebase::definitions::StubSlice,
-    file: SourceFile,
-) -> Arc<[Arc<str>]> {
-    declaration_projection_from_slice(slice, file)
-        .structural_symbols
-        .into()
-}
-
 fn declaration_projection_from_slice(
     slice: &mir_codebase::definitions::StubSlice,
     file: SourceFile,
 ) -> FileDeclarationProjection {
     let mut rows = Vec::new();
-    let mut structural_symbols = Vec::new();
-
-    let push_named_objects = |out: &mut Vec<Arc<str>>, union: &mir_types::Type| {
-        out.extend(union.types.iter().filter_map(|atomic| match atomic {
-            mir_types::atomic::Atomic::TNamedObject { fqcn, .. } => {
-                Some(Arc::<str>::from(fqcn.as_str()))
-            }
-            _ => None,
-        }));
-    };
 
     let class_like_start = rows.len();
     for (idx, c) in slice.classes.iter().enumerate() {
@@ -287,26 +267,6 @@ fn declaration_projection_from_slice(
             key: Name::new(c.fqcn.as_ref()).ascii_lowercase(),
             packed_loc: PackedSymbolLoc::from_symbol_loc(SymbolLoc::Class { file, idx }),
         });
-        if let Some(parent) = &c.parent {
-            structural_symbols.push(parent.clone());
-        }
-        structural_symbols.extend(c.interfaces.iter().cloned());
-        structural_symbols.extend(c.traits.iter().cloned());
-        for prop in c.own_properties.values() {
-            if let Some(ty) = &prop.ty {
-                push_named_objects(&mut structural_symbols, ty);
-            }
-        }
-        for method in c.own_methods.values() {
-            for param in method.params.iter() {
-                if let Some(ty) = &param.ty {
-                    push_named_objects(&mut structural_symbols, ty.as_ref());
-                }
-            }
-            if let Some(rt) = method.return_type.as_deref() {
-                push_named_objects(&mut structural_symbols, rt);
-            }
-        }
     }
     for (idx, i) in slice.interfaces.iter().enumerate() {
         rows.push(FileDeclRow {
@@ -314,22 +274,6 @@ fn declaration_projection_from_slice(
             key: Name::new(i.fqcn.as_ref()).ascii_lowercase(),
             packed_loc: PackedSymbolLoc::from_symbol_loc(SymbolLoc::Interface { file, idx }),
         });
-        structural_symbols.extend(i.extends.iter().cloned());
-        for prop in i.own_properties.values() {
-            if let Some(ty) = &prop.ty {
-                push_named_objects(&mut structural_symbols, ty);
-            }
-        }
-        for method in i.own_methods.values() {
-            for param in method.params.iter() {
-                if let Some(ty) = &param.ty {
-                    push_named_objects(&mut structural_symbols, ty.as_ref());
-                }
-            }
-            if let Some(rt) = method.return_type.as_deref() {
-                push_named_objects(&mut structural_symbols, rt);
-            }
-        }
     }
     for (idx, t) in slice.traits.iter().enumerate() {
         rows.push(FileDeclRow {
@@ -337,22 +281,6 @@ fn declaration_projection_from_slice(
             key: Name::new(t.fqcn.as_ref()).ascii_lowercase(),
             packed_loc: PackedSymbolLoc::from_symbol_loc(SymbolLoc::Trait { file, idx }),
         });
-        structural_symbols.extend(t.traits.iter().cloned());
-        for prop in t.own_properties.values() {
-            if let Some(ty) = &prop.ty {
-                push_named_objects(&mut structural_symbols, ty);
-            }
-        }
-        for method in t.own_methods.values() {
-            for param in method.params.iter() {
-                if let Some(ty) = &param.ty {
-                    push_named_objects(&mut structural_symbols, ty.as_ref());
-                }
-            }
-            if let Some(rt) = method.return_type.as_deref() {
-                push_named_objects(&mut structural_symbols, rt);
-            }
-        }
     }
     for (idx, e) in slice.enums.iter().enumerate() {
         rows.push(FileDeclRow {
@@ -360,18 +288,6 @@ fn declaration_projection_from_slice(
             key: Name::new(e.fqcn.as_ref()).ascii_lowercase(),
             packed_loc: PackedSymbolLoc::from_symbol_loc(SymbolLoc::Enum { file, idx }),
         });
-        structural_symbols.extend(e.interfaces.iter().cloned());
-        structural_symbols.extend(e.traits.iter().cloned());
-        for method in e.own_methods.values() {
-            for param in method.params.iter() {
-                if let Some(ty) = &param.ty {
-                    push_named_objects(&mut structural_symbols, ty.as_ref());
-                }
-            }
-            if let Some(rt) = method.return_type.as_deref() {
-                push_named_objects(&mut structural_symbols, rt);
-            }
-        }
     }
     let class_like = class_like_start..rows.len();
 
@@ -382,14 +298,6 @@ fn declaration_projection_from_slice(
             key: Name::new(f.fqn.as_ref()).ascii_lowercase(),
             packed_loc: PackedSymbolLoc::from_symbol_loc(SymbolLoc::Function { file, idx }),
         });
-        for param in f.params.iter() {
-            if let Some(ty) = &param.ty {
-                push_named_objects(&mut structural_symbols, ty.as_ref());
-            }
-        }
-        if let Some(rt) = f.return_type.as_deref() {
-            push_named_objects(&mut structural_symbols, rt);
-        }
     }
     let functions = function_start..rows.len();
 
@@ -403,19 +311,11 @@ fn declaration_projection_from_slice(
     }
     let constants = constant_start..rows.len();
 
-    structural_symbols.extend(
-        slice
-            .imports
-            .values()
-            .map(|fqcn| Arc::<str>::from(fqcn.as_str())),
-    );
-
     FileDeclarationProjection {
         rows,
         class_like,
         functions,
         constants,
-        structural_symbols,
     }
 }
 
