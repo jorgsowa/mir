@@ -445,19 +445,19 @@ impl AnalysisSession {
         let db = self.snapshot_db();
 
         fn push_edge(
-            dependencies: &mut [Vec<usize>],
-            dependents: &mut [Vec<usize>],
-            from: usize,
-            to: usize,
+            dependencies: &mut [Vec<u32>],
+            dependents: &mut [Vec<u32>],
+            from: u32,
+            to: u32,
         ) {
             if from == to {
                 return;
             }
-            dependents[to].push(from);
-            dependencies[from].push(to);
+            dependents[to as usize].push(from);
+            dependencies[from as usize].push(to);
         }
 
-        fn sort_and_dedup(adjacency: &mut [Vec<usize>]) {
+        fn sort_and_dedup(adjacency: &mut [Vec<u32>]) {
             for deps in adjacency {
                 deps.sort();
                 deps.dedup();
@@ -466,10 +466,14 @@ impl AnalysisSession {
 
         let mut all_files: Vec<Arc<str>> = db.source_file_paths().iter().cloned().collect();
         all_files.sort();
-        let file_ids: HashMap<Arc<str>, usize> = all_files
+        assert!(
+            u32::try_from(all_files.len()).is_ok(),
+            "dependency graph file ids require at most u32::MAX files"
+        );
+        let file_ids: HashMap<Arc<str>, u32> = all_files
             .iter()
             .enumerate()
-            .map(|(id, file)| (file.clone(), id))
+            .map(|(id, file)| (file.clone(), id as u32))
             .collect();
 
         let mut dependencies = vec![Vec::new(); all_files.len()];
@@ -478,7 +482,8 @@ impl AnalysisSession {
         for (file_id, file) in all_files.iter().enumerate() {
             // O(degree(file)) — forward index lookup, no full-table scan.
             let symbol_keys = db.file_referenced_symbols(file.as_ref());
-            let mut file_deps: HashSet<usize> = HashSet::default();
+            let file_id = file_id as u32;
+            let mut file_deps: HashSet<u32> = HashSet::default();
             for symbol_key in &symbol_keys {
                 let lookup = crate::defining_file_lookup_key(symbol_key);
                 if let Some(def_file) = db.symbol_defining_file(lookup) {
@@ -506,6 +511,7 @@ impl AnalysisSession {
             let Some(sf) = db.lookup_source_file(file.as_ref()) else {
                 continue;
             };
+            let file_id = file_id as u32;
             for target in crate::db::file_structural_deps(&db, sf).iter() {
                 if let Some(&target_id) = file_ids.get(target.as_ref()) {
                     push_edge(&mut dependencies, &mut dependents, file_id, target_id);

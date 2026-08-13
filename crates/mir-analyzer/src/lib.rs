@@ -311,11 +311,11 @@ pub struct HoverInfo {
 #[derive(Debug)]
 pub struct DependencyGraph {
     files: Vec<Arc<str>>,
-    file_ids: FxHashMap<Arc<str>, usize>,
+    file_ids: FxHashMap<Arc<str>, u32>,
     /// Direct dependencies: file id → [file ids it depends on]
-    dependencies: Vec<Vec<usize>>,
+    dependencies: Vec<Vec<u32>>,
     /// Reverse dependencies: file id → [file ids that depend on it]
-    dependents: Vec<Vec<usize>>,
+    dependents: Vec<Vec<u32>>,
     legacy_dependencies: OnceLock<FxHashMap<String, Vec<String>>>,
     legacy_dependents: OnceLock<FxHashMap<String, Vec<String>>>,
 }
@@ -336,9 +336,9 @@ impl Clone for DependencyGraph {
 impl DependencyGraph {
     pub(crate) fn from_compact_parts(
         files: Vec<Arc<str>>,
-        file_ids: FxHashMap<Arc<str>, usize>,
-        dependencies: Vec<Vec<usize>>,
-        dependents: Vec<Vec<usize>>,
+        file_ids: FxHashMap<Arc<str>, u32>,
+        dependencies: Vec<Vec<u32>>,
+        dependents: Vec<Vec<u32>>,
     ) -> Self {
         Self {
             files,
@@ -365,7 +365,11 @@ impl DependencyGraph {
         self.dependents.iter().map(Vec::len).sum()
     }
 
-    fn stringify_adjacency(&self, adjacency: &[Vec<usize>]) -> FxHashMap<String, Vec<String>> {
+    fn file_path(&self, id: u32) -> &Arc<str> {
+        &self.files[id as usize]
+    }
+
+    fn stringify_adjacency(&self, adjacency: &[Vec<u32>]) -> FxHashMap<String, Vec<String>> {
         adjacency
             .iter()
             .enumerate()
@@ -374,11 +378,36 @@ impl DependencyGraph {
                 (
                     self.files[file_id].to_string(),
                     deps.iter()
-                        .map(|&dep_id| self.files[dep_id].to_string())
+                        .map(|&dep_id| self.file_path(dep_id).to_string())
                         .collect(),
                 )
             })
             .collect()
+    }
+
+    fn direct_arcs<'a>(
+        &'a self,
+        file: &str,
+        adjacency: &'a [Vec<u32>],
+    ) -> impl Iterator<Item = &'a Arc<str>> {
+        self.file_ids
+            .get(file)
+            .and_then(|&id| adjacency.get(id as usize))
+            .into_iter()
+            .flatten()
+            .map(|&id| self.file_path(id))
+    }
+
+    /// Files that `file` directly depends on, as interned paths.
+    pub fn dependency_paths_of(&self, file: &str) -> Vec<Arc<str>> {
+        self.direct_arcs(file, &self.dependencies)
+            .cloned()
+            .collect()
+    }
+
+    /// Files that directly depend on `file`, as interned paths.
+    pub fn dependent_paths_of(&self, file: &str) -> Vec<Arc<str>> {
+        self.direct_arcs(file, &self.dependents).cloned().collect()
     }
 
     /// Files that `file` directly depends on (imports, parent classes, interfaces, traits).
@@ -406,16 +435,14 @@ impl DependencyGraph {
             return Vec::new();
         };
         let mut queue = vec![seed];
+        visited.insert(seed);
         let mut result = Vec::new();
 
         while let Some(current) = queue.pop() {
-            if !visited.insert(current) {
-                continue;
-            }
-            for &dep in &self.dependencies[current] {
-                if !visited.contains(&dep) {
+            for &dep in &self.dependencies[current as usize] {
+                if visited.insert(dep) {
                     queue.push(dep);
-                    result.push(self.files[dep].to_string());
+                    result.push(self.file_path(dep).to_string());
                 }
             }
         }
@@ -429,16 +456,14 @@ impl DependencyGraph {
             return Vec::new();
         };
         let mut queue = vec![seed];
+        visited.insert(seed);
         let mut result = Vec::new();
 
         while let Some(current) = queue.pop() {
-            if !visited.insert(current) {
-                continue;
-            }
-            for &dep in &self.dependents[current] {
-                if !visited.contains(&dep) {
+            for &dep in &self.dependents[current as usize] {
+                if visited.insert(dep) {
                     queue.push(dep);
-                    result.push(self.files[dep].to_string());
+                    result.push(self.file_path(dep).to_string());
                 }
             }
         }
@@ -450,6 +475,94 @@ pub mod symbol;
 pub use mir_codebase::definitions::{DeclaredParam, FunctionDef, TemplateParam, Visibility};
 pub use mir_issues::{Issue, IssueKind, Severity};
 pub use mir_types::Type;
+
+#[cfg(test)]
+mod dependency_graph_tests {
+    use super::*;
+
+    fn graph(edges: &[(&str, &[&str])]) -> DependencyGraph {
+        let mut files: Vec<Arc<str>> = edges
+            .iter()
+            .flat_map(|(from, deps)| {
+                std::iter::once(*from)
+                    .chain(deps.iter().copied())
+                    .map(Arc::<str>::from)
+            })
+            .collect();
+        files.sort();
+        files.dedup();
+
+        let file_ids: FxHashMap<Arc<str>, u32> = files
+            .iter()
+            .enumerate()
+            .map(|(id, file)| (file.clone(), id as u32))
+            .collect();
+        let mut dependencies = vec![Vec::new(); files.len()];
+        let mut dependents = vec![Vec::new(); files.len()];
+
+        for (from, deps) in edges {
+            let from_id = file_ids[*from];
+            for dep in *deps {
+                let dep_id = file_ids[*dep];
+                dependencies[from_id as usize].push(dep_id);
+                dependents[dep_id as usize].push(from_id);
+            }
+        }
+        for adjacency in [&mut dependencies, &mut dependents] {
+            for deps in adjacency {
+                deps.sort();
+                deps.dedup();
+            }
+        }
+
+        DependencyGraph::from_compact_parts(files, file_ids, dependencies, dependents)
+    }
+
+    #[test]
+    fn transitive_traversal_deduplicates_diamond_graphs() {
+        let graph = graph(&[
+            ("a.php", &["b.php", "c.php"]),
+            ("b.php", &["d.php"]),
+            ("c.php", &["d.php"]),
+        ]);
+
+        let deps = graph.transitive_dependencies("a.php");
+        assert_eq!(
+            deps.iter().filter(|path| path.as_str() == "d.php").count(),
+            1
+        );
+        assert_eq!(deps.len(), 3);
+
+        let dependents = graph.transitive_dependents("d.php");
+        assert_eq!(
+            dependents
+                .iter()
+                .filter(|path| path.as_str() == "a.php")
+                .count(),
+            1
+        );
+        assert_eq!(dependents.len(), 3);
+    }
+
+    #[test]
+    fn direct_arc_accessors_do_not_require_legacy_string_maps() {
+        let graph = graph(&[("consumer.php", &["service.php"])]);
+
+        let deps = graph.dependency_paths_of("consumer.php");
+        assert_eq!(deps, vec![Arc::<str>::from("service.php")]);
+        assert!(graph.legacy_dependencies.get().is_none());
+
+        let dependents = graph.dependent_paths_of("service.php");
+        assert_eq!(dependents, vec![Arc::<str>::from("consumer.php")]);
+        assert!(graph.legacy_dependents.get().is_none());
+
+        assert_eq!(
+            graph.dependencies_of("consumer.php"),
+            &["service.php".to_string()]
+        );
+        assert!(graph.legacy_dependencies.get().is_some());
+    }
+}
 
 /// Convert a parser [`php_ast::Span`] (byte-offset range) into a
 /// [`mir_types::Location`] (file path + 1-based line range +

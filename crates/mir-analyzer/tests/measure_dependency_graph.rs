@@ -102,6 +102,23 @@ fn measure_dependency_graph() {
         black_box(transitive_total),
     );
 
+    let direct_arc_start = Instant::now();
+    let dependency_edges = files
+        .iter()
+        .map(|file| graph.dependency_paths_of(file).len())
+        .sum::<usize>();
+    let dependent_edges = files
+        .iter()
+        .map(|file| graph.dependent_paths_of(file).len())
+        .sum::<usize>();
+    let direct_arc_elapsed = direct_arc_start.elapsed();
+    eprintln!(
+        "[measure_dependency_graph] direct_arc_access={:.3}s dependencies={} dependents={}",
+        direct_arc_elapsed.as_secs_f64(),
+        black_box(dependency_edges),
+        black_box(dependent_edges),
+    );
+
     let legacy_start = Instant::now();
     let dependency_edges = files
         .iter()
