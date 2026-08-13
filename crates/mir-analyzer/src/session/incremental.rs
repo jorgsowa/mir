@@ -444,37 +444,59 @@ impl AnalysisSession {
     pub fn dependency_graph(&self) -> crate::DependencyGraph {
         let db = self.snapshot_db();
 
-        let all_files: Vec<String> = db
-            .source_file_paths()
-            .iter()
-            .map(|f| f.as_ref().to_string())
-            .collect();
+        fn push_edge(
+            dependencies: &mut HashMap<Arc<str>, Vec<Arc<str>>>,
+            dependents: &mut HashMap<Arc<str>, Vec<Arc<str>>>,
+            from: Arc<str>,
+            to: Arc<str>,
+        ) {
+            if from == to {
+                return;
+            }
+            dependents.entry(to.clone()).or_default().push(from.clone());
+            dependencies.entry(from).or_default().push(to);
+        }
 
-        let mut dependencies: HashMap<String, Vec<String>> = HashMap::default();
-        let mut dependents: HashMap<String, Vec<String>> = HashMap::default();
+        fn sort_and_dedup(map: &mut HashMap<Arc<str>, Vec<Arc<str>>>) {
+            for deps in map.values_mut() {
+                deps.sort();
+                deps.dedup();
+            }
+        }
+
+        fn stringify_graph(
+            graph: HashMap<Arc<str>, Vec<Arc<str>>>,
+        ) -> HashMap<String, Vec<String>> {
+            graph
+                .into_iter()
+                .map(|(file, deps)| {
+                    (
+                        file.to_string(),
+                        deps.into_iter().map(|dep| dep.to_string()).collect(),
+                    )
+                })
+                .collect()
+        }
+
+        let all_files: Vec<Arc<str>> = db.source_file_paths().iter().cloned().collect();
+
+        let mut dependencies: HashMap<Arc<str>, Vec<Arc<str>>> = HashMap::default();
+        let mut dependents: HashMap<Arc<str>, Vec<Arc<str>>> = HashMap::default();
 
         for file in &all_files {
             // O(degree(file)) — forward index lookup, no full-table scan.
-            let symbol_keys = db.file_referenced_symbols(file);
-            let mut file_deps: HashSet<String> = HashSet::default();
+            let symbol_keys = db.file_referenced_symbols(file.as_ref());
+            let mut file_deps: HashSet<Arc<str>> = HashSet::default();
             for symbol_key in &symbol_keys {
                 let lookup = crate::defining_file_lookup_key(symbol_key);
                 if let Some(def_file) = db.symbol_defining_file(lookup) {
-                    let def = def_file.as_ref().to_string();
-                    if &def != file {
-                        file_deps.insert(def);
+                    if def_file != *file {
+                        file_deps.insert(def_file);
                     }
                 }
             }
-            for dep in &file_deps {
-                dependents
-                    .entry(dep.clone())
-                    .or_default()
-                    .push(file.clone());
-                dependencies
-                    .entry(file.clone())
-                    .or_default()
-                    .push(dep.clone());
+            for dep in file_deps {
+                push_edge(&mut dependencies, &mut dependents, file.clone(), dep);
             }
         }
 
@@ -487,29 +509,21 @@ impl AnalysisSession {
         // than a definition walk — and there is no imperatively-maintained
         // reverse map to drift out of sync with the definitions.
         for file in &all_files {
-            let Some(sf) = db.lookup_source_file(file) else {
+            let Some(sf) = db.lookup_source_file(file.as_ref()) else {
                 continue;
             };
             for target in crate::db::file_structural_deps(&db, sf).iter() {
-                let target = target.as_ref().to_string();
-                if &target != file {
-                    dependents
-                        .entry(target.clone())
-                        .or_default()
-                        .push(file.clone());
-                    dependencies.entry(file.clone()).or_default().push(target);
-                }
+                push_edge(
+                    &mut dependencies,
+                    &mut dependents,
+                    file.clone(),
+                    target.clone(),
+                );
             }
         }
 
-        for deps in dependents.values_mut() {
-            deps.sort();
-            deps.dedup();
-        }
-        for deps in dependencies.values_mut() {
-            deps.sort();
-            deps.dedup();
-        }
+        sort_and_dedup(&mut dependents);
+        sort_and_dedup(&mut dependencies);
 
         // Augment with stale dependents: files referencing symbols that were
         // deleted from their defining file. These edges disappear from the
@@ -519,6 +533,7 @@ impl AnalysisSession {
             let stale = self.stale_defined_symbols.read();
             if !stale.is_empty() {
                 for (file, deleted_syms) in stale.iter() {
+                    let file: Arc<str> = Arc::from(file.as_str());
                     for sym in deleted_syms {
                         let lookup = crate::defining_file_lookup_key(sym);
                         // `defined_symbols()` only yields top-level FQ names
@@ -531,33 +546,25 @@ impl AnalysisSession {
                             for referencing_file in
                                 db.symbol_referencers_of(&format!("{prefix}{lookup}"))
                             {
-                                let ref_file = referencing_file.as_ref().to_string();
-                                if &ref_file != file {
-                                    dependents
-                                        .entry(file.clone())
-                                        .or_default()
-                                        .push(ref_file.clone());
-                                    dependencies.entry(ref_file).or_default().push(file.clone());
-                                }
+                                push_edge(
+                                    &mut dependencies,
+                                    &mut dependents,
+                                    referencing_file,
+                                    file.clone(),
+                                );
                             }
                         }
                     }
                 }
                 // Re-sort and dedup since we may have added entries.
-                for deps in dependents.values_mut() {
-                    deps.sort();
-                    deps.dedup();
-                }
-                for deps in dependencies.values_mut() {
-                    deps.sort();
-                    deps.dedup();
-                }
+                sort_and_dedup(&mut dependents);
+                sort_and_dedup(&mut dependencies);
             }
         }
 
         crate::DependencyGraph {
-            dependencies,
-            dependents,
+            dependencies: stringify_graph(dependencies),
+            dependents: stringify_graph(dependents),
         }
     }
 }
