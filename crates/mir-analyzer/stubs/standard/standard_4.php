@@ -448,6 +448,7 @@ function ini_get(string $option): string|false {}
  * why access shows the appropriate bitmask values.
  * </p>
  * @pure
+ * @return array<string, array{global_value: string, local_value: string, access: int}>|false Array of config options on success or <b>FALSE</b> on failure.
  */
 #[ArrayShape(["global_value" => "string", "local_value" => "string", "access" => "int"])]
 function ini_get_all(?string $extension = null, #[PhpStormStubsElementAvailable(from: '7.0')] bool $details = true): array|false {}
