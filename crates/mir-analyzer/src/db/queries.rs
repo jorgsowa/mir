@@ -806,37 +806,34 @@ pub fn db_php_version(db: &dyn MirDatabase) -> crate::php_version::PhpVersion {
 ///
 /// Centralizing that setup keeps the query family behavior aligned and makes
 /// future parse/version changes land in one place.
-#[derive(Clone)]
-pub struct PreparedAnalysisFile {
-    pub path: Arc<str>,
-    pub text: Arc<str>,
-    pub parsed: TrackedParseResult,
+pub struct PreparedAnalysisFile<'a> {
+    pub path: &'a Arc<str>,
+    pub text: &'a Arc<str>,
+    pub parsed: &'a TrackedParseResult,
     pub php_version: crate::php_version::PhpVersion,
     pub has_hard_parse_errors: bool,
 }
 
-impl PreparedAnalysisFile {
+impl PreparedAnalysisFile<'_> {
     pub fn parse_result(&self) -> &php_rs_parser::ParseResult {
         &self.parsed.0
     }
 }
 
-pub fn prepare_analysis_file(db: &dyn MirDatabase, file: SourceFile) -> PreparedAnalysisFile {
+pub fn prepare_analysis_file(db: &dyn MirDatabase, file: SourceFile) -> PreparedAnalysisFile<'_> {
     let path = file.path(db);
     let text = file.text(db);
     let parsed = parse_file(db, file);
-    let has_hard_parse_errors = parsed
-        .0
-        .errors
-        .iter()
-        .any(crate::parser::is_hard_parse_error);
-
     PreparedAnalysisFile {
-        path: path.clone(),
-        text: text.clone(),
-        parsed: parsed.clone(),
+        path,
+        text,
+        has_hard_parse_errors: parsed
+            .0
+            .errors
+            .iter()
+            .any(crate::parser::is_hard_parse_error),
+        parsed,
         php_version: db_php_version(db),
-        has_hard_parse_errors,
     }
 }
 
