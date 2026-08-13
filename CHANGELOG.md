@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.71.0] - 2026-08-13
+
+### Changed
+
+- **Compact symbol indexes:** workspace declaration, subtype, and
+  referencer storage are compacted (CSR-style) across the batch path,
+  cutting duplicate projection and per-call query-setup churn.
+- **Query setup deduplication:** repeated find-symbol lookups, per-file
+  analysis setups, definition walkers, and reverse dependency projections
+  share interned symbols instead of rebuilding them.
+
+### Fixed
+
+- **`#[Pure]` stub honors:** purity analysis now respects a `#[Pure]`
+  attribute on user stubs.
+- **readonly / enum mutation-free receivers:** enum receiver accessors,
+  readonly native getters, and native readonly class methods are treated
+  as mutation-free by construction.
+- **stub shape for `ini_get_all()` documented.**
+
 ## [0.70.1] - 2026-08-06
 
 ### Added
