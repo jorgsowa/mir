@@ -747,21 +747,35 @@ impl CallAnalyzer {
                     if !reachable {
                         continue;
                     }
-                    let arg_is_object = crate::expr::assignment::resolve_chained_receiver_type(
-                        value, ctx, ea.db, &ea.file,
-                    )
-                    .is_some_and(|ty| {
-                        ty.types.iter().any(|a| {
-                            matches!(
-                                a,
-                                Atomic::TNamedObject { .. }
-                                    | Atomic::TSelf { .. }
-                                    | Atomic::TStaticObject { .. }
-                                    | Atomic::TParent { .. }
-                            )
-                        })
-                    });
-                    if arg_is_object {
+                    // An argument that itself can't be mutated — a native-readonly class or
+                    // PHP enum passed into even an impure function/object — cannot have its
+                    // state changed by the callee, so it is not a mutation risk regardless of
+                    // that callee's purity (see `expr/objects.rs`'s identical new-exemption).
+                    let arg_mutation_risk =
+                        crate::expr::assignment::resolve_chained_receiver_type(
+                            value, ctx, ea.db, &ea.file,
+                        )
+                        .is_some_and(|ty| {
+                            for atom in ty.types.iter() {
+                                match atom {
+                                    Atomic::TNamedObject { fqcn, .. }
+                                    | Atomic::TSelf { fqcn }
+                                    | Atomic::TStaticObject { fqcn }
+                                    | Atomic::TParent { fqcn } => {
+                                        if crate::db::owner_type_is_mutation_free_by_construction(
+                                            ea.db,
+                                            fqcn.as_ref(),
+                                        ) {
+                                            continue;
+                                        }
+                                        return true;
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            false
+                        });
+                    if arg_mutation_risk {
                         ea.emit(
                             IssueKind::ImpureFunctionCall {
                                 fn_name: fn_name

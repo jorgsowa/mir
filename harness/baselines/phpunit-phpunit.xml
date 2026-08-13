@@ -47,20 +47,6 @@
       <code><![CDATA[...hrtime()]]></code>
     </MixedArgument>
   </file>
-  <file src="src/Event/Value/Test/Issue/IssueTrigger.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->callee->isFirstPartyOrTest()]]></code>
-      <code><![CDATA[$this->caller->isFirstPartyOrTest()]]></code>
-      <code><![CDATA[$this->callee->isThirdPartyOrPhpunitOrPhp()]]></code>
-      <code><![CDATA[$this->caller->isThirdPartyOrPhpunitOrPhp()]]></code>
-      <code><![CDATA[$this->callee->isThirdPartyOrPhpunitOrPhp()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Event/Value/Test/TestCollection.php">
-    <ImpureFunctionCall>
-      <code><![CDATA[new TestCollectionIterator($this)]]></code>
-    </ImpureFunctionCall>
-  </file>
   <file src="src/Framework/Assert.php">
     <MissingThrowsDocblock>
       <code><![CDATA[array_combine($keysToBeConsidered, $keysToBeConsidered)]]></code>
@@ -443,11 +429,6 @@
       <code><![CDATA[$position]]></code>
     </PossiblyInvalidArgument>
   </file>
-  <file src="src/Logging/TestDox/TestResult/TestResultCollection.php">
-    <ImpureFunctionCall>
-      <code><![CDATA[new TestResultCollectionIterator($this)]]></code>
-    </ImpureFunctionCall>
-  </file>
   <file src="src/Metadata/Api/DataProvider.php">
     <MixedAssignment>
       <code><![CDATA[$data = $className::$methodName()]]></code>
@@ -468,11 +449,6 @@
     <MixedAssignment>
       <code><![CDATA[$environmentVariables    = $_ENV]]></code>
     </MixedAssignment>
-  </file>
-  <file src="src/Metadata/MetadataCollection.php">
-    <ImpureFunctionCall>
-      <code><![CDATA[new MetadataCollectionIterator($this)]]></code>
-    </ImpureFunctionCall>
   </file>
   <file src="src/Metadata/Parser/AttributeParser.php">
     <MixedAssignment>
@@ -816,66 +792,6 @@
     <MixedAssignment>
       <code><![CDATA[$file]]></code>
     </MixedAssignment>
-  </file>
-  <file src="src/TextUI/Configuration/Value/ConstantCollection.php">
-    <ImpureFunctionCall>
-      <code><![CDATA[new ConstantCollectionIterator($this)]]></code>
-    </ImpureFunctionCall>
-  </file>
-  <file src="src/TextUI/Configuration/Value/DirectoryCollection.php">
-    <ImpureFunctionCall>
-      <code><![CDATA[new DirectoryCollectionIterator($this)]]></code>
-    </ImpureFunctionCall>
-  </file>
-  <file src="src/TextUI/Configuration/Value/ExtensionBootstrapCollection.php">
-    <ImpureFunctionCall>
-      <code><![CDATA[new ExtensionBootstrapCollectionIterator($this)]]></code>
-    </ImpureFunctionCall>
-  </file>
-  <file src="src/TextUI/Configuration/Value/FileCollection.php">
-    <ImpureFunctionCall>
-      <code><![CDATA[new FileCollectionIterator($this)]]></code>
-    </ImpureFunctionCall>
-  </file>
-  <file src="src/TextUI/Configuration/Value/FilterDirectoryCollection.php">
-    <ImpureFunctionCall>
-      <code><![CDATA[new FilterDirectoryCollectionIterator($this)]]></code>
-    </ImpureFunctionCall>
-  </file>
-  <file src="src/TextUI/Configuration/Value/FilterFileCollection.php">
-    <ImpureFunctionCall>
-      <code><![CDATA[new FilterFileCollectionIterator($this)]]></code>
-    </ImpureFunctionCall>
-  </file>
-  <file src="src/TextUI/Configuration/Value/GroupCollection.php">
-    <ImpureFunctionCall>
-      <code><![CDATA[new GroupCollectionIterator($this)]]></code>
-    </ImpureFunctionCall>
-  </file>
-  <file src="src/TextUI/Configuration/Value/IniSettingCollection.php">
-    <ImpureFunctionCall>
-      <code><![CDATA[new IniSettingCollectionIterator($this)]]></code>
-    </ImpureFunctionCall>
-  </file>
-  <file src="src/TextUI/Configuration/Value/TestDirectoryCollection.php">
-    <ImpureFunctionCall>
-      <code><![CDATA[new TestDirectoryCollectionIterator($this)]]></code>
-    </ImpureFunctionCall>
-  </file>
-  <file src="src/TextUI/Configuration/Value/TestFileCollection.php">
-    <ImpureFunctionCall>
-      <code><![CDATA[new TestFileCollectionIterator($this)]]></code>
-    </ImpureFunctionCall>
-  </file>
-  <file src="src/TextUI/Configuration/Value/TestSuiteCollection.php">
-    <ImpureFunctionCall>
-      <code><![CDATA[new TestSuiteCollectionIterator($this)]]></code>
-    </ImpureFunctionCall>
-  </file>
-  <file src="src/TextUI/Configuration/Value/VariableCollection.php">
-    <ImpureFunctionCall>
-      <code><![CDATA[new VariableCollectionIterator($this)]]></code>
-    </ImpureFunctionCall>
   </file>
   <file src="src/TextUI/Configuration/Xml/Loader.php">
     <MixedArgument>

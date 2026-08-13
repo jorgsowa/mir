@@ -27,15 +27,6 @@
       <code><![CDATA[public function build(CodecInterface $codec, string $bytes): UuidInterface]]></code>
     </MethodSignatureMismatch>
   </file>
-  <file src="src/Builder/FallbackBuilder.php">
-    <ImpureFunctionCall>
-      <code><![CDATA[new BuilderNotFoundException(
-            'Could not find a suitable builder for the provided codec and fields',
-            0,
-            $lastBuilderException,
-        )]]></code>
-    </ImpureFunctionCall>
-  </file>
   <file src="src/Codec/GuidStringCodec.php">
     <ImpureMethodCall>
       <code><![CDATA[$this->getBytes($encodedUuid)]]></code>
@@ -227,14 +218,6 @@
       <code><![CDATA[self::DOMAINS]]></code>
     </MixedArgument>
   </file>
-  <file src="src/Generator/DefaultNameGenerator.php">
-    <ImpureFunctionCall>
-      <code><![CDATA[new NameException(
-                message: sprintf('Unable to hash namespace and name with algorithm \'%s\'', $hashAlgorithm),
-                previous: $e,
-            )]]></code>
-    </ImpureFunctionCall>
-  </file>
   <file src="src/Generator/DefaultTimeGenerator.php">
     <RedundantCast>
       <code><![CDATA[$exception->getCode()]]></code>
@@ -242,9 +225,6 @@
   </file>
   <file src="src/Generator/PeclUuidNameGenerator.php">
     <ImpureFunctionCall>
-      <code><![CDATA[new NameException(
-                sprintf('Unable to hash namespace and name with algorithm \'%s\'', $hashAlgorithm),
-            )]]></code>
       <code><![CDATA[uuid_parse($uuid)]]></code>
     </ImpureFunctionCall>
     <MixedArgument>
@@ -324,7 +304,6 @@
   <file src="src/Guid/GuidBuilder.php">
     <ImpureFunctionCall>
       <code><![CDATA[new Guid($this->buildFields($bytes), $this->numberConverter, $codec, $this->timeConverter)]]></code>
-      <code><![CDATA[new UnableToBuildUuidException($e->getMessage(), (int) $e->getCode(), $e)]]></code>
       <code><![CDATA[new Fields($bytes)]]></code>
     </ImpureFunctionCall>
     <RedundantCast>
@@ -424,7 +403,6 @@
   <file src="src/Nonstandard/UuidBuilder.php">
     <ImpureFunctionCall>
       <code><![CDATA[new Uuid($this->buildFields($bytes), $this->numberConverter, $codec, $this->timeConverter)]]></code>
-      <code><![CDATA[new UnableToBuildUuidException($e->getMessage(), (int) $e->getCode(), $e)]]></code>
       <code><![CDATA[new Fields($bytes)]]></code>
     </ImpureFunctionCall>
     <RedundantCast>
@@ -547,10 +525,6 @@
       <code><![CDATA[new UuidV6($fields, $this->numberConverter, $codec, $this->timeConverter)]]></code>
       <code><![CDATA[new UuidV7($fields, $this->numberConverter, $codec, $this->unixTimeConverter)]]></code>
       <code><![CDATA[new UuidV8($fields, $this->numberConverter, $codec, $this->timeConverter)]]></code>
-      <code><![CDATA[new UnsupportedOperationException(
-                    'The UUID version in the given fields is not supported by this UUID builder',
-                )]]></code>
-      <code><![CDATA[new UnableToBuildUuidException($e->getMessage(), (int) $e->getCode(), $e)]]></code>
       <code><![CDATA[new Fields($bytes)]]></code>
     </ImpureFunctionCall>
     <RedundantCast>
@@ -667,8 +641,6 @@
       <code><![CDATA[preg_match(LazyUuidFromString::VALID_REGEX, $uuid)]]></code>
       <code><![CDATA[new LazyUuidFromString($uuid)]]></code>
       <code><![CDATA[assert($uuid instanceof UuidInterface)]]></code>
-      <code><![CDATA[new BadMethodCallException('The method fromHexadecimal() does not exist on the provided factory')]]></code>
-      <code><![CDATA[new UnsupportedOperationException('The provided factory does not support the uuid8() method')]]></code>
     </ImpureFunctionCall>
     <ImpureMethodCall>
       <code><![CDATA[$this->toString()]]></code>

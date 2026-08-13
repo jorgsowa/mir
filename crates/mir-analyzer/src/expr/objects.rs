@@ -552,22 +552,40 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 if !reachable {
                                     continue;
                                 }
-                                let arg_is_object =
+                                let resolved =
                                     crate::expr::assignment::resolve_chained_receiver_type(
                                         value, ctx, self.db, &self.file,
-                                    )
-                                    .is_some_and(|ty| {
-                                        ty.types.iter().any(|a| {
-                                            matches!(
-                                                a,
-                                                Atomic::TNamedObject { .. }
-                                                    | Atomic::TSelf { .. }
-                                                    | Atomic::TStaticObject { .. }
-                                                    | Atomic::TParent { .. }
-                                            )
-                                        })
-                                    });
-                                if arg_is_object {
+                                    );
+                                // Flag only if any object atom could be mutated by the callee.
+                                // An argument that is mutation-free *by construction* (a native-readonly
+                                // class or a PHP enum) cannot have its state changed even inside an impure
+                                // constructor thanks to language-level enforcement on THAT owner. When every
+                                // resolved object atom is such an owner — the common immutable "wrap $this in
+                                // a value holder" iterator idiom (`new X($this)` copying readonly state off the
+                                // receiver) — there is no mutation risk at all, so nothing to flag.
+                                let arg_mutation_risk = resolved.is_some_and(|ty| {
+                                    for atom in ty.types.iter() {
+                                        match atom {
+                                            Atomic::TNamedObject { fqcn, .. }
+                                            | Atomic::TSelf { fqcn }
+                                            | Atomic::TStaticObject { fqcn }
+                                            | Atomic::TParent { fqcn } => {
+                                                if crate::db::
+                                                    owner_type_is_mutation_free_by_construction(
+                                                        self.db,
+                                                        fqcn.as_ref(),
+                                                    )
+                                                {
+                                                    continue;
+                                                }
+                                                return true;
+                                            }
+                                            _ => {}
+                                        }
+                                    }
+                                    false
+                                });
+                                if arg_mutation_risk {
                                     self.emit(
                                         IssueKind::ImpureFunctionCall {
                                             fn_name: format!("{fqcn}::__construct"),

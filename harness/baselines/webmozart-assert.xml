@@ -35,7 +35,6 @@
       <code><![CDATA[\preg_match('/^\{'.$uuid.'\}$/D', $value)]]></code>
       <code><![CDATA[\preg_match('/^'.$uuid.'$/D', $value)]]></code>
       <code><![CDATA[\enum_exists(\get_class($value))]]></code>
-      <code><![CDATA[new InvalidArgumentException($message)]]></code>
       <code><![CDATA[\is_callable($message)]]></code>
     </ImpureFunctionCall>
     <ImpureMethodCall>
@@ -43,7 +42,6 @@
       <code><![CDATA[static::strlen($value)]]></code>
       <code><![CDATA[static::strlen($value)]]></code>
       <code><![CDATA[static::strlen($value)]]></code>
-      <code><![CDATA[$value->format('c')]]></code>
     </ImpureMethodCall>
     <MixedArgument>
       <code><![CDATA[$value]]></code>

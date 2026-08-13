@@ -8,9 +8,6 @@
       <code><![CDATA[$n < 1]]></code>
       <code><![CDATA[$scale < 0]]></code>
     </DocblockTypeContradiction>
-    <ImpureMethodCall>
-      <code><![CDATA[$that->negated()]]></code>
-    </ImpureMethodCall>
     <ImpureStaticVariable>
       <code><![CDATA[]]></code>
       <code><![CDATA[$zero = new BigDecimal('0')]]></code>
@@ -66,13 +63,6 @@
       <code><![CDATA[hex2bin($hex)]]></code>
       <code><![CDATA[assert($result !== false)]]></code>
     </ImpureFunctionCall>
-    <ImpureMethodCall>
-      <code><![CDATA[$that->negated()]]></code>
-      <code><![CDATA[$this->negated()]]></code>
-      <code><![CDATA[$this->negated()]]></code>
-      <code><![CDATA[$this->negated()]]></code>
-      <code><![CDATA[$this->negated()]]></code>
-    </ImpureMethodCall>
     <ImpureStaticVariable>
       <code><![CDATA[]]></code>
       <code><![CDATA[$zero = new BigInteger('0')]]></code>
@@ -154,11 +144,6 @@
     </RedundantCondition>
   </file>
   <file src="src/BigRational.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$numerator->negated()]]></code>
-      <code><![CDATA[$denominator->negated()]]></code>
-      <code><![CDATA[$that->negated()]]></code>
-    </ImpureMethodCall>
     <ImpureStaticVariable>
       <code><![CDATA[]]></code>
       <code><![CDATA[$zero = new BigRational(BigInteger::zero(), BigInteger::one(), false, false)]]></code>
@@ -203,52 +188,6 @@
       <code><![CDATA[$remainder->quotient($denominator)]]></code>
       <code><![CDATA[$remainder->remainder($denominator)]]></code>
     </MissingThrowsDocblock>
-  </file>
-  <file src="src/Exception/DivisionByZeroException.php">
-    <ImpureMethodCall>
-      <code><![CDATA[parent::__construct($message)]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Exception/IntegerOverflowException.php">
-    <ImpureMethodCall>
-      <code><![CDATA[parent::__construct($message)]]></code>
-      <code><![CDATA[$value->toString()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Exception/InvalidArgumentException.php">
-    <ImpureMethodCall>
-      <code><![CDATA[parent::__construct($message)]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Exception/NegativeNumberException.php">
-    <ImpureMethodCall>
-      <code><![CDATA[parent::__construct($message)]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Exception/NoInverseException.php">
-    <ImpureMethodCall>
-      <code><![CDATA[parent::__construct($message)]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Exception/NumberFormatException.php">
-    <ImpureMethodCall>
-      <code><![CDATA[parent::__construct($message)]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Exception/RandomSourceException.php">
-    <ImpureMethodCall>
-      <code><![CDATA[parent::__construct($message, 0, $previous)]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Exception/RoundingNecessaryException.php">
-    <ImpureMethodCall>
-      <code><![CDATA[parent::__construct($message)]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Exception/UnsupportedPlatformException.php">
-    <ImpureMethodCall>
-      <code><![CDATA[parent::__construct($message)]]></code>
-    </ImpureMethodCall>
   </file>
   <file src="src/Internal/Calculator.php">
     <MissingThrowsDocblock>
@@ -315,11 +254,6 @@
     <ImpureFunctionCall>
       <code><![CDATA[assert($carry === 0)]]></code>
     </ImpureFunctionCall>
-    <ImpureMethodCall>
-      <code><![CDATA[$this->add($result, $line)]]></code>
-      <code><![CDATA[$this->add($q, '1' . $zeros)]]></code>
-      <code><![CDATA[$this->sub($a, $b . $zeros)]]></code>
-    </ImpureMethodCall>
     <MethodSignatureMismatch>
       <code><![CDATA[#[Override]]]></code>
       <code><![CDATA[#[Override]]]></code>
