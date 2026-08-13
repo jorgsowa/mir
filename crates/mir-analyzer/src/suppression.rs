@@ -188,6 +188,10 @@ impl SuppressionMap {
 
     /// Scan `source` for suppression directives.
     pub fn from_source(source: &str) -> Self {
+        if !contains_ascii_case(source, "ignore") && !contains_ascii_case(source, "suppress") {
+            return SuppressionMap::default();
+        }
+
         let raw_lines: Vec<&str> = source.lines().collect();
         let in_heredoc_body = heredoc_body_mask(&raw_lines);
         let block_comment_open = block_comment_open_mask(&raw_lines);
@@ -329,6 +333,13 @@ impl SuppressionMap {
             .map(|ns| (ns.report_line, ns.kind.clone()))
             .collect()
     }
+}
+
+fn contains_ascii_case(haystack: &str, needle: &str) -> bool {
+    haystack
+        .as_bytes()
+        .windows(needle.len())
+        .any(|window| window.eq_ignore_ascii_case(needle.as_bytes()))
 }
 
 fn insert_line(lines: &mut FxHashMap<u32, KindSet>, line: u32, kinds: KindSet) {

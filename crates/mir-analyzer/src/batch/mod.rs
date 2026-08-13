@@ -155,6 +155,31 @@ impl ParsedProjectFile {
 }
 
 impl AnalysisSession {
+    fn suppression_map_for_file(
+        &self,
+        db: &dyn MirDatabase,
+        file: &Arc<str>,
+    ) -> Option<Arc<crate::suppression::SuppressionMap>> {
+        let sf = db.lookup_source_file(file)?;
+        let text = sf.text(db).clone();
+        if let Some((_, map)) = self
+            .suppression_maps
+            .read()
+            .get(file)
+            .filter(|(cached_text, _)| cached_text.as_ref() == text.as_ref())
+        {
+            return Some(map.clone());
+        }
+
+        let map = Arc::new(crate::suppression::SuppressionMap::from_source(
+            text.as_ref(),
+        ));
+        self.suppression_maps
+            .write()
+            .insert(file.clone(), (text, map.clone()));
+        Some(map)
+    }
+
     /// Cumulative hit / miss counts on the persistent definition cache attached
     /// to this session. `(0, 0)` when no cache is configured.
     #[doc(hidden)]
@@ -191,16 +216,15 @@ impl AnalysisSession {
         issues: &mut Vec<Issue>,
         analyzed_files: &[Arc<str>],
     ) {
-        use crate::suppression::SuppressionMap;
         let db = self.snapshot_db();
-        let mut cache: HashMap<Arc<str>, Option<SuppressionMap>> = HashMap::default();
+        let mut cache: HashMap<Arc<str>, Option<Arc<crate::suppression::SuppressionMap>>> =
+            HashMap::default();
         for issue in issues.iter_mut() {
             if issue.suppressed {
                 continue;
             }
             let map = cache.entry(issue.location.file.clone()).or_insert_with(|| {
-                db.lookup_source_file(&issue.location.file)
-                    .map(|sf| SuppressionMap::from_source(sf.text(&db)))
+                self.suppression_map_for_file(&db, &issue.location.file)
             });
             if let Some(map) = map.as_ref() {
                 if map.is_suppressed(
@@ -216,10 +240,9 @@ impl AnalysisSession {
         // those that already have at least one issue (files with no issues would
         // otherwise be skipped and their unused suppressions never detected).
         for file in analyzed_files {
-            cache.entry(file.clone()).or_insert_with(|| {
-                db.lookup_source_file(file)
-                    .map(|sf| SuppressionMap::from_source(sf.text(&db)))
-            });
+            cache
+                .entry(file.clone())
+                .or_insert_with(|| self.suppression_map_for_file(&db, file));
         }
         // Now emit UnusedSuppress for each file that has named suppressions.
         let files: Vec<Arc<str>> = cache

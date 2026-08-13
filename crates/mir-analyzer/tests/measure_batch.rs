@@ -56,7 +56,15 @@ fn measure_batch() {
         project_files.len()
     );
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut cache_dir = None;
+    let session = if std::env::var("MIR_MEASURE_CACHE").is_ok() {
+        let dir = tempfile::tempdir().expect("create temporary cache dir");
+        let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+        cache_dir = Some(dir);
+        session
+    } else {
+        AnalysisSession::new(PhpVersion::LATEST)
+    };
     session.ensure_all_stubs();
 
     let t = std::time::Instant::now();
@@ -75,4 +83,5 @@ fn measure_batch() {
         result2.issues.len(),
         result.symbols.len(),
     );
+    drop(cache_dir);
 }

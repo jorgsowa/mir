@@ -92,6 +92,10 @@ pub struct AnalysisSession {
     /// `indexed_references_to` / `reanalyze_dependents` skip the serial
     /// parse + AST walk for files already faulted in.
     prepared_files: PreparedFilesCache,
+    /// Parsed suppression directives for unchanged files. Batch analysis
+    /// revisits every analyzed file to emit `UnusedSuppress`, so retaining
+    /// maps across same-session runs avoids rescanning the full workspace.
+    pub(crate) suppression_maps: SuppressionMapCache,
     /// Bumped whenever previously loaded declarations may have been removed
     /// (`invalidate_file`, symbol deletions on `ingest_file`, or a host calling
     /// [`Self::bump_prepare_generation`]) — a prepared file might then need its
@@ -282,6 +286,10 @@ type UnresolvableCache = Arc<RwLock<HashMap<Arc<str>, Option<Arc<str>>>>>;
 /// `AnalysisSession::prepared_files`.
 type PreparedFilesCache = Arc<RwLock<HashMap<Arc<str>, (Arc<str>, u64)>>>;
 
+/// Parsed inline suppressions keyed by file path and source text.
+type SuppressionMapCache =
+    Arc<RwLock<HashMap<Arc<str>, (Arc<str>, Arc<crate::suppression::SuppressionMap>)>>>;
+
 /// file → text a per-file index commit was computed from. See the field docs
 /// on `AnalysisSession::ref_committed` / `defs_committed`.
 type CommittedTexts = Arc<RwLock<HashMap<Arc<str>, Arc<str>>>>;
@@ -372,6 +380,7 @@ impl AnalysisSession {
             source_provider: Arc::new(crate::FsSourceProvider),
             pending_eager_function_files: Arc::new(parking_lot::Mutex::new(Some(Vec::new()))),
             prepared_files: Arc::new(RwLock::new(HashMap::default())),
+            suppression_maps: Arc::new(RwLock::new(HashMap::default())),
             prepare_generation: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             ref_committed: Arc::new(RwLock::new(HashMap::default())),
             defs_committed: Arc::new(RwLock::new(HashMap::default())),
