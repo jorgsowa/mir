@@ -14,7 +14,7 @@
 use std::sync::Arc;
 
 use mir_codebase::definitions::StubSlice;
-use mir_types::{atomic::Atomic, Type};
+use mir_types::{atomic::Atomic, Name, Type};
 use rustc_hash::FxHashSet;
 
 use super::*;
@@ -22,14 +22,14 @@ use super::*;
 /// Symbols that `file`'s declarations mention. Sorted for deterministic memo
 /// equality. These are lookup keys for [`MirDatabase::symbol_defining_file`].
 #[salsa::tracked]
-pub fn file_structural_symbols(db: &dyn MirDatabase, file: SourceFile) -> Arc<[Arc<str>]> {
+pub fn file_structural_symbols(db: &dyn MirDatabase, file: SourceFile) -> Arc<[Name]> {
     let defs = crate::db::collect_file_definitions(db, file);
-    let mut symbols: FxHashSet<Arc<str>> = FxHashSet::default();
+    let mut symbols: FxHashSet<Name> = FxHashSet::default();
     collect_structural_dep_symbols(&defs.slice, &mut |symbol| {
         symbols.insert(symbol);
     });
 
-    let mut sorted: Vec<Arc<str>> = symbols.into_iter().collect();
+    let mut sorted: Vec<Name> = symbols.into_iter().collect();
     sorted.sort();
     sorted.into()
 }
@@ -54,16 +54,16 @@ pub fn file_structural_deps(db: &dyn MirDatabase, file: SourceFile) -> Arc<[Arc<
     sorted.into()
 }
 
-fn collect_structural_dep_symbols(slice: &StubSlice, mut add_symbol: impl FnMut(Arc<str>)) {
+fn collect_structural_dep_symbols(slice: &StubSlice, mut add_symbol: impl FnMut(Name)) {
     for c in slice.classes.iter() {
         if let Some(parent) = &c.parent {
-            add_symbol(parent.clone());
+            add_symbol(Name::from(parent.clone()));
         }
         for interface in c.interfaces.iter() {
-            add_symbol(interface.clone());
+            add_symbol(Name::from(interface.clone()));
         }
         for trait_fqcn in c.traits.iter() {
-            add_symbol(trait_fqcn.clone());
+            add_symbol(Name::from(trait_fqcn.clone()));
         }
         for prop in c.own_properties.values() {
             if let Some(ty) = &prop.ty {
@@ -84,7 +84,7 @@ fn collect_structural_dep_symbols(slice: &StubSlice, mut add_symbol: impl FnMut(
 
     for i in slice.interfaces.iter() {
         for extended in i.extends.iter() {
-            add_symbol(extended.clone());
+            add_symbol(Name::from(extended.clone()));
         }
         for prop in i.own_properties.values() {
             if let Some(ty) = &prop.ty {
@@ -105,7 +105,7 @@ fn collect_structural_dep_symbols(slice: &StubSlice, mut add_symbol: impl FnMut(
 
     for t in slice.traits.iter() {
         for trait_fqcn in t.traits.iter() {
-            add_symbol(trait_fqcn.clone());
+            add_symbol(Name::from(trait_fqcn.clone()));
         }
         for prop in t.own_properties.values() {
             if let Some(ty) = &prop.ty {
@@ -126,10 +126,10 @@ fn collect_structural_dep_symbols(slice: &StubSlice, mut add_symbol: impl FnMut(
 
     for e in slice.enums.iter() {
         for interface in e.interfaces.iter() {
-            add_symbol(interface.clone());
+            add_symbol(Name::from(interface.clone()));
         }
         for trait_fqcn in e.traits.iter() {
-            add_symbol(trait_fqcn.clone());
+            add_symbol(Name::from(trait_fqcn.clone()));
         }
         for method in e.own_methods.values() {
             for param in method.params.iter() {
@@ -155,14 +155,14 @@ fn collect_structural_dep_symbols(slice: &StubSlice, mut add_symbol: impl FnMut(
     }
 
     for fqcn in slice.imports.values() {
-        add_symbol(Arc::from(fqcn.as_str()));
+        add_symbol(*fqcn);
     }
 }
 
-fn collect_named_object_atoms(ty: &Type, add_symbol: &mut impl FnMut(Arc<str>)) {
+fn collect_named_object_atoms(ty: &Type, add_symbol: &mut impl FnMut(Name)) {
     for atomic in ty.types.iter() {
         if let Atomic::TNamedObject { fqcn, .. } = atomic {
-            add_symbol(Arc::from(fqcn.as_str()));
+            add_symbol(*fqcn);
         }
     }
 }
