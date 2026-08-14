@@ -555,11 +555,11 @@ impl<'a> BodyAnalyzer<'a> {
     }
 
     pub(crate) fn method_ref_key(&self, class: &str, name: &str) -> Arc<str> {
-        self.reference_key_cache.lock().method(class, name)
+        Arc::from(format!("meth:{class}::{name}"))
     }
 
     pub(crate) fn propdecl_ref_key(&self, name: &str) -> Arc<str> {
-        self.reference_key_cache.lock().propdecl(name)
+        Arc::from(format!("propdecl:{name}"))
     }
 
     pub(crate) fn record_ref_span(
@@ -587,7 +587,7 @@ impl<'a> BodyAnalyzer<'a> {
     }
 
     pub(crate) fn constdecl_ref_key(&self, name: &str) -> Arc<str> {
-        self.reference_key_cache.lock().constant_decl(name)
+        Arc::from(format!("cnstdecl:{name}"))
     }
 
     fn check_and_record_type_hint_classes(

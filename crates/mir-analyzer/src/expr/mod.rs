@@ -1151,7 +1151,8 @@ impl<'a> ExpressionAnalyzer<'a> {
     }
 
     pub(crate) fn record_function_ref(&mut self, fqn: impl AsRef<str>, span: php_ast::Span) {
-        let key = self.reference_key_cache.function(fqn.as_ref());
+        let fqn = fqn.as_ref();
+        let key = Arc::<str>::from(format!("fn:{fqn}"));
         self.record_ref(key, span);
     }
 
@@ -1161,9 +1162,9 @@ impl<'a> ExpressionAnalyzer<'a> {
         name: impl AsRef<str>,
         span: php_ast::Span,
     ) {
-        let key = self
-            .reference_key_cache
-            .method(class.as_ref(), name.as_ref());
+        let class = class.as_ref();
+        let name = name.as_ref();
+        let key = Arc::<str>::from(format!("meth:{class}::{name}"));
         self.record_ref(key, span);
     }
 
@@ -1180,17 +1181,24 @@ impl<'a> ExpressionAnalyzer<'a> {
     }
 
     pub(crate) fn record_global_constant_ref(&mut self, fqn: impl AsRef<str>, span: php_ast::Span) {
-        let key = self.reference_key_cache.global_constant(fqn.as_ref());
+        let fqn = fqn.as_ref();
+        let key = Arc::<str>::from(format!("gcnst:{fqn}"));
         self.record_ref(key, span);
     }
 
-    pub(crate) fn record_dynamic_member_ref(&mut self, fqcn: impl AsRef<str>, span: php_ast::Span) {
-        let key = self.reference_key_cache.dynamic(fqcn.as_ref());
+    pub(crate) fn record_dynamic_member_ref(
+        &mut self,
+        fqcn: impl AsRef<str>,
+        span: php_ast::Span,
+    ) {
+        let fqcn = fqcn.as_ref();
+        let key = Arc::<str>::from(format!("dyn:{fqcn}"));
         self.record_ref(key, span);
     }
 
     pub(crate) fn record_impl_ref(&mut self, fqcn: impl AsRef<str>, span: php_ast::Span) {
-        let key = self.reference_key_cache.implementation(fqcn.as_ref());
+        let fqcn = fqcn.as_ref();
+        let key = Arc::<str>::from(format!("impl:{fqcn}"));
         self.record_ref(key, span);
     }
 
@@ -1206,7 +1214,8 @@ impl<'a> ExpressionAnalyzer<'a> {
     }
 
     pub(crate) fn record_propname_ref(&mut self, name: impl AsRef<str>, span: php_ast::Span) {
-        let key = self.reference_key_cache.propname(name.as_ref());
+        let name = name.as_ref();
+        let key = Arc::<str>::from(format!("propname:{name}"));
         self.record_ref(key, span);
     }
 
@@ -1216,9 +1225,9 @@ impl<'a> ExpressionAnalyzer<'a> {
         name: impl AsRef<str>,
         span: php_ast::Span,
     ) {
-        let key = self
-            .reference_key_cache
-            .trait_use_property(class.as_ref(), name.as_ref());
+        let class = class.as_ref();
+        let name = name.as_ref();
+        let key = Arc::<str>::from(format!("traituse:{class}::{name}"));
         self.record_ref(key, span);
     }
 

@@ -489,7 +489,6 @@ impl AnalysisSession {
 
         let mut dependencies = vec![Vec::new(); all_files.len()];
         let mut dependents = vec![Vec::new(); all_files.len()];
-
         for (file_id, file) in all_files.iter().enumerate() {
             let file_id = file_id as u32;
             let mut file_deps: HashSet<u32> = HashSet::default();
