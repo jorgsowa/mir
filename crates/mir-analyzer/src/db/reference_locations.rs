@@ -129,8 +129,8 @@ pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile) -> Arc<AnalyzeOutput
         }
         issues.push(crate::parser::parse_error_to_issue(
             err,
-            &prepared.path,
-            &prepared.text,
+            prepared.path,
+            prepared.text,
             &parsed.source_map,
         ));
     }

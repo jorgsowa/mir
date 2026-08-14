@@ -343,9 +343,13 @@ fn indexed_references_cache_tracks_total_locations_not_entry_count() {
     for (base, n_callers, files) in &file_sets {
         let sym = mir_analyzer::Name::method(*base, "m");
         let refs = session
-            .indexed_references_to(&sym, files, false, mir_analyzer::ReferenceIncludes::Plain, &|| {
-                false
-            })
+            .indexed_references_to(
+                &sym,
+                files,
+                false,
+                mir_analyzer::ReferenceIncludes::Plain,
+                &|| false,
+            )
             .expect("query not cancelled");
         assert_eq!(refs.len(), *n_callers);
         expected_total += refs.len();

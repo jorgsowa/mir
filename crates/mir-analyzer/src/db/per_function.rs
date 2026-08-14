@@ -103,7 +103,7 @@ pub fn infer_function(
     let driver = crate::body_analysis::BodyAnalyzer::new(db, prepared.php_version);
     let result = driver.analyze_fn_decl_pure(
         decl,
-        &prepared.path,
+        prepared.path,
         prepared.text.as_ref(),
         &parsed.source_map,
     );

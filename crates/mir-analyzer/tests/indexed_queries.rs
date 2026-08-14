@@ -242,9 +242,13 @@ fn freshness_edit_updates_postings() {
     let sym = Name::method("B", "m");
     let all = paths(&files);
     let refs = session
-        .indexed_references_to(&sym, &all, false, mir_analyzer::ReferenceIncludes::Plain, &|| {
-            false
-        })
+        .indexed_references_to(
+            &sym,
+            &all,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     assert_eq!(refs.len(), 1);
 
@@ -255,9 +259,13 @@ fn freshness_edit_updates_postings() {
         Arc::from("<?php\nfunction c(B $b): void { $b->m(); $b->m(); }\n"),
     );
     let refs = session
-        .indexed_references_to(&sym, &all, false, mir_analyzer::ReferenceIncludes::Plain, &|| {
-            false
-        })
+        .indexed_references_to(
+            &sym,
+            &all,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     assert_eq!(refs.len(), 2, "postings must follow the edit: {refs:?}");
 
@@ -267,9 +275,13 @@ fn freshness_edit_updates_postings() {
         Arc::from("<?php\nfunction c(B $b): void {}\n"),
     );
     let refs = session
-        .indexed_references_to(&sym, &all, false, mir_analyzer::ReferenceIncludes::Plain, &|| {
-            false
-        })
+        .indexed_references_to(
+            &sym,
+            &all,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     assert!(refs.is_empty(), "stale postings must not survive: {refs:?}");
 }

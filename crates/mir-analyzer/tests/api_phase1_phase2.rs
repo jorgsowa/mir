@@ -1224,7 +1224,7 @@ fn file_structural_deps_includes_enum_method_param_type_hint() {
          file_structural_deps never iterated defs.slice.enums. Got: {deps:?}"
     );
     let symbols = file_structural_symbols(&db, sf);
-    let _: &std::sync::Arc<[Name]> = &symbols;
+    let _: &std::sync::Arc<[Name]> = symbols;
     assert!(
         symbols.iter().any(|s| s.as_ref() == "Vendor\\Service"),
         "enum method param type hint must produce a structural symbol edge; got {symbols:?}"
