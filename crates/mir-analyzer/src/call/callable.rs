@@ -34,13 +34,16 @@ pub(crate) fn record_callable_string_ref(
             if let Some((owner_fqcn, method)) =
                 crate::db::find_method_respecting_precedence(ea.db, here, method_name)
             {
-                ea.record_class_ref(&resolved_class, callback_span);
+                ea.record_class_ref(
+                    &resolved_class,
+                    callable_string_token_span(ea.source, callback_span, class_name),
+                );
                 ea.record_ref(
                     Arc::from(format!(
                         "meth:{owner_fqcn}::{}",
                         crate::util::php_ident_lowercase(&method.name)
                     )),
-                    callback_span,
+                    callable_string_token_span(ea.source, callback_span, method_name),
                 );
             }
         } else {
@@ -49,10 +52,29 @@ pub(crate) fn record_callable_string_ref(
             let canonical_fqn: Option<Arc<str>> =
                 crate::db::find_function(ea.db, here).map(|f| f.fqn.clone());
             if let Some(canonical_fqn) = canonical_fqn {
-                ea.record_function_ref(&canonical_fqn, callback_span);
+                ea.record_function_ref(
+                    &canonical_fqn,
+                    callable_string_token_span(ea.source, callback_span, fqn),
+                );
             }
         }
     }
+}
+
+fn callable_string_token_span(source: &str, span: Span, token: &str) -> Span {
+    if token.is_empty() {
+        return span;
+    }
+    let start = span.start as usize;
+    let end = (span.end as usize).min(source.len());
+    let Some(slice) = source.get(start..end) else {
+        return span;
+    };
+    let Some(offset) = slice.find(token) else {
+        return span;
+    };
+    let token_start = span.start + offset as u32;
+    Span::new(token_start, token_start + token.len() as u32)
 }
 
 /// Simple param info for arity checking (works with both mir_codebase::DeclaredParam and mir_types::atomic::FnParam)

@@ -409,6 +409,31 @@ fn static_method_call_span_covers_only_name() {
 }
 
 #[test]
+fn callable_string_function_reference_span_covers_only_name() {
+    let dir = create_temp_dir("test");
+    let src = "<?php\nfunction normalize(string $s): string { return trim($s); }\nfunction caller(array $rows): void { array_map('normalize', $rows); }\n";
+    let file = write_file(&dir, "callable_string_span.php", src);
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let locs: Vec<_> = analyzer
+        .reference_locations("fn:normalize")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert_eq!(locs.len(), 1);
+    let (_, _line, col_start, col_end) = locs[0];
+    assert_eq!(
+        col_end - col_start,
+        "normalize".len() as u16,
+        "callable string span should cover only normalize, not the quotes: {locs:?}"
+    );
+}
+
+#[test]
 fn cache_hit_replays_reference_locations() {
     let dir = create_temp_dir("test");
     let cache_dir = dir.path().join("cache");
