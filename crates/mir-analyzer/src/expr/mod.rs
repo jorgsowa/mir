@@ -1174,9 +1174,9 @@ impl<'a> ExpressionAnalyzer<'a> {
         name: impl AsRef<str>,
         span: php_ast::Span,
     ) {
-        let key = self
-            .reference_key_cache
-            .property(class.as_ref(), name.as_ref());
+        let class = class.as_ref();
+        let name = name.as_ref();
+        let key = Arc::<str>::from(format!("prop:{class}::{name}"));
         self.record_ref(key, span);
     }
 
@@ -1207,9 +1207,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         short_name: impl AsRef<str>,
         span: php_ast::Span,
     ) {
-        let key = self
-            .reference_key_cache
-            .implementation_short(short_name.as_ref());
+        let short_name = short_name.as_ref();
+        let key = Arc::<str>::from(format!("implshort:{short_name}"));
         self.record_ref(key, span);
     }
 
