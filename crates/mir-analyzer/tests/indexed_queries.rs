@@ -9,6 +9,14 @@ use std::sync::Arc;
 
 use mir_analyzer::{AnalysisSession, Name, PhpVersion};
 
+fn codepoint_span(line: &str, needle: &str) -> (u32, u32) {
+    let line = line.strip_suffix('\r').unwrap_or(line);
+    let start_byte = line.find(needle).expect("needle present");
+    let start = line[..start_byte].chars().count() as u32;
+    let end = start + needle.chars().count() as u32;
+    (start, end)
+}
+
 fn session_with(files: &[(&str, &str)]) -> AnalysisSession {
     let session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
@@ -593,6 +601,46 @@ fn use_import_locations_reachable_but_excluded_from_plain_references() {
         1,
         "const import must be indexed: {const_use:?}"
     );
+}
+
+#[test]
+fn indexed_queries_use_codepoint_columns_in_multibyte_and_crlf_files() {
+    let files = [
+        (
+            "greeter.php",
+            "<?php\r\nnamespace App;\r\nclass Greeter {}\r\n",
+        ),
+        (
+            "main.php",
+            "<?php\r\nuse App\\Greeter;\r\necho \"hé\"; $g = new Greeter();\r\n",
+        ),
+    ];
+    let session = session_with(&files);
+    let all = paths(&files);
+
+    let refs = session
+        .indexed_references_to(&Name::class("App\\Greeter"), &all, false, &|| false)
+        .expect("not cancelled");
+    assert_eq!(refs.len(), 1, "{refs:?}");
+    assert_eq!(refs[0].0.as_ref(), "main.php");
+    let main_ref_line = files[1]
+        .1
+        .lines()
+        .nth(2)
+        .expect("third line in main.php");
+    let (ref_start, ref_end) = codepoint_span(main_ref_line, "Greeter");
+    assert_eq!(refs[0].1.start.line, 3, "{refs:?}");
+    assert_eq!(refs[0].1.start.column, ref_start, "{refs:?}");
+    assert_eq!(refs[0].1.end.column, ref_end, "{refs:?}");
+
+    let use_locs = session.indexed_use_import_locations(&Name::class("App\\Greeter"), &all);
+    assert_eq!(use_locs.len(), 1, "{use_locs:?}");
+    assert_eq!(use_locs[0].0.as_ref(), "main.php");
+    let import_line = files[1].1.lines().nth(1).expect("second line in main.php");
+    let (import_start, import_end) = codepoint_span(import_line, "App\\Greeter");
+    assert_eq!(use_locs[0].1.start.line, 2, "{use_locs:?}");
+    assert_eq!(use_locs[0].1.start.column, import_start, "{use_locs:?}");
+    assert_eq!(use_locs[0].1.end.column, import_end, "{use_locs:?}");
 }
 
 #[test]

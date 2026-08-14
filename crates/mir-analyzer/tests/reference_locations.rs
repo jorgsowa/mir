@@ -8,6 +8,13 @@ use mir_analyzer::{AnalysisSession, BatchOptions, PhpVersion};
 
 use self::common::{create_temp_dir, pathbuf_to_arc_str, write_file};
 
+fn codepoint_span(line: &str, needle: &str) -> (u16, u16) {
+    let start_byte = line.find(needle).expect("needle present");
+    let start = line[..start_byte].chars().count() as u16;
+    let end = start + needle.chars().count() as u16;
+    (start, end)
+}
+
 #[test]
 fn function_call_records_reference_location() {
     let dir = create_temp_dir("test");
@@ -282,6 +289,31 @@ fn new_expression_via_class_string_variable_records_class_reference() {
         locs.iter().any(|(f, ..)| f == &file_arc),
         "new $cls() should record a reference to Widget"
     );
+}
+
+#[test]
+fn new_expression_multibyte_prefix_uses_codepoint_columns() {
+    let dir = create_temp_dir("multibyte_prefix");
+    let src = "<?php\nclass Greeter {}\nfunction make(): void { echo \"hé\"; $g = new Greeter(); }\n";
+    let file = write_file(&dir, "unicode_ref.php", src);
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let locs: Vec<_> = analyzer
+        .reference_locations("cls:Greeter")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert_eq!(locs.len(), 1, "{locs:?}");
+    let (_, line, col_start, col_end) = locs[0];
+    let target_line = src.lines().nth(2).expect("third line");
+    let (expected_start, expected_end) = codepoint_span(target_line, "Greeter");
+    assert_eq!(line, 3);
+    assert_eq!(col_start, expected_start, "{locs:?}");
+    assert_eq!(col_end, expected_end, "{locs:?}");
 }
 
 #[test]

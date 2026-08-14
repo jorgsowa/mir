@@ -244,6 +244,10 @@ impl AnalysisSession {
     /// callers that need guaranteed-fresh results for an uncommitted file
     /// should analyze it first (e.g. via [`Self::indexed_references_to`] on
     /// the same file set).
+    ///
+    /// Returned ranges use mir's native coordinates: 1-based lines and
+    /// 0-based Unicode code-point columns (UTF-32/LSP `positionEncoding`
+    /// `"utf-32"`), not UTF-8 byte offsets or UTF-16 code units.
     pub fn indexed_use_import_locations(
         &self,
         symbol: &crate::Name,
@@ -289,6 +293,10 @@ impl AnalysisSession {
     /// workspace files only, excluding stubs/vendor). With
     /// `include_declaration`, the symbol's declaration name span is appended
     /// when it lies inside the scope.
+    ///
+    /// Returned ranges use mir's native coordinates: 1-based lines and
+    /// 0-based Unicode code-point columns (UTF-32/LSP `positionEncoding`
+    /// `"utf-32"`), not UTF-8 byte offsets or UTF-16 code units.
     ///
     /// `should_cancel` is polled at phase boundaries and between
     /// cancellation retries; `true` aborts with `None`.
