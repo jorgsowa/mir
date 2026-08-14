@@ -1184,11 +1184,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         self.record_ref(key, span);
     }
 
-    pub(crate) fn record_dynamic_member_ref(
-        &mut self,
-        fqcn: impl AsRef<str>,
-        span: php_ast::Span,
-    ) {
+    pub(crate) fn record_dynamic_member_ref(&mut self, fqcn: impl AsRef<str>, span: php_ast::Span) {
         let key = self.reference_key_cache.dynamic(fqcn.as_ref());
         self.record_ref(key, span);
     }

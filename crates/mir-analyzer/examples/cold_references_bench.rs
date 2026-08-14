@@ -76,7 +76,13 @@ fn main() {
     let gen_before = session.index_generation();
     let t0 = Instant::now();
     let refs = session
-        .indexed_references_to(&target, &project_paths, false, &|| false)
+        .indexed_references_to(
+            &target,
+            &project_paths,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     let cold_elapsed = t0.elapsed();
     eprintln!(
@@ -92,7 +98,13 @@ fn main() {
     // much of the cold cost is "real" resolve/parse work vs. one-time setup.
     let t1 = Instant::now();
     let refs_warm = session
-        .indexed_references_to(&target, &project_paths, false, &|| false)
+        .indexed_references_to(
+            &target,
+            &project_paths,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     eprintln!(
         "warm repeat: {:.3}s, {} references found",
@@ -172,7 +184,13 @@ fn main() {
     let gen_before = session2.index_generation();
     let t5 = Instant::now();
     let refs2 = session2
-        .indexed_references_to(&target, &project_paths, false, &|| false)
+        .indexed_references_to(
+            &target,
+            &project_paths,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     eprintln!(
         "cold references, vendor-unregistered (php-lsp shape): {:.3}s, {} references, {} revision bumps",
@@ -239,7 +257,13 @@ fn main() {
     let m_target = Name::method("Illuminate\\Support\\Str", "studly");
     let t8 = Instant::now();
     let mrefs = session3
-        .indexed_references_to(&m_target, &all_paths, false, &|| false)
+        .indexed_references_to(
+            &m_target,
+            &all_paths,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     let scans3 = session3.class_mention_stats().scans_recorded;
     eprintln!(
@@ -257,7 +281,13 @@ fn main() {
     session3.set_file_text(edited.clone(), edited_text);
     let t9 = Instant::now();
     let mrefs2 = session3
-        .indexed_references_to(&m_target, &all_paths, false, &|| false)
+        .indexed_references_to(
+            &m_target,
+            &all_paths,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     let scans4 = session3.class_mention_stats().scans_recorded;
     eprintln!(
@@ -273,7 +303,13 @@ fn main() {
     let c_target = Name::method("Illuminate\\Support\\Str", "__construct");
     let t10 = Instant::now();
     let crefs = session3
-        .indexed_references_to(&c_target, &project_paths, false, &|| false)
+        .indexed_references_to(
+            &c_target,
+            &project_paths,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     let scans5 = session3.class_mention_stats().scans_recorded;
     eprintln!(
@@ -288,6 +324,7 @@ fn main() {
             &c_target,
             &project_paths[..project_paths.len() - 1],
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");

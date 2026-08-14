@@ -74,7 +74,13 @@ fn warm_query_equals_cold_query() {
 
     let symbol = Name::class("App\\Color");
     let cold = session
-        .indexed_references_to(&symbol, &files, false, &no_cancel())
+        .indexed_references_to(
+            &symbol,
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &no_cancel(),
+        )
         .expect("not cancelled");
     assert_eq!(
         refs_files(&cold),
@@ -94,7 +100,13 @@ fn warm_query_equals_cold_query() {
     // and no new raw-text scans may be recorded.
     let scans_before = stats.scans_recorded;
     let warm = session
-        .indexed_references_to(&symbol, &files, false, &no_cancel())
+        .indexed_references_to(
+            &symbol,
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &no_cancel(),
+        )
         .expect("not cancelled");
     assert_eq!(cold, warm, "index-answered gate must not change results");
     assert_eq!(
@@ -110,6 +122,7 @@ fn warm_query_equals_cold_query() {
             &Name::class("App\\ColorPicker"),
             &files,
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &no_cancel(),
         )
         .expect("not cancelled");
@@ -140,11 +153,23 @@ fn constructor_query_uses_class_needle_gate() {
         .collect();
     let symbol = Name::method("App\\Job", "__construct");
     let cold = session
-        .indexed_references_to(&symbol, &files, false, &no_cancel())
+        .indexed_references_to(
+            &symbol,
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &no_cancel(),
+        )
         .expect("not cancelled");
     assert_eq!(refs_files(&cold), vec!["spawn.php"], "{cold:?}");
     let warm = session
-        .indexed_references_to(&symbol, &files, false, &no_cancel())
+        .indexed_references_to(
+            &symbol,
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &no_cancel(),
+        )
         .expect("not cancelled");
     assert_eq!(cold, warm);
 }
@@ -177,7 +202,13 @@ fn class_declared_after_scan_falls_back_and_is_found() {
 
     // Populate mention sets at the pre-Bar epoch.
     let foo_refs = session
-        .indexed_references_to(&Name::class("App\\Foo"), &files, false, &no_cancel())
+        .indexed_references_to(
+            &Name::class("App\\Foo"),
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &no_cancel(),
+        )
         .expect("not cancelled");
     assert_eq!(refs_files(&foo_refs), vec!["late.php"]);
     let covered_before = session.class_mention_stats().files_covered;
@@ -193,7 +224,13 @@ fn class_declared_after_scan_falls_back_and_is_found() {
     // `late.php`'s entry is from the older epoch: the gate must fall back
     // to a raw scan and still find the reference.
     let bar_refs = session
-        .indexed_references_to(&Name::class("App\\Bar"), &files, false, &no_cancel())
+        .indexed_references_to(
+            &Name::class("App\\Bar"),
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &no_cancel(),
+        )
         .expect("not cancelled");
     assert_eq!(
         refs_files(&bar_refs),
@@ -203,7 +240,13 @@ fn class_declared_after_scan_falls_back_and_is_found() {
 
     // And the follow-up query answers from upgraded entries, identically.
     let again = session
-        .indexed_references_to(&Name::class("App\\Bar"), &files, false, &no_cancel())
+        .indexed_references_to(
+            &Name::class("App\\Bar"),
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &no_cancel(),
+        )
         .expect("not cancelled");
     assert_eq!(bar_refs, again);
 }
@@ -227,7 +270,13 @@ fn edited_file_self_invalidates_its_mention_entry() {
     let symbol = Name::class("App\\Widget");
 
     let before = session
-        .indexed_references_to(&symbol, &files, false, &no_cancel())
+        .indexed_references_to(
+            &symbol,
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &no_cancel(),
+        )
         .expect("not cancelled");
     assert!(refs_files(&before).is_empty(), "{before:?}");
 
@@ -238,7 +287,13 @@ fn edited_file_self_invalidates_its_mention_entry() {
         Arc::from("<?php\nnamespace App;\nfunction b(): Widget { return new Widget(); }\n"),
     );
     let after = session
-        .indexed_references_to(&symbol, &files, false, &no_cancel())
+        .indexed_references_to(
+            &symbol,
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &no_cancel(),
+        )
         .expect("not cancelled");
     assert_eq!(refs_files(&after), vec!["buf.php"]);
 }
@@ -300,7 +355,13 @@ fn cold_and_warm_gate_agree_across_generated_workspace() {
             .map(|i| format!("use_{i}.php"))
             .collect();
         let cold = session
-            .indexed_references_to(&symbol, &files, false, &no_cancel())
+            .indexed_references_to(
+                &symbol,
+                &files,
+                false,
+                mir_analyzer::ReferenceIncludes::Plain,
+                &no_cancel(),
+            )
             .expect("not cancelled");
         let mut got = refs_files(&cold);
         got.sort();
@@ -308,7 +369,13 @@ fn cold_and_warm_gate_agree_across_generated_workspace() {
         want.sort();
         assert_eq!(got, want, "class {c}: cold");
         let warm = session
-            .indexed_references_to(&symbol, &files, false, &no_cancel())
+            .indexed_references_to(
+                &symbol,
+                &files,
+                false,
+                mir_analyzer::ReferenceIncludes::Plain,
+                &no_cancel(),
+            )
             .expect("not cancelled");
         assert_eq!(cold, warm, "class {c}: warm must equal cold");
     }
@@ -394,7 +461,13 @@ fn subtype_gate_shares_mention_cache_with_references_gate() {
     // candidates are all five files (ingest drops ref-commit marks), and it
     // only scans the three the subtype gate never touched.
     let refs = session
-        .indexed_references_to(&Name::class("App\\Shape"), &files, false, &no_cancel())
+        .indexed_references_to(
+            &Name::class("App\\Shape"),
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &no_cancel(),
+        )
         .expect("not cancelled");
     assert!(!refs.is_empty(), "Shape is referenced in uses.php");
     assert_eq!(
@@ -442,7 +515,13 @@ fn member_gate_admits_needle_and_amortizes_to_lookups() {
 
     let render = Name::method("App\\Widget", "render");
     let refs = session
-        .indexed_references_to(&render, &files, false, &no_cancel())
+        .indexed_references_to(
+            &render,
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &no_cancel(),
+        )
         .expect("not cancelled");
     assert_eq!(
         refs_files(&refs),
@@ -455,7 +534,13 @@ fn member_gate_admits_needle_and_amortizes_to_lookups() {
     // Repeat with a smaller slice (misses the ref-query memo, so the gate
     // runs): now lookup-only.
     let repeat = session
-        .indexed_references_to(&render, &files[..3], false, &no_cancel())
+        .indexed_references_to(
+            &render,
+            &files[..3],
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &no_cancel(),
+        )
         .expect("not cancelled");
     assert_eq!(refs_files(&repeat), vec!["uses_render.php"]);
     assert_eq!(
@@ -468,7 +553,13 @@ fn member_gate_admits_needle_and_amortizes_to_lookups() {
     // once (epoch), results stay exact, and its repeat is lookup-only again.
     let resize = Name::method("App\\Widget", "resize");
     let refs2 = session
-        .indexed_references_to(&resize, &files, false, &no_cancel())
+        .indexed_references_to(
+            &resize,
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &no_cancel(),
+        )
         .expect("not cancelled");
     assert_eq!(refs_files(&refs2), vec!["uses_resize.php"]);
     let scans_b = session.class_mention_stats().scans_recorded;
@@ -477,7 +568,13 @@ fn member_gate_admits_needle_and_amortizes_to_lookups() {
         "a novel needle must force a fresh recording pass"
     );
     let repeat2 = session
-        .indexed_references_to(&resize, &files[..3], false, &no_cancel())
+        .indexed_references_to(
+            &resize,
+            &files[..3],
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &no_cancel(),
+        )
         .expect("not cancelled");
     assert_eq!(refs_files(&repeat2), vec!["uses_resize.php"]);
     assert_eq!(
@@ -523,7 +620,13 @@ fn constructor_gate_raw_needles_via_mention_index() {
 
     let ctor = Name::method("App\\Gadget", "__construct");
     let refs = session
-        .indexed_references_to(&ctor, &files, false, &no_cancel())
+        .indexed_references_to(
+            &ctor,
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &no_cancel(),
+        )
         .expect("not cancelled");
     assert!(
         refs_files(&refs).contains(&"makes_gadget.php"),
@@ -532,7 +635,13 @@ fn constructor_gate_raw_needles_via_mention_index() {
     let scans = session.class_mention_stats().scans_recorded;
 
     let repeat = session
-        .indexed_references_to(&ctor, &files[..3], false, &no_cancel())
+        .indexed_references_to(
+            &ctor,
+            &files[..3],
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &no_cancel(),
+        )
         .expect("not cancelled");
     assert_eq!(refs_files(&repeat), refs_files(&refs));
     assert_eq!(

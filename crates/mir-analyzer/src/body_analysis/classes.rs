@@ -1270,9 +1270,7 @@ impl<'a> BodyAnalyzer<'a> {
                 .collect();
             for adaptation in tu.adaptations.iter() {
                 let php_ast::owned::TraitAdaptationKind::Alias {
-                    trait_name,
-                    method,
-                    ..
+                    trait_name, method, ..
                 } = &adaptation.kind
                 else {
                     continue;

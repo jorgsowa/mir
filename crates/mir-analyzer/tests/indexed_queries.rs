@@ -52,6 +52,7 @@ fn method_references_across_uncommitted_files() {
             &Name::method("App\\Service", "process"),
             &paths(&files),
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -68,6 +69,7 @@ fn method_references_across_uncommitted_files() {
             &Name::method("Other\\Free", "process"),
             &paths(&files),
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -93,6 +95,7 @@ fn include_declaration_appends_name_span() {
             &Name::method("Widget", "render"),
             &paths(&files),
             true,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -125,6 +128,7 @@ fn constructor_references_at_new_sites() {
             &Name::method("Shop\\Order", "__construct"),
             &paths(&files),
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -144,11 +148,16 @@ fn trait_alias_references_include_adaptation_and_alias_calls() {
             &Name::method("Auditable", "record"),
             &paths(&files),
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
 
-    assert_eq!(refs.len(), 3, "adaptation + direct call + alias call: {refs:?}");
+    assert_eq!(
+        refs.len(),
+        3,
+        "adaptation + direct call + alias call: {refs:?}"
+    );
 }
 
 #[test]
@@ -167,7 +176,13 @@ fn class_function_property_constant_references() {
     let all = paths(&files);
 
     let cls = session
-        .indexed_references_to(&Name::Class(Arc::from("App\\Cfg")), &all, false, &|| false)
+        .indexed_references_to(
+            &Name::Class(Arc::from("App\\Cfg")),
+            &all,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     assert!(
         cls.iter().any(|(f, _)| f.as_ref() == "use.php"),
@@ -179,6 +194,7 @@ fn class_function_property_constant_references() {
             &Name::Function(Arc::from("App\\helper")),
             &all,
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -192,6 +208,7 @@ fn class_function_property_constant_references() {
             },
             &all,
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -205,6 +222,7 @@ fn class_function_property_constant_references() {
             },
             &all,
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -224,7 +242,9 @@ fn freshness_edit_updates_postings() {
     let sym = Name::method("B", "m");
     let all = paths(&files);
     let refs = session
-        .indexed_references_to(&sym, &all, false, &|| false)
+        .indexed_references_to(&sym, &all, false, mir_analyzer::ReferenceIncludes::Plain, &|| {
+            false
+        })
         .expect("not cancelled");
     assert_eq!(refs.len(), 1);
 
@@ -235,7 +255,9 @@ fn freshness_edit_updates_postings() {
         Arc::from("<?php\nfunction c(B $b): void { $b->m(); $b->m(); }\n"),
     );
     let refs = session
-        .indexed_references_to(&sym, &all, false, &|| false)
+        .indexed_references_to(&sym, &all, false, mir_analyzer::ReferenceIncludes::Plain, &|| {
+            false
+        })
         .expect("not cancelled");
     assert_eq!(refs.len(), 2, "postings must follow the edit: {refs:?}");
 
@@ -245,7 +267,9 @@ fn freshness_edit_updates_postings() {
         Arc::from("<?php\nfunction c(B $b): void {}\n"),
     );
     let refs = session
-        .indexed_references_to(&sym, &all, false, &|| false)
+        .indexed_references_to(&sym, &all, false, mir_analyzer::ReferenceIncludes::Plain, &|| {
+            false
+        })
         .expect("not cancelled");
     assert!(refs.is_empty(), "stale postings must not survive: {refs:?}");
 }
@@ -434,6 +458,7 @@ fn static_call_on_unresolved_class_scopes_to_that_class() {
             &Name::method("UnknownClass", "doThing"),
             &paths(&files),
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -449,9 +474,13 @@ fn static_call_on_unresolved_class_scopes_to_that_class() {
     // where a call keyword (`self`/`static`/`parent`) never resolved to any
     // concrete name at all (see `static_call_bare_fallback_when_self_unresolved`).
     let bare = session
-        .indexed_references_to(&Name::method("", "doThing"), &paths(&files), false, &|| {
-            false
-        })
+        .indexed_references_to(
+            &Name::method("", "doThing"),
+            &paths(&files),
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     assert!(
         bare.is_empty(),
@@ -474,6 +503,7 @@ fn static_call_on_undefined_method_scopes_to_the_class() {
             &Name::method("Known", "doThing"),
             &paths(&files),
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -493,9 +523,13 @@ fn unknown_owner_property_declaration_reachable() {
     )];
     let session = session_with(&files);
     let refs = session
-        .indexed_references_to(&Name::property("", "label"), &paths(&files), true, &|| {
-            false
-        })
+        .indexed_references_to(
+            &Name::property("", "label"),
+            &paths(&files),
+            true,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     assert_eq!(
         refs.len(),
@@ -515,6 +549,7 @@ fn unknown_owner_constant_declaration_reachable() {
             &Name::class_constant("", "MODE"),
             &paths(&files),
             true,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -534,7 +569,13 @@ fn interface_method_declaration_reachable_with_unknown_owner() {
     )];
     let session = session_with(&files);
     let refs = session
-        .indexed_references_to(&Name::method("", "area"), &paths(&files), true, &|| false)
+        .indexed_references_to(
+            &Name::method("", "area"),
+            &paths(&files),
+            true,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     assert_eq!(
         refs.len(),
@@ -556,6 +597,7 @@ fn enum_constant_declaration_reachable_with_unknown_owner() {
             &Name::class_constant("", "DEFAULT"),
             &paths(&files),
             true,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -591,7 +633,13 @@ fn use_import_locations_reachable_but_excluded_from_plain_references() {
     // deliberately no `UnusedImport` check, and counting an import as usage
     // would hide genuinely dead classes/functions/constants.
     let cls_refs = session
-        .indexed_references_to(&Name::class("App\\Widget"), &all, false, &|| false)
+        .indexed_references_to(
+            &Name::class("App\\Widget"),
+            &all,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     assert!(
         cls_refs.is_empty(),
@@ -638,15 +686,17 @@ fn indexed_queries_use_codepoint_columns_in_multibyte_and_crlf_files() {
     let all = paths(&files);
 
     let refs = session
-        .indexed_references_to(&Name::class("App\\Greeter"), &all, false, &|| false)
+        .indexed_references_to(
+            &Name::class("App\\Greeter"),
+            &all,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     assert_eq!(refs.len(), 1, "{refs:?}");
     assert_eq!(refs[0].0.as_ref(), "main.php");
-    let main_ref_line = files[1]
-        .1
-        .lines()
-        .nth(2)
-        .expect("third line in main.php");
+    let main_ref_line = files[1].1.lines().nth(2).expect("third line in main.php");
     let (ref_start, ref_end) = codepoint_span(main_ref_line, "Greeter");
     assert_eq!(refs[0].1.start.line, 3, "{refs:?}");
     assert_eq!(refs[0].1.start.column, ref_start, "{refs:?}");
@@ -782,7 +832,13 @@ fn use_import_postings_recorded_for_unresolvable_targets() {
 
     // Freshness pass commits main.php's postings (the class never resolves).
     let _ = session
-        .indexed_references_to(&Name::class("App\\Ghost"), &all, false, &|| false)
+        .indexed_references_to(
+            &Name::class("App\\Ghost"),
+            &all,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
 
     let cls_use = session.indexed_use_import_locations(&Name::class("App\\Ghost"), &all);
@@ -831,6 +887,7 @@ fn cold_constructor_query_admits_files_naming_only_the_class() {
             &Name::method("App\\Job", "__construct"),
             &paths(&files),
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -853,7 +910,13 @@ fn gated_file_participates_after_edit_introduces_mention() {
     let session = session_with(&files);
     let sym = Name::method("App\\Service", "run");
     let refs = session
-        .indexed_references_to(&sym, &paths(&files), false, &|| false)
+        .indexed_references_to(
+            &sym,
+            &paths(&files),
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     assert!(refs.is_empty(), "{refs:?}");
 
@@ -864,7 +927,13 @@ fn gated_file_participates_after_edit_introduces_mention() {
         ),
     );
     let refs = session
-        .indexed_references_to(&sym, &paths(&files), false, &|| false)
+        .indexed_references_to(
+            &sym,
+            &paths(&files),
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     assert_eq!(refs.len(), 1, "{refs:?}");
     assert_eq!(refs[0].0.as_ref(), "idle.php");
@@ -882,9 +951,13 @@ fn static_call_bare_fallback_when_self_unresolved() {
     )];
     let session = session_with(&files);
     let refs = session
-        .indexed_references_to(&Name::method("", "doThing"), &paths(&files), false, &|| {
-            false
-        })
+        .indexed_references_to(
+            &Name::method("", "doThing"),
+            &paths(&files),
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     assert_eq!(
         refs.len(),
@@ -919,6 +992,7 @@ fn static_call_on_unresolved_ancestor_does_not_collide_with_unrelated_class() {
             &Name::method("Foo", "__construct"),
             &paths(&files),
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -934,6 +1008,7 @@ fn static_call_on_unresolved_ancestor_does_not_collide_with_unrelated_class() {
             &Name::method("BaseThing", "__construct"),
             &paths(&files),
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -985,6 +1060,7 @@ fn static_method_inherited_via_subclass_is_found_without_naming_owner() {
             &Name::method("App\\Owner", "m"),
             &paths(&files),
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -1026,6 +1102,7 @@ fn static_call_via_instance_receiver_is_found_without_naming_owner() {
             &Name::method("App\\Owner", "m"),
             &paths(&files),
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -1062,6 +1139,7 @@ fn constructor_reinit_via_instance_receiver_is_found_without_naming_owner() {
             &Name::method("App\\Owner", "__construct"),
             &paths(&files),
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -1091,6 +1169,7 @@ fn static_call_with_case_mismatched_fqcn_is_found() {
             &Name::method("App\\Owner", "m"),
             &paths(&files),
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");

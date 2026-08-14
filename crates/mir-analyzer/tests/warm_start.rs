@@ -49,6 +49,7 @@ fn warm_start_files_replays_reference_locations_from_disk_cache() {
             &Name::method("App\\Other", "bogus"),
             &[Arc::from(file_path)],
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -134,6 +135,7 @@ fn warm_start_replay_survives_workspace_growth_when_resolved() {
             &Name::method("App\\Other", "bogus"),
             &[Arc::from(file_path)],
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -191,6 +193,7 @@ fn warm_start_replay_reverifies_unresolved_files_after_growth() {
             &Name::method("App\\Other", "bogus"),
             &[Arc::from(file_path)],
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -308,6 +311,7 @@ fn session_sweep_persists_postings_for_next_launch() {
             &Name::method("Widget", "spin"),
             &[Arc::from(widget_path), Arc::from(caller_path)],
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &cancel_after_first,
         )
         .expect("replayed postings must answer the query with no analysis sweep");
@@ -337,6 +341,7 @@ fn on_demand_query_commit_persists_postings_for_next_launch() {
                 &Name::method("Widget", "spin"),
                 &[Arc::from(widget_path), Arc::from(caller_path)],
                 false,
+                mir_analyzer::ReferenceIncludes::Plain,
                 &|| false,
             )
             .expect("not cancelled");
@@ -413,6 +418,7 @@ fn warm_start_files_is_a_no_op_without_a_cache() {
             &Name::class("Plain"),
             &[Arc::from(file_path)],
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -471,6 +477,7 @@ fn warm_start_seeds_workspace_symbol_index_without_tracked_walk() {
             &Name::method("App\\Service", "run"),
             &candidates,
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -509,6 +516,7 @@ fn warm_start_seed_skipped_when_slices_missing() {
             &Name::class("C3"),
             &files.iter().map(|(p, _)| p.clone()).collect::<Vec<_>>(),
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -540,6 +548,7 @@ fn mirror_only_new_file_is_visible_after_settle() {
             &Name::method("App\\Base", "ping"),
             &candidates,
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -601,6 +610,7 @@ fn mirror_only_class_rename_updates_index_after_settle() {
             &Name::method("App\\NewShape", "draw"),
             &candidates,
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");

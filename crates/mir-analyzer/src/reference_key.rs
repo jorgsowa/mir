@@ -92,7 +92,9 @@ fn cached_pair(
     let left_arc: Arc<str> = Arc::from(left);
     let right_arc: Arc<str> = Arc::from(right);
     let key: Arc<str> = Arc::from(format!("{prefix}{left}::{right}"));
-    map.entry(left_arc).or_default().insert(right_arc, key.clone());
+    map.entry(left_arc)
+        .or_default()
+        .insert(right_arc, key.clone());
     key
 }
 

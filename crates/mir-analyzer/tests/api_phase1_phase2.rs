@@ -155,6 +155,7 @@ fn references_to_takes_typed_symbol() {
             &Name::function("helper"),
             std::slice::from_ref(&file),
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -276,7 +277,13 @@ fn resolved_symbol_to_symbol_bridges_pass2_with_queries() {
 
     // The typed Name can be passed directly to references_to
     let refs = session
-        .indexed_references_to(&typed_symbol, std::slice::from_ref(&file), false, &|| false)
+        .indexed_references_to(
+            &typed_symbol,
+            std::slice::from_ref(&file),
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     assert!(refs.iter().any(|(f, _)| f.as_ref() == file.as_ref()));
 }
@@ -312,6 +319,7 @@ fn method_references_scoped_by_declaring_class() {
             &Name::method("Foo", "toString"),
             std::slice::from_ref(&file),
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -320,6 +328,7 @@ fn method_references_scoped_by_declaring_class() {
             &Name::method("Bar", "toString"),
             std::slice::from_ref(&file),
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -382,7 +391,13 @@ fn method_references_end_to_end_symbol_at_flow() {
 
     let name = sym.to_symbol().expect("MethodCall should map to a Name");
     let refs = session
-        .indexed_references_to(&name, std::slice::from_ref(&file), false, &|| false)
+        .indexed_references_to(
+            &name,
+            std::slice::from_ref(&file),
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
 
     assert!(
@@ -432,7 +447,13 @@ fn global_constant_references_end_to_end_symbol_at_flow() {
         .to_symbol()
         .expect("GlobalConstant should map to a Name");
     let refs = session
-        .indexed_references_to(&name, std::slice::from_ref(&file), false, &|| false)
+        .indexed_references_to(
+            &name,
+            std::slice::from_ref(&file),
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
 
     assert!(
@@ -489,7 +510,13 @@ fn method_references_inherited_method_end_to_end() {
 
     let name = sym.to_symbol().expect("MethodCall maps to Name");
     let refs = session
-        .indexed_references_to(&name, std::slice::from_ref(&file), false, &|| false)
+        .indexed_references_to(
+            &name,
+            std::slice::from_ref(&file),
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
 
     assert!(
@@ -544,7 +571,13 @@ fn property_references_inherited_property_end_to_end() {
 
     let name = sym.to_symbol().expect("PropertyAccess maps to Name");
     let refs = session
-        .indexed_references_to(&name, std::slice::from_ref(&file), false, &|| false)
+        .indexed_references_to(
+            &name,
+            std::slice::from_ref(&file),
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
 
     assert!(
@@ -588,6 +621,7 @@ fn property_write_target_appears_in_references() {
             &Name::property("Foo", "v"),
             std::slice::from_ref(&file),
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -638,6 +672,7 @@ fn static_property_write_target_appears_in_references() {
             &Name::property("Counter", "n"),
             std::slice::from_ref(&file),
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -682,6 +717,7 @@ fn property_references_direct_property_end_to_end() {
             &Name::property("Foo", "value"),
             std::slice::from_ref(&file),
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -1673,6 +1709,7 @@ fn references_to_finds_extends_implements_and_trait_use() {
             &Name::class("Base"),
             std::slice::from_ref(&file),
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -1686,6 +1723,7 @@ fn references_to_finds_extends_implements_and_trait_use() {
             &Name::class("Greets"),
             std::slice::from_ref(&file),
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -1699,6 +1737,7 @@ fn references_to_finds_extends_implements_and_trait_use() {
             &Name::class("Helper"),
             std::slice::from_ref(&file),
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");

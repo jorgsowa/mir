@@ -120,6 +120,7 @@ fn measure_mention_index() {
             &mir_analyzer::Name::class("Probe\\ZzzProbeAlpha"),
             &paths,
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &never,
         )
         .unwrap();
@@ -133,6 +134,7 @@ fn measure_mention_index() {
             &mir_analyzer::Name::class("Probe\\ZzzProbeAlpha"),
             &paths,
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &never,
         )
         .unwrap();
@@ -147,6 +149,7 @@ fn measure_mention_index() {
             &mir_analyzer::Name::class("Probe\\ZzzProbeBeta"),
             &paths,
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &never,
         )
         .unwrap();
@@ -165,6 +168,7 @@ fn measure_mention_index() {
             &mir_analyzer::Name::class("Probe\\ZzzNotDeclaredAnywhere"),
             &paths,
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &never,
         )
         .unwrap();
@@ -186,6 +190,7 @@ fn measure_mention_index() {
             &mir_analyzer::Name::class("Probe\\ZzzNotDeclaredAnywhere"),
             &paths[..paths.len() - 1],
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &never,
         )
         .unwrap();

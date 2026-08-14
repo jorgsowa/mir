@@ -233,45 +233,23 @@ impl AnalysisSession {
         out
     }
 
-    /// `use`-import occurrences of `symbol` — the import statement's own name
-    /// token (`use Foo\Bar;`, `use function ...;`, `use const ...;`), not a
-    /// usage site. Recorded under a `use:`-prefixed posting distinct from the
-    /// plain `cls:`/`fn:`/`gcnst:` keys [`Self::indexed_references_to`] reads,
-    /// so a symbol rename can also find/update the import line without a
-    /// plain find-references query suddenly including import statements.
-    ///
-    /// Read-only posting-list lookup, filtered to `files` — no freshness pass:
-    /// callers that need guaranteed-fresh results for an uncommitted file
-    /// should analyze it first (e.g. via [`Self::indexed_references_to`] on
-    /// the same file set).
-    ///
-    /// Returned ranges use mir's native coordinates: 1-based lines and
-    /// 0-based Unicode code-point columns (UTF-32/LSP `positionEncoding`
-    /// `"utf-32"`), not UTF-8 byte offsets or UTF-16 code units.
+    /// Compatibility wrapper for callers that only want `use` import items.
+    /// Delegates to [`Self::indexed_references_to`] so import references share
+    /// the same freshness/self-heal path, scope filtering, and memoization
+    /// boundary as every other reference query.
     pub fn indexed_use_import_locations(
         &self,
         symbol: &crate::Name,
         files: &[Arc<str>],
     ) -> Vec<(Arc<str>, crate::Range)> {
-        self.settle_workspace_index();
-        let key = format!("use:{}", symbol.codebase_key());
-        let scope: rustc_hash::FxHashSet<&str> = files.iter().map(|f| f.as_ref()).collect();
-        let guard = self.db.salsa.read();
-        let mut out: Vec<(Arc<str>, crate::Range)> = guard
-            .reference_locations(&key)
-            .into_iter()
-            .filter(|(file, ..)| scope.contains(file.as_ref()))
-            .map(|(file, line, col_start, col_end)| {
-                (file, span_range(line, col_start as u32, col_end as u32))
-            })
-            .collect();
-        out.sort_by(|a, b| {
-            a.0.cmp(&b.0)
-                .then(a.1.start.line.cmp(&b.1.start.line))
-                .then(a.1.start.column.cmp(&b.1.start.column))
-        });
-        out.dedup();
-        out
+        self.indexed_references_to(
+            symbol,
+            files,
+            false,
+            crate::ReferenceIncludes::UseImports,
+            &|| false,
+        )
+        .unwrap_or_default()
     }
 
     /// Inverted-index find-references: posting-list lookup plus an on-demand
@@ -301,18 +279,19 @@ impl AnalysisSession {
     /// `should_cancel` is polled at phase boundaries and between
     /// cancellation retries; `true` aborts with `None`.
     ///
-    /// Memoized per `(symbol, files, include_declaration, text_revision)` —
-    /// see [`RefQueryCacheKey`]. The freshness scan below still costs
-    /// O(candidates) even when every candidate is already committed (it has
-    /// to check), so a caller re-running the same query against unchanged
-    /// state (e.g. a host recomputing reference counts for a code-lens
-    /// refresh) would otherwise re-pay that scan on every call; this makes
-    /// the repeat a single hashmap lookup instead.
+    /// Memoized per `(symbol, files, include_declaration, includes,
+    /// text_revision)` — see [`RefQueryCacheKey`]. The freshness scan below
+    /// still costs O(candidates) even when every candidate is already
+    /// committed (it has to check), so a caller re-running the same query
+    /// against unchanged state (e.g. a host recomputing reference counts for
+    /// a code-lens refresh) would otherwise re-pay that scan on every call;
+    /// this makes the repeat a single hashmap lookup instead.
     pub fn indexed_references_to(
         &self,
         symbol: &crate::Name,
         files: &[Arc<str>],
         include_declaration: bool,
+        includes: crate::ReferenceIncludes,
         should_cancel: &(dyn Fn() -> bool + Sync),
     ) -> Option<Vec<(Arc<str>, crate::Range)>> {
         // No `should_cancel()` check here: a cache hit does no analysis
@@ -324,6 +303,7 @@ impl AnalysisSession {
         let cache_key = RefQueryCacheKey {
             symbol: symbol.codebase_key(),
             include_declaration,
+            includes,
             generation: self.query_cache_generation(),
             files_hash: hash_files(files),
         };
@@ -332,8 +312,13 @@ impl AnalysisSession {
                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             return Some((**cached).clone());
         }
-        let result =
-            self.indexed_references_to_uncached(symbol, files, include_declaration, should_cancel)?;
+        let result = self.indexed_references_to_uncached(
+            symbol,
+            files,
+            include_declaration,
+            includes,
+            should_cancel,
+        )?;
         if self.query_cache_generation() != cache_key.generation {
             // The generation moved while computing (an edit, or a defs
             // commit growing the subtype index — possibly this query's own).
@@ -371,6 +356,7 @@ impl AnalysisSession {
         symbol: &crate::Name,
         files: &[Arc<str>],
         include_declaration: bool,
+        includes: crate::ReferenceIncludes,
         should_cancel: &(dyn Fn() -> bool + Sync),
     ) -> Option<Vec<(Arc<str>, crate::Range)>> {
         self.settle_workspace_index();
@@ -731,7 +717,7 @@ impl AnalysisSession {
             read_symbol_key(&scratch_key)
         };
         let mut out: Vec<(Arc<str>, crate::Range)> = Vec::new();
-        match symbol {
+        let mut append_plain = || match symbol {
             crate::Name::Method { name, .. } => {
                 for class in &hierarchy {
                     out.extend(read_composed_key(
@@ -763,8 +749,18 @@ impl AnalysisSession {
                 }
             }
             _ => out.extend(read_symbol_key(key.as_str())),
+        };
+        match includes {
+            crate::ReferenceIncludes::Plain => append_plain(),
+            crate::ReferenceIncludes::UseImports => {
+                out.extend(read_composed_key("use:", key.as_str(), "", ""));
+            }
+            crate::ReferenceIncludes::PlainAndUseImports => {
+                append_plain();
+                out.extend(read_composed_key("use:", key.as_str(), "", ""));
+            }
         }
-        if out.is_empty() {
+        if matches!(includes, crate::ReferenceIncludes::Plain) && out.is_empty() {
             match symbol {
                 crate::Name::Method { name, .. } => {
                     out = read_composed_key("methname:", name.as_ref(), "", "");
@@ -1550,10 +1546,7 @@ impl AnalysisSession {
                     raw: vec!["->__construct".to_string(), "::__construct".to_string()],
                 };
             }
-            if name.as_ref() != "__construct"
-                && name.as_ref() != "__invoke"
-                && !class.is_empty()
-            {
+            if name.as_ref() != "__construct" && name.as_ref() != "__invoke" && !class.is_empty() {
                 let db = self.snapshot_db();
                 let here = crate::db::Fqcn::from_str(&db, class.as_ref());
                 let is_static = crate::db::find_method_in_chain(&db, here, name)

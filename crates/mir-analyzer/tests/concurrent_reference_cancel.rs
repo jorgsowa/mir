@@ -160,9 +160,13 @@ fn concurrent_writes_do_not_abort_parallel_reference_reads() {
                     // cancellable path the LSP server uses.
                     let deadline = Instant::now() + CALL_BUDGET;
                     let _ = std::panic::catch_unwind(AssertUnwindSafe(|| {
-                        session.indexed_references_to(&symbol, &callers, false, &|| {
-                            Instant::now() > deadline
-                        })
+                        session.indexed_references_to(
+                            &symbol,
+                            &callers,
+                            false,
+                            mir_analyzer::ReferenceIncludes::Plain,
+                            &|| Instant::now() > deadline,
+                        )
                     }));
                     // Every other reader also drives the incremental sweep, which
                     // shares the same rayon-join hazard.

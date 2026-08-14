@@ -294,7 +294,8 @@ fn new_expression_via_class_string_variable_records_class_reference() {
 #[test]
 fn new_expression_multibyte_prefix_uses_codepoint_columns() {
     let dir = create_temp_dir("multibyte_prefix");
-    let src = "<?php\nclass Greeter {}\nfunction make(): void { echo \"hé\"; $g = new Greeter(); }\n";
+    let src =
+        "<?php\nclass Greeter {}\nfunction make(): void { echo \"hé\"; $g = new Greeter(); }\n";
     let file = write_file(&dir, "unicode_ref.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 

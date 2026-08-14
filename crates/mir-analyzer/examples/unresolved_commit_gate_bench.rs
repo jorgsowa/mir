@@ -69,7 +69,13 @@ fn main() {
     // candidates on), so this pass's cost is irrelevant to what's timed below.
     let t0 = Instant::now();
     session
-        .indexed_references_to(&Name::method("", ""), &project_paths, false, &|| false)
+        .indexed_references_to(
+            &Name::method("", ""),
+            &project_paths,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     eprintln!(
         "initial full-commit pass: {:.3}s",
@@ -90,7 +96,13 @@ fn main() {
     let target = Name::method("Illuminate\\Support\\Distinctive", "staticThing");
     let t1 = Instant::now();
     let refs = session
-        .indexed_references_to(&target, &project_paths, false, &|| false)
+        .indexed_references_to(
+            &target,
+            &project_paths,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     eprintln!(
         "post-growth distinctive-static query: {:.3}s, {} references found",

@@ -153,6 +153,20 @@ pub struct AnalysisSession {
     subtype_query_cache_hits: Arc<std::sync::atomic::AtomicU64>,
 }
 
+/// Which reference postings [`AnalysisSession::indexed_references_to`]
+/// should read back from the maintained reference index.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ReferenceIncludes {
+    /// Plain usage/declaration references only (`cls:` / `fn:` / member
+    /// postings), excluding `use` import items.
+    Plain,
+    /// Only `use` import items (`use Foo\Bar;`, `use function ...;`,
+    /// `use const ...;`), excluding plain usage/declaration references.
+    UseImports,
+    /// Plain references plus `use` import items.
+    PlainAndUseImports,
+}
+
 /// Cache key for [`AnalysisSession::indexed_references_to`]'s memoization.
 ///
 /// `generation`'s revision half is salsa's text revision, not
@@ -176,6 +190,7 @@ pub struct AnalysisSession {
 struct RefQueryCacheKey {
     symbol: String,
     include_declaration: bool,
+    includes: ReferenceIncludes,
     generation: (salsa::Revision, u64),
     files_hash: u64,
 }

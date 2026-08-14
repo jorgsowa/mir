@@ -63,7 +63,13 @@ fn cold_references_query_bumps_generation_once_for_all_lazy_loads() {
 
     let gen_before = session.index_generation();
     let refs = session
-        .indexed_references_to(&target, &paths, false, &|| false)
+        .indexed_references_to(
+            &target,
+            &paths,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     let bumps = session.index_generation() - gen_before;
 
@@ -88,7 +94,13 @@ fn cold_references_query_bumps_generation_once_for_all_lazy_loads() {
     // Warm repeat: fully committed, no loads, no bumps, same result.
     let gen_before = session.index_generation();
     let warm = session
-        .indexed_references_to(&target, &paths, false, &|| false)
+        .indexed_references_to(
+            &target,
+            &paths,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     assert_eq!(warm.len(), refs.len());
     assert_eq!(

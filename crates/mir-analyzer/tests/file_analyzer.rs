@@ -503,6 +503,7 @@ function caller(): string { return helper(); }
             &mir_analyzer::Name::function("helper"),
             std::slice::from_ref(&file),
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -826,6 +827,7 @@ function caller_v1() { foo(); }
             &mir_analyzer::Name::function("foo"),
             std::slice::from_ref(&file),
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -851,6 +853,7 @@ function caller_v2() { bar(); }
             &mir_analyzer::Name::function("foo"),
             std::slice::from_ref(&file),
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -863,6 +866,7 @@ function caller_v2() { bar(); }
             &mir_analyzer::Name::function("bar"),
             std::slice::from_ref(&file),
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
@@ -1112,6 +1116,7 @@ function caller(): string { return helper(); }
         &mir_analyzer::Name::function("helper"),
         std::slice::from_ref(&file),
         false,
+        mir_analyzer::ReferenceIncludes::Plain,
         &|| true,
     );
     assert!(refs.is_none(), "cancelled request must return None");
@@ -1131,7 +1136,13 @@ function caller(): string { return helper(); }
 
     let name = mir_analyzer::Name::function("helper");
     let first = session
-        .indexed_references_to(&name, std::slice::from_ref(&file), false, &|| false)
+        .indexed_references_to(
+            &name,
+            std::slice::from_ref(&file),
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     assert!(
         !first.is_empty(),
@@ -1139,13 +1150,25 @@ function caller(): string { return helper(); }
     );
 
     let cancellable = session
-        .indexed_references_to(&name, std::slice::from_ref(&file), false, &|| false)
+        .indexed_references_to(
+            &name,
+            std::slice::from_ref(&file),
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("uncancelled request must return Some");
     assert_eq!(first, cancellable);
 
     // Second call takes the prepared-files skip path; results must not change.
     let second = session
-        .indexed_references_to(&name, std::slice::from_ref(&file), false, &|| false)
+        .indexed_references_to(
+            &name,
+            std::slice::from_ref(&file),
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     assert_eq!(first, second);
 }
@@ -1164,7 +1187,13 @@ function caller(): string { return helper(); }
 
     let name = mir_analyzer::Name::function("helper");
     let refs_v1 = session
-        .indexed_references_to(&name, std::slice::from_ref(&file), false, &|| false)
+        .indexed_references_to(
+            &name,
+            std::slice::from_ref(&file),
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
 
     let v2 = "<?php
@@ -1175,7 +1204,13 @@ function caller2(): string { return helper(); }
     session.ingest_file(file.clone(), Arc::from(v2));
 
     let refs_v2 = session
-        .indexed_references_to(&name, std::slice::from_ref(&file), false, &|| false)
+        .indexed_references_to(
+            &name,
+            std::slice::from_ref(&file),
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     assert!(
         refs_v2.len() > refs_v1.len(),
@@ -1216,6 +1251,7 @@ class C{i} {{
             &mir_analyzer::Name::method("App\\C0", "save"),
             &files,
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("uncancelled recursive candidate query should complete");
@@ -1224,6 +1260,7 @@ class C{i} {{
             &mir_analyzer::Name::method("App\\C0", "save"),
             &files,
             false,
+            mir_analyzer::ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("warm repeat should also complete");
@@ -1257,7 +1294,13 @@ class Caller {
 
     let name = mir_analyzer::Name::method("App\\Svc", "run");
     let before = session
-        .indexed_references_to(&name, std::slice::from_ref(&caller_path), false, &|| false)
+        .indexed_references_to(
+            &name,
+            std::slice::from_ref(&caller_path),
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     assert!(
         before.is_empty(),
@@ -1275,7 +1318,13 @@ class Svc { public function run(): void {} }
     // No re-analysis of caller.php in between — staleness must catch this alone.
     let files: Vec<Arc<str>> = vec![caller_path.clone(), svc_path.clone()];
     let after = session
-        .indexed_references_to(&name, &files, false, &|| false)
+        .indexed_references_to(
+            &name,
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     assert_eq!(
         after.len(),
@@ -1309,7 +1358,13 @@ class Caller {
     let name = mir_analyzer::Name::method("App\\Svc", "run");
     let files: Vec<Arc<str>> = vec![caller_path.clone(), svc_path.clone()];
     let before = session
-        .indexed_references_to(&name, &files, false, &|| false)
+        .indexed_references_to(
+            &name,
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     assert!(
         before.is_empty(),
@@ -1324,7 +1379,13 @@ class Caller {
     );
 
     let after = session
-        .indexed_references_to(&name, &files, false, &|| false)
+        .indexed_references_to(
+            &name,
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("not cancelled");
     assert_eq!(
         after.len(),

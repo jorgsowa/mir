@@ -95,7 +95,13 @@ fn indexed_references_warm_repeat_is_pure_lookup() {
     let files = [file_a.clone(), file_b.clone()];
     let sym = mir_analyzer::Name::method("HoistBase", "m");
     let refs = session
-        .indexed_references_to(&sym, &files, false, &|| false)
+        .indexed_references_to(
+            &sym,
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("query not cancelled");
     assert_eq!(
         refs.len(),
@@ -109,7 +115,13 @@ fn indexed_references_warm_repeat_is_pure_lookup() {
     // posting lookup itself) and no prepared-file churn.
     let locks_before = session.ref_index_lock_count();
     let warm = session
-        .indexed_references_to(&sym, &files, false, &|| false)
+        .indexed_references_to(
+            &sym,
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("query not cancelled");
     assert_eq!(warm.len(), 1);
     // One lock per posting key (target class + hierarchy + name fallback) —
@@ -124,14 +136,26 @@ fn indexed_references_warm_repeat_is_pure_lookup() {
     // the sweep and the query must not duplicate results.
     let _ = session.reanalyze_files_cancellable(std::slice::from_ref(&file_b), &IndexCancel::new());
     let after_sweep = session
-        .indexed_references_to(&sym, &files, false, &|| false)
+        .indexed_references_to(
+            &sym,
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("query not cancelled");
     assert_eq!(after_sweep.len(), 1, "replace semantics must hold");
 
     // Closing a file drops its postings.
     session.invalidate_file(file_b.as_ref());
     let after_close = session
-        .indexed_references_to(&sym, &files, false, &|| false)
+        .indexed_references_to(
+            &sym,
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("query not cancelled");
     assert!(
         after_close.is_empty(),
@@ -167,7 +191,13 @@ fn warm_repeat_stays_pure_lookup_after_unrelated_file_add() {
     let files = [file_a.clone(), file_b.clone()];
     let sym = mir_analyzer::Name::method("ImmuneBase", "m");
     let refs = session
-        .indexed_references_to(&sym, &files, false, &|| false)
+        .indexed_references_to(
+            &sym,
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("query not cancelled");
     assert_eq!(refs.len(), 1);
 
@@ -179,7 +209,13 @@ fn warm_repeat_stays_pure_lookup_after_unrelated_file_add() {
 
     let locks_before = session.ref_index_lock_count();
     let warm = session
-        .indexed_references_to(&sym, &files, false, &|| false)
+        .indexed_references_to(
+            &sym,
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("query not cancelled");
     assert_eq!(warm.len(), 1);
     let locks_taken = session.ref_index_lock_count() - locks_before;
@@ -211,7 +247,13 @@ fn indexed_references_repeat_query_hits_cache() {
     let sym = mir_analyzer::Name::method("CacheBase", "m");
     let hits_before = session.ref_query_cache_hits();
     let first = session
-        .indexed_references_to(&sym, &files, false, &|| false)
+        .indexed_references_to(
+            &sym,
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("query not cancelled");
     assert_eq!(first.len(), 1);
     assert_eq!(
@@ -221,7 +263,13 @@ fn indexed_references_repeat_query_hits_cache() {
     );
 
     let second = session
-        .indexed_references_to(&sym, &files, false, &|| false)
+        .indexed_references_to(
+            &sym,
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("query not cancelled");
     assert_eq!(second, first);
     assert_eq!(
@@ -270,7 +318,13 @@ fn indexed_references_cache_tracks_total_locations_not_entry_count() {
 
         let sym = mir_analyzer::Name::method(base, "m");
         let refs = session
-            .indexed_references_to(&sym, &files, false, &|| false)
+            .indexed_references_to(
+                &sym,
+                &files,
+                false,
+                mir_analyzer::ReferenceIncludes::Plain,
+                &|| false,
+            )
             .expect("query not cancelled");
         assert_eq!(refs.len(), n_callers, "one call site per caller file");
         assert_eq!(
@@ -289,7 +343,9 @@ fn indexed_references_cache_tracks_total_locations_not_entry_count() {
     for (base, n_callers, files) in &file_sets {
         let sym = mir_analyzer::Name::method(*base, "m");
         let refs = session
-            .indexed_references_to(&sym, files, false, &|| false)
+            .indexed_references_to(&sym, files, false, mir_analyzer::ReferenceIncludes::Plain, &|| {
+                false
+            })
             .expect("query not cancelled");
         assert_eq!(refs.len(), *n_callers);
         expected_total += refs.len();
@@ -497,7 +553,13 @@ fn indexed_references_cache_invalidates_on_body_only_edit() {
     let sym = mir_analyzer::Name::method("InvalidateBase", "m");
     let gen_before = session.index_generation();
     let before_edit = session
-        .indexed_references_to(&sym, &files, false, &|| false)
+        .indexed_references_to(
+            &sym,
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("query not cancelled");
     assert_eq!(
         before_edit.len(),
@@ -515,7 +577,13 @@ fn indexed_references_cache_invalidates_on_body_only_edit() {
     );
 
     let after_edit = session
-        .indexed_references_to(&sym, &files, false, &|| false)
+        .indexed_references_to(
+            &sym,
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("query not cancelled");
     assert_eq!(
         after_edit.len(),
@@ -587,12 +655,19 @@ fn references_cache_invalidates_when_subtype_query_grows_hierarchy() {
         &mir_analyzer::Name::method("EpochBase", "nope"),
         &files,
         false,
+        mir_analyzer::ReferenceIncludes::Plain,
         &|| false,
     );
 
     let sym = mir_analyzer::Name::method("EpochBase", "m");
     let cold = session
-        .indexed_references_to(&sym, &files, false, &|| false)
+        .indexed_references_to(
+            &sym,
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("query not cancelled");
     assert!(
         cold.is_empty(),
@@ -609,7 +684,13 @@ fn references_cache_invalidates_when_subtype_query_grows_hierarchy() {
     );
 
     let warm = session
-        .indexed_references_to(&sym, &files, false, &|| false)
+        .indexed_references_to(
+            &sym,
+            &files,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
         .expect("query not cancelled");
     assert_eq!(
         warm.len(),
