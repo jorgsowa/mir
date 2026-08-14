@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.72.0] - 2026-08-14
+
+### Changed
+
+- **Reference query optimizations:**
+  - Minimized reference key cache size and simplified its usage.
+  - Optimized analyzer reference key reuse by avoiding eager cloning of prepared analysis file inputs.
+  - Reclaimed unused subtype key IDs and optimized key construction/storage.
+  - Clarified reference query column encoding.
+- **Refinement of query spans:**
+  - Narrowed callable array method and string reference spans.
+  - Narrowed method reference query gates.
+  - Utilized `Name` for file structural symbol memos to reduce overhead.
+
+### Added
+
+- **Reference include modes:** added support for specific reference include modes in indexed queries.
+- **Detailed origins:** now includes trait alias origins in references.
+
 ## [0.71.0] - 2026-08-13
 
 ### Changed
