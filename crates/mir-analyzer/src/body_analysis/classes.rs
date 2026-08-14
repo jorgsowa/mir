@@ -1162,6 +1162,8 @@ impl<'a> BodyAnalyzer<'a> {
             }
         }
 
+        self.record_trait_alias_method_refs(decl, file, source, source_map);
+
         self.check_class_docblock_magic_members(decl, fqcn, file, source, source_map, all_issues);
         self.check_class_generic_type_args(
             &decl.doc_comment,
@@ -1242,6 +1244,59 @@ impl<'a> BodyAnalyzer<'a> {
         }
 
         self.check_trait_constraints(fqcn, file, all_issues);
+    }
+
+    fn record_trait_alias_method_refs(
+        &self,
+        decl: &php_ast::owned::ClassDecl,
+        file: &Arc<str>,
+        source: &str,
+        source_map: &php_rs_parser::source_map::SourceMap,
+    ) {
+        if self.mode != AnalysisMode::Full {
+            return;
+        }
+        for member in decl.body.members.iter() {
+            let php_ast::owned::ClassMemberKind::TraitUse(tu) = &member.kind else {
+                continue;
+            };
+            let used_traits: Vec<Arc<str>> = tu
+                .traits
+                .iter()
+                .map(|name| {
+                    let written = crate::parser::name_to_string_owned(name);
+                    Arc::from(resolve_name(self.db, file.as_ref(), &written).as_str())
+                })
+                .collect();
+            for adaptation in tu.adaptations.iter() {
+                let php_ast::owned::TraitAdaptationKind::Alias {
+                    trait_name,
+                    method,
+                    ..
+                } = &adaptation.kind
+                else {
+                    continue;
+                };
+                let method_name = crate::parser::name_to_string_owned(method);
+                let method_lower = crate::util::php_ident_lowercase(&method_name);
+                let candidates: Vec<Arc<str>> = if let Some(trait_name) = trait_name {
+                    let written = crate::parser::name_to_string_owned(trait_name);
+                    vec![Arc::from(
+                        resolve_name(self.db, file.as_ref(), &written).as_str(),
+                    )]
+                } else {
+                    used_traits.clone()
+                };
+                for trait_fqcn in candidates {
+                    let here = crate::db::Fqcn::from_str(self.db, trait_fqcn.as_ref());
+                    if crate::db::find_method_in_class(self.db, here, &method_lower).is_none() {
+                        continue;
+                    }
+                    let key = self.method_ref_key(trait_fqcn.as_ref(), &method_lower);
+                    self.record_ref_span(key, file, source, source_map, method.span);
+                }
+            }
+        }
     }
 
     #[allow(clippy::too_many_arguments)]

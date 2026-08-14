@@ -747,6 +747,35 @@ impl CallAnalyzer {
     }
 }
 
+fn record_trait_alias_origin_method_ref(
+    ea: &mut ExpressionAnalyzer<'_>,
+    fqcn: &Arc<str>,
+    alias_lower: &str,
+    span: Span,
+) {
+    let here = crate::db::Fqcn::from_str(ea.db, fqcn.as_ref());
+    let Some(crate::db::ClassLike::Class(cls)) = crate::db::find_class_like(ea.db, here) else {
+        return;
+    };
+    let Some((trait_name, orig_method, _, _)) = cls.trait_aliases.get(alias_lower) else {
+        return;
+    };
+    let candidates: Vec<Arc<str>> = trait_name
+        .as_ref()
+        .map(|t| vec![t.clone()])
+        .unwrap_or_else(|| cls.traits.clone());
+    for trait_fqcn in candidates {
+        let here = crate::db::Fqcn::from_str(ea.db, trait_fqcn.as_ref());
+        if crate::db::find_method_in_class(ea.db, here, orig_method).is_none() {
+            continue;
+        }
+        ea.record_ref(
+            Arc::from(format!("meth:{}::{}", trait_fqcn, orig_method)),
+            span,
+        );
+    }
+}
+
 /// Resolves method return type for a known receiver FQCN, shared between the
 /// `TNamedObject` and `TSelf`/`TStaticObject`/`TParent` branches.
 ///
@@ -796,6 +825,7 @@ fn resolve_method_return<'a>(
             )),
             call.method.span,
         );
+        record_trait_alias_origin_method_ref(ea, fqcn, &method_name_lower, call.method.span);
         if let Some(msg) = resolved.deprecated.clone() {
             ea.emit(
                 IssueKind::DeprecatedMethod {

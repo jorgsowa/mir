@@ -133,6 +133,25 @@ fn constructor_references_at_new_sites() {
 }
 
 #[test]
+fn trait_alias_references_include_adaptation_and_alias_calls() {
+    let files = [(
+        "post.php",
+        "<?php\ntrait Auditable { public function record(): void {} }\nclass Post { use Auditable { record as audit; }\n    public function save(): void { $this->record(); $this->audit(); }\n}\n",
+    )];
+    let session = session_with(&files);
+    let refs = session
+        .indexed_references_to(
+            &Name::method("Auditable", "record"),
+            &paths(&files),
+            false,
+            &|| false,
+        )
+        .expect("not cancelled");
+
+    assert_eq!(refs.len(), 3, "adaptation + direct call + alias call: {refs:?}");
+}
+
+#[test]
 fn class_function_property_constant_references() {
     let files = [
         (

@@ -554,8 +554,36 @@ impl<'a> BodyAnalyzer<'a> {
         self.reference_key_cache.lock().class(fqcn)
     }
 
+    pub(crate) fn method_ref_key(&self, class: &str, name: &str) -> Arc<str> {
+        self.reference_key_cache.lock().method(class, name)
+    }
+
     pub(crate) fn propdecl_ref_key(&self, name: &str) -> Arc<str> {
         self.reference_key_cache.lock().propdecl(name)
+    }
+
+    pub(crate) fn record_ref_span(
+        &self,
+        symbol_key: Arc<str>,
+        file: &Arc<str>,
+        source: &str,
+        source_map: &php_rs_parser::source_map::SourceMap,
+        span: php_ast::Span,
+    ) {
+        if self.mode != AnalysisMode::Full {
+            return;
+        }
+        let (line, col_start) =
+            crate::diagnostics::offset_to_line_col(source, span.start, source_map);
+        let (line_end, col_end) =
+            crate::diagnostics::offset_to_line_col(source, span.end, source_map);
+        self.db.record_reference_location(crate::db::RefLoc {
+            symbol_key,
+            file: file.clone(),
+            line,
+            col_start,
+            col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
+        });
     }
 
     pub(crate) fn constdecl_ref_key(&self, name: &str) -> Arc<str> {
