@@ -1519,17 +1519,15 @@ impl AnalysisSession {
 
     /// Choose the candidate-admission gate for `symbol`.
     ///
-    /// For a method resolving to a *static* declaration (PHP forbids a
-    /// static/non-static override mismatch, so it is static everywhere
-    /// reachable in a valid hierarchy), the member name alone is a sound
-    /// gate — and drops the owner short name the general needle set ORs in,
-    /// which on common owner names (Color, Asset, ...) admits most of a
-    /// large workspace. Every posting-producing static reference spells the
-    /// member token: `Owner::m()`, inherited `Sub::m()`, `self::`/
-    /// `static::`/`parent::m()`, aliased `Alias::m()`, an *instance*
-    /// receiver `$obj::m()` (whose file may never name the class at all —
-    /// this is what makes requiring an owner-group name unsound), and
-    /// callable strings `'Owner::m'`. Dynamic member names (`Owner::$m()`)
+    /// For any known non-constructor/non-`__invoke` method, the member name
+    /// alone is the sound gate. Every posting-producing reference spells that
+    /// token: `$obj->m()`, `Owner::m()`, inherited `Sub::m()`,
+    /// `self::`/`static::`/`parent::m()`, callable strings/arrays, and trait
+    /// aliases (`orig as alias` records `orig`, alias calls record `alias`
+    /// plus the origin key). Dropping the owner short name matters on common
+    /// owner names (`User`, `Model`, `Widget`): otherwise a cold reference
+    /// query analyzes files that only type-hint the owner and cannot contain a
+    /// reference to the queried method. Dynamic member names (`$obj->$m()`)
     /// produce no posting, so nothing is lost there.
     ///
     /// For `__construct` with a known owner, the identifier needle is the
@@ -1538,6 +1536,9 @@ impl AnalysisSession {
     /// constructor), complemented by the raw call tokens `->__construct` /
     /// `::__construct`: an explicit re-init `$obj->__construct()` is a real
     /// recorded reference whose file may never name the class.
+    ///
+    /// `__invoke` keeps the general owner/name gate because `$obj()` call sites
+    /// do not spell `__invoke`.
     ///
     /// Everything else uses the general OR needles
     /// ([`reference_gate_needles`]).
@@ -1549,13 +1550,16 @@ impl AnalysisSession {
                     raw: vec!["->__construct".to_string(), "::__construct".to_string()],
                 };
             }
-            if name.as_ref() != "__construct" && !class.is_empty() {
+            if name.as_ref() != "__construct"
+                && name.as_ref() != "__invoke"
+                && !class.is_empty()
+            {
                 let db = self.snapshot_db();
                 let here = crate::db::Fqcn::from_str(&db, class.as_ref());
                 let is_static = crate::db::find_method_in_chain(&db, here, name)
                     .map(|(_, m)| m.is_static)
                     .unwrap_or(false);
-                if is_static {
+                if is_static || crate::db::class_exists(&db, class.as_ref()) {
                     return ReferenceGate {
                         idents: vec![name.to_string()],
                         raw: Vec::new(),
@@ -1847,15 +1851,26 @@ mod tests {
     }
 
     #[test]
-    fn gate_instance_method_keeps_general_needles() {
+    fn gate_instance_method_is_member_name_only() {
         let session = session_with(&[(
             "owner.php",
             "<?php\nclass Owner { public function m(): void {} }\n",
         )]);
         let gate = session.reference_gate(&crate::Name::method("Owner", "m"));
+        assert_eq!(gate.idents, vec!["m".to_string()]);
+        assert!(gate.raw.is_empty());
+    }
+
+    #[test]
+    fn gate_invoke_keeps_owner_needle() {
+        let session = session_with(&[(
+            "owner.php",
+            "<?php\nclass Owner { public function __invoke(): void {} }\n",
+        )]);
+        let gate = session.reference_gate(&crate::Name::method("Owner", "__invoke"));
         assert_eq!(
             gate.idents,
-            reference_gate_needles(&crate::Name::method("Owner", "m"))
+            reference_gate_needles(&crate::Name::method("Owner", "__invoke"))
         );
         assert!(gate.raw.is_empty());
     }
