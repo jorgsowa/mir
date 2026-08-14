@@ -200,7 +200,9 @@ pub struct SubtypeIndex {
     /// Interned lowercased FQCN keys used by the graph. Public payloads keep
     /// display-form names, but hot subtype traversals compare and hash ids.
     key_by_name: FxHashMap<Arc<str>, KeyId>,
-    key_names: Vec<Arc<str>>,
+    key_names: Vec<Option<Arc<str>>>,
+    free_key_ids: Vec<KeyId>,
+    key_refcounts: Vec<u32>,
 }
 
 impl SubtypeIndex {
@@ -209,13 +211,21 @@ impl SubtypeIndex {
         if let Some(id) = self.key_by_name.get(key.as_ref()) {
             return *id;
         }
-        let id: KeyId = self
-            .key_names
-            .len()
-            .try_into()
-            .expect("subtype index key arena exhausted");
+        let id = if let Some(id) = self.free_key_ids.pop() {
+            self.key_names[id as usize] = Some(key.clone());
+            self.key_refcounts[id as usize] = 0;
+            id
+        } else {
+            let id: KeyId = self
+                .key_names
+                .len()
+                .try_into()
+                .expect("subtype index key arena exhausted");
+            self.key_names.push(Some(key.clone()));
+            self.key_refcounts.push(0);
+            id
+        };
         self.key_by_name.insert(key.clone(), id);
-        self.key_names.push(key);
         id
     }
 
@@ -225,7 +235,32 @@ impl SubtypeIndex {
     }
 
     fn key_name(&self, id: KeyId) -> &str {
-        self.key_names[id as usize].as_ref()
+        self.key_names[id as usize]
+            .as_ref()
+            .expect("subtype index key id must be live")
+            .as_ref()
+    }
+
+    fn retain_key(&mut self, id: KeyId) {
+        let slot = &mut self.key_refcounts[id as usize];
+        *slot = slot
+            .checked_add(1)
+            .expect("subtype index key refcount overflow");
+    }
+
+    fn release_key(&mut self, id: KeyId) {
+        let slot = &mut self.key_refcounts[id as usize];
+        *slot = slot
+            .checked_sub(1)
+            .expect("subtype index key refcount underflow");
+        if *slot != 0 {
+            return;
+        }
+        let key = self.key_names[id as usize]
+            .take()
+            .expect("subtype index key id must be live");
+        self.key_by_name.remove(key.as_ref());
+        self.free_key_ids.push(id);
     }
 
     fn alloc_entry(&mut self, file: Arc<str>, entry: SubtypeEntry) -> EntryId {
@@ -248,6 +283,10 @@ impl SubtypeIndex {
             parents,
             location: entry.location,
         };
+        self.retain_key(child_key);
+        for parent in &stored.parents {
+            self.retain_key(parent.key);
+        }
         if let Some(id) = self.free_entry_ids.pop() {
             self.entries[id as usize] = Some(stored);
             id
@@ -355,6 +394,10 @@ impl SubtypeIndex {
             }
             self.entries[id as usize] = None;
             self.free_entry_ids.push(id);
+            self.release_key(child_key);
+            for parent in &parents {
+                self.release_key(parent.key);
+            }
         }
         true
     }
@@ -580,5 +623,27 @@ mod tests {
         );
         let subs = idx.subtypes_of("I\\Top", false);
         assert_eq!(subs.len(), 3);
+    }
+
+    #[test]
+    fn clear_file_reclaims_unused_key_ids() {
+        let mut idx = SubtypeIndex::default();
+        let a: Arc<str> = Arc::from("a.php");
+
+        idx.set_file_classes(&a, vec![entry("App\\Child", &["App\\Base"], &[])]);
+        assert_eq!(idx.key_by_name.len(), 2);
+        assert_eq!(idx.key_names.len(), 2);
+
+        idx.clear_file("a.php");
+        assert!(idx.key_by_name.is_empty());
+        assert!(idx.key_names.iter().all(Option::is_none));
+        assert_eq!(idx.free_key_ids.len(), 2);
+
+        idx.set_file_classes(&a, vec![entry("App\\OtherChild", &["App\\OtherBase"], &[])]);
+        assert_eq!(idx.key_by_name.len(), 2);
+        assert_eq!(idx.key_names.len(), 2);
+        assert_eq!(idx.free_key_ids.len(), 0);
+        assert!(idx.lookup_edge_key("App\\OtherChild").is_some());
+        assert!(idx.lookup_edge_key("App\\OtherBase").is_some());
     }
 }
