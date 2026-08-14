@@ -434,6 +434,32 @@ fn callable_string_function_reference_span_covers_only_name() {
 }
 
 #[test]
+fn callable_array_method_reference_spans_cover_only_method_name() {
+    let dir = create_temp_dir("test");
+    let src = "<?php\nclass Handler { public function handle(): void {} }\nfunction caller(Handler $handler): void {\n    $a = [$handler, 'handle'];\n    $b = [Handler::class, 'handle'];\n}\n";
+    let file = write_file(&dir, "callable_array_span.php", src);
+    let file_arc = pathbuf_to_arc_str(&file);
+
+    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+
+    let locs: Vec<_> = analyzer
+        .reference_locations("meth:Handler::handle")
+        .into_iter()
+        .filter(|(f, ..)| f == &file_arc)
+        .collect();
+
+    assert_eq!(locs.len(), 2, "expected both callable-array refs: {locs:?}");
+    for (_, _, col_start, col_end) in locs {
+        assert_eq!(
+            col_end - col_start,
+            "handle".len() as u16,
+            "callable-array method span should cover only handle, not the quotes"
+        );
+    }
+}
+
+#[test]
 fn cache_hit_replays_reference_locations() {
     let dir = create_temp_dir("test");
     let cache_dir = dir.path().join("cache");

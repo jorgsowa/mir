@@ -11,6 +11,7 @@ pub use args::{
     check_constructor_args, distinct_spans_for_expansion, expand_sole_spread_arg,
     spread_element_type, CheckArgsParams,
 };
+pub(crate) use callable::callable_string_token_span;
 pub(crate) use function::extract_class_docblock;
 pub(crate) use static_call::resolve_literal_class_scope;
 

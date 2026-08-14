@@ -61,7 +61,7 @@ pub(crate) fn record_callable_string_ref(
     }
 }
 
-fn callable_string_token_span(source: &str, span: Span, token: &str) -> Span {
+pub(crate) fn callable_string_token_span(source: &str, span: Span, token: &str) -> Span {
     if token.is_empty() {
         return span;
     }

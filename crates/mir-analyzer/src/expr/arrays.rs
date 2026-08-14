@@ -523,7 +523,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     "meth:{}::{}",
                     resolved.owner_fqcn, method_name_lower
                 )),
-                method_span,
+                crate::call::callable_string_token_span(self.source, method_span, method_name),
             );
         }
     }
