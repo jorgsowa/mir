@@ -44,7 +44,24 @@ impl<'db> Fqcn<'db> {
     /// pattern used ~30 times across the analyzer.
     #[inline]
     pub fn from_str(db: &'db dyn MirDatabase, name: &str) -> Self {
-        Self::new(db, Name::new(name))
+        Self::interned(db, Name::new(name))
+    }
+
+    /// Like [`Self::new`], but checks this db clone's interning memo first
+    /// (see [`MirDatabase::cached_fqcn_id`]) — interning is `#[salsa::interned]`,
+    /// so even a repeat call for the same `name` still pays a fixed dispatch
+    /// tax (hash the name, probe the intern table) on a memoized hit. The
+    /// memoized result is always identical to what `Self::new` would
+    /// compute, so caching it changes no query's output.
+    #[inline]
+    pub fn interned(db: &'db dyn MirDatabase, name: Name) -> Self {
+        use salsa::plumbing::{AsId, FromId};
+        if let Some(id) = db.cached_fqcn_id(name) {
+            return Self::from_id(id);
+        }
+        let fqcn = Self::new(db, name);
+        db.cache_fqcn_id(name, fqcn.as_id());
+        fqcn
     }
 }
 

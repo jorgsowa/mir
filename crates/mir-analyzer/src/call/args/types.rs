@@ -1299,7 +1299,7 @@ fn validate_callable_argument(
                 );
             } else {
                 // Class exists, check if method exists
-                let here = crate::db::Fqcn::new(ea.db, Name::from(resolved_class.as_str()));
+                let here = crate::db::Fqcn::interned(ea.db, Name::from(resolved_class.as_str()));
                 if crate::db::find_method_in_chain(ea.db, here, method_name).is_none() {
                     ea.emit(
                         IssueKind::UndefinedMethod {
@@ -1508,8 +1508,10 @@ fn validate_callable_type(
                             _ => None,
                         };
                         if let Some(resolved_class) = resolved_class {
-                            let here =
-                                crate::db::Fqcn::new(ea.db, Name::from(resolved_class.as_str()));
+                            let here = crate::db::Fqcn::interned(
+                                ea.db,
+                                Name::from(resolved_class.as_str()),
+                            );
                             if crate::db::find_method_in_chain(ea.db, here, method_name).is_none() {
                                 ea.emit(
                                     IssueKind::UndefinedMethod {

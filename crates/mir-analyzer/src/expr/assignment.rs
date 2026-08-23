@@ -1401,7 +1401,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             let db = self.db;
                             let prop_found = crate::db::find_property_in_chain(
                                 db,
-                                crate::db::Fqcn::new(db, *fqcn),
+                                crate::db::Fqcn::interned(db, *fqcn),
                                 &prop_name,
                             );
                             let prop_declaring_class =
@@ -1474,7 +1474,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                         self_cls.eq_ignore_ascii_case(fqcn.as_ref())
                                             && crate::db::property_in_own_composition(
                                                 self.db,
-                                                crate::db::Fqcn::new(self.db, *fqcn),
+                                                crate::db::Fqcn::interned(self.db, *fqcn),
                                                 &prop_name,
                                             )
                                     });

@@ -376,7 +376,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             ExprKind::Identifier(s) | ExprKind::Variable(s) => s.as_ref(),
             _ => return None,
         };
-        let here = crate::db::Fqcn::new(self.db, mir_types::Name::new(&resolved_class));
+        let here = crate::db::Fqcn::interned(self.db, mir_types::Name::new(&resolved_class));
         let (_, cdef) = crate::db::find_class_constant_in_chain(self.db, here, member)?;
         match cdef.ty.types.as_slice() {
             [Atomic::TLiteralString(s)] => Some(Atomic::TLiteralString(s.clone())),
@@ -555,7 +555,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             None
         };
         if let Some(enum_fqcn) = enum_fqcn_opt {
-            let here = crate::db::Fqcn::new(self.db, mir_types::Name::new(&enum_fqcn));
+            let here = crate::db::Fqcn::interned(self.db, mir_types::Name::new(&enum_fqcn));
             if let Some(crate::db::ClassLike::Enum(enum_def)) =
                 crate::db::find_class_like(self.db, here)
             {
@@ -633,7 +633,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         .filter(|t| !matches!(t, Atomic::TNull))
                         .collect();
                     if let [Atomic::TNamedObject { fqcn, .. }] = receiver_atoms.as_slice() {
-                        let here = crate::db::Fqcn::new(self.db, *fqcn);
+                        let here = crate::db::Fqcn::interned(self.db, *fqcn);
                         if let Some(crate::db::ClassLike::Enum(enum_def)) =
                             crate::db::find_class_like(self.db, here)
                         {

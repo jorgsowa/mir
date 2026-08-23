@@ -43,6 +43,22 @@ pub trait MirDatabase: salsa::Database {
     /// class/type-hint reference resolve to `Foo\bar`.
     fn file_class_imports(&self, file: &str) -> Arc<FxHashMap<Name, Name>>;
 
+    /// Cached `Fqcn` interning id for `name`, if this db clone has already
+    /// interned it since the last salsa input write — see
+    /// [`crate::db::Fqcn::interned`]. `None` on a cache miss; the caller
+    /// falls through to real interning and stores the result via
+    /// [`Self::cache_fqcn_id`].
+    ///
+    /// This only memoizes the *interning* step (hash the name, probe
+    /// salsa's intern table) — an idempotent operation whose result can
+    /// never differ from what `Fqcn::new` would compute, so caching it
+    /// changes no query's output, only its dispatch cost.
+    fn cached_fqcn_id(&self, name: Name) -> Option<salsa::Id>;
+
+    /// Record `id` as `name`'s interned `Fqcn` id for the remainder of this
+    /// db clone's current revision — see [`Self::cached_fqcn_id`].
+    fn cache_fqcn_id(&self, name: Name, id: salsa::Id);
+
     /// Return the known type for a PHP global variable.
     fn global_var_type(&self, name: &str) -> Option<Type>;
 
