@@ -1955,7 +1955,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 {
                     let prop_result = crate::db::find_property_in_chain(
                         self.db,
-                        crate::db::Fqcn::new(self.db, *fqcn),
+                        crate::db::Fqcn::interned(self.db, *fqcn),
                         prop_name,
                     );
                     if let Some((owner, p)) = prop_result {
@@ -2100,7 +2100,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     // the using class might supply the property.
                     let prop_result = crate::db::find_property_in_chain(
                         self.db,
-                        crate::db::Fqcn::new(self.db, *fqcn),
+                        crate::db::Fqcn::interned(self.db, *fqcn),
                         prop_name,
                     );
                     if let Some((owner, p)) = prop_result {
@@ -2172,7 +2172,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     match prop_name {
                         "name" => return Type::single(Atomic::TNonEmptyString),
                         "value" => {
-                            let here = crate::db::Fqcn::new(self.db, *fqcn);
+                            let here = crate::db::Fqcn::interned(self.db, *fqcn);
                             if let Some(scalar_ty) = crate::db::find_class_like(self.db, here)
                                 .and_then(|c| c.enum_scalar_type().cloned())
                             {
@@ -2191,7 +2191,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             return Type::mixed();
                         }
                         _ => {
-                            let here = crate::db::Fqcn::new(self.db, *fqcn);
+                            let here = crate::db::Fqcn::interned(self.db, *fqcn);
                             if let Some(crate::db::ClassLike::Enum(e)) =
                                 crate::db::find_class_like(self.db, here)
                             {
@@ -2229,7 +2229,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     // `Type::mixed()` on a miss, matching prior silent behavior.
                     let prop_result = crate::db::find_property_in_chain(
                         self.db,
-                        crate::db::Fqcn::new(self.db, *fqcn),
+                        crate::db::Fqcn::interned(self.db, *fqcn),
                         prop_name,
                     );
                     if let Some((owner, p)) = prop_result {
@@ -2274,7 +2274,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             if let Atomic::TNamedObject { fqcn, .. } = inner_atomic {
                                 let prop_result = crate::db::find_property_in_chain(
                                     self.db,
-                                    crate::db::Fqcn::new(self.db, *fqcn),
+                                    crate::db::Fqcn::interned(self.db, *fqcn),
                                     prop_name,
                                 );
                                 if let Some((owner, p)) = prop_result {

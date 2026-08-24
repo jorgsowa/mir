@@ -298,7 +298,7 @@ impl AnalysisSession {
         }
         let mut out = Vec::new();
         for fqcn in imports.values() {
-            let here = crate::db::Fqcn::new(&db, *fqcn);
+            let here = crate::db::Fqcn::interned(&db, *fqcn);
             if crate::db::find_class_like(&db, here).is_some() {
                 continue;
             }

@@ -865,7 +865,7 @@ pub fn class_ancestors_by_fqcn<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -
 
     while let Some(name) = stack.pop() {
         order.push(name.clone());
-        let here = Fqcn::new(db, Name::new(name.as_ref()));
+        let here = Fqcn::interned(db, Name::new(name.as_ref()));
         if let Some(class) = find_class_like(db, here) {
             // Push in reverse so the first ancestor in the list ends up on
             // top of the stack and is visited next (LIFO / pre-order DFS).
@@ -972,7 +972,7 @@ pub fn class_array_property_defaults<'db>(
 /// `name`?". Used for magic-method dispatch checks (`__call`, `__callstatic`,
 /// `__toString`, `__invoke`, `__get`, …) where callers only need a boolean.
 pub fn has_method_in_chain(db: &dyn MirDatabase, fqcn: &str, name: &str) -> bool {
-    let here = Fqcn::new(db, Name::new(fqcn));
+    let here = Fqcn::interned(db, Name::new(fqcn));
     find_method_in_chain(db, here, name).is_some()
 }
 
@@ -986,7 +986,7 @@ pub fn find_method_in_chain<'db>(
     name: &str,
 ) -> Option<(Arc<str>, Arc<MethodDef>)> {
     for ancestor in class_ancestors_by_fqcn(db, fqcn).iter() {
-        let here = Fqcn::new(db, Name::new(ancestor.as_ref()));
+        let here = Fqcn::interned(db, Name::new(ancestor.as_ref()));
         if let Some(m) = find_method_in_class(db, here, name) {
             return Some((ancestor.clone(), m));
         }
@@ -1027,7 +1027,7 @@ pub fn find_inheritdoc_parent<'db>(
         if anc == receiver_name.as_str() || anc == owner_name.as_str() {
             continue;
         }
-        let anc_fqcn = Fqcn::new(db, Name::new(anc));
+        let anc_fqcn = Fqcn::interned(db, Name::new(anc));
         if let Some(m) = find_method_in_class(db, anc_fqcn, method_name_lower) {
             if m.return_type
                 .as_deref()
@@ -1096,7 +1096,7 @@ fn walk_method_with_precedence<'db>(
                 cls.traits.clone()
             };
             for trait_fqcn in &search_traits {
-                let here = Fqcn::new(db, Name::new(trait_fqcn.as_ref()));
+                let here = Fqcn::interned(db, Name::new(trait_fqcn.as_ref()));
                 if let Some((_trait_fqcn, m)) =
                     walk_method_with_precedence(db, here, orig_method, visited)
                 {
@@ -1125,19 +1125,19 @@ fn walk_method_with_precedence<'db>(
             if excluded.contains(trait_fqcn) {
                 continue;
             }
-            let here = Fqcn::new(db, Name::new(trait_fqcn.as_ref()));
+            let here = Fqcn::interned(db, Name::new(trait_fqcn.as_ref()));
             if let Some(result) = walk_method_with_precedence(db, here, method_lower, visited) {
                 return Some(result);
             }
         }
         if let Some(ref parent) = cls.parent {
-            let here = Fqcn::new(db, Name::new(parent.as_ref()));
+            let here = Fqcn::interned(db, Name::new(parent.as_ref()));
             if let Some(result) = walk_method_with_precedence(db, here, method_lower, visited) {
                 return Some(result);
             }
         }
         for iface_fqcn in cls.interfaces.iter() {
-            let here = Fqcn::new(db, Name::new(iface_fqcn.as_ref()));
+            let here = Fqcn::interned(db, Name::new(iface_fqcn.as_ref()));
             if let Some(result) = walk_method_with_precedence(db, here, method_lower, visited) {
                 return Some(result);
             }
@@ -1147,7 +1147,7 @@ fn walk_method_with_precedence<'db>(
 
     // For traits and interfaces: plain ancestor walk (no per-class insteadof).
     for ancestor_fqcn in class.ancestor_fqcns() {
-        let here = Fqcn::new(db, Name::new(ancestor_fqcn.as_ref()));
+        let here = Fqcn::interned(db, Name::new(ancestor_fqcn.as_ref()));
         if let Some(result) = walk_method_with_precedence(db, here, method_lower, visited) {
             return Some(result);
         }
@@ -1171,10 +1171,10 @@ fn find_method_in_mixins<'db>(
         if !visited.insert(mixin_fqcn.clone()) {
             continue;
         }
-        let mixin_here = Fqcn::new(db, Name::new(mixin_fqcn.as_ref()));
+        let mixin_here = Fqcn::interned(db, Name::new(mixin_fqcn.as_ref()));
         // Walk the mixin's full inheritance chain.
         for ancestor in class_ancestors_by_fqcn(db, mixin_here).iter() {
-            let here = Fqcn::new(db, Name::new(ancestor.as_ref()));
+            let here = Fqcn::interned(db, Name::new(ancestor.as_ref()));
             if let Some(m) = find_method_in_class(db, here, name) {
                 return Some((ancestor.clone(), m));
             }
@@ -1219,7 +1219,7 @@ fn find_property_in_chain_uncached<'db>(
     name: &str,
 ) -> Option<(Arc<str>, PropertyDef)> {
     for ancestor in class_ancestors_by_fqcn(db, fqcn).iter() {
-        let here = Fqcn::new(db, Name::new(ancestor.as_ref()));
+        let here = Fqcn::interned(db, Name::new(ancestor.as_ref()));
         if let Some(p) = find_property_in_class(db, here, name) {
             return Some((ancestor.clone(), p));
         }
@@ -1253,7 +1253,7 @@ pub fn property_in_own_composition<'db>(
         if !visited.insert(trait_fqcn.clone()) {
             continue;
         }
-        let here = Fqcn::new(db, Name::new(trait_fqcn.as_ref()));
+        let here = Fqcn::interned(db, Name::new(trait_fqcn.as_ref()));
         if find_property_in_class(db, here, name).is_some() {
             return true;
         }
@@ -1280,10 +1280,10 @@ fn find_property_in_mixins<'db>(
         if !visited.insert(mixin_fqcn.clone()) {
             continue;
         }
-        let mixin_here = Fqcn::new(db, Name::new(mixin_fqcn.as_ref()));
+        let mixin_here = Fqcn::interned(db, Name::new(mixin_fqcn.as_ref()));
         // Walk the mixin's full inheritance chain.
         for ancestor in class_ancestors_by_fqcn(db, mixin_here).iter() {
-            let here = Fqcn::new(db, Name::new(ancestor.as_ref()));
+            let here = Fqcn::interned(db, Name::new(ancestor.as_ref()));
             if let Some(p) = find_property_in_class(db, here, name) {
                 return Some((ancestor.clone(), p));
             }
@@ -1356,7 +1356,7 @@ pub fn find_class_constant_in_chain<'db>(
     name: &str,
 ) -> Option<(Arc<str>, ConstantDef)> {
     for ancestor in class_ancestors_by_fqcn(db, fqcn).iter() {
-        let here = Fqcn::new(db, Name::new(ancestor.as_ref()));
+        let here = Fqcn::interned(db, Name::new(ancestor.as_ref()));
         if let Some(c) = find_class_constant_in_class(db, here, name) {
             return Some((ancestor.clone(), c));
         }

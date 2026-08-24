@@ -892,7 +892,7 @@ fn docblock_conflicts_with_hint(
     let doc_has_unresolved_object = doc_ty.types.iter().any(|a| {
         fc::fam(a) == fc::OBJECT
             && matches!(a, Atomic::TNamedObject { fqcn, .. }
-                if crate::db::find_class_like(db, crate::db::Fqcn::new(db, *fqcn)).is_none())
+                if crate::db::find_class_like(db, crate::db::Fqcn::interned(db, *fqcn)).is_none())
     });
     if hint_ty.types.iter().any(|a| matches!(a, Atomic::TNull))
         && !doc_ty.types.iter().any(|a| matches!(a, Atomic::TNull))
@@ -910,7 +910,7 @@ fn docblock_conflicts_with_hint(
         // actually exists, otherwise it is an unknown refinement: stay silent.
         if fa == fc::OBJECT {
             if let Atomic::TNamedObject { fqcn, .. } = a {
-                if crate::db::find_class_like(db, crate::db::Fqcn::new(db, *fqcn)).is_none() {
+                if crate::db::find_class_like(db, crate::db::Fqcn::interned(db, *fqcn)).is_none() {
                     return false;
                 }
             }
@@ -948,7 +948,7 @@ fn docblock_conflicts_with_hint(
         && collect_names(hint_ty, &mut names)
         && names
             .iter()
-            .all(|n| crate::db::find_class_like(db, crate::db::Fqcn::new(db, *n)).is_some())
+            .all(|n| crate::db::find_class_like(db, crate::db::Fqcn::interned(db, *n)).is_some())
     {
         return !crate::subtype::is_subtype(db, doc_ty, hint_ty);
     }

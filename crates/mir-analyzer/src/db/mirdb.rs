@@ -191,6 +191,63 @@ pub struct MirDbStorage {
     deferred_bump_depth: Arc<std::sync::atomic::AtomicUsize>,
     /// A bump was requested while a scope was open and is still owed.
     deferred_bump_pending: Arc<std::sync::atomic::AtomicBool>,
+    /// Per-clone memo for `Fqcn` interning and per-file `use`-import maps —
+    /// see [`NameResolutionCache`].
+    name_resolution_cache: NameResolutionCache,
+}
+
+/// Per-clone memo for two salsa reads that dominate name resolution's
+/// dispatch cost: `Fqcn` interning (`#[salsa::interned]`, hit once per
+/// distinct class name touched in a pass) and a file's `use`-import map
+/// (`#[salsa::tracked] collect_file_definitions`, re-fetched by
+/// `resolve_name` on **every** class-name reference even though it cannot
+/// change mid-pass). Both are idempotent, memoized-by-salsa reads —
+/// caching them here changes no query's output, only how many times its
+/// full dispatch (hash the key, probe the memo table, record a
+/// `QueryEdge`) gets paid for an answer already known.
+///
+/// Keyed defensively by [`salsa::plumbing::current_revision`] — salsa's own
+/// global "some input changed" counter, a plain field read — rather than
+/// relying on every caller re-cloning `MirDbStorage` per pass. This makes
+/// the cache correct even if a caller reuses one clone across edits, not
+/// just the batch pipeline's per-pass fresh `snapshot_db()` clone.
+///
+/// `Clone` resets to empty, mirroring [`PendingRefLocs`]: a worker clone
+/// starts cold rather than inheriting another clone's cached entries.
+type ClassImportsCacheEntry = (Arc<str>, Arc<FxHashMap<Name, Name>>);
+
+#[derive(Default)]
+struct NameResolutionCacheInner {
+    revision: Option<salsa::Revision>,
+    class_imports: Option<ClassImportsCacheEntry>,
+    fqcn_ids: FxHashMap<Name, salsa::Id>,
+}
+
+impl NameResolutionCacheInner {
+    /// Drop all entries if the db has been written to since they were
+    /// cached — a stale entry would otherwise silently outlive the input
+    /// change that invalidated it.
+    fn reset_if_stale(&mut self, current: salsa::Revision) {
+        if self.revision != Some(current) {
+            self.class_imports = None;
+            self.fqcn_ids.clear();
+            self.revision = Some(current);
+        }
+    }
+}
+
+struct NameResolutionCache(Mutex<NameResolutionCacheInner>);
+
+impl Default for NameResolutionCache {
+    fn default() -> Self {
+        Self(Mutex::new(NameResolutionCacheInner::default()))
+    }
+}
+
+impl Clone for NameResolutionCache {
+    fn clone(&self) -> Self {
+        Self::default()
+    }
 }
 
 /// Resolver-related state held outside salsa storage. Wrapped in a
@@ -234,6 +291,7 @@ impl Default for MirDbStorage {
             subtype_edges_epoch: Arc::default(),
             deferred_bump_depth: Arc::default(),
             deferred_bump_pending: Arc::default(),
+            name_resolution_cache: NameResolutionCache::default(),
         };
         db.init_workspace_revision();
         db
@@ -270,14 +328,35 @@ impl MirDatabase for MirDbStorage {
     }
 
     fn file_class_imports(&self, file: &str) -> Arc<HashMap<Name, Name>> {
+        let mut cache = self.name_resolution_cache.0.lock();
+        cache.reset_if_stale(salsa::plumbing::current_revision(self));
+        if let Some((cached_file, imports)) = cache.class_imports.as_ref() {
+            if cached_file.as_ref() == file {
+                return imports.clone();
+            }
+        }
         let Some(sf) = self.source_files.get(file).copied() else {
             return Arc::new(HashMap::default());
         };
-        Arc::clone(
+        let imports = Arc::clone(
             &crate::db::collect_file_definitions(self, sf)
                 .slice
                 .class_imports,
-        )
+        );
+        cache.class_imports = Some((Arc::from(file), imports.clone()));
+        imports
+    }
+
+    fn cached_fqcn_id(&self, name: Name) -> Option<salsa::Id> {
+        let mut cache = self.name_resolution_cache.0.lock();
+        cache.reset_if_stale(salsa::plumbing::current_revision(self));
+        cache.fqcn_ids.get(&name).copied()
+    }
+
+    fn cache_fqcn_id(&self, name: Name, id: salsa::Id) {
+        let mut cache = self.name_resolution_cache.0.lock();
+        cache.reset_if_stale(salsa::plumbing::current_revision(self));
+        cache.fqcn_ids.insert(name, id);
     }
 
     fn global_var_type(&self, name: &str) -> Option<Type> {
