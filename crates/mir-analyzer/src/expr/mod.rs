@@ -1256,21 +1256,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         match &hint.kind {
             TypeHintKind::Named(name) => {
                 let name_str = crate::parser::name_to_string_owned(name);
-                if matches!(
-                    crate::util::php_ident_lowercase(&name_str).as_str(),
-                    "self"
-                        | "static"
-                        | "parent"
-                        | "null"
-                        | "true"
-                        | "false"
-                        | "never"
-                        | "void"
-                        | "mixed"
-                        | "object"
-                        | "callable"
-                        | "iterable"
-                ) {
+                if crate::util::is_native_type_name(&name_str) {
                     return;
                 }
                 let resolved = crate::db::resolve_name(self.db, &self.file, &name_str);

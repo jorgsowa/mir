@@ -396,21 +396,7 @@ fn check_name_class_with_context(
 }
 
 pub(crate) fn is_pseudo_type(name: &str) -> bool {
-    matches!(
-        crate::util::php_ident_lowercase(name).as_str(),
-        "self"
-            | "static"
-            | "parent"
-            | "null"
-            | "true"
-            | "false"
-            | "never"
-            | "void"
-            | "mixed"
-            | "object"
-            | "callable"
-            | "iterable"
-    )
+    crate::util::is_native_type_name(name)
 }
 
 // ---------------------------------------------------------------------------

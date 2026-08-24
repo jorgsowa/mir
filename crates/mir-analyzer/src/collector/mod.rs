@@ -205,6 +205,7 @@ fn is_php_builtin_type(name: &str) -> bool {
             | "object"
             | "parent"
             | "positive-int"
+            | "resource"
             | "scalar"
             | "self"
             | "static"

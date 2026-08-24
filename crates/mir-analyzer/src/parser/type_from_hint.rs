@@ -122,6 +122,10 @@ fn named_type_to_union(name: &str, context_fqcn: Option<&str>) -> Type {
                 Type::single(Atomic::TObject)
             }
         }
+        // `resource` is a legacy native type name, not a class. mir does not
+        // model resources precisely yet, so keep it as `mixed` rather than
+        // misclassifying it as a named object and emitting `UndefinedClass`.
+        "resource" => Type::mixed(),
         _ => Type::single(Atomic::TNamedObject {
             fqcn: normalize_fqcn(name).into(),
             type_params: mir_types::union::empty_type_params(),

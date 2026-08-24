@@ -11,6 +11,33 @@ pub(crate) fn php_ident_lowercase(s: &str) -> String {
     s.to_ascii_lowercase()
 }
 
+/// Native PHP type names that are valid to *spell* in type positions, even if
+/// some of them (notably `resource`) are legacy/unsupported at runtime in some
+/// declarations. These must never be treated as user-defined classes.
+pub(crate) fn is_native_type_name(name: &str) -> bool {
+    matches!(
+        php_ident_lowercase(name).as_str(),
+        "array"
+            | "bool"
+            | "callable"
+            | "false"
+            | "float"
+            | "int"
+            | "iterable"
+            | "mixed"
+            | "never"
+            | "null"
+            | "object"
+            | "parent"
+            | "resource"
+            | "self"
+            | "static"
+            | "string"
+            | "true"
+            | "void"
+    )
+}
+
 /// Every native PHP superglobal name (without the `$` prefix), for purity
 /// checks that treat reading/writing one as touching external mutable
 /// state — deliberately broader than `taint::SUPERGLOBALS` (which excludes
