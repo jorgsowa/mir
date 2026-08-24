@@ -105,6 +105,160 @@ pub(super) fn check_generic_arity(
 
 impl<'a> BodyAnalyzer<'a> {
     #[allow(clippy::too_many_arguments)]
+    fn analyze_property_hooks(
+        &self,
+        hooks: &[php_ast::owned::PropertyHook],
+        property_ty: Option<mir_types::Type>,
+        fqcn: &str,
+        parent_fqcn: Option<Arc<str>>,
+        file: &Arc<str>,
+        source: &str,
+        source_map: &php_rs_parser::source_map::SourceMap,
+        all_issues: &mut Vec<Issue>,
+        all_symbols: &mut Vec<ResolvedSymbol>,
+    ) {
+        use crate::flow_state::FlowState;
+        use crate::stmt::StatementsAnalyzer;
+        use mir_issues::IssueBuffer;
+
+        for hook in hooks {
+            for param in hook.params.iter() {
+                if let Some(hint) = &param.type_hint {
+                    self.check_and_record_type_hint_classes(
+                        hint,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                        Some(&mut *all_symbols),
+                    );
+                }
+            }
+
+            if hook.params.iter().any(|p| p.default.is_some()) {
+                let mut buf = IssueBuffer::new();
+                let mut sa = StatementsAnalyzer::new(
+                    self.db,
+                    file.clone(),
+                    source,
+                    source_map,
+                    &mut buf,
+                    all_symbols,
+                    self.php_version,
+                    self.mode,
+                );
+                sa.collect_symbols = self.collect_symbols;
+                let mut default_ctx = FlowState::new();
+                default_ctx.self_fqcn = Some(Arc::from(fqcn));
+                default_ctx.parent_fqcn = parent_fqcn.clone();
+                default_ctx.static_fqcn = Some(Arc::from(fqcn));
+                for p in hook.params.iter() {
+                    if let Some(default) = &p.default {
+                        let mut ea = sa.expr_analyzer(&default_ctx);
+                        let _ = ea.analyze(default, &mut default_ctx);
+                    }
+                }
+                drop(sa);
+                all_issues.extend(buf.into_all_issues());
+            }
+
+            let params: Vec<mir_codebase::DeclaredParam> = if hook.params.is_empty()
+                && matches!(hook.kind, php_ast::ast::PropertyHookKind::Set)
+            {
+                vec![mir_codebase::DeclaredParam {
+                    name: mir_types::Name::new("value"),
+                    ty: mir_codebase::wrap_param_type(property_ty.clone()),
+                    out_ty: None,
+                    has_default: false,
+                    is_variadic: false,
+                    is_byref: hook.by_ref,
+                    is_optional: false,
+                }]
+            } else {
+                hook.params
+                    .iter()
+                    .enumerate()
+                    .map(|(i, p)| {
+                        let explicit_ty = p.type_hint.as_ref().map(|hint| {
+                            crate::parser::type_from_hint_owned(hint, Some(fqcn))
+                        });
+                        let ty = explicit_ty.or_else(|| {
+                            if matches!(hook.kind, php_ast::ast::PropertyHookKind::Set) && i == 0 {
+                                property_ty.clone()
+                            } else {
+                                None
+                            }
+                        });
+                        mir_codebase::DeclaredParam {
+                            name: mir_types::Name::new(
+                                p.name.as_deref().unwrap_or("").trim_start_matches('$'),
+                            ),
+                            ty: mir_codebase::wrap_param_type(ty),
+                            out_ty: None,
+                            has_default: p.default.is_some(),
+                            is_variadic: p.variadic,
+                            is_byref: p.by_ref,
+                            is_optional: p.default.is_some() || p.variadic,
+                        }
+                    })
+                    .collect()
+            };
+
+            let return_ty = match hook.kind {
+                php_ast::ast::PropertyHookKind::Get => property_ty.clone(),
+                php_ast::ast::PropertyHookKind::Set => Some(mir_types::Type::void()),
+            };
+
+            let mut ctx = FlowState::for_method(
+                &params,
+                return_ty,
+                Arc::from([]),
+                Some(Arc::from(fqcn)),
+                parent_fqcn.clone(),
+                Some(Arc::from(fqcn)),
+                crate::body_analysis::is_strict_types_file(source),
+                false,
+                false,
+            );
+            ctx.current_method_name = Some(Arc::from(match hook.kind {
+                php_ast::ast::PropertyHookKind::Get => "__property_get",
+                php_ast::ast::PropertyHookKind::Set => "__property_set",
+            }));
+
+            seed_param_locations(&mut ctx, &hook.params, source, source_map);
+            record_param_symbols(all_symbols, file, source, &hook.params, &ctx);
+
+            let mut buf = IssueBuffer::new();
+            let mut sa = StatementsAnalyzer::new(
+                self.db,
+                file.clone(),
+                source,
+                source_map,
+                &mut buf,
+                all_symbols,
+                self.php_version,
+                self.mode,
+            );
+            sa.collect_symbols = self.collect_symbols;
+
+            match &hook.body {
+                php_ast::owned::PropertyHookBody::Block(block) => {
+                    ctx.is_generator = body_has_yield(&block.stmts);
+                    sa.analyze_stmts(&block.stmts, &mut ctx);
+                }
+                php_ast::owned::PropertyHookBody::Expression(expr) => {
+                    let mut ea = sa.expr_analyzer(&ctx);
+                    let _ = ea.analyze(expr, &mut ctx);
+                }
+                php_ast::owned::PropertyHookBody::Abstract => {}
+            }
+
+            drop(sa);
+            all_issues.extend(buf.into_all_issues());
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
     /// Property-member checks shared by the class and trait paths: type-hint
     /// class resolution when a hint is present, `MissingPropertyType`
     /// otherwise (Full mode).
@@ -808,6 +962,37 @@ impl<'a> BodyAnalyzer<'a> {
             }
         }
 
+        if method_name == "__construct" {
+            for param in method.params.iter() {
+                if param.visibility.is_none() || param.hooks.is_empty() {
+                    continue;
+                }
+                let property_name = param.name.as_deref().unwrap_or("").trim_start_matches('$');
+                let property_ty = crate::db::find_property_in_class(
+                    self.db,
+                    crate::db::Fqcn::from_str(self.db, fqcn),
+                    property_name,
+                )
+                .and_then(|def| def.ty.as_deref().cloned())
+                .or_else(|| {
+                    param.type_hint
+                        .as_ref()
+                        .map(|hint| crate::parser::type_from_hint_owned(hint, Some(fqcn)))
+                });
+                self.analyze_property_hooks(
+                    &param.hooks,
+                    property_ty,
+                    fqcn,
+                    cx.parent_fqcn.clone(),
+                    file,
+                    source,
+                    source_map,
+                    all_issues,
+                    all_symbols,
+                );
+            }
+        }
+
         let (params, return_ty, template_params, declared_throws) =
             method_chain_signature(self.db, file.as_ref(), fqcn, method_name);
 
@@ -1223,6 +1408,30 @@ impl<'a> BodyAnalyzer<'a> {
                     drop(sa);
                     all_issues.extend(buf.into_all_issues());
                 }
+                if !prop.hooks.is_empty() {
+                    let property_ty = crate::db::find_property_in_class(
+                        self.db,
+                        crate::db::Fqcn::from_str(self.db, fqcn),
+                        prop.name.as_deref().unwrap_or(""),
+                    )
+                    .and_then(|def| def.ty.as_deref().cloned())
+                    .or_else(|| {
+                        prop.type_hint
+                            .as_ref()
+                            .map(|hint| crate::parser::type_from_hint_owned(hint, Some(fqcn)))
+                    });
+                    self.analyze_property_hooks(
+                        &prop.hooks,
+                        property_ty,
+                        fqcn,
+                        parent_fqcn.clone(),
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                        all_symbols,
+                    );
+                }
                 continue;
             }
             let php_ast::owned::ClassMemberKind::Method(method) = &member.kind else {
@@ -1407,6 +1616,30 @@ impl<'a> BodyAnalyzer<'a> {
                     source_map,
                     all_issues,
                 );
+                if !prop.hooks.is_empty() {
+                    let property_ty = crate::db::find_property_in_class(
+                        self.db,
+                        crate::db::Fqcn::from_str(self.db, fqcn),
+                        prop.name.as_deref().unwrap_or(""),
+                    )
+                    .and_then(|def| def.ty.as_deref().cloned())
+                    .or_else(|| {
+                        prop.type_hint
+                            .as_ref()
+                            .map(|hint| crate::parser::type_from_hint_owned(hint, Some(fqcn)))
+                    });
+                    self.analyze_property_hooks(
+                        &prop.hooks,
+                        property_ty,
+                        fqcn,
+                        parent_fqcn.clone(),
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                        all_symbols,
+                    );
+                }
                 continue;
             }
             let php_ast::owned::ClassMemberKind::Method(method) = &member.kind else {

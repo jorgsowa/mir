@@ -2,7 +2,10 @@ use super::StatementsAnalyzer;
 use crate::flow_state::FlowState;
 use mir_issues::{Issue, IssueKind, Location};
 use mir_types::Name;
-use php_ast::owned::{ClassDecl, ClassMemberKind, FunctionDecl, Param};
+use php_ast::ast::PropertyHookKind;
+use php_ast::owned::{
+    ClassDecl, ClassMemberKind, FunctionDecl, Param, PropertyHook, PropertyHookBody,
+};
 use php_ast::Span;
 use std::sync::Arc;
 
@@ -29,6 +32,113 @@ fn param_name_span(source: &str, p: &Param) -> Span {
 }
 
 impl<'a> StatementsAnalyzer<'a> {
+    fn analyze_property_hooks_stmt(
+        &mut self,
+        hooks: &[PropertyHook],
+        property_ty: Option<mir_types::Type>,
+        fqcn: &Arc<str>,
+        parent_fqcn: &Option<Arc<str>>,
+        strict_types: bool,
+    ) {
+        for hook in hooks {
+            let params: Vec<mir_codebase::DeclaredParam> =
+                if hook.params.is_empty() && matches!(hook.kind, PropertyHookKind::Set) {
+                    vec![mir_codebase::DeclaredParam {
+                        name: Name::new("value"),
+                        ty: mir_codebase::wrap_param_type(property_ty.clone()),
+                        out_ty: None,
+                        has_default: false,
+                        is_variadic: false,
+                        is_byref: hook.by_ref,
+                        is_optional: false,
+                    }]
+                } else {
+                    hook.params
+                        .iter()
+                        .enumerate()
+                        .map(|(i, p)| {
+                            let explicit_ty = p.type_hint.as_ref().map(|hint| {
+                                crate::parser::type_from_hint_owned(hint, Some(fqcn.as_ref()))
+                            });
+                            let ty = explicit_ty.or_else(|| {
+                                if matches!(hook.kind, PropertyHookKind::Set) && i == 0 {
+                                    property_ty.clone()
+                                } else {
+                                    None
+                                }
+                            });
+                            mir_codebase::DeclaredParam {
+                                name: Name::new(
+                                    p.name.as_deref().unwrap_or("").trim_start_matches('$'),
+                                ),
+                                ty: mir_codebase::wrap_param_type(ty),
+                                out_ty: None,
+                                has_default: p.default.is_some(),
+                                is_variadic: p.variadic,
+                                is_byref: p.by_ref,
+                                is_optional: p.default.is_some() || p.variadic,
+                            }
+                        })
+                        .collect()
+                };
+            let return_ty = match hook.kind {
+                PropertyHookKind::Get => property_ty.clone(),
+                PropertyHookKind::Set => Some(mir_types::Type::void()),
+            };
+            let mut hook_ctx = FlowState::for_method(
+                &params,
+                return_ty,
+                Arc::from([]),
+                Some(fqcn.clone()),
+                parent_fqcn.clone(),
+                Some(fqcn.clone()),
+                strict_types,
+                false,
+                false,
+            );
+            hook_ctx.current_method_name = Some(Arc::from(match hook.kind {
+                PropertyHookKind::Get => "__property_get",
+                PropertyHookKind::Set => "__property_set",
+            }));
+            for p in hook.params.iter() {
+                if let Some(default) = &p.default {
+                    let mut default_ctx = hook_ctx.clone();
+                    let mut ea = self.expr_analyzer(&default_ctx);
+                    let _ = ea.analyze(default, &mut default_ctx);
+                }
+            }
+            for p in hook.params.iter() {
+                if let Some(raw) = p.name.as_deref() {
+                    let trimmed = raw.trim_start_matches('$');
+                    let ty = hook_ctx.get_var(trimmed);
+                    self.record_symbol_for_var(param_name_span(self.source, p), trimmed, ty);
+                }
+            }
+            let mut sa = StatementsAnalyzer::new(
+                self.db,
+                self.file.clone(),
+                self.source,
+                self.source_map,
+                self.issues,
+                self.symbols,
+                self.php_version,
+                self.mode,
+            );
+            sa.collect_symbols = self.collect_symbols;
+            match &hook.body {
+                PropertyHookBody::Block(block) => {
+                    hook_ctx.is_generator = crate::body_analysis::body_has_yield(&block.stmts);
+                    sa.analyze_stmts(&block.stmts, &mut hook_ctx);
+                }
+                PropertyHookBody::Expression(expr) => {
+                    let mut ea = sa.expr_analyzer(&hook_ctx);
+                    let _ = ea.analyze(expr, &mut hook_ctx);
+                }
+                PropertyHookBody::Abstract => {}
+            }
+        }
+    }
+
     pub(crate) fn analyze_function_decl_stmt(&mut self, decl: &FunctionDecl, ctx: &mut FlowState) {
         for p in decl.params.iter() {
             if let Some(default) = &p.default {
@@ -206,6 +316,26 @@ impl<'a> StatementsAnalyzer<'a> {
                     let mut ea = self.expr_analyzer(&param_default_ctx);
                     let _ = ea.analyze(default, &mut param_default_ctx);
                 }
+                if !prop.hooks.is_empty() {
+                    let property_ty = crate::db::find_property_in_class(
+                        self.db,
+                        crate::db::Fqcn::from_str(self.db, fqcn.as_ref()),
+                        prop.name.as_deref().unwrap_or(""),
+                    )
+                    .and_then(|def| def.ty.as_deref().cloned())
+                    .or_else(|| {
+                        prop.type_hint.as_ref().map(|hint| {
+                            crate::parser::type_from_hint_owned(hint, Some(fqcn.as_ref()))
+                        })
+                    });
+                    self.analyze_property_hooks_stmt(
+                        &prop.hooks,
+                        property_ty,
+                        &fqcn,
+                        &parent_fqcn,
+                        ctx.strict_types,
+                    );
+                }
                 continue;
             }
             let ClassMemberKind::Method(method) = &member.kind else {
@@ -217,8 +347,34 @@ impl<'a> StatementsAnalyzer<'a> {
                     let _ = ea.analyze(default, &mut param_default_ctx);
                 }
             }
-            let Some(body) = &method.body else { continue };
             let method_name = method.name.as_deref().unwrap_or("");
+            if method_name == "__construct" {
+                for p in method.params.iter() {
+                    if p.visibility.is_none() || p.hooks.is_empty() {
+                        continue;
+                    }
+                    let property_name = p.name.as_deref().unwrap_or("").trim_start_matches('$');
+                    let property_ty = crate::db::find_property_in_class(
+                        self.db,
+                        crate::db::Fqcn::from_str(self.db, fqcn.as_ref()),
+                        property_name,
+                    )
+                    .and_then(|def| def.ty.as_deref().cloned())
+                    .or_else(|| {
+                        p.type_hint.as_ref().map(|hint| {
+                            crate::parser::type_from_hint_owned(hint, Some(fqcn.as_ref()))
+                        })
+                    });
+                    self.analyze_property_hooks_stmt(
+                        &p.hooks,
+                        property_ty,
+                        &fqcn,
+                        &parent_fqcn,
+                        ctx.strict_types,
+                    );
+                }
+            }
+            let Some(body) = &method.body else { continue };
             let pulled = crate::db::find_method_in_chain(
                 self.db,
                 crate::db::Fqcn::from_str(self.db, fqcn.as_ref()),
