@@ -38,6 +38,13 @@ pub(crate) fn is_native_type_name(name: &str) -> bool {
     )
 }
 
+pub(crate) fn is_shadowable_docblock_pseudotype_alias(name: &str) -> bool {
+    matches!(
+        php_ident_lowercase(name).as_str(),
+        "boolean" | "double" | "integer" | "number" | "numeric" | "real" | "resource"
+    )
+}
+
 /// Every native PHP superglobal name (without the `$` prefix), for purity
 /// checks that treat reading/writing one as touching external mutable
 /// state — deliberately broader than `taint::SUPERGLOBALS` (which excludes
@@ -200,6 +207,7 @@ pub(crate) fn reconcile_declared_params_for_body(
         .iter()
         .cloned()
         .map(|mut p| {
+            p = reconcile_declared_param_docblock_shadow(db, file, p);
             if let Some(ty) = p.ty.take() {
                 if ty.from_docblock {
                     p.ty = Some(std::sync::Arc::new(reconcile_docblock_builtin_shadow(
@@ -215,6 +223,41 @@ pub(crate) fn reconcile_declared_params_for_body(
         })
         .collect::<Vec<_>>()
         .into()
+}
+
+pub(crate) fn reconcile_declared_param_docblock_shadow(
+    db: &dyn crate::db::MirDatabase,
+    default_file: &str,
+    mut param: mir_codebase::DeclaredParam,
+) -> mir_codebase::DeclaredParam {
+    let Some(raw) = param.doc_type_raw.as_deref() else {
+        return param;
+    };
+    let Some(ty) = param.ty.as_deref() else {
+        return param;
+    };
+    if !ty.from_docblock {
+        return param;
+    }
+    let raw = raw.trim();
+    if !is_shadowable_docblock_pseudotype_alias(raw) {
+        return param;
+    }
+    let file = param.doc_type_file.as_deref().unwrap_or(default_file);
+    let fqcn = crate::db::resolve_name(db, file, raw);
+    if !crate::db::class_exists(db, &fqcn) {
+        return param;
+    }
+    let mut resolved = mir_types::Type::single(mir_types::Atomic::TNamedObject {
+        fqcn: mir_types::Name::from(fqcn.as_str()),
+        type_params: mir_types::union::empty_type_params(),
+    });
+    resolved.from_docblock = ty.from_docblock;
+    resolved.possibly_undefined = ty.possibly_undefined;
+    resolved.falsy_stripped = ty.falsy_stripped;
+    resolved.possibly_absent_offset = ty.possibly_absent_offset;
+    param.ty = Some(std::sync::Arc::new(resolved));
+    param
 }
 
 /// Property counterpart of [`reconcile_docblock_builtin_shadow`] (P28's

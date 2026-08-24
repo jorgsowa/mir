@@ -1502,6 +1502,8 @@ impl<'a> DefinitionCollector<'a> {
                         name: Name::new(p.name.as_str()),
                         ty: mir_codebase::wrap_param_type(ty),
                         out_ty: None,
+                        doc_type_raw: None,
+                        doc_type_file: None,
                         has_default: p.is_optional,
                         is_variadic: p.is_variadic,
                         is_byref: p.is_byref,
@@ -1973,6 +1975,9 @@ impl<'a> DefinitionCollector<'a> {
                     .as_ref()
                     .map(|h| type_from_hint_owned(h, Some(class_fqcn))),
             );
+            let doc_type_raw = doc
+                .get_param_type_string(param_name)
+                .map(|s| Arc::<str>::from(s.trim()));
             let ty = self
                 // phpstorm-stubs `#[LanguageLevelTypeAware]` type override wins.
                 .version_attr_type_string(&p.attributes)
@@ -2049,10 +2054,13 @@ impl<'a> DefinitionCollector<'a> {
                 resolved.from_docblock = true;
                 Self::fill_self_static_parent(resolved, class_fqcn)
             });
+            let ty_is_docblock = ty.as_ref().is_some_and(|t| t.from_docblock);
             params.push(DeclaredParam {
                 name: Name::new(param_name),
                 ty: mir_codebase::wrap_param_type(ty),
                 out_ty: mir_codebase::wrap_param_type(out_ty),
+                doc_type_raw: doc_type_raw.filter(|_| ty_is_docblock),
+                doc_type_file: ty_is_docblock.then(|| self.file.clone()),
                 has_default,
                 is_variadic: p.variadic,
                 is_byref: p.by_ref,
@@ -2082,6 +2090,8 @@ impl<'a> DefinitionCollector<'a> {
                     name: mir_types::Name::new("..."),
                     ty: None,
                     out_ty: None,
+                    doc_type_raw: None,
+                    doc_type_file: None,
                     has_default: false,
                     is_variadic: true,
                     is_byref: false,

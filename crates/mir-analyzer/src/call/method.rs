@@ -182,6 +182,11 @@ pub(crate) fn resolve_method_from_db(
         } else {
             storage.assertions.clone()
         };
+        let param_file = storage
+            .location
+            .as_ref()
+            .map(|loc| loc.file.as_ref())
+            .unwrap_or(fqcn.as_ref());
 
         return Some(ResolvedMethod {
             owner_fqcn: owner_fqcn.clone(),
@@ -209,7 +214,10 @@ pub(crate) fn resolve_method_from_db(
                         owner_fqcn.as_ref(),
                     )),
             is_external_mutation_free: storage.is_external_mutation_free,
-            params,
+            params: params
+                .into_iter()
+                .map(|p| crate::util::reconcile_declared_param_docblock_shadow(db, param_file, p))
+                .collect(),
             template_params,
             return_ty_raw,
             throws,

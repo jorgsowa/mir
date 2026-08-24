@@ -237,6 +237,17 @@ pub struct DeclaredParam {
         serialize_with = "serialize_param_type"
     )]
     pub out_ty: Option<Arc<Type>>,
+    /// Raw `@param` type spelling when `ty` came from a docblock rather than a
+    /// native hint. Preserved so later analysis can resolve ambiguous
+    /// pseudo-type aliases (e.g. `integer`) against same-named classes once the
+    /// full symbol table is available.
+    #[serde(default)]
+    pub doc_type_raw: Option<Arc<str>>,
+    /// Declaring file for `doc_type_raw`. Needed because inherited signatures
+    /// may be consumed from a different file/namespace than the original
+    /// docblock declaration.
+    #[serde(default)]
+    pub doc_type_file: Option<Arc<str>>,
     /// Whether this parameter has a default value. During analysis, defaults are
     /// never used for their value — only for marking parameters as optional.
     pub has_default: bool,
@@ -252,6 +263,8 @@ impl std::hash::Hash for DeclaredParam {
         self.is_variadic.hash(state);
         self.is_byref.hash(state);
         self.is_optional.hash(state);
+        self.doc_type_raw.hash(state);
+        self.doc_type_file.hash(state);
         // Hash the type value (not the Arc pointer) so that two FnParams with
         // equal types (PartialEq) always produce the same hash, even when they
         // are backed by different Arc allocations.

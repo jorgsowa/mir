@@ -737,6 +737,8 @@ pub fn find_method_in_class<'db>(
                 name: Name::from("value"),
                 ty: e.scalar_type.as_ref().map(|t| Arc::new(t.clone())),
                 out_ty: None,
+                doc_type_raw: None,
+                doc_type_file: None,
                 has_default: false,
                 is_variadic: false,
                 is_byref: false,

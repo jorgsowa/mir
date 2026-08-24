@@ -44,6 +44,11 @@ fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
     let inferred = crate::db::inferred_function_return_type_demand(db, fqn);
     let here = crate::db::Fqcn::from_str(db, fqn);
     if let Some(f) = crate::db::find_function(db, here) {
+        let param_file = f
+            .location
+            .as_ref()
+            .map(|loc| loc.file.as_ref())
+            .unwrap_or(ea.file.as_ref());
         let return_ty_raw = f
             .return_type
             .clone()
@@ -53,7 +58,12 @@ fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
         return Some(ResolvedFn {
             fqn: f.fqn.clone(),
             deprecated: f.deprecated.clone(),
-            params: f.params.to_vec(),
+            params: f
+                .params
+                .iter()
+                .cloned()
+                .map(|p| crate::util::reconcile_declared_param_docblock_shadow(db, param_file, p))
+                .collect(),
             template_params: f.template_params.clone(),
             assertions: f.assertions.clone(),
             return_ty_raw,
@@ -1610,6 +1620,8 @@ fn type_param_to_storage_param(p: &TypeFnParam) -> DeclaredParam {
         name: p.name,
         ty: p.ty.as_ref().map(|t| Arc::new(t.to_union())),
         out_ty: p.out_ty.as_ref().map(|t| Arc::new(t.to_union())),
+        doc_type_raw: None,
+        doc_type_file: None,
         has_default: p.default.is_some(),
         is_variadic: p.is_variadic,
         is_byref: p.is_byref,

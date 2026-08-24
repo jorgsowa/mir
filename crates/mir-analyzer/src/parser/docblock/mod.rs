@@ -49,6 +49,10 @@ impl DocblockParser {
                                 // For other errors, report the parsed type
                                 result.invalid_annotations.push(msg);
                             } else {
+                                result.param_type_strings.push((
+                                    name.trim_start_matches('$').to_string(),
+                                    ty_s.clone(),
+                                ));
                                 result.params.push((
                                     name.trim_start_matches('$').to_string(),
                                     parse_type_string(&ty_s),
@@ -601,6 +605,11 @@ pub struct DocImportType {
 pub struct ParsedDocblock {
     /// `@param Type $name`
     pub params: Vec<(String, Type)>,
+    /// Raw `@param` type spellings keyed by parameter name. Kept so later
+    /// analysis can distinguish ambiguous pseudo-type aliases like
+    /// `integer`/`boolean` from a same-named class that should take
+    /// precedence once the full symbol table is available.
+    pub param_type_strings: Vec<(String, String)>,
     /// `@param-out Type $name` / `@psalm-param-out Type $name` — the type written
     /// back to the caller's by-ref argument after the call.
     pub out_params: Vec<(String, Type)>,
@@ -713,6 +722,16 @@ impl ParsedDocblock {
             .iter()
             .rfind(|(n, _)| n.trim_start_matches('$') == name)
             .map(|(_, ty)| ty)
+    }
+
+    /// Returns the raw `@param` type spelling for a given parameter name.
+    /// Uses the **last** match, mirroring [`get_param_type`].
+    pub fn get_param_type_string(&self, name: &str) -> Option<&str> {
+        let name = name.trim_start_matches('$');
+        self.param_type_strings
+            .iter()
+            .rfind(|(n, _)| n.trim_start_matches('$') == name)
+            .map(|(_, ty)| ty.as_str())
     }
 
     /// Returns the `@param-out` / `@psalm-param-out` type for a given parameter
