@@ -1149,6 +1149,26 @@ impl Type {
                         });
                     }
                 }
+                Atomic::TKeyOf { target } => {
+                    let new_target = target.substitute_templates(bindings);
+                    if let Some(resolved) = eval_key_of_type(&new_target) {
+                        result.merge_with(&resolved);
+                    } else {
+                        result.add_type(Atomic::TKeyOf {
+                            target: Box::new(new_target),
+                        });
+                    }
+                }
+                Atomic::TValueOf { target } => {
+                    let new_target = target.substitute_templates(bindings);
+                    if let Some(resolved) = eval_value_of_type(&new_target) {
+                        result.merge_with(&resolved);
+                    } else {
+                        result.add_type(Atomic::TValueOf {
+                            target: Box::new(new_target),
+                        });
+                    }
+                }
                 Atomic::TIntersection { parts } => {
                     result.add_type(Atomic::TIntersection {
                         parts: vec_to_type_params(
@@ -1485,6 +1505,8 @@ fn atomic_may_contain_templates(atomic: &Atomic) -> bool {
             !type_params.is_empty() || !fqcn.contains('\\')
         }
         Atomic::TTemplateParam { .. }
+        | Atomic::TKeyOf { .. }
+        | Atomic::TValueOf { .. }
         | Atomic::TArray { .. }
         | Atomic::TList { .. }
         | Atomic::TNonEmptyArray { .. }
@@ -1498,6 +1520,55 @@ fn atomic_may_contain_templates(atomic: &Atomic) -> bool {
         | Atomic::TInterfaceString(Some(_)) => true,
         _ => false,
     }
+}
+
+fn eval_key_of_type(t: &Type) -> Option<Type> {
+    let mut result = Type::empty();
+    for atomic in &t.types {
+        match atomic {
+            Atomic::TArray { key, .. } | Atomic::TNonEmptyArray { key, .. } => {
+                for k in &key.types {
+                    result.add_type(k.clone());
+                }
+            }
+            Atomic::TList { .. } | Atomic::TNonEmptyList { .. } => {
+                result.add_type(Atomic::TInt);
+            }
+            Atomic::TKeyedArray { properties, .. } => {
+                for key in properties.keys() {
+                    match key {
+                        crate::atomic::ArrayKey::Int(n) => result.add_type(Atomic::TLiteralInt(*n)),
+                        crate::atomic::ArrayKey::String(s) => {
+                            result.add_type(Atomic::TLiteralString(s.clone()))
+                        }
+                    }
+                }
+            }
+            _ => return None,
+        }
+    }
+    (!result.types.is_empty()).then_some(result)
+}
+
+fn eval_value_of_type(t: &Type) -> Option<Type> {
+    let mut result = Type::empty();
+    for atomic in &t.types {
+        match atomic {
+            Atomic::TArray { value, .. }
+            | Atomic::TNonEmptyArray { value, .. }
+            | Atomic::TList { value }
+            | Atomic::TNonEmptyList { value } => {
+                result.merge_with(value);
+            }
+            Atomic::TKeyedArray { properties, .. } => {
+                for prop in properties.values() {
+                    result.merge_with(&prop.ty);
+                }
+            }
+            _ => return None,
+        }
+    }
+    (!result.types.is_empty()).then_some(result)
 }
 
 fn substitute_in_fn_param(

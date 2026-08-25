@@ -125,6 +125,28 @@ pub(crate) fn infer_foreach_types(arr_ty: &Type) -> (Type, Type) {
     let mut matched = false;
     for atomic in &arr_ty.types {
         match atomic {
+            Atomic::TTemplateParam { as_type, .. } => {
+                let iterable_bound = as_type.types.iter().any(|bound_atomic| {
+                    matches!(
+                        bound_atomic,
+                        Atomic::TArray { .. }
+                            | Atomic::TNonEmptyArray { .. }
+                            | Atomic::TList { .. }
+                            | Atomic::TNonEmptyList { .. }
+                            | Atomic::TKeyedArray { .. }
+                    )
+                });
+                if iterable_bound {
+                    matched = true;
+                    let target = Type::single(atomic.clone());
+                    keys.merge_with(&Type::single(Atomic::TKeyOf {
+                        target: Box::new(target.clone()),
+                    }));
+                    values.merge_with(&Type::single(Atomic::TValueOf {
+                        target: Box::new(target),
+                    }));
+                }
+            }
             Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value } => {
                 matched = true;
                 keys.merge_with(key);

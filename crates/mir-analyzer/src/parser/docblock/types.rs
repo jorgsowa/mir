@@ -418,12 +418,20 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
         // `key-of<T>` — the union of array/shape key types of `T`.
         "key-of" => {
             let inner_ty = parse_type_string(inner.trim());
-            eval_key_of(&inner_ty).unwrap_or_else(Type::mixed)
+            eval_key_of(&inner_ty).unwrap_or_else(|| {
+                Type::single(Atomic::TKeyOf {
+                    target: Box::new(inner_ty),
+                })
+            })
         }
         // `value-of<T>` — the union of array/shape value types of `T`.
         "value-of" => {
             let inner_ty = parse_type_string(inner.trim());
-            eval_value_of(&inner_ty).unwrap_or_else(Type::mixed)
+            eval_value_of(&inner_ty).unwrap_or_else(|| {
+                Type::single(Atomic::TValueOf {
+                    target: Box::new(inner_ty),
+                })
+            })
         }
         // `int-mask<V1, V2, ...>` — when all members are non-negative integer
         // literals and the set is small (≤ 8), expand to the union of all

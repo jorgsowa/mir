@@ -263,6 +263,8 @@ impl fmt::Display for Atomic {
             }
 
             Atomic::TTemplateParam { name, .. } => write!(f, "{name}"),
+            Atomic::TKeyOf { target } => write!(f, "key-of<{target}>"),
+            Atomic::TValueOf { target } => write!(f, "value-of<{target}>"),
             Atomic::TConditional { data } => {
                 let (subject, if_true, if_false) = (&data.subject, &data.if_true, &data.if_false);
                 match &data.param_name {

@@ -273,6 +273,7 @@ fn return_type_params_compatible(
 fn union_contains_template(u: &Type) -> bool {
     u.types.iter().any(|a| match a {
         Atomic::TTemplateParam { .. } => true,
+        Atomic::TKeyOf { target } | Atomic::TValueOf { target } => union_contains_template(target),
         Atomic::TNamedObject { type_params, .. } => type_params.iter().any(union_contains_template),
         Atomic::TArray { key, value } | Atomic::TNonEmptyArray { key, value } => {
             union_contains_template(key) || union_contains_template(value)
@@ -319,6 +320,9 @@ pub(super) fn declared_return_has_template(declared: &Type, db: &dyn MirDatabase
 fn array_part_has_template_or_unknown_class(part: &Type, db: &dyn MirDatabase) -> bool {
     part.types.iter().any(|v| match v {
         Atomic::TTemplateParam { .. } => true,
+        Atomic::TKeyOf { target } | Atomic::TValueOf { target } => {
+            array_part_has_template_or_unknown_class(target, db)
+        }
         Atomic::TNamedObject { fqcn, .. } => {
             !fqcn.contains('\\') && !crate::db::class_exists(db, fqcn.as_ref())
         }
@@ -348,6 +352,12 @@ pub(super) fn erase_templates_to_bounds(ty: &Type) -> Type {
                     out.add_type(b);
                 }
             }
+            Atomic::TKeyOf { target } => out.add_type(Atomic::TKeyOf {
+                target: Box::new(erase_templates_to_bounds(target)),
+            }),
+            Atomic::TValueOf { target } => out.add_type(Atomic::TValueOf {
+                target: Box::new(erase_templates_to_bounds(target)),
+            }),
             Atomic::TNamedObject { fqcn, type_params } => {
                 let new_params: Vec<Type> =
                     type_params.iter().map(erase_templates_to_bounds).collect();
@@ -391,6 +401,8 @@ pub(super) fn is_plain_checkable(ty: &Type) -> bool {
         | Atomic::TList { .. }
         | Atomic::TNonEmptyList { .. }
         | Atomic::TKeyedArray { .. }
+        | Atomic::TKeyOf { .. }
+        | Atomic::TValueOf { .. }
         | Atomic::TTemplateParam { .. } => false,
         _ => true,
     })
@@ -549,6 +561,26 @@ fn resolve_atomic_for_file_with_templates(
                 defining_entity,
             )),
         },
+        Atomic::TKeyOf { target } => Atomic::TKeyOf {
+            target: Box::new(resolve_union_for_file_with_templates(
+                *target,
+                db,
+                file,
+                template_names,
+                template_params,
+                defining_entity,
+            )),
+        },
+        Atomic::TValueOf { target } => Atomic::TValueOf {
+            target: Box::new(resolve_union_for_file_with_templates(
+                *target,
+                db,
+                file,
+                template_names,
+                template_params,
+                defining_entity,
+            )),
+        },
         other => resolve_atomic_for_file(other, db, file, true),
     }
 }
@@ -622,6 +654,22 @@ fn resolve_atomic_for_file(
             )),
             value: Box::new(resolve_union_for_file_inner(
                 *value,
+                db,
+                file,
+                allow_builtin_shortcut,
+            )),
+        },
+        Atomic::TKeyOf { target } => Atomic::TKeyOf {
+            target: Box::new(resolve_union_for_file_inner(
+                *target,
+                db,
+                file,
+                allow_builtin_shortcut,
+            )),
+        },
+        Atomic::TValueOf { target } => Atomic::TValueOf {
+            target: Box::new(resolve_union_for_file_inner(
+                *target,
                 db,
                 file,
                 allow_builtin_shortcut,

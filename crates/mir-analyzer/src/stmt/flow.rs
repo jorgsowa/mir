@@ -20,6 +20,9 @@ pub(crate) fn return_type_is_invalid(
     db: &dyn crate::db::MirDatabase,
     file: &str,
 ) -> bool {
+    if projected_template_return_compatible(actual, declared) {
+        return false;
+    }
     // Fast path: scalar actual is already a structural subtype of declared.
     if actual.is_subtype_structural(declared) {
         return false;
@@ -101,6 +104,30 @@ pub(crate) fn return_type_is_invalid(
         return false;
     }
     true
+}
+
+fn projected_template_return_compatible(actual: &Type, declared: &Type) -> bool {
+    fn template_name_from_target(target: &Type) -> Option<mir_types::Name> {
+        match target.types.as_slice() {
+            [Atomic::TTemplateParam { name, .. }] => Some(*name),
+            [Atomic::TNamedObject { fqcn, type_params }]
+                if type_params.is_empty() && !fqcn.contains('\\') =>
+            {
+                Some(*fqcn)
+            }
+            _ => None,
+        }
+    }
+
+    match (actual.types.as_slice(), declared.types.as_slice()) {
+        ([Atomic::TKeyOf { target: a }], [Atomic::TKeyOf { target: d }])
+        | ([Atomic::TValueOf { target: a }], [Atomic::TValueOf { target: d }]) => {
+            template_name_from_target(a)
+                .zip(template_name_from_target(d))
+                .is_some_and(|(a, d)| a == d)
+        }
+        _ => false,
+    }
 }
 
 use mir_issues::{IssueKind, Location, Severity};

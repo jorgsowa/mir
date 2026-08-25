@@ -233,6 +233,10 @@ pub enum Atomic {
         /// The entity (class or function FQN) that declared this template
         defining_entity: Name,
     },
+    /// `key-of<T>` — preserved when the operand cannot yet be reduced.
+    TKeyOf { target: Box<Type> },
+    /// `value-of<T>` — preserved when the operand cannot yet be reduced.
+    TValueOf { target: Box<Type> },
     /// `($param is TypeName ? A : B)` — conditional type.
     /// Payload boxed to keep `Atomic` at 32 bytes (see [`ConditionalData`]).
     TConditional { data: Box<ConditionalData> },
@@ -272,6 +276,8 @@ impl Atomic {
             | Atomic::TString
             | Atomic::TNonEmptyString  // "0" is both non-empty and falsy in PHP
             | Atomic::TNumericString   // "0" is a valid numeric-string and is falsy
+            | Atomic::TKeyOf { .. }
+            | Atomic::TValueOf { .. }
             | Atomic::TArray { .. }
             | Atomic::TList { .. } => true,
             // Non-empty collections always have at least one element — never falsy in PHP.
@@ -487,6 +493,8 @@ impl Atomic {
             Atomic::TNonEmptyList { .. } => "non-empty-list",
             Atomic::TKeyedArray { .. } => "array",
             Atomic::TTemplateParam { .. } => "template-param",
+            Atomic::TKeyOf { .. } => "key-of",
+            Atomic::TValueOf { .. } => "value-of",
             Atomic::TConditional { .. } => "conditional-type",
             Atomic::TInterfaceString(_) => "interface-string",
             Atomic::TEnumString => "enum-string",
@@ -554,6 +562,8 @@ enum AtomicTag {
     TNonEmptyList,
     TKeyedArray,
     TTemplateParam,
+    TKeyOf,
+    TValueOf,
     TConditional,
     TInterfaceString,
     TEnumString,
@@ -694,6 +704,14 @@ impl Hash for Atomic {
                 name.hash(state);
                 as_type.hash(state);
                 defining_entity.hash(state);
+            }
+            Atomic::TKeyOf { target } => {
+                (T::TKeyOf as u8).hash(state);
+                target.hash(state);
+            }
+            Atomic::TValueOf { target } => {
+                (T::TValueOf as u8).hash(state);
+                target.hash(state);
             }
             Atomic::TConditional { data } => {
                 (T::TConditional as u8).hash(state);

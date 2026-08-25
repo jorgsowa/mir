@@ -511,6 +511,9 @@ fn param_contains_template_or_unknown(
     fn has_template_param(union: &Type, template_names: &rustc_hash::FxHashSet<&str>) -> bool {
         union.types.iter().any(|atomic| match atomic {
             Atomic::TTemplateParam { .. } => true,
+            Atomic::TKeyOf { target } | Atomic::TValueOf { target } => {
+                has_template_param(target, template_names)
+            }
             Atomic::TNamedObject { fqcn, type_params } => {
                 // Check if this name is a template parameter
                 if !fqcn.contains('\\') && template_names.contains(fqcn.as_ref()) {
@@ -530,6 +533,9 @@ fn param_contains_template_or_unknown(
 
     param_ty.types.iter().any(|atomic| match atomic {
         Atomic::TTemplateParam { .. } => true,
+        Atomic::TKeyOf { target } | Atomic::TValueOf { target } => {
+            has_template_param(target, &template_names)
+        }
         Atomic::TNamedObject { fqcn, type_params } => {
             // Check if this name is a template parameter
             if !fqcn.contains('\\') && template_names.contains(fqcn.as_ref()) {
@@ -579,6 +585,9 @@ fn param_contains_template_or_unknown(
             ) -> bool {
                 t.types.iter().any(|v| match v {
                     Atomic::TTemplateParam { .. } => true,
+                    Atomic::TKeyOf { target } | Atomic::TValueOf { target } => {
+                        contains_template_or_unknown(target, ea, template_names)
+                    }
                     Atomic::TNamedObject { fqcn, .. } => {
                         if !fqcn.contains('\\') && template_names.contains(fqcn.as_ref()) {
                             return true;
@@ -598,6 +607,9 @@ fn param_contains_template_or_unknown(
         Atomic::TList { value } | Atomic::TNonEmptyList { value } => {
             value.types.iter().any(|v| match v {
                 Atomic::TTemplateParam { .. } => true,
+                Atomic::TKeyOf { target } | Atomic::TValueOf { target } => {
+                    has_template_param(target, &template_names)
+                }
                 Atomic::TNamedObject { fqcn, .. } => {
                     if !fqcn.contains('\\') && template_names.contains(fqcn.as_ref()) {
                         return true;

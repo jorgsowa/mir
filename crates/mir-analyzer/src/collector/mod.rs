@@ -292,6 +292,12 @@ where
             key: Box::new(expand_aliases_only(*key, aliases)),
             value: Box::new(expand_aliases_only(*value, aliases)),
         }),
+        Atomic::TKeyOf { target } => Type::single(Atomic::TKeyOf {
+            target: Box::new(expand_aliases_only(*target, aliases)),
+        }),
+        Atomic::TValueOf { target } => Type::single(Atomic::TValueOf {
+            target: Box::new(expand_aliases_only(*target, aliases)),
+        }),
         Atomic::TNonEmptyArray { key, value } => Type::single(Atomic::TNonEmptyArray {
             key: Box::new(expand_aliases_only(*key, aliases)),
             value: Box::new(expand_aliases_only(*value, aliases)),

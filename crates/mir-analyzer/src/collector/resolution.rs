@@ -197,6 +197,12 @@ pub(super) fn resolve_atomic_inner(
             key: Box::new(ru!(*key)),
             value: Box::new(ru!(*value)),
         },
+        Atomic::TKeyOf { target } => Atomic::TKeyOf {
+            target: Box::new(ru!(*target)),
+        },
+        Atomic::TValueOf { target } => Atomic::TValueOf {
+            target: Box::new(ru!(*target)),
+        },
         Atomic::TList { value } => Atomic::TList {
             value: Box::new(ru!(*value)),
         },

@@ -385,6 +385,8 @@ fn atomic_family(a: &Atomic) -> Option<TypeFamily> {
         | Atomic::TNever
         | Atomic::TCallable { .. }
         | Atomic::TTemplateParam { .. }
+        | Atomic::TKeyOf { .. }
+        | Atomic::TValueOf { .. }
         | Atomic::TConditional { .. } => return None,
     })
 }

@@ -633,9 +633,23 @@ impl FlowState {
                         }
                     }
                     mir_types::Atomic::TTemplateParam { as_type, .. } if !as_type.is_mixed() => {
-                        // If the template has a non-mixed bound, use it
-                        // Otherwise keep the TTemplateParam to avoid MixedMethodCall errors
-                        elem_ty = (**as_type).clone();
+                        let preserve_template = as_type.types.iter().any(|bound_atomic| {
+                            matches!(
+                                bound_atomic,
+                                mir_types::Atomic::TArray { .. }
+                                    | mir_types::Atomic::TNonEmptyArray { .. }
+                                    | mir_types::Atomic::TList { .. }
+                                    | mir_types::Atomic::TNonEmptyList { .. }
+                                    | mir_types::Atomic::TKeyedArray { .. }
+                            )
+                        });
+                        // Keep array-like template params intact so foreach and
+                        // key-of/value-of projections can specialize them later
+                        // at the call site. Non-array bounds still erase to the
+                        // bound for the existing body checks.
+                        if !preserve_template {
+                            elem_ty = (**as_type).clone();
+                        }
                         is_template_typed = true;
                     }
                     _ => {}
