@@ -216,7 +216,7 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         "never" | "never-return" | "no-return" | "never-returns" => Type::single(Atomic::TNever),
         "mixed" => Type::single(Atomic::TMixed),
         "object" => Type::single(Atomic::TObject),
-        "array" => Type::single(Atomic::TArray {
+        "array" | "associative-array" => Type::single(Atomic::TArray {
             key: Box::new(Type::array_key()),
             value: Box::new(Type::mixed()),
         }),
@@ -330,7 +330,7 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
 
 pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
     match name.to_lowercase().as_str() {
-        "array" => {
+        "array" | "associative-array" => {
             let params = split_generics(inner);
             let (key, value) = match params.len() {
                 n if n >= 2 => (

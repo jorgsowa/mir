@@ -192,6 +192,7 @@ fn is_php_builtin_type(name: &str) -> bool {
     matches!(
         name,
         "array"
+            | "associative-array"
             | "bool"
             | "callable"
             | "false"

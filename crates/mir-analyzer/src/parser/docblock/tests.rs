@@ -30,6 +30,13 @@ fn parse_array_of_string() {
 }
 
 #[test]
+fn parse_associative_array_alias_of_array() {
+    let u = parse_type_string("associative-array<string, int>");
+    assert!(u.contains(|t| matches!(t, Atomic::TArray { .. })));
+    assert_eq!(format!("{u}"), "array<string, int>");
+}
+
+#[test]
 fn parse_list_of_int() {
     let u = parse_type_string("list<int>");
     assert!(u.contains(|t| matches!(t, Atomic::TList { .. })));
@@ -48,6 +55,12 @@ fn parse_bare_array_keys_on_array_key_not_mixed() {
 #[test]
 fn parse_bare_array_displays_as_bare_array() {
     let u = parse_type_string("array");
+    assert_eq!(format!("{u}"), "array");
+}
+
+#[test]
+fn parse_bare_associative_array_displays_as_bare_array() {
+    let u = parse_type_string("associative-array");
     assert_eq!(format!("{u}"), "array");
 }
 
