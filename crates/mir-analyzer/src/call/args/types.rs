@@ -1094,6 +1094,40 @@ fn array_key_definitely_mismatched(arg_key: &Type, param_key: &Type) -> bool {
     )
 }
 
+fn is_non_list_array_marker(ty: &Type) -> bool {
+    matches!(
+        ty.types.as_slice(),
+        [Atomic::TKeyedArray {
+            properties,
+            is_open: true,
+            is_list: false,
+        }] if properties.is_empty()
+    )
+}
+
+fn associative_array_intersection_part(atomic: &Atomic) -> Option<&Atomic> {
+    let Atomic::TIntersection { parts } = atomic else {
+        return None;
+    };
+    let has_non_list_marker = parts.iter().any(is_non_list_array_marker);
+    if !has_non_list_marker {
+        return None;
+    }
+    parts.iter().find_map(|part| match part.types.as_slice() {
+        [Atomic::TArray { .. } | Atomic::TNonEmptyArray { .. }] => Some(&part.types[0]),
+        _ => None,
+    })
+}
+
+fn arg_is_definite_list(atomic: &Atomic) -> bool {
+    matches!(
+        atomic,
+        Atomic::TList { .. }
+            | Atomic::TNonEmptyList { .. }
+            | Atomic::TKeyedArray { is_list: true, .. }
+    )
+}
+
 fn union_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>) -> bool {
     arg_ty.types.iter().all(|av| {
         let av_fqcn: &Name = match av {
@@ -1202,7 +1236,20 @@ fn array_list_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer
                     is_open,
                     ..
                 } => {
-                    return param_ty.types.iter().any(|p_atomic| match p_atomic {
+                    return param_ty.types.iter().any(|p_atomic| {
+                        let mut requires_non_list = false;
+                        let param_atomic =
+                            if let Some(array_atomic) = associative_array_intersection_part(p_atomic)
+                            {
+                                requires_non_list = true;
+                                array_atomic
+                            } else {
+                                p_atomic
+                            };
+                        if requires_non_list && arg_is_definite_list(a_atomic) {
+                            return false;
+                        }
+                        match param_atomic {
                         Atomic::TArray { value, .. } | Atomic::TList { value } => properties
                             .values()
                             .all(|p| union_compatible(&p.ty, value, ea)),
@@ -1227,21 +1274,33 @@ fn array_list_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer
                             }
                         }),
                         _ => *is_open,
-                    });
+                    }});
                 }
                 _ => return false,
             };
         let arg_key = array_key_of(a_atomic).unwrap_or_else(Type::mixed);
 
         param_ty.types.iter().any(|p_atomic| {
-            let param_value: &Type = match p_atomic {
+            let mut requires_non_list = false;
+            let param_atomic = if let Some(array_atomic) = associative_array_intersection_part(p_atomic)
+            {
+                requires_non_list = true;
+                array_atomic
+            } else {
+                p_atomic
+            };
+            if requires_non_list && arg_is_definite_list(a_atomic) {
+                return false;
+            }
+
+            let param_value: &Type = match param_atomic {
                 Atomic::TArray { value, .. }
                 | Atomic::TNonEmptyArray { value, .. }
                 | Atomic::TList { value }
                 | Atomic::TNonEmptyList { value } => value,
                 _ => return false,
             };
-            let param_key = array_key_of(p_atomic).unwrap_or_else(Type::mixed);
+            let param_key = array_key_of(param_atomic).unwrap_or_else(Type::mixed);
 
             !array_key_definitely_mismatched(&arg_key, &param_key)
                 && union_compatible(arg_value, param_value, ea)

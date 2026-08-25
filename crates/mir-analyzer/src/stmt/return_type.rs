@@ -690,6 +690,40 @@ fn scalar_array_element_compatible(av: &Atomic, dec_val: &Type) -> bool {
     dec_val.accepts_atomic_structural(av)
 }
 
+fn is_non_list_array_marker(ty: &Type) -> bool {
+    matches!(
+        ty.types.as_slice(),
+        [Atomic::TKeyedArray {
+            properties,
+            is_open: true,
+            is_list: false,
+        }] if properties.is_empty()
+    )
+}
+
+fn associative_array_intersection_part(atomic: &Atomic) -> Option<&Atomic> {
+    let Atomic::TIntersection { parts } = atomic else {
+        return None;
+    };
+    let has_non_list_marker = parts.iter().any(is_non_list_array_marker);
+    if !has_non_list_marker {
+        return None;
+    }
+    parts.iter().find_map(|part| match part.types.as_slice() {
+        [Atomic::TArray { .. } | Atomic::TNonEmptyArray { .. }] => Some(&part.types[0]),
+        _ => None,
+    })
+}
+
+fn actual_is_definite_list(atomic: &Atomic) -> bool {
+    matches!(
+        atomic,
+        Atomic::TList { .. }
+            | Atomic::TNonEmptyList { .. }
+            | Atomic::TKeyedArray { is_list: true, .. }
+    )
+}
+
 /// Returns true if both actual and declared are array/list types whose value types are
 /// compatible with FQCN resolution (to avoid short-name vs FQCN mismatches in return types).
 pub(crate) fn return_arrays_compatible(
@@ -733,7 +767,19 @@ pub(crate) fn return_arrays_compatible(
                                 || named_object_return_compatible(&prop.ty, dv, db, file))
                     })
                 };
-                return declared.types.iter().any(|d_atomic| match d_atomic {
+                return declared.types.iter().any(|d_atomic| {
+                    let mut requires_non_list = false;
+                    let declared_atomic =
+                        if let Some(array_atomic) = associative_array_intersection_part(d_atomic) {
+                            requires_non_list = true;
+                            array_atomic
+                        } else {
+                            d_atomic
+                        };
+                    if requires_non_list && actual_is_definite_list(a_atomic) {
+                        return false;
+                    }
+                    match declared_atomic {
                     Atomic::TKeyedArray { .. } => true,
                     Atomic::TArray { key: dk, value: dv } => keys_values_compatible(dk, dv),
                     Atomic::TNonEmptyArray { key: dk, value: dv } => {
@@ -741,13 +787,25 @@ pub(crate) fn return_arrays_compatible(
                             && keys_values_compatible(dk, dv)
                     }
                     _ => false,
-                });
+                }});
             }
             _ => return false,
         };
 
         declared.types.iter().any(|d_atomic| {
-            let dec_val: &Type = match d_atomic {
+            let mut requires_non_list = false;
+            let declared_atomic = if let Some(array_atomic) = associative_array_intersection_part(d_atomic)
+            {
+                requires_non_list = true;
+                array_atomic
+            } else {
+                d_atomic
+            };
+            if requires_non_list && actual_is_definite_list(a_atomic) {
+                return false;
+            }
+
+            let dec_val: &Type = match declared_atomic {
                 Atomic::TArray { value, .. }
                 | Atomic::TNonEmptyArray { value, .. }
                 | Atomic::TList { value }

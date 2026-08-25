@@ -30,10 +30,24 @@ fn parse_array_of_string() {
 }
 
 #[test]
-fn parse_associative_array_alias_of_array() {
+fn parse_associative_array_is_distinct_non_list_array() {
     let u = parse_type_string("associative-array<string, int>");
-    assert!(u.contains(|t| matches!(t, Atomic::TArray { .. })));
-    assert_eq!(format!("{u}"), "array<string, int>");
+    let Atomic::TIntersection { parts } = &u.types[0] else {
+        panic!("expected intersection");
+    };
+    assert!(parts.iter().any(|part| {
+        part.contains(|t| matches!(t, Atomic::TArray { .. }))
+    }));
+    assert!(parts.iter().any(|part| {
+        part.contains(|t| matches!(
+            t,
+            Atomic::TKeyedArray {
+                properties,
+                is_open: true,
+                is_list: false,
+            } if properties.is_empty()
+        ))
+    }));
 }
 
 #[test]
@@ -59,9 +73,12 @@ fn parse_bare_array_displays_as_bare_array() {
 }
 
 #[test]
-fn parse_bare_associative_array_displays_as_bare_array() {
+fn parse_bare_associative_array_is_distinct_non_list_array() {
     let u = parse_type_string("associative-array");
-    assert_eq!(format!("{u}"), "array");
+    let Atomic::TIntersection { parts } = &u.types[0] else {
+        panic!("expected intersection");
+    };
+    assert_eq!(parts.len(), 2);
 }
 
 #[test]

@@ -2,6 +2,26 @@ use super::*;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 
+fn associative_array_marker() -> Type {
+    Type::single(Atomic::TKeyedArray {
+        properties: Box::default(),
+        is_open: true,
+        is_list: false,
+    })
+}
+
+fn associative_array_type(key: Type, value: Type) -> Type {
+    Type::single(Atomic::TIntersection {
+        parts: mir_types::union::vec_to_type_params(vec![
+            Type::single(Atomic::TArray {
+                key: Box::new(key),
+                value: Box::new(value),
+            }),
+            associative_array_marker(),
+        ]),
+    })
+}
+
 /// Parse an assertion annotation's type, recognizing the leading `!` negation
 /// marker (`@psalm-assert !null $x` — asserts `$x` is NOT this type) that only
 /// assertion tags use, never ordinary `@param`/`@return` type positions.
@@ -216,10 +236,11 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         "never" | "never-return" | "no-return" | "never-returns" => Type::single(Atomic::TNever),
         "mixed" => Type::single(Atomic::TMixed),
         "object" => Type::single(Atomic::TObject),
-        "array" | "associative-array" => Type::single(Atomic::TArray {
+        "array" => Type::single(Atomic::TArray {
             key: Box::new(Type::array_key()),
             value: Box::new(Type::mixed()),
         }),
+        "associative-array" => associative_array_type(Type::array_key(), Type::mixed()),
         "list" => Type::single(Atomic::TList {
             value: Box::new(Type::mixed()),
         }),
@@ -330,7 +351,7 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
 
 pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
     match name.to_lowercase().as_str() {
-        "array" | "associative-array" => {
+        "array" => {
             let params = split_generics(inner);
             let (key, value) = match params.len() {
                 n if n >= 2 => (
@@ -344,6 +365,18 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
                 key: Box::new(key),
                 value: Box::new(value),
             })
+        }
+        "associative-array" => {
+            let params = split_generics(inner);
+            let (key, value) = match params.len() {
+                n if n >= 2 => (
+                    parse_type_string(params[0].trim()),
+                    parse_type_string(params[1].trim()),
+                ),
+                1 => (Type::array_key(), parse_type_string(params[0].trim())),
+                _ => (Type::array_key(), Type::mixed()),
+            };
+            associative_array_type(key, value)
         }
         "list" | "non-empty-list" => {
             let value = parse_type_string(inner.trim());
