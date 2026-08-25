@@ -104,7 +104,7 @@ pub(crate) fn variance_compatible_across_hierarchy(
     // when the sub class DOES declare templates but the caller supplied a
     // mismatched arity — a malformed receiver, not "nothing to check".
     let sub_tps = class_template_params(db, sub_fqcn).unwrap_or_default();
-    if !sub_tps.is_empty() && sub_tps.len() != sub_params.len() {
+    if !sub_tps.is_empty() && !sub_params.is_empty() && sub_tps.len() != sub_params.len() {
         return false;
     }
     let own_bindings: FxHashMap<Name, Type> = sub_tps

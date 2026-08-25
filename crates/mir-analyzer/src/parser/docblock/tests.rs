@@ -51,6 +51,36 @@ fn parse_associative_array_is_distinct_non_list_array() {
 }
 
 #[test]
+fn parse_arraylike_object_is_structural_intersection() {
+    let u = parse_type_string("arraylike-object<string, int>");
+    let Atomic::TIntersection { parts } = &u.types[0] else {
+        panic!("expected intersection");
+    };
+    assert_eq!(parts.len(), 3);
+    assert!(parts.iter().any(|part| {
+        part.contains(|t| matches!(
+            t,
+            Atomic::TNamedObject { fqcn, type_params }
+                if fqcn.as_ref() == "ArrayAccess" && type_params.len() == 2
+        ))
+    }));
+    assert!(parts.iter().any(|part| {
+        part.contains(|t| matches!(
+            t,
+            Atomic::TNamedObject { fqcn, type_params }
+                if fqcn.as_ref() == "Countable" && type_params.is_empty()
+        ))
+    }));
+    assert!(parts.iter().any(|part| {
+        part.contains(|t| matches!(
+            t,
+            Atomic::TNamedObject { fqcn, type_params }
+                if fqcn.as_ref() == "Traversable" && type_params.len() == 2
+        ))
+    }));
+}
+
+#[test]
 fn parse_list_of_int() {
     let u = parse_type_string("list<int>");
     assert!(u.contains(|t| matches!(t, Atomic::TList { .. })));

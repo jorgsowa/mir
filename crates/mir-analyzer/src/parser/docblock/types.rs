@@ -22,6 +22,28 @@ fn associative_array_type(key: Type, value: Type) -> Type {
     })
 }
 
+fn arraylike_object_type(key: Type, value: Type) -> Type {
+    Type::single(Atomic::TIntersection {
+        parts: mir_types::union::vec_to_type_params(vec![
+            Type::single(Atomic::TNamedObject {
+                fqcn: mir_types::Name::from("ArrayAccess"),
+                type_params: mir_types::union::vec_to_type_params(vec![
+                    key.clone(),
+                    value.clone(),
+                ]),
+            }),
+            Type::single(Atomic::TNamedObject {
+                fqcn: mir_types::Name::from("Countable"),
+                type_params: Default::default(),
+            }),
+            Type::single(Atomic::TNamedObject {
+                fqcn: mir_types::Name::from("Traversable"),
+                type_params: mir_types::union::vec_to_type_params(vec![key, value]),
+            }),
+        ]),
+    })
+}
+
 /// Parse an assertion annotation's type, recognizing the leading `!` negation
 /// marker (`@psalm-assert !null $x` — asserts `$x` is NOT this type) that only
 /// assertion tags use, never ordinary `@param`/`@return` type positions.
@@ -377,6 +399,21 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
                 _ => (Type::array_key(), Type::mixed()),
             };
             associative_array_type(key, value)
+        }
+        // Psalm-only pseudo-type: any object implementing ArrayAccess,
+        // Countable, and Traversable. The bare spelling remains unresolved in
+        // Psalm too; only the generic form is meaningful.
+        "arraylike-object" => {
+            let params = split_generics(inner);
+            let (key, value) = match params.len() {
+                n if n >= 2 => (
+                    parse_type_string(params[0].trim()),
+                    parse_type_string(params[1].trim()),
+                ),
+                1 => (Type::array_key(), parse_type_string(params[0].trim())),
+                _ => (Type::array_key(), Type::mixed()),
+            };
+            arraylike_object_type(key, value)
         }
         "list" | "non-empty-list" => {
             let value = parse_type_string(inner.trim());

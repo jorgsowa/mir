@@ -207,10 +207,26 @@ fn infer_foreach_types_with_db_depth(
         return (Type::mixed(), Type::mixed());
     }
     for atomic in &arr_ty.types {
-        if let Atomic::TNamedObject { fqcn, type_params } = atomic {
-            if let Some(kv) = resolve_iterator_item_types(db, fqcn, type_params, depth) {
-                return kv;
+        match atomic {
+            Atomic::TNamedObject { fqcn, type_params } => {
+                if let Some(kv) = resolve_iterator_item_types(db, fqcn, type_params, depth) {
+                    return kv;
+                }
             }
+            Atomic::TIntersection { parts } => {
+                for part in parts.iter() {
+                    for part_atomic in &part.types {
+                        if let Atomic::TNamedObject { fqcn, type_params } = part_atomic {
+                            if let Some(kv) =
+                                resolve_iterator_item_types(db, fqcn, type_params, depth)
+                            {
+                                return kv;
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
         }
     }
     infer_foreach_types(arr_ty)

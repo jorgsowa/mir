@@ -60,6 +60,25 @@ fn spread_key_type(db: &dyn crate::db::MirDatabase, arr_ty: &Type) -> Type {
     }
 }
 
+fn for_each_named_object_part<'a>(
+    atomic: &'a Atomic,
+    mut f: impl FnMut(&'a mir_types::Name, &'a [Type]),
+) {
+    match atomic {
+        Atomic::TNamedObject { fqcn, type_params } => f(fqcn, type_params),
+        Atomic::TIntersection { parts } => {
+            for part in parts.iter() {
+                for part_atomic in &part.types {
+                    if let Atomic::TNamedObject { fqcn, type_params } = part_atomic {
+                        f(fqcn, type_params);
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
 /// Whether a literal array key's own family (int vs. string) is even
 /// plausibly a member of `declared_key_ty` — a coarse, lenient check (any
 /// unrecognized/open key-type atom is treated as a match) used only to decide
@@ -565,9 +584,15 @@ impl<'a> ExpressionAnalyzer<'a> {
         // define their own offset type via offsetGet/offsetSet/offsetExists —
         // the plain-PHP-array "offset must be an array-key" rule below doesn't
         // apply to them (e.g. WeakMap is keyed by `object`).
-        let receiver_is_array_access = arr_ty.types.iter().any(
-            |a| matches!(a, Atomic::TNamedObject { fqcn, .. } if implements_array_access(self.db, fqcn)),
-        );
+        let receiver_is_array_access = arr_ty.types.iter().any(|a| {
+            let mut is_array_access = false;
+            for_each_named_object_part(a, |fqcn, _| {
+                if implements_array_access(self.db, fqcn) {
+                    is_array_access = true;
+                }
+            });
+            is_array_access
+        });
         if let Some(idx) = &aa.index {
             let idx_ty = self.analyze(idx, ctx);
             if receiver_is_array_access {
@@ -577,7 +602,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // annotation, or offsetGet()'s own $offset param type).
                 if !idx_ty.is_mixed() {
                     for a in &arr_ty.types {
-                        if let Atomic::TNamedObject { fqcn, type_params } = a {
+                        for_each_named_object_part(a, |fqcn, type_params| {
                             if let Some(expected_key) =
                                 resolve_array_access_key_type(self.db, fqcn, type_params)
                             {
@@ -600,7 +625,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     );
                                 }
                             }
-                        }
+                        });
                     }
                 }
             } else if idx_ty.contains(|t| matches!(t, Atomic::TFloat | Atomic::TLiteralFloat(..))) {
@@ -886,13 +911,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                     contributed = true;
                     result.merge_with(&Type::single(Atomic::TString));
                 }
-                Atomic::TNamedObject { fqcn, type_params } => {
-                    if let Some(value_ty) =
-                        resolve_array_access_value_type(self.db, fqcn, type_params)
-                    {
-                        contributed = true;
-                        result.merge_with(&value_ty);
-                    }
+                Atomic::TNamedObject { .. } | Atomic::TIntersection { .. } => {
+                    for_each_named_object_part(atomic, |fqcn, type_params| {
+                        if let Some(value_ty) =
+                            resolve_array_access_value_type(self.db, fqcn, type_params)
+                        {
+                            contributed = true;
+                            result.merge_with(&value_ty);
+                        }
+                    });
                 }
                 _ => {}
             }
