@@ -1,4 +1,5 @@
 use super::*;
+use crate::expr::helpers::canonical_int_array_key;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 
@@ -104,12 +105,27 @@ pub(crate) fn split_array_key_suffix(name: &str) -> (String, Vec<mir_types::Arra
 
 fn parse_literal_array_key(inner: &str) -> Option<mir_types::ArrayKey> {
     if let Some(s) = inner.strip_prefix('\'').and_then(|s| s.strip_suffix('\'')) {
-        return Some(mir_types::ArrayKey::String(std::sync::Arc::from(s)));
+        return Some(
+            canonical_int_array_key(s)
+                .map(mir_types::ArrayKey::Int)
+                .unwrap_or_else(|| mir_types::ArrayKey::String(std::sync::Arc::from(s))),
+        );
     }
     if let Some(s) = inner.strip_prefix('"').and_then(|s| s.strip_suffix('"')) {
-        return Some(mir_types::ArrayKey::String(std::sync::Arc::from(s)));
+        return Some(
+            canonical_int_array_key(s)
+                .map(mir_types::ArrayKey::Int)
+                .unwrap_or_else(|| mir_types::ArrayKey::String(std::sync::Arc::from(s))),
+        );
     }
     inner.parse::<i64>().ok().map(mir_types::ArrayKey::Int)
+}
+
+fn parse_shape_key(inner: &str) -> mir_types::ArrayKey {
+    if let Some(key) = parse_literal_array_key(inner) {
+        return key;
+    }
+    mir_types::ArrayKey::String(std::sync::Arc::from(inner))
 }
 
 pub(crate) fn parse_type_string(s: &str) -> Type {
@@ -761,19 +777,6 @@ pub(super) fn strip_ascii_ci_prefix<'a>(s: &'a str, prefix: &str) -> Option<&'a 
         .then(|| &s[prefix.len()..])
 }
 
-pub(super) fn strip_quotes(s: &str) -> &str {
-    // len() >= 2 excludes a lone quote, which would otherwise satisfy both
-    // starts_with/ends_with and panic on the slice below (same bug as the
-    // string-literal arm of parse_type_string).
-    if s.len() >= 2
-        && ((s.starts_with('\'') && s.ends_with('\'')) || (s.starts_with('"') && s.ends_with('"')))
-    {
-        &s[1..s.len() - 1]
-    } else {
-        s
-    }
-}
-
 pub(super) fn parse_keyed_array(inner: &str, is_list: bool) -> Type {
     use mir_types::atomic::KeyedProperty;
     let mut properties: IndexMap<ArrayKey, KeyedProperty> = IndexMap::new();
@@ -814,12 +817,7 @@ pub(super) fn parse_keyed_array(inner: &str, is_list: bool) -> Type {
             let ty_part = item[colon + 1..].trim();
             let optional = key_part.ends_with('?');
             let key_str = key_part.trim_end_matches('?').trim();
-            let key_str = strip_quotes(key_str);
-            let key = if let Ok(n) = key_str.parse::<i64>() {
-                ArrayKey::Int(n)
-            } else {
-                ArrayKey::String(Arc::from(key_str))
-            };
+            let key = parse_shape_key(key_str);
             properties.insert(
                 key,
                 KeyedProperty {

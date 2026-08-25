@@ -790,6 +790,35 @@ fn lone_quote_array_shape_key_does_not_panic() {
 }
 
 #[test]
+fn quoted_shape_keys_only_canonicalize_php_int_spellings() {
+    let u = parse_type_string("array{'0': int, '007': int, '+1': int, '-1': int, '-0': int}");
+    let [Atomic::TKeyedArray { properties, .. }] = &u.types[..] else {
+        panic!("expected keyed array, got {u}");
+    };
+
+    assert!(properties.contains_key(&mir_types::ArrayKey::Int(0)));
+    assert!(properties.contains_key(&mir_types::ArrayKey::Int(-1)));
+    assert!(properties.contains_key(&mir_types::ArrayKey::String("007".into())));
+    assert!(properties.contains_key(&mir_types::ArrayKey::String("+1".into())));
+    assert!(properties.contains_key(&mir_types::ArrayKey::String("-0".into())));
+}
+
+#[test]
+fn assertion_array_key_suffix_uses_php_key_canonicalization() {
+    let (base, keys) = split_array_key_suffix("arr['0']['007']['-1']['+1']");
+    assert_eq!(base, "arr");
+    assert_eq!(
+        keys,
+        vec![
+            mir_types::ArrayKey::Int(0),
+            mir_types::ArrayKey::String("007".into()),
+            mir_types::ArrayKey::Int(-1),
+            mir_types::ArrayKey::String("+1".into()),
+        ]
+    );
+}
+
+#[test]
 fn callable_syntax_is_case_insensitive() {
     // parse_callable_syntax was rewritten to match "closure"/"callable"/
     // "pure-" case-insensitively via byte comparison instead of
