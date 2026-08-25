@@ -181,9 +181,10 @@ impl<'a> BodyAnalyzer<'a> {
                     .iter()
                     .enumerate()
                     .map(|(i, p)| {
-                        let explicit_ty = p.type_hint.as_ref().map(|hint| {
-                            crate::parser::type_from_hint_owned(hint, Some(fqcn))
-                        });
+                        let explicit_ty = p
+                            .type_hint
+                            .as_ref()
+                            .map(|hint| crate::parser::type_from_hint_owned(hint, Some(fqcn)));
                         let ty = explicit_ty.or_else(|| {
                             if matches!(hook.kind, php_ast::ast::PropertyHookKind::Set) && i == 0 {
                                 property_ty.clone()
@@ -979,7 +980,8 @@ impl<'a> BodyAnalyzer<'a> {
                 )
                 .and_then(|def| def.ty.as_deref().cloned())
                 .or_else(|| {
-                    param.type_hint
+                    param
+                        .type_hint
                         .as_ref()
                         .map(|hint| crate::parser::type_from_hint_owned(hint, Some(fqcn)))
                 });

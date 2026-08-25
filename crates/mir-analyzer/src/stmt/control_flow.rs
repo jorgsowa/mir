@@ -660,6 +660,26 @@ impl<'a> StatementsAnalyzer<'a> {
                                     false,
                                 );
                             }
+                            crate::narrowing::MatchSubject::ShapePath(base, path) => {
+                                let current = crate::narrowing::resolve_shape_base_current_type(
+                                    &mut case_ctx,
+                                    base,
+                                    self.db,
+                                    &self.file,
+                                );
+                                if let Some(narrowed_base) =
+                                    crate::narrowing::narrow_shape_path_to_asserted(
+                                        &current, path, &narrowed,
+                                    )
+                                {
+                                    crate::narrowing::set_shape_base_narrowed(
+                                        &mut case_ctx,
+                                        base,
+                                        current,
+                                        narrowed_base,
+                                    );
+                                }
+                            }
                         }
                     }
                 }
@@ -831,6 +851,26 @@ impl<'a> StatementsAnalyzer<'a> {
                                     union_ty,
                                     false,
                                 );
+                            }
+                            crate::narrowing::MatchSubject::ShapePath(base, path) => {
+                                let current = crate::narrowing::resolve_shape_base_current_type(
+                                    &mut case_ctx,
+                                    base,
+                                    self.db,
+                                    &self.file,
+                                );
+                                if let Some(narrowed_base) =
+                                    crate::narrowing::narrow_shape_path_to_asserted(
+                                        &current, path, &union_ty,
+                                    )
+                                {
+                                    crate::narrowing::set_shape_base_narrowed(
+                                        &mut case_ctx,
+                                        base,
+                                        current,
+                                        narrowed_base,
+                                    );
+                                }
                             }
                         }
                     }

@@ -34,6 +34,9 @@ use arrays::{
     narrow_static_prop_array_key_first_or_last_null, narrow_to_haystack_values,
     strip_haystack_null,
 };
+pub(crate) use arrays::{
+    narrow_shape_path_to_asserted, resolve_shape_base_current_type, set_shape_base_narrowed,
+};
 pub(crate) use assertions::apply_one_assertion;
 use assertions::{
     apply_docblock_assertions, apply_method_docblock_assertions, method_call_receiver_fqcn,

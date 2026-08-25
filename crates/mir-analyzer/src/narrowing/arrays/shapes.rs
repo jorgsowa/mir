@@ -246,6 +246,64 @@ pub(crate) fn set_shape_base_narrowed(
     }
 }
 
+/// Narrow `ty` so the value at `path` satisfies `asserted`, excluding closed
+/// shape union members whose keyed path cannot match it. Used by
+/// `match ($x['tag'])`/`switch ($x['tag'])` so an arm literal narrows the
+/// underlying tagged-union shape, not just the accessed offset expression.
+pub(crate) fn narrow_shape_path_to_asserted(
+    ty: &Type,
+    path: &[mir_types::atomic::ArrayKey],
+    asserted: &Type,
+) -> Option<Type> {
+    let Some((key, rest)) = path.split_first() else {
+        let narrowed = ty.intersect_with(asserted);
+        return (!narrowed.is_empty() && !narrowed.is_never()).then_some(narrowed);
+    };
+
+    let mut result = Type::empty();
+    result.from_docblock = ty.from_docblock;
+
+    for atomic in &ty.types {
+        match atomic {
+            Atomic::TKeyedArray {
+                properties,
+                is_open,
+                is_list,
+            } => {
+                let Some(prop) = properties.get(key) else {
+                    if *is_open {
+                        result.add_type(atomic.clone());
+                    }
+                    continue;
+                };
+
+                let Some(narrowed_value) = (if rest.is_empty() {
+                    let narrowed = prop.ty.intersect_with(asserted);
+                    (!narrowed.is_empty() && !narrowed.is_never()).then_some(narrowed)
+                } else {
+                    narrow_shape_path_to_asserted(&prop.ty, rest, asserted)
+                }) else {
+                    continue;
+                };
+
+                let mut new_props = properties.clone();
+                if let Some(p) = new_props.get_mut(key) {
+                    p.ty = narrowed_value;
+                    p.optional = false;
+                }
+                result.add_type(Atomic::TKeyedArray {
+                    properties: new_props,
+                    is_open: *is_open,
+                    is_list: *is_list,
+                });
+            }
+            other => result.add_type(other.clone()),
+        }
+    }
+
+    (!result.is_empty()).then_some(result)
+}
+
 /// Force `path`'s value type to `asserted` in every `TKeyedArray` union
 /// member — the assign counterpart of `narrow_shape_path` (which only
 /// refines a key ALREADY proven present): used by an assertion-tag target

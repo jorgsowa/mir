@@ -169,8 +169,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                     arm_ty.merge_with(&cond_ty);
                 }
             }
-            // Use type narrowing if the subject is a variable, property, or
-            // static property.
+            // Use type narrowing if the subject is a variable, property,
+            // static property, or literal-keyed array-shape path.
             if let Some(target) = &subject_target {
                 if !arm_ty.is_empty() && !arm_ty.is_mixed() {
                     let narrowed = subject_ty.intersect_with(&arm_ty);
@@ -216,6 +216,26 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     narrowed,
                                     false,
                                 )
+                            }
+                            crate::narrowing::MatchSubject::ShapePath(base, path) => {
+                                let current = crate::narrowing::resolve_shape_base_current_type(
+                                    &mut arm_ctx,
+                                    base,
+                                    self.db,
+                                    &self.file,
+                                );
+                                if let Some(narrowed_base) =
+                                    crate::narrowing::narrow_shape_path_to_asserted(
+                                        &current, path, &narrowed,
+                                    )
+                                {
+                                    crate::narrowing::set_shape_base_narrowed(
+                                        &mut arm_ctx,
+                                        base,
+                                        current,
+                                        narrowed_base,
+                                    );
+                                }
                             }
                         }
                     }

@@ -26,9 +26,11 @@ pub(super) use in_array::{
 };
 pub(super) use key_exists::narrow_array_key_exists_condition;
 pub(super) use shapes::{
-    array_access_base_target, get_shape_path_type, narrow_array_emptiness_condition,
-    narrow_container_non_null_non_false, narrow_empty_shape_key, narrow_isset_shape_key,
-    narrow_isset_shape_key_false, narrow_offset_instanceof_by_path, narrow_offset_null_by_path,
-    narrow_offset_type_fn_by_path, resolve_shape_base_current_type, set_shape_base_narrowed,
-    set_shape_path, ShapeBase,
+    array_access_base_target, collect_array_access_path, get_shape_path_type,
+    narrow_array_emptiness_condition, narrow_container_non_null_non_false, narrow_empty_shape_key,
+    narrow_isset_shape_key, narrow_isset_shape_key_false, narrow_offset_instanceof_by_path,
+    narrow_offset_null_by_path, narrow_offset_type_fn_by_path, set_shape_path, ShapeBase,
+};
+pub(crate) use shapes::{
+    narrow_shape_path_to_asserted, resolve_shape_base_current_type, set_shape_base_narrowed,
 };

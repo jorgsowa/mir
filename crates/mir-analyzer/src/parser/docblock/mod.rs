@@ -49,10 +49,9 @@ impl DocblockParser {
                                 // For other errors, report the parsed type
                                 result.invalid_annotations.push(msg);
                             } else {
-                                result.param_type_strings.push((
-                                    name.trim_start_matches('$').to_string(),
-                                    ty_s.clone(),
-                                ));
+                                result
+                                    .param_type_strings
+                                    .push((name.trim_start_matches('$').to_string(), ty_s.clone()));
                                 result.params.push((
                                     name.trim_start_matches('$').to_string(),
                                     parse_type_string(&ty_s),

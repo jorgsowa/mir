@@ -10,8 +10,9 @@ use crate::db::MirDatabase;
 use crate::flow_state::FlowState;
 
 use super::arrays::{
-    extract_count_arg, extract_count_static_prop_arg, narrow_array_count_comparison,
-    narrow_prop_array_count_comparison, narrow_static_prop_array_count_comparison,
+    collect_array_access_path, extract_count_arg, extract_count_static_prop_arg,
+    narrow_array_count_comparison, narrow_prop_array_count_comparison,
+    narrow_static_prop_array_count_comparison, ShapeBase,
 };
 use super::literals::{extract_int_literal, narrow_var_null};
 use super::strings::{
@@ -419,6 +420,7 @@ pub(crate) enum MatchSubject {
     Var(String),
     Prop(String, String),
     Static(std::sync::Arc<str>, String),
+    ShapePath(ShapeBase, Vec<mir_types::atomic::ArrayKey>),
 }
 
 impl MatchSubject {
@@ -433,6 +435,9 @@ impl MatchSubject {
         }
         if let Some((obj, prop)) = extract_prop_access(expr) {
             return Some(MatchSubject::Prop(obj, prop));
+        }
+        if let Some((base, path)) = collect_array_access_path(expr, ctx, db, file) {
+            return Some(MatchSubject::ShapePath(base, path));
         }
         extract_static_prop_access(expr, ctx, db, file)
             .map(|(fqcn, prop)| MatchSubject::Static(fqcn, prop))
