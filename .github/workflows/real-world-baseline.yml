@@ -30,24 +30,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2.9.2
 
       - name: Build mir
         run: cargo build --release -p mir-php
 
       - name: Set up PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@2.37.2
         with:
           php-version: '8.3'
           tools: composer
 
       - name: Cache package fixtures
         id: fixture-cache
-        uses: actions/cache@v6
+        uses: actions/cache@v6.1.0
         with:
           path: harness/fixtures
           key: real-world-fixtures-${{ hashFiles('harness/packages.php') }}

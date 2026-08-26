@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
       - name: Extract changelog entry
         id: changelog
@@ -61,7 +61,7 @@ jobs:
           - target: x86_64-pc-windows-msvc
             os: windows-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           submodules: recursive
 
@@ -69,12 +69,12 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2.9.2
         with:
           key: ${{ matrix.target }}
 
       - name: Build and upload
-        uses: taiki-e/upload-rust-binary-action@v1
+        uses: taiki-e/upload-rust-binary-action@v1.30.2
         with:
           # Default archive name is `$bin-$target.$ext` => `mir-<target>.tar.gz`
           # (.zip on Windows). Mir\Composer\Installer expects this exact form.
@@ -90,7 +90,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
       - name: Publish release
         run: gh release edit "$GITHUB_REF_NAME" --draft=false
@@ -103,7 +103,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
         with:
           submodules: recursive
 

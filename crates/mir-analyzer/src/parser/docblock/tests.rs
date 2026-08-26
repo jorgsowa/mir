@@ -870,10 +870,10 @@ fn value_of_union_of_lists_and_shapes() {
 }
 
 #[test]
-fn key_of_unresolvable_falls_back_to_mixed() {
-    // key-of over a named class / template cannot be resolved statically.
+fn key_of_unresolvable_is_preserved_for_later_resolution() {
+    // key-of over a named class cannot be resolved statically at parse time.
     let u = parse_type_string("key-of<\\SplStack>");
-    assert!(u.is_mixed());
+    assert!(matches!(u.types.as_slice(), [Atomic::TKeyOf { .. }]));
 }
 
 // ---------------------------------------------------------------------------

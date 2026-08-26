@@ -29,14 +29,14 @@ jobs:
       pull-requests: write   # needed to post the comparison comment
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
       - uses: dtolnay/rust-toolchain@stable
 
       # Caches registry index, downloaded crates, and compiled artifacts.
       # The bench profile inherits [profile.release] (lto=thin, codegen-units=1)
       # so the first compile is slow; this makes subsequent runs fast.
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2.9.2
 
       # Criterion stores benchmark results (JSON baselines) in target/criterion.
       # The rust-cache above may restore stale criterion data from a previous run.
@@ -49,7 +49,7 @@ jobs:
       # Cache the compiled binary so we don't rebuild it on every run.
       - name: Cache critcmp
         id: critcmp-cache
-        uses: actions/cache@v6
+        uses: actions/cache@v6.1.0
         with:
           path: ~/.cargo/bin/critcmp
           key: critcmp-${{ runner.os }}-v1
@@ -63,7 +63,7 @@ jobs:
       # invalidates the cache.
       - name: Cache Laravel fixture
         id: fixture-cache
-        uses: actions/cache@v6
+        uses: actions/cache@v6.1.0
         with:
           path: crates/mir-analyzer/benches/fixtures
           key: laravel-fixture-${{ env.LARAVEL_FIXTURE_VERSION }}
@@ -71,7 +71,7 @@ jobs:
       # PHP + Composer are only needed when the fixture cache is cold.
       - name: Set up PHP
         if: steps.fixture-cache.outputs.cache-hit != 'true'
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@2.37.2
         with:
           php-version: '8.3'
           tools: composer
@@ -96,7 +96,7 @@ jobs:
       - name: Restore main baseline
         if: github.event_name == 'pull_request'
         id: restore-baseline
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@v6.1.0
         with:
           path: target/criterion
           # Exact key won't match (PR SHA ≠ any main SHA); falls through to
@@ -128,7 +128,7 @@ jobs:
       # Push to main: persist the new baseline for future PR comparisons.
       - name: Save main baseline
         if: github.event_name == 'push'
-        uses: actions/cache/save@v6
+        uses: actions/cache/save@v6.1.0
         with:
           path: target/criterion
           key: criterion-baseline-main-${{ github.sha }}
@@ -161,7 +161,7 @@ jobs:
         if: >-
           github.event_name == 'pull_request' &&
           steps.restore-baseline.outputs.cache-matched-key == ''
-        uses: actions/github-script@v9
+        uses: actions/github-script@v9.0.0
         with:
           script: |
             await github.rest.issues.createComment({
@@ -175,7 +175,7 @@ jobs:
         if: >-
           github.event_name == 'pull_request' &&
           steps.restore-baseline.outputs.cache-matched-key != ''
-        uses: actions/github-script@v9
+        uses: actions/github-script@v9.0.0
         with:
           script: |
             const fs = require('fs');
