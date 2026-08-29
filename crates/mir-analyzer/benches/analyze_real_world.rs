@@ -1,5 +1,7 @@
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
-use mir_analyzer::{discover_files, AnalysisSession, BatchOptions, PhpVersion};
+use mir_analyzer::{
+    discover_files, perf_fixture::PerfFixture, AnalysisSession, BatchOptions, PhpVersion,
+};
 use std::alloc::{GlobalAlloc, Layout};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering::Relaxed};
@@ -73,21 +75,16 @@ fn checkpoint_alloc(label: &str) {
 // Fixture helpers
 // ---------------------------------------------------------------------------
 
-fn fixtures_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("benches/fixtures/laravel")
-}
-
 /// Returns true (and prints a message) when the fixture is absent or
 /// `composer install` has not been run yet.
-fn skip_if_missing(root: &Path) -> bool {
-    let src = root.join("src");
-    let vendor = root.join("vendor");
-    if !src.exists() || !vendor.exists() {
+fn skip_if_missing(fixture: &PerfFixture) -> bool {
+    if !fixture.has_full_corpus() {
         eprintln!(
             "\nSkipping benchmark: fixture not found or incomplete at {}\n\
-             Run once to download and install it:\n\
+             Provide MIR_PERF_FIXTURE/MIR_LARAVEL_FIXTURE/MIR_SYMFONY_FIXTURE,\n\
+             or run once to download and install it:\n\
              \n    bash crates/mir-analyzer/benches/download-fixtures.sh\n",
-            root.display()
+            fixture.root().display()
         );
         true
     } else {
@@ -110,7 +107,7 @@ fn warm_cache(cache_dir: &TempDir, vendor_files: &[PathBuf], project_files: &[Pa
     let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
     analyzer.ensure_all_stubs();
     analyzer.collect_definitions(vendor_files);
-    let _ = analyzer.analyze_paths(project_files, &BatchOptions::new());
+    let _ = analyzer.analyze_paths(project_files, &BatchOptions::new().without_symbols());
 }
 
 // ---------------------------------------------------------------------------
@@ -129,12 +126,16 @@ fn warm_cache(cache_dir: &TempDir, vendor_files: &[PathBuf], project_files: &[Pa
 ///
 /// Memory stats for one cold run are printed to stderr before the timed loop.
 fn bench_full_analysis(c: &mut Criterion) {
-    let root = fixtures_root();
-    if skip_if_missing(&root) {
+    let Some(fixture) = PerfFixture::discover() else {
+        eprintln!("\nSkipping benchmark: no supported perf fixture found\n");
+        return;
+    };
+    if skip_if_missing(&fixture) {
         return;
     }
 
-    let (vendor_files, project_files) = split_vendor_project(&root);
+    let root = fixture.root();
+    let (vendor_files, project_files) = split_vendor_project(root);
     assert!(
         !project_files.is_empty(),
         "No project PHP files found under {}",
@@ -150,10 +151,10 @@ fn bench_full_analysis(c: &mut Criterion) {
         checkpoint_alloc("after load_stubs");
         analyzer.collect_definitions(&vendor_files);
         checkpoint_alloc("after collect_definitions (vendor)");
-        let _ = analyzer.analyze_paths(&project_files, &BatchOptions::new());
+        let _ = analyzer.analyze_paths(&project_files, &BatchOptions::new().without_symbols());
         checkpoint_alloc("after analyze (project)");
     }
-    print_alloc_stats("full_analysis/laravel");
+    print_alloc_stats(&format!("full_analysis/{}", fixture.id()));
 
     let num_threads = rayon::current_num_threads();
     let mut thread_counts = vec![1usize, num_threads];
@@ -171,13 +172,13 @@ fn bench_full_analysis(c: &mut Criterion) {
             .build()
             .unwrap();
 
-        group.bench_function(BenchmarkId::new("laravel", format!("{threads}t")), |b| {
+        group.bench_function(BenchmarkId::new(fixture.id(), format!("{threads}t")), |b| {
             b.iter(|| {
                 pool.install(|| {
                     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
                     analyzer.ensure_all_stubs();
                     analyzer.collect_definitions(&vendor_files);
-                    analyzer.analyze_paths(&project_files, &BatchOptions::new())
+                    analyzer.analyze_paths(&project_files, &BatchOptions::new().without_symbols())
                 })
             })
         });
@@ -202,16 +203,19 @@ fn bench_full_analysis(c: &mut Criterion) {
 ///
 /// Memory stats for one warm re-analysis run are printed to stderr.
 fn bench_reanalysis(c: &mut Criterion) {
-    let root = fixtures_root();
-    // Bug fix: check both src/ and vendor/, not just root existence.
-    if skip_if_missing(&root) {
+    let Some(fixture) = PerfFixture::discover() else {
+        eprintln!("\nSkipping reanalysis benchmark: no supported perf fixture found\n");
+        return;
+    };
+    if skip_if_missing(&fixture) {
         return;
     }
 
-    let (vendor_files, project_files) = split_vendor_project(&root);
+    let root = fixture.root();
+    let (vendor_files, project_files) = split_vendor_project(root);
 
-    let model_path = root.join("src/Illuminate/Database/Eloquent/Model.php");
-    let leaf_path = root.join("src/Illuminate/Auth/Events/Login.php");
+    let model_path = fixture.high_fanout_file();
+    let leaf_path = fixture.leaf_file();
 
     let model_original = model_path
         .exists()
@@ -236,9 +240,9 @@ fn bench_reanalysis(c: &mut Criterion) {
                 AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_mem.path());
             analyzer.ensure_all_stubs();
             analyzer.collect_definitions(&vendor_files);
-            let _ = analyzer.analyze_paths(&project_files, &BatchOptions::new());
+            let _ = analyzer.analyze_paths(&project_files, &BatchOptions::new().without_symbols());
         }
-        print_alloc_stats("reanalysis/laravel_high_fanout");
+        print_alloc_stats(&format!("reanalysis/{}_high_fanout", fixture.id()));
         std::fs::write(&model_path, original).unwrap();
     }
     if let Some(original) = &leaf_original {
@@ -251,9 +255,9 @@ fn bench_reanalysis(c: &mut Criterion) {
                 AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_mem.path());
             analyzer.ensure_all_stubs();
             analyzer.collect_definitions(&vendor_files);
-            let _ = analyzer.analyze_paths(&project_files, &BatchOptions::new());
+            let _ = analyzer.analyze_paths(&project_files, &BatchOptions::new().without_symbols());
         }
-        print_alloc_stats("reanalysis/laravel_leaf_file");
+        print_alloc_stats(&format!("reanalysis/{}_leaf_file", fixture.id()));
         std::fs::write(&leaf_path, original).unwrap();
     }
 
@@ -276,7 +280,7 @@ fn bench_reanalysis(c: &mut Criterion) {
     group.throughput(Throughput::Elements(project_files.len() as u64));
 
     if let Some(original) = &model_original {
-        group.bench_function("laravel_high_fanout", |b| {
+        group.bench_function(format!("{}_high_fanout", fixture.id()), |b| {
             b.iter_batched(
                 || {
                     // Not timed: touch the file so its content hash changes.
@@ -289,7 +293,7 @@ fn bench_reanalysis(c: &mut Criterion) {
                         AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_model.path());
                     analyzer.ensure_all_stubs();
                     analyzer.collect_definitions(&vendor_files);
-                    analyzer.analyze_paths(&project_files, &BatchOptions::new())
+                    analyzer.analyze_paths(&project_files, &BatchOptions::new().without_symbols())
                 },
                 BatchSize::LargeInput,
             );
@@ -298,7 +302,7 @@ fn bench_reanalysis(c: &mut Criterion) {
     }
 
     if let Some(original) = &leaf_original {
-        group.bench_function("laravel_leaf_file", |b| {
+        group.bench_function(format!("{}_leaf_file", fixture.id()), |b| {
             b.iter_batched(
                 || {
                     counter_leaf += 1;
@@ -310,7 +314,7 @@ fn bench_reanalysis(c: &mut Criterion) {
                         AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_leaf.path());
                     analyzer.ensure_all_stubs();
                     analyzer.collect_definitions(&vendor_files);
-                    analyzer.analyze_paths(&project_files, &BatchOptions::new())
+                    analyzer.analyze_paths(&project_files, &BatchOptions::new().without_symbols())
                 },
                 BatchSize::LargeInput,
             );
@@ -326,15 +330,19 @@ fn bench_reanalysis(c: &mut Criterion) {
 /// comparable to the `analyze()` portion of `full_analysis` without the
 /// constant vendor-reload cost that would otherwise compress the signal.
 fn bench_reanalysis_project_only(c: &mut Criterion) {
-    let root = fixtures_root();
-    if skip_if_missing(&root) {
+    let Some(fixture) = PerfFixture::discover() else {
+        eprintln!("\nSkipping reanalysis benchmark: no supported perf fixture found\n");
+        return;
+    };
+    if skip_if_missing(&fixture) {
         return;
     }
 
-    let (vendor_files, project_files) = split_vendor_project(&root);
+    let root = fixture.root();
+    let (vendor_files, project_files) = split_vendor_project(root);
 
-    let model_path = root.join("src/Illuminate/Database/Eloquent/Model.php");
-    let leaf_path = root.join("src/Illuminate/Auth/Events/Login.php");
+    let model_path = fixture.high_fanout_file();
+    let leaf_path = fixture.leaf_file();
 
     let model_original = model_path
         .exists()
@@ -357,8 +365,11 @@ fn bench_reanalysis_project_only(c: &mut Criterion) {
         mem_analyzer.ensure_all_stubs();
         mem_analyzer.collect_definitions(&vendor_files);
         reset_alloc_counters();
-        let _ = mem_analyzer.analyze_paths(&project_files, &BatchOptions::new());
-        print_alloc_stats("reanalysis_project_only/laravel_high_fanout");
+        let _ = mem_analyzer.analyze_paths(&project_files, &BatchOptions::new().without_symbols());
+        print_alloc_stats(&format!(
+            "reanalysis_project_only/{}_high_fanout",
+            fixture.id()
+        ));
         std::fs::write(&model_path, original).unwrap();
     }
     if let Some(original) = &leaf_original {
@@ -370,8 +381,11 @@ fn bench_reanalysis_project_only(c: &mut Criterion) {
         mem_analyzer.ensure_all_stubs();
         mem_analyzer.collect_definitions(&vendor_files);
         reset_alloc_counters();
-        let _ = mem_analyzer.analyze_paths(&project_files, &BatchOptions::new());
-        print_alloc_stats("reanalysis_project_only/laravel_leaf_file");
+        let _ = mem_analyzer.analyze_paths(&project_files, &BatchOptions::new().without_symbols());
+        print_alloc_stats(&format!(
+            "reanalysis_project_only/{}_leaf_file",
+            fixture.id()
+        ));
         std::fs::write(&leaf_path, original).unwrap();
     }
 
@@ -393,7 +407,7 @@ fn bench_reanalysis_project_only(c: &mut Criterion) {
     group.throughput(Throughput::Elements(project_files.len() as u64));
 
     if let Some(original) = &model_original {
-        group.bench_function("laravel_high_fanout", |b| {
+        group.bench_function(format!("{}_high_fanout", fixture.id()), |b| {
             b.iter_batched(
                 || {
                     // Not timed: touch file and pre-load stubs + vendor types into
@@ -407,7 +421,9 @@ fn bench_reanalysis_project_only(c: &mut Criterion) {
                     analyzer.collect_definitions(&vendor_files);
                     analyzer
                 },
-                |analyzer| analyzer.analyze_paths(&project_files, &BatchOptions::new()),
+                |analyzer| {
+                    analyzer.analyze_paths(&project_files, &BatchOptions::new().without_symbols())
+                },
                 BatchSize::LargeInput,
             );
         });
@@ -415,7 +431,7 @@ fn bench_reanalysis_project_only(c: &mut Criterion) {
     }
 
     if let Some(original) = &leaf_original {
-        group.bench_function("laravel_leaf_file", |b| {
+        group.bench_function(format!("{}_leaf_file", fixture.id()), |b| {
             b.iter_batched(
                 || {
                     counter_leaf += 1;
@@ -427,7 +443,9 @@ fn bench_reanalysis_project_only(c: &mut Criterion) {
                     analyzer.collect_definitions(&vendor_files);
                     analyzer
                 },
-                |analyzer| analyzer.analyze_paths(&project_files, &BatchOptions::new()),
+                |analyzer| {
+                    analyzer.analyze_paths(&project_files, &BatchOptions::new().without_symbols())
+                },
                 BatchSize::LargeInput,
             );
         });
@@ -444,14 +462,15 @@ fn bench_reanalysis_project_only(c: &mut Criterion) {
 /// Note: unlike the project Pass 1 inside `full_analysis`, this skips the FQCN
 /// pre-index step, so it measures a slightly narrower slice of the pipeline.
 fn bench_vendor_collection(c: &mut Criterion) {
-    let root = fixtures_root();
-    // Bug fix: check vendor/ specifically, not just root existence.
-    if skip_if_missing(&root) {
+    let Some(fixture) = PerfFixture::discover() else {
+        eprintln!("\nSkipping vendor benchmark: no supported perf fixture found\n");
+        return;
+    };
+    if skip_if_missing(&fixture) {
         return;
     }
 
-    // Bug fix: collect from vendor/ only, not the entire repo root.
-    let vendor_files = discover_files(&root.join("vendor"));
+    let vendor_files = discover_files(&fixture.vendor_root());
 
     reset_alloc_counters();
     {
@@ -459,14 +478,14 @@ fn bench_vendor_collection(c: &mut Criterion) {
         analyzer.ensure_all_stubs();
         analyzer.collect_definitions(&vendor_files);
     }
-    print_alloc_stats("vendor_collection/laravel");
+    print_alloc_stats(&format!("vendor_collection/{}", fixture.id()));
 
     let mut group = c.benchmark_group("vendor_collection");
     group.sample_size(10);
     group.measurement_time(Duration::from_secs(30));
     group.throughput(Throughput::Elements(vendor_files.len() as u64));
 
-    group.bench_function("laravel", |b| {
+    group.bench_function(fixture.id(), |b| {
         b.iter(|| {
             let analyzer = AnalysisSession::new(PhpVersion::LATEST);
             analyzer.ensure_all_stubs();
@@ -479,12 +498,15 @@ fn bench_vendor_collection(c: &mut Criterion) {
 
 /// Detailed memory profiling: measure allocation at each phase of vendor collection.
 fn bench_vendor_collection_detailed(_c: &mut Criterion) {
-    let root = fixtures_root();
-    if skip_if_missing(&root) {
+    let Some(fixture) = PerfFixture::discover() else {
+        eprintln!("\nSkipping vendor benchmark: no supported perf fixture found\n");
+        return;
+    };
+    if skip_if_missing(&fixture) {
         return;
     }
 
-    let vendor_files = discover_files(&root.join("vendor"));
+    let vendor_files = discover_files(&fixture.vendor_root());
 
     eprintln!("\n=== VENDOR COLLECTION DETAILED PROFILING ===\n");
 
@@ -503,12 +525,15 @@ fn bench_vendor_collection_detailed(_c: &mut Criterion) {
 
 /// Full analysis with detailed phase breakdown.
 fn bench_full_analysis_detailed(_c: &mut Criterion) {
-    let root = fixtures_root();
-    if skip_if_missing(&root) {
+    let Some(fixture) = PerfFixture::discover() else {
+        eprintln!("\nSkipping full-analysis benchmark: no supported perf fixture found\n");
+        return;
+    };
+    if skip_if_missing(&fixture) {
         return;
     }
 
-    let (vendor_files, project_files) = split_vendor_project(&root);
+    let (vendor_files, project_files) = split_vendor_project(fixture.root());
 
     eprintln!("\n=== FULL ANALYSIS DETAILED PROFILING ===\n");
 
@@ -549,7 +574,7 @@ fn bench_full_analysis_detailed(_c: &mut Criterion) {
     analyzer.collect_definitions(&vendor_files);
     checkpoint_alloc("After collect_definitions() - VENDOR COLLECTION");
 
-    let _ = analyzer.analyze_paths(&project_files, &BatchOptions::new());
+    let _ = analyzer.analyze_paths(&project_files, &BatchOptions::new().without_symbols());
     checkpoint_alloc("After analyze() - FULL ANALYSIS COMPLETE");
 
     eprintln!();
@@ -557,12 +582,15 @@ fn bench_full_analysis_detailed(_c: &mut Criterion) {
 
 /// Vendor collection with finer-grained breakdown (file parsing vs ingestion).
 fn bench_vendor_collection_phase_breakdown(_c: &mut Criterion) {
-    let root = fixtures_root();
-    if skip_if_missing(&root) {
+    let Some(fixture) = PerfFixture::discover() else {
+        eprintln!("\nSkipping vendor benchmark: no supported perf fixture found\n");
+        return;
+    };
+    if skip_if_missing(&fixture) {
         return;
     }
 
-    let vendor_files = discover_files(&root.join("vendor"));
+    let vendor_files = discover_files(&fixture.vendor_root());
     eprintln!("\n=== VENDOR COLLECTION PHASE BREAKDOWN ===\n");
     eprintln!("  {} vendor files to collect\n", vendor_files.len());
 
@@ -587,11 +615,14 @@ fn bench_vendor_collection_phase_breakdown(_c: &mut Criterion) {
 /// The cache directory persists across both runs in a single TempDir. Both
 /// timings and memory checkpoints are printed.
 fn bench_vendor_collection_cache_cold_vs_warm(_c: &mut Criterion) {
-    let root = fixtures_root();
-    if skip_if_missing(&root) {
+    let Some(fixture) = PerfFixture::discover() else {
+        eprintln!("\nSkipping vendor benchmark: no supported perf fixture found\n");
+        return;
+    };
+    if skip_if_missing(&fixture) {
         return;
     }
-    let vendor_files = discover_files(&root.join("vendor"));
+    let vendor_files = discover_files(&fixture.vendor_root());
     let cache_dir = tempfile::tempdir().unwrap();
 
     eprintln!("\n=== VENDOR COLLECTION: COLD vs WARM (persistent StubSlice cache) ===\n");
@@ -666,11 +697,14 @@ fn bench_vendor_collection_cache_cold_vs_warm(_c: &mut Criterion) {
 /// retained bytes should be small (path strings + salsa slot overhead only).
 /// Without text-nulling: full file text stays alive in the immortal input slot.
 fn bench_file_removal_memory_probe(_c: &mut Criterion) {
-    let root = fixtures_root();
-    if skip_if_missing(&root) {
+    let Some(fixture) = PerfFixture::discover() else {
+        eprintln!("\nSkipping file-removal probe: no supported perf fixture found\n");
+        return;
+    };
+    if skip_if_missing(&fixture) {
         return;
     }
-    let project_files = discover_files(&root.join("src"));
+    let project_files = discover_files(&fixture.src_root());
 
     let sources: Vec<(Arc<str>, Arc<str>)> = project_files
         .iter()

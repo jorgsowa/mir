@@ -52,7 +52,7 @@ fn analyze_with_psr4(
     let consumer_path = write(&root, consumer_file, consumer_src);
     let psr4 = make_psr4(&root, "App\\\\", "src");
     let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
-    analyzer.analyze_paths(&[consumer_path], &BatchOptions::new())
+    analyzer.analyze_paths(&[consumer_path], &BatchOptions::new().without_symbols())
 }
 
 #[test]
@@ -114,7 +114,7 @@ fn does_not_loop_when_class_has_no_psr4_match() {
     let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
 
     // Should terminate without hanging or panicking
-    let _result = analyzer.analyze_paths(&[child_path], &BatchOptions::new());
+    let _result = analyzer.analyze_paths(&[child_path], &BatchOptions::new().without_symbols());
 }
 
 #[test]
@@ -245,7 +245,7 @@ fn lazy_loads_fqcn_with_inherited_parent_used_without_use_import() {
     );
     let psr4 = make_psr4(&root, "App\\\\", "src");
     let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
-    let result = analyzer.analyze_paths(&[consumer_path], &BatchOptions::new());
+    let result = analyzer.analyze_paths(&[consumer_path], &BatchOptions::new().without_symbols());
 
     let issues: Vec<_> = result
         .issues
@@ -302,7 +302,7 @@ fn lazy_loads_fqcn_new_expression_in_namespaced_file() {
     let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4.clone());
 
     let files = psr4.project_files();
-    let result = analyzer.analyze_paths(&files, &BatchOptions::new());
+    let result = analyzer.analyze_paths(&files, &BatchOptions::new().without_symbols());
 
     let undefined_class: Vec<_> = result
         .issues

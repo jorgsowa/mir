@@ -13,6 +13,7 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::OnceLock;
 
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
@@ -211,7 +212,7 @@ impl AnalysisSession {
     /// `analyzed_files` must list every file that was analyzed in this batch so
     /// that files with *zero* existing issues still have their suppression maps
     /// inspected for unused annotations.
-    fn apply_suppressions_and_emit_unused(
+    pub(crate) fn apply_suppressions_and_emit_unused(
         &self,
         issues: &mut Vec<Issue>,
         analyzed_files: &[Arc<str>],
@@ -356,7 +357,22 @@ mod run;
 /// Analyze a PHP source string without a real file path. Useful for tests
 /// and single-file LSP mode. Allocates a throwaway db; doesn't touch any
 /// existing session.
+///
+/// This preserves the historical default of collecting per-expression
+/// symbols. Issue-only or type-env-only callers should prefer
+/// [`analyze_source_with_options`] with [`BatchOptions::without_symbols`].
 pub fn analyze_source(source: &str) -> AnalysisResult {
+    analyze_source_with_options(source, &BatchOptions::new())
+}
+
+/// Analyze a PHP source string with batch-style output controls.
+///
+/// Mirrors [`analyze_source`] but lets issue-only consumers skip retaining
+/// whole-file `ResolvedSymbol` payloads while keeping the same typed
+/// diagnostics and type-environment behavior.
+pub fn analyze_source_with_options(source: &str, opts: &BatchOptions) -> AnalysisResult {
+    use mir_issues::Issue;
+
     let php_version = PhpVersion::LATEST;
     let file: Arc<str> = Arc::from("<source>");
     let mut db = MirDbStorage::default();
@@ -367,10 +383,37 @@ pub fn analyze_source(source: &str) -> AnalysisResult {
     // workspace symbol index. Without this, body analysis can't look up the
     // file's own functions/methods/classes and degrades every parameter to
     // `mixed` via the `ast_derived_fn_params` fallback.
-    let salsa_file = db.upsert_source_file(file.clone(), Arc::from(source));
-    let file_defs = collect_file_definitions(&db, salsa_file);
+    db.upsert_source_file(file.clone(), Arc::from(source));
+    let parsed = php_rs_parser::parse(source);
+    let mut collected_issues: Vec<Issue> = parsed
+        .errors
+        .iter()
+        .filter(|err| !crate::parser::is_spurious_reserved_class_error(err))
+        .map(|err| crate::parser::parse_error_to_issue(err, &file, source, &parsed.source_map))
+        .collect();
+    let collector = crate::collector::DefinitionCollector::new_for_slice(
+        file.clone(),
+        source,
+        &parsed.source_map,
+    )
+    .with_php_version(php_version);
+    let (mut slice, collector_issues) = collector.collect_slice(&parsed.program);
+    collected_issues.extend(collector_issues);
+    mir_codebase::definitions::deduplicate_params_in_slice(&mut slice);
+    let slice_arc = Arc::new(slice);
+    let issues_arc = Arc::new(collected_issues);
+    db.prime_parse_cache(
+        crate::stub_cache::hash_source(source),
+        php_version.cache_byte(),
+        Arc::clone(&slice_arc),
+        Arc::clone(&issues_arc),
+    );
+    let _file_defs = crate::db::FileDefinitions {
+        slice: slice_arc,
+        issues: issues_arc.clone(),
+    };
     let suppressions = crate::suppression::SuppressionMap::from_source(source);
-    let mut all_issues = Arc::unwrap_or_clone(file_defs.issues.clone());
+    let mut all_issues = Arc::unwrap_or_clone(issues_arc);
     if all_issues.iter().any(|issue| {
         matches!(issue.kind, mir_issues::IssueKind::ParseError { .. })
             && issue.severity == mir_issues::Severity::Error
@@ -380,14 +423,13 @@ pub fn analyze_source(source: &str) -> AnalysisResult {
     }
     let mut type_envs = rustc_hash::FxHashMap::default();
     let mut all_symbols = Vec::new();
-    let result = php_rs_parser::parse(source);
-
-    let driver = BodyAnalyzer::new(&db, php_version);
+    let mut driver = BodyAnalyzer::new(&db, php_version);
+    driver.collect_symbols = !opts.skip_symbols;
     all_issues.extend(driver.analyze_bodies_typed(
-        &result.program,
+        &parsed.program,
         file.clone(),
         source,
-        &result.source_map,
+        &parsed.source_map,
         &mut type_envs,
         &mut all_symbols,
     ));
@@ -398,6 +440,7 @@ pub fn analyze_source(source: &str) -> AnalysisResult {
     }
     mark_suppressed(&mut all_issues, &suppressions);
     emit_unused_suppressions(&mut all_issues, &suppressions, &file);
+    opts.apply(&mut all_issues);
     AnalysisResult::build(all_issues, type_envs, all_symbols)
 }
 
@@ -656,36 +699,38 @@ pub struct AnalysisResult {
     pub issues: Vec<Issue>,
     #[doc(hidden)]
     pub type_envs: rustc_hash::FxHashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
-    /// Per-expression resolved symbols from body analysis, sorted by file path.
+    /// Per-expression resolved symbols from body analysis in analyzer emission
+    /// order. File indexing is built lazily for the legacy [`Self::symbol_at`]
+    /// helper so issue-only consumers do not pay the setup cost.
     pub symbols: Vec<crate::symbol::ResolvedSymbol>,
-    /// Maps each file path to the contiguous range within `symbols` that
-    /// belongs to it.
-    symbols_by_file: HashMap<Arc<str>, std::ops::Range<usize>>,
+    /// Maps each file path to the symbol indices belonging to it. Built on
+    /// first use of [`Self::symbol_at`] because the batch result's navigation
+    /// helper is now primarily exercised by tests.
+    symbols_by_file: OnceLock<HashMap<Arc<str>, Vec<usize>>>,
 }
 
 impl AnalysisResult {
     fn build(
         issues: Vec<Issue>,
         type_envs: rustc_hash::FxHashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
-        mut symbols: Vec<crate::symbol::ResolvedSymbol>,
+        symbols: Vec<crate::symbol::ResolvedSymbol>,
     ) -> Self {
-        symbols.sort_unstable_by(|a, b| a.file.as_ref().cmp(b.file.as_ref()));
-        let mut symbols_by_file: HashMap<Arc<str>, std::ops::Range<usize>> = HashMap::default();
-        let mut i = 0;
-        while i < symbols.len() {
-            let file = Arc::clone(&symbols[i].file);
-            let start = i;
-            while i < symbols.len() && symbols[i].file == file {
-                i += 1;
-            }
-            symbols_by_file.insert(file, start..i);
-        }
         Self {
             issues,
             type_envs,
             symbols,
-            symbols_by_file,
+            symbols_by_file: OnceLock::new(),
         }
+    }
+
+    fn symbols_by_file(&self) -> &HashMap<Arc<str>, Vec<usize>> {
+        self.symbols_by_file.get_or_init(|| {
+            let mut by_file: HashMap<Arc<str>, Vec<usize>> = HashMap::default();
+            for (idx, symbol) in self.symbols.iter().enumerate() {
+                by_file.entry(symbol.file.clone()).or_default().push(idx);
+            }
+            by_file
+        })
     }
 
     pub fn error_count(&self) -> usize {
@@ -737,12 +782,12 @@ impl AnalysisResult {
         file: &str,
         byte_offset: u32,
     ) -> Option<&crate::symbol::ResolvedSymbol> {
-        let range = self.symbols_by_file.get(file)?;
-        let symbols = &self.symbols[range.clone()];
+        let indices = self.symbols_by_file().get(file)?;
 
         // Primary: cursor is on an identifier token.
-        if let Some(sym) = symbols
+        if let Some(sym) = indices
             .iter()
+            .map(|idx| &self.symbols[*idx])
             .filter(|s| s.span.start <= byte_offset && byte_offset < s.span.end)
             .min_by_key(|s| s.span.end - s.span.start)
         {
@@ -754,8 +799,9 @@ impl AnalysisResult {
         // full expression span recorded for call-like symbols and return the
         // innermost (smallest) enclosing call, mirroring what an AST-walk to
         // the innermost containing call expression would produce.
-        symbols
+        indices
             .iter()
+            .map(|idx| &self.symbols[*idx])
             .filter(|s| {
                 s.expr_span
                     .is_some_and(|es| es.start <= byte_offset && byte_offset < es.end)

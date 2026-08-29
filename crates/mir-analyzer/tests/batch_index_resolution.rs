@@ -97,7 +97,10 @@ fn batch_resolves_project_and_lazy_classes_with_prebuilt_index() {
     // Now analyze the project. `Acme\Widget` (lazy-loaded vendor) and `App\Helper`
     // (sibling project class) are both real and must resolve.
     let helper = root.join("src/Helper.php");
-    let result = session.analyze_paths(&[service.clone(), helper], &BatchOptions::new());
+    let result = session.analyze_paths(
+        &[service.clone(), helper],
+        &BatchOptions::new().without_symbols(),
+    );
 
     let undefined: Vec<&str> = result
         .issues

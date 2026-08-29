@@ -237,3 +237,57 @@ fn verify_no_op_correctness() {
 
     println!("✅ No-op file save produces identical results");
 }
+
+#[test]
+fn no_op_ingest_preserves_reference_postings() {
+    let session = AnalysisSession::new(mir_analyzer::PhpVersion::LATEST);
+    session.ensure_all_stubs();
+
+    let base: Arc<str> = Arc::from("base.php");
+    let caller: Arc<str> = Arc::from("caller.php");
+    let base_src = "<?php\nclass Base { public static function ping(): void {} }\n";
+    let caller_src = "<?php\nclass Caller { public function go(): void { Base::ping(); } }\n";
+
+    session.ingest_file(base.clone(), Arc::from(base_src));
+    session.ingest_file(caller.clone(), Arc::from(caller_src));
+
+    let parsed = php_rs_parser::parse(caller_src);
+    let _ = mir_analyzer::FileAnalyzer::new(&session).analyze_diagnostics_only(
+        caller.clone(),
+        caller_src,
+        &parsed.program,
+        &parsed.source_map,
+    );
+
+    let refs_before = session
+        .indexed_references_to(
+            &mir_analyzer::Name::method("Base", "ping"),
+            std::slice::from_ref(&caller),
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
+        .expect("not cancelled");
+    assert_eq!(
+        refs_before.len(),
+        1,
+        "baseline reference should be recorded"
+    );
+
+    session.ingest_file(caller.clone(), Arc::from(caller_src));
+
+    let refs_after = session
+        .indexed_references_to(
+            &mir_analyzer::Name::method("Base", "ping"),
+            std::slice::from_ref(&caller),
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| false,
+        )
+        .expect("not cancelled");
+    assert_eq!(
+        refs_after.len(),
+        1,
+        "no-op ingest must preserve reference postings instead of clearing them"
+    );
+}

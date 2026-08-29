@@ -17,7 +17,10 @@ fn assert_scope_parity(name: &str, source: &str) {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join(format!("{name}.php"));
     std::fs::write(&path, source).unwrap();
-    let _ = session.analyze_paths(std::slice::from_ref(&path), &BatchOptions::new());
+    let _ = session.analyze_paths(
+        std::slice::from_ref(&path),
+        &BatchOptions::new().without_symbols(),
+    );
 
     let db = session.snapshot_db();
     let path_str: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
@@ -25,18 +28,19 @@ fn assert_scope_parity(name: &str, source: &str) {
 
     // Reference path: whole-file walk, refs drained from the staging buffer.
     let parsed = mir_analyzer::db::parse_file(&db, file);
-    let (expected_issues, _symbols) = {
+    let expected_issues = {
         // BodyAnalyzer is crate-private; go through analyze_file's components:
         // re-run the whole-file walk via a second analyze on a fresh frame.
-        // FileAnalyzer wraps analyze_bodies 1:1 for a parsed program.
+        // Diagnostics-only open-file analysis still wraps analyze_bodies 1:1
+        // for issue emission and committed body-reference postings.
         let analyzer = mir_analyzer::FileAnalyzer::new(&session);
-        let analysis = analyzer.analyze(
+        let analysis = analyzer.analyze_diagnostics_only(
             path_str.clone(),
             source,
             &parsed.0.program,
             &parsed.0.source_map,
         );
-        (analysis.issues, analysis.symbols)
+        analysis.issues
     };
     let mut expected_refs: Vec<RefLoc> = db
         .extract_file_reference_locations(path_str.as_ref())

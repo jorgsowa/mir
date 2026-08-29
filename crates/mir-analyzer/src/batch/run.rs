@@ -137,6 +137,17 @@ impl AnalysisSession {
                 )
             })
             .collect();
+        let transient_replay = self
+            .cache
+            .is_none()
+            .then(|| {
+                self.transient_batch_replay(
+                    php_version.cache_byte(),
+                    opts.skip_symbols,
+                    &content_hexes,
+                )
+            })
+            .flatten();
 
         // ---- Cross-file invalidation: evict dependents whose surface changed --
         // A file whose content changed re-analyzes itself regardless (its body
@@ -311,6 +322,27 @@ impl AnalysisSession {
                 // Diagnostics-only consumers never read the symbol vecs —
                 // don't build them (a Type clone per reference) at all.
                 driver.collect_symbols = !opts.skip_symbols;
+                if let Some(replay) = transient_replay.as_ref() {
+                    if let Some(hit) = replay.files.get(&parsed.file) {
+                        let locs: Vec<RefLoc> = hit
+                            .ref_locs
+                            .iter()
+                            .map(|(symbol, line, col_start, col_end)| RefLoc {
+                                symbol_key: Arc::clone(symbol),
+                                file: parsed.file.clone(),
+                                line: *line,
+                                col_start: *col_start,
+                                col_end: *col_end,
+                            })
+                            .collect();
+                        return (
+                            parsed.file.clone(),
+                            hit.issues.to_vec(),
+                            hit.symbols.to_vec(),
+                            locs,
+                        );
+                    }
+                }
                 let (issues, symbols) = if let Some(cache) = &self.cache {
                     let h = content_hexes
                         .get(parsed.file.as_ref())
@@ -393,6 +425,32 @@ impl AnalysisSession {
             .collect();
 
         let _t_body_analysis = _t0.elapsed();
+
+        if self.cache.is_none() {
+            let replay_files: HashMap<Arc<str>, crate::session::BatchReplayFile> = body_results
+                .iter()
+                .map(|(file, issues, symbols, ref_locs)| {
+                    let cached_ref_locs: Arc<[crate::cache::CachedRefLoc]> = ref_locs
+                        .iter()
+                        .map(|r| (Arc::clone(&r.symbol_key), r.line, r.col_start, r.col_end))
+                        .collect();
+                    (
+                        file.clone(),
+                        crate::session::BatchReplayFile {
+                            issues: issues.as_slice().into(),
+                            ref_locs: cached_ref_locs,
+                            symbols: symbols.as_slice().into(),
+                        },
+                    )
+                })
+                .collect();
+            self.store_transient_batch_replay(
+                php_version.cache_byte(),
+                opts.skip_symbols,
+                &content_hexes,
+                replay_files,
+            );
+        }
 
         // Serial commit with replace semantics: each file's output (or cache
         // replay) is its complete reference set, so stale entries from a
@@ -511,6 +569,7 @@ impl AnalysisSession {
         new_content: &str,
         opts: &BatchOptions,
     ) -> AnalysisResult {
+        self.clear_transient_batch_replay();
         let php_version = self.batch_php_version(opts);
 
         // Fast path: content unchanged and cache has a valid entry.
@@ -548,11 +607,10 @@ impl AnalysisSession {
             guard.remove_file_definitions(file_path);
         }
 
-        let file_defs = {
-            let mut guard = self.db.salsa.write();
-            let salsa_file = guard.upsert_source_file(file.clone(), Arc::from(new_content));
-            collect_file_definitions(&**guard, salsa_file).clone()
-        };
+        let collected =
+            self.db
+                .collect_and_ingest_file_with_parsed(file.clone(), new_content, php_version);
+        let file_defs = collected.file_defs;
 
         let mut all_issues: Vec<Issue> = Arc::unwrap_or_clone(file_defs.issues.clone());
 
@@ -569,14 +627,16 @@ impl AnalysisSession {
 
         let (symbols, surface_hash) = {
             let guard = self.db.salsa.write();
-
-            let parsed = php_rs_parser::parse(new_content);
+            let parsed = collected
+                .parsed
+                .unwrap_or_else(|| php_rs_parser::parse(new_content));
             let surface_hash = surface_fingerprint(new_content, &parsed.program);
 
             let has_hard_errors = parsed.errors.iter().any(crate::parser::is_hard_parse_error);
             let symbols = if !has_hard_errors {
                 let db_ref: &dyn MirDatabase = &**guard;
-                let driver = BodyAnalyzer::new(db_ref, php_version);
+                let mut driver = BodyAnalyzer::new(db_ref, php_version);
+                driver.collect_symbols = !opts.skip_symbols;
                 let (body_issues, symbols) = driver.analyze_bodies(
                     &parsed.program,
                     file.clone(),
@@ -586,7 +646,11 @@ impl AnalysisSession {
                 all_issues.extend(body_issues);
                 let pending = guard.take_pending_ref_locs();
                 guard.set_file_reference_locations(file.as_ref(), pending);
-                symbols
+                if opts.skip_symbols {
+                    Vec::new()
+                } else {
+                    symbols
+                }
             } else {
                 Vec::new()
             };
@@ -649,6 +713,7 @@ impl AnalysisSession {
     /// the parse + definition-collection step. Cache misses run the normal
     /// pipeline and write back so subsequent runs hit.
     pub fn collect_definitions(&self, paths: &[PathBuf]) {
+        self.clear_transient_batch_replay();
         let _timing = std::env::var("MIR_TIMING").is_ok();
         let _t0 = std::time::Instant::now();
 
@@ -757,5 +822,137 @@ impl AnalysisSession {
         }
 
         crate::collector::print_collector_stats();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use rustc_hash::FxHashMap as HashMap;
+    use std::fs;
+    use std::sync::{Arc, Mutex, OnceLock};
+
+    use crate::{AnalysisSession, BatchOptions, PhpVersion};
+
+    fn metrics_test_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    fn write_php(dir: &tempfile::TempDir, name: &str, contents: &str) -> std::path::PathBuf {
+        let path = dir.path().join(name);
+        fs::write(&path, contents).expect("write fixture");
+        path
+    }
+
+    #[test]
+    fn identical_batch_rerun_replays_without_symbols() {
+        let _guard = metrics_test_lock().lock().expect("metrics test lock");
+        let dir = tempfile::tempdir().expect("tempdir");
+        let file = write_php(
+            &dir,
+            "Example.php",
+            "<?php\nclass Example {\n    public function answer(): int { return 42; }\n}\n(new Example())->answer();\n",
+        );
+        let session = AnalysisSession::new(PhpVersion::LATEST);
+        let opts = BatchOptions::new().without_symbols();
+        let hash = crate::cache::hash_content(
+            "<?php\nclass Example {\n    public function answer(): int { return 42; }\n}\n(new Example())->answer();\n",
+        );
+        let hashes = HashMap::from_iter([(Arc::from(file.to_string_lossy().as_ref()), hash)]);
+
+        let first = session.analyze_paths(std::slice::from_ref(&file), &opts);
+        assert!(first.issues.is_empty());
+        assert!(
+            session
+                .transient_batch_replay(PhpVersion::LATEST.cache_byte(), true, &hashes)
+                .is_some(),
+            "expected first run to populate transient replay"
+        );
+
+        crate::metrics::test_reset();
+        let second = session.analyze_paths(std::slice::from_ref(&file), &opts);
+        assert!(second.issues.is_empty());
+        assert!(second.symbols.is_empty());
+
+        let dump = crate::metrics::dump().expect("metrics enabled in tests");
+        assert!(
+            dump.contains("whole-file walks     : 0"),
+            "expected replay to skip body walks, got:\n{dump}"
+        );
+        assert!(
+            dump.contains("symbols allocated    : 0"),
+            "expected diagnostics-only replay to avoid symbol allocation, got:\n{dump}"
+        );
+    }
+
+    #[test]
+    fn identical_batch_rerun_replays_with_symbols() {
+        let _guard = metrics_test_lock().lock().expect("metrics test lock");
+        let dir = tempfile::tempdir().expect("tempdir");
+        let file = write_php(
+            &dir,
+            "Example.php",
+            "<?php\nclass Example {\n    public function answer(): int { return 42; }\n}\n(new Example())->answer();\n",
+        );
+        let session = AnalysisSession::new(PhpVersion::LATEST);
+        let opts = BatchOptions::new();
+        let hash = crate::cache::hash_content(
+            "<?php\nclass Example {\n    public function answer(): int { return 42; }\n}\n(new Example())->answer();\n",
+        );
+        let hashes = HashMap::from_iter([(Arc::from(file.to_string_lossy().as_ref()), hash)]);
+
+        let first = session.analyze_paths(std::slice::from_ref(&file), &opts);
+        assert!(
+            !first.symbols.is_empty(),
+            "expected first run to collect symbols"
+        );
+        assert!(
+            session
+                .transient_batch_replay(PhpVersion::LATEST.cache_byte(), false, &hashes)
+                .is_some(),
+            "expected first run to populate transient replay"
+        );
+
+        crate::metrics::test_reset();
+        let second = session.analyze_paths(std::slice::from_ref(&file), &opts);
+        assert_eq!(second.symbols.len(), first.symbols.len());
+
+        let dump = crate::metrics::dump().expect("metrics enabled in tests");
+        assert!(
+            dump.contains("whole-file walks     : 0"),
+            "expected replay to skip body walks, got:\n{dump}"
+        );
+    }
+
+    #[test]
+    fn session_mutation_clears_batch_replay() {
+        let _guard = metrics_test_lock().lock().expect("metrics test lock");
+        let dir = tempfile::tempdir().expect("tempdir");
+        let file = write_php(
+            &dir,
+            "Example.php",
+            "<?php\nclass Example {\n    public function answer(): int { return 42; }\n}\n(new Example())->answer();\n",
+        );
+        let file_arc: Arc<str> = Arc::from(file.to_string_lossy().as_ref());
+        let session = AnalysisSession::new(PhpVersion::LATEST);
+        let opts = BatchOptions::new().without_symbols();
+
+        let _ = session.analyze_paths(std::slice::from_ref(&file), &opts);
+        session.ingest_file(
+            Arc::clone(&file_arc),
+            Arc::from(
+                "<?php\nclass Example {\n    public function answer(): string { return 'forty two'; }\n}\n(new Example())->answer();\n",
+            ),
+        );
+
+        crate::metrics::test_reset();
+        let result = session.analyze_paths(std::slice::from_ref(&file), &opts);
+        assert!(result.issues.is_empty());
+
+        let dump = crate::metrics::dump().expect("metrics enabled in tests");
+        assert!(
+            dump.contains("whole-file walks     : 1"),
+            "expected session mutation to invalidate replay, got:\n{dump}"
+        );
     }
 }

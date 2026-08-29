@@ -32,7 +32,7 @@ use crate::db::MirDatabase;
 use crate::expr::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
 use crate::php_version::PhpVersion;
-use crate::symbol::ResolvedSymbol;
+use crate::symbol::{NavigationFact, ResolvedNavigationFact, ResolvedSymbol};
 
 // ---------------------------------------------------------------------------
 // VarAnnotation
@@ -201,13 +201,27 @@ pub struct StatementsAnalyzer<'a> {
     pub source: &'a str,
     pub source_map: &'a php_rs_parser::source_map::SourceMap,
     pub issues: &'a mut IssueBuffer,
-    pub symbols: &'a mut Vec<ResolvedSymbol>,
+    pub symbols: Option<&'a mut Vec<ResolvedSymbol>>,
+    pub navigation_facts: &'a std::cell::RefCell<Vec<NavigationFact>>,
+    pub resolved_navigation_facts: &'a std::cell::RefCell<Vec<ResolvedNavigationFact>>,
     pub php_version: PhpVersion,
     pub mode: AnalysisMode,
     /// When false, `ResolvedSymbol` recording is skipped entirely. Set by
     /// pure inference walks whose caller discards the symbol buffer, so the
     /// walk doesn't clone a Type per reference just to drop it.
     pub collect_symbols: bool,
+    /// When false, recorded symbols keep only navigation shape and use
+    /// `Type::mixed()` instead of cloning the precise resolved type.
+    pub capture_symbol_types: bool,
+    /// When true, skip symbols that cannot map to a codebase-level
+    /// [`crate::Name`] (currently variables only on the stmt side).
+    pub codebase_symbols_only: bool,
+    /// When false, skip recording reference-location postings.
+    pub record_reference_locations: bool,
+    /// When true, collect compact codebase-name navigation facts.
+    pub collect_navigation_facts: bool,
+    /// When true, collect compact typed facts for codebase symbol resolution.
+    pub collect_resolved_navigation_facts: bool,
     /// Accumulated inferred return types for the current function.
     pub return_types: Vec<Type>,
     /// `(key type, value type)` for every `yield`/`yield from` seen so far in
@@ -250,7 +264,9 @@ impl<'a> StatementsAnalyzer<'a> {
         source: &'a str,
         source_map: &'a php_rs_parser::source_map::SourceMap,
         issues: &'a mut IssueBuffer,
-        symbols: &'a mut Vec<ResolvedSymbol>,
+        symbols: Option<&'a mut Vec<ResolvedSymbol>>,
+        navigation_facts: &'a std::cell::RefCell<Vec<NavigationFact>>,
+        resolved_navigation_facts: &'a std::cell::RefCell<Vec<ResolvedNavigationFact>>,
         php_version: PhpVersion,
         mode: AnalysisMode,
     ) -> Self {
@@ -261,9 +277,16 @@ impl<'a> StatementsAnalyzer<'a> {
             source_map,
             issues,
             symbols,
+            navigation_facts,
+            resolved_navigation_facts,
             php_version,
             mode,
             collect_symbols: true,
+            capture_symbol_types: true,
+            codebase_symbols_only: false,
+            record_reference_locations: true,
+            collect_navigation_facts: false,
+            collect_resolved_navigation_facts: false,
             return_types: Vec::new(),
             yielded_types: Vec::new(),
             break_ctx_stack: Vec::new(),
@@ -392,7 +415,7 @@ impl<'a> StatementsAnalyzer<'a> {
                             },
                         ));
                     } else {
-                        if self.mode == AnalysisMode::Full {
+                        if self.mode == AnalysisMode::Full && self.record_reference_locations {
                             self.db.record_reference_location(crate::db::RefLoc {
                                 symbol_key: self.reference_key_cache.class(fqcn.as_ref()),
                                 file: self.file.clone(),
@@ -777,7 +800,9 @@ impl<'a> StatementsAnalyzer<'a> {
             self.source,
             self.source_map,
             self.issues,
-            self.symbols,
+            self.symbols.as_deref_mut(),
+            self.navigation_facts,
+            self.resolved_navigation_facts,
             self.php_version,
             self.mode,
             &mut self.yielded_types,
@@ -785,21 +810,94 @@ impl<'a> StatementsAnalyzer<'a> {
         );
         ea.strict_types = ctx.strict_types;
         ea.collect_symbols = self.collect_symbols;
+        ea.capture_symbol_types = self.capture_symbol_types;
+        ea.codebase_symbols_only = self.codebase_symbols_only;
+        ea.record_reference_locations = self.record_reference_locations;
+        ea.collect_navigation_facts = self.collect_navigation_facts;
+        ea.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
         ea
     }
 
     fn record_symbol_for_var(&mut self, span: php_ast::Span, var_name: &str, ty: Type) {
         use crate::symbol::ReferenceKind;
+        if self.collect_resolved_navigation_facts {
+            self.resolved_navigation_facts
+                .borrow_mut()
+                .push(ResolvedNavigationFact {
+                    span,
+                    expr_span: None,
+                    kind: ReferenceKind::Variable(Arc::from(var_name)),
+                    resolved_type: self.symbol_type(ty.clone()),
+                });
+        }
         if !self.collect_symbols {
             return;
         }
-        self.symbols.push(ResolvedSymbol {
-            file: self.file.clone(),
-            span,
-            expr_span: None,
-            kind: ReferenceKind::Variable(Arc::from(var_name)),
-            resolved_type: ty,
-        });
+        if self.codebase_symbols_only {
+            return;
+        }
+        let resolved_type = self.symbol_type(ty);
+        if let Some(symbols) = self.symbols.as_deref_mut() {
+            symbols.push(ResolvedSymbol {
+                file: self.file.clone(),
+                span,
+                expr_span: None,
+                kind: ReferenceKind::Variable(Arc::from(var_name)),
+                resolved_type,
+            });
+        }
+    }
+
+    pub(crate) fn record_symbol(
+        &mut self,
+        span: php_ast::Span,
+        kind: crate::symbol::ReferenceKind,
+        ty: Type,
+    ) {
+        let name = kind.to_name();
+        if self.codebase_symbols_only && name.is_none() {
+            return;
+        }
+        if self.collect_navigation_facts {
+            if let Some(name) = name.clone() {
+                self.navigation_facts.borrow_mut().push(NavigationFact {
+                    span,
+                    expr_span: None,
+                    name,
+                });
+            }
+        }
+        if self.collect_resolved_navigation_facts {
+            self.resolved_navigation_facts
+                .borrow_mut()
+                .push(ResolvedNavigationFact {
+                    span,
+                    expr_span: None,
+                    kind: kind.clone(),
+                    resolved_type: self.symbol_type(ty.clone()),
+                });
+        }
+        if !self.collect_symbols {
+            return;
+        }
+        let resolved_type = self.symbol_type(ty);
+        if let Some(symbols) = self.symbols.as_deref_mut() {
+            symbols.push(ResolvedSymbol {
+                file: self.file.clone(),
+                span,
+                expr_span: None,
+                kind,
+                resolved_type,
+            });
+        }
+    }
+
+    fn symbol_type(&self, ty: Type) -> Type {
+        if self.capture_symbol_types {
+            ty
+        } else {
+            Type::mixed()
+        }
     }
 
     fn offset_to_line_col(&self, offset: u32) -> (u32, u16) {
@@ -850,7 +948,10 @@ impl<'a> StatementsAnalyzer<'a> {
     /// marks these names as used. Without this, a class/trait reachable only
     /// through an anonymous class's clause is falsely treated as unreferenced.
     pub(crate) fn record_class_like_ref(&mut self, resolved: &str, span: php_ast::Span) {
-        if self.mode != AnalysisMode::Full || !crate::db::class_exists(self.db, resolved) {
+        if self.mode != AnalysisMode::Full
+            || !self.record_reference_locations
+            || !crate::db::class_exists(self.db, resolved)
+        {
             return;
         }
         let (line, col_start) = self.offset_to_line_col(span.start);

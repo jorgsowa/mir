@@ -73,6 +73,11 @@ pub struct AnalyzerDb {
     pub(crate) stub_cache: Option<Arc<crate::stub_cache::StubSliceCache>>,
 }
 
+pub(crate) struct CollectedIngest {
+    pub file_defs: crate::db::FileDefinitions,
+    pub parsed: Option<php_rs_parser::ParseResult>,
+}
+
 impl AnalyzerDb {
     pub fn new() -> Self {
         let mut db = MirDbStorage::default();
@@ -250,6 +255,16 @@ impl AnalyzerDb {
         source: &str,
         php_version: PhpVersion,
     ) -> crate::db::FileDefinitions {
+        self.collect_and_ingest_file_with_parsed(file, source, php_version)
+            .file_defs
+    }
+
+    pub(crate) fn collect_and_ingest_file_with_parsed(
+        &self,
+        file: Arc<str>,
+        source: &str,
+        php_version: PhpVersion,
+    ) -> CollectedIngest {
         use mir_issues::Issue;
 
         let php_v = php_version.cache_byte();
@@ -311,7 +326,10 @@ impl AnalyzerDb {
                     Arc::from(source),
                     durability,
                 );
-                return file_defs;
+                return CollectedIngest {
+                    file_defs,
+                    parsed: None,
+                };
             }
         }
 
@@ -338,7 +356,10 @@ impl AnalyzerDb {
             };
             let mut guard = self.salsa.write();
             guard.upsert_source_file_with_durability(file.clone(), Arc::from(source), durability);
-            return file_defs;
+            return CollectedIngest {
+                file_defs,
+                parsed: None,
+            };
         }
         crate::metrics::record_stub_cache_miss();
 
@@ -398,7 +419,10 @@ impl AnalyzerDb {
             guard.upsert_source_file_with_durability(file.clone(), Arc::from(source), durability);
         }
 
-        file_defs
+        CollectedIngest {
+            file_defs,
+            parsed: Some(parsed),
+        }
     }
 }
 

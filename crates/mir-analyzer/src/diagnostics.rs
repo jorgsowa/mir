@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::db::{class_exists, resolve_name, MirDatabase};
 use crate::php_version::PhpVersion;
-use crate::symbol::{ReferenceKind, ResolvedSymbol};
+use crate::symbol::{NavigationFact, ReferenceKind, ResolvedSymbol};
 
 // ---------------------------------------------------------------------------
 // Stored-location → Issue Location passthrough
@@ -250,7 +250,7 @@ pub(crate) fn check_name_class(
     issues: &mut Vec<mir_issues::Issue>,
     php_version: PhpVersion,
     record_refs: bool,
-    symbols: &mut Vec<ResolvedSymbol>,
+    symbols: Option<&mut Vec<ResolvedSymbol>>,
 ) {
     check_name_class_with_context(
         name,
@@ -263,6 +263,7 @@ pub(crate) fn check_name_class(
         false,
         record_refs,
         symbols,
+        None,
     );
 }
 
@@ -276,7 +277,8 @@ pub(crate) fn check_name_class_for_extends(
     issues: &mut Vec<mir_issues::Issue>,
     php_version: PhpVersion,
     record_refs: bool,
-    symbols: &mut Vec<ResolvedSymbol>,
+    symbols: Option<&mut Vec<ResolvedSymbol>>,
+    navigation_facts: Option<&mut Vec<NavigationFact>>,
 ) {
     check_name_class_with_context(
         name,
@@ -289,6 +291,7 @@ pub(crate) fn check_name_class_for_extends(
         true,
         record_refs,
         symbols,
+        navigation_facts,
     );
 }
 
@@ -303,7 +306,8 @@ fn check_name_class_with_context(
     php_version: PhpVersion,
     is_extends: bool,
     record_refs: bool,
-    symbols: &mut Vec<ResolvedSymbol>,
+    mut symbols: Option<&mut Vec<ResolvedSymbol>>,
+    mut navigation_facts: Option<&mut Vec<NavigationFact>>,
 ) {
     let name_str = crate::parser::name_to_string_owned(name);
     let resolved = resolve_name(db, file.as_ref(), &name_str);
@@ -357,13 +361,22 @@ fn check_name_class_with_context(
         // Hover / go-to-definition on the extends/implements class-name token
         // itself, matching every other class-name usage site (type hints,
         // `new`, `instanceof`, use-imports).
-        symbols.push(ResolvedSymbol {
-            file: file.clone(),
-            span,
-            expr_span: None,
-            kind: ReferenceKind::ClassReference(Arc::from(resolved.as_str())),
-            resolved_type: mir_types::Type::single(mir_types::Atomic::TClassString(None)),
-        });
+        if let Some(facts) = navigation_facts.as_deref_mut() {
+            facts.push(NavigationFact {
+                span,
+                expr_span: None,
+                name: crate::Name::class(Arc::from(resolved.as_str())),
+            });
+        }
+        if let Some(symbols) = symbols.as_deref_mut() {
+            symbols.push(ResolvedSymbol {
+                file: file.clone(),
+                span,
+                expr_span: None,
+                kind: ReferenceKind::ClassReference(Arc::from(resolved.as_str())),
+                resolved_type: mir_types::Type::single(mir_types::Atomic::TClassString(None)),
+            });
+        }
     }
 
     // Check if extending an interface

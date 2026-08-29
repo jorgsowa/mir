@@ -8,13 +8,23 @@
 //! When `MIR_TIMING` is unset the counters are no-ops (an `AtomicBool` check
 //! plus a branch). Safe to leave compiled in.
 
+use std::collections::BTreeMap;
+use std::mem::size_of;
+#[cfg(test)]
+use std::sync::atomic::AtomicBool;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::OnceLock;
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
 
 static ENABLED: OnceLock<bool> = OnceLock::new();
+#[cfg(test)]
+static TEST_ENABLED: AtomicBool = AtomicBool::new(false);
 
 fn enabled() -> bool {
+    #[cfg(test)]
+    if TEST_ENABLED.load(Ordering::Relaxed) {
+        return true;
+    }
     *ENABLED.get_or_init(|| {
         std::env::var("MIR_TIMING")
             .map(|v| v != "0" && !v.is_empty())
@@ -76,6 +86,50 @@ pub struct Counters {
     pub flow_branch_var_locs_entries: AtomicU64,
     /// Sum of last_write_locs.len() at each branch() call.
     pub flow_branch_last_write_entries: AtomicU64,
+
+    /// Number of whole-file body walks (`BodyAnalyzer::analyze_bodies`).
+    pub whole_file_body_walks: AtomicU64,
+    /// Number of per-scope salsa executions (`infer_scope`).
+    pub scopes_analyzed: AtomicU64,
+    /// Total `ResolvedSymbol` entries produced across all analysis paths.
+    pub symbols_allocated: AtomicU64,
+    /// Number of targeted cursor-resolution calls (`resolve_at`).
+    pub name_at_calls: AtomicU64,
+    /// Total wall time spent in `name_at`, in microseconds.
+    pub name_at_micros: AtomicU64,
+    /// `name_at` queries answered by compact facts.
+    pub name_at_compact_hits: AtomicU64,
+    /// `name_at` queries that still required a fallback symbol walk.
+    pub name_at_fallback_walks: AtomicU64,
+    /// Number of targeted cursor-resolution calls (`resolve_at`).
+    pub resolve_at_calls: AtomicU64,
+    /// Total wall time spent in `resolve_at`, in microseconds.
+    pub resolve_at_micros: AtomicU64,
+    /// `resolve_at` queries answered by compact typed facts.
+    pub resolve_at_compact_hits: AtomicU64,
+    /// `resolve_at` queries that still required a fallback symbol walk.
+    pub resolve_at_fallback_walks: AtomicU64,
+    /// Number of cursor hover lookups (`hover_at`).
+    pub hover_at_calls: AtomicU64,
+    /// Total wall time spent in `hover_at`, in microseconds.
+    pub hover_at_micros: AtomicU64,
+    /// Number of cursor definition lookups (`definition_at`).
+    pub definition_at_calls: AtomicU64,
+    /// Total wall time spent in `definition_at`, in microseconds.
+    pub definition_at_micros: AtomicU64,
+
+    /// Lower-bound retained bytes for `analyze_file` memos.
+    pub analyze_file_retained_bytes: AtomicU64,
+    /// Number of `analyze_file` memo payloads measured.
+    pub analyze_file_retained_samples: AtomicU64,
+    /// Lower-bound retained bytes for `infer_scope` memos.
+    pub infer_scope_retained_bytes: AtomicU64,
+    /// Number of `infer_scope` memo payloads measured.
+    pub infer_scope_retained_samples: AtomicU64,
+    /// Lower-bound retained bytes for `infer_function` memos.
+    pub infer_function_retained_bytes: AtomicU64,
+    /// Number of `infer_function` memo payloads measured.
+    pub infer_function_retained_samples: AtomicU64,
 }
 
 static COUNTERS: Counters = Counters {
@@ -95,7 +149,31 @@ static COUNTERS: Counters = Counters {
     flow_branch_read_vars_entries: AtomicU64::new(0),
     flow_branch_var_locs_entries: AtomicU64::new(0),
     flow_branch_last_write_entries: AtomicU64::new(0),
+    whole_file_body_walks: AtomicU64::new(0),
+    scopes_analyzed: AtomicU64::new(0),
+    symbols_allocated: AtomicU64::new(0),
+    name_at_calls: AtomicU64::new(0),
+    name_at_micros: AtomicU64::new(0),
+    name_at_compact_hits: AtomicU64::new(0),
+    name_at_fallback_walks: AtomicU64::new(0),
+    resolve_at_calls: AtomicU64::new(0),
+    resolve_at_micros: AtomicU64::new(0),
+    resolve_at_compact_hits: AtomicU64::new(0),
+    resolve_at_fallback_walks: AtomicU64::new(0),
+    hover_at_calls: AtomicU64::new(0),
+    hover_at_micros: AtomicU64::new(0),
+    definition_at_calls: AtomicU64::new(0),
+    definition_at_micros: AtomicU64::new(0),
+    analyze_file_retained_bytes: AtomicU64::new(0),
+    analyze_file_retained_samples: AtomicU64::new(0),
+    infer_scope_retained_bytes: AtomicU64::new(0),
+    infer_scope_retained_samples: AtomicU64::new(0),
+    infer_function_retained_bytes: AtomicU64::new(0),
+    infer_function_retained_samples: AtomicU64::new(0),
 };
+
+static BODY_WALKS_BY_FILE: Mutex<BTreeMap<String, u64>> = Mutex::new(BTreeMap::new());
+static SCOPES_BY_FILE: Mutex<BTreeMap<String, u64>> = Mutex::new(BTreeMap::new());
 
 pub fn record_file_analysis() {
     if enabled() {
@@ -196,6 +274,163 @@ pub fn record_flow_branch(read_vars: usize, var_locs: usize, last_write: usize) 
     }
 }
 
+pub fn record_whole_file_body_walk(file: &str, symbols_allocated: usize) {
+    if !enabled() {
+        return;
+    }
+    COUNTERS
+        .whole_file_body_walks
+        .fetch_add(1, Ordering::Relaxed);
+    COUNTERS
+        .symbols_allocated
+        .fetch_add(symbols_allocated as u64, Ordering::Relaxed);
+    let mut walks = BODY_WALKS_BY_FILE.lock().unwrap();
+    *walks.entry(file.to_string()).or_insert(0) += 1;
+}
+
+pub fn record_scope_analysis(file: &str, symbols_allocated: usize) {
+    if !enabled() {
+        return;
+    }
+    COUNTERS.scopes_analyzed.fetch_add(1, Ordering::Relaxed);
+    COUNTERS
+        .symbols_allocated
+        .fetch_add(symbols_allocated as u64, Ordering::Relaxed);
+    let mut scopes = SCOPES_BY_FILE.lock().unwrap();
+    *scopes.entry(file.to_string()).or_insert(0) += 1;
+}
+
+pub fn record_resolve_at(duration_micros: u64) {
+    if !enabled() {
+        return;
+    }
+    COUNTERS.resolve_at_calls.fetch_add(1, Ordering::Relaxed);
+    COUNTERS
+        .resolve_at_micros
+        .fetch_add(duration_micros, Ordering::Relaxed);
+}
+
+pub fn record_resolve_at_compact_hit() {
+    if !enabled() {
+        return;
+    }
+    COUNTERS
+        .resolve_at_compact_hits
+        .fetch_add(1, Ordering::Relaxed);
+}
+
+pub fn record_resolve_at_fallback_walk() {
+    if !enabled() {
+        return;
+    }
+    COUNTERS
+        .resolve_at_fallback_walks
+        .fetch_add(1, Ordering::Relaxed);
+}
+
+pub fn record_name_at(duration_micros: u64) {
+    if !enabled() {
+        return;
+    }
+    COUNTERS.name_at_calls.fetch_add(1, Ordering::Relaxed);
+    COUNTERS
+        .name_at_micros
+        .fetch_add(duration_micros, Ordering::Relaxed);
+}
+
+pub fn record_name_at_compact_hit() {
+    if !enabled() {
+        return;
+    }
+    COUNTERS
+        .name_at_compact_hits
+        .fetch_add(1, Ordering::Relaxed);
+}
+
+pub fn record_name_at_fallback_walk() {
+    if !enabled() {
+        return;
+    }
+    COUNTERS
+        .name_at_fallback_walks
+        .fetch_add(1, Ordering::Relaxed);
+}
+
+pub fn record_hover_at(duration_micros: u64) {
+    if !enabled() {
+        return;
+    }
+    COUNTERS.hover_at_calls.fetch_add(1, Ordering::Relaxed);
+    COUNTERS
+        .hover_at_micros
+        .fetch_add(duration_micros, Ordering::Relaxed);
+}
+
+pub fn record_definition_at(duration_micros: u64) {
+    if !enabled() {
+        return;
+    }
+    COUNTERS.definition_at_calls.fetch_add(1, Ordering::Relaxed);
+    COUNTERS
+        .definition_at_micros
+        .fetch_add(duration_micros, Ordering::Relaxed);
+}
+
+pub fn record_analyze_file_retained(issues: usize, ref_locs: usize) {
+    if !enabled() {
+        return;
+    }
+    let bytes = (issues * size_of::<mir_issues::Issue>()
+        + ref_locs * size_of::<crate::db::RefLoc>()) as u64;
+    COUNTERS
+        .analyze_file_retained_bytes
+        .fetch_add(bytes, Ordering::Relaxed);
+    COUNTERS
+        .analyze_file_retained_samples
+        .fetch_add(1, Ordering::Relaxed);
+}
+
+pub fn record_infer_scope_retained(
+    issues: usize,
+    ref_locs: usize,
+    inferred_functions: usize,
+    inferred_methods: usize,
+    inferred_properties: usize,
+) {
+    if !enabled() {
+        return;
+    }
+    let bytes = (issues * size_of::<mir_issues::Issue>()
+        + ref_locs * size_of::<crate::db::RefLoc>()
+        + inferred_functions * (size_of::<Arc<str>>() + size_of::<mir_types::Type>())
+        + inferred_methods
+            * (size_of::<Arc<str>>() + size_of::<Arc<str>>() + size_of::<mir_types::Type>())
+        + inferred_properties
+            * (size_of::<Arc<str>>() + size_of::<Arc<str>>() + size_of::<mir_types::Type>()))
+        as u64;
+    COUNTERS
+        .infer_scope_retained_bytes
+        .fetch_add(bytes, Ordering::Relaxed);
+    COUNTERS
+        .infer_scope_retained_samples
+        .fetch_add(1, Ordering::Relaxed);
+}
+
+pub fn record_infer_function_retained(issues: usize, ref_locs: usize, has_return_type: bool) {
+    if !enabled() {
+        return;
+    }
+    let bytes = (issues * size_of::<mir_issues::Issue>()
+        + ref_locs * size_of::<crate::db::RefLoc>()
+        + usize::from(has_return_type) * size_of::<mir_types::Type>()) as u64;
+    COUNTERS
+        .infer_function_retained_bytes
+        .fetch_add(bytes, Ordering::Relaxed);
+    COUNTERS
+        .infer_function_retained_samples
+        .fetch_add(1, Ordering::Relaxed);
+}
+
 pub fn record_lazy_load_failure(reason: LazyLoadFailure, fqcn: &str) {
     if !enabled() {
         return;
@@ -234,6 +469,21 @@ fn render_samples() -> String {
         for fqcn in b.iter().take(20) {
             out.push_str(&format!("\n    {fqcn}"));
         }
+    }
+    out
+}
+
+fn render_top_counts(label: &str, counts: &Mutex<BTreeMap<String, u64>>) -> String {
+    let counts = counts.lock().unwrap();
+    if counts.is_empty() {
+        return String::new();
+    }
+    let mut top: Vec<(&str, u64)> = counts.iter().map(|(k, v)| (k.as_str(), *v)).collect();
+    top.sort_unstable_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(b.0)));
+    let mut out = String::new();
+    out.push_str(&format!("\n  top {label}:"));
+    for (file, n) in top.into_iter().take(10) {
+        out.push_str(&format!("\n    {n:>4}  {file}"));
     }
     out
 }
@@ -298,9 +548,53 @@ pub fn dump() -> Option<String> {
     let branch_last_write = COUNTERS
         .flow_branch_last_write_entries
         .load(Ordering::Relaxed);
+    let whole_file_body_walks = COUNTERS.whole_file_body_walks.load(Ordering::Relaxed);
+    let scopes_analyzed = COUNTERS.scopes_analyzed.load(Ordering::Relaxed);
+    let symbols_allocated = COUNTERS.symbols_allocated.load(Ordering::Relaxed);
+    let name_at_calls = COUNTERS.name_at_calls.load(Ordering::Relaxed);
+    let name_at_micros = COUNTERS.name_at_micros.load(Ordering::Relaxed);
+    let name_at_compact_hits = COUNTERS.name_at_compact_hits.load(Ordering::Relaxed);
+    let name_at_fallback_walks = COUNTERS.name_at_fallback_walks.load(Ordering::Relaxed);
+    let resolve_at_calls = COUNTERS.resolve_at_calls.load(Ordering::Relaxed);
+    let resolve_at_micros = COUNTERS.resolve_at_micros.load(Ordering::Relaxed);
+    let resolve_at_compact_hits = COUNTERS.resolve_at_compact_hits.load(Ordering::Relaxed);
+    let resolve_at_fallback_walks = COUNTERS.resolve_at_fallback_walks.load(Ordering::Relaxed);
+    let hover_at_calls = COUNTERS.hover_at_calls.load(Ordering::Relaxed);
+    let hover_at_micros = COUNTERS.hover_at_micros.load(Ordering::Relaxed);
+    let definition_at_calls = COUNTERS.definition_at_calls.load(Ordering::Relaxed);
+    let definition_at_micros = COUNTERS.definition_at_micros.load(Ordering::Relaxed);
+    let analyze_file_retained_bytes = COUNTERS.analyze_file_retained_bytes.load(Ordering::Relaxed);
+    let analyze_file_retained_samples = COUNTERS
+        .analyze_file_retained_samples
+        .load(Ordering::Relaxed);
+    let infer_scope_retained_bytes = COUNTERS.infer_scope_retained_bytes.load(Ordering::Relaxed);
+    let infer_scope_retained_samples = COUNTERS
+        .infer_scope_retained_samples
+        .load(Ordering::Relaxed);
+    let infer_function_retained_bytes = COUNTERS
+        .infer_function_retained_bytes
+        .load(Ordering::Relaxed);
+    let infer_function_retained_samples = COUNTERS
+        .infer_function_retained_samples
+        .load(Ordering::Relaxed);
 
     let avg_pass2_us = body_analysis_micros
         .checked_div(body_analysis_runs)
+        .unwrap_or(0);
+    let avg_name_at_us = name_at_micros.checked_div(name_at_calls).unwrap_or(0);
+    let avg_resolve_at_us = resolve_at_micros.checked_div(resolve_at_calls).unwrap_or(0);
+    let avg_hover_at_us = hover_at_micros.checked_div(hover_at_calls).unwrap_or(0);
+    let avg_definition_at_us = definition_at_micros
+        .checked_div(definition_at_calls)
+        .unwrap_or(0);
+    let avg_analyze_file_retained = analyze_file_retained_bytes
+        .checked_div(analyze_file_retained_samples)
+        .unwrap_or(0);
+    let avg_infer_scope_retained = infer_scope_retained_bytes
+        .checked_div(infer_scope_retained_samples)
+        .unwrap_or(0);
+    let avg_infer_function_retained = infer_function_retained_bytes
+        .checked_div(infer_function_retained_samples)
         .unwrap_or(0);
 
     // Compute upper-bound clone bytes per run: entry counts × per-entry bytes.
@@ -312,19 +606,147 @@ pub fn dump() -> Option<String> {
     let last_write_ub_mb = branch_last_write * entry_bytes * 2 / 1_000_000;
 
     let samples = render_samples();
+    let body_walks = render_top_counts("body walks/file", &BODY_WALKS_BY_FILE);
+    let scopes = render_top_counts("scopes analyzed/file", &SCOPES_BY_FILE);
     Some(format!(
         "mir metrics:\n  \
          file analyses        : {analyses}\n  \
          body analysis runs   : {body_analysis_runs}\n  \
          body analysis time   : {body_analysis_micros} us  (avg/run: {avg_pass2_us} us)\n  \
+         whole-file walks     : {whole_file_body_walks}\n  \
+         scopes analyzed      : {scopes_analyzed}\n  \
+         symbols allocated    : {symbols_allocated}\n  \
+         name_at              : {name_at_calls} calls  {name_at_micros} us total  (avg {avg_name_at_us} us)\n  \
+         name_at path         : compact {name_at_compact_hits}  fallback {name_at_fallback_walks}\n  \
+         resolve_at           : {resolve_at_calls} calls  {resolve_at_micros} us total  (avg {avg_resolve_at_us} us)\n  \
+         resolve_at path      : compact {resolve_at_compact_hits}  fallback {resolve_at_fallback_walks}\n  \
+         hover_at             : {hover_at_calls} calls  {hover_at_micros} us total  (avg {avg_hover_at_us} us)\n  \
+         definition_at        : {definition_at_calls} calls  {definition_at_micros} us total  (avg {avg_definition_at_us} us)\n  \
          lazy load attempts   : {attempts}  resolved: {resolved}\n  \
          lazy load failures   : no_resolver={ll_no_resolver}  resolver_none={ll_resolver_none}  \
          source_unreadable={ll_source_unreadable}  ingest_then_missing={ll_ingest_missing}\n  \
          stub cache           : hits {cache_hits}  misses {cache_misses}\n  \
          fn short-name scans  : {fn_short_scans}\n  \
+         retained/analyze_file: {analyze_file_retained_bytes} B  ({analyze_file_retained_samples} samples, avg {avg_analyze_file_retained} B)\n  \
+         retained/infer_scope : {infer_scope_retained_bytes} B  ({infer_scope_retained_samples} samples, avg {avg_infer_scope_retained} B)\n  \
+         retained/infer_fn    : {infer_function_retained_bytes} B  ({infer_function_retained_samples} samples, avg {avg_infer_function_retained} B)\n  \
          flow branch()        : {branch_calls} calls\n  \
            read_vars          : {branch_read_vars} total entries  (~{read_vars_ub_mb} MB upper bound)\n  \
            var_locations      : {branch_var_locs} total entries  (~{var_locs_ub_mb} MB upper bound)\n  \
-           last_write_locs    : {branch_last_write} total entries  (~{last_write_ub_mb} MB upper bound){samples}"
+           last_write_locs    : {branch_last_write} total entries  (~{last_write_ub_mb} MB upper bound){body_walks}{scopes}{samples}"
     ))
+}
+
+#[cfg(test)]
+pub(crate) fn test_reset() {
+    TEST_ENABLED.store(true, Ordering::Relaxed);
+    COUNTERS.file_analyses.store(0, Ordering::Relaxed);
+    COUNTERS.body_analysis_runs.store(0, Ordering::Relaxed);
+    COUNTERS.lazy_loads_attempted.store(0, Ordering::Relaxed);
+    COUNTERS.lazy_loads_resolved.store(0, Ordering::Relaxed);
+    COUNTERS.body_analysis_micros.store(0, Ordering::Relaxed);
+    COUNTERS.stub_cache_hits.store(0, Ordering::Relaxed);
+    COUNTERS.stub_cache_misses.store(0, Ordering::Relaxed);
+    COUNTERS.ll_fail_no_resolver.store(0, Ordering::Relaxed);
+    COUNTERS.ll_fail_resolver_none.store(0, Ordering::Relaxed);
+    COUNTERS
+        .ll_fail_source_unreadable
+        .store(0, Ordering::Relaxed);
+    COUNTERS
+        .ll_fail_ingest_then_missing
+        .store(0, Ordering::Relaxed);
+    COUNTERS.fn_short_name_scans.store(0, Ordering::Relaxed);
+    COUNTERS.flow_branch_calls.store(0, Ordering::Relaxed);
+    COUNTERS
+        .flow_branch_read_vars_entries
+        .store(0, Ordering::Relaxed);
+    COUNTERS
+        .flow_branch_var_locs_entries
+        .store(0, Ordering::Relaxed);
+    COUNTERS
+        .flow_branch_last_write_entries
+        .store(0, Ordering::Relaxed);
+    COUNTERS.whole_file_body_walks.store(0, Ordering::Relaxed);
+    COUNTERS.scopes_analyzed.store(0, Ordering::Relaxed);
+    COUNTERS.symbols_allocated.store(0, Ordering::Relaxed);
+    COUNTERS.name_at_calls.store(0, Ordering::Relaxed);
+    COUNTERS.name_at_micros.store(0, Ordering::Relaxed);
+    COUNTERS.name_at_compact_hits.store(0, Ordering::Relaxed);
+    COUNTERS.name_at_fallback_walks.store(0, Ordering::Relaxed);
+    COUNTERS.resolve_at_calls.store(0, Ordering::Relaxed);
+    COUNTERS.resolve_at_micros.store(0, Ordering::Relaxed);
+    COUNTERS.resolve_at_compact_hits.store(0, Ordering::Relaxed);
+    COUNTERS
+        .resolve_at_fallback_walks
+        .store(0, Ordering::Relaxed);
+    COUNTERS.hover_at_calls.store(0, Ordering::Relaxed);
+    COUNTERS.hover_at_micros.store(0, Ordering::Relaxed);
+    COUNTERS.definition_at_calls.store(0, Ordering::Relaxed);
+    COUNTERS.definition_at_micros.store(0, Ordering::Relaxed);
+    COUNTERS
+        .analyze_file_retained_bytes
+        .store(0, Ordering::Relaxed);
+    COUNTERS
+        .analyze_file_retained_samples
+        .store(0, Ordering::Relaxed);
+    COUNTERS
+        .infer_scope_retained_bytes
+        .store(0, Ordering::Relaxed);
+    COUNTERS
+        .infer_scope_retained_samples
+        .store(0, Ordering::Relaxed);
+    COUNTERS
+        .infer_function_retained_bytes
+        .store(0, Ordering::Relaxed);
+    COUNTERS
+        .infer_function_retained_samples
+        .store(0, Ordering::Relaxed);
+    BODY_WALKS_BY_FILE.lock().unwrap().clear();
+    SCOPES_BY_FILE.lock().unwrap().clear();
+    let mut samples = FAILURE_SAMPLES.lock().unwrap();
+    samples.no_resolver.clear();
+    samples.resolver_none.clear();
+    samples.source_unreadable.clear();
+    samples.ingest_then_missing.clear();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dump_includes_new_navigation_and_retained_metrics() {
+        test_reset();
+        record_whole_file_body_walk("/tmp/a.php", 3);
+        record_whole_file_body_walk("/tmp/a.php", 2);
+        record_scope_analysis("/tmp/a.php", 4);
+        record_scope_analysis("/tmp/b.php", 1);
+        record_name_at(13);
+        record_name_at_compact_hit();
+        record_resolve_at(17);
+        record_resolve_at_fallback_walk();
+        record_hover_at(23);
+        record_definition_at(11);
+        record_analyze_file_retained(2, 3);
+        record_infer_scope_retained(1, 2, 1, 2, 3);
+        record_infer_function_retained(1, 1, true);
+
+        let dump = dump().expect("metrics enabled in tests");
+        assert!(dump.contains("whole-file walks     : 2"));
+        assert!(dump.contains("scopes analyzed      : 2"));
+        assert!(dump.contains("symbols allocated    : 10"));
+        assert!(dump.contains("name_at              : 1 calls"));
+        assert!(dump.contains("name_at path         : compact 1  fallback 0"));
+        assert!(dump.contains("resolve_at           : 1 calls"));
+        assert!(dump.contains("resolve_at path      : compact 0  fallback 1"));
+        assert!(dump.contains("hover_at             : 1 calls"));
+        assert!(dump.contains("definition_at        : 1 calls"));
+        assert!(dump.contains("retained/analyze_file:"));
+        assert!(dump.contains("retained/infer_scope :"));
+        assert!(dump.contains("retained/infer_fn    :"));
+        assert!(dump.contains("top body walks/file:"));
+        assert!(dump.contains("/tmp/a.php"));
+        assert!(dump.contains("top scopes analyzed/file:"));
+        assert!(dump.contains("/tmp/b.php"));
+    }
 }

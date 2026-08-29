@@ -135,7 +135,7 @@ pub fn analyze_fixture_files(fx: &FullSymfonyFixture, files: &[Arc<str>]) {
     let paths: Vec<PathBuf> = files.iter().map(|f| PathBuf::from(f.as_ref())).collect();
     let _ = fx
         .session
-        .analyze_paths(&paths, &mir_analyzer::BatchOptions::new());
+        .analyze_paths(&paths, &mir_analyzer::BatchOptions::new().without_symbols());
 }
 
 pub fn reanalyze_fixture_files(fx: &FullSymfonyFixture, files: &[Arc<str>]) {

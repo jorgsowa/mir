@@ -17,32 +17,37 @@
 //! call sites) forces the freshness-gate to admit a wide `stale` set, so
 //! Phase 1's warm-up loop has real, comparable work to do.
 
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 
-use mir_analyzer::{discover_files, AnalysisSession, IndexCancel, Name, PhpVersion};
+use mir_analyzer::{
+    discover_files, perf_fixture::PerfFixture, AnalysisSession, IndexCancel, Name, PhpVersion,
+};
 
 fn main() {
-    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("benches/fixtures/laravel");
-    if !fixture.join("vendor").exists() || !fixture.join("src").exists() {
+    let Some(fixture) = PerfFixture::discover() else {
+        eprintln!("No supported perf fixture found.");
+        std::process::exit(2);
+    };
+    let fixture_root = fixture.root();
+    if !fixture.has_full_corpus() {
         eprintln!(
-            "Laravel fixture not found at {}; run `bash {}/benches/download-fixtures.sh`",
-            fixture.display(),
+            "Perf fixture not found or incomplete at {}; provide MIR_PERF_FIXTURE/MIR_LARAVEL_FIXTURE/MIR_SYMFONY_FIXTURE or run `bash {}/benches/download-fixtures.sh`",
+            fixture_root.display(),
             env!("CARGO_MANIFEST_DIR")
         );
         std::process::exit(2);
     }
 
     let psr4 = Arc::new(
-        mir_analyzer::composer::Psr4Map::from_composer(&fixture)
+        mir_analyzer::composer::Psr4Map::from_composer(fixture_root)
             .expect("failed to load composer.json"),
     );
     let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
     session.ensure_all_stubs();
 
-    let project_files = discover_files(&fixture.join("src"));
-    let vendor_files = discover_files(&fixture.join("vendor"));
+    let project_files = discover_files(&fixture.src_root());
+    let vendor_files = discover_files(&fixture.vendor_root());
     eprintln!(
         "loaded {} project files, {} vendor files",
         project_files.len(),
@@ -164,7 +169,7 @@ fn main() {
     // new-file registration bumps the workspace revision, so this is the
     // path where per-load bumps (reader cancellations) actually accumulate.
     let psr4b = Arc::new(
-        mir_analyzer::composer::Psr4Map::from_composer(&fixture)
+        mir_analyzer::composer::Psr4Map::from_composer(fixture_root)
             .expect("failed to load composer.json"),
     );
     let session2 = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4b);
@@ -205,7 +210,7 @@ fn main() {
     // never-committed candidate per BFS round, so this times that gate and
     // counts the raw-text passes it records/skips via the mention index.
     let psr4c = Arc::new(
-        mir_analyzer::composer::Psr4Map::from_composer(&fixture)
+        mir_analyzer::composer::Psr4Map::from_composer(fixture_root)
             .expect("failed to load composer.json"),
     );
     let session3 = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4c);

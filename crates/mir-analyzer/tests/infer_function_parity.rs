@@ -47,7 +47,10 @@ fn old_path_issues_for(
     let path = dir.path().join("fixture.php");
     std::fs::write(&path, source).unwrap();
 
-    let result = session.analyze_paths(std::slice::from_ref(&path), &BatchOptions::new());
+    let result = session.analyze_paths(
+        std::slice::from_ref(&path),
+        &BatchOptions::new().without_symbols(),
+    );
 
     // Find the function's line range in the source so we can filter issues.
     // Simple scan: starting line of `function $fn_name(` and the matching `}`.
@@ -92,7 +95,10 @@ fn new_path_issues_for(fn_name: &str, source: &str) -> Vec<mir_issues::Issue> {
     std::fs::write(&path, source).unwrap();
     // Use the session's prepared db so workspace lookups work the same way
     // as the old-path measurement.
-    let _ = session.analyze_paths(std::slice::from_ref(&path), &BatchOptions::new());
+    let _ = session.analyze_paths(
+        std::slice::from_ref(&path),
+        &BatchOptions::new().without_symbols(),
+    );
     let db_snap = session.snapshot_db();
 
     let path_str: Arc<str> = Arc::from(path.to_string_lossy().as_ref());

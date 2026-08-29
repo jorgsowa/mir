@@ -5,7 +5,6 @@
 
 mod common;
 
-use mir_analyzer::symbol::ReferenceKind;
 use mir_analyzer::{AnalysisSession, BatchOptions, Name, PhpVersion, SymbolLookupError};
 
 use self::common::{create_temp_dir, path_to_str, write_file};
@@ -17,7 +16,7 @@ fn definition_of_finds_class() {
     let file_str = path_to_str(&file).to_string();
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyzer.analyze_paths(&[file], &BatchOptions::new());
+    analyzer.analyze_paths(&[file], &BatchOptions::new().without_symbols());
 
     let loc = analyzer
         .definition_of(&Name::class("Foo"))
@@ -35,7 +34,7 @@ fn definition_of_finds_function() {
     );
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyzer.analyze_paths(&[file], &BatchOptions::new());
+    analyzer.analyze_paths(&[file], &BatchOptions::new().without_symbols());
 
     assert!(
         analyzer.definition_of(&Name::function("my_func")).is_ok(),
@@ -53,7 +52,7 @@ fn definition_of_finds_interface() {
     );
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyzer.analyze_paths(&[file], &BatchOptions::new());
+    analyzer.analyze_paths(&[file], &BatchOptions::new().without_symbols());
 
     assert!(
         analyzer.definition_of(&Name::class("Renderable")).is_ok(),
@@ -71,7 +70,7 @@ fn definition_of_finds_method() {
     );
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyzer.analyze_paths(&[file], &BatchOptions::new());
+    analyzer.analyze_paths(&[file], &BatchOptions::new().without_symbols());
 
     assert!(
         analyzer.definition_of(&Name::method("Bar", "baz")).is_ok(),
@@ -89,7 +88,7 @@ fn definition_of_finds_property() {
     );
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyzer.analyze_paths(&[file], &BatchOptions::new());
+    analyzer.analyze_paths(&[file], &BatchOptions::new().without_symbols());
 
     assert!(
         analyzer
@@ -109,7 +108,7 @@ fn definition_of_promoted_property_points_at_own_param_not_constructor() {
     );
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyzer.analyze_paths(&[file], &BatchOptions::new());
+    analyzer.analyze_paths(&[file], &BatchOptions::new().without_symbols());
 
     let x_loc = analyzer
         .definition_of(&Name::property("Point", "x"))
@@ -142,7 +141,7 @@ fn definition_of_finds_trait_constant_via_consuming_class_usage() {
     );
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyzer.analyze_paths(&[file], &BatchOptions::new());
+    analyzer.analyze_paths(&[file], &BatchOptions::new().without_symbols());
 
     assert!(
         analyzer
@@ -162,7 +161,7 @@ fn definition_of_finds_trait_aliased_method() {
     );
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyzer.analyze_paths(&[file], &BatchOptions::new());
+    analyzer.analyze_paths(&[file], &BatchOptions::new().without_symbols());
 
     assert!(
         analyzer
@@ -183,7 +182,7 @@ fn definition_of_trait_conflict_resolves_to_insteadof_winner() {
     );
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyzer.analyze_paths(&[file], &BatchOptions::new());
+    analyzer.analyze_paths(&[file], &BatchOptions::new().without_symbols());
 
     let loc = analyzer
         .definition_of(&Name::method("C", "hello"))
@@ -212,7 +211,7 @@ fn definition_of_returns_not_found_for_unknown() {
 }
 
 // ---------------------------------------------------------------------------
-// laravel_definition_on_new_expression — full flow: symbol_at → definition_of
+// laravel_definition_on_new_expression — full flow: definition_at
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -233,30 +232,20 @@ fn laravel_definition_on_new_expression() {
     let auth_file_str = path_to_str(&auth_file).to_string();
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(&[guard_file, auth_file], &BatchOptions::new());
-
-    let offset = auth_src.find("new RequestGuard").unwrap() as u32 + "new ".len() as u32;
-    let sym = result
-        .symbol_at(&auth_file_str, offset)
-        .expect("symbol_at must find ClassReference on RequestGuard");
-
-    assert!(
-        matches!(&sym.kind, ReferenceKind::ClassReference(n) if n.as_ref() == "Illuminate\\Auth\\RequestGuard"),
-        "ClassReference must carry the FQN, got {:?}",
-        sym.kind
+    let _result = analyzer.analyze_paths(
+        &[guard_file, auth_file],
+        &BatchOptions::new().without_symbols(),
     );
 
-    let name = sym
-        .to_symbol()
-        .expect("ClassReference must convert to Name");
+    let offset = auth_src.find("new RequestGuard").unwrap() as u32 + "new ".len() as u32;
     let loc = analyzer
-        .definition_of(&name)
-        .expect("definition_of must find RequestGuard");
+        .definition_at(&auth_file_str, offset)
+        .expect("definition_at must find RequestGuard");
 
     assert_eq!(
         loc.file.as_ref(),
         guard_file_str.as_str(),
-        "definition_of must navigate to RequestGuard.php, not AuthManager.php"
+        "definition_at must navigate to RequestGuard.php, not AuthManager.php"
     );
 }
 
@@ -279,7 +268,10 @@ fn class_imports_returns_alias_to_fqn_map() {
     let gate_file_str = path_to_str(&gate_file).to_string();
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyzer.analyze_paths(&[str_file, gate_file], &BatchOptions::new());
+    analyzer.analyze_paths(
+        &[str_file, gate_file],
+        &BatchOptions::new().without_symbols(),
+    );
 
     let imports = analyzer.class_imports(&gate_file_str);
     assert!(
@@ -305,7 +297,10 @@ fn class_imports_handles_renamed_alias() {
     let caller_file_str = path_to_str(&caller_file).to_string();
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyzer.analyze_paths(&[bar_file, caller_file], &BatchOptions::new());
+    analyzer.analyze_paths(
+        &[bar_file, caller_file],
+        &BatchOptions::new().without_symbols(),
+    );
 
     let imports = analyzer.class_imports(&caller_file_str);
     assert!(

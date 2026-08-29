@@ -5,30 +5,31 @@
 //! Run with:
 //!   cargo test -p mir-analyzer --test regression_timing --release -- --nocapture --ignored
 
-use std::path::PathBuf;
 use std::time::Instant;
 
-use mir_analyzer::{discover_files, AnalysisSession, BatchOptions, PhpVersion};
-
-fn fixtures_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("benches")
-        .join("fixtures")
-        .join("laravel")
-}
+use mir_analyzer::{
+    discover_files, perf_fixture::PerfFixture, AnalysisSession, BatchOptions, PhpVersion,
+};
 
 #[test]
 #[ignore = "regression timing; run with --release --ignored"]
 fn time_analyze_paths_repeats() {
-    let root = fixtures_root();
-    if !root.exists() {
-        eprintln!("Skipping: fixture not present at {}", root.display());
+    let Some(fixture) = PerfFixture::discover() else {
+        eprintln!("Skipping: no supported perf fixture present");
+        return;
+    };
+    let root = fixture.root();
+    if !fixture.has_full_corpus() {
+        eprintln!(
+            "Skipping: fixture not present or incomplete at {}",
+            root.display()
+        );
         return;
     }
 
     // Use the smaller `src/` slice (project code only) to keep iteration time
     // bounded. About 1410 files; ~60 s per iter in release on the dev box.
-    let project_files = discover_files(&root.join("src"));
+    let project_files = discover_files(&fixture.src_root());
     eprintln!(
         "Timing analyze_paths over {} project files",
         project_files.len()
@@ -40,7 +41,7 @@ fn time_analyze_paths_repeats() {
         let session = AnalysisSession::new(PhpVersion::LATEST);
         session.ensure_all_stubs();
         let t = Instant::now();
-        let _ = session.analyze_paths(&project_files, &BatchOptions::new());
+        let _ = session.analyze_paths(&project_files, &BatchOptions::new().without_symbols());
         let elapsed = t.elapsed();
         eprintln!("run {i}: {:?}", elapsed);
         times.push(elapsed);

@@ -164,7 +164,7 @@ fn indexed_references_warm_repeat_is_pure_lookup() {
 
     // FileAnalyzer (the open-file flow) also commits with replace semantics.
     let parsed = php_rs_parser::parse(src_a);
-    let _ = FileAnalyzer::new(&session).analyze(
+    let _ = FileAnalyzer::new(&session).analyze_diagnostics_only(
         file_a.clone(),
         src_a,
         &parsed.program,

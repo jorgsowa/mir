@@ -142,7 +142,7 @@ fn references_to_takes_typed_symbol() {
     // Now run pass 2 to record references
     use mir_analyzer::FileAnalyzer;
     let parsed = php_rs_parser::parse(&source);
-    let _analysis = FileAnalyzer::new(&session).analyze(
+    let _analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
         file.clone(),
         &source,
         &parsed.program,
@@ -256,18 +256,22 @@ fn resolved_symbol_to_symbol_bridges_pass2_with_queries() {
     session.ingest_file(file.clone(), source.clone());
 
     let parsed = php_rs_parser::parse(&source);
-    let analysis = FileAnalyzer::new(&session).analyze(
+    let _analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
         file.clone(),
         &source,
         &parsed.program,
         &parsed.source_map,
     );
 
-    let helper_call = analysis
-        .symbols
-        .iter()
-        .find(|s| matches!(&s.kind, ReferenceKind::FunctionCall(name) if name.as_ref() == "helper"))
-        .expect("should record helper() call in caller body");
+    let call_offset = source.rfind("helper();").unwrap() as u32;
+    let helper_call = session
+        .symbol_at(file.as_ref(), call_offset)
+        .expect("should resolve helper() call in caller body");
+
+    assert!(matches!(
+        &helper_call.kind,
+        ReferenceKind::FunctionCall(name) if name.as_ref() == "helper"
+    ));
 
     let typed_symbol = helper_call
         .to_symbol()
@@ -307,7 +311,7 @@ fn method_references_scoped_by_declaring_class() {
 
     session.ingest_file(file.clone(), source.clone());
     let parsed = php_rs_parser::parse(&source);
-    let _ = FileAnalyzer::new(&session).analyze(
+    let _ = FileAnalyzer::new(&session).analyze_diagnostics_only(
         file.clone(),
         &source,
         &parsed.program,
@@ -351,11 +355,10 @@ fn method_references_scoped_by_declaring_class() {
 
 #[test]
 fn method_references_end_to_end_symbol_at_flow() {
-    // Verify the real findReferences flow: symbol_at → to_symbol() → references_to.
-    // The Name built from the resolved symbol at the call position must round-trip
-    // back to the same reference.
+    // Verify the real findReferences flow: cursor offset → references_at.
+    // The targeted navigation path must round-trip the call position back to
+    // the same reference without a retained whole-file symbol list.
     use mir_analyzer::symbol::ReferenceKind;
-    use mir_analyzer::FileAnalyzer;
 
     let session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
@@ -368,19 +371,11 @@ fn method_references_end_to_end_symbol_at_flow() {
     );
 
     session.ingest_file(file.clone(), source.clone());
-    let parsed = php_rs_parser::parse(&source);
-    let analysis = FileAnalyzer::new(&session).analyze(
-        file.clone(),
-        &source,
-        &parsed.program,
-        &parsed.source_map,
-    );
-
     // "->toString" — skip the "->" (2 bytes) to land on the 't'.
     let call_offset = source.find("->toString").unwrap() as u32 + 2;
 
-    let sym = analysis
-        .symbol_at(call_offset)
+    let sym = session
+        .symbol_at(file.as_ref(), call_offset)
         .expect("should resolve symbol at toString call site");
 
     assert!(
@@ -389,20 +384,19 @@ fn method_references_end_to_end_symbol_at_flow() {
         sym.kind
     );
 
-    let name = sym.to_symbol().expect("MethodCall should map to a Name");
     let refs = session
-        .indexed_references_to(
-            &name,
+        .references_at(
+            file.as_ref(),
+            call_offset,
             std::slice::from_ref(&file),
             false,
             mir_analyzer::ReferenceIncludes::Plain,
-            &|| false,
         )
-        .expect("not cancelled");
+        .expect("references_at should resolve the call site");
 
     assert!(
         !refs.is_empty(),
-        "references_to via symbol_at flow must find the call site; got none"
+        "references_at must find the call site; got none"
     );
 }
 
@@ -411,7 +405,6 @@ fn global_constant_references_end_to_end_symbol_at_flow() {
     // Global constant usages must enter the reference/symbol pipeline, same as
     // functions/methods/properties/class constants.
     use mir_analyzer::symbol::ReferenceKind;
-    use mir_analyzer::FileAnalyzer;
 
     let session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
@@ -424,17 +417,9 @@ fn global_constant_references_end_to_end_symbol_at_flow() {
     );
 
     session.ingest_file(file.clone(), source.clone());
-    let parsed = php_rs_parser::parse(&source);
-    let analysis = FileAnalyzer::new(&session).analyze(
-        file.clone(),
-        &source,
-        &parsed.program,
-        &parsed.source_map,
-    );
-
     let use_offset = source.rfind("FOO").unwrap() as u32;
-    let sym = analysis
-        .symbol_at(use_offset)
+    let sym = session
+        .symbol_at(file.as_ref(), use_offset)
         .expect("should resolve symbol at FOO usage site");
 
     assert!(
@@ -443,22 +428,19 @@ fn global_constant_references_end_to_end_symbol_at_flow() {
         sym.kind
     );
 
-    let name = sym
-        .to_symbol()
-        .expect("GlobalConstant should map to a Name");
     let refs = session
-        .indexed_references_to(
-            &name,
+        .references_at(
+            file.as_ref(),
+            use_offset,
             std::slice::from_ref(&file),
             false,
             mir_analyzer::ReferenceIncludes::Plain,
-            &|| false,
         )
-        .expect("not cancelled");
+        .expect("references_at should resolve the constant usage");
 
     assert!(
         !refs.is_empty(),
-        "references_to via symbol_at flow must find the `echo FOO;` usage; got none"
+        "references_at must find the `echo FOO;` usage; got none"
     );
 }
 
@@ -469,7 +451,6 @@ fn method_references_inherited_method_end_to_end() {
     // stored class "Foo" (the receiver), making symbol_at → references_to return
     // nothing. After the fix both keys agree on the declaring class.
     use mir_analyzer::symbol::ReferenceKind;
-    use mir_analyzer::FileAnalyzer;
 
     let session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
@@ -483,19 +464,11 @@ fn method_references_inherited_method_end_to_end() {
     );
 
     session.ingest_file(file.clone(), source.clone());
-    let parsed = php_rs_parser::parse(&source);
-    let analysis = FileAnalyzer::new(&session).analyze(
-        file.clone(),
-        &source,
-        &parsed.program,
-        &parsed.source_map,
-    );
-
     // "->toString" — skip the "->" (2 bytes) to land on the 't'.
     let call_offset = source.find("->toString").unwrap() as u32 + 2;
 
-    let sym = analysis
-        .symbol_at(call_offset)
+    let sym = session
+        .symbol_at(file.as_ref(), call_offset)
         .expect("should resolve symbol at toString call");
 
     let declaring_class = match &sym.kind {
@@ -508,20 +481,19 @@ fn method_references_inherited_method_end_to_end() {
         "symbol_at must report the DECLARING class (Base), not the receiver (Foo)"
     );
 
-    let name = sym.to_symbol().expect("MethodCall maps to Name");
     let refs = session
-        .indexed_references_to(
-            &name,
+        .references_at(
+            file.as_ref(),
+            call_offset,
             std::slice::from_ref(&file),
             false,
             mir_analyzer::ReferenceIncludes::Plain,
-            &|| false,
         )
-        .expect("not cancelled");
+        .expect("references_at should resolve the inherited method call");
 
     assert!(
         !refs.is_empty(),
-        "references_to(Base::toString) must find the (new Foo())->toString() call; \
+        "references_at(Base::toString) must find the (new Foo())->toString() call; \
          got none (declaring_class was '{declaring_class}', refs: {refs:?})"
     );
 }
@@ -532,7 +504,6 @@ fn property_references_inherited_property_end_to_end() {
     // use the declaring class (Base), not the receiver (Foo), so that
     // references_to(Base::count) finds the access site.
     use mir_analyzer::symbol::ReferenceKind;
-    use mir_analyzer::FileAnalyzer;
 
     let session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
@@ -546,17 +517,9 @@ fn property_references_inherited_property_end_to_end() {
     );
 
     session.ingest_file(file.clone(), source.clone());
-    let parsed = php_rs_parser::parse(&source);
-    let analysis = FileAnalyzer::new(&session).analyze(
-        file.clone(),
-        &source,
-        &parsed.program,
-        &parsed.source_map,
-    );
-
     let prop_offset = source.find("->count").unwrap() as u32 + 2;
-    let sym = analysis
-        .symbol_at(prop_offset)
+    let sym = session
+        .symbol_at(file.as_ref(), prop_offset)
         .expect("should resolve symbol at ->count");
 
     let declaring_class = match &sym.kind {
@@ -569,20 +532,19 @@ fn property_references_inherited_property_end_to_end() {
         "symbol_at must report the DECLARING class (Base), not the receiver (Foo)"
     );
 
-    let name = sym.to_symbol().expect("PropertyAccess maps to Name");
     let refs = session
-        .indexed_references_to(
-            &name,
+        .references_at(
+            file.as_ref(),
+            prop_offset,
             std::slice::from_ref(&file),
             false,
             mir_analyzer::ReferenceIncludes::Plain,
-            &|| false,
         )
-        .expect("not cancelled");
+        .expect("references_at should resolve the inherited property access");
 
     assert!(
         !refs.is_empty(),
-        "references_to(Base::count) must find the (new Foo())->count access; \
+        "references_at(Base::count) must find the (new Foo())->count access; \
          got none (declaring_class was '{declaring_class}', refs: {refs:?})"
     );
 }
@@ -609,7 +571,7 @@ fn property_write_target_appears_in_references() {
 
     session.ingest_file(file.clone(), source.clone());
     let parsed = php_rs_parser::parse(&source);
-    let _analysis = FileAnalyzer::new(&session).analyze(
+    let _analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
         file.clone(),
         &source,
         &parsed.program,
@@ -660,7 +622,7 @@ fn static_property_write_target_appears_in_references() {
 
     session.ingest_file(file.clone(), source.clone());
     let parsed = php_rs_parser::parse(&source);
-    let _analysis = FileAnalyzer::new(&session).analyze(
+    let _analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
         file.clone(),
         &source,
         &parsed.program,
@@ -705,7 +667,7 @@ fn property_references_direct_property_end_to_end() {
 
     session.ingest_file(file.clone(), source.clone());
     let parsed = php_rs_parser::parse(&source);
-    let _ = FileAnalyzer::new(&session).analyze(
+    let _ = FileAnalyzer::new(&session).analyze_diagnostics_only(
         file.clone(),
         &source,
         &parsed.program,
@@ -853,7 +815,12 @@ fn reanalyze_dependents_runs_in_parallel() {
         (&dep_b, "<?php\nclass B extends Base {}\n"),
     ] {
         let parsed = php_rs_parser::parse(src);
-        FileAnalyzer::new(&session).analyze(file.clone(), src, &parsed.program, &parsed.source_map);
+        let _ = FileAnalyzer::new(&session).analyze_diagnostics_only(
+            file.clone(),
+            src,
+            &parsed.program,
+            &parsed.source_map,
+        );
     }
 
     // source_of returns the registered source.
@@ -1099,7 +1066,7 @@ fn reanalyze_dependents_tracks_bare_fqn_new() {
 
     let consumer_src = "<?php\nfunction consume(): void { $s = new \\Service(); $s->run(); }\n";
     let parsed = php_rs_parser::parse(consumer_src);
-    FileAnalyzer::new(&session).analyze(
+    FileAnalyzer::new(&session).analyze_diagnostics_only(
         consumer.clone(),
         consumer_src,
         &parsed.program,
@@ -1136,7 +1103,7 @@ fn reanalyze_dependents_tracks_bare_fqn_static_call() {
 
     let caller_src = "<?php\nfunction call_it(): void { \\Helper::go(); }\n";
     let parsed = php_rs_parser::parse(caller_src);
-    FileAnalyzer::new(&session).analyze(
+    FileAnalyzer::new(&session).analyze_diagnostics_only(
         caller.clone(),
         caller_src,
         &parsed.program,
@@ -1177,7 +1144,7 @@ fn dependency_graph_includes_unused_param_type_hint() {
     // Analyze the consumer file to trigger Pass 2
     let consumer_src = "<?php\nnamespace Vendor\nfunction consume(Service $s) { }\n";
     let parsed = php_rs_parser::parse(consumer_src);
-    FileAnalyzer::new(&session).analyze(
+    FileAnalyzer::new(&session).analyze_diagnostics_only(
         consumer.clone(),
         consumer_src,
         &parsed.program,
@@ -1269,7 +1236,12 @@ fn file_structural_deps_includes_trait_property_and_method_type_hints() {
 fn analyze_file(session: &AnalysisSession, file: Arc<str>, src: &str) {
     use mir_analyzer::FileAnalyzer;
     let parsed = php_rs_parser::parse(src);
-    FileAnalyzer::new(session).analyze(file, src, &parsed.program, &parsed.source_map);
+    FileAnalyzer::new(session).analyze_diagnostics_only(
+        file,
+        src,
+        &parsed.program,
+        &parsed.source_map,
+    );
 }
 
 /// Return the set of file paths returned by reanalyze_dependents.
@@ -1590,7 +1562,6 @@ fn catch_clause_records_class_reference_symbol() {
     // ResolvedSymbol being recorded, which the catch-clause path previously
     // skipped (it only ever recorded the dead-code `cls:` reference).
     use mir_analyzer::symbol::ReferenceKind;
-    use mir_analyzer::FileAnalyzer;
 
     let session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
@@ -1608,20 +1579,15 @@ fn catch_clause_records_class_reference_symbol() {
     );
 
     session.ingest_file(file.clone(), source.clone());
-    let parsed = php_rs_parser::parse(&source);
-    let analysis = FileAnalyzer::new(&session).analyze(
-        file.clone(),
-        &source,
-        &parsed.program,
-        &parsed.source_map,
-    );
-
-    let catch_symbol = analysis.symbols.iter().find(|s| {
-        matches!(&s.kind, ReferenceKind::ClassReference(name) if name.as_ref() == "MyException")
-            && s.span.start > source.find("catch (").unwrap() as u32
-    });
+    let catch_offset = source.rfind("catch (MyException").unwrap() as u32 + "catch (".len() as u32;
+    let catch_symbol = session
+        .symbol_at(file.as_ref(), catch_offset)
+        .expect("catch (MyException $e) should resolve a class symbol");
     assert!(
-        catch_symbol.is_some(),
+        matches!(
+            &catch_symbol.kind,
+            ReferenceKind::ClassReference(name) if name.as_ref() == "MyException"
+        ),
         "catch (MyException $e) should record a ClassReference symbol for MyException"
     );
 }
@@ -1632,8 +1598,6 @@ fn static_property_access_records_symbols() {
     // ResolvedSymbol, so hover/go-to-definition silently did nothing on a
     // static property access (unlike instance `$obj->prop`, which does).
     use mir_analyzer::symbol::ReferenceKind;
-    use mir_analyzer::FileAnalyzer;
-
     let session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
@@ -1649,27 +1613,29 @@ fn static_property_access_records_symbols() {
     );
 
     session.ingest_file(file.clone(), source.clone());
-    let parsed = php_rs_parser::parse(&source);
-    let analysis = FileAnalyzer::new(&session).analyze(
-        file.clone(),
-        &source,
-        &parsed.program,
-        &parsed.source_map,
-    );
+    let static_access = "Counter::$count =";
+    let class_offset = source.find(static_access).unwrap() as u32;
+    let prop_offset = class_offset + "Counter::$".len() as u32;
+    let class_symbol = session
+        .symbol_at(file.as_ref(), class_offset)
+        .expect("Counter::$count should resolve the class reference");
+    let prop_symbol = session
+        .symbol_at(file.as_ref(), prop_offset)
+        .expect("Counter::$count should resolve the property access");
 
     assert!(
-        analysis.symbols.iter().any(|s| matches!(
-            &s.kind,
+        matches!(
+            &class_symbol.kind,
             ReferenceKind::ClassReference(name) if name.as_ref() == "Counter"
-        )),
+        ),
         "Counter::$count should record a ClassReference symbol for Counter"
     );
     assert!(
-        analysis.symbols.iter().any(|s| matches!(
-            &s.kind,
+        matches!(
+            &prop_symbol.kind,
             ReferenceKind::PropertyAccess { class, property }
                 if class.as_ref() == "Counter" && property.as_ref() == "count"
-        )),
+        ),
         "Counter::$count should record a PropertyAccess symbol for Counter::$count"
     );
 }
@@ -1697,7 +1663,7 @@ fn references_to_finds_extends_implements_and_trait_use() {
 
     session.ingest_file(file.clone(), source.clone());
     let parsed = php_rs_parser::parse(&source);
-    let _ = FileAnalyzer::new(&session).analyze(
+    let _ = FileAnalyzer::new(&session).analyze_diagnostics_only(
         file.clone(),
         &source,
         &parsed.program,

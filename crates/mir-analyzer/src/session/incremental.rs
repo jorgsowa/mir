@@ -219,12 +219,14 @@ impl AnalysisSession {
         // entirely, so a no-op re-sweep is a pointer compare per file.
         {
             let guard = self.db.salsa.read();
+            let mut dependency_graph_changed = false;
             for (file, text, out, entries, put, mentions) in results.iter_mut() {
                 // Pointer-identical memo ⇒ identical postings: skip the
                 // index rewrite. The mark is re-stamped unconditionally so a
                 // no-op sweep still advances the commit's generation.
                 if !self.ref_commit_is_current(file.as_ref(), text, out) {
                     guard.set_file_reference_locations(file.as_ref(), out.ref_locs.to_vec());
+                    dependency_graph_changed = true;
                 }
                 if let (Some(s), Some(m)) = (&mention_scanner, mentions.take()) {
                     guard.set_file_class_mentions(file, text, s.epoch(), m);
@@ -242,7 +244,11 @@ impl AnalysisSession {
                 if !self.is_defs_committed(file.as_ref(), text) {
                     guard.set_file_class_edges(file, entries.clone());
                     self.mark_defs_committed(file, text);
+                    dependency_graph_changed = true;
                 }
+            }
+            if dependency_graph_changed {
+                self.clear_dependency_graph_cache();
             }
         }
 
@@ -291,20 +297,27 @@ impl AnalysisSession {
     /// Returns an empty Vec if the file hasn't been ingested or has no
     /// unresolved imports.
     pub fn pending_lazy_loads(&self, file: &str) -> Vec<Arc<str>> {
+        use rustc_hash::FxHashSet;
+
         let db = self.snapshot_db();
         let imports = db.file_imports(file);
         if imports.is_empty() {
             return Vec::new();
         }
         let mut out = Vec::new();
+        let mut seen: FxHashSet<Arc<str>> = FxHashSet::default();
         for fqcn in imports.values() {
             let here = crate::db::Fqcn::interned(&db, *fqcn);
             if crate::db::find_class_like(&db, here).is_some() {
                 continue;
             }
             if let Some(resolver) = &self.resolver {
+                let fqcn_arc: Arc<str> = Arc::from(fqcn.as_str());
+                if !seen.insert(fqcn_arc.clone()) {
+                    continue;
+                }
                 if resolver.resolve(fqcn.as_str()).is_some() {
-                    out.push(Arc::from(fqcn.as_str()));
+                    out.push(fqcn_arc);
                 }
             }
         }
@@ -335,6 +348,7 @@ impl AnalysisSession {
         // Fault in each imported FQCN directly (single-file load + tier-merge).
         // Inheritance ancestors / signature types resolve through the eagerly
         // built workspace symbol index — no transitive walk needed here.
+        let _deferred_bumps = self.defer_revision_bumps();
         let mut loaded = 0;
         for fqcn in &pending {
             if self.load_class(fqcn.as_ref()).is_loaded() {
@@ -443,6 +457,9 @@ impl AnalysisSession {
     /// file via O(1) lookup. Total cost is O(E) where E is the number of
     /// (file, symbol) edges.
     pub fn dependency_graph(&self) -> crate::DependencyGraph {
+        if let Some(graph) = self.dependency_graph_cache.read().as_ref() {
+            return graph.clone();
+        }
         let db = self.snapshot_db();
 
         fn push_edge(
@@ -555,6 +572,13 @@ impl AnalysisSession {
             }
         }
 
-        crate::DependencyGraph::from_compact_parts(all_files, file_ids, dependencies, dependents)
+        let graph = crate::DependencyGraph::from_compact_parts(
+            all_files,
+            file_ids,
+            dependencies,
+            dependents,
+        );
+        *self.dependency_graph_cache.write() = Some(graph.clone());
+        graph
     }
 }

@@ -76,8 +76,11 @@ impl AnalysisSession {
     /// Auto-discover and ingest the embedded stubs needed to cover every
     /// built-in PHP function / class / constant referenced by `source`.
     ///
-    /// Used by [`crate::FileAnalyzer::analyze`] to keep essentials-only mode
-    /// correct without forcing callers to enumerate which stubs they need.
+    /// Used by the open-file analysis paths
+    /// ([`crate::FileAnalyzer::analyze`] and
+    /// [`crate::FileAnalyzer::analyze_diagnostics_only`]) to keep
+    /// essentials-only mode correct without forcing callers to enumerate which
+    /// stubs they need.
     /// Idempotent — already-loaded stubs are skipped via [`Self::loaded_stubs`].
     ///
     /// The discovery scan is a coarse identifier sweep (see
@@ -177,8 +180,7 @@ impl AnalysisSession {
     /// and PSR-4 class preloading) before body analysis of a single file.
     ///
     /// Replaces the two separate `ensure_stubs_for_ast` /
-    /// `preload_psr4_classes_for_ast` calls at every `FileAnalyzer::analyze`
-    /// site.
+    /// `preload_psr4_classes_for_ast` calls at every open-file analysis site.
     pub fn prepare_ast_for_analysis(&self, program: &php_ast::owned::Program, file: &str) {
         self.ensure_stubs_for_ast(program);
         self.ensure_vendor_eager_functions();
@@ -271,6 +273,7 @@ impl AnalysisSession {
     /// file might then need its warm-up re-run to lazy-load a replacement
     /// (a vendor class shadowed by a since-deleted project class).
     pub fn bump_prepare_generation(&self) {
+        self.clear_transient_batch_replay();
         self.prepare_generation
             .fetch_add(1, std::sync::atomic::Ordering::Release);
     }

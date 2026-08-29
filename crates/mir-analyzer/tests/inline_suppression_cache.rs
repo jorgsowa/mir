@@ -45,7 +45,8 @@ fn inline_suppression_survives_cache_hit_in_fresh_session() {
         0,
     ));
     let session1 = AnalysisSession::new(PhpVersion::LATEST).with_cache(cache1.clone());
-    let result1 = session1.re_analyze_file("test.php", SOURCE, &BatchOptions::new());
+    let result1 =
+        session1.re_analyze_file("test.php", SOURCE, &BatchOptions::new().without_symbols());
     let (total1, visible1) = undefined_class_issues(&result1);
     assert_eq!(total1, 1, "first run should detect the UndefinedClass");
     assert_eq!(visible1, 0, "first run: @mir-ignore should suppress it");
@@ -62,7 +63,8 @@ fn inline_suppression_survives_cache_hit_in_fresh_session() {
         0,
     ));
     let session2 = AnalysisSession::new(PhpVersion::LATEST).with_cache(cache2.clone());
-    let result2 = session2.re_analyze_file("test.php", SOURCE, &BatchOptions::new());
+    let result2 =
+        session2.re_analyze_file("test.php", SOURCE, &BatchOptions::new().without_symbols());
     let (total2, visible2) = undefined_class_issues(&result2);
     assert_eq!(
         total2, 1,

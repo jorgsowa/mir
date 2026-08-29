@@ -840,55 +840,46 @@ pub fn prepare_analysis_file(db: &dyn MirDatabase, file: SourceFile) -> Prepared
 #[salsa::tracked(cycle_fn = infer_file_return_types_cycle, cycle_initial = infer_file_return_types_initial)]
 pub fn infer_file_return_types(db: &dyn MirDatabase, file: SourceFile) -> InferredFileTypes {
     let prepared = prepare_analysis_file(db, file);
-    let parsed = prepared.parse_result();
 
     if prepared.has_hard_parse_errors {
         return InferredFileTypes::empty();
     }
 
-    let driver = crate::body_analysis::BodyAnalyzer::new_inference_only(db, prepared.php_version);
-    driver.analyze_bodies(
-        &parsed.program,
-        prepared.path.clone(),
-        prepared.text.as_ref(),
-        &parsed.source_map,
-    );
-    let inferred = driver.take_inferred_types();
+    let mut functions: FxHashMap<Arc<str>, Arc<Type>> = FxHashMap::default();
+    let mut methods: FxHashMap<(Arc<str>, Arc<str>), Arc<Type>> = FxHashMap::default();
+    let mut properties: FxHashMap<(Arc<str>, Arc<str>), Arc<Type>> = FxHashMap::default();
 
-    let mut functions: FxHashMap<Arc<str>, Arc<Type>> =
-        FxHashMap::with_capacity_and_hasher(inferred.functions.len(), Default::default());
-    for (fqn, ty) in inferred.functions {
-        functions.insert(fqn, mir_codebase::definitions::wrap_var_type(ty));
-    }
-
-    let mut methods: FxHashMap<(Arc<str>, Arc<str>), Arc<Type>> =
-        FxHashMap::with_capacity_and_hasher(inferred.methods.len(), Default::default());
-    for (fqcn, name, ty) in inferred.methods {
-        let name_lower: Arc<str> = if name.bytes().any(|b| b.is_ascii_uppercase()) {
-            Arc::from(crate::util::php_ident_lowercase(&name).as_str())
-        } else {
-            name
-        };
-        methods.insert(
-            (fqcn, name_lower),
-            mir_codebase::definitions::wrap_var_type(ty),
-        );
-    }
-
-    let mut properties: FxHashMap<(Arc<str>, Arc<str>), Arc<Type>> =
-        FxHashMap::with_capacity_and_hasher(inferred.properties.len(), Default::default());
-    for (fqcn, name, ty) in inferred.properties {
-        // Multiple constructor assignment sites for the same property merge
-        // via union, same reasoning as `merge_return_types` for return
-        // statements — any of them could be the runtime value.
-        properties
-            .entry((fqcn, name))
-            .and_modify(|existing: &mut Arc<Type>| {
-                let mut merged = (**existing).clone();
-                merged.merge_with(&ty);
-                *existing = mir_codebase::definitions::wrap_var_type(merged);
-            })
-            .or_insert_with(|| mir_codebase::definitions::wrap_var_type(ty));
+    for key in crate::db::file_scopes(db, file).iter() {
+        let inferred = crate::db::infer_scope(db, file, key.clone())
+            .inferred_types
+            .clone();
+        for (fqn, ty) in inferred.functions.iter() {
+            functions.insert(
+                fqn.clone(),
+                mir_codebase::definitions::wrap_var_type(ty.clone()),
+            );
+        }
+        for (fqcn, name, ty) in inferred.methods.iter() {
+            let name_lower: Arc<str> = if name.bytes().any(|b| b.is_ascii_uppercase()) {
+                Arc::from(crate::util::php_ident_lowercase(name).as_str())
+            } else {
+                name.clone()
+            };
+            methods.insert(
+                (fqcn.clone(), name_lower),
+                mir_codebase::definitions::wrap_var_type(ty.clone()),
+            );
+        }
+        for (fqcn, name, ty) in inferred.properties.iter() {
+            properties
+                .entry((fqcn.clone(), name.clone()))
+                .and_modify(|existing: &mut Arc<Type>| {
+                    let mut merged = (**existing).clone();
+                    merged.merge_with(ty);
+                    *existing = mir_codebase::definitions::wrap_var_type(merged);
+                })
+                .or_insert_with(|| mir_codebase::definitions::wrap_var_type(ty.clone()));
+        }
     }
 
     InferredFileTypes {

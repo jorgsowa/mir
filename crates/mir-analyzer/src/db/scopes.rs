@@ -54,6 +54,7 @@ pub enum ScopeKey {
 pub struct ScopeInferenceResult {
     pub issues: Arc<[Issue]>,
     pub ref_locs: Arc<[RefLoc]>,
+    pub(crate) inferred_types: Arc<crate::body_analysis::InferredTypes>,
 }
 
 /// Declaration scopes of `file` in source order (file-frame scopes are
@@ -145,6 +146,11 @@ pub fn infer_scope(
         Arc::new(ScopeInferenceResult {
             issues: Arc::from([]),
             ref_locs: Arc::from([]),
+            inferred_types: Arc::new(crate::body_analysis::InferredTypes {
+                functions: Vec::new(),
+                methods: Vec::new(),
+                properties: Vec::new(),
+            }),
         })
     };
 
@@ -153,9 +159,11 @@ pub fn infer_scope(
     }
 
     let driver = BodyAnalyzer::new(db, prepared.php_version);
+    let mut driver = driver;
+    driver.collect_inferred_types = true;
+    driver.collect_symbols = false;
 
     let mut issues: Vec<Issue> = Vec::new();
-    let mut symbols: Vec<crate::symbol::ResolvedSymbol> = Vec::new();
 
     // Isolate this scope's refs in a fresh staging frame so nested on-demand
     // inference on the same handle can't leak into (or consume) them.
@@ -187,7 +195,7 @@ pub fn infer_scope(
                 text.as_ref(),
                 &parsed.source_map,
                 &mut issues,
-                &mut symbols,
+                None,
             );
         }
         ScopeKey::Function(fqn, occ) | ScopeKey::ClassLike(fqn, occ) => {
@@ -230,7 +238,7 @@ pub fn infer_scope(
                         text.as_ref(),
                         &parsed.source_map,
                         &mut issues,
-                        &mut symbols,
+                        None,
                     ),
                     StmtKind::Class(decl) => driver.analyze_class_decl(
                         decl,
@@ -238,7 +246,7 @@ pub fn infer_scope(
                         text.as_ref(),
                         &parsed.source_map,
                         &mut issues,
-                        &mut symbols,
+                        None,
                         &Default::default(),
                     ),
                     StmtKind::Enum(decl) => driver.analyze_enum_decl(
@@ -247,7 +255,7 @@ pub fn infer_scope(
                         text.as_ref(),
                         &parsed.source_map,
                         &mut issues,
-                        &mut symbols,
+                        None,
                     ),
                     StmtKind::Interface(decl) => driver.analyze_interface_decl(
                         decl,
@@ -256,7 +264,7 @@ pub fn infer_scope(
                         &parsed.source_map,
                         &mut issues,
                         &Default::default(),
-                        &mut symbols,
+                        None,
                     ),
                     StmtKind::Trait(decl) => driver.analyze_trait_decl(
                         decl,
@@ -264,7 +272,7 @@ pub fn infer_scope(
                         text.as_ref(),
                         &parsed.source_map,
                         &mut issues,
-                        &mut symbols,
+                        None,
                     ),
                     _ => {}
                 }
@@ -273,10 +281,20 @@ pub fn infer_scope(
     }
 
     let ref_locs = db.pop_ref_loc_frame();
+    let inferred_types = Arc::new(driver.take_inferred_types());
+    crate::metrics::record_scope_analysis(path.as_ref(), 0);
+    crate::metrics::record_infer_scope_retained(
+        issues.len(),
+        ref_locs.len(),
+        inferred_types.functions.len(),
+        inferred_types.methods.len(),
+        inferred_types.properties.len(),
+    );
 
     Arc::new(ScopeInferenceResult {
         issues: issues.into(),
         ref_locs: ref_locs.into(),
+        inferred_types,
     })
 }
 
@@ -297,7 +315,8 @@ fn check_use_decls(
         match &stmt.kind {
             StmtKind::Use(use_decl) => {
                 crate::body_analysis::check_use_decl_casing(
-                    use_decl, db, file, source, source_map, issues, None, is_full,
+                    use_decl, db, file, source, source_map, issues, None, None, None, false,
+                    is_full, true,
                 );
             }
             StmtKind::Namespace(ns) => {

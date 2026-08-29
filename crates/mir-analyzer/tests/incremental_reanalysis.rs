@@ -4,15 +4,7 @@ mod common;
 
 use std::sync::Arc;
 
-use mir_analyzer::{AnalysisSession, BatchOptions, FileAnalyzer, PhpVersion, ReferenceKind};
-
-fn var_type(symbols: &[mir_analyzer::ResolvedSymbol], name: &str) -> String {
-    symbols
-        .iter()
-        .find(|s| matches!(&s.kind, ReferenceKind::Variable(n) if n.as_ref() == name))
-        .map(|s| format!("{}", s.resolved_type))
-        .unwrap_or_else(|| "not found".to_string())
-}
+use mir_analyzer::{AnalysisSession, BatchOptions, PhpVersion};
 
 fn new_session() -> AnalysisSession {
     AnalysisSession::new(PhpVersion::LATEST)
@@ -32,7 +24,10 @@ fn re_analyze_file_picks_up_new_error() {
     );
 
     let analyzer = new_session();
-    let result1 = analyzer.analyze_paths(std::slice::from_ref(&file_a), &BatchOptions::new());
+    let result1 = analyzer.analyze_paths(
+        std::slice::from_ref(&file_a),
+        &BatchOptions::new().without_symbols(),
+    );
 
     // The initial code should have no UndefinedFunction issues
     let undef_fn_count = result1
@@ -48,7 +43,11 @@ fn re_analyze_file_picks_up_new_error() {
     // Now re-analyze the same file with content that calls an undefined function
     let file_path = file_a.to_string_lossy().to_string();
     let new_content = "<?php\nfunction test(): void { nonexistent_func(); }\n";
-    let result2 = analyzer.re_analyze_file(&file_path, new_content, &BatchOptions::new());
+    let result2 = analyzer.re_analyze_file(
+        &file_path,
+        new_content,
+        &BatchOptions::new().without_symbols(),
+    );
 
     let undef_fn_count2 = result2
         .issues
@@ -83,7 +82,10 @@ fn re_analyze_file_removes_old_definitions() {
     );
 
     let analyzer = new_session();
-    let result1 = analyzer.analyze_paths(&[file_a.clone(), file_b.clone()], &BatchOptions::new());
+    let result1 = analyzer.analyze_paths(
+        &[file_a.clone(), file_b.clone()],
+        &BatchOptions::new().without_symbols(),
+    );
 
     // bar() exists, so no UndefinedMethod on file B
     let undef_method = result1
@@ -96,7 +98,11 @@ fn re_analyze_file_removes_old_definitions() {
     // Now change A.php: rename the method from bar() to baz()
     let file_path_a = file_a.to_string_lossy().to_string();
     let new_content_a = "<?php\nclass Foo { public function baz(): void {} }\n";
-    let _result2 = analyzer.re_analyze_file(&file_path_a, new_content_a, &BatchOptions::new());
+    let _result2 = analyzer.re_analyze_file(
+        &file_path_a,
+        new_content_a,
+        &BatchOptions::new().without_symbols(),
+    );
 
     // Verify the old method bar() is gone and baz() exists
     assert!(
@@ -121,7 +127,10 @@ fn re_analyze_file_fixes_error() {
     );
 
     let analyzer = new_session();
-    let result1 = analyzer.analyze_paths(std::slice::from_ref(&file_a), &BatchOptions::new());
+    let result1 = analyzer.analyze_paths(
+        std::slice::from_ref(&file_a),
+        &BatchOptions::new().without_symbols(),
+    );
 
     let undef_count = result1
         .issues
@@ -134,7 +143,11 @@ fn re_analyze_file_fixes_error() {
     let file_path = file_a.to_string_lossy().to_string();
     let new_content =
         "<?php\nfunction missing_fn(): void {}\nfunction test(): void { missing_fn(); }\n";
-    let result2 = analyzer.re_analyze_file(&file_path, new_content, &BatchOptions::new());
+    let result2 = analyzer.re_analyze_file(
+        &file_path,
+        new_content,
+        &BatchOptions::new().without_symbols(),
+    );
 
     let undef_count2 = result2
         .issues
@@ -164,7 +177,10 @@ fn re_analyze_file_uses_cache_on_unchanged_content() {
     let file_path = file_a.to_string_lossy().to_string();
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-    let result1 = analyzer.analyze_paths(std::slice::from_ref(&file_a), &BatchOptions::new());
+    let result1 = analyzer.analyze_paths(
+        std::slice::from_ref(&file_a),
+        &BatchOptions::new().without_symbols(),
+    );
 
     let undef_count = result1
         .issues
@@ -184,7 +200,8 @@ fn re_analyze_file_uses_cache_on_unchanged_content() {
     );
 
     // Re-analyze with identical content — must hit the cache.
-    let result2 = analyzer.re_analyze_file(&file_path, content, &BatchOptions::new());
+    let result2 =
+        analyzer.re_analyze_file(&file_path, content, &BatchOptions::new().without_symbols());
 
     let undef_count2 = result2
         .issues
@@ -195,6 +212,36 @@ fn re_analyze_file_uses_cache_on_unchanged_content() {
         undef_count2, undef_count,
         "cache hit should return the same cached issues; slow-path would return 0 \
          because ghost_fn was inserted into the codebase"
+    );
+}
+
+#[test]
+fn re_analyze_file_without_symbols_skips_symbol_retention() {
+    let src_dir = create_temp_dir("test");
+    let file_a = write_file(
+        &src_dir,
+        "A.php",
+        "<?php\nfunction test(): void { missing_fn(); }\n",
+    );
+    let file_path = file_a.to_string_lossy().to_string();
+
+    let analyzer = new_session();
+    let result = analyzer.re_analyze_file(
+        &file_path,
+        "<?php\nfunction test(): void { missing_fn(); }\n",
+        &BatchOptions::new().without_symbols(),
+    );
+
+    assert!(
+        result.symbols.is_empty(),
+        "without_symbols should skip symbol retention on re_analyze_file"
+    );
+    assert!(
+        result
+            .issues
+            .iter()
+            .any(|i| i.kind.name() == "UndefinedFunction"),
+        "re_analyze_file should still report diagnostics when symbols are skipped"
     );
 }
 
@@ -228,7 +275,7 @@ fn re_analyze_preserves_namespace_and_use_alias_resolution() {
     let analyzer = new_session();
     let result1 = analyzer.analyze_paths(
         &[src_dir.path().join("Entity.php"), handler.clone()],
-        &BatchOptions::new(),
+        &BatchOptions::new().without_symbols(),
     );
 
     let undef1: Vec<_> = result1
@@ -247,7 +294,7 @@ fn re_analyze_preserves_namespace_and_use_alias_resolution() {
     let result2 = analyzer.re_analyze_file(
         handler.to_string_lossy().as_ref(),
         handler_src2,
-        &BatchOptions::new(),
+        &BatchOptions::new().without_symbols(),
     );
 
     let undef2: Vec<_> = result2
@@ -281,7 +328,10 @@ fn re_analyze_file_primes_inferred_return_type_for_same_file_calls() {
     let file_path = file.to_string_lossy().to_string();
 
     let analyzer = new_session();
-    let result1 = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    let result1 = analyzer.analyze_paths(
+        std::slice::from_ref(&file),
+        &BatchOptions::new().without_symbols(),
+    );
 
     let issues1: Vec<_> = result1
         .issues
@@ -296,7 +346,8 @@ fn re_analyze_file_primes_inferred_return_type_for_same_file_calls() {
     // Re-analyze the same file with a trivial body change.  The priming sweep
     // must repopulate bar.inferred_return_type before foo is analyzed.
     let content2 = "<?php\nfunction bar() { return 'hello'; }\nfunction foo(): string { return bar(); /* re-analyzed */ }\n";
-    let result2 = analyzer.re_analyze_file(&file_path, content2, &BatchOptions::new());
+    let result2 =
+        analyzer.re_analyze_file(&file_path, content2, &BatchOptions::new().without_symbols());
 
     let issues2: Vec<_> = result2
         .issues
@@ -331,18 +382,14 @@ fn file_analyzer_sees_fresh_return_type_after_ingest() {
     session.ingest_file(file_a.clone(), Arc::from(a_src_v1));
     session.ingest_file(file_b.clone(), Arc::from(b_src));
 
-    let parsed_b = php_rs_parser::parse(b_src);
-
     // Update a.php: Maker::make() now returns Banana.
     session.ingest_file(file_a.clone(), Arc::from(a_src_v2));
 
-    let analysis = FileAnalyzer::new(&session).analyze(
-        file_b.clone(),
-        b_src,
-        &parsed_b.program,
-        &parsed_b.source_map,
-    );
-    let x_ty = var_type(&analysis.symbols, "x");
+    let x_offset = b_src.rfind("$x").unwrap() as u32;
+    let x_ty = session
+        .resolve_at(file_b.as_ref(), x_offset)
+        .map(|symbol| format!("{}", symbol.resolved_type))
+        .unwrap_or_else(|| "not found".to_string());
     assert_eq!(
         x_ty, "Banana",
         "$x must resolve to Banana immediately after ingest_file updates a.php; got {x_ty}"
@@ -380,7 +427,10 @@ fn re_analyze_file_evicts_dependents_after_ingest() {
 
     // First pass: populate the cache. b.php is valid (no issues) and gets cached.
     let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-    let initial = session.analyze_paths(&[file_a.clone(), file_b.clone()], &BatchOptions::new());
+    let initial = session.analyze_paths(
+        &[file_a.clone(), file_b.clone()],
+        &BatchOptions::new().without_symbols(),
+    );
     assert!(
         initial
             .issues
@@ -401,7 +451,8 @@ fn re_analyze_file_evicts_dependents_after_ingest() {
 
     // b.php content is unchanged, so a stale cache hit would return "no issues".
     // With the fix, b.php's entry is evicted and re-analysis finds InvalidArgument.
-    let result = session.re_analyze_file(&file_b_path, b_src, &BatchOptions::new());
+    let result =
+        session.re_analyze_file(&file_b_path, b_src, &BatchOptions::new().without_symbols());
     let has_invalid_arg = result
         .issues
         .iter()
@@ -427,7 +478,8 @@ fn re_analyze_file_flags_unused_suppress_without_cache() {
     let source = "<?php\nclass Foo {\n    /**\n     * @suppress UndefinedClass\n     */\n    public string $bar = \"baz\";\n}\n";
 
     let analyzer = new_session();
-    let result = analyzer.re_analyze_file("Foo.php", source, &BatchOptions::new());
+    let result =
+        analyzer.re_analyze_file("Foo.php", source, &BatchOptions::new().without_symbols());
 
     assert!(
         result

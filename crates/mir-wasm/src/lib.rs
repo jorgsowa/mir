@@ -1,6 +1,6 @@
 use wasm_bindgen::prelude::*;
 
-use mir_analyzer::{AnalysisSession, BatchOptions, PhpVersion};
+use mir_analyzer::{AnalysisSession, PhpVersion};
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -50,8 +50,9 @@ impl Playground {
             self.session = make_session(version);
             self.php_version = version;
         }
-        let opts = BatchOptions::new();
-        let result = self.session.re_analyze_file("<playground>", source, &opts);
+        let result = self
+            .session
+            .analyze_file_diagnostics("<playground>", source);
         let issues: Vec<WasmIssue> = result
             .issues
             .iter()

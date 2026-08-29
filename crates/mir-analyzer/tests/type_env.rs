@@ -17,15 +17,25 @@ fn scope_id_function_equality() {
 
 #[test]
 fn analyze_result_has_type_envs_field() {
-    let result = mir_analyzer::analyze_source("<?php\n");
+    let result = mir_analyzer::analyze_source_with_options(
+        "<?php\n",
+        &mir_analyzer::BatchOptions::new().without_symbols(),
+    );
     // just verifying the field exists and is empty for a trivial source
     assert!(result.type_envs.is_empty());
+    assert!(
+        result.symbols.is_empty(),
+        "symbol-free single-source analysis should not retain symbols"
+    );
 }
 
 #[test]
 fn returns_type_env_for_function_scope() {
     let src = "<?php\nfunction myFn(): void {\n    $greeting = 'hello';\n}\n";
-    let result = mir_analyzer::analyze_source(src);
+    let result = mir_analyzer::analyze_source_with_options(
+        src,
+        &mir_analyzer::BatchOptions::new().without_symbols(),
+    );
     let scope = result.type_envs.iter().find(|(k, _)| {
         matches!(k, mir_analyzer::ScopeId::Function { name, .. } if name.as_ref() == "myFn")
     });
@@ -40,7 +50,10 @@ fn returns_type_env_for_function_scope() {
 #[test]
 fn returns_type_env_for_method_scope() {
     let src = "<?php\nclass MyClass {\n    public function handle(): void {\n        $result = 42;\n    }\n}\n";
-    let result = mir_analyzer::analyze_source(src);
+    let result = mir_analyzer::analyze_source_with_options(
+        src,
+        &mir_analyzer::BatchOptions::new().without_symbols(),
+    );
     let scope = result.type_envs.iter().find(|(k, _)| {
         matches!(k, mir_analyzer::ScopeId::Method { method, .. } if method.as_ref() == "handle")
     });
@@ -55,7 +68,10 @@ fn returns_type_env_for_method_scope() {
 #[test]
 fn get_var_returns_none_for_unknown_variable() {
     let src = "<?php\nfunction f(): void {\n    $x = 1;\n}\n";
-    let result = mir_analyzer::analyze_source(src);
+    let result = mir_analyzer::analyze_source_with_options(
+        src,
+        &mir_analyzer::BatchOptions::new().without_symbols(),
+    );
     let scope = result.type_envs.iter().find(
         |(k, _)| matches!(k, mir_analyzer::ScopeId::Function { name, .. } if name.as_ref() == "f"),
     );
@@ -67,7 +83,10 @@ fn get_var_returns_none_for_unknown_variable() {
 #[test]
 fn var_names_lists_all_variables_in_scope() {
     let src = "<?php\nfunction f(): void {\n    $a = 1;\n    $b = 'hello';\n}\n";
-    let result = mir_analyzer::analyze_source(src);
+    let result = mir_analyzer::analyze_source_with_options(
+        src,
+        &mir_analyzer::BatchOptions::new().without_symbols(),
+    );
     let env = result.type_envs.values().next().unwrap();
     let names: Vec<&str> = env.var_names().collect();
     assert!(names.contains(&"a"), "Expected 'a' in var_names");
@@ -91,7 +110,10 @@ fn issue_kind_accessible_via_mir_analyzer() {
 #[test]
 fn analyze_source_flags_attribute_on_function() {
     let src = "<?php\n#[Attribute]\nfunction foo(): void {}\n";
-    let result = mir_analyzer::analyze_source(src);
+    let result = mir_analyzer::analyze_source_with_options(
+        src,
+        &mir_analyzer::BatchOptions::new().without_symbols(),
+    );
     assert!(
         result
             .issues
@@ -109,7 +131,10 @@ fn analyze_source_flags_attribute_on_function() {
 #[test]
 fn analyze_source_flags_attribute_on_abstract_class() {
     let src = "<?php\n#[Attribute]\nabstract class Foo {}\n";
-    let result = mir_analyzer::analyze_source(src);
+    let result = mir_analyzer::analyze_source_with_options(
+        src,
+        &mir_analyzer::BatchOptions::new().without_symbols(),
+    );
     assert!(
         result
             .issues
@@ -127,7 +152,10 @@ fn analyze_source_flags_attribute_on_abstract_class() {
 #[test]
 fn analyze_source_flags_attribute_on_trait() {
     let src = "<?php\n#[Attribute]\ntrait Foo {}\n";
-    let result = mir_analyzer::analyze_source(src);
+    let result = mir_analyzer::analyze_source_with_options(
+        src,
+        &mir_analyzer::BatchOptions::new().without_symbols(),
+    );
     assert!(
         result
             .issues
@@ -145,7 +173,10 @@ fn analyze_source_flags_attribute_on_trait() {
 #[test]
 fn analyze_source_flags_undefined_class_in_param_default() {
     let src = "<?php\nfunction foo($x = NoSuchClass::VALUE): void {}\n";
-    let result = mir_analyzer::analyze_source(src);
+    let result = mir_analyzer::analyze_source_with_options(
+        src,
+        &mir_analyzer::BatchOptions::new().without_symbols(),
+    );
     assert!(
         result
             .issues
@@ -163,7 +194,10 @@ fn analyze_source_flags_undefined_class_in_param_default() {
 #[test]
 fn analyze_source_flags_duplicate_function_declaration() {
     let src = "<?php\nfunction foo(): void {}\nfunction foo(): void {}\n";
-    let result = mir_analyzer::analyze_source(src);
+    let result = mir_analyzer::analyze_source_with_options(
+        src,
+        &mir_analyzer::BatchOptions::new().without_symbols(),
+    );
     assert!(
         result
             .issues

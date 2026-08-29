@@ -414,12 +414,19 @@ impl<'a> ExpressionAnalyzer<'a> {
             self.source,
             self.source_map,
             self.issues,
-            self.symbols,
+            self.symbols.as_deref_mut(),
+            self.navigation_facts,
+            self.resolved_navigation_facts,
             self.php_version,
             self.mode,
         );
 
         sa.collect_symbols = self.collect_symbols;
+        sa.capture_symbol_types = self.capture_symbol_types;
+        sa.codebase_symbols_only = self.codebase_symbols_only;
+        sa.record_reference_locations = self.record_reference_locations;
+        sa.collect_navigation_facts = self.collect_navigation_facts;
+        sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
         sa.analyze_stmts(&c.body.stmts, &mut closure_ctx);
         let inferred_return =
             crate::body_analysis::merge_return_types(&sa.return_types, closure_ctx.diverges);

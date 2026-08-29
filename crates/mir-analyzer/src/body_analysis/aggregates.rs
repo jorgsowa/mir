@@ -9,7 +9,7 @@ impl<'a> BodyAnalyzer<'a> {
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<Issue>,
-        all_symbols: &mut Vec<ResolvedSymbol>,
+        mut all_symbols: Option<&mut Vec<ResolvedSymbol>>,
     ) {
         crate::attributes::check_trait_attributes(
             decl,
@@ -19,7 +19,9 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
             all_issues,
             self.mode == AnalysisMode::Full,
-            Some(&mut *all_symbols),
+            self.collect_symbols
+                .then(|| all_symbols.as_deref_mut())
+                .flatten(),
         );
 
         let resolved = resolve_name(self.db, file.as_ref(), decl.name.as_deref().unwrap_or(""));
@@ -59,27 +61,35 @@ impl<'a> BodyAnalyzer<'a> {
                 if let Some(default) = &prop.default {
                     use crate::flow_state::FlowState;
                     use crate::stmt::StatementsAnalyzer;
-                    use mir_issues::IssueBuffer;
                     let mut default_ctx = FlowState::new();
                     default_ctx.self_fqcn = Some(scope_cx.fqcn.clone());
                     default_ctx.static_fqcn = Some(scope_cx.fqcn.clone());
                     default_ctx.strict_types = scope_cx.strict_types;
-                    let mut buf = IssueBuffer::new();
+                    let mut buf = self.issue_buffer();
                     let mut sa = StatementsAnalyzer::new(
                         self.db,
                         file.clone(),
                         source,
                         source_map,
                         &mut buf,
-                        all_symbols,
+                        all_symbols.as_deref_mut(),
+                        &self.navigation_facts,
+                        &self.resolved_navigation_facts,
                         self.php_version,
                         self.mode,
                     );
                     sa.collect_symbols = self.collect_symbols;
+                    sa.capture_symbol_types = self.capture_symbol_types;
+                    sa.codebase_symbols_only = self.codebase_symbols_only;
+                    sa.record_reference_locations = self.record_reference_locations;
+                    sa.collect_navigation_facts = self.collect_navigation_facts;
+                    sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
                     let mut ea = sa.expr_analyzer(&default_ctx);
                     let _ = ea.analyze(default, &mut default_ctx);
                     drop(sa);
-                    all_issues.extend(buf.into_all_issues());
+                    if self.mode == AnalysisMode::Full {
+                        all_issues.extend(buf.into_all_issues());
+                    }
                 }
                 continue;
             }
@@ -96,7 +106,7 @@ impl<'a> BodyAnalyzer<'a> {
                 source,
                 source_map,
                 all_issues,
-                all_symbols,
+                all_symbols.as_deref_mut(),
                 None,
             );
         }
@@ -171,7 +181,7 @@ impl<'a> BodyAnalyzer<'a> {
                 source,
                 source_map,
                 all_issues,
-                all_symbols,
+                Some(all_symbols),
                 Some(&mut *type_envs),
             );
         }
@@ -194,11 +204,10 @@ impl<'a> BodyAnalyzer<'a> {
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<Issue>,
-        all_symbols: &mut Vec<ResolvedSymbol>,
+        all_symbols: Option<&mut Vec<ResolvedSymbol>>,
     ) {
         use crate::flow_state::FlowState;
         use crate::stmt::StatementsAnalyzer;
-        use mir_issues::IssueBuffer;
         use php_ast::owned::EnumMemberKind;
 
         let has_case_value = decl
@@ -209,7 +218,7 @@ impl<'a> BodyAnalyzer<'a> {
         if !has_case_value {
             return;
         }
-        let mut buf = IssueBuffer::new();
+        let mut buf = self.issue_buffer();
         let mut sa = StatementsAnalyzer::new(
             self.db,
             file.clone(),
@@ -217,10 +226,17 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
             &mut buf,
             all_symbols,
+            &self.navigation_facts,
+            &self.resolved_navigation_facts,
             self.php_version,
             self.mode,
         );
         sa.collect_symbols = self.collect_symbols;
+        sa.capture_symbol_types = self.capture_symbol_types;
+        sa.codebase_symbols_only = self.codebase_symbols_only;
+        sa.record_reference_locations = self.record_reference_locations;
+        sa.collect_navigation_facts = self.collect_navigation_facts;
+        sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
         let mut ctx = FlowState::new();
         ctx.self_fqcn = Some(Arc::from(fqcn));
         ctx.static_fqcn = Some(Arc::from(fqcn));
@@ -233,7 +249,9 @@ impl<'a> BodyAnalyzer<'a> {
             }
         }
         drop(sa);
-        all_issues.extend(buf.into_all_issues());
+        if self.mode == AnalysisMode::Full {
+            all_issues.extend(buf.into_all_issues());
+        }
     }
 
     pub(crate) fn analyze_enum_decl(
@@ -243,7 +261,7 @@ impl<'a> BodyAnalyzer<'a> {
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<Issue>,
-        all_symbols: &mut Vec<ResolvedSymbol>,
+        mut all_symbols: Option<&mut Vec<ResolvedSymbol>>,
     ) {
         use php_ast::owned::EnumMemberKind;
 
@@ -255,7 +273,9 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
             all_issues,
             self.mode == AnalysisMode::Full,
-            Some(&mut *all_symbols),
+            self.collect_symbols
+                .then(|| all_symbols.as_deref_mut())
+                .flatten(),
         );
 
         for iface in decl.implements.iter() {
@@ -268,7 +288,9 @@ impl<'a> BodyAnalyzer<'a> {
                 all_issues,
                 self.php_version,
                 self.mode == AnalysisMode::Full,
-                all_symbols,
+                self.collect_symbols
+                    .then(|| all_symbols.as_deref_mut())
+                    .flatten(),
             );
         }
 
@@ -299,7 +321,7 @@ impl<'a> BodyAnalyzer<'a> {
                 source,
                 source_map,
                 all_issues,
-                all_symbols,
+                all_symbols.as_deref_mut(),
                 None,
             );
         }
@@ -311,7 +333,7 @@ impl<'a> BodyAnalyzer<'a> {
             source,
             source_map,
             all_issues,
-            all_symbols,
+            all_symbols.as_deref_mut(),
         );
         self.check_trait_constraints(fqcn, file, all_issues);
     }
@@ -354,7 +376,7 @@ impl<'a> BodyAnalyzer<'a> {
                 all_issues,
                 self.php_version,
                 self.mode == AnalysisMode::Full,
-                all_symbols,
+                self.collect_symbols.then_some(&mut *all_symbols),
             );
         }
 
@@ -385,7 +407,7 @@ impl<'a> BodyAnalyzer<'a> {
                 source,
                 source_map,
                 all_issues,
-                all_symbols,
+                Some(all_symbols),
                 Some(&mut *type_envs),
             );
         }
@@ -397,7 +419,7 @@ impl<'a> BodyAnalyzer<'a> {
             source,
             source_map,
             all_issues,
-            all_symbols,
+            Some(all_symbols),
         );
         self.check_trait_constraints(fqcn, file, all_issues);
     }
@@ -411,7 +433,7 @@ impl<'a> BodyAnalyzer<'a> {
         source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<Issue>,
         guards: &rustc_hash::FxHashSet<std::sync::Arc<str>>,
-        all_symbols: &mut Vec<ResolvedSymbol>,
+        mut all_symbols: Option<&mut Vec<ResolvedSymbol>>,
     ) {
         crate::attributes::check_interface_attributes(
             decl,
@@ -421,7 +443,9 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
             all_issues,
             self.mode == AnalysisMode::Full,
-            Some(&mut *all_symbols),
+            self.collect_symbols
+                .then(|| all_symbols.as_deref_mut())
+                .flatten(),
         );
         let iface_name = decl.name.as_deref().unwrap_or("<anonymous>");
         let iface_fqcn = resolve_name(self.db, file.as_ref(), iface_name);
@@ -452,7 +476,9 @@ impl<'a> BodyAnalyzer<'a> {
                 all_issues,
                 self.php_version,
                 self.mode == AnalysisMode::Full,
-                all_symbols,
+                self.collect_symbols
+                    .then(|| all_symbols.as_deref_mut())
+                    .flatten(),
             );
         }
         let iface_fqcn_ref = crate::db::Fqcn::from_str(self.db, &iface_fqcn);
@@ -469,7 +495,7 @@ impl<'a> BodyAnalyzer<'a> {
             // record the same name-only `methdecl:` fallback here so an
             // unknown-owner query still surfaces an interface's own method
             // declarations.
-            if self.mode == AnalysisMode::Full {
+            if self.mode == AnalysisMode::Full && self.record_reference_locations {
                 if let Some(name) = method.name.as_deref() {
                     let span = super::bare_name_span_in(source, &member.span, name);
                     if span.end > span.start {

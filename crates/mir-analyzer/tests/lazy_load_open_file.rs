@@ -3,7 +3,8 @@
 //!
 //! `tests/lazy_load.rs` exercises the *batch* path (`analyze_paths`). This file
 //! exercises the *open-file* path (`AnalysisSession::ingest_file` +
-//! `FileAnalyzer::analyze`), which the LSP uses for the currently-edited buffer.
+//! `FileAnalyzer` analysis entrypoints), which the LSP uses for the
+//! currently-edited buffer.
 //!
 //! In the eager-static-input model the consumer indexes the project + vendor
 //! files up front (`index_batch` + `finalize_index`), so the workspace symbol
@@ -77,7 +78,12 @@ fn analyze_open_file_with_psr4(
         "parser errors in open-file source: {:?}",
         parsed.errors
     );
-    FileAnalyzer::new(&session).analyze(open_path, open_src, &parsed.program, &parsed.source_map)
+    FileAnalyzer::new(&session).analyze_diagnostics_only(
+        open_path,
+        open_src,
+        &parsed.program,
+        &parsed.source_map,
+    )
 }
 
 fn undefined_method_count(analysis: &mir_analyzer::FileAnalysis) -> usize {
@@ -128,7 +134,12 @@ fn analyze_open_file_unindexed(
         "parse errors: {:?}",
         parsed.errors
     );
-    FileAnalyzer::new(&session).analyze(open_path, open_src, &parsed.program, &parsed.source_map)
+    FileAnalyzer::new(&session).analyze_diagnostics_only(
+        open_path,
+        open_src,
+        &parsed.program,
+        &parsed.source_map,
+    )
 }
 
 /// `extends` with a bare, same-namespace name (no `use`): `Child extends Base`
@@ -336,7 +347,7 @@ fn priority_index_pre_loads_docblock_only_param_class() {
         parsed.errors
     );
 
-    let analysis = FileAnalyzer::new(&session).analyze(
+    let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
         open_path,
         open_src,
         &parsed.program,
@@ -407,7 +418,12 @@ fn analyze_open_file_unindexed_psr0(
         "parse errors: {:?}",
         parsed.errors
     );
-    FileAnalyzer::new(&session).analyze(open_path, open_src, &parsed.program, &parsed.source_map)
+    FileAnalyzer::new(&session).analyze_diagnostics_only(
+        open_path,
+        open_src,
+        &parsed.program,
+        &parsed.source_map,
+    )
 }
 
 /// Issue: default lazy-vendor mode reported a PSR-0 (PEAR-style, no

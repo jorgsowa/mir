@@ -63,6 +63,12 @@ pub struct AnalysisSession {
     /// this, re-deriving "old" symbols from the (possibly pre-updated) input
     /// would miss deletions and break cross-file dependency invalidation.
     last_ingested_symbols: Arc<RwLock<HashMap<String, HashSet<Arc<str>>>>>,
+    /// Structural outgoing dependency targets by file, as of the last
+    /// ingestion that updated this session's declaration state. Lets
+    /// `ingest_file` tell whether the dependency graph's declaration-shaped
+    /// edges actually changed, so body-only edits need not invalidate the
+    /// cached graph.
+    last_structural_targets: Arc<RwLock<HashMap<String, HashSet<String>>>>,
     /// Negative cache: FQCNs that `load_class` already failed on.
     /// The value is the resolver-mapped path (when known) so eviction on
     /// `set_file_text` / `ingest_file` is a path equality check rather than
@@ -151,6 +157,14 @@ pub struct AnalysisSession {
     subtype_query_cache_sites: Arc<std::sync::atomic::AtomicUsize>,
     /// Hits served from `subtype_query_cache`. Diagnostic only.
     subtype_query_cache_hits: Arc<std::sync::atomic::AtomicU64>,
+    /// Session-local memo of the derived dependency graph. Rebuilt lazily on
+    /// demand and invalidated whenever committed references, structural
+    /// edges, source-file membership, or stale-symbol tracking changes.
+    dependency_graph_cache: DependencyGraphCache,
+    /// One-run replay cache for `analyze_paths` when the next batch invocation
+    /// on this session sees the same file set with identical bytes. Any
+    /// mutation outside `analyze_paths` clears it.
+    transient_batch_replay: BatchReplayCache,
 }
 
 /// Which reference postings [`AnalysisSession::indexed_references_to`]
@@ -278,6 +292,9 @@ const SUBTYPE_QUERY_CACHE_SITE_CAP: usize = 50_000;
 type SubtypeQueryCache =
     Arc<RwLock<RevisionedMap<SubtypeQueryCacheKey, Arc<Vec<SubtypeClassSite>>>>>;
 
+type DependencyGraphCache = Arc<RwLock<Option<crate::DependencyGraph>>>;
+type BatchReplayCache = Arc<RwLock<Option<Arc<BatchReplayState>>>>;
+
 /// Stable content hash of a candidate-file list, order-sensitive. Callers
 /// that rebuild the list identically each time (the common case — the same
 /// scope-narrowing query re-run against unchanged state) still hash equal;
@@ -347,6 +364,31 @@ pub(crate) struct RefCommit {
 /// file → [`RefCommit`] map shared across session clones.
 type CommittedRefs = Arc<RwLock<HashMap<Arc<str>, RefCommit>>>;
 
+/// One file's replayable body-analysis output from the previous batch run.
+pub(crate) struct BatchReplayFile {
+    pub(crate) issues: Arc<[mir_issues::Issue]>,
+    pub(crate) ref_locs: Arc<[crate::cache::CachedRefLoc]>,
+    pub(crate) symbols: Arc<[crate::symbol::ResolvedSymbol]>,
+}
+
+/// Fingerprint for a session-local whole-batch replay.
+///
+/// The replay path is intentionally narrow: exact path→content-hash equality,
+/// same PHP version, and same symbol-collection mode. This keeps it suitable
+/// for watch-mode warm repeats without widening it into a general incremental
+/// cache.
+#[derive(PartialEq, Eq)]
+pub(crate) struct BatchReplayKey {
+    php_version: u8,
+    skip_symbols: bool,
+    content_hashes: HashMap<Arc<str>, String>,
+}
+
+pub(crate) struct BatchReplayState {
+    key: BatchReplayKey,
+    pub(crate) files: HashMap<Arc<str>, BatchReplayFile>,
+}
+
 /// Cap on the negative-resolution cache. Sized to accommodate a large
 /// workspace's worth of genuinely-missing references without unbounded
 /// growth. On overflow the cache is cleared; the cost is a few extra
@@ -391,6 +433,7 @@ impl AnalysisSession {
             user_stub_dirs: Vec::new(),
             stale_defined_symbols: Arc::new(RwLock::new(HashMap::default())),
             last_ingested_symbols: Arc::new(RwLock::new(HashMap::default())),
+            last_structural_targets: Arc::new(RwLock::new(HashMap::default())),
             unresolvable_fqcns: Arc::new(RwLock::new(HashMap::default())),
             source_provider: Arc::new(crate::FsSourceProvider),
             pending_eager_function_files: Arc::new(parking_lot::Mutex::new(Some(Vec::new()))),
@@ -405,6 +448,8 @@ impl AnalysisSession {
             subtype_query_cache: Arc::new(RwLock::new(RevisionedMap::default())),
             subtype_query_cache_sites: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             subtype_query_cache_hits: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            dependency_graph_cache: Arc::new(RwLock::new(None)),
+            transient_batch_replay: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -440,6 +485,45 @@ impl AnalysisSession {
     /// Times the reference index has been locked on this session's db.
     pub fn ref_index_lock_count(&self) -> u64 {
         self.db.salsa.read().ref_index_lock_count()
+    }
+
+    pub(crate) fn clear_dependency_graph_cache(&self) {
+        *self.dependency_graph_cache.write() = None;
+    }
+
+    pub(crate) fn clear_transient_batch_replay(&self) {
+        *self.transient_batch_replay.write() = None;
+    }
+
+    pub(crate) fn transient_batch_replay(
+        &self,
+        php_version: u8,
+        skip_symbols: bool,
+        content_hashes: &HashMap<Arc<str>, String>,
+    ) -> Option<Arc<BatchReplayState>> {
+        let replay = self.transient_batch_replay.read();
+        let state = replay.as_ref()?;
+        (state.key.php_version == php_version
+            && state.key.skip_symbols == skip_symbols
+            && state.key.content_hashes == *content_hashes)
+            .then(|| Arc::clone(state))
+    }
+
+    pub(crate) fn store_transient_batch_replay(
+        &self,
+        php_version: u8,
+        skip_symbols: bool,
+        content_hashes: &HashMap<Arc<str>, String>,
+        files: HashMap<Arc<str>, BatchReplayFile>,
+    ) {
+        *self.transient_batch_replay.write() = Some(Arc::new(BatchReplayState {
+            key: BatchReplayKey {
+                php_version,
+                skip_symbols,
+                content_hashes: content_hashes.clone(),
+            },
+            files,
+        }));
     }
 
     /// Open a scope during which `bump_workspace_revision` calls coalesce:

@@ -780,27 +780,28 @@ pub(crate) fn return_arrays_compatible(
                         return false;
                     }
                     match declared_atomic {
-                    Atomic::TKeyedArray { .. } => true,
-                    Atomic::TArray { key: dk, value: dv } => keys_values_compatible(dk, dv),
-                    Atomic::TNonEmptyArray { key: dk, value: dv } => {
-                        (*is_open || properties.iter().any(|(_, p)| !p.optional))
-                            && keys_values_compatible(dk, dv)
+                        Atomic::TKeyedArray { .. } => true,
+                        Atomic::TArray { key: dk, value: dv } => keys_values_compatible(dk, dv),
+                        Atomic::TNonEmptyArray { key: dk, value: dv } => {
+                            (*is_open || properties.iter().any(|(_, p)| !p.optional))
+                                && keys_values_compatible(dk, dv)
+                        }
+                        _ => false,
                     }
-                    _ => false,
-                }});
+                });
             }
             _ => return false,
         };
 
         declared.types.iter().any(|d_atomic| {
             let mut requires_non_list = false;
-            let declared_atomic = if let Some(array_atomic) = associative_array_intersection_part(d_atomic)
-            {
-                requires_non_list = true;
-                array_atomic
-            } else {
-                d_atomic
-            };
+            let declared_atomic =
+                if let Some(array_atomic) = associative_array_intersection_part(d_atomic) {
+                    requires_non_list = true;
+                    array_atomic
+                } else {
+                    d_atomic
+                };
             if requires_non_list && actual_is_definite_list(a_atomic) {
                 return false;
             }

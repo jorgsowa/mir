@@ -47,7 +47,7 @@ fn project_analyzer_cold_and_warm_produce_identical_symbol_table() {
 
     // --- Cold: populate the cache. -------------------------------------
     let cold = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-    let cold_result = cold.analyze_paths(&paths, &BatchOptions::new());
+    let cold_result = cold.analyze_paths(&paths, &BatchOptions::new().without_symbols());
     let cold_issues = cold_result.issues.len();
     assert!(
         cold.contains_class("App\\A"),
@@ -72,7 +72,7 @@ fn project_analyzer_cold_and_warm_produce_identical_symbol_table() {
     // no hits the assertion below catches regressions: cold and warm
     // must agree on the observable analyzer state.
     let warm = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-    let warm_result = warm.analyze_paths(&paths, &BatchOptions::new());
+    let warm_result = warm.analyze_paths(&paths, &BatchOptions::new().without_symbols());
     assert_eq!(
         warm_result.issues.len(),
         cold_issues,

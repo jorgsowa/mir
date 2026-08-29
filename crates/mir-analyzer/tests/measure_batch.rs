@@ -17,21 +17,23 @@
 
 use std::path::PathBuf;
 
-use mir_analyzer::{discover_files, AnalysisSession, BatchOptions, PhpVersion};
-
-fn fixtures_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("benches")
-        .join("fixtures")
-        .join("laravel")
-}
+use mir_analyzer::{
+    discover_files, perf_fixture::PerfFixture, AnalysisSession, BatchOptions, PhpVersion,
+};
 
 #[test]
 #[ignore = "measurement harness; run explicitly with --release --ignored"]
 fn measure_batch() {
-    let root = fixtures_root();
-    if !root.exists() {
-        eprintln!("Skipping: fixture not present at {}", root.display());
+    let Some(fixture) = PerfFixture::discover() else {
+        eprintln!("Skipping: no supported perf fixture present");
+        return;
+    };
+    let root = fixture.root();
+    if !fixture.has_full_corpus() {
+        eprintln!(
+            "Skipping: fixture not present or incomplete at {}",
+            root.display()
+        );
         return;
     }
 
@@ -42,8 +44,8 @@ fn measure_batch() {
         other => panic!("unknown MIR_MEASURE mode: {other}"),
     };
 
-    let vendor_files = discover_files(&root.join("vendor"));
-    let project_files = discover_files(&root.join("src"));
+    let vendor_files = discover_files(&fixture.vendor_root());
+    let project_files = discover_files(&fixture.src_root());
     let all_files: Vec<PathBuf> = vendor_files
         .iter()
         .chain(project_files.iter())

@@ -7,25 +7,17 @@
 //! ```
 
 use std::hint::black_box;
-use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use mir_analyzer::{discover_files, AnalysisSession, BatchOptions, PhpVersion};
+use mir_analyzer::{
+    discover_files, perf_fixture::PerfFixture, AnalysisSession, BatchOptions, PhpVersion,
+};
 
-fn fixtures_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("benches")
-        .join("fixtures")
-        .join("laravel")
-}
-
-fn skip_if_missing(root: &Path) -> bool {
-    let src = root.join("src");
-    let vendor = root.join("vendor");
-    if !src.exists() || !vendor.exists() {
+fn skip_if_missing(fixture: &PerfFixture) -> bool {
+    if !fixture.has_full_corpus() {
         eprintln!(
             "Skipping measurement: fixture not found or incomplete at {}",
-            root.display()
+            fixture.root().display()
         );
         true
     } else {
@@ -36,17 +28,20 @@ fn skip_if_missing(root: &Path) -> bool {
 #[test]
 #[ignore = "measurement harness; run explicitly with --release --ignored"]
 fn measure_dependency_graph() {
-    let root = fixtures_root();
-    if skip_if_missing(&root) {
+    let Some(fixture) = PerfFixture::discover() else {
+        eprintln!("Skipping measurement: no supported perf fixture found");
+        return;
+    };
+    if skip_if_missing(&fixture) {
         return;
     }
 
-    let vendor_files = discover_files(&root.join("vendor"));
-    let project_files = discover_files(&root.join("src"));
+    let vendor_files = discover_files(&fixture.vendor_root());
+    let project_files = discover_files(&fixture.src_root());
     let session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
     session.collect_definitions(&vendor_files);
-    let _ = session.analyze_paths(&project_files, &BatchOptions::new());
+    let _ = session.analyze_paths(&project_files, &BatchOptions::new().without_symbols());
     session.rebuild_workspace_symbol_index();
 
     let db = session.snapshot_db();

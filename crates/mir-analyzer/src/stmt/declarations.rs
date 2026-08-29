@@ -124,11 +124,18 @@ impl<'a> StatementsAnalyzer<'a> {
                 self.source,
                 self.source_map,
                 self.issues,
-                self.symbols,
+                self.symbols.as_deref_mut(),
+                self.navigation_facts,
+                self.resolved_navigation_facts,
                 self.php_version,
                 self.mode,
             );
             sa.collect_symbols = self.collect_symbols;
+            sa.capture_symbol_types = self.capture_symbol_types;
+            sa.collect_navigation_facts = self.collect_navigation_facts;
+            sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
+            sa.codebase_symbols_only = self.codebase_symbols_only;
+            sa.record_reference_locations = self.record_reference_locations;
             match &hook.body {
                 PropertyHookBody::Block(block) => {
                     hook_ctx.is_generator = crate::body_analysis::body_has_yield(&block.stmts);
@@ -243,11 +250,18 @@ impl<'a> StatementsAnalyzer<'a> {
             self.source,
             self.source_map,
             self.issues,
-            self.symbols,
+            self.symbols.as_deref_mut(),
+            self.navigation_facts,
+            self.resolved_navigation_facts,
             self.php_version,
             self.mode,
         );
         sa.collect_symbols = self.collect_symbols;
+        sa.capture_symbol_types = self.capture_symbol_types;
+        sa.collect_navigation_facts = self.collect_navigation_facts;
+        sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
+        sa.codebase_symbols_only = self.codebase_symbols_only;
+        sa.record_reference_locations = self.record_reference_locations;
         sa.analyze_stmts(&decl.body.stmts, &mut fn_ctx);
     }
 
@@ -445,11 +459,18 @@ impl<'a> StatementsAnalyzer<'a> {
                 self.source,
                 self.source_map,
                 self.issues,
-                self.symbols,
+                self.symbols.as_deref_mut(),
+                self.navigation_facts,
+                self.resolved_navigation_facts,
                 self.php_version,
                 self.mode,
             );
             sa.collect_symbols = self.collect_symbols;
+            sa.capture_symbol_types = self.capture_symbol_types;
+            sa.codebase_symbols_only = self.codebase_symbols_only;
+            sa.record_reference_locations = self.record_reference_locations;
+            sa.collect_navigation_facts = self.collect_navigation_facts;
+            sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
             sa.analyze_stmts(&body.stmts, &mut method_ctx);
         }
     }

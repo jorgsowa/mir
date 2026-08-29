@@ -44,6 +44,7 @@ impl AnalysisSession {
         text: Arc<str>,
         durability: salsa::Durability,
     ) -> crate::db::SourceFile {
+        self.clear_transient_batch_replay();
         self.db.upsert_source_file(path, text, durability)
     }
 
@@ -60,6 +61,7 @@ impl AnalysisSession {
     /// **Internal API — exposes Salsa types.** Subject to change without notice.
     #[doc(hidden)]
     pub fn remove_source_file_input(&self, path: &str) {
+        self.clear_transient_batch_replay();
         self.db.remove_source_file(path);
     }
 
@@ -71,6 +73,7 @@ impl AnalysisSession {
     /// **Internal API — exposes Salsa types.** Subject to change without notice.
     #[doc(hidden)]
     pub fn with_db_mut<R>(&self, f: impl FnOnce(&mut MirDbStorage) -> R) -> R {
+        self.clear_transient_batch_replay();
         let mut guard = self.db.salsa.write();
         f(&mut guard)
     }
@@ -104,10 +107,12 @@ impl AnalysisSession {
         generation: u64,
         resolved: bool,
     ) {
+        self.clear_transient_batch_replay();
         {
             let guard = self.db.salsa.read();
             guard.set_file_reference_locations(file.as_ref(), locs);
         }
+        self.clear_dependency_graph_cache();
         if let Some(text) = text {
             // No memoized output on the imperative path — the empty weak
             // handle makes the next re-analysis sweep recommit once (and
@@ -138,6 +143,22 @@ impl AnalysisSession {
     /// accumulate dead reference-location entries indefinitely.)
     pub fn ingest_file(&self, file: Arc<str>, source: Arc<str>) {
         self.ensure_all_stubs();
+        let existing_text = {
+            let db = self.snapshot_db();
+            db.lookup_source_file(file.as_ref())
+                .map(|sf| sf.text(&db as &dyn MirDatabase).clone())
+        };
+        if existing_text
+            .as_ref()
+            .is_some_and(|text| text.as_ref() == source.as_ref())
+            && self
+                .last_ingested_symbols
+                .read()
+                .contains_key(file.as_ref())
+        {
+            return;
+        }
+        self.clear_transient_batch_replay();
 
         // The symbols this file defined as of its last ingest. Read from the
         // explicit `last_ingested_symbols` map rather than re-deriving via
@@ -147,6 +168,12 @@ impl AnalysisSession {
         // the new set and silently drop deletions.
         let old_symbols: HashSet<Arc<str>> = self
             .last_ingested_symbols
+            .read()
+            .get(file.as_ref())
+            .cloned()
+            .unwrap_or_default();
+        let old_structural_targets: HashSet<String> = self
+            .last_structural_targets
             .read()
             .get(file.as_ref())
             .cloned()
@@ -183,8 +210,8 @@ impl AnalysisSession {
         if !deleted.is_empty() || !re_added.is_empty() {
             let mut stale = self.stale_defined_symbols.write();
             let entry = stale.entry(file.as_ref().to_string()).or_default();
-            for sym in deleted {
-                entry.insert(sym);
+            for sym in &deleted {
+                entry.insert(sym.clone());
             }
             for sym in &re_added {
                 entry.remove(sym);
@@ -200,6 +227,23 @@ impl AnalysisSession {
             // on its own — this covers definitions appearing in an
             // already-registered file (edits, `set_file_text` lazy loads).
             self.db.salsa.write().bump_workspace_revision();
+        }
+
+        // Structural edges depend only on declaration-shaped data already
+        // committed above, so compute them now and only invalidate the cached
+        // dependency graph when those edges actually changed.
+        let new_structural_targets = {
+            let db = self.snapshot_db();
+            file_outgoing_dependencies(&db, file.as_ref(), false)
+        };
+        self.last_structural_targets
+            .write()
+            .insert(file.as_ref().to_string(), new_structural_targets.clone());
+        let dependency_graph_changed = old_structural_targets != new_structural_targets
+            || !deleted.is_empty()
+            || !re_added.is_empty();
+        if dependency_graph_changed {
+            self.clear_dependency_graph_cache();
         }
 
         self.update_reverse_deps_for(&file);
@@ -274,6 +318,7 @@ impl AnalysisSession {
     /// [`Self::ingest_file`], so faulting in a dependency never cascades into
     /// preparing *its* dependencies — the load frontier stays one file wide.
     pub fn ingest_file_prepared(&self, file: Arc<str>, source: Arc<str>) {
+        self.clear_transient_batch_replay();
         self.ingest_file(file.clone(), source);
         self.prepare_file_for_analysis(&file);
     }
@@ -296,10 +341,12 @@ impl AnalysisSession {
     /// Clears the negative cache: a previously-unresolvable FQCN may now
     /// resolve if its defining file is among the newly-registered set.
     pub fn set_file_text(&self, file: Arc<str>, source: Arc<str>) {
+        self.clear_transient_batch_replay();
         {
             let mut guard = self.db.salsa.write();
             guard.upsert_source_file(file.clone(), source);
         }
+        self.clear_dependency_graph_cache();
         self.evict_unresolvable_for_file(&file);
     }
 
@@ -315,6 +362,8 @@ impl AnalysisSession {
     where
         I: IntoIterator<Item = (Arc<str>, Arc<str>)>,
     {
+        self.clear_transient_batch_replay();
+        self.clear_dependency_graph_cache();
         // One revision bump for the batch, not one per registered file. The
         // scope must close after the guard drops (the flush takes the lock).
         let _deferred_bumps = self.defer_revision_bumps();
@@ -358,6 +407,7 @@ impl AnalysisSession {
     where
         I: IntoIterator<Item = (Arc<str>, Arc<str>)>,
     {
+        self.clear_dependency_graph_cache();
         // One revision bump for the batch, not one per registered file.
         let _deferred_bumps = self.defer_revision_bumps();
         let registered_paths: Vec<Arc<str>> = {
@@ -438,7 +488,7 @@ impl AnalysisSession {
     /// under the lock, so the write window per chunk is short and an interactive
     /// read on another thread blocks at most that long. Note that, per salsa's
     /// snapshot model, a *cancellable query* in flight on another thread (e.g.
-    /// `hover`, `definition_of`, `FileAnalyzer::analyze`) when this batch takes
+    /// `hover`, `definition_of`, `FileAnalyzer::analyze_diagnostics_only`) when this batch takes
     /// the write lock may unwind with `salsa::Cancelled`; a multi-threaded
     /// consumer should catch that and retry the request (the rust-analyzer
     /// pattern). A single-threaded consumer that interleaves requests *between*
@@ -457,6 +507,7 @@ impl AnalysisSession {
             };
         }
         self.ensure_all_stubs();
+        self.clear_dependency_graph_cache();
 
         // 1. Register the chunk as HIGH-durability inputs — one short write
         //    window, then release the lock so interactive requests interleave.
@@ -704,28 +755,47 @@ impl AnalysisSession {
         let mut seed_decls: Vec<(crate::db::SourceFile, crate::db::FileDeclarations)> =
             Vec::with_capacity(hits.len());
         let mut unresolved: Vec<Arc<str>> = Vec::new();
-        for hit in hits {
-            let WarmStartHit {
-                file,
-                sf,
-                stored_text,
-                refs,
-                stub,
-            } = hit;
-            if let Some((locs, resolved)) = refs {
-                self.commit_file_refs(&file, Some(stored_text.clone()), locs, commit_gen, resolved);
-                if !resolved {
-                    unresolved.push(file.clone());
+        let mut structural_target_files: Vec<Arc<str>> = Vec::new();
+        let mut dependency_graph_changed = false;
+        {
+            let guard = self.db.salsa.read();
+            for hit in hits {
+                let WarmStartHit {
+                    file,
+                    sf,
+                    stored_text,
+                    refs,
+                    stub,
+                } = hit;
+                if let Some((locs, resolved)) = refs {
+                    guard.set_file_reference_locations(file.as_ref(), locs);
+                    self.mark_ref_committed(&file, &stored_text, None, commit_gen, resolved);
+                    dependency_graph_changed = true;
+                    if !resolved {
+                        unresolved.push(file.clone());
+                    }
                 }
-            }
-            if let Some((entries, decls)) = stub {
-                {
-                    let guard = self.db.salsa.read();
+                if let Some((entries, decls)) = stub {
                     guard.set_file_class_edges(&file, entries);
+                    self.mark_defs_committed(&file, &stored_text);
+                    structural_target_files.push(file.clone());
+                    dependency_graph_changed = true;
+                    seed_decls.push((sf, decls));
                 }
-                self.mark_defs_committed(&file, &stored_text);
-                seed_decls.push((sf, decls));
             }
+        }
+        if !structural_target_files.is_empty() {
+            let db = self.snapshot_db();
+            let mut structural_targets = self.last_structural_targets.write();
+            for file in &structural_target_files {
+                structural_targets.insert(
+                    file.as_ref().to_string(),
+                    file_outgoing_dependencies(&db, file.as_ref(), false),
+                );
+            }
+        }
+        if dependency_graph_changed {
+            self.clear_dependency_graph_cache();
         }
 
         self.seed_workspace_index_from_warm_start(seed_decls);
@@ -858,6 +928,8 @@ impl AnalysisSession {
     /// [`Self::ingest_file`] also drops old definitions, but does not
     /// remove the salsa input handle — call this for full cleanup.)
     pub fn invalidate_file(&self, file: &str) {
+        self.clear_transient_batch_replay();
+        self.clear_dependency_graph_cache();
         {
             let mut guard = self.db.salsa.write();
             guard.remove_file_definitions(file);
@@ -872,6 +944,7 @@ impl AnalysisSession {
         // Clear stale symbol tracking for this file — it's fully gone.
         self.stale_defined_symbols.write().remove(file);
         self.last_ingested_symbols.write().remove(file);
+        self.last_structural_targets.write().remove(file);
         // Declarations this file provided are gone; other prepared files may
         // now need their warm-up re-run to lazy-load replacements.
         self.forget_prepared(file);

@@ -1,4 +1,5 @@
 use rustc_hash::FxHashMap;
+use std::cell::RefCell;
 use std::sync::Arc;
 
 use mir_issues::Issue;
@@ -12,7 +13,7 @@ use crate::diagnostics::{
 };
 use crate::php_version::PhpVersion;
 use crate::reference_key::ReferenceKeyCache;
-use crate::symbol::ResolvedSymbol;
+use crate::symbol::{NavigationFact, ReferenceKind, ResolvedNavigationFact, ResolvedSymbol};
 
 /// Calls `f` on every file-scope statement that is **not** a control-flow
 /// wrapper, recursing into the bodies of `if`/`elseif`/`else`, `while`, `for`,
@@ -118,7 +119,7 @@ pub(crate) enum AnalysisMode {
     InferenceOnly,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct InferredTypes {
     pub(crate) functions: Vec<(Arc<str>, Type)>,
     pub(crate) methods: Vec<(Arc<str>, Arc<str>, Type)>,
@@ -235,7 +236,7 @@ fn method_chain_signature(
 }
 
 /// Resolve a function declaration's storage via the salsa pull path
-/// (qualified FQN → raw name → short-name scan over `workspace_functions`).
+/// (qualified FQN → raw name → short-name postings from the workspace index).
 fn lookup_function_node_for_decl(
     db: &dyn MirDatabase,
     file: &str,
@@ -251,14 +252,15 @@ fn lookup_function_node_for_decl(
     if let Some(f) = try_lookup(fn_name) {
         return Some((Arc::from(fn_name), f));
     }
-    crate::metrics::record_fn_short_name_scan();
-    for fqn in crate::db::workspace_functions(db).iter() {
+    let short_lower = if fn_name.bytes().any(|b| b.is_ascii_uppercase()) {
+        fn_name.to_ascii_lowercase()
+    } else {
+        fn_name.to_string()
+    };
+    for fqn in crate::db::workspace_index(db).functions_named(Name::new(&short_lower)) {
         let fqn = fqn.as_str();
-        let short = fqn.rsplit('\\').next().unwrap_or(fqn);
-        if short == fn_name {
-            if let Some(f) = try_lookup(fqn) {
-                return Some((Arc::from(fqn), f));
-            }
+        if let Some(f) = try_lookup(fqn) {
+            return Some((Arc::from(fqn), f));
         }
     }
     None
@@ -478,8 +480,26 @@ pub(crate) struct BodyAnalyzer<'a> {
     /// diagnostics-only consumers (`BatchOptions::skip_symbols`) so per-
     /// reference Type clones aren't built just to be discarded.
     pub(crate) collect_symbols: bool,
+    /// When false, any recorded symbol keeps only navigation shape and uses a
+    /// cheap placeholder type instead of cloning the fully-resolved payload.
+    pub(crate) capture_symbol_types: bool,
+    /// When true, only record symbols that map to a codebase-level
+    /// [`crate::Name`]. Used by targeted cursor-name resolution, which does
+    /// not need locals or receiver-gap markers.
+    pub(crate) codebase_symbols_only: bool,
+    /// When false, skip recording reference-location postings. Targeted
+    /// cursor navigation does not commit or read them back.
+    pub(crate) record_reference_locations: bool,
+    /// When true, collect compact codebase-name navigation facts.
+    pub(crate) collect_navigation_facts: bool,
+    /// When true, collect compact typed facts for codebase symbol resolution.
+    pub(crate) collect_resolved_navigation_facts: bool,
+    /// When true, retain compact inferred return/property facts from the walk.
+    pub(crate) collect_inferred_types: bool,
     inferred_types: Arc<Mutex<InferredTypes>>,
     reference_key_cache: Arc<Mutex<ReferenceKeyCache>>,
+    navigation_facts: RefCell<Vec<NavigationFact>>,
+    resolved_navigation_facts: RefCell<Vec<ResolvedNavigationFact>>,
 }
 
 impl<'a> BodyAnalyzer<'a> {
@@ -489,12 +509,20 @@ impl<'a> BodyAnalyzer<'a> {
             php_version,
             mode: AnalysisMode::Full,
             collect_symbols: true,
+            capture_symbol_types: true,
+            codebase_symbols_only: false,
+            record_reference_locations: true,
+            collect_navigation_facts: false,
+            collect_resolved_navigation_facts: false,
+            collect_inferred_types: false,
             inferred_types: Arc::new(Mutex::new(InferredTypes {
                 functions: Vec::new(),
                 methods: Vec::new(),
                 properties: Vec::new(),
             })),
             reference_key_cache: Arc::new(Mutex::new(ReferenceKeyCache::default())),
+            navigation_facts: RefCell::new(Vec::new()),
+            resolved_navigation_facts: RefCell::new(Vec::new()),
         }
     }
 
@@ -504,12 +532,20 @@ impl<'a> BodyAnalyzer<'a> {
             php_version,
             mode: AnalysisMode::InferenceOnly,
             collect_symbols: true,
+            capture_symbol_types: true,
+            codebase_symbols_only: false,
+            record_reference_locations: true,
+            collect_navigation_facts: false,
+            collect_resolved_navigation_facts: false,
+            collect_inferred_types: true,
             inferred_types: Arc::new(Mutex::new(InferredTypes {
                 functions: Vec::new(),
                 methods: Vec::new(),
                 properties: Vec::new(),
             })),
             reference_key_cache: Arc::new(Mutex::new(ReferenceKeyCache::default())),
+            navigation_facts: RefCell::new(Vec::new()),
+            resolved_navigation_facts: RefCell::new(Vec::new()),
         }
     }
 
@@ -520,15 +556,32 @@ impl<'a> BodyAnalyzer<'a> {
             .unwrap_or_else(|arc| arc.lock().clone())
     }
 
+    pub(crate) fn issue_buffer(&self) -> mir_issues::IssueBuffer {
+        let buf = mir_issues::IssueBuffer::new();
+        if self.mode == AnalysisMode::Full {
+            buf
+        } else {
+            buf.discarding()
+        }
+    }
+
+    pub(crate) fn take_navigation_facts(&self) -> Vec<NavigationFact> {
+        std::mem::take(&mut *self.navigation_facts.borrow_mut())
+    }
+
+    pub(crate) fn take_resolved_navigation_facts(&self) -> Vec<ResolvedNavigationFact> {
+        std::mem::take(&mut *self.resolved_navigation_facts.borrow_mut())
+    }
+
     fn record_function_inference(&self, fqn: &Arc<str>, inferred: &Type) {
-        if self.mode == AnalysisMode::InferenceOnly {
+        if self.collect_inferred_types {
             let mut types = self.inferred_types.lock();
             types.functions.push((fqn.clone(), inferred.clone()));
         }
     }
 
     fn record_method_inference(&self, fqcn: &str, name: &str, inferred: &Type) {
-        if self.mode == AnalysisMode::InferenceOnly {
+        if self.collect_inferred_types {
             let mut types = self.inferred_types.lock();
             types
                 .methods
@@ -544,7 +597,7 @@ impl<'a> BodyAnalyzer<'a> {
     /// owner), not necessarily the class whose constructor was analyzed —
     /// same property-name convention as `find_property_in_chain` itself.
     pub(crate) fn record_property_inference(&self, fqcn: &str, name: &str, inferred: &Type) {
-        if self.mode == AnalysisMode::InferenceOnly {
+        if self.collect_inferred_types {
             let mut types = self.inferred_types.lock();
             types
                 .properties
@@ -572,7 +625,7 @@ impl<'a> BodyAnalyzer<'a> {
         source_map: &php_rs_parser::source_map::SourceMap,
         span: php_ast::Span,
     ) {
-        if self.mode != AnalysisMode::Full {
+        if self.mode != AnalysisMode::Full || !self.record_reference_locations {
             return;
         }
         let (line, col_start) =
@@ -610,9 +663,27 @@ impl<'a> BodyAnalyzer<'a> {
             all_issues,
             self.php_version,
         );
-        if self.mode == AnalysisMode::Full {
-            let mut all_symbols = all_symbols;
-            for (fqcn, span) in collect_type_hint_class_refs(hint, self.db, file) {
+        let mut all_symbols = all_symbols;
+        for (fqcn, span) in collect_type_hint_class_refs(hint, self.db, file) {
+            let class_exists = crate::db::class_exists(self.db, fqcn.as_ref());
+            if self.collect_navigation_facts && class_exists {
+                self.navigation_facts.borrow_mut().push(NavigationFact {
+                    span,
+                    expr_span: None,
+                    name: crate::Name::class(fqcn.clone()),
+                });
+            }
+            if self.collect_resolved_navigation_facts && class_exists {
+                self.resolved_navigation_facts
+                    .borrow_mut()
+                    .push(ResolvedNavigationFact {
+                        span,
+                        expr_span: None,
+                        kind: ReferenceKind::ClassReference(fqcn.clone()),
+                        resolved_type: Type::single(mir_types::Atomic::TClassString(None)),
+                    });
+            }
+            if self.mode == AnalysisMode::Full && self.record_reference_locations {
                 let (line, col_start) =
                     crate::diagnostics::offset_to_line_col(source, span.start, source_map);
                 let (line_end, col_end) =
@@ -624,13 +695,12 @@ impl<'a> BodyAnalyzer<'a> {
                     col_start,
                     col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
                 });
-                // Without this, hover/go-to-definition on a native type-hint class name
-                // (the single most common symbol position in the codebase) resolved
-                // nothing — the closure/arrow-fn twin (`check_type_hint` in expr/mod.rs)
-                // records both a ref and a symbol for the identical AST shape.
-                if crate::db::class_exists(self.db, fqcn.as_ref()) {
+                // Full diagnostics still need reference postings here, but the
+                // retained `ResolvedSymbol` payload should only exist on symbol-
+                // collecting paths. Targeted navigation during diagnostics-only
+                // runs goes through compact facts instead.
+                if self.collect_symbols && class_exists {
                     if let Some(symbols) = all_symbols.as_deref_mut() {
-                        use crate::symbol::ReferenceKind;
                         symbols.push(ResolvedSymbol {
                             file: file.clone(),
                             span,
@@ -657,7 +727,8 @@ impl<'a> BodyAnalyzer<'a> {
         source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<Issue>,
     ) {
-        if self.mode != AnalysisMode::Full || throws.is_empty() {
+        if self.mode != AnalysisMode::Full || !self.record_reference_locations || throws.is_empty()
+        {
             return;
         }
         let (line, col_start) =
@@ -1135,13 +1206,22 @@ pub(super) fn bare_name_span_in(
 /// Push one `Variable` symbol per parameter declaration into `all_symbols`.
 /// Called immediately after [`seed_param_locations`] at every function/method body entry.
 fn record_param_symbols(
-    all_symbols: &mut Vec<ResolvedSymbol>,
+    all_symbols: Option<&mut Vec<ResolvedSymbol>>,
     file: &Arc<str>,
     source: &str,
     ast_params: &[php_ast::owned::Param],
     ctx: &crate::flow_state::FlowState,
+    collect_symbols: bool,
+    capture_symbol_types: bool,
+    codebase_symbols_only: bool,
 ) {
     use crate::symbol::ReferenceKind;
+    if !collect_symbols || codebase_symbols_only {
+        return;
+    }
+    let Some(all_symbols) = all_symbols else {
+        return;
+    };
     for p in ast_params {
         let Some(raw) = p.name.as_deref() else {
             continue;
@@ -1154,7 +1234,11 @@ fn record_param_symbols(
             span,
             expr_span: None,
             kind: ReferenceKind::Variable(Arc::from(bare)),
-            resolved_type: ty,
+            resolved_type: if capture_symbol_types {
+                ty
+            } else {
+                Type::mixed()
+            },
         });
     }
 }
@@ -1168,7 +1252,11 @@ pub(crate) fn check_use_decl_casing(
     source_map: &php_rs_parser::source_map::SourceMap,
     all_issues: &mut Vec<Issue>,
     mut all_symbols: Option<&mut Vec<ResolvedSymbol>>,
+    mut navigation_facts: Option<&mut Vec<NavigationFact>>,
+    mut resolved_navigation_facts: Option<&mut Vec<ResolvedNavigationFact>>,
+    collect_symbols: bool,
     is_full: bool,
+    record_reference_locations: bool,
 ) {
     use php_ast::ast::UseKind;
     for item in use_decl.uses.iter() {
@@ -1197,7 +1285,7 @@ pub(crate) fn check_use_decl_casing(
         // checks (which only ever look up the unprefixed key) stay blind to
         // it, preserving the "an import alone isn't a usage" invariant below.
         let record_use_posting = |db: &dyn crate::db::MirDatabase, name: crate::Name| {
-            if !is_full {
+            if !is_full || !record_reference_locations {
                 return;
             }
             db.record_reference_location(crate::db::RefLoc {
@@ -1231,17 +1319,35 @@ pub(crate) fn check_use_decl_casing(
                     // the symbol is recorded (not a `cls:` ref): an import alone
                     // deliberately does not count as a usage (no UnusedImport check
                     // exists), so this must not affect UnusedClass.
-                    if let Some(symbols) = all_symbols.as_deref_mut() {
-                        use crate::symbol::ReferenceKind;
-                        symbols.push(ResolvedSymbol {
-                            file: file.clone(),
+                    if let Some(facts) = navigation_facts.as_deref_mut() {
+                        facts.push(NavigationFact {
+                            span: item.span,
+                            expr_span: None,
+                            name: crate::Name::class(fqcn.clone()),
+                        });
+                    }
+                    if let Some(facts) = resolved_navigation_facts.as_deref_mut() {
+                        facts.push(ResolvedNavigationFact {
                             span: item.span,
                             expr_span: None,
                             kind: ReferenceKind::UseImport(Box::new(
-                                ReferenceKind::ClassReference(fqcn),
+                                ReferenceKind::ClassReference(fqcn.clone()),
                             )),
                             resolved_type: Type::single(mir_types::Atomic::TClassString(None)),
                         });
+                    }
+                    if collect_symbols {
+                        if let Some(symbols) = all_symbols.as_deref_mut() {
+                            symbols.push(ResolvedSymbol {
+                                file: file.clone(),
+                                span: item.span,
+                                expr_span: None,
+                                kind: ReferenceKind::UseImport(Box::new(
+                                    ReferenceKind::ClassReference(fqcn),
+                                )),
+                                resolved_type: Type::single(mir_types::Atomic::TClassString(None)),
+                            });
+                        }
                     }
                 } else {
                     // Unresolvable target (not yet loaded, vendor-only, or
@@ -1268,10 +1374,15 @@ pub(crate) fn check_use_decl_casing(
                     }
                     record_use_posting(db, crate::Name::function(func.fqn.clone()));
                     // Same dead-zone fix as UseKind::Normal above, for `use function`.
-                    if let Some(symbols) = all_symbols.as_deref_mut() {
-                        use crate::symbol::ReferenceKind;
-                        symbols.push(ResolvedSymbol {
-                            file: file.clone(),
+                    if let Some(facts) = navigation_facts.as_deref_mut() {
+                        facts.push(NavigationFact {
+                            span: item.span,
+                            expr_span: None,
+                            name: crate::Name::function(func.fqn.clone()),
+                        });
+                    }
+                    if let Some(facts) = resolved_navigation_facts.as_deref_mut() {
+                        facts.push(ResolvedNavigationFact {
                             span: item.span,
                             expr_span: None,
                             kind: ReferenceKind::UseImport(Box::new(ReferenceKind::FunctionCall(
@@ -1284,6 +1395,23 @@ pub(crate) fn check_use_decl_casing(
                                 .unwrap_or_else(Type::mixed),
                         });
                     }
+                    if collect_symbols {
+                        if let Some(symbols) = all_symbols.as_deref_mut() {
+                            symbols.push(ResolvedSymbol {
+                                file: file.clone(),
+                                span: item.span,
+                                expr_span: None,
+                                kind: ReferenceKind::UseImport(Box::new(
+                                    ReferenceKind::FunctionCall(func.fqn.clone()),
+                                )),
+                                resolved_type: func
+                                    .return_type
+                                    .as_deref()
+                                    .cloned()
+                                    .unwrap_or_else(Type::mixed),
+                            });
+                        }
+                    }
                 } else {
                     // See the UseKind::Normal miss arm.
                     record_use_posting(db, crate::Name::function(full_name.as_str()));
@@ -1295,17 +1423,35 @@ pub(crate) fn check_use_decl_casing(
                     let fqn: Arc<str> = Arc::from(full_name.as_str());
                     record_use_posting(db, crate::Name::global_constant(fqn.clone()));
                     // Same dead-zone fix as UseKind::Normal/Function above, for `use const`.
-                    if let Some(symbols) = all_symbols.as_deref_mut() {
-                        use crate::symbol::ReferenceKind;
-                        symbols.push(ResolvedSymbol {
-                            file: file.clone(),
+                    if let Some(facts) = navigation_facts.as_deref_mut() {
+                        facts.push(NavigationFact {
+                            span: item.span,
+                            expr_span: None,
+                            name: crate::Name::global_constant(fqn.clone()),
+                        });
+                    }
+                    if let Some(facts) = resolved_navigation_facts.as_deref_mut() {
+                        facts.push(ResolvedNavigationFact {
                             span: item.span,
                             expr_span: None,
                             kind: ReferenceKind::UseImport(Box::new(
-                                ReferenceKind::GlobalConstant(fqn),
+                                ReferenceKind::GlobalConstant(fqn.clone()),
                             )),
                             resolved_type: (*ty).clone(),
                         });
+                    }
+                    if collect_symbols {
+                        if let Some(symbols) = all_symbols.as_deref_mut() {
+                            symbols.push(ResolvedSymbol {
+                                file: file.clone(),
+                                span: item.span,
+                                expr_span: None,
+                                kind: ReferenceKind::UseImport(Box::new(
+                                    ReferenceKind::GlobalConstant(fqn),
+                                )),
+                                resolved_type: (*ty).clone(),
+                            });
+                        }
                     }
                 } else {
                     // See the UseKind::Normal miss arm.

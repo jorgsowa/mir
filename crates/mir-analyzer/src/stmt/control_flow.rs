@@ -7,15 +7,13 @@ use php_ast::owned::{
 use mir_issues::{Issue, IssueKind, Location};
 use mir_types::{Atomic, Name, Type};
 
+use super::loops::infer_foreach_types_with_db;
+use super::StatementsAnalyzer;
 use crate::db;
 use crate::expr::extract_simple_var;
 use crate::flow_state::FlowState;
 use crate::narrowing::narrow_from_condition;
 use crate::parser;
-use crate::symbol::ResolvedSymbol;
-
-use super::loops::infer_foreach_types_with_db;
-use super::StatementsAnalyzer;
 
 impl<'a> StatementsAnalyzer<'a> {
     pub(super) fn analyze_if_stmt(&mut self, if_stmt: &IfStmt, ctx: &mut FlowState) {
@@ -991,13 +989,13 @@ impl<'a> StatementsAnalyzer<'a> {
             let mut this_clause_types: Vec<Arc<str>> = Vec::new();
             for catch_ty in catch.types.iter() {
                 self.check_name_undefined_class(catch_ty);
-                if self.mode == crate::body_analysis::AnalysisMode::Full {
-                    let raw = parser::name_to_string_owned(catch_ty);
-                    let resolved = db::resolve_name(self.db, &self.file, &raw);
-                    if !matches!(resolved.as_str(), "self" | "static" | "parent") {
-                        let span = catch_ty.span;
-                        let (line, col_start) = self.offset_to_line_col(span.start);
-                        let (line_end, col_end) = self.offset_to_line_col(span.end);
+                let raw = parser::name_to_string_owned(catch_ty);
+                let resolved = db::resolve_name(self.db, &self.file, &raw);
+                if !matches!(resolved.as_str(), "self" | "static" | "parent") {
+                    let span = catch_ty.span;
+                    let (line, col_start) = self.offset_to_line_col(span.start);
+                    let (line_end, col_end) = self.offset_to_line_col(span.end);
+                    if self.record_reference_locations {
                         self.db.record_reference_location(crate::db::RefLoc {
                             symbol_key: self.reference_key_cache.class(resolved.as_str()),
                             file: self.file.clone(),
@@ -1007,16 +1005,20 @@ impl<'a> StatementsAnalyzer<'a> {
                                 line, line_end, col_start, col_end,
                             ),
                         });
-                        if self.collect_symbols {
-                            let fqcn: Arc<str> = Arc::from(resolved.as_str());
-                            self.symbols.push(ResolvedSymbol {
-                                file: self.file.clone(),
-                                span,
-                                expr_span: None,
-                                kind: crate::symbol::ReferenceKind::ClassReference(fqcn),
-                                resolved_type: Type::single(Atomic::TClassString(None)),
-                            });
-                        }
+                    }
+                    if self.collect_symbols
+                        || self.collect_navigation_facts
+                        || self.collect_resolved_navigation_facts
+                    {
+                        self.record_symbol(
+                            span,
+                            crate::symbol::ReferenceKind::ClassReference(Arc::from(
+                                resolved.as_str(),
+                            )),
+                            Type::single(Atomic::TClassString(None)),
+                        );
+                    }
+                    if self.mode == crate::body_analysis::AnalysisMode::Full {
                         // Check if the caught type extends Throwable
                         if crate::db::class_exists(self.db, &resolved) {
                             let here = crate::db::Fqcn::from_str(self.db, resolved.as_str());

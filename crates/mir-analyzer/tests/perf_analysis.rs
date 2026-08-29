@@ -10,27 +10,26 @@
 //!   3. Per-edit latency (keystroke-style ingest with no concurrent snapshot)
 //!   4. Per-edit latency with snapshot held (LSP serving queries during edit)
 //!   5. Lazy-load on first navigation
-//!   6. Parallel dependent re-analysis on save
+//!   6. Cold vs warm diagnostics
+//!   7. Hover after diagnostics
+//!   8. Parallel dependent re-analysis on save
+//!   9. Edit-locality and retained-memory metrics snapshot
 
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use mir_analyzer::{AnalysisSession, BatchOptions, Name, PhpVersion, Psr4Map};
+use mir_analyzer::{
+    perf_fixture::PerfFixture, AnalysisSession, BatchOptions, Name, PhpVersion, Psr4Map,
+};
 
-fn fixture_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("benches/fixtures/laravel")
-}
-
-fn fixture_available() -> bool {
-    let root = fixture_root();
-    let src = root.join("src");
-    let vendor = root.join("vendor");
-    if !src.exists() || !vendor.exists() {
+fn fixture_available(fixture: &PerfFixture) -> bool {
+    if !fixture.has_full_corpus() {
         eprintln!(
             "\nSkipping perf analysis: fixture not at {}\n\
-             Run: bash crates/mir-analyzer/benches/download-fixtures.sh\n",
-            root.display()
+             Provide MIR_PERF_FIXTURE/MIR_LARAVEL_FIXTURE/MIR_SYMFONY_FIXTURE,\n\
+             or run: bash crates/mir-analyzer/benches/download-fixtures.sh\n",
+            fixture.root().display()
         );
         false
     } else {
@@ -78,20 +77,37 @@ fn print_row(label: &str, time: Duration, note: &str) {
     println!("  {:32} {:>12}   {}", label, fmt_ms(time), note);
 }
 
+fn print_metrics_lines(title: &str, dump: &str, prefixes: &[&str]) {
+    println!("  {title}");
+    for line in dump.lines() {
+        if prefixes.iter().any(|prefix| line.starts_with(prefix)) {
+            println!("{line}");
+        }
+    }
+}
+
 #[test]
 #[ignore]
 fn perf_analysis_full_report() {
-    if !fixture_available() {
+    let Some(fixture) = PerfFixture::discover() else {
+        eprintln!(
+            "\nSkipping perf analysis: no supported perf fixture found\n\
+             Looked for MIR_PERF_FIXTURE, MIR_LARAVEL_FIXTURE, MIR_SYMFONY_FIXTURE,\n\
+             and local benches/fixtures/{{laravel,symfony}}\n"
+        );
+        return;
+    };
+    if !fixture_available(&fixture) {
         return;
     }
-    let root = fixture_root();
-    let src_files = discover_php(&root.join("src"));
-    let vendor_files = discover_php(&root.join("vendor"));
+    let root = fixture.root();
+    let src_files = discover_php(&fixture.src_root());
+    let vendor_files = discover_php(&fixture.vendor_root());
     let total = src_files.len() + vendor_files.len();
 
     println!("\n╔══════════════════════════════════════════════════════════════════════════════╗");
     println!("║                  mir-analyzer Performance Analysis                           ║");
-    println!("║                       Fixture: Laravel                                       ║");
+    println!("║                       Fixture: {:<45}║", fixture.label());
     println!("╚══════════════════════════════════════════════════════════════════════════════╝");
     println!("  src files:    {:>5}", src_files.len());
     println!("  vendor files: {:>5}", vendor_files.len());
@@ -116,7 +132,7 @@ fn perf_analysis_full_report() {
     print_row("ensure_all_stubs() (all 120)", stubs_time, "one-time cost");
 
     let t0 = Instant::now();
-    let _result = analyzer.analyze_paths(&src_files, &BatchOptions::new());
+    let _result = analyzer.analyze_paths(&src_files, &BatchOptions::new().without_symbols());
     let analyze_src_time = t0.elapsed();
     print_row(
         "analyze(src) — 1410 files",
@@ -135,7 +151,7 @@ fn perf_analysis_full_report() {
     println!("  touched. PSR-4 resolver attached for lazy load on first miss.");
     println!();
 
-    let composer_root = root.clone();
+    let composer_root = root.to_path_buf();
     let t0 = Instant::now();
     let session = match Psr4Map::from_composer(&composer_root) {
         Ok(map) => AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(map)),
@@ -145,14 +161,18 @@ fn perf_analysis_full_report() {
     print_row("AnalysisSession::new + psr4", session_new, "");
 
     // Pick a representative file to "open"
-    let open_path = root.join("src/Illuminate/Auth/Events/Login.php");
+    let open_path = fixture.open_file();
     let open_source = std::fs::read_to_string(&open_path).unwrap_or_else(|_| "<?php\n".to_string());
     let open_arc: Arc<str> = Arc::from(open_path.to_string_lossy().as_ref());
 
     let t0 = Instant::now();
     session.ingest_file(open_arc.clone(), Arc::from(open_source.as_str()));
     let ingest_one = t0.elapsed();
-    print_row("ingest_file(open file)", ingest_one, "Login.php");
+    print_row(
+        "ingest_file(open file)",
+        ingest_one,
+        fixture.open_file_label(),
+    );
 
     let total_lazy = session_new + ingest_one;
     print_row("─ TOTAL", total_lazy, "user can interact NOW");
@@ -227,13 +247,7 @@ fn perf_analysis_full_report() {
     println!("  User clicks an imported vendor symbol that isn't loaded yet.");
     println!();
 
-    let targets = [
-        "Illuminate\\Foundation\\Application",
-        "Illuminate\\Database\\Eloquent\\Model",
-        "Illuminate\\Support\\Collection",
-        "Illuminate\\Http\\Request",
-    ];
-    for target in &targets {
+    for target in fixture.lazy_load_targets() {
         if session.contains_class(target) {
             continue;
         }
@@ -260,7 +274,11 @@ fn perf_analysis_full_report() {
     println!();
 
     let pending = session.pending_lazy_loads(open_arc.as_ref());
-    println!("  Pending imports for Login.php: {}", pending.len());
+    println!(
+        "  Pending imports for {}: {}",
+        fixture.open_file_label(),
+        pending.len()
+    );
     let t0 = Instant::now();
     let loaded = session.prefetch_imports(open_arc.as_ref());
     let prefetch_time = t0.elapsed();
@@ -271,20 +289,150 @@ fn perf_analysis_full_report() {
     );
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Scenario 7: Parallel dependent re-analysis on save
+    // Scenario 7: Cold vs warm diagnostics
     // ─────────────────────────────────────────────────────────────────────────
-    print_header("Scenario 7 — Parallel dependent re-analysis on save");
+    print_header("Scenario 7 — Cold vs warm diagnostics");
+    println!("  Run open-file diagnostics twice on the same ingested text to separate");
+    println!("  first-run cost from the warm repeat after caches and indexes exist.");
+    println!();
+
+    let parsed = php_rs_parser::parse(&open_source);
+    let t0 = Instant::now();
+    let first_diagnostics = mir_analyzer::FileAnalyzer::new(&session).analyze_diagnostics_only(
+        open_arc.clone(),
+        &open_source,
+        &parsed.program,
+        &parsed.source_map,
+    );
+    let first_diagnostics_time = t0.elapsed();
+    print_row(
+        "first diagnostics_only",
+        first_diagnostics_time,
+        &format!("{} issues", first_diagnostics.issues.len()),
+    );
+
+    let t0 = Instant::now();
+    let second_diagnostics = mir_analyzer::FileAnalyzer::new(&session).analyze_diagnostics_only(
+        open_arc.clone(),
+        &open_source,
+        &parsed.program,
+        &parsed.source_map,
+    );
+    let second_diagnostics_time = t0.elapsed();
+    print_row(
+        "repeat diagnostics_only",
+        second_diagnostics_time,
+        &format!("{} issues", second_diagnostics.issues.len()),
+    );
+    let diagnostics_speedup =
+        first_diagnostics_time.as_secs_f64() / second_diagnostics_time.as_secs_f64();
+    println!();
+    println!(
+        "  ┃ Warm diagnostics speedup: {:.2}× ({} → {})",
+        diagnostics_speedup,
+        fmt_ms(first_diagnostics_time),
+        fmt_ms(second_diagnostics_time)
+    );
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Scenario 8: Cursor-name resolution after diagnostics
+    // ─────────────────────────────────────────────────────────────────────────
+    print_header("Scenario 8 — Name lookup after diagnostics");
+    println!("  Reuse the post-diagnostics open file and resolve the codebase name");
+    println!("  at a concrete cursor offset without retaining whole-file symbols.");
+    println!();
+
+    if let Some(offset) = open_source.find(fixture.open_symbol_probe()) {
+        let name_offset = offset as u32;
+        let t0 = Instant::now();
+        let first_name = session.name_at(open_arc.as_ref(), name_offset);
+        let first_name_time = t0.elapsed();
+        print_row(
+            "first name_at",
+            first_name_time,
+            if first_name.is_some() {
+                "after diagnostics"
+            } else {
+                "no symbol at chosen offset"
+            },
+        );
+
+        let t0 = Instant::now();
+        let second_name = session.name_at(open_arc.as_ref(), name_offset);
+        let repeat_name_time = t0.elapsed();
+        print_row(
+            "repeat name_at",
+            repeat_name_time,
+            if second_name.is_some() {
+                "warm repeat"
+            } else {
+                "no symbol at chosen offset"
+            },
+        );
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Scenario 9: Hover after diagnostics
+    // ─────────────────────────────────────────────────────────────────────────
+    print_header("Scenario 9 — Hover after diagnostics");
+    println!("  Reuse the same post-diagnostics cursor position to resolve");
+    println!("  hover info through the targeted navigation path.");
+    println!();
+
+    if let Some(offset) = open_source.find(fixture.open_symbol_probe()) {
+        let hover_offset = offset as u32;
+        let t0 = Instant::now();
+        let first_hover = session.hover_at(open_arc.as_ref(), hover_offset);
+        let first_hover_time = t0.elapsed();
+        print_row(
+            "first hover_at",
+            first_hover_time,
+            if first_hover.is_ok() {
+                "after diagnostics"
+            } else {
+                "no symbol at chosen offset"
+            },
+        );
+
+        let t0 = Instant::now();
+        let second_hover = session.hover_at(open_arc.as_ref(), hover_offset);
+        let repeat_hover_time = t0.elapsed();
+        print_row(
+            "repeat hover_at",
+            repeat_hover_time,
+            if second_hover.is_ok() {
+                "warm repeat"
+            } else {
+                "no symbol at chosen offset"
+            },
+        );
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Scenario 10: Parallel dependent re-analysis on save
+    // ─────────────────────────────────────────────────────────────────────────
+    print_header("Scenario 10 — Parallel dependent re-analysis on save");
     println!("  After ingesting a base class, re-analyze its dependents in parallel.");
     println!();
 
     // Pick a high-fanout file
-    let base_path = root.join("src/Illuminate/Database/Eloquent/Model.php");
+    let base_path = fixture.high_fanout_file();
     let base_arc: Arc<str> = Arc::from(base_path.to_string_lossy().as_ref());
     if let Ok(src) = std::fs::read_to_string(&base_path) {
         let t0 = Instant::now();
         session.ingest_file(base_arc.clone(), Arc::from(src.as_str()));
         let ingest_base = t0.elapsed();
-        print_row("ingest_file(Model.php)", ingest_base, "");
+        print_row(
+            &format!(
+                "ingest_file({})",
+                base_path
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("target.php")
+            ),
+            ingest_base,
+            "",
+        );
 
         let t0 = Instant::now();
         let results = session.reanalyze_dependents(base_arc.as_ref());
@@ -294,6 +442,42 @@ fn perf_analysis_full_report() {
             dep_time,
             &format!("{} dependents, parallel via rayon", results.len()),
         );
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Scenario 11: Metrics snapshot for locality + retained memory
+    // ─────────────────────────────────────────────────────────────────────────
+    print_header("Scenario 11 — Edit locality and retained memory snapshot");
+    println!("  Enable with MIR_TIMING=1 to capture how much work was avoided and");
+    println!("  how much Salsa-retained state each canonical query shape keeps.");
+    println!();
+
+    match mir_analyzer::metrics::dump() {
+        Some(dump) => {
+            print_metrics_lines(
+                "Locality counters:",
+                &dump,
+                &[
+                    "  whole-file walks",
+                    "  scopes analyzed",
+                    "  symbols allocated",
+                    "  top body walks/file:",
+                    "  top scopes analyzed/file:",
+                ],
+            );
+            print_metrics_lines(
+                "Retained memory:",
+                &dump,
+                &[
+                    "  retained/analyze_file:",
+                    "  retained/infer_scope :",
+                    "  retained/infer_fn    :",
+                ],
+            );
+        }
+        None => {
+            println!("  metrics disabled; rerun with `MIR_TIMING=1` to print locality and retained-memory counters");
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -317,5 +501,13 @@ fn perf_analysis_full_report() {
         pending.len(),
         fmt_ms(prefetch_time)
     );
+    println!(
+        "  Diagnostics: {} → {}  ({:.2}× speedup)",
+        fmt_ms(first_diagnostics_time),
+        fmt_ms(second_diagnostics_time),
+        diagnostics_speedup
+    );
+    println!("  Hover:       first + repeat measured after diagnostics");
+    println!("  Locality:    metrics snapshot printed when MIR_TIMING=1");
     println!();
 }

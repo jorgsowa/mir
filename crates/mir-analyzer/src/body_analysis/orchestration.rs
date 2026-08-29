@@ -41,9 +41,10 @@ impl<'a> BodyAnalyzer<'a> {
             source,
             source_map,
             &mut all_issues,
-            &mut all_symbols,
+            Some(&mut all_symbols),
         );
 
+        crate::metrics::record_whole_file_body_walk(file.as_ref(), all_symbols.len());
         (all_issues, all_symbols)
     }
 
@@ -57,19 +58,21 @@ impl<'a> BodyAnalyzer<'a> {
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<Issue>,
-        all_symbols: &mut Vec<ResolvedSymbol>,
+        all_symbols: Option<&mut Vec<ResolvedSymbol>>,
     ) {
-        if self.mode != AnalysisMode::Full {
+        if self.mode != AnalysisMode::Full
+            && !self.collect_symbols
+            && !self.collect_navigation_facts
+            && !self.collect_resolved_navigation_facts
+        {
             return;
         }
         use php_ast::owned::StmtKind;
 
         use crate::flow_state::FlowState;
         use crate::stmt::StatementsAnalyzer;
-        use mir_issues::IssueBuffer;
-
         let mut ctx = FlowState::new();
-        let mut buf = IssueBuffer::new();
+        let mut buf = self.issue_buffer();
         let mut sa = StatementsAnalyzer::new(
             self.db,
             file.clone(),
@@ -77,10 +80,17 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
             &mut buf,
             all_symbols,
+            &self.navigation_facts,
+            &self.resolved_navigation_facts,
             self.php_version,
             self.mode,
         );
         sa.collect_symbols = self.collect_symbols;
+        sa.capture_symbol_types = self.capture_symbol_types;
+        sa.codebase_symbols_only = self.codebase_symbols_only;
+        sa.record_reference_locations = self.record_reference_locations;
+        sa.collect_navigation_facts = self.collect_navigation_facts;
+        sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
         // Braced namespace bodies carry ordinary executable statements
         // (`namespace Shop { $o = new Order(1); }`); walk them like top-level
         // code. Declarations stay skipped at every level — they're analyzed
@@ -135,8 +145,10 @@ impl<'a> BodyAnalyzer<'a> {
         }
         exec_stmts(&mut sa, &mut ctx, &program.stmts, uniform_namespace);
         drop(sa);
-        crate::diagnostics::emit_unused_variables(&ctx, file, all_issues);
-        all_issues.extend(buf.into_all_issues());
+        if self.mode == AnalysisMode::Full {
+            crate::diagnostics::emit_unused_variables(&ctx, file, all_issues);
+            all_issues.extend(buf.into_all_issues());
+        }
     }
 
     /// Like `analyze_bodies` but also populates `type_envs` with per-scope type environments.
@@ -174,21 +186,26 @@ impl<'a> BodyAnalyzer<'a> {
         {
             use crate::flow_state::FlowState;
             use crate::stmt::StatementsAnalyzer;
-            use mir_issues::IssueBuffer;
-
             let mut ctx = FlowState::new();
-            let mut buf = IssueBuffer::new();
+            let mut buf = self.issue_buffer();
             let mut sa = StatementsAnalyzer::new(
                 self.db,
                 file.clone(),
                 source,
                 source_map,
                 &mut buf,
-                all_symbols,
+                Some(all_symbols),
+                &self.navigation_facts,
+                &self.resolved_navigation_facts,
                 self.php_version,
                 self.mode,
             );
             sa.collect_symbols = self.collect_symbols;
+            sa.capture_symbol_types = self.capture_symbol_types;
+            sa.codebase_symbols_only = self.codebase_symbols_only;
+            sa.record_reference_locations = self.record_reference_locations;
+            sa.collect_navigation_facts = self.collect_navigation_facts;
+            sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
             for stmt in program.stmts.iter() {
                 match &stmt.kind {
                     StmtKind::Function(_)
@@ -226,7 +243,14 @@ impl<'a> BodyAnalyzer<'a> {
         for stmt in stmts.iter() {
             match &stmt.kind {
                 StmtKind::Function(decl) => {
-                    self.analyze_fn_decl(decl, file, source, source_map, all_issues, all_symbols);
+                    self.analyze_fn_decl(
+                        decl,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                        Some(all_symbols),
+                    );
                 }
                 StmtKind::Class(decl) => {
                     self.analyze_class_decl(
@@ -235,12 +259,19 @@ impl<'a> BodyAnalyzer<'a> {
                         source,
                         source_map,
                         all_issues,
-                        all_symbols,
+                        Some(all_symbols),
                         &guards,
                     );
                 }
                 StmtKind::Enum(decl) => {
-                    self.analyze_enum_decl(decl, file, source, source_map, all_issues, all_symbols);
+                    self.analyze_enum_decl(
+                        decl,
+                        file,
+                        source,
+                        source_map,
+                        all_issues,
+                        Some(all_symbols),
+                    );
                 }
                 StmtKind::Interface(decl) => {
                     self.analyze_interface_decl(
@@ -250,7 +281,7 @@ impl<'a> BodyAnalyzer<'a> {
                         source_map,
                         all_issues,
                         &guards,
-                        all_symbols,
+                        Some(all_symbols),
                     );
                 }
                 StmtKind::Trait(decl) => {
@@ -260,7 +291,7 @@ impl<'a> BodyAnalyzer<'a> {
                         source,
                         source_map,
                         all_issues,
-                        all_symbols,
+                        Some(all_symbols),
                     );
                 }
                 StmtKind::Namespace(ns) => {
@@ -276,6 +307,7 @@ impl<'a> BodyAnalyzer<'a> {
                     }
                 }
                 StmtKind::Use(use_decl) => {
+                    let mut navigation_facts = self.navigation_facts.borrow_mut();
                     check_use_decl_casing(
                         use_decl,
                         self.db,
@@ -284,7 +316,12 @@ impl<'a> BodyAnalyzer<'a> {
                         source_map,
                         all_issues,
                         Some(&mut *all_symbols),
+                        self.collect_navigation_facts
+                            .then_some(&mut *navigation_facts),
+                        None,
+                        self.collect_symbols,
                         self.mode == AnalysisMode::Full,
+                        self.record_reference_locations,
                     );
                 }
                 _ => {}
@@ -351,7 +388,7 @@ impl<'a> BodyAnalyzer<'a> {
                         source_map,
                         all_issues,
                         &guards,
-                        all_symbols,
+                        Some(all_symbols),
                     );
                 }
                 StmtKind::Trait(decl) => {
@@ -379,6 +416,7 @@ impl<'a> BodyAnalyzer<'a> {
                     }
                 }
                 StmtKind::Use(use_decl) => {
+                    let mut navigation_facts = self.navigation_facts.borrow_mut();
                     check_use_decl_casing(
                         use_decl,
                         self.db,
@@ -387,7 +425,12 @@ impl<'a> BodyAnalyzer<'a> {
                         source_map,
                         all_issues,
                         Some(&mut *all_symbols),
+                        self.collect_navigation_facts
+                            .then_some(&mut *navigation_facts),
+                        None,
+                        self.collect_symbols,
                         self.mode == AnalysisMode::Full,
+                        self.record_reference_locations,
                     );
                 }
                 _ => {}

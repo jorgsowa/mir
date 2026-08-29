@@ -151,6 +151,7 @@ pub fn analyze_file(db: &dyn MirDatabase, file: SourceFile) -> Arc<AnalyzeOutput
         ref_locs.sort_unstable();
         ref_locs.dedup();
     }
+    crate::metrics::record_analyze_file_retained(issues.len(), ref_locs.len());
 
     Arc::new(AnalyzeOutput {
         issues: issues.into(),

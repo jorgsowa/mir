@@ -14,30 +14,28 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use mir_analyzer::db::MirDatabase;
-use mir_analyzer::{discover_files, AnalysisSession, BatchOptions, PhpVersion};
-
-fn fixtures_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("benches")
-        .join("fixtures")
-        .join("laravel")
-}
+use mir_analyzer::{
+    discover_files, perf_fixture::PerfFixture, AnalysisSession, BatchOptions, PhpVersion,
+};
 
 #[test]
 #[ignore = "long-running measurement; run explicitly with --release --ignored"]
 fn measure_per_function_inference_size() {
-    let root = fixtures_root();
-    if !root.exists() {
+    let Some(fixture) = PerfFixture::discover() else {
+        eprintln!("Skipping: no supported perf fixture found.");
+        return;
+    };
+    let root = fixture.root();
+    if !fixture.has_full_corpus() {
         eprintln!(
-            "Skipping: fixture not found at {}. Run `bash crates/mir-analyzer/benches/download-fixtures.sh` first.",
+            "Skipping: fixture not found or incomplete at {}. Provide MIR_PERF_FIXTURE/MIR_LARAVEL_FIXTURE/MIR_SYMFONY_FIXTURE or run `bash crates/mir-analyzer/benches/download-fixtures.sh` first.",
             root.display()
         );
         return;
     }
 
-    // Discover all PHP files under the Laravel fixture.
-    let vendor_files = discover_files(&root.join("vendor"));
-    let project_files = discover_files(&root.join("src"));
+    let vendor_files = discover_files(&fixture.vendor_root());
+    let project_files = discover_files(&fixture.src_root());
     let all_files: Vec<PathBuf> = vendor_files
         .iter()
         .chain(project_files.iter())
@@ -138,8 +136,8 @@ fn measure_per_function_inference_size() {
 
     // Sanity guard so a smoke run is meaningful.
     assert!(n_callables > 1000, "fixture too small to be meaningful");
-    // Document a soft ceiling — fail loudly if it ever drifts past 200 MB on Laravel
-    // (would invalidate the architecture).
+    // Document a soft ceiling — fail loudly if it ever drifts into obviously
+    // architecture-breaking territory on a real framework corpus.
     let mb = total_cache_bytes / (1024.0 * 1024.0);
     assert!(
         mb < 500.0,

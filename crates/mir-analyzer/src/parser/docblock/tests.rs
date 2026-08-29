@@ -35,18 +35,20 @@ fn parse_associative_array_is_distinct_non_list_array() {
     let Atomic::TIntersection { parts } = &u.types[0] else {
         panic!("expected intersection");
     };
+    assert!(parts
+        .iter()
+        .any(|part| { part.contains(|t| matches!(t, Atomic::TArray { .. })) }));
     assert!(parts.iter().any(|part| {
-        part.contains(|t| matches!(t, Atomic::TArray { .. }))
-    }));
-    assert!(parts.iter().any(|part| {
-        part.contains(|t| matches!(
-            t,
-            Atomic::TKeyedArray {
-                properties,
-                is_open: true,
-                is_list: false,
-            } if properties.is_empty()
-        ))
+        part.contains(|t| {
+            matches!(
+                t,
+                Atomic::TKeyedArray {
+                    properties,
+                    is_open: true,
+                    is_list: false,
+                } if properties.is_empty()
+            )
+        })
     }));
 }
 
@@ -58,25 +60,31 @@ fn parse_arraylike_object_is_structural_intersection() {
     };
     assert_eq!(parts.len(), 3);
     assert!(parts.iter().any(|part| {
-        part.contains(|t| matches!(
-            t,
-            Atomic::TNamedObject { fqcn, type_params }
-                if fqcn.as_ref() == "ArrayAccess" && type_params.len() == 2
-        ))
+        part.contains(|t| {
+            matches!(
+                t,
+                Atomic::TNamedObject { fqcn, type_params }
+                    if fqcn.as_ref() == "ArrayAccess" && type_params.len() == 2
+            )
+        })
     }));
     assert!(parts.iter().any(|part| {
-        part.contains(|t| matches!(
-            t,
-            Atomic::TNamedObject { fqcn, type_params }
-                if fqcn.as_ref() == "Countable" && type_params.is_empty()
-        ))
+        part.contains(|t| {
+            matches!(
+                t,
+                Atomic::TNamedObject { fqcn, type_params }
+                    if fqcn.as_ref() == "Countable" && type_params.is_empty()
+            )
+        })
     }));
     assert!(parts.iter().any(|part| {
-        part.contains(|t| matches!(
-            t,
-            Atomic::TNamedObject { fqcn, type_params }
-                if fqcn.as_ref() == "Traversable" && type_params.len() == 2
-        ))
+        part.contains(|t| {
+            matches!(
+                t,
+                Atomic::TNamedObject { fqcn, type_params }
+                    if fqcn.as_ref() == "Traversable" && type_params.len() == 2
+            )
+        })
     }));
 }
 

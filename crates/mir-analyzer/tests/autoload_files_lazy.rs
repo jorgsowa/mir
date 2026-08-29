@@ -4,8 +4,8 @@
 //! and constants.  Unlike PSR-4 classes there is no name → path mapping, so
 //! the class resolver cannot discover them on demand.  Instead, `with_psr4`
 //! registers their paths and `prepare_ast_for_analysis` (called from every
-//! `FileAnalyzer::analyze`) indexes them on the first analysis call with no
-//! action required from the consumer.
+//! open-file analysis path, including `analyze_diagnostics_only`) indexes them
+//! on the first analysis call with no action required from the consumer.
 
 mod common;
 
@@ -78,7 +78,7 @@ fn undefined_function_count(issues: &[mir_analyzer::Issue]) -> usize {
 // FileAnalyzer (open-file / LSP) path
 // ---------------------------------------------------------------------------
 
-/// No manual indexing call. `FileAnalyzer::analyze` must lazy-load vendor
+/// No manual indexing call. The open-file diagnostics path must lazy-load vendor
 /// `autoload.files` functions automatically on the first call.
 #[test]
 fn file_analyzer_lazy_loads_vendor_autoload_files_functions() {
@@ -99,8 +99,12 @@ fn file_analyzer_lazy_loads_vendor_autoload_files_functions() {
     session.ingest_file(path.clone(), Arc::from(src));
 
     let parsed = php_rs_parser::parse(src);
-    let result =
-        FileAnalyzer::new(&session).analyze(path, src, &parsed.program, &parsed.source_map);
+    let result = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        path,
+        src,
+        &parsed.program,
+        &parsed.source_map,
+    );
 
     assert_eq!(
         undefined_function_count(&result.issues),
@@ -111,7 +115,7 @@ fn file_analyzer_lazy_loads_vendor_autoload_files_functions() {
     );
 }
 
-/// A second `FileAnalyzer::analyze` call on the same session must not
+/// A second diagnostics-only open-file analysis on the same session must not
 /// re-index the eager files (idempotency / double-load guard).
 #[test]
 fn file_analyzer_lazy_load_is_idempotent_across_calls() {
@@ -132,7 +136,7 @@ fn file_analyzer_lazy_load_is_idempotent_across_calls() {
     for _ in 0..3 {
         session.ingest_file(path.clone(), Arc::from(src));
         let parsed = php_rs_parser::parse(src);
-        let result = FileAnalyzer::new(&session).analyze(
+        let result = FileAnalyzer::new(&session).analyze_diagnostics_only(
             path.clone(),
             src,
             &parsed.program,
@@ -146,7 +150,7 @@ fn file_analyzer_lazy_load_is_idempotent_across_calls() {
     }
 }
 
-/// Calling `FileAnalyzer::analyze` on a session *without* a PSR-4 map must
+/// Calling the diagnostics-only open-file path on a session *without* a PSR-4 map must
 /// not panic or regress — `ensure_vendor_eager_functions` is a no-op when
 /// no psr4 map is attached.
 #[test]
@@ -156,8 +160,12 @@ fn file_analyzer_no_psr4_does_not_panic() {
     let path: Arc<str> = Arc::from("plain.php");
     session.ingest_file(path.clone(), Arc::from(src));
     let parsed = php_rs_parser::parse(src);
-    let result =
-        FileAnalyzer::new(&session).analyze(path, src, &parsed.program, &parsed.source_map);
+    let result = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        path,
+        src,
+        &parsed.program,
+        &parsed.source_map,
+    );
     assert!(
         result.issues.is_empty(),
         "no issues expected for trivial PHP; got: {:?}",
@@ -216,8 +224,12 @@ fn project_autoload_files_indexed_via_project_files() {
     let path: Arc<str> = Arc::from("consumer.php");
     session.ingest_file(path.clone(), Arc::from(src));
     let parsed = php_rs_parser::parse(src);
-    let result =
-        FileAnalyzer::new(&session).analyze(path, src, &parsed.program, &parsed.source_map);
+    let result = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        path,
+        src,
+        &parsed.program,
+        &parsed.source_map,
+    );
 
     assert_eq!(
         undefined_function_count(&result.issues),
@@ -249,8 +261,12 @@ fn vendor_autoload_files_function_exists_guard_is_transparent() {
     let path: Arc<str> = Arc::from("consumer.php");
     session.ingest_file(path.clone(), Arc::from(src));
     let parsed = php_rs_parser::parse(src);
-    let result =
-        FileAnalyzer::new(&session).analyze(path, src, &parsed.program, &parsed.source_map);
+    let result = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        path,
+        src,
+        &parsed.program,
+        &parsed.source_map,
+    );
 
     assert_eq!(
         undefined_function_count(&result.issues),

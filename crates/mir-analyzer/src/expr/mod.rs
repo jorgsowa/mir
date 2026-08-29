@@ -11,7 +11,7 @@ use crate::db::MirDatabase;
 use crate::flow_state::FlowState;
 use crate::php_version::PhpVersion;
 use crate::reference_key::ReferenceKeyCache;
-use crate::symbol::{ReferenceKind, ResolvedSymbol};
+use crate::symbol::{NavigationFact, ReferenceKind, ResolvedNavigationFact, ResolvedSymbol};
 
 mod arrays;
 pub(crate) mod assignment;
@@ -62,7 +62,9 @@ pub struct ExpressionAnalyzer<'a> {
     pub source: &'a str,
     pub source_map: &'a php_rs_parser::source_map::SourceMap,
     pub issues: &'a mut IssueBuffer,
-    pub symbols: &'a mut Vec<ResolvedSymbol>,
+    pub symbols: Option<&'a mut Vec<ResolvedSymbol>>,
+    pub navigation_facts: &'a std::cell::RefCell<Vec<NavigationFact>>,
+    pub resolved_navigation_facts: &'a std::cell::RefCell<Vec<ResolvedNavigationFact>>,
     pub php_version: PhpVersion,
     pub mode: AnalysisMode,
     /// Whether `declare(strict_types=1)` is active for the calling file.
@@ -72,6 +74,18 @@ pub struct ExpressionAnalyzer<'a> {
     /// When false, `record_symbol*` calls are no-ops — see
     /// `StatementsAnalyzer::collect_symbols`.
     pub collect_symbols: bool,
+    /// When false, recorded symbols keep only navigation shape and use
+    /// `Type::mixed()` instead of cloning the precise resolved type.
+    pub capture_symbol_types: bool,
+    /// When true, skip symbols that cannot map to a codebase-level
+    /// [`crate::Name`] (currently variables and receiver-gap markers).
+    pub codebase_symbols_only: bool,
+    /// When false, skip recording reference-location postings.
+    pub record_reference_locations: bool,
+    /// When true, collect compact codebase-name navigation facts.
+    pub collect_navigation_facts: bool,
+    /// When true, collect compact typed facts for codebase symbol resolution.
+    pub collect_resolved_navigation_facts: bool,
     /// When true, we are inside an existence-check context (isset/empty/??) where missing
     /// variables and missing array offsets are not errors — they are what is being tested.
     in_existence_check: bool,
@@ -119,7 +133,9 @@ impl<'a> ExpressionAnalyzer<'a> {
         source: &'a str,
         source_map: &'a php_rs_parser::source_map::SourceMap,
         issues: &'a mut IssueBuffer,
-        symbols: &'a mut Vec<ResolvedSymbol>,
+        symbols: Option<&'a mut Vec<ResolvedSymbol>>,
+        navigation_facts: &'a std::cell::RefCell<Vec<NavigationFact>>,
+        resolved_navigation_facts: &'a std::cell::RefCell<Vec<ResolvedNavigationFact>>,
         php_version: PhpVersion,
         mode: AnalysisMode,
         yielded_types: &'a mut Vec<(Type, Type)>,
@@ -132,10 +148,17 @@ impl<'a> ExpressionAnalyzer<'a> {
             source_map,
             issues,
             symbols,
+            navigation_facts,
+            resolved_navigation_facts,
             php_version,
             mode,
             strict_types: false,
             collect_symbols: true,
+            capture_symbol_types: true,
+            codebase_symbols_only: false,
+            record_reference_locations: true,
+            collect_navigation_facts: false,
+            collect_resolved_navigation_facts: false,
             in_existence_check: false,
             in_array_access_base: false,
             yielded_types,
@@ -183,16 +206,42 @@ impl<'a> ExpressionAnalyzer<'a> {
 
     /// Record a resolved symbol.
     pub fn record_symbol(&mut self, span: php_ast::Span, kind: ReferenceKind, resolved_type: Type) {
+        let name = kind.to_name();
+        if self.codebase_symbols_only && name.is_none() {
+            return;
+        }
+        if self.collect_navigation_facts {
+            if let Some(name) = name.clone() {
+                self.navigation_facts.borrow_mut().push(NavigationFact {
+                    span,
+                    expr_span: None,
+                    name,
+                });
+            }
+        }
+        if self.collect_resolved_navigation_facts {
+            self.resolved_navigation_facts
+                .borrow_mut()
+                .push(ResolvedNavigationFact {
+                    span,
+                    expr_span: None,
+                    kind: kind.clone(),
+                    resolved_type: self.symbol_type(resolved_type.clone()),
+                });
+        }
         if !self.collect_symbols {
             return;
         }
-        self.symbols.push(ResolvedSymbol {
-            file: self.file.clone(),
-            span,
-            expr_span: None,
-            kind,
-            resolved_type,
-        });
+        let resolved_type = self.symbol_type(resolved_type);
+        if let Some(symbols) = self.symbols.as_deref_mut() {
+            symbols.push(ResolvedSymbol {
+                file: self.file.clone(),
+                span,
+                expr_span: None,
+                kind,
+                resolved_type,
+            });
+        }
     }
 
     pub fn record_symbol_with_expr_span(
@@ -202,16 +251,50 @@ impl<'a> ExpressionAnalyzer<'a> {
         kind: ReferenceKind,
         resolved_type: Type,
     ) {
+        let name = kind.to_name();
+        if self.codebase_symbols_only && name.is_none() {
+            return;
+        }
+        if self.collect_navigation_facts {
+            if let Some(name) = name.clone() {
+                self.navigation_facts.borrow_mut().push(NavigationFact {
+                    span,
+                    expr_span: Some(expr_span),
+                    name,
+                });
+            }
+        }
+        if self.collect_resolved_navigation_facts {
+            self.resolved_navigation_facts
+                .borrow_mut()
+                .push(ResolvedNavigationFact {
+                    span,
+                    expr_span: Some(expr_span),
+                    kind: kind.clone(),
+                    resolved_type: self.symbol_type(resolved_type.clone()),
+                });
+        }
         if !self.collect_symbols {
             return;
         }
-        self.symbols.push(ResolvedSymbol {
-            file: self.file.clone(),
-            span,
-            expr_span: Some(expr_span),
-            kind,
-            resolved_type,
-        });
+        let resolved_type = self.symbol_type(resolved_type);
+        if let Some(symbols) = self.symbols.as_deref_mut() {
+            symbols.push(ResolvedSymbol {
+                file: self.file.clone(),
+                span,
+                expr_span: Some(expr_span),
+                kind,
+                resolved_type,
+            });
+        }
+    }
+
+    fn symbol_type(&self, resolved_type: Type) -> Type {
+        if self.capture_symbol_types {
+            resolved_type
+        } else {
+            Type::mixed()
+        }
     }
 
     /// Record a member-access receiver's type at the gap between
@@ -449,11 +532,18 @@ impl<'a> ExpressionAnalyzer<'a> {
                     self.source,
                     self.source_map,
                     self.issues,
-                    self.symbols,
+                    self.symbols.as_deref_mut(),
+                    self.navigation_facts,
+                    self.resolved_navigation_facts,
                     self.php_version,
                     self.mode,
                 );
                 sa.collect_symbols = self.collect_symbols;
+                sa.capture_symbol_types = self.capture_symbol_types;
+                sa.codebase_symbols_only = self.codebase_symbols_only;
+                sa.record_reference_locations = self.record_reference_locations;
+                sa.collect_navigation_facts = self.collect_navigation_facts;
+                sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
                 sa.analyze_class_decl_stmt(anon, ctx);
                 Type::single(Atomic::TObject)
             }
@@ -1111,7 +1201,7 @@ impl<'a> ExpressionAnalyzer<'a> {
 
     /// Record a reference location for `symbol_key` at `span`, unless in inference-only mode.
     pub(crate) fn record_ref(&self, symbol_key: Arc<str>, span: php_ast::Span) {
-        if self.mode == AnalysisMode::InferenceOnly {
+        if self.mode == AnalysisMode::InferenceOnly || !self.record_reference_locations {
             return;
         }
         // Static property tokens (`Cls::$prop`) span the `$` sigil while

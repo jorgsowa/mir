@@ -10,6 +10,35 @@ use std::sync::Arc;
 use mir_types::Type;
 use php_ast::Span;
 
+/// Compact navigation payload for cursor-based name resolution.
+#[derive(Debug, Clone)]
+pub struct NavigationFact {
+    pub span: Span,
+    pub expr_span: Option<Span>,
+    pub name: crate::Name,
+}
+
+/// Compact typed navigation payload for cursor-based symbol resolution.
+#[derive(Debug, Clone)]
+pub struct ResolvedNavigationFact {
+    pub span: Span,
+    pub expr_span: Option<Span>,
+    pub kind: ReferenceKind,
+    pub resolved_type: Type,
+}
+
+impl ResolvedNavigationFact {
+    pub fn into_resolved_symbol(self, file: Arc<str>) -> ResolvedSymbol {
+        ResolvedSymbol {
+            file,
+            span: self.span,
+            expr_span: self.expr_span,
+            kind: self.kind,
+            resolved_type: self.resolved_type,
+        }
+    }
+}
+
 /// A single resolved symbol observed during body analysis.
 #[derive(Debug, Clone)]
 pub struct ResolvedSymbol {

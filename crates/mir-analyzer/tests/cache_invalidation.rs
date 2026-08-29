@@ -27,7 +27,10 @@ fn dependent_file_is_reanalyzed_when_base_changes() {
     );
 
     let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-    let result1 = session.analyze_paths(&[base.clone(), child.clone()], &BatchOptions::new());
+    let result1 = session.analyze_paths(
+        &[base.clone(), child.clone()],
+        &BatchOptions::new().without_symbols(),
+    );
     let undefined_method_count = result1
         .issues
         .iter()
@@ -44,7 +47,10 @@ fn dependent_file_is_reanalyzed_when_base_changes() {
 
     // Second run with a fresh analyzer (simulates a new CLI invocation) but same cache.
     let session2 = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-    let result2 = session2.analyze_paths(&[base.clone(), child.clone()], &BatchOptions::new());
+    let result2 = session2.analyze_paths(
+        &[base.clone(), child.clone()],
+        &BatchOptions::new().without_symbols(),
+    );
     let undefined_method_count2 = result2
         .issues
         .iter()
@@ -77,7 +83,9 @@ fn unrelated_file_cache_entry_survives() {
     // group so the bare `helper()` function in Unrelated.php doesn't
     // surface as `UnusedFunction` in the assertions below.
     let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-    let opts = BatchOptions::new().with_suppressed(dead_code_issue_kinds().iter().copied());
+    let opts = BatchOptions::new()
+        .without_symbols()
+        .with_suppressed(dead_code_issue_kinds().iter().copied());
     session.analyze_paths(&[base.clone(), unrelated.clone()], &opts);
 
     // Modify only Base.
@@ -91,7 +99,9 @@ fn unrelated_file_cache_entry_survives() {
     // Its cache entry should survive (we cannot observe this directly from the
     // public API, but we verify no issues are raised for it and the run succeeds).
     let session2 = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-    let opts2 = BatchOptions::new().with_suppressed(dead_code_issue_kinds().iter().copied());
+    let opts2 = BatchOptions::new()
+        .without_symbols()
+        .with_suppressed(dead_code_issue_kinds().iter().copied());
     let result = session2.analyze_paths(&[base.clone(), unrelated.clone()], &opts2);
 
     let unrelated_str = unrelated.to_string_lossy();
@@ -114,9 +124,11 @@ fn reanalyzed_count(cache_dir: &std::path::Path, paths: &[std::path::PathBuf]) -
     use std::sync::Arc;
     let n = Arc::new(AtomicUsize::new(0));
     let counter = n.clone();
-    let opts = BatchOptions::new().with_progress_callback(Arc::new(move || {
-        counter.fetch_add(1, Ordering::Relaxed);
-    }));
+    let opts = BatchOptions::new()
+        .without_symbols()
+        .with_progress_callback(Arc::new(move || {
+            counter.fetch_add(1, Ordering::Relaxed);
+        }));
     let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir);
     session.analyze_paths(paths, &opts);
     n.load(Ordering::Relaxed)
@@ -143,7 +155,10 @@ fn body_only_change_to_base_does_not_reanalyze_dependent() {
 
     // Cold run populates the cache for both files.
     let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-    session.analyze_paths(&[base.clone(), child.clone()], &BatchOptions::new());
+    session.analyze_paths(
+        &[base.clone(), child.clone()],
+        &BatchOptions::new().without_symbols(),
+    );
 
     // Body-only edit to Base::foo — declared return type `int` is unchanged.
     write_file(
@@ -178,7 +193,10 @@ fn signature_change_to_base_reanalyzes_dependent() {
     );
 
     let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-    session.analyze_paths(&[base.clone(), child.clone()], &BatchOptions::new());
+    session.analyze_paths(
+        &[base.clone(), child.clone()],
+        &BatchOptions::new().without_symbols(),
+    );
 
     // Signature change: foo(): int -> foo(): string.
     write_file(
@@ -215,7 +233,10 @@ fn warm_run_without_changes_does_not_rewrite_cache() {
     );
 
     let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-    let result1 = session.analyze_paths(&[base.clone(), child.clone()], &BatchOptions::new());
+    let result1 = session.analyze_paths(
+        &[base.clone(), child.clone()],
+        &BatchOptions::new().without_symbols(),
+    );
 
     let cache_bin = cache_dir.path().join("cache.bin");
     let mtime1 = std::fs::metadata(&cache_bin)
@@ -228,7 +249,10 @@ fn warm_run_without_changes_does_not_rewrite_cache() {
     std::thread::sleep(std::time::Duration::from_millis(20));
 
     let session2 = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-    let result2 = session2.analyze_paths(&[base.clone(), child.clone()], &BatchOptions::new());
+    let result2 = session2.analyze_paths(
+        &[base.clone(), child.clone()],
+        &BatchOptions::new().without_symbols(),
+    );
 
     let mtime2 = std::fs::metadata(&cache_bin).unwrap().modified().unwrap();
 

@@ -52,7 +52,12 @@ fn analyze(session: &AnalysisSession, path: Arc<str>, src: &str) -> mir_analyzer
         parsed.errors
     );
     session.ingest_file(path.clone(), Arc::from(src));
-    FileAnalyzer::new(session).analyze(path, src, &parsed.program, &parsed.source_map)
+    FileAnalyzer::new(session).analyze_diagnostics_only(
+        path,
+        src,
+        &parsed.program,
+        &parsed.source_map,
+    )
 }
 
 /// Every PHP file the analyzer should index for these fixtures. The fixtures

@@ -28,10 +28,7 @@ fn arraylike_object_type(key: Type, value: Type) -> Type {
         parts: mir_types::union::vec_to_type_params(vec![
             Type::single(Atomic::TNamedObject {
                 fqcn: mir_types::Name::from("ArrayAccess"),
-                type_params: mir_types::union::vec_to_type_params(vec![
-                    key.clone(),
-                    value.clone(),
-                ]),
+                type_params: mir_types::union::vec_to_type_params(vec![key.clone(), value.clone()]),
             }),
             Type::single(Atomic::TNamedObject {
                 fqcn: mir_types::Name::from("Countable"),

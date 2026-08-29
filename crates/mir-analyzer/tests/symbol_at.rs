@@ -11,6 +11,13 @@ use mir_analyzer::{AnalysisSession, BatchOptions, PhpVersion};
 
 use self::common::{create_temp_dir, path_to_str, write_file};
 
+fn analyze_single_file(analyzer: &AnalysisSession, file: &std::path::PathBuf) {
+    analyzer.analyze_paths(
+        std::slice::from_ref(file),
+        &BatchOptions::new().without_symbols(),
+    );
+}
+
 // ---------------------------------------------------------------------------
 // symbol_at — basic resolution
 // ---------------------------------------------------------------------------
@@ -26,7 +33,7 @@ fn symbol_at_finds_function_call() {
     let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let offset = src.find("{ greet").unwrap() as u32 + 2; // points at 'g' of greet()
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, offset)
         .expect("symbol_at should find a symbol at the greet() call");
 
@@ -49,7 +56,7 @@ fn symbol_at_returns_none_for_unknown_offset() {
 
     // Offset 0 is '<?php', before any symbol spans
     assert!(
-        result.symbol_at(file_str, 0).is_none(),
+        analyzer.symbol_at(file_str, 0).is_none(),
         "no symbol at offset 0 (opening tag)"
     );
 }
@@ -224,11 +231,11 @@ fn symbol_at_finds_this_method_call() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    analyze_single_file(&analyzer, &file);
 
     // Point cursor at 'helper' in '$this->helper()'
     let offset = src.find("->helper").unwrap() as u32 + 2; // +2 skips '->'
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, offset)
         .expect("symbol_at should resolve $this->helper() (issue #191)");
 
@@ -273,10 +280,10 @@ fn symbol_at_finds_first_class_callable_function() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    analyze_single_file(&analyzer, &file);
 
     let offset = src.find("greet(...)").unwrap() as u32 + 1;
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, offset)
         .expect("symbol_at should find a symbol at greet(...)");
 
@@ -300,10 +307,10 @@ fn symbol_at_finds_use_function_import() {
     let main_str = path_to_str(&main);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(&[lib, main.clone()], &BatchOptions::new());
+    analyzer.analyze_paths(&[lib, main.clone()], &BatchOptions::new().without_symbols());
 
     let offset = main_src.find("greet;").unwrap() as u32 + 1;
-    let sym = result
+    let sym = analyzer
         .symbol_at(main_str, offset)
         .expect("symbol_at should find a symbol on the use-function import");
 
@@ -330,10 +337,10 @@ fn symbol_at_finds_use_const_import() {
     let main_str = path_to_str(&main);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(&[lib, main.clone()], &BatchOptions::new());
+    analyzer.analyze_paths(&[lib, main.clone()], &BatchOptions::new().without_symbols());
 
     let offset = main_src.find("GREETING;").unwrap() as u32 + 1;
-    let sym = result
+    let sym = analyzer
         .symbol_at(main_str, offset)
         .expect("symbol_at should find a symbol on the use-const import");
 
@@ -357,10 +364,10 @@ fn symbol_at_finds_first_class_callable_method() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    analyze_single_file(&analyzer, &file);
 
     let offset = src.find("run(...)").unwrap() as u32 + 1;
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, offset)
         .expect("symbol_at should find a symbol at $s->run(...)");
 
@@ -380,10 +387,10 @@ fn symbol_at_finds_first_class_callable_static_method() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    analyze_single_file(&analyzer, &file);
 
     let offset = src.find("sq(...)").unwrap() as u32 + 1;
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, offset)
         .expect("symbol_at should find a symbol at Math::sq(...)");
 
@@ -404,10 +411,10 @@ fn symbol_at_finds_this_property_access() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    analyze_single_file(&analyzer, &file);
 
     let offset = src.find("->count").unwrap() as u32 + 2; // +2 skips '->'
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, offset)
         .expect("symbol_at should resolve $this->count");
 
@@ -433,10 +440,10 @@ fn symbol_at_finds_property_write_target() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    analyze_single_file(&analyzer, &file);
 
     let offset = src.find("->count = 0;").unwrap() as u32 + 2; // +2 skips '->'
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, offset)
         .expect("symbol_at should resolve the $this->count write target");
 
@@ -462,10 +469,10 @@ fn symbol_at_finds_variable_write_target() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    analyze_single_file(&analyzer, &file);
 
     let offset = src.find("$x = 5").unwrap() as u32 + 1; // +1 skips '$'
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, offset)
         .expect("symbol_at should resolve the $x write target");
 
@@ -489,7 +496,7 @@ fn symbol_at_finds_array_destructuring_write_target() {
     let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let offset = src.find("$a, $b").unwrap() as u32 + 1; // +1 skips '$'
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, offset)
         .expect("symbol_at should resolve the $a destructuring write target");
 
@@ -513,7 +520,7 @@ fn symbol_at_this_method_call_full_lsp_flow() {
     let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let offset = src.find("->helper").unwrap() as u32 + 2;
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, offset)
         .expect("symbol_at should find first $this->helper()");
 
@@ -546,7 +553,7 @@ fn symbol_at_this_in_non_static_closure() {
     let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let offset = src.find("->helper").unwrap() as u32 + 2;
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, offset)
         .expect("symbol_at should resolve $this->helper() inside a non-static closure");
 
@@ -569,12 +576,12 @@ fn symbol_at_returns_innermost_symbol() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    analyze_single_file(&analyzer, &file);
 
     // Find the offset of "run" in "$s->run()"
     let offset = src.rfind("run").unwrap() as u32;
 
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, offset)
         .expect("symbol_at should find a symbol at the run() call");
 
@@ -743,12 +750,12 @@ fn full_flow_cursor_to_reference_locations() {
     let file = write_file(&dir, "l.php", src);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    analyze_single_file(&analyzer, &file);
     let file_str = path_to_str(&file);
 
     let first_call_offset = src.find("{ ping").unwrap() as u32 + 2;
 
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, first_call_offset)
         .expect("symbol_at should find a symbol at the first ping() call");
 
@@ -893,11 +900,11 @@ fn symbol_at_finds_property_access() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    analyze_single_file(&analyzer, &file);
 
     // Point cursor at 'count' in '$c->count'
     let offset = src.find("->count").unwrap() as u32 + 2; // +2 skips '->'
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, offset)
         .expect("symbol_at should find a symbol at $c->count");
 
@@ -927,11 +934,11 @@ fn symbol_at_finds_nullsafe_property_access() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    analyze_single_file(&analyzer, &file);
 
     // Point cursor at 'val' in '$b?->val'
     let offset = src.find("?->val").unwrap() as u32 + 3; // +3 skips '?->'
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, offset)
         .expect("symbol_at should find a symbol at $b?->val");
 
@@ -960,11 +967,11 @@ fn symbol_at_finds_nullsafe_method_call() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    analyze_single_file(&analyzer, &file);
 
     // Point cursor at 'run' in '$s?->run()'
     let offset = src.find("?->run").unwrap() as u32 + 3; // +3 skips '?->'
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, offset)
         .expect("symbol_at should find a symbol at $s?->run()");
 
@@ -996,10 +1003,10 @@ fn symbol_at_method_call_span_matches_reference_location_span() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    analyze_single_file(&analyzer, &file);
 
     let offset = src.find("->run").unwrap() as u32 + 2; // points at 'r' of run
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, offset)
         .expect("symbol_at must find MethodCall(run)");
 
@@ -1028,10 +1035,10 @@ fn symbol_at_function_call_span_matches_reference_location_span() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    analyze_single_file(&analyzer, &file);
 
     let offset = src.find("{ greet").unwrap() as u32 + 2; // points at 'g' of greet
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, offset)
         .expect("symbol_at must find FunctionCall(greet)");
 
@@ -1418,7 +1425,7 @@ fn symbol_at_attribute_class_name_resolves_to_class_reference() {
     let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let offset = src.rfind("MyAttr").unwrap() as u32;
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, offset)
         .expect("symbol_at must find ClassReference on an attribute class name");
     assert!(
@@ -1442,10 +1449,10 @@ fn symbol_at_interface_method_attribute_class_name_resolves_to_class_reference()
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    analyze_single_file(&analyzer, &file);
 
     let offset = src.rfind("MyAttr").unwrap() as u32;
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, offset)
         .expect("symbol_at must find ClassReference on an interface method's attribute class name");
     assert!(
@@ -1468,13 +1475,13 @@ fn symbol_at_use_import_name_resolves_to_class_reference() {
     let user_file_str = path_to_str(&user_file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(
+    analyzer.analyze_paths(
         &[base_file.clone(), user_file.clone()],
-        &BatchOptions::new(),
+        &BatchOptions::new().without_symbols(),
     );
 
     let offset = user_src.find("Bar;").unwrap() as u32;
-    let sym = result
+    let sym = analyzer
         .symbol_at(user_file_str, offset)
         .expect("symbol_at must find ClassReference on the use-import class name");
     assert!(
@@ -1689,11 +1696,11 @@ fn symbol_at_parent_keyword_in_static_call_resolves_to_parent_class() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    analyze_single_file(&analyzer, &file);
 
     let offset = src.find("parent::greet").unwrap() as u32;
 
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, offset)
         .expect("symbol_at must find a ClassReference on the `parent` keyword");
 
@@ -1817,10 +1824,10 @@ fn symbol_at_finds_interface_declared_property_access() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    analyze_single_file(&analyzer, &file);
 
     let offset = src.find("->name").unwrap() as u32 + 2; // +2 skips '->'
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, offset)
         .expect("symbol_at should find a symbol at $x->name through an interface-typed receiver");
 
@@ -1852,10 +1859,10 @@ fn symbol_at_attribute_argument_does_not_resolve_to_class_reference() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    analyze_single_file(&analyzer, &file);
 
     let offset = src.rfind("\"/x\"").unwrap() as u32 + 2; // inside the string literal argument
-    let sym = result.symbol_at(file_str, offset);
+    let sym = analyzer.symbol_at(file_str, offset);
     assert!(
         !matches!(&sym, Some(s) if matches!(&s.kind, ReferenceKind::ClassReference(n) if n.as_ref() == "Route")),
         "cursor inside attribute arguments must not resolve to the attribute's ClassReference, got {:?}",
@@ -1875,10 +1882,10 @@ fn symbol_at_class_extends_name_resolves() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    analyze_single_file(&analyzer, &file);
 
     let offset = src.rfind("Base {}").unwrap() as u32;
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, offset)
         .expect("symbol_at should find a symbol at the extends class-name token");
 
@@ -1897,10 +1904,10 @@ fn symbol_at_class_implements_name_resolves() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    analyze_single_file(&analyzer, &file);
 
     let offset = src.rfind("Greets {}").unwrap() as u32;
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, offset)
         .expect("symbol_at should find a symbol at the implements class-name token");
 
@@ -1919,10 +1926,10 @@ fn symbol_at_interface_extends_name_resolves() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    analyze_single_file(&analyzer, &file);
 
     let offset = src.rfind("Base {}").unwrap() as u32;
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, offset)
         .expect("symbol_at should find a symbol at the interface-extends class-name token");
 
@@ -1941,10 +1948,10 @@ fn symbol_at_enum_implements_name_resolves() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    analyze_single_file(&analyzer, &file);
 
     let offset = src.rfind("HasLabel {").unwrap() as u32;
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, offset)
         .expect("symbol_at should find a symbol at the enum implements class-name token");
 
@@ -1971,11 +1978,11 @@ fn symbol_at_property_access_gap_returns_receiver_type() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    analyze_single_file(&analyzer, &file);
 
     // Cursor right after `$obj`, on the `-` of `->`.
     let gap_off = src.find("$obj->name").unwrap() as u32 + "$obj".len() as u32;
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, gap_off)
         .expect("symbol_at must not return None for the `->` gap before a property name");
 
@@ -1989,7 +1996,7 @@ fn symbol_at_property_access_gap_returns_receiver_type() {
     // The property's own symbol at `name` itself must still win over the gap
     // symbol — the fix must not shadow the existing, more precise lookup.
     let prop_off = src.find("->name").unwrap() as u32 + 2;
-    let prop_sym = result
+    let prop_sym = analyzer
         .symbol_at(file_str, prop_off)
         .expect("symbol_at should still find PropertyAccess on the property token");
     assert!(
@@ -2008,11 +2015,11 @@ fn symbol_at_nullsafe_property_access_gap_returns_receiver_type() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    analyze_single_file(&analyzer, &file);
 
     // Cursor right after `$b`, on the `?` of `?->`.
     let gap_off = src.find("$b?->val").unwrap() as u32 + "$b".len() as u32;
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, gap_off)
         .expect("symbol_at must not return None for the `?->` gap before a property name");
 
@@ -2036,11 +2043,11 @@ fn symbol_at_static_property_access_gap_returns_receiver_type() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    analyze_single_file(&analyzer, &file);
 
     // Cursor right after `Config`, on the first `:` of `::`.
     let gap_off = src.find("Config::$env").unwrap() as u32 + "Config".len() as u32;
-    let sym = result
+    let sym = analyzer
         .symbol_at(file_str, gap_off)
         .expect("symbol_at must not return None for the `::` gap before a static property name");
 
@@ -2174,11 +2181,11 @@ fn symbol_at_self_static_property_access_gap_returns_receiver_type() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    analyze_single_file(&analyzer, &file);
 
     // Cursor right after `self`, on the first `:` of `::`.
     let gap_off = src.find("self::$env").unwrap() as u32 + "self".len() as u32;
-    let sym = result.symbol_at(file_str, gap_off).expect(
+    let sym = analyzer.symbol_at(file_str, gap_off).expect(
         "symbol_at must not return None for the `self::` gap before a static property name",
     );
 

@@ -1697,6 +1697,19 @@ impl<'a> ExpressionAnalyzer<'a> {
                 if let Some((fqcn, prop_name)) =
                     resolve_static_prop_target(spa, ctx, self.db, &self.file)
                 {
+                    self.record_class_ref(&fqcn, spa.class.span);
+                    self.record_symbol(
+                        spa.class.span,
+                        crate::symbol::ReferenceKind::ClassReference(fqcn.clone()),
+                        Type::single(Atomic::TClassString(None)),
+                    );
+                    self.record_receiver_type(
+                        spa.class.span,
+                        spa.member.span,
+                        Type::single(Atomic::TClassString(Some(mir_types::Name::from(
+                            fqcn.as_ref(),
+                        )))),
+                    );
                     let prop_name_opt = Some(prop_name);
                     if let Some(prop_name) = &prop_name_opt {
                         // Purity check: assigning to a static property in a @pure

@@ -20,7 +20,10 @@ use std::time::Duration;
 
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use mir_analyzer::cache::AnalysisCache;
-use mir_analyzer::{discover_files, AnalysisSession, BatchOptions, FileAnalyzer, Name, PhpVersion};
+use mir_analyzer::{
+    discover_files, perf_fixture::PerfFixture, AnalysisSession, BatchOptions, FileAnalyzer, Name,
+    PhpVersion,
+};
 use mir_types::Name as MirSymbol;
 use salsa::Cancelled;
 use tempfile::TempDir;
@@ -68,18 +71,13 @@ fn snapshot_alloc() -> (f64, f64, f64) {
 // Fixture helpers (mirrored from analyze_real_world.rs)
 // ---------------------------------------------------------------------------
 
-fn fixtures_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("benches/fixtures/laravel")
-}
-
-fn skip_if_missing(root: &Path) -> bool {
-    let src = root.join("src");
-    let vendor = root.join("vendor");
-    if !src.exists() || !vendor.exists() {
+fn skip_if_missing(fixture: &PerfFixture) -> bool {
+    if !fixture.has_full_corpus() {
         eprintln!(
             "\nSkipping incremental workload benchmark: fixture not found at {}\n\
-             Run: bash crates/mir-analyzer/benches/download-fixtures.sh\n",
-            root.display()
+             Provide MIR_PERF_FIXTURE/MIR_LARAVEL_FIXTURE/MIR_SYMFONY_FIXTURE,\n\
+             or run: bash crates/mir-analyzer/benches/download-fixtures.sh\n",
+            fixture.root().display()
         );
         true
     } else {
@@ -105,7 +103,7 @@ fn warm_project_analyzer(
     let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
     analyzer.ensure_all_stubs();
     analyzer.collect_definitions(vendor_files);
-    let _ = analyzer.analyze_paths(project_files, &BatchOptions::new());
+    let _ = analyzer.analyze_paths(project_files, &BatchOptions::new().without_symbols());
     analyzer
 }
 
@@ -164,15 +162,19 @@ fn warm_session(
 /// Best-case path: edit a leaf file with no dependents. Measures pure
 /// per-file Pass 2 cost.
 fn bench_single_file_edit(c: &mut Criterion) {
-    let root = fixtures_root();
-    if skip_if_missing(&root) {
+    let Some(fixture) = PerfFixture::discover() else {
+        eprintln!("\nSkipping incremental workload benchmark: no supported perf fixture found\n");
+        return;
+    };
+    if skip_if_missing(&fixture) {
         return;
     }
 
-    let (vendor_files, project_files) = split_vendor_project(&root);
-    let target = root.join("src/Illuminate/Auth/Events/Login.php");
+    let root = fixture.root();
+    let (vendor_files, project_files) = split_vendor_project(root);
+    let target = fixture.leaf_file();
     if !target.exists() {
-        eprintln!("Skipping: target Login.php not found");
+        eprintln!("Skipping: leaf target {} not found", target.display());
         return;
     }
     let target_str = target.to_string_lossy().to_string();
@@ -195,7 +197,11 @@ fn bench_single_file_edit(c: &mut Criterion) {
                     format!("{original}\n// edit {counter}\n")
                 },
                 |new_content| {
-                    analyzer.re_analyze_file(&target_str, &new_content, &BatchOptions::new())
+                    analyzer.re_analyze_file(
+                        &target_str,
+                        &new_content,
+                        &BatchOptions::new().without_symbols(),
+                    )
                 },
                 BatchSize::LargeInput,
             );
@@ -232,7 +238,7 @@ fn bench_single_file_edit(c: &mut Criterion) {
                         "bench source must parse (hard errors: {})",
                         hard_errors.len()
                     );
-                    FileAnalyzer::new(&session).analyze(
+                    FileAnalyzer::new(&session).analyze_diagnostics_only(
                         target_arc.clone(),
                         new_content.as_ref(),
                         &parsed.program,
@@ -257,15 +263,22 @@ fn bench_single_file_edit(c: &mut Criterion) {
 /// (consumers typically publish diagnostics for the open buffer; dependents
 /// are picked up on their own re-analysis).
 fn bench_high_fanout_edit(c: &mut Criterion) {
-    let root = fixtures_root();
-    if skip_if_missing(&root) {
+    let Some(fixture) = PerfFixture::discover() else {
+        eprintln!("\nSkipping incremental workload benchmark: no supported perf fixture found\n");
+        return;
+    };
+    if skip_if_missing(&fixture) {
         return;
     }
 
-    let (vendor_files, project_files) = split_vendor_project(&root);
-    let target = root.join("src/Illuminate/Database/Eloquent/Model.php");
+    let root = fixture.root();
+    let (vendor_files, project_files) = split_vendor_project(root);
+    let target = fixture.high_fanout_file();
     if !target.exists() {
-        eprintln!("Skipping: target Model.php not found");
+        eprintln!(
+            "Skipping: high-fanout target {} not found",
+            target.display()
+        );
         return;
     }
     let target_str = target.to_string_lossy().to_string();
@@ -287,7 +300,11 @@ fn bench_high_fanout_edit(c: &mut Criterion) {
                     format!("{original}\n// edit {counter}\n")
                 },
                 |new_content| {
-                    analyzer.re_analyze_file(&target_str, &new_content, &BatchOptions::new())
+                    analyzer.re_analyze_file(
+                        &target_str,
+                        &new_content,
+                        &BatchOptions::new().without_symbols(),
+                    )
                 },
                 BatchSize::LargeInput,
             );
@@ -322,7 +339,7 @@ fn bench_high_fanout_edit(c: &mut Criterion) {
                         "bench source must parse (hard errors: {})",
                         hard_errors.len()
                     );
-                    FileAnalyzer::new(&session).analyze(
+                    FileAnalyzer::new(&session).analyze_diagnostics_only(
                         target_arc.clone(),
                         new_content.as_ref(),
                         &parsed.program,
@@ -347,12 +364,15 @@ fn bench_high_fanout_edit(c: &mut Criterion) {
 /// clone-then-release pattern, this is dominated by `MirDb::clone()` plus the
 /// query itself; not by waiting for any concurrent edits.
 fn bench_read_query_latency(c: &mut Criterion) {
-    let root = fixtures_root();
-    if skip_if_missing(&root) {
+    let Some(fixture) = PerfFixture::discover() else {
+        eprintln!("\nSkipping read-query benchmark: no supported perf fixture found\n");
+        return;
+    };
+    if skip_if_missing(&fixture) {
         return;
     }
 
-    let (vendor_files, project_files) = split_vendor_project(&root);
+    let (vendor_files, project_files) = split_vendor_project(fixture.root());
     let cache: TempDir = tempfile::tempdir().unwrap();
     let analyzer = warm_project_analyzer(&cache, &vendor_files, &project_files);
 
@@ -361,7 +381,7 @@ fn bench_read_query_latency(c: &mut Criterion) {
     group.measurement_time(Duration::from_secs(10));
 
     group.bench_function("project_analyzer_symbol_location", |b| {
-        b.iter(|| analyzer.definition_of(&Name::class("Illuminate\\Database\\Eloquent\\Model")));
+        b.iter(|| analyzer.definition_of(&Name::class(fixture.read_query_target_class())));
     });
 
     let cache_b: TempDir = tempfile::tempdir().unwrap();
@@ -372,7 +392,7 @@ fn bench_read_query_latency(c: &mut Criterion) {
             session.read(|db| {
                 let fqcn = mir_analyzer::db::Fqcn::new(
                     db,
-                    MirSymbol::new("Illuminate\\Database\\Eloquent\\Model"),
+                    MirSymbol::new(fixture.read_query_target_class()),
                 );
                 mir_analyzer::db::find_class_like(db, fqcn).is_some()
             })
@@ -437,20 +457,24 @@ fn bench_concurrent_read_under_edits(c: &mut Criterion) {
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::thread;
 
-    let root = fixtures_root();
-    if skip_if_missing(&root) {
+    let Some(fixture) = PerfFixture::discover() else {
+        eprintln!("\nSkipping concurrent-read benchmark: no supported perf fixture found\n");
+        return;
+    };
+    if skip_if_missing(&fixture) {
         return;
     }
 
-    let (vendor_files, project_files) = split_vendor_project(&root);
+    let root = fixture.root();
+    let (vendor_files, project_files) = split_vendor_project(root);
     let cache: TempDir = tempfile::tempdir().unwrap();
     let session = Arc::new(warm_session(&cache, &vendor_files, &project_files));
 
     // Pick a class that exists in the warmed session so reads are cache-hot.
-    let target_class = "Illuminate\\Auth\\Events\\Login";
+    let target_class = fixture.concurrent_target_class();
 
     // Pre-load the editing target's source so the writer doesn't pay disk I/O.
-    let edit_path = root.join("src/Illuminate/Auth/Events/Login.php");
+    let edit_path = fixture.leaf_file();
     let edit_path_str: Arc<str> = Arc::from(edit_path.to_string_lossy().as_ref());
     let original = std::fs::read_to_string(&edit_path).unwrap();
 
@@ -543,11 +567,14 @@ fn bench_concurrent_read_under_edits(c: &mut Criterion) {
 /// The first iteration populates the cache; subsequent iterations measure
 /// the LSP cold-start the user feels every time they restart their editor.
 fn bench_lsp_cold_start_warm_cache(_c: &mut Criterion) {
-    let root = fixtures_root();
-    if skip_if_missing(&root) {
+    let Some(fixture) = PerfFixture::discover() else {
+        eprintln!("\nSkipping LSP cold-start benchmark: no supported perf fixture found\n");
+        return;
+    };
+    if skip_if_missing(&fixture) {
         return;
     }
-    let (vendor_files, _project_files) = split_vendor_project(&root);
+    let (vendor_files, _project_files) = split_vendor_project(fixture.root());
     let cache_dir = TempDir::new().unwrap();
 
     eprintln!("\n=== LSP COLD-START via AnalysisSession::with_cache_dir ===\n");
@@ -610,14 +637,18 @@ fn bench_lsp_cold_start_warm_cache(_c: &mut Criterion) {
 /// A regression here (vs prior versions where every call ran Pass 2) means
 /// the caching wiring is broken; an improvement means S5-B paid off.
 fn bench_file_analyzer_cache_hit(c: &mut Criterion) {
-    let root = fixtures_root();
-    if skip_if_missing(&root) {
+    let Some(fixture) = PerfFixture::discover() else {
+        eprintln!("\nSkipping FileAnalyzer cache benchmark: no supported perf fixture found\n");
+        return;
+    };
+    if skip_if_missing(&fixture) {
         return;
     }
-    let (vendor_files, project_files) = split_vendor_project(&root);
-    let target = root.join("src/Illuminate/Auth/Events/Login.php");
+    let root = fixture.root();
+    let (vendor_files, project_files) = split_vendor_project(root);
+    let target = fixture.leaf_file();
     if !target.exists() {
-        eprintln!("Skipping: target Login.php not found");
+        eprintln!("Skipping: leaf target {} not found", target.display());
         return;
     }
     let target_str = target.to_string_lossy().to_string();
@@ -634,7 +665,7 @@ fn bench_file_analyzer_cache_hit(c: &mut Criterion) {
     session.ingest_file(target_arc.clone(), source_arc.clone());
 
     let parsed = php_rs_parser::parse(source_arc.as_ref());
-    let _ = FileAnalyzer::new(&session).analyze(
+    let _ = FileAnalyzer::new(&session).analyze_diagnostics_only(
         target_arc.clone(),
         source_arc.as_ref(),
         &parsed.program,
@@ -645,40 +676,613 @@ fn bench_file_analyzer_cache_hit(c: &mut Criterion) {
     group.sample_size(50);
     group.measurement_time(Duration::from_secs(10));
 
-    group.bench_function("login_php_unchanged", |b| {
-        b.iter(|| {
-            // Caller-side parse is part of the actual FileAnalyzer API
-            // contract, so measure it as part of the iteration body.
+    group.bench_function(
+        format!(
+            "{}_unchanged",
+            target
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("target")
+        ),
+        |b| {
+            b.iter(|| {
+                // Caller-side parse is part of the actual FileAnalyzer API
+                // contract, so measure it as part of the iteration body.
 
-            let parsed = php_rs_parser::parse(source_arc.as_ref());
-            FileAnalyzer::new(&session).analyze(
-                target_arc.clone(),
-                source_arc.as_ref(),
-                &parsed.program,
-                &parsed.source_map,
-            )
-        });
-    });
+                let parsed = php_rs_parser::parse(source_arc.as_ref());
+                FileAnalyzer::new(&session).analyze_diagnostics_only(
+                    target_arc.clone(),
+                    source_arc.as_ref(),
+                    &parsed.program,
+                    &parsed.source_map,
+                )
+            });
+        },
+    );
 
     group.finish();
+}
+
+/// Targeted navigation latency once diagnostics have already run.
+fn bench_diagnostics_only_latency(c: &mut Criterion) {
+    let src = "<?php
+class Dep {
+    public function next(int $value): int { return $value + 1; }
+}
+function run(Dep $dep): int {
+    return $dep->next(41) + totally_undefined_function();
+}
+";
+    let file: Arc<str> = Arc::from("/bench/diagnostics.php");
+
+    let mut cold_group = c.benchmark_group("diagnostics_only_cold");
+    cold_group.sample_size(50);
+    cold_group.measurement_time(Duration::from_secs(10));
+    cold_group.bench_function("first_diagnostics", |b| {
+        b.iter_batched(
+            || {
+                let session = AnalysisSession::new(PhpVersion::LATEST);
+                session.ingest_file(file.clone(), Arc::from(src));
+                let parsed = php_rs_parser::parse(src);
+                (session, parsed)
+            },
+            |(session, parsed)| {
+                let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+                    file.clone(),
+                    src,
+                    &parsed.program,
+                    &parsed.source_map,
+                );
+                assert!(
+                    analysis.symbols.is_empty(),
+                    "diagnostics path should not retain whole-file symbols"
+                );
+                assert!(
+                    analysis
+                        .issues
+                        .iter()
+                        .any(|issue| issue.kind.name() == "UndefinedFunction"),
+                    "fixture should keep producing the expected diagnostic"
+                );
+            },
+            BatchSize::LargeInput,
+        );
+    });
+    cold_group.finish();
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ingest_file(file.clone(), Arc::from(src));
+    let parsed = php_rs_parser::parse(src);
+    let first = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        file.clone(),
+        src,
+        &parsed.program,
+        &parsed.source_map,
+    );
+    assert!(first.symbols.is_empty());
+    let first_issue_kinds: Vec<_> = first.issues.iter().map(|issue| issue.kind.name()).collect();
+
+    let mut warm_group = c.benchmark_group("diagnostics_only_warm");
+    warm_group.sample_size(100);
+    warm_group.measurement_time(Duration::from_secs(10));
+    warm_group.bench_function("repeat_diagnostics", |b| {
+        b.iter(|| {
+            let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+                file.clone(),
+                src,
+                &parsed.program,
+                &parsed.source_map,
+            );
+            assert!(analysis.symbols.is_empty());
+            let issue_kinds: Vec<_> = analysis
+                .issues
+                .iter()
+                .map(|issue| issue.kind.name())
+                .collect();
+            assert_eq!(
+                issue_kinds, first_issue_kinds,
+                "warm diagnostics should preserve the cold diagnostics result"
+            );
+        });
+    });
+    warm_group.finish();
+}
+
+/// Targeted navigation latency once diagnostics have already run.
+fn bench_name_at_after_diagnostics(c: &mut Criterion) {
+    let src = "<?php
+function helper(int $x): int { return $x + 1; }
+function caller(): int { return helper(41); }
+";
+    let file: Arc<str> = Arc::from("/bench/name.php");
+    let offset = src.find("helper(41)").unwrap() as u32 + 1;
+
+    let mut cold_group = c.benchmark_group("name_at_after_diagnostics");
+    cold_group.sample_size(50);
+    cold_group.measurement_time(Duration::from_secs(10));
+    cold_group.bench_function("first_name", |b| {
+        b.iter_batched(
+            || {
+                let session = AnalysisSession::new(PhpVersion::LATEST);
+                session.ingest_file(file.clone(), Arc::from(src));
+                let parsed = php_rs_parser::parse(src);
+                let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+                    file.clone(),
+                    src,
+                    &parsed.program,
+                    &parsed.source_map,
+                );
+                assert!(
+                    analysis.symbols.is_empty(),
+                    "diagnostics path should not retain whole-file symbols"
+                );
+                session
+            },
+            |session| {
+                let name = session
+                    .name_at(file.as_ref(), offset)
+                    .expect("name_at should find helper call");
+                assert_eq!(name, Name::function("helper"));
+            },
+            BatchSize::LargeInput,
+        );
+    });
+    cold_group.finish();
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ingest_file(file.clone(), Arc::from(src));
+    let parsed = php_rs_parser::parse(src);
+    let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        file.clone(),
+        src,
+        &parsed.program,
+        &parsed.source_map,
+    );
+    assert!(analysis.symbols.is_empty());
+
+    let mut warm_group = c.benchmark_group("name_at_repeat");
+    warm_group.sample_size(100);
+    warm_group.measurement_time(Duration::from_secs(10));
+    warm_group.bench_function("repeat_name", |b| {
+        b.iter(|| {
+            let name = session
+                .name_at(file.as_ref(), offset)
+                .expect("name_at should keep resolving helper call");
+            assert_eq!(name, Name::function("helper"));
+        });
+    });
+    warm_group.finish();
+}
+
+/// Targeted navigation latency once diagnostics have already run.
+fn bench_resolve_at_after_diagnostics(c: &mut Criterion) {
+    let src = "<?php
+function helper(int $x): int { return $x + 1; }
+function caller(): int { return helper(41); }
+";
+    let file: Arc<str> = Arc::from("/bench/hover.php");
+    let offset = src.find("helper(41)").unwrap() as u32 + 1;
+
+    let mut cold_group = c.benchmark_group("resolve_at_after_diagnostics");
+    cold_group.sample_size(50);
+    cold_group.measurement_time(Duration::from_secs(10));
+    cold_group.bench_function("first_resolve", |b| {
+        b.iter_batched(
+            || {
+                let session = AnalysisSession::new(PhpVersion::LATEST);
+                session.ingest_file(file.clone(), Arc::from(src));
+                let parsed = php_rs_parser::parse(src);
+                let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+                    file.clone(),
+                    src,
+                    &parsed.program,
+                    &parsed.source_map,
+                );
+                assert!(
+                    analysis.symbols.is_empty(),
+                    "diagnostics path should not retain whole-file symbols"
+                );
+                session
+            },
+            |session| {
+                session
+                    .resolve_at(file.as_ref(), offset)
+                    .expect("resolve_at should find helper call")
+            },
+            BatchSize::LargeInput,
+        );
+    });
+    cold_group.finish();
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ingest_file(file.clone(), Arc::from(src));
+    let parsed = php_rs_parser::parse(src);
+    let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        file.clone(),
+        src,
+        &parsed.program,
+        &parsed.source_map,
+    );
+    assert!(analysis.symbols.is_empty());
+
+    let mut warm_group = c.benchmark_group("resolve_at_repeat");
+    warm_group.sample_size(100);
+    warm_group.measurement_time(Duration::from_secs(10));
+    warm_group.bench_function("repeat_resolve", |b| {
+        b.iter(|| {
+            session
+                .resolve_at(file.as_ref(), offset)
+                .expect("resolve_at should keep resolving helper call")
+        });
+    });
+    warm_group.finish();
+}
+
+/// Targeted hover latency once diagnostics have already run.
+fn bench_hover_at_after_diagnostics(c: &mut Criterion) {
+    let src = "<?php
+function helper(int $x): int { return $x + 1; }
+function caller(): int { return helper(41); }
+";
+    let file: Arc<str> = Arc::from("/bench/hover_at.php");
+    let offset = src.find("helper(41)").unwrap() as u32 + 1;
+
+    let mut cold_group = c.benchmark_group("hover_at_after_diagnostics");
+    cold_group.sample_size(50);
+    cold_group.measurement_time(Duration::from_secs(10));
+    cold_group.bench_function("first_hover", |b| {
+        b.iter_batched(
+            || {
+                let session = AnalysisSession::new(PhpVersion::LATEST);
+                session.ingest_file(file.clone(), Arc::from(src));
+                let parsed = php_rs_parser::parse(src);
+                let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+                    file.clone(),
+                    src,
+                    &parsed.program,
+                    &parsed.source_map,
+                );
+                assert!(
+                    analysis.symbols.is_empty(),
+                    "diagnostics path should not retain whole-file symbols"
+                );
+                session
+            },
+            |session| {
+                session
+                    .hover_at(file.as_ref(), offset)
+                    .expect("hover_at should find helper call")
+            },
+            BatchSize::LargeInput,
+        );
+    });
+    cold_group.finish();
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ingest_file(file.clone(), Arc::from(src));
+    let parsed = php_rs_parser::parse(src);
+    let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        file.clone(),
+        src,
+        &parsed.program,
+        &parsed.source_map,
+    );
+    assert!(analysis.symbols.is_empty());
+
+    let mut warm_group = c.benchmark_group("hover_at_repeat");
+    warm_group.sample_size(100);
+    warm_group.measurement_time(Duration::from_secs(10));
+    warm_group.bench_function("repeat_hover", |b| {
+        b.iter(|| {
+            session
+                .hover_at(file.as_ref(), offset)
+                .expect("hover_at should keep resolving helper call")
+        });
+    });
+    warm_group.finish();
+}
+
+/// Targeted definition latency once diagnostics have already run.
+fn bench_definition_at_after_diagnostics(c: &mut Criterion) {
+    let src = "<?php
+function helper(int $x): int { return $x + 1; }
+function caller(): int { return helper(41); }
+";
+    let file: Arc<str> = Arc::from("/bench/definition_at.php");
+    let offset = src.find("helper(41)").unwrap() as u32 + 1;
+
+    let mut cold_group = c.benchmark_group("definition_at_after_diagnostics");
+    cold_group.sample_size(50);
+    cold_group.measurement_time(Duration::from_secs(10));
+    cold_group.bench_function("first_definition", |b| {
+        b.iter_batched(
+            || {
+                let session = AnalysisSession::new(PhpVersion::LATEST);
+                session.ingest_file(file.clone(), Arc::from(src));
+                let parsed = php_rs_parser::parse(src);
+                let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+                    file.clone(),
+                    src,
+                    &parsed.program,
+                    &parsed.source_map,
+                );
+                assert!(
+                    analysis.symbols.is_empty(),
+                    "diagnostics path should not retain whole-file symbols"
+                );
+                session
+            },
+            |session| {
+                let definition = session
+                    .definition_at(file.as_ref(), offset)
+                    .expect("definition_at should find helper call");
+                assert_eq!(definition.file.as_ref(), file.as_ref());
+            },
+            BatchSize::LargeInput,
+        );
+    });
+    cold_group.finish();
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ingest_file(file.clone(), Arc::from(src));
+    let parsed = php_rs_parser::parse(src);
+    let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        file.clone(),
+        src,
+        &parsed.program,
+        &parsed.source_map,
+    );
+    assert!(analysis.symbols.is_empty());
+
+    let mut warm_group = c.benchmark_group("definition_at_repeat");
+    warm_group.sample_size(100);
+    warm_group.measurement_time(Duration::from_secs(10));
+    warm_group.bench_function("repeat_definition", |b| {
+        b.iter(|| {
+            let definition = session
+                .definition_at(file.as_ref(), offset)
+                .expect("definition_at should keep resolving helper call");
+            assert_eq!(definition.file.as_ref(), file.as_ref());
+        });
+    });
+    warm_group.finish();
+}
+
+/// Targeted `resolve_at` latency for a variable read once diagnostics have run.
+fn bench_resolve_at_variable_after_diagnostics(c: &mut Criterion) {
+    let src = "<?php
+function helper(int $value): int { return $value + 1; }
+";
+    let file: Arc<str> = Arc::from("/bench/resolve_var.php");
+    let offset = src.rfind("$value").unwrap() as u32 + 1;
+
+    let mut cold_group = c.benchmark_group("resolve_at_variable_after_diagnostics");
+    cold_group.sample_size(50);
+    cold_group.measurement_time(Duration::from_secs(10));
+    cold_group.bench_function("first_variable", |b| {
+        b.iter_batched(
+            || {
+                let session = AnalysisSession::new(PhpVersion::LATEST);
+                session.ingest_file(file.clone(), Arc::from(src));
+                let parsed = php_rs_parser::parse(src);
+                let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+                    file.clone(),
+                    src,
+                    &parsed.program,
+                    &parsed.source_map,
+                );
+                assert!(analysis.symbols.is_empty());
+                session
+            },
+            |session| {
+                let sym = session
+                    .resolve_at(file.as_ref(), offset)
+                    .expect("resolve_at should find $value");
+                assert!(matches!(
+                    &sym.kind,
+                    mir_analyzer::ReferenceKind::Variable(name) if name.as_ref() == "value"
+                ));
+            },
+            BatchSize::LargeInput,
+        );
+    });
+    cold_group.finish();
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ingest_file(file.clone(), Arc::from(src));
+    let parsed = php_rs_parser::parse(src);
+    let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        file.clone(),
+        src,
+        &parsed.program,
+        &parsed.source_map,
+    );
+    assert!(analysis.symbols.is_empty());
+
+    let mut warm_group = c.benchmark_group("resolve_at_variable_repeat");
+    warm_group.sample_size(100);
+    warm_group.measurement_time(Duration::from_secs(10));
+    warm_group.bench_function("repeat_variable", |b| {
+        b.iter(|| {
+            let sym = session
+                .resolve_at(file.as_ref(), offset)
+                .expect("resolve_at should keep resolving $value");
+            assert!(matches!(
+                &sym.kind,
+                mir_analyzer::ReferenceKind::Variable(name) if name.as_ref() == "value"
+            ));
+        });
+    });
+    warm_group.finish();
+}
+
+/// Targeted `resolve_at` latency for a receiver-gap cursor once diagnostics have run.
+fn bench_resolve_at_receiver_gap_after_diagnostics(c: &mut Criterion) {
+    let src = "<?php
+class Box { public int $value = 0; }
+function read(Box $box): void { $box->value; }
+";
+    let file: Arc<str> = Arc::from("/bench/resolve_receiver_gap.php");
+    let offset = src.find("$box->value").unwrap() as u32 + "$box".len() as u32;
+
+    let mut cold_group = c.benchmark_group("resolve_at_receiver_gap_after_diagnostics");
+    cold_group.sample_size(50);
+    cold_group.measurement_time(Duration::from_secs(10));
+    cold_group.bench_function("first_receiver_gap", |b| {
+        b.iter_batched(
+            || {
+                let session = AnalysisSession::new(PhpVersion::LATEST);
+                session.ingest_file(file.clone(), Arc::from(src));
+                let parsed = php_rs_parser::parse(src);
+                let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+                    file.clone(),
+                    src,
+                    &parsed.program,
+                    &parsed.source_map,
+                );
+                assert!(analysis.symbols.is_empty());
+                session
+            },
+            |session| {
+                let sym = session
+                    .resolve_at(file.as_ref(), offset)
+                    .expect("resolve_at should find the receiver gap");
+                assert!(matches!(&sym.kind, mir_analyzer::ReferenceKind::Receiver));
+            },
+            BatchSize::LargeInput,
+        );
+    });
+    cold_group.finish();
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ingest_file(file.clone(), Arc::from(src));
+    let parsed = php_rs_parser::parse(src);
+    let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        file.clone(),
+        src,
+        &parsed.program,
+        &parsed.source_map,
+    );
+    assert!(analysis.symbols.is_empty());
+
+    let mut warm_group = c.benchmark_group("resolve_at_receiver_gap_repeat");
+    warm_group.sample_size(100);
+    warm_group.measurement_time(Duration::from_secs(10));
+    warm_group.bench_function("repeat_receiver_gap", |b| {
+        b.iter(|| {
+            let sym = session
+                .resolve_at(file.as_ref(), offset)
+                .expect("resolve_at should keep resolving the receiver gap");
+            assert!(matches!(&sym.kind, mir_analyzer::ReferenceKind::Receiver));
+        });
+    });
+    warm_group.finish();
+}
+
+/// Targeted find-references latency once diagnostics have already run.
+fn bench_references_at_after_diagnostics(c: &mut Criterion) {
+    let src = "<?php
+function helper(int $x): int { return $x + 1; }
+function caller(): int { return helper(41); }
+";
+    let file: Arc<str> = Arc::from("/bench/references.php");
+    let files = vec![file.clone()];
+    let offset = src.find("helper(41)").unwrap() as u32 + 1;
+
+    let mut cold_group = c.benchmark_group("references_at_after_diagnostics");
+    cold_group.sample_size(50);
+    cold_group.measurement_time(Duration::from_secs(10));
+    cold_group.bench_function("first_references", |b| {
+        b.iter_batched(
+            || {
+                let session = AnalysisSession::new(PhpVersion::LATEST);
+                session.ingest_file(file.clone(), Arc::from(src));
+                let parsed = php_rs_parser::parse(src);
+                let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+                    file.clone(),
+                    src,
+                    &parsed.program,
+                    &parsed.source_map,
+                );
+                assert!(
+                    analysis.symbols.is_empty(),
+                    "diagnostics path should not retain whole-file symbols"
+                );
+                session
+            },
+            |session| {
+                let refs = session
+                    .references_at(
+                        file.as_ref(),
+                        offset,
+                        &files,
+                        false,
+                        mir_analyzer::ReferenceIncludes::Plain,
+                    )
+                    .expect("references_at should find helper call");
+                assert!(
+                    !refs.is_empty(),
+                    "references_at should return the helper() call site"
+                );
+            },
+            BatchSize::LargeInput,
+        );
+    });
+    cold_group.finish();
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ingest_file(file.clone(), Arc::from(src));
+    let parsed = php_rs_parser::parse(src);
+    let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        file.clone(),
+        src,
+        &parsed.program,
+        &parsed.source_map,
+    );
+    assert!(analysis.symbols.is_empty());
+
+    let mut warm_group = c.benchmark_group("references_at_repeat");
+    warm_group.sample_size(100);
+    warm_group.measurement_time(Duration::from_secs(10));
+    warm_group.bench_function("repeat_references", |b| {
+        b.iter(|| {
+            let refs = session
+                .references_at(
+                    file.as_ref(),
+                    offset,
+                    &files,
+                    false,
+                    mir_analyzer::ReferenceIncludes::Plain,
+                )
+                .expect("references_at should keep resolving helper call");
+            assert!(
+                !refs.is_empty(),
+                "references_at warm repeat should stay non-empty"
+            );
+        });
+    });
+    warm_group.finish();
 }
 
 /// Memory probe (not a Criterion bench — uses `eprintln!` for output).
 ///
 /// Warms a session over the full project + vendor, snapshots allocator
-/// state, then runs `FileAnalyzer::analyze` once on every project file so
-/// the salsa cache fills with accumulator entries (IssueAccumulator,
-/// RefLocAccumulator, SymbolAccumulator). Reports the live-bytes delta
-/// retained by the cache + the total bytes allocated during the loop.
+/// state, then runs the open-file diagnostics path once on every project file
+/// so the salsa cache fills with diagnostics/reference data without retaining
+/// whole-file navigation symbols. Reports the live-bytes delta retained by the
+/// cache + the total bytes allocated during the loop.
 ///
 /// Comparing this number with-and-without S5-B is the only signal for
 /// "did the accumulator-based cache balloon memory?"
 fn bench_file_analyzer_memory_probe(_c: &mut Criterion) {
-    let root = fixtures_root();
-    if skip_if_missing(&root) {
+    let Some(fixture) = PerfFixture::discover() else {
+        eprintln!("\nSkipping FileAnalyzer memory probe: no supported perf fixture found\n");
+        return;
+    };
+    if skip_if_missing(&fixture) {
         return;
     }
-    let (vendor_files, project_files) = split_vendor_project(&root);
+    let (vendor_files, project_files) = split_vendor_project(fixture.root());
     let cache: TempDir = tempfile::tempdir().unwrap();
     let session = warm_session(&cache, &vendor_files, &project_files);
 
@@ -713,7 +1317,7 @@ fn bench_file_analyzer_memory_probe(_c: &mut Criterion) {
         if !parsed.errors.is_empty() {
             continue;
         }
-        let _ = FileAnalyzer::new(&session).analyze(
+        let _ = FileAnalyzer::new(&session).analyze_diagnostics_only(
             file.clone(),
             source.as_ref(),
             &parsed.program,
@@ -745,6 +1349,14 @@ criterion_group!(
     bench_single_file_edit,
     bench_high_fanout_edit,
     bench_file_analyzer_cache_hit,
+    bench_diagnostics_only_latency,
+    bench_name_at_after_diagnostics,
+    bench_resolve_at_after_diagnostics,
+    bench_hover_at_after_diagnostics,
+    bench_definition_at_after_diagnostics,
+    bench_resolve_at_variable_after_diagnostics,
+    bench_resolve_at_receiver_gap_after_diagnostics,
+    bench_references_at_after_diagnostics,
     bench_file_analyzer_memory_probe,
     bench_read_query_latency,
     bench_stub_loading,

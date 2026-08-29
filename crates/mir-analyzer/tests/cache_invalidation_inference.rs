@@ -56,7 +56,7 @@ fn transitive_inferred_return_invalidation() {
 
     // --- Run 1: $x is int, check passes -> no mismatch. -----------------------
     let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-    let result1 = session.analyze_paths(&files, &BatchOptions::new());
+    let result1 = session.analyze_paths(&files, &BatchOptions::new().without_symbols());
     assert_eq!(
         type_check_mismatches(&result1),
         0,
@@ -79,7 +79,7 @@ fn transitive_inferred_return_invalidation() {
     // A.php is byte-identical, so its content-hash entry is a cache hit unless
     // the reverse-dep graph evicts it as a transitive dependent of C.
     let session2 = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-    let result2 = session2.analyze_paths(&files, &BatchOptions::new());
+    let result2 = session2.analyze_paths(&files, &BatchOptions::new().without_symbols());
 
     assert_eq!(
         type_check_mismatches(&result2),
@@ -117,7 +117,7 @@ fn transitive_inferred_return_invalidation_via_methods() {
     let files = [a.clone(), b.clone(), c.clone()];
 
     let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-    let result1 = session.analyze_paths(&files, &BatchOptions::new());
+    let result1 = session.analyze_paths(&files, &BatchOptions::new().without_symbols());
     assert_eq!(
         type_check_mismatches(&result1),
         0,
@@ -131,7 +131,7 @@ fn transitive_inferred_return_invalidation_via_methods() {
     );
 
     let session2 = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-    let result2 = session2.analyze_paths(&files, &BatchOptions::new());
+    let result2 = session2.analyze_paths(&files, &BatchOptions::new().without_symbols());
     assert_eq!(
         type_check_mismatches(&result2),
         1,
@@ -165,7 +165,7 @@ fn transitive_inferred_return_invalidation_via_trait() {
     let files = [a.clone(), t.clone(), c.clone()];
 
     let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-    let result1 = session.analyze_paths(&files, &BatchOptions::new());
+    let result1 = session.analyze_paths(&files, &BatchOptions::new().without_symbols());
     assert_eq!(
         type_check_mismatches(&result1),
         0,
@@ -179,7 +179,7 @@ fn transitive_inferred_return_invalidation_via_trait() {
     );
 
     let session2 = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-    let result2 = session2.analyze_paths(&files, &BatchOptions::new());
+    let result2 = session2.analyze_paths(&files, &BatchOptions::new().without_symbols());
     assert_eq!(
         type_check_mismatches(&result2),
         1,
@@ -216,7 +216,10 @@ fn deleting_a_dependency_file_invalidates_dependents() {
         let baseline_cache = create_temp_dir("delete_dependency: baseline cache");
         let baseline = AnalysisSession::new(PhpVersion::LATEST)
             .with_cache_dir(baseline_cache.path())
-            .analyze_paths(std::slice::from_ref(&a), &BatchOptions::new());
+            .analyze_paths(
+                std::slice::from_ref(&a),
+                &BatchOptions::new().without_symbols(),
+            );
         assert!(
             type_check_mismatches(&baseline) >= 1,
             "baseline: with C absent, c_val() is unresolved and the @mir-check must \
@@ -226,7 +229,10 @@ fn deleting_a_dependency_file_invalidates_dependents() {
 
     // Run 1: C present, $x is int, check passes.
     let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-    let result1 = session.analyze_paths(&[a.clone(), c.clone()], &BatchOptions::new());
+    let result1 = session.analyze_paths(
+        &[a.clone(), c.clone()],
+        &BatchOptions::new().without_symbols(),
+    );
     assert_eq!(
         type_check_mismatches(&result1),
         0,
@@ -237,7 +243,10 @@ fn deleting_a_dependency_file_invalidates_dependents() {
     std::fs::remove_file(&c).unwrap();
 
     let session2 = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
-    let result2 = session2.analyze_paths(std::slice::from_ref(&a), &BatchOptions::new());
+    let result2 = session2.analyze_paths(
+        std::slice::from_ref(&a),
+        &BatchOptions::new().without_symbols(),
+    );
     assert_eq!(
         type_check_mismatches(&result2),
         1,

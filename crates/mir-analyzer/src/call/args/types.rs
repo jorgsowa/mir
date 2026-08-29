@@ -1209,47 +1209,45 @@ fn union_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>)
 
 fn array_list_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer<'_>) -> bool {
     arg_ty.types.iter().all(|a_atomic| {
-        let arg_value: &Type =
-            match a_atomic {
-                Atomic::TArray { value, .. }
-                | Atomic::TNonEmptyArray { value, .. }
-                | Atomic::TList { value }
-                | Atomic::TNonEmptyList { value } => value,
-                // An open shape may carry additional keys of unknown type — those
-                // stay permissive, matching atomic_subtype's treatment of open
-                // shapes. But every KNOWN property must still fit the param's
-                // element type regardless of openness; a `non-empty-*` param
-                // additionally requires at least one known property when the arg
-                // is closed (an empty shape like `[]` is not a `non-empty-list`,
-                // even though `.all()` over its empty properties is vacuously
-                // true — an open shape may still hide a first element, so it
-                // stays permissive there). A TKeyedArray param atom (shape-to-
-                // shape) requires every required param key to be present in the
-                // arg's own shape with a compatible value, unless the arg is open
-                // (an open arg's missing key might be one of its unknown ones) —
-                // an arg missing a required key on a CLOSED shape (or with an
-                // incompatible value for a shared key) is not shape-compatible;
-                // extra arg keys beyond the param's declared set are still left
-                // permissive.
-                Atomic::TKeyedArray {
-                    properties,
-                    is_open,
-                    ..
-                } => {
-                    return param_ty.types.iter().any(|p_atomic| {
-                        let mut requires_non_list = false;
-                        let param_atomic =
-                            if let Some(array_atomic) = associative_array_intersection_part(p_atomic)
-                            {
-                                requires_non_list = true;
-                                array_atomic
-                            } else {
-                                p_atomic
-                            };
-                        if requires_non_list && arg_is_definite_list(a_atomic) {
-                            return false;
-                        }
-                        match param_atomic {
+        let arg_value: &Type = match a_atomic {
+            Atomic::TArray { value, .. }
+            | Atomic::TNonEmptyArray { value, .. }
+            | Atomic::TList { value }
+            | Atomic::TNonEmptyList { value } => value,
+            // An open shape may carry additional keys of unknown type — those
+            // stay permissive, matching atomic_subtype's treatment of open
+            // shapes. But every KNOWN property must still fit the param's
+            // element type regardless of openness; a `non-empty-*` param
+            // additionally requires at least one known property when the arg
+            // is closed (an empty shape like `[]` is not a `non-empty-list`,
+            // even though `.all()` over its empty properties is vacuously
+            // true — an open shape may still hide a first element, so it
+            // stays permissive there). A TKeyedArray param atom (shape-to-
+            // shape) requires every required param key to be present in the
+            // arg's own shape with a compatible value, unless the arg is open
+            // (an open arg's missing key might be one of its unknown ones) —
+            // an arg missing a required key on a CLOSED shape (or with an
+            // incompatible value for a shared key) is not shape-compatible;
+            // extra arg keys beyond the param's declared set are still left
+            // permissive.
+            Atomic::TKeyedArray {
+                properties,
+                is_open,
+                ..
+            } => {
+                return param_ty.types.iter().any(|p_atomic| {
+                    let mut requires_non_list = false;
+                    let param_atomic =
+                        if let Some(array_atomic) = associative_array_intersection_part(p_atomic) {
+                            requires_non_list = true;
+                            array_atomic
+                        } else {
+                            p_atomic
+                        };
+                    if requires_non_list && arg_is_definite_list(a_atomic) {
+                        return false;
+                    }
+                    match param_atomic {
                         Atomic::TArray { value, .. } | Atomic::TList { value } => properties
                             .values()
                             .all(|p| union_compatible(&p.ty, value, ea)),
@@ -1274,21 +1272,22 @@ fn array_list_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer
                             }
                         }),
                         _ => *is_open,
-                    }});
-                }
-                _ => return false,
-            };
+                    }
+                });
+            }
+            _ => return false,
+        };
         let arg_key = array_key_of(a_atomic).unwrap_or_else(Type::mixed);
 
         param_ty.types.iter().any(|p_atomic| {
             let mut requires_non_list = false;
-            let param_atomic = if let Some(array_atomic) = associative_array_intersection_part(p_atomic)
-            {
-                requires_non_list = true;
-                array_atomic
-            } else {
-                p_atomic
-            };
+            let param_atomic =
+                if let Some(array_atomic) = associative_array_intersection_part(p_atomic) {
+                    requires_non_list = true;
+                    array_atomic
+                } else {
+                    p_atomic
+                };
             if requires_non_list && arg_is_definite_list(a_atomic) {
                 return false;
             }

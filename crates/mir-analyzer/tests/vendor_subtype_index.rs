@@ -41,7 +41,10 @@ fn vendor_tree_implementor_reaches_subtype_index() {
     session.collect_definitions(std::slice::from_ref(&vendor_impl));
 
     // Project ingestion via the batch pipeline (never touches `ingest_file`).
-    session.analyze_paths(std::slice::from_ref(&shape), &BatchOptions::new());
+    session.analyze_paths(
+        std::slice::from_ref(&shape),
+        &BatchOptions::new().without_symbols(),
+    );
 
     // Query scope deliberately excludes the vendor file: the on-demand
     // self-heal (`commit_defs_for_matching`) only ever looks at files in this
@@ -76,7 +79,10 @@ fn batch_project_implementor_reaches_subtype_index_without_ingest_file() {
     session.ensure_all_stubs();
 
     // Pure CLI batch pipeline — no `ingest_file` call anywhere.
-    session.analyze_paths(&[shape.clone(), impl_file.clone()], &BatchOptions::new());
+    session.analyze_paths(
+        &[shape.clone(), impl_file.clone()],
+        &BatchOptions::new().without_symbols(),
+    );
 
     // Query scope excludes Circle.php so self-heal cannot independently
     // discover it; only `analyze_paths` committing its edges makes this pass.

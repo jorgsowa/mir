@@ -54,7 +54,7 @@ fn body_analysis_alone_misses_backed_enum_case_type_mismatch() {
         "unexpected parse errors: {:?}",
         parsed.errors
     );
-    let body_issues = FileAnalyzer::new(&session).analyze(
+    let body_issues = FileAnalyzer::new(&session).analyze_diagnostics_only(
         file.clone(),
         ENUM_WITH_MISMATCHED_CASE,
         &parsed.program,

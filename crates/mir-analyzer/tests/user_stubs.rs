@@ -37,7 +37,7 @@ fn stub_file_function_resolves_without_undefined_function_error() {
 
     let analyzer =
         AnalysisSession::new(PhpVersion::LATEST).with_user_stubs(vec![stub_file], Vec::new());
-    let result = analyzer.analyze_paths(&[src_file], &BatchOptions::new());
+    let result = analyzer.analyze_paths(&[src_file], &BatchOptions::new().without_symbols());
 
     let undefined: Vec<_> = result
         .issues
@@ -65,7 +65,7 @@ fn stub_directory_function_resolves_without_undefined_function_error() {
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST)
         .with_user_stubs(Vec::new(), vec![stubs_dir.path().to_path_buf()]);
-    let result = analyzer.analyze_paths(&[src_file], &BatchOptions::new());
+    let result = analyzer.analyze_paths(&[src_file], &BatchOptions::new().without_symbols());
 
     let undefined: Vec<_> = result
         .issues

@@ -374,6 +374,7 @@ pub struct WorkspaceSymbolIndex {
     functions: Arc<FxHashMap<Name, SymbolLoc>>,
     constants: Arc<FxHashMap<Name, SymbolLoc>>,
     class_like_by_short_name: ShortNameIndex,
+    function_by_short_name: ShortNameIndex,
     class_like_collisions: Arc<FxHashMap<Name, Box<[SymbolLoc]>>>,
     function_collisions: Arc<FxHashMap<Name, Box<[SymbolLoc]>>>,
     constant_collisions: Arc<FxHashMap<Name, Box<[SymbolLoc]>>>,
@@ -386,7 +387,7 @@ pub struct ShortNameIndex {
 }
 
 impl ShortNameIndex {
-    fn from_class_like_keys(keys: impl Iterator<Item = Name>) -> Self {
+    fn from_keys(keys: impl Iterator<Item = Name>) -> Self {
         let mut pairs: Vec<(Name, Name)> = keys.map(|key| (short_name_key(key), key)).collect();
         pairs.sort_by(|a, b| {
             a.0.as_str()
@@ -469,6 +470,10 @@ impl WorkspaceSymbolIndex {
         self.class_like_by_short_name.get(short_name)
     }
 
+    pub fn functions_named(&self, short_name: Name) -> &[Name] {
+        self.function_by_short_name.get(short_name)
+    }
+
     pub fn class_like_ptr(&self) -> *const FxHashMap<Name, SymbolLoc> {
         Arc::as_ptr(&self.class_like)
     }
@@ -507,6 +512,7 @@ impl PartialEq for WorkspaceSymbolIndex {
             && Arc::ptr_eq(&self.function_collisions, &other.function_collisions)
             && Arc::ptr_eq(&self.constant_collisions, &other.constant_collisions)
             && self.class_like_by_short_name == other.class_like_by_short_name
+            && self.function_by_short_name == other.function_by_short_name
     }
 }
 
@@ -529,7 +535,8 @@ pub fn build_workspace_symbol_index(
     }
 
     WorkspaceSymbolIndex {
-        class_like_by_short_name: ShortNameIndex::from_class_like_keys(class_like.keys().copied()),
+        class_like_by_short_name: ShortNameIndex::from_keys(class_like.keys().copied()),
+        function_by_short_name: ShortNameIndex::from_keys(functions.keys().copied()),
         class_like: Arc::new(class_like),
         functions: Arc::new(functions),
         constants: Arc::new(constants),
@@ -915,13 +922,25 @@ mod builder_equivalence_tests {
             .iter()
             .map(|key| key.as_str())
             .collect();
+        let tracked_dup_fn_short: Vec<_> = tracked
+            .functions_named(Name::new("dup_fn"))
+            .iter()
+            .map(|key| key.as_str())
+            .collect();
         let rebuilt_dup_short: Vec<_> = rebuilt
             .class_likes_named(Name::new("dup"))
             .iter()
             .map(|key| key.as_str())
             .collect();
+        let rebuilt_dup_fn_short: Vec<_> = rebuilt
+            .functions_named(Name::new("dup_fn"))
+            .iter()
+            .map(|key| key.as_str())
+            .collect();
         assert_eq!(tracked_dup_short, rebuilt_dup_short);
+        assert_eq!(tracked_dup_fn_short, rebuilt_dup_fn_short);
         assert_eq!(rebuilt_dup_short, vec!["app\\dup", "dup"]);
+        assert_eq!(rebuilt_dup_fn_short, vec!["dup_fn"]);
         assert_eq!(
             collision_map(&db, tracked.class_like_collisions()),
             collision_map(&db, rebuilt.class_like_collisions())

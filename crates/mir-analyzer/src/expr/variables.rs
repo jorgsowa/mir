@@ -81,7 +81,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         } else {
             ctx.get_var_sym(sym)
         };
-        if self.collect_symbols {
+        if self.collect_symbols || self.collect_resolved_navigation_facts {
             self.record_symbol(
                 expr.span,
                 ReferenceKind::Variable(Arc::from(name_str)),

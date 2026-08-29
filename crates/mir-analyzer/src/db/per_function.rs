@@ -107,5 +107,10 @@ pub fn infer_function(
         prepared.text.as_ref(),
         &parsed.source_map,
     );
+    crate::metrics::record_infer_function_retained(
+        result.issues.len(),
+        result.ref_locs.len(),
+        result.return_type.is_some(),
+    );
     Some(Arc::new(result))
 }

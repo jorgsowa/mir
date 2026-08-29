@@ -5,7 +5,7 @@
 
 use std::sync::Once;
 
-use mir_analyzer::analyze_source;
+use mir_analyzer::{analyze_source_with_options, BatchOptions};
 use mir_issues::{Issue, IssueKind, Severity};
 use mir_plugin::php_ast::owned::{ExprKind, StmtKind};
 use mir_plugin::{
@@ -115,7 +115,7 @@ fn setup() {
 }
 
 fn unsuppressed(source: &str) -> Vec<Issue> {
-    analyze_source(source)
+    analyze_source_with_options(source, &BatchOptions::new().without_symbols())
         .issues
         .into_iter()
         .filter(|i| !i.suppressed)
@@ -209,7 +209,7 @@ fn after_function_call_hook_fires_for_declared_function() {
 #[test]
 fn plugin_issues_are_suppressible_by_their_own_name() {
     setup();
-    let all = analyze_source(
+    let all = analyze_source_with_options(
         r#"<?php
 function dangerous(): void {}
 function k(): void {
@@ -217,6 +217,7 @@ function k(): void {
     dangerous();
 }
 "#,
+        &BatchOptions::new().without_symbols(),
     )
     .issues;
     let dangerous: Vec<_> = all

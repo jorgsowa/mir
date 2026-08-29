@@ -10,7 +10,7 @@ impl<'a> BodyAnalyzer<'a> {
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<Issue>,
-        all_symbols: &mut Vec<ResolvedSymbol>,
+        mut all_symbols: Option<&mut Vec<ResolvedSymbol>>,
     ) {
         crate::attributes::check_function_attributes(
             decl,
@@ -20,7 +20,9 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
             all_issues,
             self.mode == AnalysisMode::Full,
-            Some(&mut *all_symbols),
+            self.collect_symbols
+                .then(|| all_symbols.as_deref_mut())
+                .flatten(),
         );
         let fn_name = decl.name.as_deref().unwrap_or("").to_string();
         for param in decl.params.iter() {
@@ -31,7 +33,9 @@ impl<'a> BodyAnalyzer<'a> {
                     source,
                     source_map,
                     all_issues,
-                    Some(&mut *all_symbols),
+                    self.collect_symbols
+                        .then(|| all_symbols.as_deref_mut())
+                        .flatten(),
                 );
             }
             // Defaults are fully analyzed below (the expression analyzer
@@ -44,13 +48,13 @@ impl<'a> BodyAnalyzer<'a> {
                 source,
                 source_map,
                 all_issues,
-                Some(&mut *all_symbols),
+                self.collect_symbols
+                    .then(|| all_symbols.as_deref_mut())
+                    .flatten(),
             );
         }
         use crate::flow_state::FlowState;
         use crate::stmt::StatementsAnalyzer;
-        use mir_issues::IssueBuffer;
-
         let resolved = lookup_function_node_for_decl(self.db, file.as_ref(), &fn_name);
         let fqn = resolved.as_ref().map(|(f, _)| f.clone());
         #[allow(clippy::type_complexity)]
@@ -158,19 +162,35 @@ impl<'a> BodyAnalyzer<'a> {
             .is_some_and(|(_, s)| s.is_mutation_free || s.is_external_mutation_free);
         ctx.current_function_fqn = fqn.clone();
         seed_param_locations(&mut ctx, &decl.params, source, source_map);
-        record_param_symbols(all_symbols, file, source, &decl.params, &ctx);
-        let mut buf = IssueBuffer::new();
+        record_param_symbols(
+            all_symbols.as_deref_mut(),
+            file,
+            source,
+            &decl.params,
+            &ctx,
+            self.collect_symbols,
+            self.capture_symbol_types,
+            self.codebase_symbols_only,
+        );
+        let mut buf = self.issue_buffer();
         let mut sa = StatementsAnalyzer::new(
             self.db,
             file.clone(),
             source,
             source_map,
             &mut buf,
-            all_symbols,
+            all_symbols.as_deref_mut(),
+            &self.navigation_facts,
+            &self.resolved_navigation_facts,
             self.php_version,
             self.mode,
         );
         sa.collect_symbols = self.collect_symbols;
+        sa.capture_symbol_types = self.capture_symbol_types;
+        sa.codebase_symbols_only = self.codebase_symbols_only;
+        sa.record_reference_locations = self.record_reference_locations;
+        sa.collect_navigation_facts = self.collect_navigation_facts;
+        sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
         // Parameter defaults are constant expressions outside the body flow;
         // analyze them (mirroring the class-method path) so `Cfg::MODE`-style
         // defaults record references.
@@ -195,9 +215,11 @@ impl<'a> BodyAnalyzer<'a> {
         let body_diverges = ctx.diverges;
         drop(sa);
 
-        emit_unused_params(&params, &ctx, "", file, all_issues, 0);
-        emit_unused_variables(&ctx, file, all_issues);
-        all_issues.extend(buf.into_all_issues());
+        if self.mode == AnalysisMode::Full {
+            emit_unused_params(&params, &ctx, "", file, all_issues, 0);
+            emit_unused_variables(&ctx, file, all_issues);
+            all_issues.extend(buf.into_all_issues());
+        }
 
         if self.mode == AnalysisMode::Full && !ctx.is_generator {
             crate::diagnostics::check_missing_return(
@@ -367,7 +389,7 @@ impl<'a> BodyAnalyzer<'a> {
                         },
                     ));
                 } else {
-                    if self.mode == AnalysisMode::Full {
+                    if self.mode == AnalysisMode::Full && self.record_reference_locations {
                         self.db.record_reference_location(crate::db::RefLoc {
                             symbol_key: self.class_ref_key(fqcn.as_ref()),
                             file: file.clone(),
@@ -533,7 +555,7 @@ impl<'a> BodyAnalyzer<'a> {
                         ));
                         continue;
                     }
-                    if self.mode == AnalysisMode::Full {
+                    if self.mode == AnalysisMode::Full && self.record_reference_locations {
                         self.db.record_reference_location(crate::db::RefLoc {
                             symbol_key: self.class_ref_key(fqcn.as_ref()),
                             file: file.clone(),
@@ -591,13 +613,10 @@ impl<'a> BodyAnalyzer<'a> {
     ) -> crate::db::FunctionInferenceResult {
         use crate::flow_state::FlowState;
         use crate::stmt::StatementsAnalyzer;
-        use mir_issues::IssueBuffer;
-
         // Isolate this walk's refs in a fresh staging frame; popped at exit.
         self.db.push_ref_loc_frame();
 
         let mut issues: Vec<Issue> = Vec::new();
-        let mut discarded_symbols: Vec<ResolvedSymbol> = Vec::new();
 
         let fn_name = decl.name.as_deref().unwrap_or("").to_string();
         for param in decl.params.iter() {
@@ -608,7 +627,7 @@ impl<'a> BodyAnalyzer<'a> {
                     source,
                     source_map,
                     &mut issues,
-                    Some(&mut discarded_symbols),
+                    None,
                 );
             }
             if let Some(default_expr) = &param.default {
@@ -630,7 +649,7 @@ impl<'a> BodyAnalyzer<'a> {
                 source,
                 source_map,
                 &mut issues,
-                Some(&mut discarded_symbols),
+                None,
             );
         }
 
@@ -703,18 +722,23 @@ impl<'a> BodyAnalyzer<'a> {
         );
         seed_param_locations(&mut ctx, &decl.params, source, source_map);
 
-        let mut buf = IssueBuffer::new();
+        let mut buf = self.issue_buffer();
         let mut sa = StatementsAnalyzer::new(
             self.db,
             file.clone(),
             source,
             source_map,
             &mut buf,
-            &mut discarded_symbols,
+            None,
+            &self.navigation_facts,
+            &self.resolved_navigation_facts,
             self.php_version,
             self.mode,
         );
         sa.collect_symbols = self.collect_symbols;
+        sa.capture_symbol_types = self.capture_symbol_types;
+        sa.collect_navigation_facts = self.collect_navigation_facts;
+        sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
         // The symbol buffer above is dropped at return — skip building it.
         sa.collect_symbols = false;
         ctx.is_generator = body_has_yield(&decl.body.stmts);
@@ -727,9 +751,11 @@ impl<'a> BodyAnalyzer<'a> {
         };
         drop(sa);
 
-        emit_unused_params(&params, &ctx, "", file, &mut issues, 0);
-        emit_unused_variables(&ctx, file, &mut issues);
-        issues.extend(buf.into_all_issues());
+        if self.mode == AnalysisMode::Full {
+            emit_unused_params(&params, &ctx, "", file, &mut issues, 0);
+            emit_unused_variables(&ctx, file, &mut issues);
+            issues.extend(buf.into_all_issues());
+        }
 
         let ref_locs = self.db.pop_ref_loc_frame();
 
@@ -753,8 +779,6 @@ impl<'a> BodyAnalyzer<'a> {
     ) {
         use crate::flow_state::FlowState;
         use crate::stmt::StatementsAnalyzer;
-        use mir_issues::IssueBuffer;
-
         crate::attributes::check_function_attributes(
             decl,
             self.db,
@@ -884,19 +908,35 @@ impl<'a> BodyAnalyzer<'a> {
             .is_some_and(|(_, s)| s.is_mutation_free || s.is_external_mutation_free);
         ctx.current_function_fqn = fqn.clone();
         seed_param_locations(&mut ctx, &decl.params, source, source_map);
-        record_param_symbols(all_symbols, file, source, &decl.params, &ctx);
-        let mut buf = IssueBuffer::new();
+        record_param_symbols(
+            Some(all_symbols),
+            file,
+            source,
+            &decl.params,
+            &ctx,
+            self.collect_symbols,
+            self.capture_symbol_types,
+            self.codebase_symbols_only,
+        );
+        let mut buf = self.issue_buffer();
         let mut sa = StatementsAnalyzer::new(
             self.db,
             file.clone(),
             source,
             source_map,
             &mut buf,
-            all_symbols,
+            Some(all_symbols),
+            &self.navigation_facts,
+            &self.resolved_navigation_facts,
             self.php_version,
             self.mode,
         );
         sa.collect_symbols = self.collect_symbols;
+        sa.capture_symbol_types = self.capture_symbol_types;
+        sa.codebase_symbols_only = self.codebase_symbols_only;
+        sa.record_reference_locations = self.record_reference_locations;
+        sa.collect_navigation_facts = self.collect_navigation_facts;
+        sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
         ctx.is_generator = body_has_yield(&decl.body.stmts);
         sa.analyze_stmts(&decl.body.stmts, &mut ctx);
         let inferred = merge_return_types(&sa.return_types, ctx.diverges);
@@ -916,9 +956,11 @@ impl<'a> BodyAnalyzer<'a> {
             crate::type_env::TypeEnv::new(ctx.vars.clone()),
         );
 
-        emit_unused_params(&params, &ctx, "", file, all_issues, 0);
-        emit_unused_variables(&ctx, file, all_issues);
-        all_issues.extend(buf.into_all_issues());
+        if self.mode == AnalysisMode::Full {
+            emit_unused_params(&params, &ctx, "", file, all_issues, 0);
+            emit_unused_variables(&ctx, file, all_issues);
+            all_issues.extend(buf.into_all_issues());
+        }
 
         if let Some(fqn) = fqn {
             self.record_function_inference(&fqn, &inferred);

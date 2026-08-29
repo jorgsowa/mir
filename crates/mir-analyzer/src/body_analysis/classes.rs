@@ -115,12 +115,10 @@ impl<'a> BodyAnalyzer<'a> {
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<Issue>,
-        all_symbols: &mut Vec<ResolvedSymbol>,
+        mut all_symbols: Option<&mut Vec<ResolvedSymbol>>,
     ) {
         use crate::flow_state::FlowState;
         use crate::stmt::StatementsAnalyzer;
-        use mir_issues::IssueBuffer;
-
         for hook in hooks {
             for param in hook.params.iter() {
                 if let Some(hint) = &param.type_hint {
@@ -130,24 +128,32 @@ impl<'a> BodyAnalyzer<'a> {
                         source,
                         source_map,
                         all_issues,
-                        Some(&mut *all_symbols),
+                        self.collect_symbols
+                            .then(|| all_symbols.as_deref_mut())
+                            .flatten(),
                     );
                 }
             }
 
             if hook.params.iter().any(|p| p.default.is_some()) {
-                let mut buf = IssueBuffer::new();
+                let mut buf = self.issue_buffer();
                 let mut sa = StatementsAnalyzer::new(
                     self.db,
                     file.clone(),
                     source,
                     source_map,
                     &mut buf,
-                    all_symbols,
+                    all_symbols.as_deref_mut(),
+                    &self.navigation_facts,
+                    &self.resolved_navigation_facts,
                     self.php_version,
                     self.mode,
                 );
                 sa.collect_symbols = self.collect_symbols;
+                sa.capture_symbol_types = self.capture_symbol_types;
+                sa.codebase_symbols_only = self.codebase_symbols_only;
+                sa.collect_navigation_facts = self.collect_navigation_facts;
+                sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
                 let mut default_ctx = FlowState::new();
                 default_ctx.self_fqcn = Some(Arc::from(fqcn));
                 default_ctx.parent_fqcn = parent_fqcn.clone();
@@ -159,7 +165,9 @@ impl<'a> BodyAnalyzer<'a> {
                     }
                 }
                 drop(sa);
-                all_issues.extend(buf.into_all_issues());
+                if self.mode == AnalysisMode::Full {
+                    all_issues.extend(buf.into_all_issues());
+                }
             }
 
             let params: Vec<mir_codebase::DeclaredParam> = if hook.params.is_empty()
@@ -231,20 +239,35 @@ impl<'a> BodyAnalyzer<'a> {
             }));
 
             seed_param_locations(&mut ctx, &hook.params, source, source_map);
-            record_param_symbols(all_symbols, file, source, &hook.params, &ctx);
+            record_param_symbols(
+                all_symbols.as_deref_mut(),
+                file,
+                source,
+                &hook.params,
+                &ctx,
+                self.collect_symbols,
+                self.capture_symbol_types,
+                self.codebase_symbols_only,
+            );
 
-            let mut buf = IssueBuffer::new();
+            let mut buf = self.issue_buffer();
             let mut sa = StatementsAnalyzer::new(
                 self.db,
                 file.clone(),
                 source,
                 source_map,
                 &mut buf,
-                all_symbols,
+                all_symbols.as_deref_mut(),
+                &self.navigation_facts,
+                &self.resolved_navigation_facts,
                 self.php_version,
                 self.mode,
             );
             sa.collect_symbols = self.collect_symbols;
+            sa.capture_symbol_types = self.capture_symbol_types;
+            sa.codebase_symbols_only = self.codebase_symbols_only;
+            sa.collect_navigation_facts = self.collect_navigation_facts;
+            sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
 
             match &hook.body {
                 php_ast::owned::PropertyHookBody::Block(block) => {
@@ -259,7 +282,9 @@ impl<'a> BodyAnalyzer<'a> {
             }
 
             drop(sa);
-            all_issues.extend(buf.into_all_issues());
+            if self.mode == AnalysisMode::Full {
+                all_issues.extend(buf.into_all_issues());
+            }
         }
     }
 
@@ -281,7 +306,7 @@ impl<'a> BodyAnalyzer<'a> {
         // Record the declaration name under a name-only key so find-references
         // with an unresolvable receiver ($x->prop on an untyped $x) can still
         // surface matching declarations, mirroring `methdecl:` for methods.
-        if self.mode == AnalysisMode::Full {
+        if self.mode == AnalysisMode::Full && self.record_reference_locations {
             if let Some(name) = prop.name.as_deref() {
                 if !name.is_empty() {
                     let span = super::property_name_span(source, member_span, name);
@@ -385,6 +410,9 @@ impl<'a> BodyAnalyzer<'a> {
             crate::diagnostics::offset_to_line_col(source, span.start, source_map);
         let (_, col_end) = crate::diagnostics::offset_to_line_col(source, span.end, source_map);
         // Constant names are case-sensitive in PHP, same as properties.
+        if !self.record_reference_locations {
+            return;
+        }
         self.db.record_reference_location(crate::db::RefLoc {
             symbol_key: self.constdecl_ref_key(name),
             file: file.clone(),
@@ -447,7 +475,7 @@ impl<'a> BodyAnalyzer<'a> {
                             ),
                         },
                     ));
-                } else if self.mode == AnalysisMode::Full {
+                } else if self.mode == AnalysisMode::Full && self.record_reference_locations {
                     self.db.record_reference_location(crate::db::RefLoc {
                         symbol_key: self.class_ref_key(cls_fqcn.as_ref()),
                         file: file.clone(),
@@ -532,7 +560,7 @@ impl<'a> BodyAnalyzer<'a> {
                                 },
                                 header_location.clone(),
                             ));
-                        } else {
+                        } else if self.record_reference_locations {
                             self.db.record_reference_location(crate::db::RefLoc {
                                 symbol_key: self.class_ref_key(cls_fqcn.as_ref()),
                                 file: file.clone(),
@@ -708,7 +736,7 @@ impl<'a> BodyAnalyzer<'a> {
                 },
                 location.clone(),
             ));
-        } else {
+        } else if self.record_reference_locations {
             self.db.record_reference_location(crate::db::RefLoc {
                 symbol_key: self.class_ref_key(cls_fqcn.as_ref()),
                 file: location.file.clone(),
@@ -830,13 +858,11 @@ impl<'a> BodyAnalyzer<'a> {
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<Issue>,
-        all_symbols: &mut Vec<ResolvedSymbol>,
+        mut all_symbols: Option<&mut Vec<ResolvedSymbol>>,
         type_envs: Option<&mut FxHashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>>,
     ) {
         use crate::flow_state::FlowState;
         use crate::stmt::StatementsAnalyzer;
-        use mir_issues::IssueBuffer;
-
         let fqcn: &str = cx.fqcn.as_ref();
 
         // Record the declaration name under a name-only key so
@@ -850,16 +876,18 @@ impl<'a> BodyAnalyzer<'a> {
                         crate::diagnostics::offset_to_line_col(source, span.start, source_map);
                     let (_, col_end) =
                         crate::diagnostics::offset_to_line_col(source, span.end, source_map);
-                    self.db.record_reference_location(crate::db::RefLoc {
-                        symbol_key: Arc::from(format!(
-                            "methdecl:{}",
-                            crate::util::php_ident_lowercase(name)
-                        )),
-                        file: file.clone(),
-                        line,
-                        col_start,
-                        col_end,
-                    });
+                    if self.record_reference_locations {
+                        self.db.record_reference_location(crate::db::RefLoc {
+                            symbol_key: Arc::from(format!(
+                                "methdecl:{}",
+                                crate::util::php_ident_lowercase(name)
+                            )),
+                            file: file.clone(),
+                            line,
+                            col_start,
+                            col_end,
+                        });
+                    }
                 }
             }
         }
@@ -872,7 +900,9 @@ impl<'a> BodyAnalyzer<'a> {
                     source,
                     source_map,
                     all_issues,
-                    Some(&mut *all_symbols),
+                    self.collect_symbols
+                        .then(|| all_symbols.as_deref_mut())
+                        .flatten(),
                 );
             }
         }
@@ -883,24 +913,33 @@ impl<'a> BodyAnalyzer<'a> {
                 source,
                 source_map,
                 all_issues,
-                Some(&mut *all_symbols),
+                self.collect_symbols
+                    .then(|| all_symbols.as_deref_mut())
+                    .flatten(),
             );
         }
         self.check_method_docblock_classes(method, fqcn, file, source, source_map, all_issues);
 
         if cx.analyze_param_defaults && method.params.iter().any(|p| p.default.is_some()) {
-            let mut buf = IssueBuffer::new();
+            let mut buf = self.issue_buffer();
             let mut sa = StatementsAnalyzer::new(
                 self.db,
                 file.clone(),
                 source,
                 source_map,
                 &mut buf,
-                all_symbols,
+                all_symbols.as_deref_mut(),
+                &self.navigation_facts,
+                &self.resolved_navigation_facts,
                 self.php_version,
                 self.mode,
             );
             sa.collect_symbols = self.collect_symbols;
+            sa.capture_symbol_types = self.capture_symbol_types;
+            sa.codebase_symbols_only = self.codebase_symbols_only;
+            sa.record_reference_locations = self.record_reference_locations;
+            sa.collect_navigation_facts = self.collect_navigation_facts;
+            sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
             let mut default_ctx = FlowState::new();
             default_ctx.self_fqcn = Some(cx.fqcn.clone());
             default_ctx.parent_fqcn = cx.parent_fqcn.clone();
@@ -912,7 +951,9 @@ impl<'a> BodyAnalyzer<'a> {
                 }
             }
             drop(sa);
-            all_issues.extend(buf.into_all_issues());
+            if self.mode == AnalysisMode::Full {
+                all_issues.extend(buf.into_all_issues());
+            }
         }
 
         let Some(body) = &method.body else { return };
@@ -994,7 +1035,7 @@ impl<'a> BodyAnalyzer<'a> {
                     source,
                     source_map,
                     all_issues,
-                    all_symbols,
+                    all_symbols.as_deref_mut(),
                 );
             }
         }
@@ -1073,7 +1114,16 @@ impl<'a> BodyAnalyzer<'a> {
         }
 
         seed_param_locations(&mut ctx, &method.params, source, source_map);
-        record_param_symbols(all_symbols, file, source, &method.params, &ctx);
+        record_param_symbols(
+            all_symbols.as_deref_mut(),
+            file,
+            source,
+            &method.params,
+            &ctx,
+            self.collect_symbols,
+            self.capture_symbol_types,
+            self.codebase_symbols_only,
+        );
 
         // Promoted constructor properties are implicitly assigned on every
         // call — seed them as definitely-assigned before the body runs so
@@ -1088,18 +1138,24 @@ impl<'a> BodyAnalyzer<'a> {
             }
         }
 
-        let mut buf = IssueBuffer::new();
+        let mut buf = self.issue_buffer();
         let mut sa = StatementsAnalyzer::new(
             self.db,
             file.clone(),
             source,
             source_map,
             &mut buf,
-            all_symbols,
+            all_symbols.as_deref_mut(),
+            &self.navigation_facts,
+            &self.resolved_navigation_facts,
             self.php_version,
             self.mode,
         );
         sa.collect_symbols = self.collect_symbols;
+        sa.capture_symbol_types = self.capture_symbol_types;
+        sa.codebase_symbols_only = self.codebase_symbols_only;
+        sa.collect_navigation_facts = self.collect_navigation_facts;
+        sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
         ctx.is_generator = body_has_yield(&body.stmts);
         sa.analyze_stmts(&body.stmts, &mut ctx);
         let inferred = merge_return_types(&sa.return_types, ctx.diverges);
@@ -1232,16 +1288,18 @@ impl<'a> BodyAnalyzer<'a> {
                 .max()
                 .unwrap_or(0)
         };
-        emit_unused_params(
-            &params,
-            &ctx,
-            method_name,
-            file,
-            all_issues,
-            contract_param_count,
-        );
-        emit_unused_variables(&ctx, file, all_issues);
-        all_issues.extend(buf.into_all_issues());
+        if self.mode == AnalysisMode::Full {
+            emit_unused_params(
+                &params,
+                &ctx,
+                method_name,
+                file,
+                all_issues,
+                contract_param_count,
+            );
+            emit_unused_variables(&ctx, file, all_issues);
+            all_issues.extend(buf.into_all_issues());
+        }
 
         if cx.check_returns && self.mode == AnalysisMode::Full && !is_ctor && !ctx.is_generator {
             crate::diagnostics::check_missing_return(
@@ -1282,7 +1340,7 @@ impl<'a> BodyAnalyzer<'a> {
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<Issue>,
-        all_symbols: &mut Vec<ResolvedSymbol>,
+        mut all_symbols: Option<&mut Vec<ResolvedSymbol>>,
         guards: &rustc_hash::FxHashSet<std::sync::Arc<str>>,
     ) {
         crate::attributes::check_class_attributes(
@@ -1293,7 +1351,9 @@ impl<'a> BodyAnalyzer<'a> {
             source_map,
             all_issues,
             self.mode == AnalysisMode::Full,
-            Some(&mut *all_symbols),
+            self.collect_symbols
+                .then(|| all_symbols.as_deref_mut())
+                .flatten(),
         );
 
         let class_name_owned = decl
@@ -1322,6 +1382,7 @@ impl<'a> BodyAnalyzer<'a> {
             let parent_str = crate::parser::name_to_string_owned(parent);
             let parent_resolved = resolve_name(self.db, file.as_ref(), &parent_str);
             if !guards.contains(parent_resolved.as_str()) {
+                let mut navigation_facts = self.navigation_facts.borrow_mut();
                 crate::diagnostics::check_name_class_for_extends(
                     parent,
                     self.db,
@@ -1331,7 +1392,11 @@ impl<'a> BodyAnalyzer<'a> {
                     all_issues,
                     self.php_version,
                     self.mode == AnalysisMode::Full,
-                    all_symbols,
+                    self.collect_symbols
+                        .then(|| all_symbols.as_deref_mut())
+                        .flatten(),
+                    self.collect_navigation_facts
+                        .then_some(&mut *navigation_facts),
                 );
             }
         }
@@ -1348,7 +1413,9 @@ impl<'a> BodyAnalyzer<'a> {
                     all_issues,
                     self.php_version,
                     self.mode == AnalysisMode::Full,
-                    all_symbols,
+                    self.collect_symbols
+                        .then(|| all_symbols.as_deref_mut())
+                        .flatten(),
                 );
             }
         }
@@ -1391,28 +1458,35 @@ impl<'a> BodyAnalyzer<'a> {
                 if let Some(default) = &prop.default {
                     use crate::flow_state::FlowState;
                     use crate::stmt::StatementsAnalyzer;
-                    use mir_issues::IssueBuffer;
                     let mut default_ctx = FlowState::new();
                     default_ctx.self_fqcn = Some(scope_cx.fqcn.clone());
                     default_ctx.parent_fqcn = scope_cx.parent_fqcn.clone();
                     default_ctx.static_fqcn = Some(scope_cx.fqcn.clone());
                     default_ctx.strict_types = scope_cx.strict_types;
-                    let mut buf = IssueBuffer::new();
+                    let mut buf = self.issue_buffer();
                     let mut sa = StatementsAnalyzer::new(
                         self.db,
                         file.clone(),
                         source,
                         source_map,
                         &mut buf,
-                        all_symbols,
+                        all_symbols.as_deref_mut(),
+                        &self.navigation_facts,
+                        &self.resolved_navigation_facts,
                         self.php_version,
                         self.mode,
                     );
                     sa.collect_symbols = self.collect_symbols;
+                    sa.capture_symbol_types = self.capture_symbol_types;
+                    sa.codebase_symbols_only = self.codebase_symbols_only;
+                    sa.collect_navigation_facts = self.collect_navigation_facts;
+                    sa.collect_resolved_navigation_facts = self.collect_resolved_navigation_facts;
                     let mut ea = sa.expr_analyzer(&default_ctx);
                     let _ = ea.analyze(default, &mut default_ctx);
                     drop(sa);
-                    all_issues.extend(buf.into_all_issues());
+                    if self.mode == AnalysisMode::Full {
+                        all_issues.extend(buf.into_all_issues());
+                    }
                 }
                 if !prop.hooks.is_empty() {
                     let property_ty = crate::db::find_property_in_class(
@@ -1435,7 +1509,7 @@ impl<'a> BodyAnalyzer<'a> {
                         source,
                         source_map,
                         all_issues,
-                        all_symbols,
+                        all_symbols.as_deref_mut(),
                     );
                 }
                 continue;
@@ -1453,7 +1527,7 @@ impl<'a> BodyAnalyzer<'a> {
                 source,
                 source_map,
                 all_issues,
-                all_symbols,
+                all_symbols.as_deref_mut(),
                 None,
             );
         }
@@ -1561,6 +1635,7 @@ impl<'a> BodyAnalyzer<'a> {
             let parent_str = crate::parser::name_to_string_owned(parent);
             let parent_resolved = resolve_name(self.db, file.as_ref(), &parent_str);
             if !guards.contains(parent_resolved.as_str()) {
+                let mut navigation_facts = self.navigation_facts.borrow_mut();
                 crate::diagnostics::check_name_class_for_extends(
                     parent,
                     self.db,
@@ -1570,7 +1645,9 @@ impl<'a> BodyAnalyzer<'a> {
                     all_issues,
                     self.php_version,
                     self.mode == AnalysisMode::Full,
-                    all_symbols,
+                    self.collect_symbols.then_some(&mut *all_symbols),
+                    self.collect_navigation_facts
+                        .then_some(&mut *navigation_facts),
                 );
             }
         }
@@ -1587,7 +1664,7 @@ impl<'a> BodyAnalyzer<'a> {
                     all_issues,
                     self.php_version,
                     self.mode == AnalysisMode::Full,
-                    all_symbols,
+                    self.collect_symbols.then_some(&mut *all_symbols),
                 );
             }
         }
@@ -1643,7 +1720,7 @@ impl<'a> BodyAnalyzer<'a> {
                         source,
                         source_map,
                         all_issues,
-                        all_symbols,
+                        Some(all_symbols),
                     );
                 }
                 continue;
@@ -1661,7 +1738,7 @@ impl<'a> BodyAnalyzer<'a> {
                 source,
                 source_map,
                 all_issues,
-                all_symbols,
+                Some(all_symbols),
                 Some(&mut *type_envs),
             );
         }
@@ -1729,7 +1806,7 @@ impl<'a> BodyAnalyzer<'a> {
                 Some(c) => c,
             };
 
-            if self.mode == AnalysisMode::Full {
+            if self.mode == AnalysisMode::Full && self.record_reference_locations {
                 let loc = make_loc();
                 self.db.record_reference_location(crate::db::RefLoc {
                     symbol_key: self.class_ref_key(trait_fqcn.as_ref()),

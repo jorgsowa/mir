@@ -192,6 +192,65 @@ mod tests {
     }
 
     #[test]
+    fn infer_scope_does_not_allocate_resolved_symbols() {
+        crate::metrics::test_reset();
+
+        let db = MirDbStorage::default();
+        let file = SourceFile::new(
+            &db,
+            Arc::from("/tmp/infer_scope_symbol_free.php"),
+            Arc::from("<?php function foo(Dep $dep): Dep { return $dep; }\nclass Dep {}"),
+        );
+        let scopes = file_scopes(&db, file);
+        assert!(!scopes.is_empty(), "expected at least one scope to analyze");
+
+        let _ = infer_scope(&db, file, scopes[0].clone());
+
+        let dump = crate::metrics::dump().expect("metrics enabled in tests");
+        assert!(
+            dump.contains("scopes analyzed      : 1"),
+            "infer_scope should still execute the requested scope, got:\n{dump}"
+        );
+        assert!(
+            dump.contains("symbols allocated    : 0"),
+            "infer_scope should avoid allocating resolved symbols, got:\n{dump}"
+        );
+    }
+
+    #[test]
+    fn infer_file_return_types_uses_per_scope_queries() {
+        crate::metrics::test_reset();
+
+        let db = MirDbStorage::default();
+        let file = SourceFile::new(
+            &db,
+            Arc::from("/tmp/infer_file_types.php"),
+            Arc::from(
+                "<?php\nclass Base { public function id(): int { return 1; } }\nfunction helper(): int { return 1; }\n",
+            ),
+        );
+
+        let inferred = infer_file_return_types(&db, file);
+        assert_eq!(
+            inferred
+                .methods
+                .get(&(Arc::from("Base"), Arc::from("id")))
+                .map(|ty| ty.to_string()),
+            Some("1".to_string())
+        );
+
+        let dump = crate::metrics::dump().expect("metrics enabled in tests");
+        assert!(
+            dump.contains("whole-file walks     : 0"),
+            "infer_file_return_types should avoid whole-file body walks, got:\n{dump}"
+        );
+        assert!(
+            dump.contains("scopes analyzed      : 2"),
+            "infer_file_return_types should analyze the function and class scopes, got:\n{dump}"
+        );
+    }
+
+    #[test]
     fn infer_function_returns_some_for_existing_free_fn() {
         let db = MirDbStorage::default();
         let file = SourceFile::new(
@@ -236,6 +295,32 @@ mod tests {
         assert!(
             Arc::ptr_eq(&r1, &r2),
             "unchanged file + fqn must reuse the memoized Arc<FunctionInferenceResult>"
+        );
+    }
+
+    #[test]
+    fn infer_function_does_not_allocate_resolved_symbols() {
+        crate::metrics::test_reset();
+
+        let db = MirDbStorage::default();
+        let file = SourceFile::new(
+            &db,
+            Arc::from("/tmp/infer_fn_symbol_free.php"),
+            Arc::from("<?php function foo(Dep $dep): Dep { return $dep; } class Dep {}"),
+        );
+        let _ = collect_file_definitions(&db, file);
+
+        let result = infer_function(&db, file, Arc::from("foo"));
+        assert!(result.is_some(), "expected infer_function to locate `foo`");
+
+        let dump = crate::metrics::dump().expect("metrics enabled in tests");
+        assert!(
+            dump.contains("symbols allocated    : 0"),
+            "infer_function should not retain or allocate resolved symbols, got:\n{dump}"
+        );
+        assert!(
+            dump.contains("retained/infer_fn    :"),
+            "infer_function should still record retained-size metrics, got:\n{dump}"
         );
     }
 

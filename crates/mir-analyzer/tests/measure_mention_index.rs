@@ -12,12 +12,14 @@
 //! ```
 
 use std::alloc::{GlobalAlloc, Layout, System};
-use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
-use mir_analyzer::{discover_files, AnalysisSession, IndexCancel, IndexParallelism, PhpVersion};
+use mir_analyzer::{
+    discover_files, perf_fixture::PerfFixture, AnalysisSession, IndexCancel, IndexParallelism,
+    PhpVersion,
+};
 
 static ALLOCS: AtomicU64 = AtomicU64::new(0);
 static ALLOC_BYTES: AtomicU64 = AtomicU64::new(0);
@@ -50,19 +52,19 @@ fn alloc_snapshot() -> (u64, u64) {
     )
 }
 
-fn fixtures_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("benches")
-        .join("fixtures")
-        .join("laravel")
-}
-
 #[test]
 #[ignore = "measurement harness; run explicitly with --release --ignored"]
 fn measure_mention_index() {
-    let root = fixtures_root();
-    if !root.exists() {
-        eprintln!("Skipping: fixture not present at {}", root.display());
+    let Some(fixture) = PerfFixture::discover() else {
+        eprintln!("Skipping: no supported perf fixture present");
+        return;
+    };
+    let root = fixture.root();
+    if !fixture.has_full_corpus() {
+        eprintln!(
+            "Skipping: fixture not present or incomplete at {}",
+            root.display()
+        );
         return;
     }
 

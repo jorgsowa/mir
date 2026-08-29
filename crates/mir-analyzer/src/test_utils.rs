@@ -698,7 +698,7 @@ fn run_analyzer(files: &[(&str, &str)], config: &FixtureConfig) -> Vec<Issue> {
     let tmp_dir_str = tmp_dir.to_string_lossy().into_owned();
 
     // Build BatchOptions from the fixture's suppression config.
-    let mut opts = BatchOptions::new();
+    let mut opts = BatchOptions::new().without_symbols();
     if let Some(explicit) = &config.suppressed_issue_kinds {
         opts.suppressed_issue_kinds = explicit.clone();
     }

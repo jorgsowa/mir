@@ -10,6 +10,7 @@ mod common;
 use std::fs;
 use std::sync::Arc;
 
+use mir_analyzer::symbol::ReferenceKind;
 use mir_analyzer::{AnalysisSession, FileAnalyzer, PhpVersion};
 
 use self::common::create_temp_dir;
@@ -29,6 +30,33 @@ fn parse_and_analyze(source: &str) -> mir_analyzer::FileAnalysis {
     FileAnalyzer::new(&session).analyze(file, source, &parsed.program, &parsed.source_map)
 }
 
+fn parse_and_analyze_diagnostics(source: &str) -> mir_analyzer::FileAnalysis {
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let file: Arc<str> = Arc::from("<test>");
+    session.ingest_file(file.clone(), Arc::from(source));
+
+    let parsed = php_rs_parser::parse(source);
+    assert!(
+        parsed.errors.is_empty(),
+        "parser errors in test source: {:?}",
+        parsed.errors
+    );
+
+    FileAnalyzer::new(&session).analyze_diagnostics_only(
+        file,
+        source,
+        &parsed.program,
+        &parsed.source_map,
+    )
+}
+
+fn session_for_source(path: &str, source: &str) -> (AnalysisSession, Arc<str>) {
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let file: Arc<str> = Arc::from(path);
+    session.ingest_file(file.clone(), Arc::from(source));
+    (session, file)
+}
+
 /// Trait method bodies must be analyzed. `StatementsAnalyzer` (the layer
 /// some external consumers were forced to use) skips traits; `FileAnalyzer`
 /// goes through `BodyAnalyzer`, which walks them. Regression guard for the
@@ -42,7 +70,7 @@ trait Greeter {
     }
 }
 ";
-    let result = parse_and_analyze(src);
+    let result = parse_and_analyze_diagnostics(src);
     let has_undefined_fn = result
         .issues
         .iter()
@@ -67,7 +95,7 @@ function greet(): string {
     return 'hello';
 }
 ";
-    let result = parse_and_analyze(src);
+    let result = parse_and_analyze_diagnostics(src);
     let problem = result
         .issues
         .iter()
@@ -80,6 +108,92 @@ function greet(): string {
             .iter()
             .map(|i| i.kind.name())
             .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn file_analyzer_diagnostics_only_skips_symbols_but_keeps_issues() {
+    let src = "<?php
+function helper(): void {}
+function demo(): void {
+    helper();
+    totally_undefined_function();
+}
+";
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let file: Arc<str> = Arc::from("/proj/demo.php");
+    session.ingest_file(file.clone(), Arc::from(src));
+
+    let parsed = php_rs_parser::parse(src);
+    assert!(parsed.errors.is_empty());
+
+    let full =
+        FileAnalyzer::new(&session).analyze(file.clone(), src, &parsed.program, &parsed.source_map);
+    let diag_only = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        file,
+        src,
+        &parsed.program,
+        &parsed.source_map,
+    );
+
+    assert!(
+        !full.symbols.is_empty(),
+        "full open-file analysis should still collect navigation symbols"
+    );
+    assert!(
+        diag_only.symbols.is_empty(),
+        "diagnostics-only analysis should skip whole-file symbol retention"
+    );
+    assert_eq!(
+        full.issues.iter().map(|i| &i.kind).collect::<Vec<_>>(),
+        diag_only.issues.iter().map(|i| &i.kind).collect::<Vec<_>>(),
+        "diagnostics-only analysis must preserve diagnostics"
+    );
+}
+
+#[test]
+fn analysis_session_diagnostics_helper_keeps_issues_without_symbols() {
+    let src = "<?php
+function helper(): void {}
+function demo(): void {
+    helper();
+    totally_undefined_function();
+}
+";
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let analysis = session.analyze_file_diagnostics("/proj/helper.php", src);
+
+    assert!(
+        analysis.symbols.is_empty(),
+        "session diagnostics helper should not retain whole-file symbols"
+    );
+    assert!(
+        analysis
+            .issues
+            .iter()
+            .any(|issue| issue.kind.name() == "UndefinedFunction"),
+        "session diagnostics helper should preserve body-analysis issues"
+    );
+}
+
+#[test]
+fn analysis_session_diagnostics_helper_preserves_parse_errors() {
+    let src = "<?php
+function broken( {
+";
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let analysis = session.analyze_file_diagnostics("/proj/broken.php", src);
+
+    assert!(
+        analysis.symbols.is_empty(),
+        "parse-error diagnostics helper path should not retain symbols"
+    );
+    assert!(
+        analysis
+            .issues
+            .iter()
+            .any(|issue| issue.kind.name() == "ParseError"),
+        "session diagnostics helper should preserve parse errors"
     );
 }
 
@@ -154,8 +268,12 @@ function encode(array $data): string {
     let parsed = php_rs_parser::parse(src);
     assert!(parsed.errors.is_empty());
 
-    let analysis =
-        FileAnalyzer::new(&session).analyze(file, src, &parsed.program, &parsed.source_map);
+    let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        file,
+        src,
+        &parsed.program,
+        &parsed.source_map,
+    );
 
     let undefined: Vec<_> = analysis
         .issues
@@ -182,6 +300,312 @@ function encode(array $data): string {
     );
 }
 
+#[test]
+fn resolve_at_finds_function_call_without_whole_file_symbol_list() {
+    let src = "<?php\nfunction greet(): void {}\nfunction caller(): void { greet(); }\n";
+    let (session, file) = session_for_source("/proj/a.php", src);
+    assert!(
+        session.reference_locations("fn:greet").is_empty(),
+        "fixture should start with no committed reference postings"
+    );
+
+    let offset = src.find("{ greet").unwrap() as u32 + 2;
+    let sym = session
+        .resolve_at(file.as_ref(), offset)
+        .expect("resolve_at should find greet()");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::FunctionCall(name) if name.as_ref() == "greet"),
+        "expected FunctionCall(greet), got {:?}",
+        sym.kind
+    );
+    assert!(
+        session.reference_locations("fn:greet").is_empty(),
+        "resolve_at should not commit reference postings as a side effect"
+    );
+}
+
+#[test]
+fn resolve_at_finds_method_call_inside_class_scope() {
+    let src = "<?php\nclass Svc { public function helper(): void {}\npublic function run(): void { $this->helper(); } }\n";
+    let (session, file) = session_for_source("/proj/this_call.php", src);
+
+    let offset = src.find("->helper").unwrap() as u32 + 2;
+    let sym = session
+        .resolve_at(file.as_ref(), offset)
+        .expect("resolve_at should resolve $this->helper()");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::MethodCall { method, .. } if method.as_ref() == "helper"),
+        "expected MethodCall(helper), got {:?}",
+        sym.kind
+    );
+}
+
+#[test]
+fn resolve_at_finds_use_import_symbol() {
+    let dir = create_temp_dir("resolve_at_use_import");
+    let dep = self::common::write_file(&dir, "Dep.php", "<?php\nnamespace App;\nclass Dep {}\n");
+    let main_src = "<?php\nuse App\\Dep;\nfunction run(): Dep { return new Dep(); }\n";
+    let main = self::common::write_file(&dir, "Main.php", main_src);
+    let main_str = self::common::path_to_str(&main).to_string();
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ingest_file(
+        Arc::from(self::common::path_to_str(&dep)),
+        Arc::from(fs::read_to_string(&dep).unwrap()),
+    );
+    session.ingest_file(Arc::from(main_str.as_str()), Arc::from(main_src));
+
+    let offset = main_src.find("App\\Dep").unwrap() as u32 + "App\\".len() as u32;
+    let sym = session
+        .resolve_at(&main_str, offset)
+        .expect("resolve_at should find use-import symbol");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::UseImport(inner) if matches!(inner.as_ref(), ReferenceKind::ClassReference(name) if name.as_ref() == "App\\Dep")),
+        "expected UseImport(ClassReference(App\\Dep)), got {:?}",
+        sym.kind
+    );
+}
+
+#[test]
+fn resolve_at_finds_top_level_exec_symbol() {
+    let src =
+        "<?php\nclass Svc { public function run(): void {} }\n$svc = new Svc();\n$svc->run();\n";
+    let (session, file) = session_for_source("/proj/top_level_exec.php", src);
+
+    let offset = src.rfind("->run").unwrap() as u32 + 2;
+    let sym = session
+        .resolve_at(file.as_ref(), offset)
+        .expect("resolve_at should find top-level method call");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::MethodCall { class, method } if class.as_ref() == "Svc" && method.as_ref() == "run"),
+        "expected top-level MethodCall(Svc::run), got {:?}",
+        sym.kind
+    );
+}
+
+#[test]
+fn resolve_at_finds_native_type_hint_symbol() {
+    let src = "<?php\nclass Dep {}\nfunction run(Dep $d): Dep { return $d; }\n";
+    let (session, file) = session_for_source("/proj/resolve_type_hint.php", src);
+
+    let offset = src.find("run(Dep").unwrap() as u32 + "run(".len() as u32;
+    let sym = session
+        .resolve_at(file.as_ref(), offset)
+        .expect("resolve_at should resolve the parameter type-hint class name");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::ClassReference(name) if name.as_ref() == "Dep"),
+        "expected ClassReference(Dep), got {:?}",
+        sym.kind
+    );
+    assert_eq!(sym.resolved_type.to_string(), "class-string");
+}
+
+#[test]
+fn resolve_at_finds_variable_symbol() {
+    let src = "<?php\nfunction run(int $value): int { return $value; }\n";
+    let (session, file) = session_for_source("/proj/resolve_var.php", src);
+
+    let offset = src.rfind("$value").unwrap() as u32 + 1;
+    let sym = session
+        .resolve_at(file.as_ref(), offset)
+        .expect("resolve_at should resolve the variable read");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::Variable(name) if name.as_ref() == "value"),
+        "expected Variable(value), got {:?}",
+        sym.kind
+    );
+    assert_eq!(sym.resolved_type.to_string(), "int");
+}
+
+#[test]
+fn resolve_at_finds_receiver_gap_symbol() {
+    let src =
+        "<?php\nclass Foo { public string $name = ''; }\nfunction read(Foo $obj): void { $obj->name; }\n";
+    let (session, file) = session_for_source("/proj/resolve_receiver_gap.php", src);
+
+    let gap_off = src.find("$obj->name").unwrap() as u32 + "$obj".len() as u32;
+    let sym = session
+        .resolve_at(file.as_ref(), gap_off)
+        .expect("resolve_at should resolve the receiver-gap symbol");
+
+    assert!(
+        matches!(&sym.kind, ReferenceKind::Receiver),
+        "expected Receiver, got {:?}",
+        sym.kind
+    );
+    assert_eq!(sym.resolved_type.to_string(), "Foo");
+}
+
+#[test]
+fn hover_at_uses_targeted_navigation_path() {
+    let src = "<?php\nfunction helper(): int { return 1; }\nfunction caller(): int { return helper(); }\n";
+    let (session, file) = session_for_source("/proj/hover.php", src);
+
+    let offset = src.rfind("helper()").unwrap() as u32;
+    let hover = session
+        .hover_at(file.as_ref(), offset)
+        .expect("hover_at should resolve helper()");
+
+    assert_eq!(hover.ty.to_string(), "int");
+    assert!(
+        hover.definition.is_some(),
+        "hover_at should surface the helper() definition location"
+    );
+}
+
+#[test]
+fn hover_at_returns_type_for_variable_without_definition_lookup() {
+    let src = "<?php\nfunction run(int $value): int { return $value; }\n";
+    let (session, file) = session_for_source("/proj/hover_var.php", src);
+
+    let offset = src.rfind("$value").unwrap() as u32 + 1;
+    let hover = session
+        .hover_at(file.as_ref(), offset)
+        .expect("hover_at should resolve variable reads");
+
+    assert_eq!(hover.ty.to_string(), "int");
+    assert!(
+        hover.definition.is_none(),
+        "variable hover should not require a codebase definition location"
+    );
+    assert!(hover.docstring.is_none());
+}
+
+#[test]
+fn hover_at_returns_type_for_receiver_gap_without_definition_lookup() {
+    let src =
+        "<?php\nclass Foo { public string $name = ''; }\nfunction read(Foo $obj): void { $obj->name; }\n";
+    let (session, file) = session_for_source("/proj/hover_receiver.php", src);
+
+    let gap_off = src.find("$obj->name").unwrap() as u32 + "$obj".len() as u32;
+    let hover = session
+        .hover_at(file.as_ref(), gap_off)
+        .expect("hover_at should resolve receiver-gap positions");
+
+    assert_eq!(hover.ty.to_string(), "Foo");
+    assert!(
+        hover.definition.is_none(),
+        "receiver-gap hover should surface the inferred receiver type without a definition lookup"
+    );
+    assert!(hover.docstring.is_none());
+}
+
+#[test]
+fn name_at_uses_compact_navigation_fact_path() {
+    let src = "<?php\nfunction helper(): void {}\nfunction caller(): void { helper(); }\n";
+    let (session, file) = session_for_source("/proj/name_at.php", src);
+    assert!(
+        session.reference_locations("fn:helper").is_empty(),
+        "fixture should start with no committed reference postings"
+    );
+
+    let offset = src.rfind("helper();").unwrap() as u32;
+    let name = session
+        .name_at(file.as_ref(), offset)
+        .expect("name_at should resolve helper()");
+
+    assert_eq!(name, mir_analyzer::Name::function("helper"));
+    assert!(
+        session.reference_locations("fn:helper").is_empty(),
+        "name_at should not commit reference postings as a side effect"
+    );
+}
+
+#[test]
+fn name_at_resolves_use_import_via_navigation_facts() {
+    let dir = create_temp_dir("name_at_use_import");
+    let dep = self::common::write_file(&dir, "Dep.php", "<?php\nnamespace App;\nclass Dep {}\n");
+    let main_src = "<?php\nuse App\\Dep;\nfunction run(): Dep { return new Dep(); }\n";
+    let main = self::common::write_file(&dir, "Main.php", main_src);
+    let main_str = self::common::path_to_str(&main).to_string();
+
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ingest_file(
+        Arc::from(self::common::path_to_str(&dep)),
+        Arc::from(fs::read_to_string(&dep).unwrap()),
+    );
+    session.ingest_file(Arc::from(main_str.as_str()), Arc::from(main_src));
+
+    let offset = main_src.find("App\\Dep").unwrap() as u32 + "App\\".len() as u32;
+    let name = session
+        .name_at(&main_str, offset)
+        .expect("name_at should resolve the use-import class name");
+
+    assert_eq!(name, mir_analyzer::Name::class("App\\Dep"));
+    assert!(
+        session.reference_locations("cls:App\\Dep").is_empty(),
+        "name_at on a use import should not commit reference postings"
+    );
+}
+
+#[test]
+fn name_at_resolves_native_type_hint_via_navigation_facts() {
+    let src = "<?php\nclass Dep {}\nfunction run(Dep $d): Dep { return $d; }\n";
+    let (session, file) = session_for_source("/proj/type_hint_name_at.php", src);
+
+    let offset = src.find("run(Dep").unwrap() as u32 + "run(".len() as u32;
+    let name = session
+        .name_at(file.as_ref(), offset)
+        .expect("name_at should resolve the parameter type-hint class name");
+
+    assert_eq!(name, mir_analyzer::Name::class("Dep"));
+    assert!(
+        session.reference_locations("cls:Dep").is_empty(),
+        "name_at on a type hint should not commit reference postings"
+    );
+}
+
+#[test]
+fn references_at_uses_compact_navigation_fact_path() {
+    let src = "<?php
+function helper(): void {}
+function caller(): void { helper(); }
+";
+    let (session, file) = session_for_source("/proj/references_at.php", src);
+    let offset = src.find("helper();").unwrap() as u32 + 1;
+
+    let refs = session
+        .references_at(
+            file.as_ref(),
+            offset,
+            std::slice::from_ref(&file),
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+        )
+        .expect("references_at should resolve helper()");
+
+    assert!(
+        refs.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
+        "references_at should include the helper() call site; got {refs:?}"
+    );
+}
+
+#[test]
+fn references_at_cancellable_reports_not_found_without_running_query() {
+    let src = "<?php
+function helper(): void {}
+";
+    let (session, file) = session_for_source("/proj/references_at_missing.php", src);
+    let offset = src.find("function").unwrap() as u32;
+
+    let result = session.references_at_cancellable(
+        file.as_ref(),
+        offset,
+        std::slice::from_ref(&file),
+        false,
+        mir_analyzer::ReferenceIncludes::Plain,
+        &|| true,
+    );
+
+    assert_eq!(result, Err(mir_analyzer::SymbolLookupError::NotFound));
+}
+
 // ── Version-filtering helpers ────────────────────────────────────────────────
 
 /// Run `FileAnalyzer` on `src` inside `session` and return all issue-kind
@@ -192,7 +616,7 @@ fn version_test_issues(session: &AnalysisSession, src: &str) -> Vec<String> {
     session.ingest_file(file.clone(), Arc::from(src));
     let parsed = php_rs_parser::parse(src);
     FileAnalyzer::new(session)
-        .analyze(file, src, &parsed.program, &parsed.source_map)
+        .analyze_diagnostics_only(file, src, &parsed.program, &parsed.source_map)
         .issues
         .iter()
         .map(|i| i.kind.name().to_string())
@@ -430,8 +854,12 @@ function build(): Greeter { return new Greeter(); }
     session.ingest_file(file.clone(), Arc::from(src));
 
     let parsed = php_rs_parser::parse(src);
-    let analysis =
-        FileAnalyzer::new(&session).analyze(file.clone(), src, &parsed.program, &parsed.source_map);
+    let _analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        file.clone(),
+        src,
+        &parsed.program,
+        &parsed.source_map,
+    );
 
     // Resolve "Greeter" by name — caller doesn't need to know its position.
     let loc = session
@@ -444,16 +872,15 @@ function build(): Greeter { return new Greeter(); }
     let greet_loc = session.definition_of(&mir_analyzer::Name::method("Greeter", "greet"));
     assert!(greet_loc.is_ok(), "Greeter::greet() must resolve");
 
-    // Sanity: at least one ClassReference symbol got recorded so symbol_at
-    // is wired through the pipeline.
-    let any_class_ref = analysis.symbols.iter().any(|s| {
-        matches!(
-            s.kind,
-            mir_analyzer::ReferenceKind::ClassReference(_)
-                | mir_analyzer::ReferenceKind::FunctionCall(_)
-        )
-    });
-    assert!(any_class_ref, "expected at least one resolved symbol");
+    let class_offset = src.rfind("new Greeter").unwrap() as u32 + "new ".len() as u32;
+    let class_ref = session
+        .symbol_at(file.as_ref(), class_offset)
+        .expect("expected targeted symbol resolution for new Greeter()");
+    assert!(matches!(
+        class_ref.kind,
+        mir_analyzer::ReferenceKind::ClassReference(_)
+            | mir_analyzer::ReferenceKind::FunctionCall(_)
+    ));
 }
 
 /// `document_symbols` powers the editor outline view. Must list every top-
@@ -495,8 +922,12 @@ function caller(): string { return helper(); }
     session.ingest_file(file.clone(), Arc::from(src));
 
     let parsed = php_rs_parser::parse(src);
-    let _ =
-        FileAnalyzer::new(&session).analyze(file.clone(), src, &parsed.program, &parsed.source_map);
+    let _ = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        file.clone(),
+        src,
+        &parsed.program,
+        &parsed.source_map,
+    );
 
     let refs = session
         .indexed_references_to(
@@ -528,8 +959,12 @@ target(); function target(): void {}
     session.ingest_file(file.clone(), Arc::from(src));
 
     let parsed = php_rs_parser::parse(src);
-    let analysis =
-        FileAnalyzer::new(&session).analyze(file, src, &parsed.program, &parsed.source_map);
+    let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        file,
+        src,
+        &parsed.program,
+        &parsed.source_map,
+    );
 
     // Find an offset inside the `target` call. The call is on line 2, before
     // the `function` keyword.
@@ -602,16 +1037,16 @@ function caller(): string { return helper(); }
     let session = AnalysisSession::new(PhpVersion::LATEST);
     let file: Arc<str> = Arc::from("/proj/loc.php");
     session.ingest_file(file.clone(), Arc::from(src));
-    let analysis =
-        FileAnalyzer::new(&session).analyze(file.clone(), src, &parsed.program, &parsed.source_map);
+    let _analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        file.clone(),
+        src,
+        &parsed.program,
+        &parsed.source_map,
+    );
 
-    // The helper() call site produces a FunctionCall ResolvedSymbol whose
-    // span we can translate. Pick that one explicitly so the test doesn't
-    // depend on iteration order.
-    let call = analysis
-        .symbols
-        .iter()
-        .find(|s| matches!(&s.kind, mir_analyzer::ReferenceKind::FunctionCall(_)))
+    let call_offset = src.rfind("helper();").unwrap() as u32;
+    let call = session
+        .symbol_at(file.as_ref(), call_offset)
         .expect("expected a FunctionCall symbol for helper()");
     let loc = mir_analyzer::location_from_span(call.span, file.clone(), src, &parsed.source_map);
 
@@ -643,8 +1078,12 @@ function caller(): void {
     session.ingest_file(file.clone(), Arc::from(src));
 
     let parsed = php_rs_parser::parse(src);
-    let analysis =
-        FileAnalyzer::new(&session).analyze(file, src, &parsed.program, &parsed.source_map);
+    let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        file,
+        src,
+        &parsed.program,
+        &parsed.source_map,
+    );
 
     let undefined: Vec<_> = analysis
         .issues
@@ -708,8 +1147,12 @@ function foo(): string { return bar(); }
     let parsed = php_rs_parser::parse(src);
     assert!(parsed.errors.is_empty());
 
-    let analysis =
-        FileAnalyzer::new(&session).analyze(file, src, &parsed.program, &parsed.source_map);
+    let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        file,
+        src,
+        &parsed.program,
+        &parsed.source_map,
+    );
 
     let invalid_return = analysis
         .issues
@@ -819,7 +1262,12 @@ function caller_v1() { foo(); }
     session.ingest_file(file.clone(), Arc::from(v1));
     {
         let parsed = php_rs_parser::parse(v1);
-        FileAnalyzer::new(&session).analyze(file.clone(), v1, &parsed.program, &parsed.source_map);
+        FileAnalyzer::new(&session).analyze_diagnostics_only(
+            file.clone(),
+            v1,
+            &parsed.program,
+            &parsed.source_map,
+        );
     }
 
     let foo_refs_v1 = session
@@ -845,7 +1293,12 @@ function caller_v2() { bar(); }
     session.ingest_file(file.clone(), Arc::from(v2));
     {
         let parsed = php_rs_parser::parse(v2);
-        FileAnalyzer::new(&session).analyze(file.clone(), v2, &parsed.program, &parsed.source_map);
+        FileAnalyzer::new(&session).analyze_diagnostics_only(
+            file.clone(),
+            v2,
+            &parsed.program,
+            &parsed.source_map,
+        );
     }
 
     let foo_refs_v2 = session
@@ -971,7 +1424,7 @@ fn file_analyzer_self_loads_psr4_classes_without_pre_enumeration() {
 
     let parsed = php_rs_parser::parse(consumer_src);
     let analyzer = FileAnalyzer::new(&session);
-    let result = analyzer.analyze(
+    let result = analyzer.analyze_diagnostics_only(
         consumer_path,
         consumer_src,
         &parsed.program,
@@ -1004,7 +1457,7 @@ fn file_analyzer_reports_undefined_class_unconditionally() {
 
     let parsed = php_rs_parser::parse(src);
     let analyzer = FileAnalyzer::new(&session);
-    let result = analyzer.analyze(file, src, &parsed.program, &parsed.source_map);
+    let result = analyzer.analyze_diagnostics_only(file, src, &parsed.program, &parsed.source_map);
 
     let undefined = result
         .issues
@@ -1081,7 +1534,7 @@ fn vendor_autoload_files_functions_lazy_loaded_automatically() {
     let parsed = php_rs_parser::parse(open_src);
     session.ingest_file(open_path.clone(), Arc::from(open_src));
 
-    let result = FileAnalyzer::new(&session).analyze(
+    let result = FileAnalyzer::new(&session).analyze_diagnostics_only(
         open_path,
         open_src,
         &parsed.program,
@@ -1285,7 +1738,7 @@ class Caller {
 
     // Commit caller.php's postings before Svc exists.
     let parsed = php_rs_parser::parse(caller_src);
-    FileAnalyzer::new(&session).analyze(
+    FileAnalyzer::new(&session).analyze_diagnostics_only(
         caller_path.clone(),
         caller_src,
         &parsed.program,

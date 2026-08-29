@@ -27,6 +27,8 @@ pub(crate) mod narrowing;
 pub mod parse_cache;
 #[doc(hidden)]
 pub mod parser;
+#[doc(hidden)]
+pub mod perf_fixture;
 pub mod php_version;
 pub mod prelude;
 pub(crate) mod reference_key;
@@ -44,7 +46,8 @@ pub(crate) mod type_env;
 pub(crate) mod util;
 
 pub use batch::{
-    analyze_source, dead_code_issue_kinds, discover_files, AnalysisResult, BatchOptions,
+    analyze_source, analyze_source_with_options, dead_code_issue_kinds, discover_files,
+    AnalysisResult, BatchOptions,
 };
 pub use file_analyzer::{FileAnalysis, FileAnalyzer};
 pub use indexing::{IndexBatchOutcome, IndexCancel, IndexParallelism};
@@ -89,8 +92,9 @@ pub use stubs::{
 //   run definition collection and body analysis over many files in parallel.
 //
 // - Incremental (LSP, watch mode): ingest files as they change; per-file
-//   results come from `FileAnalyzer::analyze`. Builder-style configuration
-//   (`with_cache`, `with_psr4`, …).
+//   diagnostics come from `FileAnalyzer::analyze_diagnostics_only`, and
+//   cursor navigation comes from `AnalysisSession::{symbol_at,hover_at,definition_at}`.
+//   Builder-style configuration (`with_cache`, `with_psr4`, …).
 //
 // The two phases of analysis are:
 //   1. Definition collection — discovers classes, functions, constants in a

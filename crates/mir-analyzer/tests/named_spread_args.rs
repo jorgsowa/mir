@@ -27,7 +27,7 @@ fn issues_for(source: &str) -> Vec<String> {
     );
 
     FileAnalyzer::new(&session)
-        .analyze(file, source, &parsed.program, &parsed.source_map)
+        .analyze_diagnostics_only(file, source, &parsed.program, &parsed.source_map)
         .issues
         .iter()
         .map(|i| i.kind.name().to_string())

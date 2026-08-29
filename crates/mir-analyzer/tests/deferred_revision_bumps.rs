@@ -135,3 +135,60 @@ fn bulk_registration_bumps_generation_once_per_batch() {
         "adding files must still advance the generation for host progress tracking"
     );
 }
+
+#[test]
+fn prefetch_imports_batches_generation_bumps() {
+    let root = create_temp_dir("prefetch-deferred-bumps");
+    fs::create_dir_all(root.path().join("src")).unwrap();
+
+    for i in 0..LIB_CLASSES {
+        let path = root.path().join(format!("src/Dep{i}.php"));
+        let src =
+            format!("<?php\nnamespace App;\nclass Dep{i} {{ public function m(): void {{}} }}\n");
+        fs::write(&path, &src).unwrap();
+    }
+
+    let uses: String = (0..LIB_CLASSES)
+        .map(|i| format!("use App\\Dep{i};\n"))
+        .collect();
+    let params: String = (0..LIB_CLASSES)
+        .map(|i| format!("Dep{i} $d{i}"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let body: String = (0..LIB_CLASSES).map(|i| format!("$d{i}->m();\n")).collect();
+    let opened_src = format!(
+        "<?php\n{uses}class Caller {{ public function go({params}): void {{\n{body}}} }}\n"
+    );
+
+    fs::write(
+        root.path().join("composer.json"),
+        r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+    )
+    .unwrap();
+    let psr4 =
+        Arc::new(mir_analyzer::composer::Psr4Map::from_composer(root.path()).expect("psr4 map"));
+
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
+    let opened: Arc<str> = Arc::from("opened.php");
+    session.ingest_file(opened.clone(), Arc::from(opened_src.as_str()));
+    session.rebuild_workspace_symbol_index();
+
+    let gen_before = session.index_generation();
+    let loaded = session.prefetch_imports(opened.as_ref());
+    let bumps = session.index_generation() - gen_before;
+
+    assert_eq!(
+        loaded, LIB_CLASSES,
+        "prefetch must load every unresolved imported class"
+    );
+    assert!(
+        bumps <= 2,
+        "expected prefetch_imports to coalesce lazy loads into one revision bump, got {bumps}"
+    );
+    for i in 0..LIB_CLASSES {
+        assert!(
+            session.contains_class(&format!("App\\Dep{i}")),
+            "App\\Dep{i} must be loaded after prefetch"
+        );
+    }
+}

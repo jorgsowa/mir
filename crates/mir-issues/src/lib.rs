@@ -2153,6 +2153,7 @@ pub struct IssueBuffer {
     seen: HashSet<(&'static str, Arc<str>, u32, u16)>,
     /// Issue names suppressed at the file level (from `@psalm-suppress` / `@suppress` on the file docblock)
     file_suppressions: Vec<String>,
+    discard: bool,
 }
 
 impl IssueBuffer {
@@ -2160,7 +2161,15 @@ impl IssueBuffer {
         Self::default()
     }
 
+    pub fn discarding(mut self) -> Self {
+        self.discard = true;
+        self
+    }
+
     pub fn add(&mut self, issue: Issue) {
+        if self.discard {
+            return;
+        }
         let key = (
             issue.kind.name(),
             issue.location.file.clone(),
