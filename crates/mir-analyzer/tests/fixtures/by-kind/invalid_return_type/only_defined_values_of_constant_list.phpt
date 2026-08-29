@@ -13,3 +13,4 @@ class A {
 }
 
 ===expect===
+InvalidReturnType@8:8-8:23: Return type '"adams"' is not compatible with declared 'key-of<A::FOO>'

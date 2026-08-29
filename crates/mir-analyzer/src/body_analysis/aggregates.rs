@@ -11,18 +11,23 @@ impl<'a> BodyAnalyzer<'a> {
         all_issues: &mut Vec<Issue>,
         mut all_symbols: Option<&mut Vec<ResolvedSymbol>>,
     ) {
-        crate::attributes::check_trait_attributes(
-            decl,
-            self.db,
-            file,
-            source,
-            source_map,
-            all_issues,
-            self.mode == AnalysisMode::Full,
-            self.collect_symbols
-                .then(|| all_symbols.as_deref_mut())
-                .flatten(),
-        );
+        {
+            let mut resolved_navigation_facts = self.resolved_navigation_facts.borrow_mut();
+            crate::attributes::check_trait_attributes(
+                decl,
+                self.db,
+                file,
+                source,
+                source_map,
+                all_issues,
+                self.mode == AnalysisMode::Full,
+                self.collect_symbols
+                    .then_some(all_symbols.as_deref_mut())
+                    .flatten(),
+                self.collect_resolved_navigation_facts
+                    .then_some(&mut *resolved_navigation_facts),
+            );
+        }
 
         let resolved = resolve_name(self.db, file.as_ref(), decl.name.as_deref().unwrap_or(""));
         let fqcn: &str = &resolved;
@@ -124,16 +129,21 @@ impl<'a> BodyAnalyzer<'a> {
         type_envs: &mut FxHashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
         all_symbols: &mut Vec<ResolvedSymbol>,
     ) {
-        crate::attributes::check_trait_attributes(
-            decl,
-            self.db,
-            file,
-            source,
-            source_map,
-            all_issues,
-            self.mode == AnalysisMode::Full,
-            Some(&mut *all_symbols),
-        );
+        {
+            let mut resolved_navigation_facts = self.resolved_navigation_facts.borrow_mut();
+            crate::attributes::check_trait_attributes(
+                decl,
+                self.db,
+                file,
+                source,
+                source_map,
+                all_issues,
+                self.mode == AnalysisMode::Full,
+                Some(&mut *all_symbols),
+                self.collect_resolved_navigation_facts
+                    .then_some(&mut *resolved_navigation_facts),
+            );
+        }
 
         let resolved = resolve_name(self.db, file.as_ref(), decl.name.as_deref().unwrap_or(""));
         let fqcn: &str = &resolved;
@@ -265,20 +275,26 @@ impl<'a> BodyAnalyzer<'a> {
     ) {
         use php_ast::owned::EnumMemberKind;
 
-        crate::attributes::check_enum_attributes(
-            decl,
-            self.db,
-            file,
-            source,
-            source_map,
-            all_issues,
-            self.mode == AnalysisMode::Full,
-            self.collect_symbols
-                .then(|| all_symbols.as_deref_mut())
-                .flatten(),
-        );
+        {
+            let mut resolved_navigation_facts = self.resolved_navigation_facts.borrow_mut();
+            crate::attributes::check_enum_attributes(
+                decl,
+                self.db,
+                file,
+                source,
+                source_map,
+                all_issues,
+                self.mode == AnalysisMode::Full,
+                self.collect_symbols
+                    .then_some(all_symbols.as_deref_mut())
+                    .flatten(),
+                self.collect_resolved_navigation_facts
+                    .then_some(&mut *resolved_navigation_facts),
+            );
+        }
 
         for iface in decl.implements.iter() {
+            let mut resolved_navigation_facts = self.resolved_navigation_facts.borrow_mut();
             check_name_class(
                 iface,
                 self.db,
@@ -289,8 +305,10 @@ impl<'a> BodyAnalyzer<'a> {
                 self.php_version,
                 self.mode == AnalysisMode::Full,
                 self.collect_symbols
-                    .then(|| all_symbols.as_deref_mut())
+                    .then_some(all_symbols.as_deref_mut())
                     .flatten(),
+                self.collect_resolved_navigation_facts
+                    .then_some(&mut *resolved_navigation_facts),
             );
         }
 
@@ -326,15 +344,7 @@ impl<'a> BodyAnalyzer<'a> {
             );
         }
 
-        self.analyze_enum_case_values(
-            decl,
-            fqcn,
-            file,
-            source,
-            source_map,
-            all_issues,
-            all_symbols.as_deref_mut(),
-        );
+        self.analyze_enum_case_values(decl, fqcn, file, source, source_map, all_issues, all_symbols);
         self.check_trait_constraints(fqcn, file, all_issues);
     }
 
@@ -351,22 +361,28 @@ impl<'a> BodyAnalyzer<'a> {
     ) {
         use php_ast::owned::EnumMemberKind;
 
-        crate::attributes::check_enum_attributes(
-            decl,
-            self.db,
-            file,
-            source,
-            source_map,
-            all_issues,
-            self.mode == AnalysisMode::Full,
-            Some(&mut *all_symbols),
-        );
+        {
+            let mut resolved_navigation_facts = self.resolved_navigation_facts.borrow_mut();
+            crate::attributes::check_enum_attributes(
+                decl,
+                self.db,
+                file,
+                source,
+                source_map,
+                all_issues,
+                self.mode == AnalysisMode::Full,
+                Some(&mut *all_symbols),
+                self.collect_resolved_navigation_facts
+                    .then_some(&mut *resolved_navigation_facts),
+            );
+        }
 
         // Single pass: same analysis as the untyped path, additionally
         // recording type environments for LSP hover/go-to-def. (Previously
         // this ran the full body analysis twice and discarded the second
         // run's issues — the shared core makes one run produce both.)
         for iface in decl.implements.iter() {
+            let mut resolved_navigation_facts = self.resolved_navigation_facts.borrow_mut();
             check_name_class(
                 iface,
                 self.db,
@@ -377,6 +393,8 @@ impl<'a> BodyAnalyzer<'a> {
                 self.php_version,
                 self.mode == AnalysisMode::Full,
                 self.collect_symbols.then_some(&mut *all_symbols),
+                self.collect_resolved_navigation_facts
+                    .then_some(&mut *resolved_navigation_facts),
             );
         }
 
@@ -435,18 +453,23 @@ impl<'a> BodyAnalyzer<'a> {
         guards: &rustc_hash::FxHashSet<std::sync::Arc<str>>,
         mut all_symbols: Option<&mut Vec<ResolvedSymbol>>,
     ) {
-        crate::attributes::check_interface_attributes(
-            decl,
-            self.db,
-            file,
-            source,
-            source_map,
-            all_issues,
-            self.mode == AnalysisMode::Full,
-            self.collect_symbols
-                .then(|| all_symbols.as_deref_mut())
-                .flatten(),
-        );
+        {
+            let mut resolved_navigation_facts = self.resolved_navigation_facts.borrow_mut();
+            crate::attributes::check_interface_attributes(
+                decl,
+                self.db,
+                file,
+                source,
+                source_map,
+                all_issues,
+                self.mode == AnalysisMode::Full,
+                self.collect_symbols
+                    .then_some(all_symbols.as_deref_mut())
+                    .flatten(),
+                self.collect_resolved_navigation_facts
+                    .then_some(&mut *resolved_navigation_facts),
+            );
+        }
         let iface_name = decl.name.as_deref().unwrap_or("<anonymous>");
         let iface_fqcn = resolve_name(self.db, file.as_ref(), iface_name);
         self.check_class_generic_type_args(
@@ -467,6 +490,7 @@ impl<'a> BodyAnalyzer<'a> {
             if guards.contains(parent_resolved.as_str()) {
                 continue;
             }
+            let mut resolved_navigation_facts = self.resolved_navigation_facts.borrow_mut();
             check_name_class(
                 parent,
                 self.db,
@@ -477,8 +501,10 @@ impl<'a> BodyAnalyzer<'a> {
                 self.php_version,
                 self.mode == AnalysisMode::Full,
                 self.collect_symbols
-                    .then(|| all_symbols.as_deref_mut())
+                    .then_some(all_symbols.as_deref_mut())
                     .flatten(),
+                self.collect_resolved_navigation_facts
+                    .then_some(&mut *resolved_navigation_facts),
             );
         }
         let iface_fqcn_ref = crate::db::Fqcn::from_str(self.db, &iface_fqcn);

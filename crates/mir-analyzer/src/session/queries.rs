@@ -172,6 +172,7 @@ impl AnalysisSession {
     ///
     /// Returns `Err(NotFound)` when no symbol exists at the cursor. Returns
     /// `Ok(None)` when `should_cancel` aborts the underlying indexed query.
+    #[allow(clippy::type_complexity)]
     pub fn references_at_cancellable(
         &self,
         file: &str,

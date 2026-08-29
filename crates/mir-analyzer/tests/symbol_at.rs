@@ -30,7 +30,7 @@ fn symbol_at_finds_function_call() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    let _result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let offset = src.find("{ greet").unwrap() as u32 + 2; // points at 'g' of greet()
     let sym = analyzer
@@ -52,7 +52,7 @@ fn symbol_at_returns_none_for_unknown_offset() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    let _result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     // Offset 0 is '<?php', before any symbol spans
     assert!(
@@ -493,7 +493,7 @@ fn symbol_at_finds_array_destructuring_write_target() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    let _result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let offset = src.find("$a, $b").unwrap() as u32 + 1; // +1 skips '$'
     let sym = analyzer
@@ -517,7 +517,7 @@ fn symbol_at_this_method_call_full_lsp_flow() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    let _result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let offset = src.find("->helper").unwrap() as u32 + 2;
     let sym = analyzer
@@ -550,7 +550,7 @@ fn symbol_at_this_in_non_static_closure() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    let _result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let offset = src.find("->helper").unwrap() as u32 + 2;
     let sym = analyzer
@@ -1422,7 +1422,7 @@ fn symbol_at_attribute_class_name_resolves_to_class_reference() {
     let file_str = path_to_str(&file);
 
     let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    let result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
+    let _result = analyzer.analyze_paths(std::slice::from_ref(&file), &BatchOptions::new());
 
     let offset = src.rfind("MyAttr").unwrap() as u32;
     let sym = analyzer

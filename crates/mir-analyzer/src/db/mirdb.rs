@@ -889,8 +889,12 @@ impl MirDbStorage {
     /// [`Self::rebuild_workspace_symbol_index`].
     ///
     /// Also returns `false` if no singleton exists yet (nothing to update).
-    pub fn update_workspace_index_for_file(&mut self, file: SourceFile) -> bool {
-        use crate::db::{collect_file_declarations, SymbolLoc};
+    pub fn update_workspace_index_for_file(
+        &mut self,
+        file: SourceFile,
+        new_decls: crate::db::FileDeclarations,
+    ) -> bool {
+        use crate::db::SymbolLoc;
         let Some(singleton) = *self.workspace_symbol_index_input.read() else {
             return false;
         };
@@ -898,14 +902,6 @@ impl MirDbStorage {
             self.user_stub_source_files().into_iter().collect();
         let old_decls = self.file_decl_snapshots.read().get(&file).cloned();
 
-        // Compute the new declarations once. If the declared NAMES are
-        // unchanged (body-only edit — `FileDeclarations` PartialEq is name-only)
-        // do nothing: no singleton write, so the HIGH-durability dep does not
-        // invalidate body-analysis memos. This is the warm-cache guarantee.
-        let new_decls = {
-            let db: &dyn MirDatabase = &*self;
-            collect_file_declarations(db, file).clone()
-        };
         let mention_keys: Vec<Name> = new_decls
             .class_like()
             .map(|decl| decl.lookup_key())

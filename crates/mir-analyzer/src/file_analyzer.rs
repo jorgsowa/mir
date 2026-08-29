@@ -53,7 +53,7 @@ fn span_len(span: Span) -> u32 {
     span.end.saturating_sub(span.start)
 }
 
-fn symbol_at<'a>(symbols: &'a [ResolvedSymbol], byte_offset: u32) -> Option<&'a ResolvedSymbol> {
+fn symbol_at(symbols: &[ResolvedSymbol], byte_offset: u32) -> Option<&ResolvedSymbol> {
     if let Some(symbol) = symbols
         .iter()
         .filter(|f| span_contains(f.span, byte_offset))
@@ -71,10 +71,10 @@ fn symbol_at<'a>(symbols: &'a [ResolvedSymbol], byte_offset: u32) -> Option<&'a 
         .min_by_key(|symbol| symbol.expr_span.map(span_len).unwrap_or(u32::MAX))
 }
 
-fn navigation_fact_at<'a>(
-    facts: &'a [NavigationFact],
+fn navigation_fact_at(
+    facts: &[NavigationFact],
     byte_offset: u32,
-) -> Option<&'a NavigationFact> {
+) -> Option<&NavigationFact> {
     if let Some(fact) = facts
         .iter()
         .filter(|fact| span_contains(fact.span, byte_offset))
@@ -91,10 +91,10 @@ fn navigation_fact_at<'a>(
         .min_by_key(|fact| fact.expr_span.map(span_len).unwrap_or(u32::MAX))
 }
 
-fn resolved_navigation_fact_at<'a>(
-    facts: &'a [ResolvedNavigationFact],
+fn resolved_navigation_fact_at(
+    facts: &[ResolvedNavigationFact],
     byte_offset: u32,
-) -> Option<&'a ResolvedNavigationFact> {
+) -> Option<&ResolvedNavigationFact> {
     if let Some(fact) = facts
         .iter()
         .filter(|fact| span_contains(fact.span, byte_offset))
@@ -117,10 +117,10 @@ fn for_each_navigation_scope<'a>(stmts: &'a [Stmt], f: &mut impl FnMut(&'a Stmt)
     }
 }
 
-fn best_navigation_scope_stmt<'a>(program: &'a Program, byte_offset: u32) -> Option<&'a Stmt> {
+fn best_navigation_scope_stmt(program: &Program, byte_offset: u32) -> Option<&Stmt> {
     let mut best_stmt: Option<&Stmt> = None;
     for_each_navigation_scope(&program.stmts, &mut |stmt| {
-        if !span_contains(stmt.span, byte_offset) {
+        if !span_contains(navigation_scope_span(stmt), byte_offset) {
             return;
         }
         if !matches!(
@@ -134,11 +134,51 @@ fn best_navigation_scope_stmt<'a>(program: &'a Program, byte_offset: u32) -> Opt
         ) {
             return;
         }
-        if best_stmt.is_none_or(|best| span_len(stmt.span) <= span_len(best.span)) {
+        if best_stmt.is_none_or(|best| {
+            span_len(navigation_scope_span(stmt)) <= span_len(navigation_scope_span(best))
+        }) {
             best_stmt = Some(stmt);
         }
     });
     best_stmt
+}
+
+fn navigation_scope_span(stmt: &Stmt) -> Span {
+    use php_ast::owned::StmtKind;
+
+    fn widen_with_comment_and_attrs(
+        span: Span,
+        doc_comment: Option<&php_ast::owned::Comment>,
+        attrs: &[php_ast::owned::Attribute],
+    ) -> Span {
+        let attr_start = attrs.first().map(|attr| attr.span.start);
+        let doc_start = doc_comment.map(|comment| comment.span.start);
+        let start = attr_start
+            .into_iter()
+            .chain(doc_start)
+            .min()
+            .unwrap_or(span.start);
+        Span::new(start, span.end)
+    }
+
+    match &stmt.kind {
+        StmtKind::Function(decl) => {
+            widen_with_comment_and_attrs(stmt.span, decl.doc_comment.as_ref(), &decl.attributes)
+        }
+        StmtKind::Class(decl) => {
+            widen_with_comment_and_attrs(stmt.span, decl.doc_comment.as_ref(), &decl.attributes)
+        }
+        StmtKind::Enum(decl) => {
+            widen_with_comment_and_attrs(stmt.span, decl.doc_comment.as_ref(), &decl.attributes)
+        }
+        StmtKind::Interface(decl) => {
+            widen_with_comment_and_attrs(stmt.span, decl.doc_comment.as_ref(), &decl.attributes)
+        }
+        StmtKind::Trait(decl) => {
+            widen_with_comment_and_attrs(stmt.span, decl.doc_comment.as_ref(), &decl.attributes)
+        }
+        _ => stmt.span,
+    }
 }
 
 fn visit_navigation_scope_stmt<'a>(stmt: &'a Stmt, f: &mut impl FnMut(&'a Stmt)) {
@@ -200,6 +240,7 @@ fn visit_navigation_scope_stmt<'a>(stmt: &'a Stmt, f: &mut impl FnMut(&'a Stmt))
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn resolve_scope_symbols(
     db: &dyn MirDatabase,
     php_version: crate::PhpVersion,
@@ -607,6 +648,7 @@ impl<'a> FileAnalyzer<'a> {
         navigation_fact_at(&facts, byte_offset).map(|fact| fact.name.clone())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn resolve_at_via_compact_facts(
         &self,
         db: &dyn MirDatabase,

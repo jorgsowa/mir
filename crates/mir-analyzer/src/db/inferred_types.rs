@@ -22,12 +22,21 @@ thread_local! {
     static INFER_IN_PROGRESS: RefCell<HashSet<Arc<str>>> = RefCell::new(HashSet::new());
 }
 
-struct InferGuard(Arc<str>);
+pub(crate) struct InferGuard(Arc<str>);
 
 impl Drop for InferGuard {
     fn drop(&mut self) {
         INFER_IN_PROGRESS.with(|s| s.borrow_mut().remove(&self.0));
     }
+}
+
+pub(crate) fn try_mark_infer_in_progress(path: Arc<str>) -> Option<InferGuard> {
+    let already_active = INFER_IN_PROGRESS.with(|s| s.borrow().contains(&path));
+    if already_active {
+        return None;
+    }
+    INFER_IN_PROGRESS.with(|s| s.borrow_mut().insert(path.clone()));
+    Some(InferGuard(path))
 }
 
 /// Demand-driven inferred return type lookup for a function.
@@ -44,12 +53,7 @@ pub fn inferred_function_return_type_demand(db: &dyn MirDatabase, fqn: &str) -> 
         _ => return None,
     };
     let path = sf.path(db).clone();
-    let already_active = INFER_IN_PROGRESS.with(|s| s.borrow().contains(&path));
-    if already_active {
-        return None;
-    }
-    INFER_IN_PROGRESS.with(|s| s.borrow_mut().insert(path.clone()));
-    let _guard = InferGuard(path);
+    let _guard = try_mark_infer_in_progress(path)?;
     let inferred = crate::db::infer_file_return_types(db, sf);
     inferred.functions.get(fqn).cloned()
 }
@@ -75,12 +79,7 @@ pub fn inferred_method_return_type_demand(
         _ => return None,
     };
     let path = sf.path(db).clone();
-    let already_active = INFER_IN_PROGRESS.with(|s| s.borrow().contains(&path));
-    if already_active {
-        return None;
-    }
-    INFER_IN_PROGRESS.with(|s| s.borrow_mut().insert(path.clone()));
-    let _guard = InferGuard(path);
+    let _guard = try_mark_infer_in_progress(path)?;
     let inferred = crate::db::infer_file_return_types(db, sf);
     inferred
         .methods
@@ -113,12 +112,7 @@ pub fn inferred_property_type_demand(
         _ => return None,
     };
     let path = sf.path(db).clone();
-    let already_active = INFER_IN_PROGRESS.with(|s| s.borrow().contains(&path));
-    if already_active {
-        return None;
-    }
-    INFER_IN_PROGRESS.with(|s| s.borrow_mut().insert(path.clone()));
-    let _guard = InferGuard(path);
+    let _guard = try_mark_infer_in_progress(path)?;
     let inferred = crate::db::infer_file_return_types(db, sf);
     inferred
         .properties

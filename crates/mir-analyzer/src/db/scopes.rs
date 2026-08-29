@@ -138,6 +138,7 @@ pub fn infer_scope(
     scope: ScopeKey,
 ) -> Arc<ScopeInferenceResult> {
     let prepared = super::queries::prepare_analysis_file(db, file);
+    let _guard = super::inferred_types::try_mark_infer_in_progress(prepared.path.clone());
     let path = &prepared.path;
     let text = &prepared.text;
     let parsed = prepared.parse_result();

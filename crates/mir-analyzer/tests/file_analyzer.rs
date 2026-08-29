@@ -949,22 +949,10 @@ function caller(): string { return helper(); }
 /// hover info.
 #[test]
 fn file_analysis_symbol_at_finds_call_site() {
-    let session = AnalysisSession::new(PhpVersion::LATEST);
-    let file: Arc<str> = Arc::from("/proj/sym_at.php");
-    // The call to `target()` is at byte offset 26 in the source (within the
-    // `target()` identifier).
     let src = "<?php
 target(); function target(): void {}
 ";
-    session.ingest_file(file.clone(), Arc::from(src));
-
-    let parsed = php_rs_parser::parse(src);
-    let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
-        file,
-        src,
-        &parsed.program,
-        &parsed.source_map,
-    );
+    let analysis = parse_and_analyze(src);
 
     // Find an offset inside the `target` call. The call is on line 2, before
     // the `function` keyword.
