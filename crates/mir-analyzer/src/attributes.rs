@@ -906,9 +906,9 @@ fn check_attribute_list(
                         kind: crate::symbol::ReferenceKind::ClassReference(Arc::from(
                             fqcn.as_str(),
                         )),
-                        resolved_type: mir_types::Type::single(
-                            mir_types::Atomic::TClassString(None),
-                        ),
+                        resolved_type: mir_types::Type::single(mir_types::Atomic::TClassString(
+                            None,
+                        )),
                     });
                 }
                 if let Some(facts) = resolved_navigation_facts.as_deref_mut() {
@@ -918,9 +918,9 @@ fn check_attribute_list(
                         kind: crate::symbol::ReferenceKind::ClassReference(Arc::from(
                             fqcn.as_str(),
                         )),
-                        resolved_type: mir_types::Type::single(
-                            mir_types::Atomic::TClassString(None),
-                        ),
+                        resolved_type: mir_types::Type::single(mir_types::Atomic::TClassString(
+                            None,
+                        )),
                     });
                 }
                 // Check for case mismatch between the written attribute name and canonical.

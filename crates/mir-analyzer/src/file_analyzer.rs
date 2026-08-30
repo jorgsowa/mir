@@ -71,10 +71,7 @@ fn symbol_at(symbols: &[ResolvedSymbol], byte_offset: u32) -> Option<&ResolvedSy
         .min_by_key(|symbol| symbol.expr_span.map(span_len).unwrap_or(u32::MAX))
 }
 
-fn navigation_fact_at(
-    facts: &[NavigationFact],
-    byte_offset: u32,
-) -> Option<&NavigationFact> {
+fn navigation_fact_at(facts: &[NavigationFact], byte_offset: u32) -> Option<&NavigationFact> {
     if let Some(fact) = facts
         .iter()
         .filter(|fact| span_contains(fact.span, byte_offset))

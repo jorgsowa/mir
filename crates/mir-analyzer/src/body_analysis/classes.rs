@@ -1402,7 +1402,8 @@ impl<'a> BodyAnalyzer<'a> {
                     self.collect_symbols
                         .then_some(all_symbols.as_deref_mut())
                         .flatten(),
-                    self.collect_navigation_facts.then_some(&mut *navigation_facts),
+                    self.collect_navigation_facts
+                        .then_some(&mut *navigation_facts),
                     self.collect_resolved_navigation_facts
                         .then_some(&mut *resolved_navigation_facts),
                 );
@@ -1481,7 +1482,7 @@ impl<'a> BodyAnalyzer<'a> {
                         source,
                         source_map,
                         &mut buf,
-            all_symbols.as_deref_mut(),
+                        all_symbols.as_deref_mut(),
                         &self.navigation_facts,
                         &self.resolved_navigation_facts,
                         self.php_version,
@@ -1663,7 +1664,8 @@ impl<'a> BodyAnalyzer<'a> {
                     self.php_version,
                     self.mode == AnalysisMode::Full,
                     self.collect_symbols.then_some(&mut *all_symbols),
-                    self.collect_navigation_facts.then_some(&mut *navigation_facts),
+                    self.collect_navigation_facts
+                        .then_some(&mut *navigation_facts),
                     self.collect_resolved_navigation_facts
                         .then_some(&mut *resolved_navigation_facts),
                 );

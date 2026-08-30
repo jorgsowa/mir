@@ -344,7 +344,15 @@ impl<'a> BodyAnalyzer<'a> {
             );
         }
 
-        self.analyze_enum_case_values(decl, fqcn, file, source, source_map, all_issues, all_symbols);
+        self.analyze_enum_case_values(
+            decl,
+            fqcn,
+            file,
+            source,
+            source_map,
+            all_issues,
+            all_symbols,
+        );
         self.check_trait_constraints(fqcn, file, all_issues);
     }
 
