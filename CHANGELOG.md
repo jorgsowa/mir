@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.72.1] - 2026-08-30
+
+### Changed
+
+- **Rust toolchain bump:** pinned the workspace to Rust `1.98.0`.
+- **Workspace package metadata:** declared `rust-version = "1.98"`
+  across the workspace crates so published artifacts advertise the same
+  minimum supported compiler.
+- **Release version sync:** bumped the workspace and internal crate
+  dependency versions to `0.72.1` and refreshed `Cargo.lock` to match.
+
 ## [0.72.0] - 2026-08-14
 
 ### Changed
