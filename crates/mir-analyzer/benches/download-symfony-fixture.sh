@@ -5,7 +5,7 @@
 # Prerequisites: git
 set -euo pipefail
 
-SYMFONY_COMMIT="27515cd"
+SYMFONY_COMMIT="27515cd94ea2aa332f7d72612d03b179954a1022"
 DEST="$(dirname "$0")/fixtures/symfony"
 
 if [ -d "$DEST" ]; then
