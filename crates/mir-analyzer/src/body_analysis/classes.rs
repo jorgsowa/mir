@@ -1210,13 +1210,14 @@ impl<'a> BodyAnalyzer<'a> {
             {
                 if let Some(props) = class.own_properties() {
                     for (prop_name, p) in props.iter() {
-                        // A property with a `get`/`set` hook is virtual when it
-                        // carries no default: its value is computed on access and
-                        // never stored, so it can't be "left uninitialized".
+                        // A get-only hooked property is virtual: it has no backing
+                        // storage and can never be assigned, so it can't be "left
+                        // uninitialized". A property with a `set` hook is backed
+                        // and still requires init.
                         let requires_init = p.has_native_type
-                            && !p.has_hook
-                             && p.default.is_none()
-                             && p.ty.as_deref().is_some_and(|ty| !ty.is_nullable());
+                            && !p.get_only_hook
+                            && p.default.is_none()
+                            && p.ty.as_deref().is_some_and(|ty| !ty.is_nullable());
                         if !requires_init {
                             continue;
                         }

@@ -566,12 +566,14 @@ pub struct PropertyDef {
     /// do **not** participate in PHP's inheritance visibility rules.
     #[serde(default)]
     pub from_docblock: bool,
-    /// True when the property declares a PHP 8.4 accessor hook (`get`/`set`).
-    /// Such a property is virtual when it carries no default — it computes its
-    /// value on access rather than storing one, so it is never "left
-    /// uninitialized" by the constructor.
+    /// True when the property declares a `get` hook with no accompanying `set`
+    /// hook. Such a property is virtual: it has no backing storage, computes
+    /// its value on every access, and can never be assigned to at all — so it
+    /// is never "left uninitialized" by the constructor. A property that also
+    /// declares (or only declares) a `set` hook is backed and can still be
+    /// left uninitialized, so it does not count here.
     #[serde(default)]
-    pub has_hook: bool,
+    pub get_only_hook: bool,
     /// True when `readonly` comes from a native PHP keyword (`readonly` modifier or
     /// `readonly class`). False when only a `@readonly` docblock annotation is present.
     /// Distinguishes PHP-enforced read-only from advisory documentation.

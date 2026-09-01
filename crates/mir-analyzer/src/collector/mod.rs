@@ -121,6 +121,18 @@ fn native_scalar_family(native: &Type) -> Option<fn(&mir_types::atomic::Atomic) 
     })
 }
 
+/// True when `hooks` declares a `get` hook with no accompanying `set` hook —
+/// the property is then virtual (no backing storage, never assignable), so
+/// it can never be "left uninitialized" by a constructor. A `set` hook (with
+/// or without `get`) means the property is backed and can still be.
+pub(crate) fn is_get_only_hook(hooks: &[php_ast::owned::PropertyHook]) -> bool {
+    use php_ast::ast::PropertyHookKind;
+    !hooks.is_empty()
+        && hooks
+            .iter()
+            .all(|h| matches!(h.kind, PropertyHookKind::Get))
+}
+
 pub(crate) fn native_hint_wins_over_docblock_scalar(native: &Type, doc: &Type) -> bool {
     if doc.types.is_empty() {
         return false;
@@ -1460,7 +1472,7 @@ impl<'a> DefinitionCollector<'a> {
                     // Magic `@property` declarations carry no PHP native type.
                     has_native_type: false,
                     from_docblock: true,
-                    has_hook: false,
+                    get_only_hook: false,
                 },
             );
         }
