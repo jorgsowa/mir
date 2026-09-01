@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.72.1] - 2026-08-30
+
+### Added
+
+- **Promoted-property hook analysis:** constructor-promoted property hook
+  bodies are now analyzed, including invalid argument flows inside them.
+- **Generic `arraylike-object` docblocks:** docblocks can now express
+  `arraylike-object<TKey, TValue>` shapes while preserving structural
+  capabilities and argument validation.
+
+### Changed
+
+- **Open-file navigation and scope analysis:** navigation, per-scope
+  analysis, and related open-file paths now reuse more tracked state and
+  ship with expanded benchmark coverage for incremental workloads.
+- **Batch analysis query routing:** batch analysis now goes through the
+  tracked file-query path used elsewhere in the analyzer, improving
+  consistency across batch and interactive analysis.
+- **Docblock array typing:** `associative-array` is now recognized as an
+  array alias and, in Phan mode, enforced as a non-list keyed array.
+- **Docblock key parsing:** array key normalization now follows PHP's
+  canonical int/string key behavior more closely.
+- **Analyzer clone caching:** FQCN interning and class-import resolution
+  are memoized per database clone to reduce repeated setup work.
+- **Native type recognition:** `resource` is now treated as a native type
+  name instead of being misread as a class reference.
+- **Rust toolchain bump:** pinned the workspace to Rust `1.98.0`.
+- **Workspace package metadata:** declared `rust-version = "1.98"`
+  across the workspace crates so published artifacts advertise the same
+  minimum supported compiler.
+- **Release version sync:** bumped the workspace and internal crate
+  dependency versions to `0.72.1` and refreshed `Cargo.lock` to match.
+
+### Fixed
+
+- **Docblock pseudotype precedence:** same-named classes no longer regress
+  docblock pseudotype resolution, including imported aliases and inherited
+  method calls.
+- **`key-of` fallback inference:** literal keys are now preserved more
+  reliably at call sites and through fallback inference paths.
+- **Tagged-union `match` narrowing:** array-shape discriminants now narrow
+  tagged unions correctly and drive exhaustiveness checks more accurately.
+- **Navigation and ingest regressions:** follow-up fixes corrected
+  navigation and ingest issues introduced during the open-file analysis
+  optimizations.
+
 ## [0.72.0] - 2026-08-14
 
 ### Changed

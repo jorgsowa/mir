@@ -2,7 +2,11 @@ use super::*;
 use crate::util::reconcile_docblock_builtin_shadow;
 
 impl<'a> BodyAnalyzer<'a> {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::needless_option_as_deref,
+        clippy::option_as_ref_deref,
+        clippy::too_many_arguments
+    )]
     pub(crate) fn analyze_fn_decl(
         &self,
         decl: &php_ast::owned::FunctionDecl,
@@ -12,18 +16,23 @@ impl<'a> BodyAnalyzer<'a> {
         all_issues: &mut Vec<Issue>,
         mut all_symbols: Option<&mut Vec<ResolvedSymbol>>,
     ) {
-        crate::attributes::check_function_attributes(
-            decl,
-            self.db,
-            file,
-            source,
-            source_map,
-            all_issues,
-            self.mode == AnalysisMode::Full,
-            self.collect_symbols
-                .then(|| all_symbols.as_deref_mut())
-                .flatten(),
-        );
+        {
+            let mut resolved_navigation_facts = self.resolved_navigation_facts.borrow_mut();
+            crate::attributes::check_function_attributes(
+                decl,
+                self.db,
+                file,
+                source,
+                source_map,
+                all_issues,
+                self.mode == AnalysisMode::Full,
+                self.collect_symbols
+                    .then_some(all_symbols.as_deref_mut())
+                    .flatten(),
+                self.collect_resolved_navigation_facts
+                    .then_some(&mut *resolved_navigation_facts),
+            );
+        }
         let fn_name = decl.name.as_deref().unwrap_or("").to_string();
         for param in decl.params.iter() {
             if let Some(hint) = &param.type_hint {
@@ -34,7 +43,7 @@ impl<'a> BodyAnalyzer<'a> {
                     source_map,
                     all_issues,
                     self.collect_symbols
-                        .then(|| all_symbols.as_deref_mut())
+                        .then_some(all_symbols.as_deref_mut())
                         .flatten(),
                 );
             }
@@ -49,7 +58,7 @@ impl<'a> BodyAnalyzer<'a> {
                 source_map,
                 all_issues,
                 self.collect_symbols
-                    .then(|| all_symbols.as_deref_mut())
+                    .then_some(all_symbols.as_deref_mut())
                     .flatten(),
             );
         }
@@ -779,16 +788,21 @@ impl<'a> BodyAnalyzer<'a> {
     ) {
         use crate::flow_state::FlowState;
         use crate::stmt::StatementsAnalyzer;
-        crate::attributes::check_function_attributes(
-            decl,
-            self.db,
-            file,
-            source,
-            source_map,
-            all_issues,
-            self.mode == AnalysisMode::Full,
-            Some(&mut *all_symbols),
-        );
+        {
+            let mut resolved_navigation_facts = self.resolved_navigation_facts.borrow_mut();
+            crate::attributes::check_function_attributes(
+                decl,
+                self.db,
+                file,
+                source,
+                source_map,
+                all_issues,
+                self.mode == AnalysisMode::Full,
+                Some(&mut *all_symbols),
+                self.collect_resolved_navigation_facts
+                    .then_some(&mut *resolved_navigation_facts),
+            );
+        }
         let fn_name = decl.name.as_deref().unwrap_or("").to_string();
 
         for param in decl.params.iter() {

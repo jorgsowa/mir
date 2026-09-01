@@ -229,6 +229,7 @@ pub(crate) fn check_function_attributes(
     issues: &mut Vec<Issue>,
     record_refs: bool,
     mut all_symbols: Option<&mut Vec<crate::symbol::ResolvedSymbol>>,
+    mut resolved_navigation_facts: Option<&mut Vec<crate::symbol::ResolvedNavigationFact>>,
 ) {
     for attr in decl.attributes.iter() {
         if !is_attribute_class_annotation(attr) {
@@ -250,6 +251,7 @@ pub(crate) fn check_function_attributes(
         issues,
         record_refs,
         all_symbols.as_deref_mut(),
+        resolved_navigation_facts.as_deref_mut(),
     );
     for param in decl.params.iter() {
         // `#[Attribute]` on a function parameter is invalid
@@ -273,6 +275,7 @@ pub(crate) fn check_function_attributes(
             issues,
             record_refs,
             all_symbols.as_deref_mut(),
+            resolved_navigation_facts.as_deref_mut(),
         );
     }
 }
@@ -292,6 +295,7 @@ pub(crate) fn check_class_attributes(
     issues: &mut Vec<Issue>,
     record_refs: bool,
     mut all_symbols: Option<&mut Vec<crate::symbol::ResolvedSymbol>>,
+    mut resolved_navigation_facts: Option<&mut Vec<crate::symbol::ResolvedNavigationFact>>,
 ) {
     // Check 1: `#[Attribute]` on abstract class
     if decl.modifiers.is_abstract {
@@ -341,6 +345,7 @@ pub(crate) fn check_class_attributes(
         issues,
         record_refs,
         all_symbols.as_deref_mut(),
+        resolved_navigation_facts.as_deref_mut(),
     );
 
     for member in decl.body.members.iter() {
@@ -356,6 +361,7 @@ pub(crate) fn check_class_attributes(
                     issues,
                     record_refs,
                     all_symbols.as_deref_mut(),
+                    resolved_navigation_facts.as_deref_mut(),
                 );
                 for param in method.params.iter() {
                     check_attribute_list(
@@ -368,6 +374,7 @@ pub(crate) fn check_class_attributes(
                         issues,
                         record_refs,
                         all_symbols.as_deref_mut(),
+                        resolved_navigation_facts.as_deref_mut(),
                     );
                     // `#[Attribute]` on a method parameter is invalid
                     for attr in param.attributes.iter() {
@@ -414,6 +421,7 @@ pub(crate) fn check_class_attributes(
                     issues,
                     record_refs,
                     all_symbols.as_deref_mut(),
+                    resolved_navigation_facts.as_deref_mut(),
                 );
                 check_property_hook_attributes(
                     &prop.hooks,
@@ -424,6 +432,7 @@ pub(crate) fn check_class_attributes(
                     issues,
                     record_refs,
                     all_symbols.as_deref_mut(),
+                    resolved_navigation_facts.as_deref_mut(),
                 );
                 // `#[Attribute]` on a property is invalid
                 for attr in prop.attributes.iter() {
@@ -453,6 +462,7 @@ pub(crate) fn check_class_attributes(
                     issues,
                     record_refs,
                     all_symbols.as_deref_mut(),
+                    resolved_navigation_facts.as_deref_mut(),
                 );
                 // `#[Attribute]` on a class constant is invalid
                 for attr in c.attributes.iter() {
@@ -487,6 +497,7 @@ pub(crate) fn check_interface_attributes(
     issues: &mut Vec<Issue>,
     record_refs: bool,
     mut all_symbols: Option<&mut Vec<crate::symbol::ResolvedSymbol>>,
+    mut resolved_navigation_facts: Option<&mut Vec<crate::symbol::ResolvedNavigationFact>>,
 ) {
     for attr in decl.attributes.iter() {
         if !is_attribute_class_annotation(attr) {
@@ -509,6 +520,7 @@ pub(crate) fn check_interface_attributes(
                     issues,
                     record_refs,
                     all_symbols.as_deref_mut(),
+                    resolved_navigation_facts.as_deref_mut(),
                 );
                 for param in method.params.iter() {
                     check_attribute_list(
@@ -521,6 +533,7 @@ pub(crate) fn check_interface_attributes(
                         issues,
                         record_refs,
                         all_symbols.as_deref_mut(),
+                        resolved_navigation_facts.as_deref_mut(),
                     );
                 }
             }
@@ -535,6 +548,7 @@ pub(crate) fn check_interface_attributes(
                     issues,
                     record_refs,
                     all_symbols.as_deref_mut(),
+                    resolved_navigation_facts.as_deref_mut(),
                 );
             }
             _ => {}
@@ -553,6 +567,7 @@ pub(crate) fn check_trait_attributes(
     issues: &mut Vec<Issue>,
     record_refs: bool,
     mut all_symbols: Option<&mut Vec<crate::symbol::ResolvedSymbol>>,
+    mut resolved_navigation_facts: Option<&mut Vec<crate::symbol::ResolvedNavigationFact>>,
 ) {
     for attr in decl.attributes.iter() {
         if !is_attribute_class_annotation(attr) {
@@ -575,6 +590,7 @@ pub(crate) fn check_trait_attributes(
                     issues,
                     record_refs,
                     all_symbols.as_deref_mut(),
+                    resolved_navigation_facts.as_deref_mut(),
                 );
                 for param in method.params.iter() {
                     check_attribute_list(
@@ -587,6 +603,7 @@ pub(crate) fn check_trait_attributes(
                         issues,
                         record_refs,
                         all_symbols.as_deref_mut(),
+                        resolved_navigation_facts.as_deref_mut(),
                     );
                 }
             }
@@ -601,6 +618,7 @@ pub(crate) fn check_trait_attributes(
                     issues,
                     record_refs,
                     all_symbols.as_deref_mut(),
+                    resolved_navigation_facts.as_deref_mut(),
                 );
                 check_property_hook_attributes(
                     &prop.hooks,
@@ -611,6 +629,7 @@ pub(crate) fn check_trait_attributes(
                     issues,
                     record_refs,
                     all_symbols.as_deref_mut(),
+                    resolved_navigation_facts.as_deref_mut(),
                 );
             }
             _ => {}
@@ -632,6 +651,7 @@ pub(crate) fn check_enum_attributes(
     issues: &mut Vec<Issue>,
     record_refs: bool,
     mut all_symbols: Option<&mut Vec<crate::symbol::ResolvedSymbol>>,
+    mut resolved_navigation_facts: Option<&mut Vec<crate::symbol::ResolvedNavigationFact>>,
 ) {
     for attr in decl.attributes.iter() {
         if !is_attribute_class_annotation(attr) {
@@ -650,6 +670,7 @@ pub(crate) fn check_enum_attributes(
         issues,
         record_refs,
         all_symbols.as_deref_mut(),
+        resolved_navigation_facts.as_deref_mut(),
     );
     for member in decl.body.members.iter() {
         match &member.kind {
@@ -664,6 +685,7 @@ pub(crate) fn check_enum_attributes(
                     issues,
                     record_refs,
                     all_symbols.as_deref_mut(),
+                    resolved_navigation_facts.as_deref_mut(),
                 );
                 for param in method.params.iter() {
                     check_attribute_list(
@@ -676,6 +698,7 @@ pub(crate) fn check_enum_attributes(
                         issues,
                         record_refs,
                         all_symbols.as_deref_mut(),
+                        resolved_navigation_facts.as_deref_mut(),
                     );
                 }
             }
@@ -690,6 +713,7 @@ pub(crate) fn check_enum_attributes(
                     issues,
                     record_refs,
                     all_symbols.as_deref_mut(),
+                    resolved_navigation_facts.as_deref_mut(),
                 );
             }
             EnumMemberKind::ClassConst(c) => {
@@ -703,6 +727,7 @@ pub(crate) fn check_enum_attributes(
                     issues,
                     record_refs,
                     all_symbols.as_deref_mut(),
+                    resolved_navigation_facts.as_deref_mut(),
                 );
             }
             _ => {}
@@ -725,6 +750,7 @@ fn check_property_hook_attributes(
     issues: &mut Vec<Issue>,
     record_refs: bool,
     mut all_symbols: Option<&mut Vec<crate::symbol::ResolvedSymbol>>,
+    mut resolved_navigation_facts: Option<&mut Vec<crate::symbol::ResolvedNavigationFact>>,
 ) {
     for hook in hooks.iter() {
         check_attribute_list(
@@ -737,6 +763,7 @@ fn check_property_hook_attributes(
             issues,
             record_refs,
             all_symbols.as_deref_mut(),
+            resolved_navigation_facts.as_deref_mut(),
         );
         for param in hook.params.iter() {
             check_attribute_list(
@@ -749,6 +776,7 @@ fn check_property_hook_attributes(
                 issues,
                 record_refs,
                 all_symbols.as_deref_mut(),
+                resolved_navigation_facts.as_deref_mut(),
             );
         }
     }
@@ -812,6 +840,7 @@ fn check_attribute_list(
     issues: &mut Vec<Issue>,
     record_refs: bool,
     mut all_symbols: Option<&mut Vec<crate::symbol::ResolvedSymbol>>,
+    mut resolved_navigation_facts: Option<&mut Vec<crate::symbol::ResolvedNavigationFact>>,
 ) {
     let mut seen_fqcns: Vec<(String, u32)> = Vec::new(); // (fqcn, span.start)
 
@@ -848,13 +877,13 @@ fn check_attribute_list(
                 // `#[MyAttr(...)]` is a real reference to MyAttr — record it, or a
                 // class used only via attribute annotations elsewhere is falsely
                 // flagged UnusedClass.
+                // Use the name token's own span, not the whole `#[Attr(...)]` —
+                // otherwise a find-references hit reports the full attribute
+                // (name and args), and a cursor anywhere inside the argument
+                // list resolves to this ClassReference symbol even when it
+                // isn't actually over the class name.
+                let name_span = attr.name.span;
                 if record_refs {
-                    // Use the name token's own span, not the whole `#[Attr(...)]` —
-                    // otherwise a find-references hit reports the full attribute
-                    // (name and args), and a cursor anywhere inside the argument
-                    // list resolves to this ClassReference symbol even when it
-                    // isn't actually over the class name.
-                    let name_span = attr.name.span;
                     let (line, col_start) = offset_to_line_col(source, name_span.start, source_map);
                     let (line_end, col_end) = offset_to_line_col(source, name_span.end, source_map);
                     db.record_reference_location(crate::db::RefLoc {
@@ -866,22 +895,33 @@ fn check_attribute_list(
                             line, line_end, col_start, col_end,
                         ),
                     });
-                    // Without this, hover/go-to-definition on the attribute class name
-                    // in `#[MyAttr]` resolved nothing, unlike every other class-name
-                    // position — the same gap already fixed for `Foo::class`.
-                    if let Some(symbols) = all_symbols.as_deref_mut() {
-                        symbols.push(crate::symbol::ResolvedSymbol {
-                            file: file.clone(),
-                            span: name_span,
-                            expr_span: None,
-                            kind: crate::symbol::ReferenceKind::ClassReference(Arc::from(
-                                fqcn.as_str(),
-                            )),
-                            resolved_type: mir_types::Type::single(
-                                mir_types::Atomic::TClassString(None),
-                            ),
-                        });
-                    }
+                }
+                // Keep attribute-name navigation available even on compact
+                // resolve-at paths that do not record reference locations.
+                if let Some(symbols) = all_symbols.as_deref_mut() {
+                    symbols.push(crate::symbol::ResolvedSymbol {
+                        file: file.clone(),
+                        span: name_span,
+                        expr_span: None,
+                        kind: crate::symbol::ReferenceKind::ClassReference(Arc::from(
+                            fqcn.as_str(),
+                        )),
+                        resolved_type: mir_types::Type::single(mir_types::Atomic::TClassString(
+                            None,
+                        )),
+                    });
+                }
+                if let Some(facts) = resolved_navigation_facts.as_deref_mut() {
+                    facts.push(crate::symbol::ResolvedNavigationFact {
+                        span: name_span,
+                        expr_span: None,
+                        kind: crate::symbol::ReferenceKind::ClassReference(Arc::from(
+                            fqcn.as_str(),
+                        )),
+                        resolved_type: mir_types::Type::single(mir_types::Atomic::TClassString(
+                            None,
+                        )),
+                    });
                 }
                 // Check for case mismatch between the written attribute name and canonical.
                 if let Some((used, canonical)) =

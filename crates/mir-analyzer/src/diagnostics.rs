@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::db::{class_exists, resolve_name, MirDatabase};
 use crate::php_version::PhpVersion;
-use crate::symbol::{NavigationFact, ReferenceKind, ResolvedSymbol};
+use crate::symbol::{NavigationFact, ReferenceKind, ResolvedNavigationFact, ResolvedSymbol};
 
 // ---------------------------------------------------------------------------
 // Stored-location → Issue Location passthrough
@@ -251,6 +251,7 @@ pub(crate) fn check_name_class(
     php_version: PhpVersion,
     record_refs: bool,
     symbols: Option<&mut Vec<ResolvedSymbol>>,
+    resolved_navigation_facts: Option<&mut Vec<ResolvedNavigationFact>>,
 ) {
     check_name_class_with_context(
         name,
@@ -264,6 +265,7 @@ pub(crate) fn check_name_class(
         record_refs,
         symbols,
         None,
+        resolved_navigation_facts,
     );
 }
 
@@ -279,6 +281,7 @@ pub(crate) fn check_name_class_for_extends(
     record_refs: bool,
     symbols: Option<&mut Vec<ResolvedSymbol>>,
     navigation_facts: Option<&mut Vec<NavigationFact>>,
+    resolved_navigation_facts: Option<&mut Vec<ResolvedNavigationFact>>,
 ) {
     check_name_class_with_context(
         name,
@@ -292,6 +295,7 @@ pub(crate) fn check_name_class_for_extends(
         record_refs,
         symbols,
         navigation_facts,
+        resolved_navigation_facts,
     );
 }
 
@@ -306,8 +310,9 @@ fn check_name_class_with_context(
     php_version: PhpVersion,
     is_extends: bool,
     record_refs: bool,
-    mut symbols: Option<&mut Vec<ResolvedSymbol>>,
-    mut navigation_facts: Option<&mut Vec<NavigationFact>>,
+    symbols: Option<&mut Vec<ResolvedSymbol>>,
+    navigation_facts: Option<&mut Vec<NavigationFact>>,
+    resolved_navigation_facts: Option<&mut Vec<ResolvedNavigationFact>>,
 ) {
     let name_str = crate::parser::name_to_string_owned(name);
     let resolved = resolve_name(db, file.as_ref(), &name_str);
@@ -347,8 +352,8 @@ fn check_name_class_with_context(
         return;
     }
 
+    let span = name.span;
     if record_refs {
-        let span = name.span;
         let (line, col_start) = offset_to_line_col(source, span.start, source_map);
         let (line_end, col_end) = offset_to_line_col(source, span.end, source_map);
         db.record_reference_location(crate::db::RefLoc {
@@ -358,25 +363,34 @@ fn check_name_class_with_context(
             col_start,
             col_end: clamp_col_end(line, line_end, col_start, col_end),
         });
-        // Hover / go-to-definition on the extends/implements class-name token
-        // itself, matching every other class-name usage site (type hints,
-        // `new`, `instanceof`, use-imports).
-        if let Some(facts) = navigation_facts.as_deref_mut() {
-            facts.push(NavigationFact {
-                span,
-                expr_span: None,
-                name: crate::Name::class(Arc::from(resolved.as_str())),
-            });
-        }
-        if let Some(symbols) = symbols.as_deref_mut() {
-            symbols.push(ResolvedSymbol {
-                file: file.clone(),
-                span,
-                expr_span: None,
-                kind: ReferenceKind::ClassReference(Arc::from(resolved.as_str())),
-                resolved_type: mir_types::Type::single(mir_types::Atomic::TClassString(None)),
-            });
-        }
+    }
+    // Hover / go-to-definition on the extends/implements class-name token
+    // itself, matching every other class-name usage site (type hints,
+    // `new`, `instanceof`, use-imports). Keep this independent from
+    // reference-posting so the compact navigation path still resolves.
+    if let Some(facts) = navigation_facts {
+        facts.push(NavigationFact {
+            span,
+            expr_span: None,
+            name: crate::Name::class(Arc::from(resolved.as_str())),
+        });
+    }
+    if let Some(facts) = resolved_navigation_facts {
+        facts.push(ResolvedNavigationFact {
+            span,
+            expr_span: None,
+            kind: ReferenceKind::ClassReference(Arc::from(resolved.as_str())),
+            resolved_type: mir_types::Type::single(mir_types::Atomic::TClassString(None)),
+        });
+    }
+    if let Some(symbols) = symbols {
+        symbols.push(ResolvedSymbol {
+            file: file.clone(),
+            span,
+            expr_span: None,
+            kind: ReferenceKind::ClassReference(Arc::from(resolved.as_str())),
+            resolved_type: mir_types::Type::single(mir_types::Atomic::TClassString(None)),
+        });
     }
 
     // Check if extending an interface

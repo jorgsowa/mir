@@ -1,4 +1,5 @@
 use super::*;
+use std::panic::AssertUnwindSafe;
 
 /// One file's disk-cache lookup result from `AnalysisSession::warm_start_files`'s
 /// parallel read phase — everything the sequential apply phase needs, so it
@@ -17,6 +18,16 @@ struct WarmStartHit {
 }
 
 impl AnalysisSession {
+    fn snapshot_retry<R>(&self, mut f: impl FnMut(&MirDbStorage) -> R) -> R {
+        loop {
+            let db = self.snapshot_db();
+            if let Ok(value) = salsa::Cancelled::catch(AssertUnwindSafe(|| f(&db))) {
+                return value;
+            }
+            std::thread::yield_now();
+        }
+    }
+
     /// Cheap clone of the salsa db for a read-only query. The lock is held
     /// only for the duration of the clone, so concurrent readers never
     /// serialize on each other or on writes for longer than the clone itself.
@@ -143,11 +154,10 @@ impl AnalysisSession {
     /// accumulate dead reference-location entries indefinitely.)
     pub fn ingest_file(&self, file: Arc<str>, source: Arc<str>) {
         self.ensure_all_stubs();
-        let existing_text = {
-            let db = self.snapshot_db();
+        let existing_text = self.snapshot_retry(|db| {
             db.lookup_source_file(file.as_ref())
-                .map(|sf| sf.text(&db as &dyn MirDatabase).clone())
-        };
+                .map(|sf| sf.text(db as &dyn MirDatabase).clone())
+        });
         if existing_text
             .as_ref()
             .is_some_and(|text| text.as_ref() == source.as_ref())
@@ -186,6 +196,12 @@ impl AnalysisSession {
         let file_defs =
             self.db
                 .collect_and_ingest_file(file.clone(), source.as_ref(), self.php_version);
+        let new_decls = {
+            let sf = self
+                .lookup_source_file(file.as_ref())
+                .expect("collect_and_ingest_file must register SourceFile");
+            crate::db::decls_from_slice(&file_defs.slice, sf)
+        };
 
         // Derive this file's defined symbols from the `FileDefinitions` just
         // computed above — do NOT re-read them via a salsa query on the shared
@@ -232,10 +248,8 @@ impl AnalysisSession {
         // Structural edges depend only on declaration-shaped data already
         // committed above, so compute them now and only invalidate the cached
         // dependency graph when those edges actually changed.
-        let new_structural_targets = {
-            let db = self.snapshot_db();
-            file_outgoing_dependencies(&db, file.as_ref(), false)
-        };
+        let new_structural_targets =
+            self.snapshot_retry(|db| file_outgoing_dependencies(db, file.as_ref(), false));
         self.last_structural_targets
             .write()
             .insert(file.as_ref().to_string(), new_structural_targets.clone());
@@ -274,7 +288,7 @@ impl AnalysisSession {
             let mut guard = self.db.salsa.write();
             if guard.workspace_symbol_index_singleton().is_some() {
                 if let Some(sf) = guard.lookup_source_file(file.as_ref()) {
-                    if !guard.update_workspace_index_for_file(sf) {
+                    if !guard.update_workspace_index_for_file(sf, new_decls.clone()) {
                         guard.rebuild_workspace_symbol_index();
                     }
                     guard.clear_index_pending(file.as_ref());
@@ -293,14 +307,7 @@ impl AnalysisSession {
         }
         // Freshness is keyed on the Arc actually stored on the input (the
         // upsert keeps the prior Arc when content is equal), so read it back.
-        let stored_text = {
-            let db = self.snapshot_db();
-            db.lookup_source_file(file.as_ref())
-                .map(|sf| sf.text(&db as &dyn MirDatabase).clone())
-        };
-        if let Some(text) = stored_text {
-            self.mark_defs_committed(&file, &text);
-        }
+        self.mark_defs_committed(&file, &source);
         // `remove_file_definitions` above cleared the file's postings, so the
         // freshness mark must drop unconditionally — even for unchanged text —
         // or a query would trust the now-empty posting lists.
@@ -893,6 +900,10 @@ impl AnalysisSession {
             .iter()
             .filter_map(|p| snap.lookup_source_file(p.as_ref()))
             .collect();
+        let decls: Vec<(crate::db::SourceFile, crate::db::FileDeclarations)> = sfs
+            .iter()
+            .map(|&sf| (sf, crate::db::collect_file_declarations(&snap, sf).clone()))
+            .collect();
         // Best-effort pre-warm; a concurrent write may cancel it, in which
         // case the update below collects under the lock (single file, rare).
         let _ = salsa::Cancelled::catch(std::panic::AssertUnwindSafe(|| {
@@ -911,8 +922,8 @@ impl AnalysisSession {
             guard.rebuild_workspace_symbol_index();
             return;
         }
-        for sf in sfs {
-            if !guard.update_workspace_index_for_file(sf) {
+        for (sf, decls) in decls {
+            if !guard.update_workspace_index_for_file(sf, decls) {
                 guard.rebuild_workspace_symbol_index();
             }
         }

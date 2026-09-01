@@ -1205,6 +1205,7 @@ pub(super) fn bare_name_span_in(
 
 /// Push one `Variable` symbol per parameter declaration into `all_symbols`.
 /// Called immediately after [`seed_param_locations`] at every function/method body entry.
+#[allow(clippy::too_many_arguments)]
 fn record_param_symbols(
     all_symbols: Option<&mut Vec<ResolvedSymbol>>,
     file: &Arc<str>,

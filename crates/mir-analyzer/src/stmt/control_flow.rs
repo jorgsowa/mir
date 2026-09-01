@@ -667,7 +667,7 @@ impl<'a> StatementsAnalyzer<'a> {
                                 );
                                 if let Some(narrowed_base) =
                                     crate::narrowing::narrow_shape_path_to_asserted(
-                                        &current, path, &narrowed,
+                                        &current, path, narrowed,
                                     )
                                 {
                                     crate::narrowing::set_shape_base_narrowed(

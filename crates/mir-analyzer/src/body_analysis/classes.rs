@@ -129,7 +129,7 @@ impl<'a> BodyAnalyzer<'a> {
                         source_map,
                         all_issues,
                         self.collect_symbols
-                            .then(|| all_symbols.as_deref_mut())
+                            .then_some(all_symbols.as_deref_mut())
                             .flatten(),
                     );
                 }
@@ -850,6 +850,7 @@ impl<'a> BodyAnalyzer<'a> {
     /// container-kind divergences so each call site's behavior — including
     /// issue emission *order* — is reproduced exactly.
     #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::needless_option_as_deref)]
     pub(super) fn analyze_method_scope(
         &self,
         method: &php_ast::owned::MethodDecl,
@@ -901,7 +902,7 @@ impl<'a> BodyAnalyzer<'a> {
                     source_map,
                     all_issues,
                     self.collect_symbols
-                        .then(|| all_symbols.as_deref_mut())
+                        .then_some(all_symbols.as_deref_mut())
                         .flatten(),
                 );
             }
@@ -914,7 +915,7 @@ impl<'a> BodyAnalyzer<'a> {
                 source_map,
                 all_issues,
                 self.collect_symbols
-                    .then(|| all_symbols.as_deref_mut())
+                    .then_some(all_symbols.as_deref_mut())
                     .flatten(),
             );
         }
@@ -1348,18 +1349,23 @@ impl<'a> BodyAnalyzer<'a> {
         mut all_symbols: Option<&mut Vec<ResolvedSymbol>>,
         guards: &rustc_hash::FxHashSet<std::sync::Arc<str>>,
     ) {
-        crate::attributes::check_class_attributes(
-            decl,
-            self.db,
-            file,
-            source,
-            source_map,
-            all_issues,
-            self.mode == AnalysisMode::Full,
-            self.collect_symbols
-                .then(|| all_symbols.as_deref_mut())
-                .flatten(),
-        );
+        {
+            let mut resolved_navigation_facts = self.resolved_navigation_facts.borrow_mut();
+            crate::attributes::check_class_attributes(
+                decl,
+                self.db,
+                file,
+                source,
+                source_map,
+                all_issues,
+                self.mode == AnalysisMode::Full,
+                self.collect_symbols
+                    .then_some(all_symbols.as_deref_mut())
+                    .flatten(),
+                self.collect_resolved_navigation_facts
+                    .then_some(&mut *resolved_navigation_facts),
+            );
+        }
 
         let class_name_owned = decl
             .name
@@ -1388,6 +1394,7 @@ impl<'a> BodyAnalyzer<'a> {
             let parent_resolved = resolve_name(self.db, file.as_ref(), &parent_str);
             if !guards.contains(parent_resolved.as_str()) {
                 let mut navigation_facts = self.navigation_facts.borrow_mut();
+                let mut resolved_navigation_facts = self.resolved_navigation_facts.borrow_mut();
                 crate::diagnostics::check_name_class_for_extends(
                     parent,
                     self.db,
@@ -1398,10 +1405,12 @@ impl<'a> BodyAnalyzer<'a> {
                     self.php_version,
                     self.mode == AnalysisMode::Full,
                     self.collect_symbols
-                        .then(|| all_symbols.as_deref_mut())
+                        .then_some(all_symbols.as_deref_mut())
                         .flatten(),
                     self.collect_navigation_facts
                         .then_some(&mut *navigation_facts),
+                    self.collect_resolved_navigation_facts
+                        .then_some(&mut *resolved_navigation_facts),
                 );
             }
         }
@@ -1409,6 +1418,7 @@ impl<'a> BodyAnalyzer<'a> {
             let iface_str = crate::parser::name_to_string_owned(iface);
             let iface_resolved = resolve_name(self.db, file.as_ref(), &iface_str);
             if !guards.contains(iface_resolved.as_str()) {
+                let mut resolved_navigation_facts = self.resolved_navigation_facts.borrow_mut();
                 check_name_class(
                     iface,
                     self.db,
@@ -1419,8 +1429,10 @@ impl<'a> BodyAnalyzer<'a> {
                     self.php_version,
                     self.mode == AnalysisMode::Full,
                     self.collect_symbols
-                        .then(|| all_symbols.as_deref_mut())
+                        .then_some(all_symbols.as_deref_mut())
                         .flatten(),
+                    self.collect_resolved_navigation_facts
+                        .then_some(&mut *resolved_navigation_facts),
                 );
             }
         }
@@ -1603,16 +1615,21 @@ impl<'a> BodyAnalyzer<'a> {
         all_symbols: &mut Vec<ResolvedSymbol>,
         guards: &rustc_hash::FxHashSet<std::sync::Arc<str>>,
     ) {
-        crate::attributes::check_class_attributes(
-            decl,
-            self.db,
-            file,
-            source,
-            source_map,
-            all_issues,
-            self.mode == AnalysisMode::Full,
-            Some(&mut *all_symbols),
-        );
+        {
+            let mut resolved_navigation_facts = self.resolved_navigation_facts.borrow_mut();
+            crate::attributes::check_class_attributes(
+                decl,
+                self.db,
+                file,
+                source,
+                source_map,
+                all_issues,
+                self.mode == AnalysisMode::Full,
+                Some(&mut *all_symbols),
+                self.collect_resolved_navigation_facts
+                    .then_some(&mut *resolved_navigation_facts),
+            );
+        }
 
         let class_name_owned = decl
             .name
@@ -1641,6 +1658,7 @@ impl<'a> BodyAnalyzer<'a> {
             let parent_resolved = resolve_name(self.db, file.as_ref(), &parent_str);
             if !guards.contains(parent_resolved.as_str()) {
                 let mut navigation_facts = self.navigation_facts.borrow_mut();
+                let mut resolved_navigation_facts = self.resolved_navigation_facts.borrow_mut();
                 crate::diagnostics::check_name_class_for_extends(
                     parent,
                     self.db,
@@ -1653,6 +1671,8 @@ impl<'a> BodyAnalyzer<'a> {
                     self.collect_symbols.then_some(&mut *all_symbols),
                     self.collect_navigation_facts
                         .then_some(&mut *navigation_facts),
+                    self.collect_resolved_navigation_facts
+                        .then_some(&mut *resolved_navigation_facts),
                 );
             }
         }
@@ -1660,6 +1680,7 @@ impl<'a> BodyAnalyzer<'a> {
             let iface_str = crate::parser::name_to_string_owned(iface);
             let iface_resolved = resolve_name(self.db, file.as_ref(), &iface_str);
             if !guards.contains(iface_resolved.as_str()) {
+                let mut resolved_navigation_facts = self.resolved_navigation_facts.borrow_mut();
                 check_name_class(
                     iface,
                     self.db,
@@ -1670,6 +1691,8 @@ impl<'a> BodyAnalyzer<'a> {
                     self.php_version,
                     self.mode == AnalysisMode::Full,
                     self.collect_symbols.then_some(&mut *all_symbols),
+                    self.collect_resolved_navigation_facts
+                        .then_some(&mut *resolved_navigation_facts),
                 );
             }
         }
