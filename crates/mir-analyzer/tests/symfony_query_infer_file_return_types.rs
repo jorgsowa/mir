@@ -21,24 +21,24 @@ fn symfony_query_infer_file_return_types() {
         0,
         "RequestStack should not infer standalone function return types"
     );
-    assert_eq!(
-        inferred.methods.len(),
-        0,
-        "RequestStack methods already declare return types, so the inference map should stay empty"
+    assert!(
+        !inferred.methods.is_empty(),
+        "inference narrows RequestStack's method bodies even though they already declare native \
+         return types — the narrowed type feeds callers that want more than the declared signature"
     );
     assert_eq!(
         inferred.properties.len(),
         0,
         "RequestStack should not infer constructor-only property types for this fixture file"
     );
-    assert_eq!(
+    assert!(
         inferred_method_return_type_demand(
             &db,
             "Symfony\\Component\\HttpFoundation\\RequestStack",
             "pop",
-        ),
-        None,
-        "demand-driven inference should not synthesize RequestStack::pop when a native return type exists"
+        )
+        .is_some(),
+        "demand-driven inference should surface RequestStack::pop's narrowed body-derived type"
     );
     assert!(
         inferred_method_return_type_demand(
@@ -46,7 +46,7 @@ fn symfony_query_infer_file_return_types() {
             "Symfony\\Component\\HttpFoundation\\RequestStack",
             "getsession",
         )
-        .is_none(),
-        "getSession should also resolve from declarations rather than inferred return-type state"
+        .is_some(),
+        "demand-driven inference should surface RequestStack::getSession's narrowed body-derived type"
     );
 }
