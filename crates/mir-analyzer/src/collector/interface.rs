@@ -295,6 +295,7 @@ impl<'a> DefinitionCollector<'a> {
                                 },
                             ),
                             has_native_type: p.type_hint.is_some(),
+                            has_hook: !p.hooks.is_empty(),
                             from_docblock: false,
                         },
                     );

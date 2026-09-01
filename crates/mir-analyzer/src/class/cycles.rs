@@ -340,13 +340,13 @@ impl<'a> ClassAnalyzer<'a> {
             if let Some(class) = crate::db::find_class_like(self.db, anc_here) {
                 if let Some(props) = class.own_properties() {
                     return props.values().any(|p| {
-                        // Only a NATIVE-typed property can be "uninitialized". A
-                        // property typed only via a `@var` docblock (or untyped)
-                        // gets an implicit `null` default in PHP, so it never
-                        // requires a constructor.
-                        p.has_native_type
-                            && p.default.is_none()
-                            && p.ty.as_deref().is_some_and(|ty| !ty.is_nullable())
+                         // A hooked property is virtual when default-less (its
+                         // value is computed on access), so it never forces a
+                         // constructor.
+                         !p.has_hook
+                              && p.has_native_type
+                               && p.default.is_none()
+                               && p.ty.as_deref().is_some_and(|ty| !ty.is_nullable())
                     });
                 }
             }

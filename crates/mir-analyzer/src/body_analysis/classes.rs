@@ -1210,9 +1210,13 @@ impl<'a> BodyAnalyzer<'a> {
             {
                 if let Some(props) = class.own_properties() {
                     for (prop_name, p) in props.iter() {
+                        // A property with a `get`/`set` hook is virtual when it
+                        // carries no default: its value is computed on access and
+                        // never stored, so it can't be "left uninitialized".
                         let requires_init = p.has_native_type
-                            && p.default.is_none()
-                            && p.ty.as_deref().is_some_and(|ty| !ty.is_nullable());
+                            && !p.has_hook
+                             && p.default.is_none()
+                             && p.ty.as_deref().is_some_and(|ty| !ty.is_nullable());
                         if !requires_init {
                             continue;
                         }

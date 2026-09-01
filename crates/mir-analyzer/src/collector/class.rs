@@ -223,6 +223,7 @@ impl<'a> DefinitionCollector<'a> {
                                     location: Some(self.location(p.span.start, p.span.end)),
                                     deprecated: None,
                                     has_native_type: p.type_hint.is_some(),
+                                    has_hook: !p.hooks.is_empty(),
                                     from_docblock: false,
                                 };
                                 own_properties.insert(Arc::from(param_name), prop);
@@ -326,6 +327,7 @@ impl<'a> DefinitionCollector<'a> {
                             }
                         }),
                         has_native_type: p.type_hint.is_some(),
+                        has_hook: !p.hooks.is_empty(),
                         from_docblock: false,
                     };
                     // A native `readonly` property (own keyword or whole-class
