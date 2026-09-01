@@ -421,7 +421,7 @@ impl AnalysisCache {
             // same pattern as stub_cache.rs. A crash mid-write leaves only
             // the tmp file; the prior cache.bin (or none, on a first run)
             // stays intact instead of being truncated in place.
-            let tmp = cache_file.with_extension(format!("bin.tmp.{}", std::process::id()));
+            let tmp = cache_file.with_extension(format!("bin.tmp.{}", crate::tmp_suffix::next()));
             if std::fs::write(&tmp, &bytes).is_ok() {
                 let _ = std::fs::rename(&tmp, &cache_file);
             }

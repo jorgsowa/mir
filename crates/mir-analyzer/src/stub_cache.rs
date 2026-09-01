@@ -321,7 +321,7 @@ fn write_entry(job: WriteJob) {
     }
     // Tempfile in the same directory so the rename is atomic on every
     // POSIX filesystem (cross-mount renames would degrade to copy).
-    let tmp = entry_path.with_extension(format!("tmp.{}.{}", std::process::id(), seq));
+    let tmp = entry_path.with_extension(format!("tmp.{}.{}", crate::tmp_suffix::next(), seq));
     if std::fs::write(&tmp, &buf).is_err() {
         return;
     }
