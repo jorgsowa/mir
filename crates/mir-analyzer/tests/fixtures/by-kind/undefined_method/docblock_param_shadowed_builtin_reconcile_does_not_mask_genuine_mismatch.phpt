@@ -1,6 +1,6 @@
 ===description===
 P28 control: the docblock-shadowed-builtin reconciliation (see the P28
-false_positive_repro fixtures) only ever narrows a bare *builtin* name
+regression fixtures) only ever narrows a bare *builtin* name
 (`Generator`/`Closure`/etc.) to a same-namespace local class of that exact
 name. A `@param` naming a genuinely different, unrelated class must still
 store that class's own type — and calling a method that class doesn't have

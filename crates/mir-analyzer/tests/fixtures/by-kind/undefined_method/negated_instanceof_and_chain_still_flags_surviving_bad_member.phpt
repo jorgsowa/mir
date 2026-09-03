@@ -2,7 +2,7 @@
 P24 control: a chain of ANDed negated `instanceof` checks must only exclude
 the classes it actually names — a `Bad1` that isn't excluded by either
 conjunct must still be flagged as a real UndefinedMethod, proving the De
-Morgan narrowing fix (see the false_positive_repro P24 fixtures) doesn't
+Morgan narrowing fix (see the regression P24 fixtures) doesn't
 over-narrow.
 ===file===
 <?php
