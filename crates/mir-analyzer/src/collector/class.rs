@@ -1,4 +1,5 @@
 use super::DefinitionCollector;
+use crate::collector::literal_types;
 use crate::parser::{name_to_string_owned, type_from_hint_owned};
 use mir_codebase::definitions::{
     ConstantDef, DeclaredParam, MethodDef, PropertyDef, TemplateParam,
@@ -297,9 +298,34 @@ impl<'a> DefinitionCollector<'a> {
                             })
                         })
                         .or_else(|| hint_ty.clone());
+                    // M7: a bare `array` declaration with a literal initializer
+                    // reads back the literal's far narrower shape. Rebuild the
+                    // initializer type (which the collector used to discard)
+                    // and refine the declared type into it when the property
+                    // is private static, the initializer is a typed literal,
+                    // and no static write in this file touches the property
+                    // (a `private static` is file-scoped, so that scan is
+                    // complete). Non-private-static properties and written
+                    // properties keep their declared type.
+                    let default_ty = p.default.as_ref().map(|d| {
+                        // Preserve the collector's historical `Some(mixed)`
+                        // for initializers we don't type as literals: `None`
+                        // means "no initializer" to readers such as the
+                        // missing-constructor check.
+                        literal_types::literal_type(d).unwrap_or_else(mir_types::Type::mixed)
+                    });
+                    let refined_ty = literal_types::refine_static_array_default(
+                        ty,
+                        &default_ty,
+                        &self.static_writes,
+                        &fqcn,
+                        prop_name,
+                        matches!(p.visibility.as_ref(), Some(php_ast::Visibility::Private)),
+                        p.is_static,
+                    );
                     let prop = PropertyDef {
                         name: Arc::from(prop_name),
-                        ty: mir_codebase::definitions::wrap_property_type(ty),
+                        ty: mir_codebase::definitions::wrap_property_type(refined_ty),
                         inferred_ty: None,
                         native_ty: mir_codebase::definitions::wrap_property_type(hint_ty),
                         visibility: Self::convert_visibility(p.visibility),
@@ -309,9 +335,7 @@ impl<'a> DefinitionCollector<'a> {
                             || prop_doc.is_readonly
                             || class_doc.is_readonly,
                         has_native_readonly: p.is_readonly || decl.modifiers.is_readonly,
-                        default: mir_codebase::definitions::wrap_property_type(
-                            p.default.as_ref().map(|_| mir_types::Type::mixed()),
-                        ),
+                        default: mir_codebase::definitions::wrap_property_type(default_ty),
                         location: Some(self.location(member.span.start, member.span.end)),
                         deprecated: prop_doc.deprecated.as_deref().map(Arc::from).or_else(|| {
                             if p.attributes.iter().any(|a| {

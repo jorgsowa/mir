@@ -937,7 +937,7 @@ function get_extension_funcs(string $extension): array|false {}
  * )
  * </pre>
  * </p>
- * @return array
+ * @return array<string, mixed>
  * @pure
  */
 function get_defined_constants(bool $categorize = false): array {}
