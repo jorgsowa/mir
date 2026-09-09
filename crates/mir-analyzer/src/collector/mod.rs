@@ -28,6 +28,7 @@ mod class;
 mod r#enum;
 mod function;
 mod interface;
+mod literal_types;
 mod resolution;
 mod r#trait;
 mod version_attrs;
@@ -726,6 +727,12 @@ pub struct DefinitionCollector<'a> {
     /// Feeds `slice.class_imports`, consulted by class-name resolution so a
     /// function/constant import can't shadow a same-named class reference.
     accumulated_class_imports: FxHashMap<String, String>,
+    /// Static-property write targets found in this file, from
+    /// `literal_types::scan_static_property_writes(program)` — the soundness
+    /// gate for initializer-based property type refinement (ROADMAP M7): a
+    /// property written to anywhere in its own file must not be refined from
+    /// its literal default.
+    static_writes: literal_types::StaticWrites,
 }
 
 impl<'a> DefinitionCollector<'a> {
@@ -750,6 +757,7 @@ impl<'a> DefinitionCollector<'a> {
             first_namespace: None,
             accumulated_imports: FxHashMap::default(),
             accumulated_class_imports: FxHashMap::default(),
+            static_writes: literal_types::StaticWrites::default(),
         }
     }
 
@@ -846,6 +854,9 @@ impl<'a> DefinitionCollector<'a> {
     }
 
     pub fn collect_slice(mut self, program: &Program) -> (StubSlice, Vec<Issue>) {
+        // M7: scan before the main pass — property refinement in
+        // `collect_class` consults the result.
+        self.static_writes = literal_types::scan_static_property_writes(program);
         let _ = self.visit_program(program);
         self.finalize_slice();
         (self.slice, self.issues.into_all_issues())

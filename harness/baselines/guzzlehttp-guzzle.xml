@@ -177,9 +177,6 @@
       <code><![CDATA[return $this->data['Discard'];]]></code>
       <code><![CDATA[return $this->data['HttpOnly'];]]></code>
     </MixedReturnStatement>
-    <PossiblyInvalidArgument>
-      <code><![CDATA[$search]]></code>
-    </PossiblyInvalidArgument>
     <RedundantCast>
       <code><![CDATA[$name]]></code>
       <code><![CDATA[$value]]></code>
@@ -1404,9 +1401,6 @@
     <MixedReturnStatement>
       <code><![CDATA[return $data;]]></code>
     </MixedReturnStatement>
-    <PossiblyInvalidArgument>
-      <code><![CDATA[$errorConstant]]></code>
-    </PossiblyInvalidArgument>
     <RedundantCast>
       <code><![CDATA[$value]]></code>
     </RedundantCast>

@@ -1408,81 +1408,207 @@ impl Type {
 // Conditional return resolution helpers
 // ---------------------------------------------------------------------------
 
-fn is_string_atomic(a: &Atomic) -> bool {
-    matches!(
-        a,
-        Atomic::TString
-            | Atomic::TNonEmptyString
-            | Atomic::TLiteralString(_)
-            | Atomic::TNumericString
-            | Atomic::TClassString(_)
-            | Atomic::TInterfaceString(_)
-            | Atomic::TCallableString
-    )
+/// Coarse value class of a runtime value.
+///
+/// One atom may hold several classes (a `bool` may hold `true` *or*
+/// `false`; a `scalar` argument is one of the five scalar classes).
+/// Literal refinements stay precise only where they matter: `int`/`float`
+/// literals get their own class so that `int` and `float` literals decide
+/// against each other's subjects; string literals collapse to
+/// [`ValueClass::String`] (refined string kinds never feed a conditional
+/// subject and would only cost match precision).
+#[derive(Clone, PartialEq, Eq, Debug)]
+enum ValueClass {
+    Int,
+    Float,
+    True,
+    False,
+    String,
+    Array,
+    /// `list`-shaped arrays (sequential integer keys) — a refinement of [`Array`].
+    List,
+    Object,
+    Null,
+    /// `mixed`/`void` — a value of every class; it overlaps every other
+    /// class, so a `mixed` argument rules out no branch.
+    Top,
+    /// Literal `int` — precise against `int`/`float` subjects: an `int`
+    /// literal is not a float, a float literal is not an int.
+    LitInt(i64),
+    /// Literal `float` — the bit decomposition mirrors [`Atomic::TLiteralFloat`].
+    LitFloat(i64, i64),
+    /// A specific `string` literal.
+    LitString(Arc<str>),
 }
 
-fn is_array_atomic(a: &Atomic) -> bool {
-    matches!(
-        a,
-        Atomic::TArray { .. }
-            | Atomic::TNonEmptyArray { .. }
-            | Atomic::TKeyedArray { .. }
-            | Atomic::TList { .. }
-            | Atomic::TNonEmptyList { .. }
-    )
-}
-
-fn is_list_atomic(a: &Atomic) -> bool {
-    match a {
-        Atomic::TList { .. } | Atomic::TNonEmptyList { .. } => true,
-        Atomic::TKeyedArray { is_list, .. } => *is_list,
-        _ => false,
+impl ValueClass {
+    /// Whether a value of class `b` is necessarily a value of class `a`, i.e.
+    /// whether the class lattice (`int` literal <: `int` <: `scalar`;
+    /// `list` <: `array`; `true`/`false` <: `bool`; `mixed` <: everything)
+    /// places `b` beneath `a`.
+    fn includes(&self, b: &Self) -> bool {
+        self == b
+            || matches!(
+                (self, b),
+                (Self::Top, _)
+                    | (Self::Int, Self::LitInt(_))
+                    | (Self::Float, Self::LitFloat(..))
+                    | (Self::String, Self::LitString(_))
+                    | (Self::Array, Self::List)
+            )
     }
 }
 
-fn is_float_atomic(a: &Atomic) -> bool {
+/// The value classes an atom may hold.
+///
+/// Meta-types map to every class they may hold (`TBool` holds `true` *and*
+/// `false`); opaque/deferred atoms (`TTemplateParam`, `TKeyOf`, …) map to
+/// none — an argument of such a type rules out no branch.
+fn value_classes(a: &Atomic) -> Vec<ValueClass> {
+    use ValueClass::*;
+    match a {
+        // Integers (range bounds are not modeled: a subject `int` is a
+        // family question).
+        Atomic::TInt
+        | Atomic::TIntRange { .. }
+        | Atomic::TPositiveInt
+        | Atomic::TNegativeInt
+        | Atomic::TNonNegativeInt => vec![Int],
+        Atomic::TLiteralInt(v) => vec![LitInt(*v)],
+        // Floats.
+        Atomic::TFloat | Atomic::TIntegralFloat => vec![Float],
+        Atomic::TLiteralFloat(int_bits, frac_bits) => {
+            vec![LitFloat(*int_bits, *frac_bits)]
+        }
+        // Bools.
+        Atomic::TBool => vec![True, False],
+        Atomic::TTrue => vec![True],
+        Atomic::TFalse => vec![False],
+        // Strings — every refined string kind maps to one class.
+        Atomic::TString
+        | Atomic::TNonEmptyString
+        | Atomic::TNumericString
+        | Atomic::TClassString(_)
+        | Atomic::TInterfaceString(_)
+        | Atomic::TEnumString
+        | Atomic::TTraitString
+        | Atomic::TCallableString => vec![String],
+        Atomic::TLiteralString(s) => vec![LitString(s.clone())],
+        // Arrays — `list` is a refinement of `array`.
+        Atomic::TArray { .. }
+        | Atomic::TNonEmptyArray { .. }
+        | Atomic::TKeyedArray { is_list: false, .. } => vec![Array],
+        Atomic::TList { .. }
+        | Atomic::TNonEmptyList { .. }
+        | Atomic::TKeyedArray { is_list: true, .. } => vec![List],
+        // Objects — a specific class instance is an object at runtime.
+        Atomic::TObject
+        | Atomic::TNamedObject { .. }
+        | Atomic::TStaticObject { .. }
+        | Atomic::TSelf { .. }
+        | Atomic::TParent { .. }
+        | Atomic::TClosure { .. }
+        | Atomic::TLiteralEnumCase { .. } => vec![Object],
+        // Null. `void` maps to `Top` (a `void`-typed value is unknown; treating
+        // it as "everything" keeps any branch it feeds undecidable).
+        Atomic::TNull => vec![Null],
+        Atomic::TVoid => vec![Top],
+        // Everything / scalars.
+        Atomic::TMixed => vec![Top],
+        Atomic::TScalar => vec![Int, Float, True, False, String],
+        // `numeric` may hold `int` or `float` values (a numeric *string*
+        // can never be the discriminant of an `is numeric` subject).
+        Atomic::TNumeric => vec![Int, Float],
+        // Opaque / deferred — rules out no branch.
+        Atomic::TCallable { .. }
+        | Atomic::TNever
+        | Atomic::TTemplateParam { .. }
+        | Atomic::TKeyOf { .. }
+        | Atomic::TValueOf { .. }
+        | Atomic::TConditional { .. }
+        | Atomic::TIntersection { .. } => Vec::new(),
+    }
+}
+
+/// Whether a conditional discriminant subject can be decided by value class.
+///
+/// Only the bare family kinds qualify. A refined subject (a named object, a
+/// shape, a non-empty list, an enum case, …) carries value-level constraints
+/// the class lattice cannot express — an argument that is *some* object is
+/// not necessarily *that* class — so refined subjects stay undecidable, the
+/// same behavior as the pre-class predicate (which had no arm for them).
+fn subject_is_decidable(subject: &Atomic) -> bool {
     matches!(
-        a,
-        Atomic::TFloat | Atomic::TIntegralFloat | Atomic::TLiteralFloat(..)
+        subject,
+        Atomic::TNull
+            | Atomic::TTrue
+            | Atomic::TFalse
+            | Atomic::TBool
+            | Atomic::TString
+            | Atomic::TInt
+            | Atomic::TFloat
+            | Atomic::TArray { .. }
+            | Atomic::TList { .. }
+            | Atomic::TObject
+            | Atomic::TMixed
+            | Atomic::TScalar
     )
 }
 
-fn is_bool_atomic(a: &Atomic) -> bool {
-    matches!(a, Atomic::TBool | Atomic::TTrue | Atomic::TFalse)
-}
-
-/// Resolve one branch of a conditional return type given the subject discriminant
-/// atomic and the actual argument type at the call site.
+/// Resolve one branch of a conditional return type given the subject
+/// discriminant and the actual argument type at the call site.
 ///
-/// Returns `Some(branch)` when the branch can be determined statically, or `None`
-/// to signal that the caller should widen to the union of both branches.
+/// Returns `Some(branch)` when the branch can be determined statically, or
+/// `None` to signal that the caller should widen to the union of both
+/// branches.
+///
+/// Decision rule (value-class semantics): the discriminant and the argument
+/// are compared *only on value classes* — the value sets the runtime type
+/// system uses for narrowing. Class containment is the same lattice the
+/// subtype relation uses for these kinds (`true` ⊆ `bool` ⊆ `scalar`,
+/// `list` ⊆ `array`, `int`/`float` literals distinct, `mixed` ⊆ everything),
+/// so a subject kind and an argument kind are related iff some contained
+/// class relates them.
+///
+/// The true branch commits when every argument class is contained in some
+/// subject class (every value the argument can hold is a subject value); the
+/// false branch commits when every argument class is disjoint from every
+/// subject class (no value the argument can hold is a subject value).
+/// Otherwise the branch is undecidable and the caller widens to the union of
+/// both branches.
 fn resolve_conditional_branch(
     subject: &Atomic,
     arg_ty: &Type,
     if_true: &Type,
     if_false: &Type,
 ) -> Option<Type> {
-    let predicate: fn(&Atomic) -> bool = match subject {
-        Atomic::TNull => |a| matches!(a, Atomic::TNull),
-        Atomic::TTrue => |a| matches!(a, Atomic::TTrue),
-        Atomic::TFalse => |a| matches!(a, Atomic::TFalse),
-        Atomic::TString => is_string_atomic,
-        Atomic::TList { .. } => is_list_atomic,
-        Atomic::TArray { .. } => is_array_atomic,
-        Atomic::TInt => Atomic::is_int,
-        Atomic::TFloat => is_float_atomic,
-        Atomic::TBool => is_bool_atomic,
-        _ => return None,
-    };
-
+    if !subject_is_decidable(subject) {
+        return None;
+    }
     if arg_ty.types.is_empty() {
         return None;
     }
-    let all_match = arg_ty.types.iter().all(&predicate);
-    let none_match = !arg_ty.types.iter().any(predicate);
+    let subject_classes = value_classes(subject);
+    let arg_classes: Vec<ValueClass> = arg_ty
+        .types
+        .iter()
+        .flat_map(value_classes)
+        .collect();
+    if arg_classes.is_empty() {
+        // Opaque argument (template, `key-of`, …) — no branch is ruled out.
+        return None;
+    }
+    let all_match = arg_classes
+        .iter()
+        .all(|c| subject_classes.iter().any(|s| s.includes(c)));
+    let any_overlap = arg_classes.iter().any(|c| {
+        subject_classes
+            .iter()
+            .any(|s| s.includes(c) || c.includes(s))
+    });
     if all_match {
         Some(if_true.clone())
-    } else if none_match {
+    } else if !any_overlap {
         Some(if_false.clone())
     } else {
         None
@@ -2760,6 +2886,501 @@ mod tests {
         );
         assert_eq!(result.types.len(), 1);
         assert!(matches!(result.types[0], Atomic::TString));
+    }
+
+    #[test]
+    fn resolve_conditional_true_subject_bool_arg_widens() {
+        // A `bool` argument carries the value classes `{true, false}`:
+        // `false` is not contained in the `true` class, and `true`
+        // overlaps it, so neither branch is ruled out.
+        let ty = Type::single(conditional(
+            Some(Name::new("x")),
+            Type::single(Atomic::TTrue),
+            Type::single(Atomic::TInt),
+            Type::single(Atomic::TString),
+        ));
+        let result = ty.resolve_conditional_returns(|name| {
+            if name == "x" {
+                Some(Type::single(Atomic::TBool))
+            } else {
+                None
+            }
+        });
+        assert_eq!(result.types.len(), 2);
+        assert!(result.contains(|t| matches!(t, Atomic::TInt)));
+        assert!(result.contains(|t| matches!(t, Atomic::TString)));
+    }
+
+    #[test]
+    fn resolve_conditional_true_subject_mixed_arg_widens() {
+        // `mixed` maps to the `Top` value class, which overlaps every
+        // other class, so it can never rule a branch out.
+        let ty = Type::single(conditional(
+            Some(Name::new("x")),
+            Type::single(Atomic::TTrue),
+            Type::single(Atomic::TInt),
+            Type::single(Atomic::TString),
+        ));
+        let result = ty.resolve_conditional_returns(|name| {
+            if name == "x" {
+                Some(Type::mixed())
+            } else {
+                None
+            }
+        });
+        assert_eq!(result.types.len(), 2);
+        assert!(result.contains(|t| matches!(t, Atomic::TInt)));
+        assert!(result.contains(|t| matches!(t, Atomic::TString)));
+    }
+
+    #[test]
+    fn resolve_conditional_true_subject_literal_args() {
+        // Literals decide by value class: `false` is contained in
+        // `{false}` and disjoint from `{true}`, and vice versa.
+        let ty = Type::single(conditional(
+            Some(Name::new("x")),
+            Type::single(Atomic::TTrue),
+            Type::single(Atomic::TInt),
+            Type::single(Atomic::TString),
+        ));
+        let false_arg = ty
+            .clone()
+            .resolve_conditional_returns(|name| {
+                if name == "x" {
+                    Some(Type::single(Atomic::TFalse))
+                } else {
+                    None
+                }
+            });
+        assert_eq!(false_arg.types.len(), 1);
+        assert!(matches!(false_arg.types[0], Atomic::TString));
+
+        let true_arg = ty.resolve_conditional_returns(|name| {
+            if name == "x" {
+                Some(Type::single(Atomic::TTrue))
+            } else {
+                None
+            }
+        });
+        assert_eq!(true_arg.types.len(), 1);
+        assert!(matches!(true_arg.types[0], Atomic::TInt));
+    }
+
+    #[test]
+    fn resolve_conditional_bool_subject_scalar_arg_widens() {
+        // `scalar` carries all five scalar classes: `true`/`false`
+        // overlap the `bool` subject, but `int`/`float`/`string` are
+        // not contained in `{true, false}`, so neither branch commits.
+        let ty = Type::single(conditional(
+            Some(Name::new("x")),
+            Type::single(Atomic::TBool),
+            Type::single(Atomic::TInt),
+            Type::single(Atomic::TString),
+        ));
+        let result = ty.resolve_conditional_returns(|name| {
+            if name == "x" {
+                Some(Type::single(Atomic::TScalar))
+            } else {
+                None
+            }
+        });
+        assert_eq!(result.types.len(), 2);
+        assert!(result.contains(|t| matches!(t, Atomic::TInt)));
+        assert!(result.contains(|t| matches!(t, Atomic::TString)));
+    }
+
+    #[test]
+    fn resolve_conditional_string_subject_bool_arg_false_branch() {
+        // Disjoint value classes still commit to the false branch: a
+        // `bool` argument carries `{true, false}`, none of which is a
+        // string, and strings are not bools.
+        let ty = Type::single(conditional(
+            Some(Name::new("x")),
+            Type::single(Atomic::TString),
+            Type::single(Atomic::TInt),
+            Type::single(Atomic::TBool),
+        ));
+        let result = ty.resolve_conditional_returns(|name| {
+            if name == "x" {
+                Some(Type::single(Atomic::TBool))
+            } else {
+                None
+            }
+        });
+        assert_eq!(result.types.len(), 1);
+        assert!(matches!(result.types[0], Atomic::TBool));
+    }
+
+    #[test]
+    fn resolve_conditional_list_subject_bare_array_arg_widens() {
+        // A bare `array` is the supertype of `list`, so it may or may
+        // not be a list: both branches stay live.
+        let ty = Type::single(conditional(
+            Some(Name::new("x")),
+            Type::single(Atomic::TList {
+                value: Box::new(Type::mixed()),
+            }),
+            Type::single(Atomic::TInt),
+            Type::single(Atomic::TString),
+        ));
+        let result = ty.resolve_conditional_returns(|name| {
+            if name == "x" {
+                Some(Type::single(Atomic::TArray {
+                    key: Box::new(Type::mixed()),
+                    value: Box::new(Type::mixed()),
+                }))
+            } else {
+                None
+            }
+        });
+        assert_eq!(result.types.len(), 2);
+        assert!(result.contains(|t| matches!(t, Atomic::TInt)));
+        assert!(result.contains(|t| matches!(t, Atomic::TString)));
+    }
+
+    #[test]
+    fn resolve_conditional_float_subject_int_literal_false_branch() {
+        // A `float` subject is the `Float` class; an int literal is
+        // `LitInt`, which is not a float, and floats are not ints.
+        let ty = resolve_conditional_branch(
+            &Atomic::TFloat,
+            &Type::single(Atomic::TLiteralInt(42)),
+            &Type::single(Atomic::TInt),
+            &Type::single(Atomic::TString),
+        );
+        assert!(matches!(
+            ty.as_ref(),
+            Some(t) if t.types.len() == 1 && matches!(t.types[0], Atomic::TString)
+        ));
+    }
+
+    #[test]
+    fn resolve_conditional_int_subject_float_literal_false_branch() {
+        let ty = resolve_conditional_branch(
+            &Atomic::TInt,
+            &Type::single(Atomic::TLiteralFloat(1, 0)),
+            &Type::single(Atomic::TInt),
+            &Type::single(Atomic::TString),
+        );
+        assert!(matches!(
+            ty.as_ref(),
+            Some(t) if t.types.len() == 1 && matches!(t.types[0], Atomic::TString)
+        ));
+    }
+
+    #[test]
+    fn resolve_conditional_float_subject_float_literal_then_branch() {
+        let ty = resolve_conditional_branch(
+            &Atomic::TFloat,
+            &Type::single(Atomic::TLiteralFloat(1, 5)),
+            &Type::single(Atomic::TInt),
+            &Type::single(Atomic::TString),
+        );
+        assert!(matches!(
+            ty.as_ref(),
+            Some(t) if t.types.len() == 1 && matches!(t.types[0], Atomic::TInt)
+        ));
+    }
+
+    #[test]
+    fn resolve_conditional_int_subject_int_literal_then_branch() {
+        let ty = resolve_conditional_branch(
+            &Atomic::TInt,
+            &Type::single(Atomic::TLiteralInt(7)),
+            &Type::single(Atomic::TInt),
+            &Type::single(Atomic::TString),
+        );
+        assert!(matches!(
+            ty.as_ref(),
+            Some(t) if t.types.len() == 1 && matches!(t.types[0], Atomic::TInt)
+        ));
+    }
+
+    #[test]
+    fn resolve_conditional_int_subject_float_arg_false_branch() {
+        // A bare `float` argument is never an `int`: disjoint value
+        // classes commit to the false branch.
+        let ty = resolve_conditional_branch(
+            &Atomic::TInt,
+            &Type::single(Atomic::TFloat),
+            &Type::single(Atomic::TInt),
+            &Type::single(Atomic::TString),
+        );
+        assert!(matches!(
+            ty.as_ref(),
+            Some(t) if t.types.len() == 1 && matches!(t.types[0], Atomic::TString)
+        ));
+    }
+
+    #[test]
+    fn resolve_conditional_array_subject_string_arg_false_branch() {
+        let ty = resolve_conditional_branch(
+            &Atomic::TArray {
+                key: Box::new(Type::mixed()),
+                value: Box::new(Type::mixed()),
+            },
+            &Type::single(Atomic::TString),
+            &Type::single(Atomic::TInt),
+            &Type::single(Atomic::TString),
+        );
+        assert!(matches!(
+            ty.as_ref(),
+            Some(t) if t.types.len() == 1 && matches!(t.types[0], Atomic::TString)
+        ));
+    }
+
+    #[test]
+    fn resolve_conditional_array_subject_bool_arg_false_branch() {
+        let ty = resolve_conditional_branch(
+            &Atomic::TArray {
+                key: Box::new(Type::mixed()),
+                value: Box::new(Type::mixed()),
+            },
+            &Type::single(Atomic::TBool),
+            &Type::single(Atomic::TInt),
+            &Type::single(Atomic::TString),
+        );
+        assert!(matches!(
+            ty.as_ref(),
+            Some(t) if t.types.len() == 1 && matches!(t.types[0], Atomic::TString)
+        ));
+    }
+
+    #[test]
+    fn resolve_conditional_array_subject_mixed_arg_widens() {
+        // A `mixed` argument is `Top`: it overlaps `array`, so the then
+        // branch is never ruled out, and it is not contained in `array`,
+        // so the false branch is never ruled out either.
+        let ty = resolve_conditional_branch(
+            &Atomic::TArray {
+                key: Box::new(Type::mixed()),
+                value: Box::new(Type::mixed()),
+            },
+            &Type::mixed(),
+            &Type::single(Atomic::TInt),
+            &Type::single(Atomic::TString),
+        );
+        assert!(ty.is_none());
+    }
+
+    #[test]
+    fn resolve_conditional_array_subject_list_arg_then_branch() {
+        // A `list` argument is an `array` (`List` is contained in
+        // `Array`), so every argument class is in the subject's class.
+        let ty = resolve_conditional_branch(
+            &Atomic::TArray {
+                key: Box::new(Type::mixed()),
+                value: Box::new(Type::mixed()),
+            },
+            &Type::single(Atomic::TList {
+                value: Box::new(Type::mixed()),
+            }),
+            &Type::single(Atomic::TInt),
+            &Type::single(Atomic::TString),
+        );
+        assert!(matches!(
+            ty.as_ref(),
+            Some(t) if t.types.len() == 1 && matches!(t.types[0], Atomic::TInt)
+        ));
+    }
+
+    #[test]
+    fn resolve_conditional_list_subject_keyed_list_arg_then_branch() {
+        // A keyed array with `is_list` is a list at runtime.
+        let ty = resolve_conditional_branch(
+            &Atomic::TList {
+                value: Box::new(Type::mixed()),
+            },
+            &Type::single(Atomic::TKeyedArray {
+                properties: Box::default(),
+                is_open: false,
+                is_list: true,
+            }),
+            &Type::single(Atomic::TInt),
+            &Type::single(Atomic::TString),
+        );
+        assert!(matches!(
+            ty.as_ref(),
+            Some(t) if t.types.len() == 1 && matches!(t.types[0], Atomic::TInt)
+        ));
+    }
+
+    #[test]
+    fn resolve_conditional_list_subject_list_string_union_widens() {
+        // A `list|string` argument carries `{List, String}`: `List`
+        // overlaps the `list` subject, `String` does not, so neither
+        // branch is ruled out.
+        let ty = resolve_conditional_branch(
+            &Atomic::TList {
+                value: Box::new(Type::mixed()),
+            },
+            &Type::from_vec(vec![
+                Atomic::TList {
+                    value: Box::new(Type::mixed()),
+                },
+                Atomic::TString,
+            ]),
+            &Type::single(Atomic::TInt),
+            &Type::single(Atomic::TString),
+        );
+        assert!(ty.is_none());
+    }
+
+    #[test]
+    fn resolve_conditional_numeric_subject_widens() {
+        // `numeric` is a refined subject (it admits numeric strings such
+        // as `"123"`), so the value-class lattice cannot reduce it: the
+        // branch stays undecidable even for a literal string argument.
+        let ty = resolve_conditional_branch(
+            &Atomic::TNumeric,
+            &Type::single(Atomic::TLiteralString("123".into())),
+            &Type::single(Atomic::TInt),
+            &Type::single(Atomic::TString),
+        );
+        assert!(ty.is_none());
+    }
+
+    #[test]
+    fn resolve_conditional_non_empty_string_subject_widens() {
+        // A `non-empty-string` subject is refined (`""` is a string but
+        // not non-empty), so even a bare string argument is undecidable.
+        let ty = resolve_conditional_branch(
+            &Atomic::TNonEmptyString,
+            &Type::single(Atomic::TString),
+            &Type::single(Atomic::TInt),
+            &Type::single(Atomic::TString),
+        );
+        assert!(ty.is_none());
+    }
+
+    #[test]
+    fn resolve_conditional_template_arg_widens() {
+        // A template parameter has no value classes at all (opaque), so
+        // it is undecidable against any subject.
+        let ty = resolve_conditional_branch(
+            &Atomic::TString,
+            &t_param("T"),
+            &Type::single(Atomic::TInt),
+            &Type::single(Atomic::TString),
+        );
+        assert!(ty.is_none());
+    }
+
+    #[test]
+    fn resolve_conditional_mixed_subject_bool_arg_then_branch() {
+        // `mixed` is a decidable subject: every value class is contained
+        // in `Top`, so a bool argument is always `mixed`.
+        let ty = resolve_conditional_branch(
+            &Atomic::TMixed,
+            &Type::single(Atomic::TBool),
+            &Type::single(Atomic::TInt),
+            &Type::single(Atomic::TString),
+        );
+        assert!(matches!(
+            ty.as_ref(),
+            Some(t) if t.types.len() == 1 && matches!(t.types[0], Atomic::TInt)
+        ));
+    }
+
+    #[test]
+    fn resolve_conditional_scalar_subject_null_arg_false_branch() {
+        // `null` is not a scalar value class: the argument is disjoint
+        // from the subject, so the false branch is taken.
+        let ty = resolve_conditional_branch(
+            &Atomic::TScalar,
+            &Type::single(Atomic::TNull),
+            &Type::single(Atomic::TInt),
+            &Type::single(Atomic::TString),
+        );
+        assert!(matches!(
+            ty.as_ref(),
+            Some(t) if t.types.len() == 1 && matches!(t.types[0], Atomic::TString)
+        ));
+    }
+
+    #[test]
+    fn resolve_conditional_object_subject_named_arg_then_branch() {
+        // A named class instance is an object at runtime.
+        let ty = resolve_conditional_branch(
+            &Atomic::TObject,
+            &Type::single(Atomic::TNamedObject {
+                fqcn: Name::new("Foo"),
+                type_params: empty_type_params(),
+            }),
+            &Type::single(Atomic::TInt),
+            &Type::single(Atomic::TString),
+        );
+        assert!(matches!(
+            ty.as_ref(),
+            Some(t) if t.types.len() == 1 && matches!(t.types[0], Atomic::TInt)
+        ));
+    }
+
+    #[test]
+    fn resolve_conditional_named_subject_other_class_widens() {
+        // A named-object subject is refined (one specific class), so an
+        // instance of another class is undecidable even though both are
+        // objects.
+        let ty = resolve_conditional_branch(
+            &Atomic::TNamedObject {
+                fqcn: Name::new("Foo"),
+                type_params: empty_type_params(),
+            },
+            &Type::single(Atomic::TNamedObject {
+                fqcn: Name::new("Bar"),
+                type_params: empty_type_params(),
+            }),
+            &Type::single(Atomic::TInt),
+            &Type::single(Atomic::TString),
+        );
+        assert!(ty.is_none());
+    }
+
+    #[test]
+    fn resolve_conditional_enum_case_subject_widens() {
+        // An enum-case subject is refined: the value-class lattice cannot
+        // reduce a specific enum case, so an int argument is undecidable.
+        let ty = resolve_conditional_branch(
+            &Atomic::TLiteralEnumCase {
+                enum_fqcn: Name::new("RoundingMode"),
+                case_name: Name::new("Unnecessary"),
+            },
+            &Type::single(Atomic::TInt),
+            &Type::single(Atomic::TInt),
+            &Type::single(Atomic::TString),
+        );
+        assert!(ty.is_none());
+    }
+
+    #[test]
+    fn resolve_conditional_null_subject_bool_arg_false_branch() {
+        // `null` and bool are disjoint value classes.
+        let ty = resolve_conditional_branch(
+            &Atomic::TNull,
+            &Type::single(Atomic::TBool),
+            &Type::single(Atomic::TInt),
+            &Type::single(Atomic::TString),
+        );
+        assert!(matches!(
+            ty.as_ref(),
+            Some(t) if t.types.len() == 1 && matches!(t.types[0], Atomic::TString)
+        ));
+    }
+
+    #[test]
+    fn resolve_conditional_bool_subject_true_arg_then_branch() {
+        // `true` is contained in `bool`'s `{true, false}` classes, so
+        // the then branch is taken.
+        let ty = resolve_conditional_branch(
+            &Atomic::TBool,
+            &Type::single(Atomic::TTrue),
+            &Type::single(Atomic::TInt),
+            &Type::single(Atomic::TString),
+        );
+        assert!(matches!(
+            ty.as_ref(),
+            Some(t) if t.types.len() == 1 && matches!(t.types[0], Atomic::TInt)
+        ));
     }
 
     #[test]

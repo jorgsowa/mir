@@ -1050,12 +1050,8 @@
       <code><![CDATA[$value]]></code>
       <code><![CDATA[$value]]></code>
       <code><![CDATA[$value]]></code>
-      <code><![CDATA[$value]]></code>
       <code><![CDATA[$element]]></code>
     </MixedAssignment>
-    <PossiblyInvalidArgument>
-      <code><![CDATA[$key]]></code>
-    </PossiblyInvalidArgument>
   </file>
   <file src="src/Util/Json.php">
     <MixedAssignment>
