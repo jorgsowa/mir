@@ -80,6 +80,61 @@ fn propagate_readonly_prop_refinements(
     }
 }
 
+/// Pick the return type recorded on a closure/arrow function. Normally the
+/// declared return (`: T` native hint or `@return` docblock) wins, because
+/// a declared contract is what call sites may rely on. But when the body —
+/// fully visible at this expression — provably returns a narrower *string*
+/// than the declared string family, record the body's refined type instead:
+/// every value the closure can actually return is a body value, so the
+/// refinement is sound for call sites (e.g.
+/// `fn (string $n): string => 'prefix' . $n` provably returns
+/// `non-empty-string`, letting `array_map` yield `list<non-empty-string>`
+/// rather than `list<string>` — M19, B8 lineage).
+///
+/// The refinement is deliberately limited to the string family: B8/M19 is
+/// the `non-empty-string` lineage. A declared signature is never demoted to
+/// literal precision (`"hello"`), and `mixed`/`never`/object/array body
+/// types never replace the declared contract. When the body is not a subtype
+/// of the declared type (e.g. it returns `null` where the declaration does
+/// not allow it, or a different family), keep the declared one: the
+/// `InvalidReturnType`/`MixedReturnStatement` emitted for the mismatch
+/// already covers it, and call sites must not see a value domain the
+/// declared contract does not promise. Always-diverging bodies (`never`)
+/// are likewise left alone: recording `never` changes call-site typing in
+/// a way a refinement of the declared contract does not.
+fn refined_closure_return(
+    db: &dyn crate::db::MirDatabase,
+    return_ty_hint: Option<Type>,
+    inferred_return: Type,
+) -> Type {
+    let refines = return_ty_hint
+        .as_ref()
+        .filter(|declared| {
+            is_string_family(declared)
+                && is_string_family(&inferred_return)
+                && !inferred_return.contains(|a| matches!(a, Atomic::TLiteralString(_)))
+                && crate::subtype::is_subtype(db, &inferred_return, declared)
+        })
+        .is_some();
+    if refines {
+        inferred_return
+    } else {
+        return_ty_hint.unwrap_or(inferred_return)
+    }
+}
+
+/// String family: every atom is a string variant (a `null` in the union is
+/// tolerated; the final subtype check decides whether it is allowed by the
+/// declared type). `mixed`, `never`, scalars, objects, and arrays fail, so
+/// this predicate alone keeps the refinement inside the B8/M19 lineage.
+fn is_string_family(ty: &Type) -> bool {
+    !ty.types.is_empty()
+        && ty
+            .types
+            .iter()
+            .all(|a| a.is_string() || matches!(a, Atomic::TNull))
+}
+
 impl<'a> ExpressionAnalyzer<'a> {
     /// Local type aliases (`@psalm-type`/`@phpstan-type`) declared in the
     /// enclosing class-like's (or, for a closure declared inside a free
@@ -450,7 +505,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
         }
 
-        let return_ty = return_ty_hint.unwrap_or(inferred_return);
+        let return_ty = refined_closure_return(self.db, return_ty_hint, inferred_return);
         let closure_params: Box<[mir_types::atomic::FnParam]> = params
             .iter()
             .map(|p| mir_types::atomic::FnParam {
@@ -716,7 +771,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
         }
 
-        let return_ty = return_ty_hint.unwrap_or(inferred_return);
+        let return_ty = refined_closure_return(self.db, return_ty_hint, inferred_return);
         let closure_params: Box<[mir_types::atomic::FnParam]> = params
             .iter()
             .map(|p| mir_types::atomic::FnParam {

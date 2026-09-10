@@ -653,9 +653,8 @@ pub(super) fn infer_const_value(
 /// look "impossible". Widen to the constant's own base scalar type instead.
 fn widen_environment_dependent_constant(name: &str, inferred: Type) -> Type {
     match name {
-        "PHP_OS" | "PHP_OS_FAMILY" | "PHP_SAPI" | "DIRECTORY_SEPARATOR" => {
-            Type::single(Atomic::TString)
-        }
+        "PHP_OS" | "PHP_OS_FAMILY" | "PHP_SAPI" => Type::single(Atomic::TString),
+        "DIRECTORY_SEPARATOR" => Type::single(Atomic::TNonEmptyString),
         "PHP_INT_SIZE" => Type::single(Atomic::TInt),
         _ => inferred,
     }
