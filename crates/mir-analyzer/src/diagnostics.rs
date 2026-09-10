@@ -426,6 +426,16 @@ pub(crate) fn is_pseudo_type(name: &str) -> bool {
     crate::util::is_native_type_name(name)
 }
 
+/// Wide docblock gate: `is_pseudo_type` extended with the parser's full
+/// keyword table (`interface-string`, `int-mask`, `class-string-map`, …).
+/// Docblock keywords that survive parsing as a `TNamedObject` (backslash-
+/// qualified spellings, raw `@throws` strings) must not reach `class_exists`.
+/// Code-side checks (native type hints) keep `is_pseudo_type`: `Integer`,
+/// `List`, … are legal class names in code, so the narrow gate stays there.
+pub(crate) fn is_docblock_keyword(name: &str) -> bool {
+    is_pseudo_type(name) || crate::parser::docblock::is_docblock_type_keyword(name)
+}
+
 // ---------------------------------------------------------------------------
 // Expression class checking
 // ---------------------------------------------------------------------------

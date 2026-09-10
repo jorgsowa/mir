@@ -24,22 +24,111 @@ fn associative_array_type(key: Type, value: Type) -> Type {
 }
 
 fn arraylike_object_type(key: Type, value: Type) -> Type {
+    // The internal interfaces are written with a leading backslash so the
+    // collector's namespace resolution keeps them global. `Name::from`
+    // without one would be qualified against the docblock's namespace
+    // (e.g. `App\Countable` in a namespaced file) and the existence check
+    // would flag the keyword expansion itself as an undefined class.
+    // `Countable` in particular is excluded from
+    // `is_global_builtin_docblock_class` (a name users commonly redeclare
+    // locally), so the backslash is the only thing that pins it global.
     Type::single(Atomic::TIntersection {
         parts: mir_types::union::vec_to_type_params(vec![
             Type::single(Atomic::TNamedObject {
-                fqcn: mir_types::Name::from("ArrayAccess"),
+                fqcn: mir_types::Name::from("\\ArrayAccess"),
                 type_params: mir_types::union::vec_to_type_params(vec![key.clone(), value.clone()]),
             }),
             Type::single(Atomic::TNamedObject {
-                fqcn: mir_types::Name::from("Countable"),
+                fqcn: mir_types::Name::from("\\Countable"),
                 type_params: Default::default(),
             }),
             Type::single(Atomic::TNamedObject {
-                fqcn: mir_types::Name::from("Traversable"),
+                fqcn: mir_types::Name::from("\\Traversable"),
                 type_params: mir_types::union::vec_to_type_params(vec![key, value]),
             }),
         ]),
     })
+}
+
+/// Docblock type keywords/pseudo-types — never class names.
+///
+/// The single source of truth for "docblock type keyword": consulted by
+/// `parse_type_string`/`parse_generic` (keyword vs. class), `validate`
+/// (template/`self`/class-string), `collector::is_php_builtin_type`, and the
+/// `diagnostics::is_docblock_keyword` gate (skips namespace-qualification and
+/// `class_exists` probing). Entries are native types, keywords, and hyphenated
+/// Psalm pseudo-types — all reserved: a class cannot legally contain a hyphen,
+/// and the bare spellings are PHP keywords.
+pub(crate) const DOCBLOCK_TYPE_KEYWORDS: &[&str] = &[
+    "$this",
+    "array",
+    "array-key",
+    "arraylike-object",
+    "associative-array",
+    "bool",
+    "boolean",
+    "callable",
+    "callable-string",
+    "class-string",
+    "class-string-map",
+    "double",
+    "empty",
+    "enum-string",
+    "false",
+    "float",
+    "int",
+    "int-mask",
+    "int-mask-of",
+    "integer",
+    "interface-string",
+    "iterable",
+    "key-of",
+    "list",
+    "literal-int",
+    "literal-string",
+    "lowercase-string",
+    "mixed",
+    "never",
+    "never-return",
+    "never-returns",
+    "no-return",
+    "negative-int",
+    "non-empty-array",
+    "non-empty-lowercase-string",
+    "non-empty-list",
+    "non-empty-string",
+    "non-empty-uppercase-string",
+    "non-falsy-string",
+    "non-negative-int",
+    "null",
+    "numeric",
+    "numeric-string",
+    "object",
+    "parent",
+    "positive-int",
+    "pure-callable",
+    "pure-closure",
+    "resource",
+    "scalar",
+    "self",
+    "static",
+    "string",
+    "trait-string",
+    "true",
+    "truthy-string",
+    "uppercase-string",
+    "value-of",
+    "void",
+];
+
+/// Is `name` a docblock type keyword (see [`DOCBLOCK_TYPE_KEYWORDS`])?
+/// Case-insensitive, tolerating a leading `\` (`\int`); a global class name
+/// such as `\Foo` is not a keyword, so the strip cannot hide a real class.
+pub(crate) fn is_docblock_type_keyword(name: &str) -> bool {
+    let name = name.strip_prefix('\\').unwrap_or(name);
+    DOCBLOCK_TYPE_KEYWORDS
+        .iter()
+        .any(|k| *k == name.to_lowercase().as_str())
 }
 
 /// Parse an assertion annotation's type, recognizing the leading `!` negation
@@ -127,6 +216,14 @@ fn parse_shape_key(inner: &str) -> mir_types::ArrayKey {
 
 pub(crate) fn parse_type_string(s: &str) -> Type {
     let s = s.trim();
+    // Docblock keywords are legal with a leading global `\` (`@param \int $x`);
+    // class names cannot contain `-`, so a keyword is a keyword regardless.
+    let mut s = s;
+    if let Some(stripped) = s.strip_prefix('\\') {
+        if is_docblock_type_keyword(stripped) {
+            s = stripped;
+        }
+    }
 
     // Nullable shorthand: `?Type`
     if let Some(inner) = s.strip_prefix('?') {
@@ -248,6 +345,24 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         "interface-string" => Type::single(Atomic::TInterfaceString(None)),
         "trait-string" => Type::single(Atomic::TTraitString),
         "enum-string" => Type::single(Atomic::TEnumString),
+        "int-mask" | "int-mask-of" => Type::single(Atomic::TInt),
+        "class-string-map" => {
+            let mut t = Type::single(Atomic::TArray {
+                key: Box::new(Type::single(Atomic::TClassString(None))),
+                value: Box::new(Type::mixed()),
+            });
+            t.add_type(Atomic::TObject);
+            t
+        }
+        "non-empty-associative-array" => associative_array_type(Type::array_key(), Type::mixed()),
+        "non-empty-list" => Type::single(Atomic::TList {
+            value: Box::new(Type::mixed()),
+        }),
+        "arraylike-object" => {
+            let mut t = arraylike_object_type(Type::array_key(), Type::mixed());
+            t.add_type(Atomic::TObject);
+            t
+        }
         "int" | "integer" => Type::single(Atomic::TInt),
         // `literal-int`/`literal-string`: "any literal value of this kind",
         // used almost exclusively as a template bound (`@template T of
@@ -272,6 +387,10 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         "mixed" => Type::single(Atomic::TMixed),
         "object" => Type::single(Atomic::TObject),
         "array" => Type::single(Atomic::TArray {
+            key: Box::new(Type::array_key()),
+            value: Box::new(Type::mixed()),
+        }),
+        "non-empty-array" => Type::single(Atomic::TNonEmptyArray {
             key: Box::new(Type::array_key()),
             value: Box::new(Type::mixed()),
         }),
@@ -344,6 +463,10 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
             fqcn: mir_types::Name::from(""),
         }),
 
+        // A docblock keyword with no arm above (table/arms drift) is still a
+        // keyword — approximate as mixed, never a named class to resolve.
+        _ if is_docblock_type_keyword(s) => Type::mixed(),
+
         // Named class
         _ if !s.is_empty()
             && s.chars()
@@ -385,6 +508,17 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
 }
 
 pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
+    // A leading `\` marks a class name global, but keywords may legally
+    // carry one (`\int-mask<...>` — it stays a keyword, never a qualified
+    // class). Strip only for keywords: for a real class the backslash is
+    // the only thing keeping the name global, and losing it would let the
+    // collector re-qualify it against the docblock's namespace.
+    let mut name = name;
+    if let Some(stripped) = name.strip_prefix('\\') {
+        if is_docblock_type_keyword(stripped) {
+            name = stripped;
+        }
+    }
     match name.to_lowercase().as_str() {
         "array" => {
             let params = split_generics(inner);

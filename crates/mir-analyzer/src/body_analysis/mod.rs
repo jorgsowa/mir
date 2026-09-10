@@ -736,7 +736,7 @@ impl<'a> BodyAnalyzer<'a> {
         let (line_end, col_end) =
             crate::diagnostics::offset_to_line_col(source, span.end, source_map);
         for fqcn in throws {
-            if crate::diagnostics::is_pseudo_type(fqcn.as_ref()) {
+            if crate::diagnostics::is_docblock_keyword(fqcn.as_ref()) {
                 continue;
             }
             if !crate::db::class_exists(self.db, fqcn.as_ref()) {

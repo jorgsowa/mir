@@ -64,7 +64,7 @@ fn parse_arraylike_object_is_structural_intersection() {
             matches!(
                 t,
                 Atomic::TNamedObject { fqcn, type_params }
-                    if fqcn.as_ref() == "ArrayAccess" && type_params.len() == 2
+                    if fqcn.as_ref() == "\\ArrayAccess" && type_params.len() == 2
             )
         })
     }));
@@ -73,7 +73,7 @@ fn parse_arraylike_object_is_structural_intersection() {
             matches!(
                 t,
                 Atomic::TNamedObject { fqcn, type_params }
-                    if fqcn.as_ref() == "Countable" && type_params.is_empty()
+                    if fqcn.as_ref() == "\\Countable" && type_params.is_empty()
             )
         })
     }));
@@ -82,7 +82,7 @@ fn parse_arraylike_object_is_structural_intersection() {
             matches!(
                 t,
                 Atomic::TNamedObject { fqcn, type_params }
-                    if fqcn.as_ref() == "Traversable" && type_params.len() == 2
+                    if fqcn.as_ref() == "\\Traversable" && type_params.len() == 2
             )
         })
     }));
@@ -531,6 +531,9 @@ fn parse_empty_generic_iterable_graceful() {
 fn parse_empty_generic_non_empty_array_graceful() {
     let u = parse_type_string("non-empty-array<>");
     assert!(u.contains(|t| matches!(t, Atomic::TNonEmptyArray { .. })));
+    // Bare spelling (no `<>`): non-empty array of mixed.
+    let b = parse_type_string("non-empty-array");
+    assert!(b.contains(|t| matches!(t, Atomic::TNonEmptyArray { .. })));
 }
 
 #[test]
@@ -923,4 +926,59 @@ fn parse_param_line_byref_param_name_correct() {
     let (name, ty) = &parsed.params[0];
     assert_eq!(name, "out");
     assert!(ty.contains(|t| matches!(t, Atomic::TString)));
+}
+
+/// The keyword table is the single source of truth for "docblock type name,
+/// not a class": every bare entry must parse to a non-class, every
+/// generic-only entry must dispatch through `parse_generic`. Fails if a
+/// parser arm recognizes a keyword missing from the table (it would then be
+/// namespace-qualified / class-existence-checked as a class).
+#[test]
+fn every_keyword_table_entry_parses_as_a_keyword() {
+    for kw in super::types::DOCBLOCK_TYPE_KEYWORDS {
+        let ty = parse_type_string(kw);
+        assert!(
+            ty.types.iter().all(
+                |a| !matches!(
+                    a,
+                    Atomic::TNamedObject { fqcn, .. } if *fqcn == mir_types::Name::from(*kw)
+                )
+            ),
+            "table entry `{kw}` parses as a class named `{kw}` — add a match arm in parse_type_string/parse_generic",
+        );
+    }
+    for kw in [
+        "arraylike-object", "class-string-map", "int-mask", "int-mask-of",
+        "key-of", "non-empty-array", "non-empty-list", "value-of",
+    ] {
+        let ty = parse_type_string(&format!("{kw}<string>"));
+        assert!(
+            ty.types.iter().all(
+                |a| !matches!(
+                    a,
+                    Atomic::TNamedObject { fqcn, .. } if *fqcn == mir_types::Name::from(kw)
+                )
+            ),
+            "generic form of `{kw}` didn't dispatch to parse_generic",
+        );
+    }
+}
+
+/// A leading backslash on a docblock keyword means the same keyword, not a
+/// global class: class names cannot contain `-`, and the hyphen-free
+/// keywords are PHP reserved words, so nothing else can share the spelling.
+#[test]
+fn parse_backslash_qualified_keyword_stays_a_keyword() {
+    let u = parse_type_string(r"\interface-string");
+    assert!(u.contains(|t| matches!(t, Atomic::TInterfaceString(_))));
+    let u = parse_type_string(r"\int");
+    assert!(u.contains(|t| matches!(t, Atomic::TInt)));
+    // Non-keyword FQCNs are unaffected: `\MyClass` stays a class.
+    let c = parse_type_string(r"\MyClass");
+    assert!(
+        c.contains(|t| {
+            matches!(t, Atomic::TNamedObject { fqcn, .. } if *fqcn == mir_types::Name::from("\\MyClass"))
+        }),
+        "expected TNamedObject \\MyClass, got {c}"
+    );
 }

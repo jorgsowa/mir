@@ -199,51 +199,13 @@ pub(crate) fn preserve_native_nullability(native: &Type, mut doc: Type) -> Type 
     doc
 }
 
-/// Returns true for PHP built-in type keywords and Psalm pseudo-types that must never be
-/// namespace-qualified, even when they appear as TNamedObject (e.g. inside generic params).
+/// True for type keywords/pseudo-types that must never be namespace-
+/// qualified (even as TNamedObject, e.g. inside generic params). Delegates to
+/// the docblock parser's keyword table — single source of truth, a strict
+/// superset of the old hand-maintained list. Case-insensitive, tolerates
+/// one leading `\`.
 fn is_php_builtin_type(name: &str) -> bool {
-    matches!(
-        name,
-        "array"
-            | "associative-array"
-            | "bool"
-            | "callable"
-            | "false"
-            | "float"
-            | "int"
-            | "iterable"
-            | "list"
-            | "mixed"
-            | "never"
-            | "null"
-            | "object"
-            | "parent"
-            | "positive-int"
-            | "resource"
-            | "scalar"
-            | "self"
-            | "static"
-            | "string"
-            | "true"
-            | "void"
-            | "class-string"
-            | "int-mask"
-            | "int-mask-of"
-            | "key-of"
-            | "lowercase-string"
-            | "negative-int"
-            | "non-empty-array"
-            | "non-empty-list"
-            | "non-empty-string"
-            | "non-falsy-string"
-            | "numeric-string"
-            | "truthy-string"
-            | "value-of"
-            | "interface-string"
-            | "trait-string"
-            | "enum-string"
-            | "callable-string"
-    )
+    crate::parser::docblock::is_docblock_type_keyword(name)
 }
 
 /// Substitute alias names in `union` with their pre-built definitions.
@@ -2168,10 +2130,10 @@ impl<'a> DefinitionCollector<'a> {
         let throws = doc
             .throws
             .iter()
-            // See collector/function.rs's identical filter: a pseudo-type
-            // (`@throws void` meaning "doesn't throw") must be dropped BEFORE
-            // namespace-qualifying, or it's stored as a bogus throwable class.
-            .filter(|t| !crate::diagnostics::is_pseudo_type(t))
+            // See collector/function.rs's identical filter: docblock keywords
+            // (`@throws void` = "doesn't throw", `@throws int` ≈ int-mask) must
+            // be dropped BEFORE namespace-qualifying, or stored as bogus classes.
+            .filter(|t| !crate::diagnostics::is_docblock_keyword(t))
             .map(|t| {
                 Arc::from(resolution::resolve_name(t, &self.namespace, &self.use_aliases).as_str())
             })

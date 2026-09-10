@@ -761,3 +761,4 @@ use types::*;
 use validate::*;
 
 pub(crate) use types::parse_type_string;
+pub(crate) use types::is_docblock_type_keyword;

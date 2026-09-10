@@ -457,7 +457,7 @@ impl<'a> BodyAnalyzer<'a> {
             crate::diagnostics::offset_to_line_col(source, member_span.end, source_map);
         for atomic in &ty.types {
             if let mir_types::Atomic::TNamedObject { fqcn: cls_fqcn, .. } = atomic {
-                if crate::diagnostics::is_pseudo_type(cls_fqcn.as_ref()) {
+                if crate::diagnostics::is_docblock_keyword(cls_fqcn.as_ref()) {
                     continue;
                 }
                 if !crate::db::class_exists(self.db, cls_fqcn.as_ref()) {
@@ -609,7 +609,7 @@ impl<'a> BodyAnalyzer<'a> {
                 };
                 for atomic in &doc_ty.types {
                     if let mir_types::Atomic::TNamedObject { fqcn: cls_fqcn, .. } = atomic {
-                        if crate::diagnostics::is_pseudo_type(cls_fqcn.as_ref()) {
+                        if crate::diagnostics::is_docblock_keyword(cls_fqcn.as_ref()) {
                             continue;
                         }
                         self.check_and_record_docblock_class_at(
@@ -726,7 +726,7 @@ impl<'a> BodyAnalyzer<'a> {
         location: &mir_issues::Location,
         all_issues: &mut Vec<Issue>,
     ) {
-        if crate::diagnostics::is_pseudo_type(cls_fqcn) {
+        if crate::diagnostics::is_docblock_keyword(cls_fqcn) {
             return;
         }
         if !crate::db::class_exists(self.db, cls_fqcn) {

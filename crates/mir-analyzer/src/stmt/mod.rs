@@ -395,7 +395,7 @@ impl<'a> StatementsAnalyzer<'a> {
             // via a local `@var` assertion isn't falsely flagged UnusedClass.
             for atomic in &ann.ty.types {
                 if let Atomic::TNamedObject { fqcn, type_params } = atomic {
-                    if crate::diagnostics::is_pseudo_type(fqcn.as_ref()) {
+                    if crate::diagnostics::is_docblock_keyword(fqcn.as_ref()) {
                         continue;
                     }
                     let (line, line_end, col_start, col_end) = self.span_to_location(stmt.span);
