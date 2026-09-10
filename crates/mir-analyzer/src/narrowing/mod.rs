@@ -1565,7 +1565,7 @@ pub fn narrow_from_condition(
                                 {
                                     if let ExprKind::String(method_name) = &method_value.kind {
                                         let method_lc = std::sync::Arc::from(
-                                            crate::util::php_ident_lowercase(method_name).as_str(),
+                                            crate::util::php_ident_lowercase(method_name),
                                         );
                                         ctx.method_exists_guards.insert((expr_key, method_lc));
                                     }

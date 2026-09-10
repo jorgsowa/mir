@@ -861,7 +861,7 @@ pub fn infer_file_return_types(db: &dyn MirDatabase, file: SourceFile) -> Inferr
         }
         for (fqcn, name, ty) in inferred.methods.iter() {
             let name_lower: Arc<str> = if name.bytes().any(|b| b.is_ascii_uppercase()) {
-                Arc::from(crate::util::php_ident_lowercase(name).as_str())
+                Arc::from(crate::util::php_ident_lowercase(name))
             } else {
                 name.clone()
             };

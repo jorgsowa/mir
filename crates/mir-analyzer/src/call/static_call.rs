@@ -1268,7 +1268,7 @@ impl CallAnalyzer {
                 .map(|key| {
                     ctx.method_exists_guards.contains(&(
                         key,
-                        Arc::from(crate::util::php_ident_lowercase(method_name).as_str()),
+                        Arc::from(crate::util::php_ident_lowercase(method_name)),
                     ))
                 })
                 .unwrap_or(false);

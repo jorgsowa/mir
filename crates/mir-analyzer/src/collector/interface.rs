@@ -164,7 +164,7 @@ impl<'a> DefinitionCollector<'a> {
                         &iface_template_params,
                     ) {
                         own_methods.insert(
-                            Arc::from(crate::util::php_ident_lowercase(&method.name).as_str()),
+                            Arc::from(crate::util::php_ident_lowercase(&method.name)),
                             Arc::new(method),
                         );
                     }

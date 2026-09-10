@@ -127,7 +127,7 @@ impl<'a> ClassAnalyzer<'a> {
             // Find parent definition (if any) — search ancestor chain
             let method_name_lower: Arc<str> = if method_name.bytes().any(|b| b.is_ascii_uppercase())
             {
-                Arc::from(crate::util::php_ident_lowercase(&method_name).as_str())
+                Arc::from(crate::util::php_ident_lowercase(&method_name))
             } else {
                 method_name.clone()
             };

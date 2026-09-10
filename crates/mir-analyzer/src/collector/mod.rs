@@ -1453,7 +1453,7 @@ impl<'a> DefinitionCollector<'a> {
             if method.name.is_empty() {
                 continue;
             }
-            let key = Arc::from(crate::util::php_ident_lowercase(&method.name).as_str());
+            let key = Arc::from(crate::util::php_ident_lowercase(&method.name));
             if own_methods.contains_key(&key) {
                 continue;
             }

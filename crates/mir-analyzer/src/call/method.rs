@@ -77,7 +77,7 @@ pub(crate) fn resolve_method_from_db(
     ) {
         let name = storage.name.clone();
         let name_lower = if name.bytes().any(|b| b.is_ascii_uppercase()) {
-            Arc::<str>::from(crate::util::php_ident_lowercase(&name).as_str())
+            Arc::<str>::from(crate::util::php_ident_lowercase(&name))
         } else {
             name.clone()
         };
@@ -1382,7 +1382,7 @@ fn resolve_method_return<'a>(
                 .map(|key| {
                     ctx.reflection_throws_guards.contains(&(
                         key,
-                        Arc::from(crate::util::php_ident_lowercase(method_name).as_str()),
+                        Arc::from(crate::util::php_ident_lowercase(method_name)),
                     ))
                 })
                 .unwrap_or(false);
@@ -1599,7 +1599,7 @@ fn resolve_method_return<'a>(
             .map(|key| {
                 ctx.method_exists_guards.contains(&(
                     key,
-                    Arc::from(crate::util::php_ident_lowercase(method_name).as_str()),
+                    Arc::from(crate::util::php_ident_lowercase(method_name)),
                 ))
             })
             .unwrap_or(false);
