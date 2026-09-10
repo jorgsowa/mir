@@ -329,7 +329,7 @@ impl AnalysisSession {
         // Wire the PHP version into the db before any SourceFile inputs are
         // registered — collect_file_definitions reads it for @since/@removed filtering.
         {
-            let version_str = Arc::from(php_version.to_string().as_str());
+            let version_str = Arc::from(php_version.to_string());
             self.db.salsa.write().set_php_version(version_str);
         }
 
@@ -376,7 +376,7 @@ pub fn analyze_source_with_options(source: &str, opts: &BatchOptions) -> Analysi
     let php_version = PhpVersion::LATEST;
     let file: Arc<str> = Arc::from("<source>");
     let mut db = MirDbStorage::default();
-    db.set_php_version(Arc::from(php_version.to_string().as_str()));
+    db.set_php_version(Arc::from(php_version.to_string()));
     crate::stubs::load_stubs_for_version(&mut db, php_version);
     // Register the file through the workspace registry (not a bare
     // `SourceFile::new`) so it lands in `all_source_files()` and the

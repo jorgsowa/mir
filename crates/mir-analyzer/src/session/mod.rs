@@ -422,7 +422,7 @@ impl AnalysisSession {
         let db = Arc::new(AnalyzerDb::new());
         db.salsa
             .write()
-            .set_php_version(Arc::from(php_version.to_string().as_str()));
+            .set_php_version(Arc::from(php_version.to_string()));
         Self {
             db,
             cache: None,
@@ -851,7 +851,7 @@ impl AnalysisSession {
         self.db
             .salsa
             .write()
-            .set_php_version(Arc::from(self.php_version.to_string().as_str()));
+            .set_php_version(Arc::from(self.php_version.to_string()));
         self.cache = Some(cache);
         self
     }
@@ -874,7 +874,7 @@ impl AnalysisSession {
         self.db
             .salsa
             .write()
-            .set_php_version(Arc::from(self.php_version.to_string().as_str()));
+            .set_php_version(Arc::from(self.php_version.to_string()));
         // Fold the user-stub fingerprint into the cache epoch. `with_user_stubs`
         // must run before this for it to be picked up (it does in `build_session`);
         // sessions without user stubs get 0, which is correct.

@@ -235,7 +235,7 @@ pub(crate) fn load_stubs(db: &mut MirDbStorage) {
 pub(crate) fn load_stubs_for_version(db: &mut MirDbStorage, php_version: PhpVersion) {
     // Wire the target version before registering any SourceFile inputs so
     // collect_file_definitions reads the right version for @since/@removed filtering.
-    db.set_php_version(Arc::from(php_version.to_string().as_str()));
+    db.set_php_version(Arc::from(php_version.to_string()));
     // Register each stub file's text as a salsa `SourceFile` input.
     // `find_class_like` / `find_function` resolve built-in PHP symbols by
     // routing through the `StubClassResolver` we install below.
