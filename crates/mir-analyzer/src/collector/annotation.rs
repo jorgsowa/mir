@@ -52,7 +52,9 @@ pub(super) fn emit_docblock_issues(
     source_map: &php_rs_parser::source_map::SourceMap,
     issues: &mut mir_issues::IssueBuffer,
 ) {
-    if php_version.is_some() || doc.invalid_annotations.is_empty() {
+    if php_version.is_some()
+        || (doc.invalid_annotations.is_empty() && doc.backslash_keyword_types.is_empty())
+    {
         return;
     }
     let lc = source_map.offset_to_line_col(span_start);
@@ -69,6 +71,37 @@ pub(super) fn emit_docblock_issues(
                 line_end: line,
                 col_start: 0,
                 col_end: 0,
+            },
+        );
+        issues.add(if suppressed { issue.suppress() } else { issue });
+    }
+    let suppressed = doc
+        .suppressed_issues
+        .iter()
+        .any(|s| s == "InvalidDocblockType");
+    for o in &doc.backslash_keyword_types {
+        // The docblock text's first line starts at the span's column
+        // (indented docblocks); later lines start at column 0.
+        let col = ((if o.line == 0 {
+            lc.col + o.col
+        } else {
+            o.col
+        })
+        .min(u16::MAX as u32)) as u16;
+        let token_line = line + o.line;
+        let issue = Issue::new(
+            IssueKind::InvalidDocblockType {
+                message: format!(
+                    "@{} backslash-qualified non-class type '{}' is not a fully qualified name",
+                    o.tag, o.token
+                ),
+            },
+            mir_issues::Location {
+                file: file.clone(),
+                line: token_line,
+                line_end: token_line,
+                col_start: col,
+                col_end: (col as u32 + o.token.len() as u32).min(u16::MAX as u32) as u16,
             },
         );
         issues.add(if suppressed { issue.suppress() } else { issue });

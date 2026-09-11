@@ -714,7 +714,7 @@ impl<'a> BodyAnalyzer<'a> {
         }
     }
 
-    /// `UndefinedDocblockClass`/`cls:` usage for a function or method's
+    /// `UndefinedThrowsDocblock`/`cls:` usage for a function or method's
     /// `@throws` docblock tags, attached at `span` (the declaration header —
     /// individual `@throws` tags carry no span of their own). `throws` is
     /// the collector-resolved, already-namespace-resolved list.
@@ -741,7 +741,7 @@ impl<'a> BodyAnalyzer<'a> {
             }
             if !crate::db::class_exists(self.db, fqcn.as_ref()) {
                 all_issues.push(Issue::new(
-                    mir_issues::IssueKind::UndefinedDocblockClass {
+                    mir_issues::IssueKind::UndefinedThrowsDocblock {
                         name: fqcn.to_string(),
                     },
                     mir_issues::Location {

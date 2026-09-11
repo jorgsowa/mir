@@ -95,6 +95,7 @@ pub(crate) fn issues_have_unresolved_names(issues: &[Issue]) -> bool {
                 | K::UndefinedTrait { .. }
                 | K::UndefinedTraitAliasMethod { .. }
                 | K::UndefinedDocblockClass { .. }
+                | K::UndefinedThrowsDocblock { .. }
                 | K::UndefinedAttributeClass { .. }
         )
     })

@@ -948,17 +948,21 @@ fn every_keyword_table_entry_parses_as_a_keyword() {
         );
     }
     for kw in [
-        "arraylike-object", "class-string-map", "int-mask", "int-mask-of",
-        "key-of", "non-empty-array", "non-empty-list", "value-of",
+        "arraylike-object",
+        "class-string-map",
+        "int-mask",
+        "int-mask-of",
+        "key-of",
+        "non-empty-array",
+        "non-empty-list",
+        "value-of",
     ] {
         let ty = parse_type_string(&format!("{kw}<string>"));
         assert!(
-            ty.types.iter().all(
-                |a| !matches!(
-                    a,
-                    Atomic::TNamedObject { fqcn, .. } if *fqcn == mir_types::Name::from(kw)
-                )
-            ),
+            ty.types.iter().all(|a| !matches!(
+                a,
+                Atomic::TNamedObject { fqcn, .. } if *fqcn == mir_types::Name::from(kw)
+            )),
             "generic form of `{kw}` didn't dispatch to parse_generic",
         );
     }
@@ -980,5 +984,35 @@ fn parse_backslash_qualified_keyword_stays_a_keyword() {
             matches!(t, Atomic::TNamedObject { fqcn, .. } if *fqcn == mir_types::Name::from("\\MyClass"))
         }),
         "expected TNamedObject \\MyClass, got {c}"
+    );
+}
+
+#[test]
+fn backslash_keyword_members_records_spanned_offenders() {
+    let doc = super::DocblockParser::parse(
+        "/**\n * @param \\int|\\string $a\n * @return \\INT\n * @var \\non-empty-array<int> $b\n */",
+    );
+    let entries: Vec<(&str, &str)> = doc
+        .backslash_keyword_types
+        .iter()
+        .map(|o| (o.tag.as_str(), o.token.as_str()))
+        .collect();
+    assert_eq!(
+        entries,
+        vec![
+            ("param", r"\int"),
+            ("param", r"\string"),
+            ("return", r"\INT"),
+            ("var", r"\non-empty-array<int>"),
+        ]
+    );
+    // The first offender sits on the docblock's second line, at the type's
+    // own column (`\int` sits at column 10 of the docblock's second line).
+    assert_eq!(
+        (
+            doc.backslash_keyword_types[0].line,
+            doc.backslash_keyword_types[0].col
+        ),
+        (1, 10)
     );
 }

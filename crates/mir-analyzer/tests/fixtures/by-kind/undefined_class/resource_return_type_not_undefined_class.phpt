@@ -9,4 +9,3 @@ function makeHandle(): resource {
     return fopen('php://memory', 'r');
 }
 ===expect===
-

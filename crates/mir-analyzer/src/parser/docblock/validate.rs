@@ -60,6 +60,42 @@ pub(super) fn validate_type_str(s: &str, tag: &str) -> Option<String> {
     None
 }
 
+/// Union members of `s` that write a docblock **type keyword** (a pseudo-type
+/// such as `int` — never a class) with a leading `\`, the fully-qualified
+/// class qualifier (`\int`, `?\string`, `\array<int, string>`, …). A keyword
+/// is not a class, so the backslash qualifies nothing: the spelling is not a
+/// fully qualified name. Members are returned verbatim, backslash included.
+/// `is_docblock_type_keyword` compares case-insensitively, so `\Int` is
+/// caught the same way.
+pub(super) fn backslash_keyword_members(s: &str) -> Vec<String> {
+    let mut offenders = Vec::new();
+    for part in split_union(s) {
+        // A nullable (`?`) or assertion-negation (`!`) prefix carries down to
+        // the member's type.
+        let mut p = part.trim();
+        while let Some(rest) = p.strip_prefix('?').or_else(|| p.strip_prefix('!')) {
+            p = rest.trim();
+        }
+        let Some(rest) = p.strip_prefix('\\') else {
+            continue;
+        };
+        // The type token ends at the first depth-0 whitespace (a parameter/
+        // variable name or free text may follow the type), and the base name
+        // ends at the first generic/callable/array/intersection opener:
+        // `\int`, `\array<int, string>`, `\int[]`, `\callable(): string`.
+        let base_token = extract_return_type(rest);
+        let base = base_token
+            .split(['<', '(', '[', '{', '&'])
+            .next()
+            .unwrap_or("")
+            .trim();
+        if !base.is_empty() && is_docblock_type_keyword(base) {
+            offenders.push(format!("\\{}", base_token));
+        }
+    }
+    offenders
+}
+
 /// Validates semantic constraints on generic type expressions like `int<min, max>` and `array<key, value>`.
 pub(super) fn validate_generic_semantics(s: &str, tag: &str) -> Option<String> {
     let (name, inner) = extract_generic_content(s)?;

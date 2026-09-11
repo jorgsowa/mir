@@ -659,6 +659,11 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/stmt/flow.rs`.
     /// Fixtures: `tests/fixtures/by-kind/missing_throws_docblock/`.
     MissingThrowsDocblock { class: String },
+    /// `@throws` declares an exception class that does not exist in the
+    /// workspace — the class the docblock promises to raise never was.
+    /// Emitted by `mir-analyzer/src/body_analysis/mod.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/undefined_throws_docblock/`.
+    UndefinedThrowsDocblock { name: String },
     /// Emitted by `mir-analyzer/src/stmt/expressions.rs`.
     /// Fixtures: `tests/fixtures/by-kind/implicit_to_string_cast/`.
     ImplicitToStringCast { class: String },
@@ -671,6 +676,13 @@ pub enum IssueKind {
     /// Emitted by `mir-analyzer/src/collector/annotation.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_docblock/`.
     InvalidDocblock { message: String },
+    /// A docblock type uses a leading `\` (the fully-qualified class
+    /// qualifier) with a non-class type keyword (`\int`, `\string`, …): a
+    /// pseudo-type is never a class, so the backslash makes no sense and the
+    /// spelling is not a fully qualified name.
+    /// Emitted by `mir-analyzer/src/collector/annotation.rs`.
+    /// Fixtures: `tests/fixtures/by-kind/invalid_docblock_type/`.
+    InvalidDocblockType { message: String },
     /// Emitted by `mir-analyzer/src/call/args/types.rs`.
     /// Fixtures: `tests/fixtures/by-kind/mixed_argument/`.
     MixedArgument { param: String, fn_name: String },
@@ -902,7 +914,9 @@ impl IssueKind {
             | IssueKind::ImpossibleLooseComparison { .. }
             | IssueKind::DuplicateArrayKey { .. }
             | IssueKind::ForbiddenCode { .. }
-            | IssueKind::PropertyPossiblyUninitialized { .. } => Severity::Warning,
+            | IssueKind::PropertyPossiblyUninitialized { .. }
+            | IssueKind::UndefinedThrowsDocblock { .. }
+            | IssueKind::InvalidDocblockType { .. } => Severity::Warning,
 
             // PossiblyUndefined: shown at default error level (same as Warning)
             IssueKind::PossiblyUndefinedVariable { .. } => Severity::Warning,
@@ -1182,6 +1196,8 @@ impl IssueKind {
             IssueKind::MissingClosureReturnType => "MIR1105",
             IssueKind::MissingThrowsDocblock { .. } => "MIR1102",
             IssueKind::InvalidDocblock { .. } => "MIR1103",
+            IssueKind::UndefinedThrowsDocblock { .. } => "MIR1106",
+            IssueKind::InvalidDocblockType { .. } => "MIR1107",
 
             // Mixed (1200-1299)
             IssueKind::MixedArgument { .. } => "MIR1200",
@@ -1246,7 +1262,9 @@ impl IssueKind {
             | "MIR0300" | "MIR0301" | "MIR0302" | "MIR0303" | "MIR0404" | "MIR0405" | "MIR0408"
             | "MIR0500" | "MIR0506" | "MIR0703" | "MIR0710" | "MIR1301" | "MIR1501" | "MIR1502"
             | "MIR1700" | "MIR1701" | "MIR1702" | "MIR1703" | "MIR1704" | "MIR1705" | "MIR1706"
-            | "MIR1707" | "MIR1708" | "MIR1506" | "MIR1510" => Some(Severity::Warning),
+            | "MIR1707" | "MIR1708" | "MIR1506" | "MIR1510" | "MIR1106" | "MIR1107" => {
+                Some(Severity::Warning)
+            }
 
             // Info
             "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207" | "MIR0209"
@@ -1418,6 +1436,8 @@ impl IssueKind {
             IssueKind::ImplicitFloatToIntCast { .. } => "ImplicitFloatToIntCast",
             IssueKind::ParseError { .. } => "ParseError",
             IssueKind::InvalidDocblock { .. } => "InvalidDocblock",
+            IssueKind::UndefinedThrowsDocblock { .. } => "UndefinedThrowsDocblock",
+            IssueKind::InvalidDocblockType { .. } => "InvalidDocblockType",
             IssueKind::MixedArgument { .. } => "MixedArgument",
             IssueKind::MixedAssignment { .. } => "MixedAssignment",
             IssueKind::MixedMethodCall { .. } => "MixedMethodCall",
@@ -2017,6 +2037,12 @@ impl IssueKind {
             }
             IssueKind::ParseError { message } => format!("Parse error: {message}"),
             IssueKind::InvalidDocblock { message } => format!("Invalid docblock: {message}"),
+            IssueKind::UndefinedThrowsDocblock { name } => {
+                format!("@throws class '{name}' does not exist")
+            }
+            IssueKind::InvalidDocblockType { message } => {
+                format!("Invalid docblock type: {message}")
+            }
             IssueKind::MixedArgument { param, fn_name } => {
                 format!("Argument ${param} of {fn_name}() is mixed")
             }
@@ -2637,6 +2663,8 @@ mod code_tests {
             },
             IssueKind::MissingThrowsDocblock { class: s() },
             IssueKind::InvalidDocblock { message: s() },
+            IssueKind::UndefinedThrowsDocblock { name: s() },
+            IssueKind::InvalidDocblockType { message: s() },
             IssueKind::MixedArgument {
                 param: s(),
                 fn_name: s(),
@@ -2752,6 +2780,6 @@ mod code_tests {
     fn one_of_each_has_every_variant() {
         // If this assertion fires after you added a new variant, also add it
         // to `one_of_each()` so the uniqueness and shape tests cover it.
-        assert_eq!(one_of_each().len(), 158);
+        assert_eq!(one_of_each().len(), 160);
     }
 }

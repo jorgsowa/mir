@@ -7,4 +7,3 @@ suppress=UnusedFunction,UnusedParam
 <?php
 function takesResource(resource $value): void {}
 ===expect===
-
