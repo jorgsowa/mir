@@ -1172,6 +1172,8 @@ fn resolve_method_return<'a>(
                 too_many_arity_unknown,
                 template_params: &resolved.template_params,
                 no_named_arguments: resolved.no_named_arguments,
+                ctx,
+                args: &call.args,
             },
         );
 

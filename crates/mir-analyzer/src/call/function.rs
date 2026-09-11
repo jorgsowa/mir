@@ -210,6 +210,8 @@ impl CallAnalyzer {
                             too_many_arity_unknown: false,
                             template_params: &[],
                             no_named_arguments: false,
+                            ctx,
+                            args: &call.args,
                         },
                     );
                 } else if let Some(params) = extract_callable_params(&callee_ty, ea) {
@@ -854,6 +856,8 @@ impl CallAnalyzer {
                     too_many_arity_unknown: false,
                     template_params: &template_params,
                     no_named_arguments,
+                    ctx,
+                    args: &call.args,
                 },
             );
 

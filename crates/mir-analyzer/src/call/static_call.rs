@@ -802,6 +802,8 @@ impl CallAnalyzer {
                     too_many_arity_unknown: false,
                     template_params: &resolved.template_params,
                     no_named_arguments: resolved.no_named_arguments,
+                    ctx,
+                    args: &call.args,
                 },
             );
             // `self::`/`static::`/`parent::`/`$this::` forwarding a

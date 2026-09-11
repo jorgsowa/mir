@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use php_ast::owned::Arg;
 use php_ast::Span;
 
 use mir_codebase::definitions::{DeclaredParam, TemplateParam, Visibility};
@@ -7,6 +8,7 @@ use mir_issues::{IssueKind, Severity};
 use mir_types::{ArrayKey, Atomic, Name, Type};
 
 use crate::expr::ExpressionAnalyzer;
+use crate::flow_state::FlowState;
 
 mod counts;
 mod nullability;
@@ -52,6 +54,17 @@ pub struct CheckArgsParams<'a> {
     pub template_params: &'a [TemplateParam],
     /// True when the function/method is tagged `@no-named-arguments`.
     pub no_named_arguments: bool,
+    /// The call's own flow state — lets per-argument checks consult the
+    /// active `method_exists()`/`property_exists()` guards (the same
+    /// `FlowState::method_exists_guards` set the direct-call path in
+    /// `call/method.rs` suppresses `UndefinedMethod` with) for callable
+    /// *values* such as `[$obj, 'm']` / `'Class::m'`.
+    pub ctx: &'a FlowState,
+    /// The call's AST arguments, positionally aligned with `arg_types` /
+    /// `arg_spans`. A sole spread arg may be expanded into more `arg_types`
+    /// entries than there are actual args — lookups past the end simply
+    /// yield `None` and suppress nothing.
+    pub args: &'a [Arg],
 }
 
 // ---------------------------------------------------------------------------
@@ -430,6 +443,8 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
         too_many_arity_unknown,
         template_params,
         no_named_arguments,
+        ctx,
+        args,
     } = p;
 
     let bindings = counts::check_counts(
@@ -479,6 +494,13 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
                 raw_param_ty
             };
 
+            // The argument's own AST expression (when the binding maps onto
+            // a real positional argument) — lets the callable validations
+            // consult `method_exists()` guards on the callable's receiver.
+            // `arg_idx` can run past `args` for a sole spread arg expanded
+            // into per-element bindings; `.get` yields `None` there.
+            let arg_expr = args.get(*arg_idx).and_then(|a| a.value.as_ref());
+
             // types::check_one handles the full per-binding sequence: callable-sig validations,
             // null checks (via nullability::check_one), and type-compat checks.
             types::check_one(
@@ -490,6 +512,8 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
                 *arg_span,
                 *arg_idx,
                 template_params,
+                ctx,
+                arg_expr,
             );
         }
     }

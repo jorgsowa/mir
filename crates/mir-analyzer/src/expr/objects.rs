@@ -688,6 +688,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     too_many_arity_unknown: false,
                                     template_params: ctor_templates,
                                     no_named_arguments: *ctor_no_named_args,
+                                    ctx,
+                                    args: &n.args,
                                 },
                             );
                         }

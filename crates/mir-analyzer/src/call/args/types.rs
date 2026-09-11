@@ -1,5 +1,8 @@
+use std::sync::Arc;
+
 use rustc_hash::FxHashMap;
 
+use php_ast::owned::{Expr, ExprKind};
 use php_ast::Span;
 
 use mir_codebase::definitions::TemplateParam;
@@ -7,6 +10,7 @@ use mir_issues::{IssueKind, Severity};
 use mir_types::{Atomic, Name, Type};
 
 use crate::expr::ExpressionAnalyzer;
+use crate::flow_state::FlowState;
 
 fn type_exists(ea: &ExpressionAnalyzer<'_>, fqcn: &str) -> bool {
     crate::db::class_exists(ea.db, fqcn)
@@ -54,6 +58,8 @@ pub(crate) fn check_one(
     arg_span: Span,
     arg_idx: usize,
     template_params: &[TemplateParam],
+    ctx: &FlowState,
+    arg_expr: Option<&Expr>,
 ) {
     // Check typed callable signature compatibility when param type is
     // `callable(T1,T2,...):R` or the equivalent `Closure(T1,T2,...):R` docblock syntax —
@@ -85,11 +91,11 @@ pub(crate) fn check_one(
     let skip_validation =
         matches!(fn_name, "call_user_func" | "call_user_func_array") && arg_idx == 0;
     if !skip_validation {
-        validate_callable_argument(ea, param_ty, arg_ty, arg_span);
+        validate_callable_argument(ea, param_ty, arg_ty, arg_span, ctx, arg_expr);
     }
     validate_class_string_argument(ea, param_ty, arg_ty, arg_span);
     validate_interface_string_argument(ea, param_ty, arg_ty, arg_span);
-    validate_callable_type(ea, param_ty, arg_ty, arg_span);
+    validate_callable_type(ea, param_ty, arg_ty, arg_span, ctx, arg_expr);
 
     // A bare string literal passed where any parameter accepts `callable` is a
     // real runtime reference to the named function/method (register_shutdown_function,
@@ -1306,13 +1312,60 @@ fn array_list_compatible(arg_ty: &Type, param_ty: &Type, ea: &ExpressionAnalyzer
         })
     })
 }
+/// True when an active `method_exists()` guard (the `FlowState`
+/// `method_exists_guards` set the direct-call paths in `call/method.rs` and
+/// `call/static_call.rs` consult to suppress `UndefinedMethod` on
+/// `$obj->method()`) proves `method_name` exists on the receiver keyed by
+/// `guard_key` — the same lookup, extended to callable *values*
+/// (`[$obj, 'm']` / `'Class::m'` passed as arguments). Method names are
+/// case-insensitive, matching how the guards are recorded.
+fn method_exists_guarded(ctx: &FlowState, guard_key: &Arc<str>, method_name: &str) -> bool {
+    ctx.method_exists_guards.contains(&(
+        guard_key.clone(),
+        Arc::from(crate::util::php_ident_lowercase(method_name)),
+    ))
+}
 
+/// The `method_exists()` guard key of the *receiver* of an array callable
+/// argument (`[receiver, 'method']`) — taken only from the array literal's
+/// own first element (list position `0`, implicit or explicit). `None` for
+/// any other argument shape (a variable holding the callable, a non-array,
+/// or a receiver too complex for `extract_expr_guard_key` to key) —
+/// conservative: no suppression. A guard recorded against some other element
+/// of the array can therefore never count.
+fn array_callable_guard_key(
+    ea: &ExpressionAnalyzer<'_>,
+    ctx: &FlowState,
+    arg_expr: Option<&Expr>,
+) -> Option<Arc<str>> {
+    let ExprKind::Array(items) = &arg_expr?.kind else {
+        return None;
+    };
+    let element = items
+        .iter()
+        .find(|item| is_list_position_zero(item.key.as_ref()))?;
+    crate::narrowing::extract_expr_guard_key(&element.value, ctx, ea.db, &ea.file)
+}
+
+/// True when an array literal element occupies list position `0` — an
+/// implicit key (`[$obj, 'm']`) or an explicit `0` / `'0'` key. That slot
+/// is the callable's receiver; an element in any other position is not.
+fn is_list_position_zero(key: Option<&Expr>) -> bool {
+    match key.map(|k| &k.kind) {
+        None => true,
+        Some(ExprKind::Int(0)) => true,
+        Some(ExprKind::String(s)) => s.as_ref() == "0",
+        _ => false,
+    }
+}
 /// Validate callable arguments: check that string callables reference existing functions/methods
 fn validate_callable_argument(
     ea: &mut ExpressionAnalyzer<'_>,
     param_ty: &Type,
     arg_ty: &Type,
     arg_span: Span,
+    ctx: &FlowState,
+    arg_expr: Option<&Expr>,
 ) {
     // Only validate if parameter is callable or documented as callable-string
     if !param_ty.contains(|t| matches!(t, Atomic::TCallable { .. } | Atomic::TCallableString)) {
@@ -1359,14 +1412,31 @@ fn validate_callable_argument(
                 // Class exists, check if method exists
                 let here = crate::db::Fqcn::interned(ea.db, Name::from(resolved_class.as_str()));
                 if crate::db::find_method_in_chain(ea.db, here, method_name).is_none() {
-                    ea.emit(
-                        IssueKind::UndefinedMethod {
-                            class: resolved_class.clone(),
-                            method: method_name.to_string(),
-                        },
-                        Severity::Error,
-                        arg_span,
-                    );
+                    // A `method_exists(Class::class, 'method')` guard proves the
+                    // method at runtime — the same consultation the direct-call
+                    // path makes in `call/method.rs`, extended to the string
+                    // callable form. The key mirrors `extract_expr_guard_key`'s
+                    // `cls:` shape for `Foo::class` (the guard's receiver), built
+                    // from the same `resolve_name` call, so it matches the
+                    // recorded guard. Only a literal string is consulted — a
+                    // variable whose type merely infers to this literal could
+                    // have been assigned from anywhere.
+                    let guarded = matches!(arg_expr.map(|e| &e.kind), Some(ExprKind::String(_)))
+                        && method_exists_guarded(
+                            ctx,
+                            &Arc::from(format!("cls:{resolved_class}").as_str()),
+                            method_name,
+                        );
+                    if !guarded {
+                        ea.emit(
+                            IssueKind::UndefinedMethod {
+                                class: resolved_class.clone(),
+                                method: method_name.to_string(),
+                            },
+                            Severity::Error,
+                            arg_span,
+                        );
+                    }
                 }
             }
         } else {
@@ -1502,6 +1572,8 @@ fn validate_callable_type(
     param_ty: &Type,
     arg_ty: &Type,
     arg_span: Span,
+    ctx: &FlowState,
+    arg_expr: Option<&Expr>,
 ) {
     // Only validate if parameter expects callable
     let is_callable = param_ty.contains(|t| matches!(t, Atomic::TCallable { .. }));
@@ -1571,14 +1643,26 @@ fn validate_callable_type(
                                 Name::from(resolved_class.as_str()),
                             );
                             if crate::db::find_method_in_chain(ea.db, here, method_name).is_none() {
-                                ea.emit(
-                                    IssueKind::UndefinedMethod {
-                                        class: resolved_class.clone(),
-                                        method: method_name.to_string(),
-                                    },
-                                    Severity::Error,
-                                    arg_span,
-                                );
+                                // A `method_exists(receiver, 'method')` guard on the
+                                // callable's own receiver proves the method at
+                                // runtime — the direct-call twin of the suppression
+                                // in `call/method.rs` (which consults the same
+                                // `method_exists_guards` set for `$obj->method()`),
+                                // now extended to array callables passed by value.
+                                let guarded = array_callable_guard_key(ea, ctx, arg_expr)
+                                    .is_some_and(|key| {
+                                        method_exists_guarded(ctx, &key, method_name)
+                                    });
+                                if !guarded {
+                                    ea.emit(
+                                        IssueKind::UndefinedMethod {
+                                            class: resolved_class.clone(),
+                                            method: method_name.to_string(),
+                                        },
+                                        Severity::Error,
+                                        arg_span,
+                                    );
+                                }
                             }
                         }
                     }
