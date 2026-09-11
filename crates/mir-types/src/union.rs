@@ -1589,11 +1589,7 @@ fn resolve_conditional_branch(
         return None;
     }
     let subject_classes = value_classes(subject);
-    let arg_classes: Vec<ValueClass> = arg_ty
-        .types
-        .iter()
-        .flat_map(value_classes)
-        .collect();
+    let arg_classes: Vec<ValueClass> = arg_ty.types.iter().flat_map(value_classes).collect();
     if arg_classes.is_empty() {
         // Opaque argument (template, `key-of`, …) — no branch is ruled out.
         return None;
@@ -2943,15 +2939,13 @@ mod tests {
             Type::single(Atomic::TInt),
             Type::single(Atomic::TString),
         ));
-        let false_arg = ty
-            .clone()
-            .resolve_conditional_returns(|name| {
-                if name == "x" {
-                    Some(Type::single(Atomic::TFalse))
-                } else {
-                    None
-                }
-            });
+        let false_arg = ty.clone().resolve_conditional_returns(|name| {
+            if name == "x" {
+                Some(Type::single(Atomic::TFalse))
+            } else {
+                None
+            }
+        });
         assert_eq!(false_arg.types.len(), 1);
         assert!(matches!(false_arg.types[0], Atomic::TString));
 

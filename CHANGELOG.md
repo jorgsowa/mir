@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.73.0] - 2026-09-11
+
+### Added
+
+- **Undefined `@throws` warnings:** nonexistent classes referenced by
+  `@throws` now produce the warning-level `UndefinedThrowsDocblock`
+  diagnostic (`MIR1106`) and are visible in default output.
+- **Invalid qualified docblock type warnings:** PHP/docblock keywords written
+  with a leading backslash, such as `\int` or `\non-empty-array<int>`, now
+  produce `InvalidDocblockType` (`MIR1107`) at the offending token.
+- **Analyzer architecture roadmap:** documented the planned canonical-FQCN
+  migration and Salsa query/memory work, with compatibility boundaries,
+  benchmarks, risks, and staged success criteria.
+
+### Changed
+
+- **Unified docblock keyword handling:** the parser, collector, and
+  diagnostics now share a single case-insensitive keyword table, improving
+  support for aliases, refinements, and generic-only pseudo-types.
+- **String refinement inference:** `DIRECTORY_SEPARATOR` is typed as
+  `non-empty-string`, and captured closure return types preserve compatible
+  string refinements through calls such as `array_map`.
+- **Rust and parser dependencies:** updated the pinned Rust toolchain to
+  `1.98.1`, the PHP parser crates to `0.19.2`, and refreshed workspace
+  dependencies.
+- **Release version sync:** bumped the workspace and internal crate dependency
+  versions to `0.73.0` and refreshed `Cargo.lock` to match.
+
+### Fixed
+
+- **PHP 8.4 property-hook initialization:** get-only hooked properties are
+  treated as virtual, while properties with both get and set hooks still
+  require backing-property initialization.
+- **Array key inference:** keys from bare-array static properties and
+  `get_defined_constants()` are narrowed instead of remaining overly broad.
+- **Docblock class resolution:** keyword aliases and refinements no longer
+  trigger spurious undefined-class diagnostics, while genuinely
+  fully-qualified class names continue to resolve correctly.
+- **Cache temp-file naming:** cache temporary files no longer depend on
+  obtaining a process ID.
+
+### Performance
+
+- **Interned string allocation:** lowercased identifier and PHP-version
+  strings now move directly into `Arc<str>`, avoiding a redundant allocation
+  and copy.
+- **Interactive regression coverage:** added latency checks for warm-cache
+  definition, reference, hover, and unchanged-tree reindex paths.
+
 ## [0.72.1] - 2026-08-30
 
 ### Added

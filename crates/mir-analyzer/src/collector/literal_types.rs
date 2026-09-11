@@ -179,9 +179,7 @@ impl WriteScanner {
                     let prop = single_name(&sp.member);
                     match (prop, self.resolve_class(&sp.class)) {
                         (Some(prop), Some(class)) => {
-                            self.out
-                                .writes
-                                .insert((class, prop.to_lowercase()));
+                            self.out.writes.insert((class, prop.to_lowercase()));
                         }
                         _ => self.out.unresolved = true,
                     }
@@ -386,9 +384,7 @@ pub(super) fn refine_static_array_default(
         && is_static
         && !writes.unresolved
         && refined.is_some()
-        && declared
-            .as_ref()
-            .is_some_and(is_bare_array)
+        && declared.as_ref().is_some_and(is_bare_array)
         && !writes
             .writes
             .contains(&(fqcn.to_lowercase(), prop.to_lowercase()));
