@@ -82,12 +82,7 @@ pub(super) fn emit_docblock_issues(
     for o in &doc.backslash_keyword_types {
         // The docblock text's first line starts at the span's column
         // (indented docblocks); later lines start at column 0.
-        let col = ((if o.line == 0 {
-            lc.col + o.col
-        } else {
-            o.col
-        })
-        .min(u16::MAX as u32)) as u16;
+        let col = ((if o.line == 0 { lc.col + o.col } else { o.col }).min(u16::MAX as u32)) as u16;
         let token_line = line + o.line;
         let issue = Issue::new(
             IssueKind::InvalidDocblockType {
