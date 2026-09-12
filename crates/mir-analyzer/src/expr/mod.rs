@@ -359,9 +359,15 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // the literal happens to be spelled as a heredoc.
                 let mut literal = String::new();
                 let mut all_literal = true;
+                let mut any_non_empty_literal = false;
                 for part in parts.iter() {
                     match part {
-                        php_ast::owned::StringPart::Literal(s) => literal.push_str(s),
+                        php_ast::owned::StringPart::Literal(s) => {
+                            if !s.is_empty() {
+                                any_non_empty_literal = true;
+                            }
+                            literal.push_str(s);
+                        }
                         php_ast::owned::StringPart::Expr(e) => {
                             all_literal = false;
                             let expr_ty = self.analyze(e, ctx);
@@ -371,6 +377,12 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
                 if all_literal {
                     Type::single(Atomic::TLiteralString(literal.into()))
+                } else if any_non_empty_literal {
+                    // A non-empty literal part stays in the result no matter how
+                    // the embedded expressions coerce to string, so the whole
+                    // string is guaranteed non-empty — same rule as `.`
+                    // concatenation (`is_non_empty_when_concat` in binary.rs).
+                    Type::single(Atomic::TNonEmptyString)
                 } else {
                     Type::single(Atomic::TString)
                 }
