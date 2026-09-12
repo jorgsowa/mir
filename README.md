@@ -68,6 +68,17 @@ mir --baseline baseline.xml src/  # suppress known issues
 
 See the [CLI reference](https://jorgsowa.github.io/mir/reference/cli/) for all flags and options.
 
+### GitHub Actions
+
+Use the [mir GitHub Action](https://github.com/jorgsowa/mir-action) to run
+analysis in your workflow:
+
+```yaml
+- uses: jorgsowa/mir-action@v1
+  with:
+    path: src
+```
+
 ### Suppressing issues inline
 
 Use `@mir-ignore`, `@mir-ignore-next-line`, or `@mir-ignore-file` to suppress a
