@@ -1,9 +1,5 @@
 ===description===
-G11: `instanceof` type-guard narrowing never used to apply to array-offset
-expressions — only plain variables and property accesses had a narrowing
-arm. `$arr['item'] instanceof Foo` (a literal-keyed shape access) must
-narrow the key's own stored type the same way `$this->item instanceof Foo`
-already does, so a later read of the same key sees only `Foo`.
+`instanceof` narrows literal array offsets.
 ===file===
 <?php
 class Foo { public function fooOnly(): void {} }

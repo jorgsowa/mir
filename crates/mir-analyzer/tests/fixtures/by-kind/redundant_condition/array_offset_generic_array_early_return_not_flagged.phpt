@@ -1,10 +1,5 @@
 ===description===
-L3, narrowing-divergence side: without the `possibly_absent_offset` fix,
-`if ($row === null) { return; }` on a generic-array offset read was treated
-as an impossible/dead branch (the stored type never literally includes
-`null`), producing both a condition-level diagnostic and (via
-`narrow_var_null`'s divergence marking) a dead-branch one on the `return;`
-itself. Neither should fire once presence is correctly treated as unproven.
+Early returns for null generic array reads are allowed.
 ===config===
 suppress=UnusedParam
 ===file===

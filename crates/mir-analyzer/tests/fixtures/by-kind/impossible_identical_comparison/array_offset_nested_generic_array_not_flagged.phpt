@@ -1,7 +1,5 @@
 ===description===
-L3, nested generic arrays: both the outer and the inner offset read are
-individually uncertain (`array<string, array<string,int>>`), so a null
-check on either level's read must not be flagged.
+Null comparisons on nested generic array reads are allowed.
 ===config===
 suppress=UnusedVariable,UnusedParam
 ===file===

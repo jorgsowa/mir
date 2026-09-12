@@ -1,10 +1,5 @@
 ===description===
-G11, false-branch/early-return forms of `instanceof` narrowing on a
-literal-keyed array-offset access. `negatedGuard` proves presence via the
-negated form (`!(... instanceof Foo)` + early return); `earlyReturnOnMatch`
-proves the OPPOSITE fact (returning when it DOES match `Foo` excludes `Foo`
-from the fall-through, so a `Foo`-only method call afterwards must still be
-flagged — proving the exclusion is real, not just "narrowing never fires").
+Negated and early-return `instanceof` guards narrow array offsets correctly.
 ===file===
 <?php
 class Foo { public function fooOnly(): void {} }

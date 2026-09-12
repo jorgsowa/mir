@@ -1,6 +1,5 @@
 ===description===
-G11, nested path: `$arr['a']['b'] instanceof Foo` (two literal keys deep)
-must narrow the innermost key, same as the single-level case.
+`instanceof` narrows nested array offsets.
 ===file===
 <?php
 class Foo { public function fooOnly(): void {} }

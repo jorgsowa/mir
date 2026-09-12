@@ -1,7 +1,5 @@
 ===description===
-G11, more of the `type_fn_narrowed` family on array offsets: `is_int()`'s
-true branch and `is_null()`'s false branch (which proves non-null the same
-way a plain-variable/property receiver's false branch already does).
+`is_int()` and `!is_null()` narrow array-offset types.
 ===config===
 suppress=UnusedParam
 ===file===

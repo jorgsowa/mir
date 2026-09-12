@@ -1,7 +1,5 @@
 ===description===
-L3, dynamic-key variant: `$map[$k]` where `$k` isn't a compile-time literal
-is at least as uncertain about key presence as the literal-key case — must
-not be flagged either.
+Null comparisons on generic array reads with dynamic keys are allowed.
 ===config===
 suppress=UnusedVariable,UnusedParam
 ===file===
