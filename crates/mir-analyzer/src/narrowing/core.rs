@@ -365,11 +365,12 @@ pub(super) fn extract_var_name(expr: &php_ast::owned::Expr) -> Option<String> {
 
 /// Extract a compact key for simple expressions used as the first arg of
 /// `method_exists`/`property_exists`. Supports `$var` → `"var"`,
-/// `$var->prop` → `"var->prop"` (depth-1 only), and `Foo::class` → the
-/// resolved FQCN prefixed `"cls:"` (disjoint from the variable-key
-/// namespace, so a variable named e.g. `Foo` can never collide with a
-/// class-name guard). Returns `None` for anything more complex so we don't
-/// risk false-positive suppression.
+/// `$var->prop` → `"var->prop"` (depth-1 only), `Foo::class` and `'Foo'`
+/// literals → the resolved FQCN prefixed `"cls:"` (the two class-name forms
+/// are interchangeable and register the same key; `cls:` is disjoint from the
+/// variable-key namespace, so a variable named e.g. `Foo` can never collide
+/// with a class-name guard). Returns `None` for anything more complex so we
+/// don't risk false-positive suppression.
 pub(crate) fn extract_expr_guard_key(
     expr: &php_ast::owned::Expr,
     ctx: &FlowState,
@@ -405,6 +406,15 @@ pub(crate) fn extract_expr_guard_key(
                 return None;
             };
             let resolved = crate::db::resolve_name(db, file, class_name.as_ref());
+            Some(std::sync::Arc::from(format!("cls:{resolved}").as_str()))
+        }
+        // 'Foo\Bar' — a class name as a string literal (the form
+        // method_exists()/property_exists() take when the object can't be
+        // named as an expression). Resolved against the file's namespace
+        // exactly like the `Foo::class` form above, so both register the
+        // same `cls:` key.
+        ExprKind::String(s) => {
+            let resolved = crate::db::resolve_name(db, file, s.as_ref());
             Some(std::sync::Arc::from(format!("cls:{resolved}").as_str()))
         }
         _ => None,

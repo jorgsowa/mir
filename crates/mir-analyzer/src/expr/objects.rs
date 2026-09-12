@@ -689,6 +689,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                                     template_params: ctor_templates,
                                     no_named_arguments: *ctor_no_named_args,
                                     ctx,
+                                    receiver_fqcn: Some(fqcn.as_ref()),
                                     args: &n.args,
                                 },
                             );
@@ -702,6 +703,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         // constructor (`new self` / a named class still are).
                         && resolved.as_str() != "static"
                         && crate::db::class_exists(self.db, fqcn.as_ref())
+                        && !ctx.is_class_guarded(fqcn.as_ref())
                     {
                         // Class has no constructor but arguments were passed —
                         // PHP's implicit constructor accepts zero arguments.

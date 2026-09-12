@@ -1173,6 +1173,7 @@ fn resolve_method_return<'a>(
                 template_params: &resolved.template_params,
                 no_named_arguments: resolved.no_named_arguments,
                 ctx,
+                receiver_fqcn: Some(fqcn.as_ref()),
                 args: &call.args,
             },
         );
