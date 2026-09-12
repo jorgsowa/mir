@@ -1,8 +1,5 @@
 ===description===
-Valid PHP: a list built by appending subtype elements is a `list<Marker>`
-(AlphaMarker and BetaMarker both implement Marker). mir keeps the literal array
-shape `array{0: AlphaMarker, 1?: BetaMarker}` instead of widening to `list<Marker>`,
-so the declared `list<Marker>` return is reported as a mismatch.
+Lists built from subtype elements satisfy their shared base-type return.
 ===ignore===
 ===config===
 php_version=8.4

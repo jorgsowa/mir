@@ -1,7 +1,5 @@
 ===description===
-When a parent method's docblock uses a shadowable pseudotype alias that is
-also a real class in scope, inherited method calls must keep enforcing the
-class-resolved parameter type.
+Inherited methods retain class-resolved docblock parameter types.
 ===file===
 <?php
 namespace Regression\DocblockTypePrecedence;

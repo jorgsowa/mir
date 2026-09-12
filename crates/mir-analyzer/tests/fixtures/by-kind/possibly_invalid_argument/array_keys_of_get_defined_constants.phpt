@@ -1,7 +1,5 @@
 ===description===
-M7 path A: the get_defined_constants() stub declares its keys as `string`
-(`@return array<string, mixed>`), so array_keys() yields `string` keys
-and no PossiblyInvalidArgument is reported for string params.
+`array_keys(get_defined_constants())` returns string keys.
 ===config===
 suppress=ForbiddenCode
 ===file===

@@ -1,7 +1,5 @@
 ===description===
-Matching on a tagged-union array-shape discriminant must narrow the original
-shape union inside each arm, so variant-specific offset reads stay known and
-the match result preserves both arm-local value types.
+Tagged-union match arms narrow variant-specific array shapes.
 ===config===
 suppress=UnusedVariable
 ===file===

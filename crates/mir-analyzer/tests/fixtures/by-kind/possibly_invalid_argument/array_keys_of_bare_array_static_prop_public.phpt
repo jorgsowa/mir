@@ -1,7 +1,5 @@
 ===description===
-M7 negative: a *public* static bare-`array` property may be written from
-any other file, so it must NOT be refined from its literal initializer.
-Keys stay `int|string` and the possibly-invalid argument is reported.
+Public static arrays do not retain key types inferred from literal defaults.
 ===config===
 suppress=ForbiddenCode
 ===file===

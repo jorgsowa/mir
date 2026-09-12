@@ -1,7 +1,5 @@
 ===description===
-Refinement keywords in class property `@var` docblocks without a native type
-hint (`int-mask`, `non-empty-associative-array`, `class-string-map`) resolve
-as keywords, never as nonexistent classes.
+Refinement docblock keywords are not resolved as classes.
 ===config===
 suppress=MissingPropertyType
 ===file===

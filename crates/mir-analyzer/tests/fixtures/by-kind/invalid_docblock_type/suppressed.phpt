@@ -1,6 +1,5 @@
 ===description===
-`@psalm-suppress InvalidDocblockType` suppresses the warning for that
-docblock.
+Suppressing `InvalidDocblockType` hides the warning.
 ===config===
 suppress=UnusedParam
 ===file===

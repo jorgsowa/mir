@@ -1,6 +1,5 @@
 ===description===
-Phan's `associative-array` accepts a definitely non-list returned array with
-matching string keys and value types.
+`associative-array` accepts matching string-keyed return values.
 ===file===
 <?php
 /**

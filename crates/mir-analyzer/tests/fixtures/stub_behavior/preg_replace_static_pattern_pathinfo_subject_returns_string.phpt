@@ -1,7 +1,5 @@
 ===description===
-preg_replace with a valid static pattern and pathinfo's filename component returns
-a string, so it can initialize a string constructor property without an array
-alternative leaking from either call.
+`preg_replace()` with a static pattern and filename input returns a string.
 ===file===
 <?php
 final class Project {

@@ -1,6 +1,5 @@
 ===description===
-Phan's `associative-array` is distinct from a list, so returning a plain list
-does not satisfy the declaration.
+`associative-array` return types reject lists.
 ===file===
 <?php
 /**

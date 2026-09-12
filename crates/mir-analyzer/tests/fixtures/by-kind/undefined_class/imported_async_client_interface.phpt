@@ -1,5 +1,5 @@
 ===description===
-An imported async-client interface must resolve in a class implements list.
+Imported interfaces resolve in implements clauses.
 ===file===
 <?php
 namespace Http\Client;

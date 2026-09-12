@@ -1,8 +1,5 @@
 ===description===
-PHP only canonicalizes a string array key to int when the string is in the
-same integer spelling PHP itself would print: "0", "1", "1234", "-1", etc.
-Numeric-looking strings like "007", "+1", "-0", and "1.0" remain string
-keys, so shape inference must preserve that exact boundary.
+Only canonical integer strings become integer array keys.
 ===config===
 suppress=UnusedVariable,UnusedParam
 ===file===

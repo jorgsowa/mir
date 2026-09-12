@@ -1,6 +1,5 @@
 ===description===
-When a same-named class is in scope, a docblock `@param Integer` must resolve
-to that class rather than to the `integer` pseudo-type alias.
+Docblock types prefer matching in-scope classes over pseudotype aliases.
 ===file===
 <?php
 namespace Regression\DocblockTypePrecedence;

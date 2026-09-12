@@ -1,8 +1,5 @@
 ===description===
-A mutable (non-readonly, non-enum) object passed into an impure constructor from
-an immutable context MUST still be flagged: only native-readonly classes and enums
-are mutation-free by construction. This is the positive control guarding against
-over-suppression of case #2.
+Passing a mutable object to an impure constructor from an immutable context is invalid.
 ===config===
 suppress=MissingConstructor,InvalidReturnType
 ===file===

@@ -1,8 +1,5 @@
 ===description===
-An absolute parameter type must lazy-load its exact Composer PSR-4 class,
-even when another mapped namespace declares the same short class name. This
-guards php-lsp#253: member completion for `Zeta\\Widget` must expose
-`targetOnly`, never `Alpha\\Widget::decoyOnly`.
+Absolute parameter types resolve the exact class despite short-name collisions.
 ===file:composer.json===
 {
   "autoload": {

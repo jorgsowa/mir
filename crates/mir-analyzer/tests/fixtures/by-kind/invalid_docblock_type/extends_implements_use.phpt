@@ -1,7 +1,5 @@
 ===description===
-Generic-inheritance tags are checked too: a backslash-qualified keyword is
-invalid, while backslash-qualified real classes are valid fully qualified
-names.
+Inheritance tags reject backslash-qualified keywords but allow class names.
 ===file===
 <?php
 /**

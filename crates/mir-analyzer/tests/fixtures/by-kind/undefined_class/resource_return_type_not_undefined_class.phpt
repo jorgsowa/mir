@@ -1,6 +1,5 @@
 ===description===
-Legacy native `resource` in a return type position must not be treated as an
-undefined class while mir reports the underlying declaration error.
+Legacy `resource` return types are not undefined classes.
 ===config===
 suppress=UnusedFunction
 ===file===

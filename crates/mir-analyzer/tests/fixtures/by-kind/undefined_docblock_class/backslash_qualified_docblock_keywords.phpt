@@ -1,10 +1,5 @@
 ===description===
-Docblock keywords written with a leading backslash (`\int`,
-`\boolean`, `\interface-string`) are still keywords, not
-fully-qualified class names: the keyword lookup strips one leading
-backslash before the table check, and the same applies inside generic
-type arguments (`\int-mask<1, 2, 4>`). Each such spelling is also
-reported as an InvalidDocblockType warning.
+Backslash-qualified docblock keywords are not undefined classes and are invalid types.
 ===config===
 suppress=UnusedParam
 ===file===

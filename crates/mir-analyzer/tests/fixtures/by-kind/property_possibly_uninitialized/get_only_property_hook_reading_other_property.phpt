@@ -1,7 +1,5 @@
 ===description===
-Valid PHP 8.4: a get-only property whose `get =>` hook returns another property
-is never uninitialized — the value is computed on access and never stored, so mir
-does not report it as possibly uninitialized.
+Get-only computed properties are initialized on access.
 ===config===
 php_version=8.4
 ===file===

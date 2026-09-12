@@ -1,8 +1,5 @@
 ===description===
-M7 negative: a private static bare-`array` property that is *written*
-within the file (with different keys than the default) must NOT be
-refined from its literal initializer, so the keys stay `int|string`
-and the possibly-invalid argument is still reported.
+Written private static arrays do not retain key types inferred from defaults.
 ===config===
 suppress=ForbiddenCode
 ===file===

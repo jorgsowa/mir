@@ -1,5 +1,5 @@
 ===description===
-method_exists() guard suppresses UndefinedMethod for a [$obj, 'method'] array callable
+`method_exists()` suppresses undefined methods for guarded array callables.
 ===config===
 suppress=MissingReturnType
 ===file===

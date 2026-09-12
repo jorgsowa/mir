@@ -1,7 +1,5 @@
 ===description===
-Matching on a tagged-union array-shape discriminant should reuse the literal
-union inferred for that offset, so covering both tag literals is exhaustive
-without a default arm.
+Matching every tagged-union discriminant value is exhaustive.
 ===file===
 <?php
 /** @param array{type: 'a', foo: int}|array{type: 'b', bar: string} $x */

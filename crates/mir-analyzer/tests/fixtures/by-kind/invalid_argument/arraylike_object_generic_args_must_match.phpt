@@ -1,7 +1,5 @@
 ===description===
-The `arraylike-object<K, V>` spelling is only meaningful in its generic form,
-and those key/value args must participate in subtype matching rather than
-being treated like an untyped "some object".
+`arraylike-object` key and value arguments participate in subtype matching.
 ===config===
 suppress=MissingConstructor,UnusedParam
 ===file===

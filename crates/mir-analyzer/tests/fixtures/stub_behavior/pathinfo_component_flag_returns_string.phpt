@@ -1,5 +1,5 @@
 ===description===
-pathinfo with a literal component flag returns a string, not its all-components array shape.
+`pathinfo()` with a literal component flag returns a string.
 ===file===
 <?php
 final class FileName {

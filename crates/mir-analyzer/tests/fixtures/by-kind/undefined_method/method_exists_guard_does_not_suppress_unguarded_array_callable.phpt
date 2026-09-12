@@ -1,5 +1,5 @@
 ===description===
-Unguarded [Foo::class, 'method'] array callable still reports UndefinedMethod
+Unguarded array callables report undefined methods.
 ===config===
 suppress=MissingReturnType
 ===file===

@@ -1,5 +1,5 @@
 ===description===
-A string property assignment guarded against normalizer failure is valid.
+A normalizer failure guard permits string property assignment.
 ===file===
 <?php
 class Text {

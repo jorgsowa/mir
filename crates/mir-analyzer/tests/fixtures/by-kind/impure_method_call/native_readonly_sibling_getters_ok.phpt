@@ -1,7 +1,5 @@
 ===description===
-Unannotated instance methods of a PHP 8.2+ native readonly class are mutation-free
-by construction: the language forbids property reassignment after construction, so
-a sibling getter called from another method must not be flagged as ImpureMethodCall.
+Readonly-class methods are allowed in immutable contexts.
 ===file===
 <?php
 

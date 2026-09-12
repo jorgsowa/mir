@@ -1,7 +1,5 @@
 ===description===
-`arraylike-object<K, V>` must not degrade to accepting any object: a plain
-class that implements none of ArrayAccess/Countable/Traversable is still
-rejected.
+`arraylike-object` rejects objects without array-like capabilities.
 ===config===
 suppress=UnusedParam
 ===file===

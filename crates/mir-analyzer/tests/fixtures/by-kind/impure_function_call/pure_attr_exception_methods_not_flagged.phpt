@@ -1,6 +1,5 @@
 ===description===
-#[Pure]-marked stub methods (e.g. Exception::getCode) called inside a @pure
-function are not flagged as impure calls.
+Pure-marked methods are allowed in pure functions.
 ===file===
 <?php
 /** @pure */

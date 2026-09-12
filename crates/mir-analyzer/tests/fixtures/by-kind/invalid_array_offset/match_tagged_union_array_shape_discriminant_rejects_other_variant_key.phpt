@@ -1,6 +1,5 @@
 ===description===
-After matching on a tagged-union array-shape discriminant, reading the other
-variant's key inside an arm must still be rejected.
+Tagged-union match arms reject keys from other variants.
 ===config===
 suppress=UnusedVariable
 ===file===

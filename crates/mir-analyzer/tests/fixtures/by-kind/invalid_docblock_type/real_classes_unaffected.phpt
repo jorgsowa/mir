@@ -1,8 +1,5 @@
 ===description===
-Backslash-qualified REAL classes are valid fully qualified names and must
-not be flagged — nor must un-backslashed keywords. The info-level
-UndefinedDocblockClass (hidden without `--show-info`) still fires for the
-unresolvable `\Foo\Bar`.
+Fully qualified classes and unqualified keywords remain valid docblock types.
 ===config===
 suppress=UnusedParam
 ===file===

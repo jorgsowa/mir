@@ -1,10 +1,5 @@
 ===description===
-M19: a closure/arrow returning a provably non-empty `.` concat kept its
-declared `string` return, so `array_map` produced `list<string>` and was
-flagged InvalidArgument for a `list<non-empty-string>` parameter — the
-shape of phpunit's TestUI/TestSuiteFilterProcessor.php. The recorded
-closure/arrow return refines to non-empty-string when the declared type
-and the body are both string-family and the body is provably non-empty.
+`array_map()` preserves a callback's inferred non-empty-string return type.
 ===config===
 suppress=UnusedVariable,UnusedParam
 ===file===

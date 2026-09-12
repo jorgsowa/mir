@@ -1,5 +1,5 @@
 ===description===
-method_exists() guard does not suppress a variable holding the callable (its value may have been assigned elsewhere)
+`method_exists()` does not suppress callable variables.
 ===config===
 suppress=MissingReturnType
 ===file===

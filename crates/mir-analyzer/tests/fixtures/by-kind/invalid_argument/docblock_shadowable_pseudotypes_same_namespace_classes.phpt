@@ -1,6 +1,5 @@
 ===description===
-Shadowable docblock pseudotype aliases should resolve to same-namespace classes
-when those classes exist, rather than falling back to scalar pseudotypes.
+Docblock pseudotype aliases prefer matching classes in the same namespace.
 ===file===
 <?php
 namespace Regression\DocblockTypePrecedence;

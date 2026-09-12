@@ -1,5 +1,5 @@
 ===description===
-A backslash-qualified keyword as a `@template` bound is invalid.
+Template bounds reject backslash-qualified keywords.
 ===config===
 suppress=UnusedParam
 ===file===

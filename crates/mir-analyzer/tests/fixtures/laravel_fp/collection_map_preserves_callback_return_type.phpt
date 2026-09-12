@@ -1,7 +1,5 @@
 ===description===
-Regression (mir-labs): `Post::all()` builds its collection exclusively through
-`Post::fromFile()`. Its `map()` result must therefore retain `Post` as the
-collection value type, so `findBySlug()` returns `Post|null`, not `mixed`.
+`map()` preserves the callback's collection value type.
 ===config===
 suppress=MissingReturnType,MissingParamType,MissingPropertyType,UnusedParam
 ===file===

@@ -1,8 +1,5 @@
 ===description===
-Valid PHP: after `if (!$this->isAssigned()) { throw ...; }` the property
-`$this->value` is provably non-null. mir cannot narrow the property through the
-boolean-predicate method call, keeps `int|null`, and reports the `int` return as
-nullable.
+Predicate-method guards narrow properties before return.
 ===ignore===
 ===config===
 php_version=8.4
