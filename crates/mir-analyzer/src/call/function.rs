@@ -1368,6 +1368,12 @@ impl CallAnalyzer {
                             .map(Type::falsy_stripped)
                             .unwrap_or(return_ty)
                     }
+                    // pathinfo returns an array only when its optional flags argument is
+                    // omitted or explicitly requests every path component. Any other
+                    // literal flag selects a single component and therefore returns a
+                    // string.
+                    "pathinfo" => super::callable::pathinfo_return_type(&arg_types)
+                        .unwrap_or(return_ty),
                     // substr_replace: strip |array when $string is a scalar string.
                     "substr_replace" => {
                         super::callable::string_if_string_arg(&arg_types, 0).unwrap_or(return_ty)

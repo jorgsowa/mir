@@ -376,6 +376,20 @@ pub(crate) fn string_if_string_arg(arg_types: &[Type], idx: usize) -> Option<Typ
     }
 }
 
+/// `pathinfo()` returns an array only when all components are requested. A literal
+/// component flag selects one component and always returns a string.
+pub(crate) fn pathinfo_return_type(arg_types: &[Type]) -> Option<Type> {
+    const PATHINFO_ALL: i64 = 15;
+
+    let flags = arg_types.get(1)?;
+    match flags.types.as_slice() {
+        [Atomic::TLiteralInt(flag)] if *flag != PATHINFO_ALL => {
+            Some(Type::single(Atomic::TString))
+        }
+        _ => None,
+    }
+}
+
 /// Infer the return type of `number_format()`.
 ///
 /// `number_format()` always returns a non-empty string — even `number_format(0)`
