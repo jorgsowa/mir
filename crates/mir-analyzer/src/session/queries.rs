@@ -1161,8 +1161,8 @@ impl AnalysisSession {
     /// frontier short name get their definitions committed, so results are
     /// complete even before a background sweep has covered the workspace.
     /// That short-name gate is only candidate discovery; subtype identity is
-    /// still resolved from the edge index below (exact FQCN first, then the
-    /// index's written-form leniency when exact lookup has no hits).
+    /// still resolved from the edge index below using the exact canonical
+    /// FQCN.
     /// Committed files answer from the index with no parsing at all.
     ///
     /// `include_trait_users` also counts `use Trait;` composition as a
