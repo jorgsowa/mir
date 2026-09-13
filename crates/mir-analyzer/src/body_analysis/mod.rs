@@ -235,35 +235,43 @@ fn method_chain_signature(
     (Arc::from([]), None, vec![], Arc::from([]))
 }
 
-/// Resolve a function declaration's storage via the salsa pull path
-/// (qualified FQN → raw name → short-name postings from the workspace index).
+/// Resolve the storage for this exact function declaration.
+///
+/// The collector already records each declaration's canonical FQN and source
+/// range. Match the declaration by that range, then use the canonical function
+/// index for the actual lookup. A same-short-name function in another namespace
+/// is never a valid fallback for a declaration.
 fn lookup_function_node_for_decl(
     db: &dyn MirDatabase,
     file: &str,
-    fn_name: &str,
+    decl: &php_ast::owned::FunctionDecl,
+    source: &str,
+    source_map: &php_rs_parser::source_map::SourceMap,
 ) -> Option<(Arc<str>, Arc<mir_codebase::definitions::FunctionDef>)> {
-    let qualified = resolve_name(db, file, fn_name);
-    let try_lookup = |fqn: &str| -> Option<Arc<mir_codebase::definitions::FunctionDef>> {
-        crate::db::find_function(db, crate::db::Fqcn::from_str(db, fqn))
-    };
-    if let Some(f) = try_lookup(qualified.as_str()) {
-        return Some((Arc::from(qualified), f));
-    }
-    if let Some(f) = try_lookup(fn_name) {
-        return Some((Arc::from(fn_name), f));
-    }
-    let short_lower = if fn_name.bytes().any(|b| b.is_ascii_uppercase()) {
-        fn_name.to_ascii_lowercase()
-    } else {
-        fn_name.to_string()
-    };
-    for fqn in crate::db::workspace_index(db).functions_named(Name::new(&short_lower)) {
-        let fqn = fqn.as_str();
-        if let Some(f) = try_lookup(fqn) {
-            return Some((Arc::from(fqn), f));
-        }
-    }
-    None
+    let source_file = db.lookup_source_file(file)?;
+    let (body_line, body_col) =
+        crate::diagnostics::offset_to_line_col(source, decl.body.span.start, source_map);
+    let short_name = decl.name.as_deref().unwrap_or("");
+
+    let definition = crate::db::collect_file_definitions(db, source_file)
+        .slice
+        .functions
+        .iter()
+        .find(|definition| {
+            let Some(location) = definition.location.as_ref() else {
+                return false;
+            };
+            location.file.as_ref() == file
+                && definition.short_name.eq_ignore_ascii_case(short_name)
+                && (location.line < body_line
+                    || (location.line == body_line && location.col_start <= body_col))
+                && (location.line_end > body_line
+                    || (location.line_end == body_line && location.col_end >= body_col))
+        })?;
+
+    let fqn = Arc::clone(&definition.fqn);
+    crate::db::find_function(db, crate::db::Fqcn::from_str(db, fqn.as_ref()))
+        .map(|definition| (fqn, definition))
 }
 
 /// Build `DeclaredParam`s directly from the declaration AST when no storage match is

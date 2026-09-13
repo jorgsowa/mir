@@ -33,7 +33,6 @@ impl<'a> BodyAnalyzer<'a> {
                     .then_some(&mut *resolved_navigation_facts),
             );
         }
-        let fn_name = decl.name.as_deref().unwrap_or("").to_string();
         for param in decl.params.iter() {
             if let Some(hint) = &param.type_hint {
                 self.check_and_record_type_hint_classes(
@@ -64,7 +63,8 @@ impl<'a> BodyAnalyzer<'a> {
         }
         use crate::flow_state::FlowState;
         use crate::stmt::StatementsAnalyzer;
-        let resolved = lookup_function_node_for_decl(self.db, file.as_ref(), &fn_name);
+        let resolved =
+            lookup_function_node_for_decl(self.db, file.as_ref(), decl, source, source_map);
         let fqn = resolved.as_ref().map(|(f, _)| f.clone());
         #[allow(clippy::type_complexity)]
         let (params, return_ty, template_params, declared_throws): (
@@ -627,7 +627,6 @@ impl<'a> BodyAnalyzer<'a> {
 
         let mut issues: Vec<Issue> = Vec::new();
 
-        let fn_name = decl.name.as_deref().unwrap_or("").to_string();
         for param in decl.params.iter() {
             if let Some(hint) = &param.type_hint {
                 self.check_and_record_type_hint_classes(
@@ -662,7 +661,8 @@ impl<'a> BodyAnalyzer<'a> {
             );
         }
 
-        let resolved = lookup_function_node_for_decl(self.db, file.as_ref(), &fn_name);
+        let resolved =
+            lookup_function_node_for_decl(self.db, file.as_ref(), decl, source, source_map);
         if self.mode == AnalysisMode::Full {
             self.emit_missing_fn_types(
                 decl,
@@ -839,7 +839,8 @@ impl<'a> BodyAnalyzer<'a> {
             );
         }
 
-        let resolved = lookup_function_node_for_decl(self.db, file.as_ref(), &fn_name);
+        let resolved =
+            lookup_function_node_for_decl(self.db, file.as_ref(), decl, source, source_map);
         if self.mode == AnalysisMode::Full {
             self.emit_missing_fn_types(
                 decl,
