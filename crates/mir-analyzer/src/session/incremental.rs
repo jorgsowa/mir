@@ -390,27 +390,6 @@ impl AnalysisSession {
             .collect()
     }
 
-    /// Every class/interface/trait/enum in the workspace whose *own* short
-    /// (unqualified) name is exactly `short_name`, each paired with its FQCN
-    /// and declaration location.
-    ///
-    /// Compatibility helper for callers that surface a bare class name without
-    /// first resolving it to a canonical FQCN.
-    pub fn classes_named(&self, short_name: &str) -> Vec<(Arc<str>, Option<mir_types::Location>)> {
-        let db = self.snapshot_db();
-        let key = mir_types::Name::new(short_name).ascii_lowercase();
-        crate::db::workspace_index(&db)
-            .class_likes_named(key)
-            .iter()
-            .copied()
-            .filter_map(|fqcn_key| {
-                let here = crate::db::Fqcn::from_str(&db, fqcn_key.as_str());
-                crate::db::find_class_like(&db, here)
-                    .map(|class| (class.fqcn().clone(), class.location().cloned()))
-            })
-            .collect()
-    }
-
     /// Every ancestor of `fqcn` — extended class, implemented interfaces,
     /// used traits, transitively — most-derived first. Does not include
     /// `fqcn` itself. Memoized per FQCN (shares `class_ancestors_by_fqcn`'s

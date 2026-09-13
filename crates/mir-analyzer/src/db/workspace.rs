@@ -10,7 +10,6 @@
 //! then enumerate via the off-salsa `source_files` registry and demand
 //! `collect_file_definitions` / `collect_file_declarations` per file.
 
-use std::ops::Range;
 use std::sync::Arc;
 use std::{fmt, fmt::Formatter};
 
@@ -373,59 +372,9 @@ pub struct WorkspaceSymbolIndex {
     class_like: Arc<FxHashMap<Name, SymbolLoc>>,
     functions: Arc<FxHashMap<Name, SymbolLoc>>,
     constants: Arc<FxHashMap<Name, SymbolLoc>>,
-    class_like_by_short_name: ShortNameIndex,
     class_like_collisions: Arc<FxHashMap<Name, Box<[SymbolLoc]>>>,
     function_collisions: Arc<FxHashMap<Name, Box<[SymbolLoc]>>>,
     constant_collisions: Arc<FxHashMap<Name, Box<[SymbolLoc]>>>,
-}
-
-#[derive(Clone, Default)]
-pub struct ShortNameIndex {
-    ranges: Arc<FxHashMap<Name, Range<u32>>>,
-    postings: Arc<[Name]>,
-}
-
-impl ShortNameIndex {
-    fn from_keys(keys: impl Iterator<Item = Name>) -> Self {
-        let mut pairs: Vec<(Name, Name)> = keys.map(|key| (short_name_key(key), key)).collect();
-        pairs.sort_by(|a, b| {
-            a.0.as_str()
-                .cmp(b.0.as_str())
-                .then_with(|| a.1.as_str().cmp(b.1.as_str()))
-        });
-
-        let mut ranges = FxHashMap::default();
-        let mut postings = Vec::with_capacity(pairs.len());
-        let mut idx = 0;
-        while idx < pairs.len() {
-            let short = pairs[idx].0;
-            let start = postings.len() as u32;
-            while idx < pairs.len() && pairs[idx].0 == short {
-                postings.push(pairs[idx].1);
-                idx += 1;
-            }
-            let end = postings.len() as u32;
-            ranges.insert(short, start..end);
-        }
-
-        Self {
-            ranges: Arc::new(ranges),
-            postings: Arc::from(postings),
-        }
-    }
-
-    pub fn get(&self, short_name: Name) -> &[Name] {
-        let Some(range) = self.ranges.get(&short_name) else {
-            return &[];
-        };
-        &self.postings[range.start as usize..range.end as usize]
-    }
-}
-
-impl PartialEq for ShortNameIndex {
-    fn eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.ranges, &other.ranges) && Arc::ptr_eq(&self.postings, &other.postings)
-    }
 }
 
 impl WorkspaceSymbolIndex {
@@ -465,10 +414,6 @@ impl WorkspaceSymbolIndex {
         self.class_like.iter().map(|(k, v)| (*k, *v))
     }
 
-    pub fn class_likes_named(&self, short_name: Name) -> &[Name] {
-        self.class_like_by_short_name.get(short_name)
-    }
-
     pub fn class_like_ptr(&self) -> *const FxHashMap<Name, SymbolLoc> {
         Arc::as_ptr(&self.class_like)
     }
@@ -506,7 +451,6 @@ impl PartialEq for WorkspaceSymbolIndex {
             && Arc::ptr_eq(&self.class_like_collisions, &other.class_like_collisions)
             && Arc::ptr_eq(&self.function_collisions, &other.function_collisions)
             && Arc::ptr_eq(&self.constant_collisions, &other.constant_collisions)
-            && self.class_like_by_short_name == other.class_like_by_short_name
     }
 }
 
@@ -529,21 +473,12 @@ pub fn build_workspace_symbol_index(
     }
 
     WorkspaceSymbolIndex {
-        class_like_by_short_name: ShortNameIndex::from_keys(class_like.keys().copied()),
         class_like: Arc::new(class_like),
         functions: Arc::new(functions),
         constants: Arc::new(constants),
         class_like_collisions: freeze(class_like_collisions),
         function_collisions: freeze(function_collisions),
         constant_collisions: freeze(constant_collisions),
-    }
-}
-
-pub fn short_name_key(fqcn_lower: Name) -> Name {
-    let s = fqcn_lower.as_str().trim_start_matches('\\');
-    match s.rsplit_once('\\') {
-        Some((_, short)) => Name::new(short),
-        None => Name::new(s),
     }
 }
 
@@ -910,18 +845,6 @@ mod builder_equivalence_tests {
         ));
         assert_eq!(tracked.function_len(), rebuilt.function_len());
         assert_eq!(tracked.constant_len(), rebuilt.constant_len());
-        let tracked_dup_short: Vec<_> = tracked
-            .class_likes_named(Name::new("dup"))
-            .iter()
-            .map(|key| key.as_str())
-            .collect();
-        let rebuilt_dup_short: Vec<_> = rebuilt
-            .class_likes_named(Name::new("dup"))
-            .iter()
-            .map(|key| key.as_str())
-            .collect();
-        assert_eq!(tracked_dup_short, rebuilt_dup_short);
-        assert_eq!(rebuilt_dup_short, vec!["app\\dup", "dup"]);
         assert_eq!(
             collision_map(&db, tracked.class_like_collisions()),
             collision_map(&db, rebuilt.class_like_collisions())
