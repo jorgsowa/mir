@@ -348,34 +348,28 @@ pub(crate) fn array_fill_return_type(arg_types: &[Type]) -> Option<Type> {
 
 /// Infer the return type of `array_keys($array)`.
 ///
-/// When the argument is a statically non-empty array, upgrades `list<K>` in
-/// the stub's template-resolved return type to `non-empty-list<K>` so the key
-/// type from Psalm-style template inference is preserved. Returns the stub
-/// return unchanged when the source is not provably non-empty.
+/// The returned list values are the input array's own key type. This keeps
+/// precise keys for shapes and for specialized builtins such as
+/// `get_defined_constants()`, without depending on generic binding fallback.
+/// When the argument is statically non-empty, returns `non-empty-list<K>`.
 pub(crate) fn array_keys_return_type(arg_types: &[Type], return_ty: &Type) -> Type {
     let Some(arr) = arg_types.first() else {
         return return_ty.clone();
     };
-    if !super::callable::is_non_empty_collection(arr) {
+    if arr.is_mixed() {
         return return_ty.clone();
     }
-    // Upgrade list<K> → non-empty-list<K> while keeping the stub's key type.
-    let mut result = Type::empty();
-    result.from_docblock = return_ty.from_docblock;
-    for atomic in &return_ty.types {
-        match atomic {
-            Atomic::TList { value } => {
-                result.add_type(Atomic::TNonEmptyList {
-                    value: value.clone(),
-                });
-            }
-            other => result.add_type(other.clone()),
-        }
-    }
-    if result.is_empty() {
+    let (key, _) = crate::stmt::infer_foreach_types(arr);
+    if key.is_mixed() || key.is_empty() {
         return_ty.clone()
+    } else if super::callable::is_non_empty_collection(arr) {
+        Type::single(Atomic::TNonEmptyList {
+            value: Box::new(key),
+        })
     } else {
-        result
+        Type::single(Atomic::TList {
+            value: Box::new(key),
+        })
     }
 }
 
