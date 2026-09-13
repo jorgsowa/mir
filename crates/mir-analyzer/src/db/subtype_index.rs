@@ -471,15 +471,6 @@ impl SubtypeIndex {
         out
     }
 
-
-    /// FQCNs (display form) of every class-like currently missing a
-    /// declaration entry but referenced as a parent from `fqcn`'s subtree.
-    /// Used by completeness passes to decide which frontier names still need
-    /// their declaring files committed.
-    pub fn has_decl(&self, fqcn: &str) -> bool {
-        self.lookup_edge_key(fqcn)
-            .is_some_and(|key| self.decls.contains_key(&key))
-    }
 }
 
 #[cfg(test)]

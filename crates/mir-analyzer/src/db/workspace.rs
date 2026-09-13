@@ -98,18 +98,6 @@ impl fmt::Debug for FileDeclarations {
 }
 
 impl FileDeclarations {
-    pub fn class_like_len(&self) -> usize {
-        self.class_like.len()
-    }
-
-    pub fn function_len(&self) -> usize {
-        self.functions.len()
-    }
-
-    pub fn constant_len(&self) -> usize {
-        self.constants.len()
-    }
-
     pub fn class_like(&self) -> impl ExactSizeIterator<Item = FileDecl> + '_ {
         self.rows[self.class_like.clone()]
             .iter()
@@ -379,18 +367,6 @@ pub struct WorkspaceSymbolIndex {
 }
 
 impl WorkspaceSymbolIndex {
-    pub fn class_like_len(&self) -> usize {
-        self.class_like.len()
-    }
-
-    pub fn function_len(&self) -> usize {
-        self.functions.len()
-    }
-
-    pub fn constant_len(&self) -> usize {
-        self.constants.len()
-    }
-
     pub fn class_like_loc(&self, key: Name) -> Option<SymbolLoc> {
         self.class_like.get(&key).copied()
     }
@@ -401,22 +377,6 @@ impl WorkspaceSymbolIndex {
 
     pub fn constant_loc(&self, key: Name) -> Option<SymbolLoc> {
         self.constants.get(&key).copied()
-    }
-
-    pub fn contains_class_like(&self, key: Name) -> bool {
-        self.class_like.contains_key(&key)
-    }
-
-    pub fn contains_function(&self, key: Name) -> bool {
-        self.functions.contains_key(&key)
-    }
-
-    pub fn iter_class_likes(&self) -> impl Iterator<Item = (Name, SymbolLoc)> + '_ {
-        self.class_like.iter().map(|(k, v)| (*k, *v))
-    }
-
-    pub fn class_like_ptr(&self) -> *const FxHashMap<Name, SymbolLoc> {
-        Arc::as_ptr(&self.class_like)
     }
 
     pub(crate) fn class_like_map(&self) -> &FxHashMap<Name, SymbolLoc> {
@@ -807,14 +767,6 @@ mod builder_equivalence_tests {
         db.rebuild_workspace_symbol_index();
         let rebuilt = workspace_index(&db).clone();
 
-        fn maps_equal(
-            a: impl Iterator<Item = (Name, SymbolLoc)>,
-            b: impl Iterator<Item = (Name, SymbolLoc)>,
-        ) -> bool {
-            let a: FxHashMap<_, _> = a.collect();
-            let b: FxHashMap<_, _> = b.collect();
-            a == b
-        }
         fn collision_map(
             db: &crate::db::MirDbStorage,
             map: &FxHashMap<Name, Box<[SymbolLoc]>>,
@@ -840,12 +792,9 @@ mod builder_equivalence_tests {
                 })
                 .collect()
         }
-        assert!(maps_equal(
-            tracked.iter_class_likes(),
-            rebuilt.iter_class_likes()
-        ));
-        assert_eq!(tracked.function_len(), rebuilt.function_len());
-        assert_eq!(tracked.constant_len(), rebuilt.constant_len());
+        assert_eq!(tracked.class_like_map(), rebuilt.class_like_map());
+        assert_eq!(tracked.function_map(), rebuilt.function_map());
+        assert_eq!(tracked.constant_map(), rebuilt.constant_map());
         assert_eq!(
             collision_map(&db, tracked.class_like_collisions()),
             collision_map(&db, rebuilt.class_like_collisions())
@@ -912,7 +861,7 @@ mod decl_projection_tests {
         for (t, p) in pairs {
             assert_eq!(t, p);
         }
-        assert_eq!(tracked.class_like_len(), 5, "I, T, E, C, D expected");
+        assert_eq!(tracked.class_like().count(), 5, "I, T, E, C, D expected");
     }
 
     #[test]

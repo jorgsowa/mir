@@ -11,7 +11,7 @@ use std::time::Instant;
 
 use mir_analyzer::db::{
     file_structural_deps, file_structural_symbols, workspace_classes, workspace_functions,
-    workspace_symbol_index, MirDatabase,
+    MirDatabase,
 };
 use mir_analyzer::{
     discover_files, perf_fixture::PerfFixture, AnalysisSession, BatchOptions, PhpVersion,
@@ -71,13 +71,6 @@ fn measure_workspace_projections() {
     let functions_warm = black_box(workspace_functions(&db).len());
     let functions_warm_elapsed = functions_warm_start.elapsed();
 
-    let index_cold_start = Instant::now();
-    let index_cold = black_box(workspace_symbol_index(&db).class_like_len());
-    let index_cold_elapsed = index_cold_start.elapsed();
-    let index_warm_start = Instant::now();
-    let index_warm = black_box(workspace_symbol_index(&db).class_like_len());
-    let index_warm_elapsed = index_warm_start.elapsed();
-
     let structural_symbols_cold_start = Instant::now();
     let structural_symbols_cold = black_box(
         files
@@ -121,11 +114,6 @@ fn measure_workspace_projections() {
         "[measure_workspace_projections] workspace_functions cold={:.3}s warm={:.3}s count={functions_cold}/{functions_warm}",
         functions_cold_elapsed.as_secs_f64(),
         functions_warm_elapsed.as_secs_f64(),
-    );
-    eprintln!(
-        "[measure_workspace_projections] workspace_symbol_index cold={:.3}s warm={:.3}s class_like={index_cold}/{index_warm}",
-        index_cold_elapsed.as_secs_f64(),
-        index_warm_elapsed.as_secs_f64(),
     );
     eprintln!(
         "[measure_workspace_projections] file_structural_symbols(all files) cold={:.3}s warm={:.3}s symbols={structural_symbols_cold}/{structural_symbols_warm}",

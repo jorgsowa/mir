@@ -1208,11 +1208,6 @@ impl MirDbStorage {
             .subtypes_of(fqcn, include_trait_users)
     }
 
-    /// Whether the subtype edge index has a declaration entry for `fqcn`.
-    pub fn subtype_index_has_decl(&self, fqcn: &str) -> bool {
-        self.subtype_index.lock().has_decl(fqcn)
-    }
-
     /// Mark a file path as a user-provided stub so `workspace_symbol_index`
     /// gives it priority over native stubs for the same symbol.
     pub fn register_user_stub_path(&self, path: Arc<str>) {
