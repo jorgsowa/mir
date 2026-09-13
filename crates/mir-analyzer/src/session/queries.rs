@@ -1158,9 +1158,12 @@ impl AnalysisSession {
     ///
     /// `files` is the host's candidate scope for the on-demand completeness
     /// pass: per BFS round, not-yet-committed files whose text mentions a
-    /// frontier name get their definitions committed, so results are complete
-    /// even before a background sweep has covered the workspace. Committed
-    /// files answer from the index with no parsing at all.
+    /// frontier short name get their definitions committed, so results are
+    /// complete even before a background sweep has covered the workspace.
+    /// That short-name gate is only candidate discovery; subtype identity is
+    /// still resolved from the edge index below (exact FQCN first, then the
+    /// index's written-form leniency when exact lookup has no hits).
+    /// Committed files answer from the index with no parsing at all.
     ///
     /// `include_trait_users` also counts `use Trait;` composition as a
     /// subtype edge (visibility-scoping semantics); leave it off for
@@ -1231,6 +1234,9 @@ impl AnalysisSession {
         let mut pending: Vec<String> = vec![class_fqn.trim_start_matches('\\').to_string()];
         let mut sites: Vec<crate::db::SubtypeSite> = Vec::new();
         while !pending.is_empty() {
+            // Use short names only to discover stale/uncommitted files worth
+            // collecting. The query result itself comes from the subtype
+            // edge index (`subtype_sites_of_lenient`) below.
             let needles: Vec<String> = pending
                 .drain(..)
                 .filter(|f| scanned.insert(f.clone()))
