@@ -328,7 +328,6 @@ fn subtype_classes_do_not_fall_back_to_another_namespace() {
         ),
     ];
     let session = session_with(&files);
-
     let app = session.indexed_subtype_classes("App\\Shape", &paths(&files), false);
     assert!(app.is_empty(), "exact query leaked across namespaces: {app:?}");
 
@@ -353,6 +352,9 @@ fn anonymous_subtype_uses_the_resolved_canonical_parent() {
         ),
     ];
     let session = session_with(&files);
+    // Anonymous-class edges are emitted by body analysis, unlike named
+    // class-like edges which are available after definition collection.
+    session.analyze_file_diagnostics("use.php", files[2].1);
 
     let app = session.indexed_subtype_classes("App\\Shape", &paths(&files), false);
     assert_eq!(app.len(), 1, "canonical anonymous edge missing: {app:?}");

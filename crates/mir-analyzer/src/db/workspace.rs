@@ -10,6 +10,7 @@
 //! then enumerate via the off-salsa `source_files` registry and demand
 //! `collect_file_definitions` / `collect_file_declarations` per file.
 
+use std::ops::Range;
 use std::sync::Arc;
 use std::{fmt, fmt::Formatter};
 
