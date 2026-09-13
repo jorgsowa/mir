@@ -1,5 +1,5 @@
 ===description===
-`@property` and magic `@method` type positions are checked the same way.
+Property and magic method types reject backslash-qualified keywords.
 ===file===
 <?php
 class Bag {

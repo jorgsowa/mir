@@ -1,5 +1,5 @@
 ===description===
-invalid argument inside constructor-promoted property hook bodies is analyzed
+Invalid arguments in promoted-property hooks are analyzed.
 ===config===
 php_version=8.4
 ===file===

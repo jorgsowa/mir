@@ -1,5 +1,5 @@
 ===description===
-method_exists() guard suppresses UndefinedMethod for a [Foo::class, 'method'] array callable
+`method_exists()` suppresses undefined methods for guarded class-string callables.
 ===config===
 suppress=MissingReturnType
 ===file===

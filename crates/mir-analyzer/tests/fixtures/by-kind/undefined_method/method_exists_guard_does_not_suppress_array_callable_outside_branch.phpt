@@ -1,5 +1,5 @@
 ===description===
-method_exists() guard does not suppress [$obj, 'method'] array callable outside the guarded branch
+`method_exists()` does not suppress array callables outside its branch.
 ===config===
 suppress=MissingReturnType
 ===file===

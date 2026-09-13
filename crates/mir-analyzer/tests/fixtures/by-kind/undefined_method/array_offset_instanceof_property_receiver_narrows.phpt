@@ -1,7 +1,5 @@
 ===description===
-G11, property-held array: `$this->data['item'] instanceof Foo` — the
-`ShapeBase::Prop` receiver variant of the same access-path machinery, not
-just plain variables.
+`instanceof` narrows offsets on array properties.
 ===file===
 <?php
 class Foo { public function fooOnly(): void {} }

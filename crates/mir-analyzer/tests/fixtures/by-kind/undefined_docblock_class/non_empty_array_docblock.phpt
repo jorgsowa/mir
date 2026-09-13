@@ -1,9 +1,5 @@
 ===description===
-`non-empty-array` resolves to the non-empty array pseudo-type as a
-docblock keyword (it had a generic arm but was missing from the
-keyword table, so the bare form parsed as a nonexistent class): an
-empty array is rejected where a non-empty one is required, and a
-non-empty one is accepted.
+`non-empty-array` resolves as a docblock keyword.
 ===config===
 suppress=UnusedParam,UnusedVariable
 ===file===

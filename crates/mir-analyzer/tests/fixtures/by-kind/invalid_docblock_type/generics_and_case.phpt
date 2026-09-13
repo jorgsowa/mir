@@ -1,6 +1,5 @@
 ===description===
-Generic type arguments don't shield a backslash-qualified keyword base,
-and the keyword lookup is case-insensitive (`\INT`).
+Generic arguments reject backslash-qualified keywords case-insensitively.
 ===config===
 suppress=UnusedParam
 ===file===

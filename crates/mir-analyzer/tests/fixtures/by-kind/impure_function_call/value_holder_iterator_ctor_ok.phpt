@@ -1,8 +1,5 @@
 ===description===
-Constructing a value-holder iterator inside an @immutable method must not be
-flagged as ImpureFunctionCall: passing `$this` (an immutable readonly receiver)
-into a constructor that only reads it — copying its array state into the new
-iterator — cannot mutate anything.
+Immutable methods can construct iterators from immutable receivers.
 ===config===
 suppress=MissingConstructor,UnusedClass,InvalidReturnType
 ===file===

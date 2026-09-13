@@ -150,6 +150,39 @@ mir --update-baseline --baseline psalm-baseline.xml src/
 
 ### CI integration
 
+#### GitHub Actions
+
+The [mir GitHub Action](https://github.com/jorgsowa/mir-action) installs and
+runs mir in a workflow. Create `.github/workflows/mir.yml`:
+
+```yaml
+name: MIR
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: jorgsowa/mir-action@v1
+        with:
+          path: src
+```
+
+Set `version` to an exact mir package version and pin the action to a commit
+SHA when you need reproducible builds. The action also accepts `php-version`
+and `arguments` inputs; see its [README](https://github.com/jorgsowa/mir-action)
+for the complete reference.
+
+#### Other CI systems
+
 mir supports several output formats suited to CI environments:
 
 ```bash

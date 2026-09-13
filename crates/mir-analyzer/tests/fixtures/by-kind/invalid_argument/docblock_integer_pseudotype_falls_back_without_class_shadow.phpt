@@ -1,6 +1,5 @@
 ===description===
-Without an in-scope class named `Integer`, the `integer` docblock spelling
-should keep its scalar pseudotype meaning and accept an int argument.
+Docblock pseudotypes retain their scalar meaning without a matching class.
 ===file===
 <?php
 namespace Regression\DocblockTypePrecedence;

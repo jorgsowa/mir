@@ -1,6 +1,5 @@
 ===description===
-The check applies per union member and through `?`/`[]` wrappers: each
-offending member is reported with its verbatim spelling.
+Union, nullable, and array types validate each member.
 ===config===
 suppress=UnusedParam
 ===file===

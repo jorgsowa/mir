@@ -1,8 +1,5 @@
 ===description===
-L3, `list<T>`/`non-empty-array<K,V>`/`non-empty-list<T>` variants: "non-empty"
-only proves at least one element exists, not that a specific offset does —
-every generic-array-shaped atom must get the same treatment as plain
-`array<K,V>`.
+Null comparisons on list and non-empty array reads are allowed when the offset may be absent.
 ===config===
 suppress=UnusedVariable,UnusedParam
 ===file===

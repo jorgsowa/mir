@@ -1,5 +1,5 @@
 ===description===
-invalid argument inside a property hook body is analyzed
+Invalid arguments in property hooks are analyzed.
 ===config===
 php_version=8.4
 suppress=MissingConstructor

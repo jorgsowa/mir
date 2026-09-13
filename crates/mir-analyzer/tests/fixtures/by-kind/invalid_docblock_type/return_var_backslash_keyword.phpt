@@ -1,6 +1,5 @@
 ===description===
-`@return` and `@var` positions are checked the same way: backslash-qualified
-type keywords are warnings.
+Return and variable types reject backslash-qualified keywords.
 ===config===
 suppress=UnusedParam
 ===file===

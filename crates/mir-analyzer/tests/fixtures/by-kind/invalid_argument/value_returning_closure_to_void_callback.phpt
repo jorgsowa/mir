@@ -1,7 +1,5 @@
 ===description===
-Valid PHP: passing a value-returning closure to a callback typed `Closure(): void`
-is valid — PHP discards the returned value. mir checks the closure's return type
-against `void` and reports the non-void return as an invalid argument.
+Value-returning closures are valid for void callbacks.
 ===ignore===
 ===config===
 php_version=8.4

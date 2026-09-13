@@ -1,9 +1,5 @@
 ===description===
-`key-of<T>` over a function template should stay tied to the caller's inferred
-array keys. Falling back to plain `mixed` loses both parts of the contract:
-the foreach value binding in the callee spuriously reports MixedAssignment, and
-valid callers passing the returned key to `string` or a literal-key union
-spuriously report MixedArgument.
+`key-of<T>` preserves caller-inferred literal keys through template calls.
 ===config===
 suppress=UnusedParam,UnusedForeachValue
 ===file===

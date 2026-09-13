@@ -1,7 +1,5 @@
 ===description===
-An enum receiver's method call from an immutable context is NOT flagged, but a
-method on a NON-enum object (a mutable third-party class) stored in the same
-immutable class still IS — only enumerations are mutation-free by construction.
+Mutable object method calls remain impure in immutable contexts.
 ===config===
 suppress=MissingConstructor
 ===file===

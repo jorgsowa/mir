@@ -1,8 +1,5 @@
 ===description===
-Valid PHP: `array_filter` with a `!is_null` predicate strips the null members, so
-the result is a list of ints and satisfies the declared `int[]` return. mir does
-not narrow the filtered-out value type, keeps `list<int|null>`, and reports it as
-not matching `array<int|string, int>`.
+`array_filter()` with a non-null predicate narrows the returned values.
 ===ignore===
 ===config===
 php_version=8.4

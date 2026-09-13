@@ -1,8 +1,5 @@
 ===description===
-Calling a method on an enum receiver from within an immutable context must not be
-flagged as ImpureMethodCall: enumerations have no mutable properties, so every
-enum instance method is mutation-free by construction — storing an enum in an
-immutable (readonly) class and calling its methods cannot mutate state.
+Enum method calls are allowed in immutable contexts.
 ===config===
 suppress=MissingConstructor
 ===file===

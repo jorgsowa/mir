@@ -1,7 +1,5 @@
 ===description===
-`arraylike-object<K, V>` resolves structurally to
-`ArrayAccess<K, V>&Countable&Traversable<K, V>`, so a matching object keeps
-its indexed value type, foreach key/value types, and countability.
+`arraylike-object` preserves indexed, iterable, and countable capabilities.
 ===config===
 suppress=MissingConstructor,UnusedParam,UnusedVariable
 ===file===

@@ -1,6 +1,5 @@
 ===description===
-An imported class alias should also take precedence over the shadowable
-`integer` docblock pseudotype spelling.
+Imported class aliases take precedence over docblock pseudotype aliases.
 ===file:main.php===
 <?php
 namespace Regression\DocblockTypePrecedence;

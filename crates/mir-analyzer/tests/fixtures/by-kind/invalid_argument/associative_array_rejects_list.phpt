@@ -1,6 +1,5 @@
 ===description===
-Phan's `associative-array` is distinct from a list, so a plain list argument
-is rejected even though its values match.
+`associative-array` rejects lists.
 ===config===
 suppress=UnusedParam
 ===file===

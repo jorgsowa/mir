@@ -1,7 +1,5 @@
 ===description===
-UndefinedThrowsDocblock fires when a function's `@throws` docblock names a
-class that does not exist. It is a warning (shown by default) — the
-info-level UndefinedDocblockClass remains for the other docblock tags.
+`@throws` annotations report undefined classes.
 ===file===
 <?php
 /**

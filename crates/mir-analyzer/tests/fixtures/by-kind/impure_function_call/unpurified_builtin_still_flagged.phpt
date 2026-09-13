@@ -1,7 +1,5 @@
 ===description===
-An unpurified stub builtin (error_log, no @pure/#[Pure]) called inside a
-@pure function IS still flagged as an impure call — proving #[Pure] attribute
-detection is what enables the exemption.
+Unmarked built-ins remain impure in pure functions.
 ===file===
 <?php
 /** @pure */

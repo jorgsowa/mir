@@ -1,8 +1,5 @@
 ===description===
-A leading backslash on a docblock type keyword (`@param \int`) is not a
-fully qualified name — a backslash only qualifies class names — so the
-spelling is invalid and reported as a warning. The un-backslashed keyword
-is fine.
+Backslash-qualified parameter keywords are invalid; unqualified keywords are valid.
 ===config===
 suppress=UnusedParam
 ===file===

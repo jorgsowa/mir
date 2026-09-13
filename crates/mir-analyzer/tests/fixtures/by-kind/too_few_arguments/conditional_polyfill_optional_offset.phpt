@@ -1,5 +1,5 @@
 ===description===
-A conditional polyfill function must retain its defaulted offset parameter.
+Conditional polyfills retain optional parameters.
 ===file===
 <?php
 if (!function_exists('grapheme_extract')) {

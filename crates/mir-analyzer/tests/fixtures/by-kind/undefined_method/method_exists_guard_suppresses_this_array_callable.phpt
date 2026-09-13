@@ -1,5 +1,5 @@
 ===description===
-method_exists() guard suppresses UndefinedMethod for a [$this, 'method'] array callable
+`method_exists()` suppresses undefined methods for guarded `$this` callables.
 ===config===
 suppress=MissingReturnType
 ===file===

@@ -1,6 +1,5 @@
 ===description===
-Method-call argument checking should respect class precedence for a shadowable
-docblock pseudotype alias on the method parameter.
+Method parameter types prefer matching classes over docblock pseudotype aliases.
 ===file===
 <?php
 namespace Regression\DocblockTypePrecedence;

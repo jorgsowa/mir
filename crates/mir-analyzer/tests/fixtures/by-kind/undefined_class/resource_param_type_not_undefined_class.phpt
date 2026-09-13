@@ -1,6 +1,5 @@
 ===description===
-Legacy native `resource` in a parameter type position must not be treated as an
-undefined class while mir reports the underlying declaration error.
+Legacy `resource` parameter types are not undefined classes.
 ===config===
 suppress=UnusedFunction,UnusedParam
 ===file===

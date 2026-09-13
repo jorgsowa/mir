@@ -1,8 +1,5 @@
 ===description===
-M7: array_keys() of a private static property declared as bare `array`
-with a literal initializer. The collector refines the property type from
-the literal default (string keys), so the keys are `string`, not
-`int|string`, and no PossiblyInvalidArgument is reported.
+Private static arrays retain key types inferred from literal defaults.
 ===config===
 suppress=ForbiddenCode
 ===file===

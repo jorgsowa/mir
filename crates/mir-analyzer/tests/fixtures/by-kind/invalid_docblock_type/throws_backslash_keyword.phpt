@@ -1,8 +1,5 @@
 ===description===
-A backslash-qualified keyword in `@throws` gets the backslash warning but
-must not also be treated as an undefined class (docblock keywords are
-filtered before the class-existence check); a backslash-qualified real
-class is a valid fully qualified name and stays quiet.
+Throws annotations reject backslash-qualified keywords but allow class names.
 ===file===
 <?php
 /**

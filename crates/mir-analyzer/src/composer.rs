@@ -1158,6 +1158,42 @@ mod tests {
     }
 
     #[test]
+    fn resolves_same_short_name_from_its_exact_namespace() {
+        // Keep this at the resolver boundary as well as the analyzer fixture:
+        // php-lsp#253 was only observable when a completion receiver's
+        // fully-qualified MIR type (`Zeta\\Widget`) shared `Widget` with a
+        // differently-mapped namespace (`Alpha\\Widget`). A resolver must never
+        // turn that exact FQCN into the other namespace's file.
+        let root = make_temp_project("same_short_name_exact_namespace");
+        let target = root.join("vendor/pkg/target/src");
+        let decoy = root.join("vendor/pkg/decoy/src");
+        fs::create_dir_all(&target).unwrap();
+        fs::create_dir_all(&decoy).unwrap();
+        fs::write(
+            target.join("Widget.php"),
+            "<?php namespace Zeta; class Widget {}",
+        )
+        .unwrap();
+        fs::write(
+            decoy.join("Widget.php"),
+            "<?php namespace Alpha; class Widget {}",
+        )
+        .unwrap();
+        fs::write(
+            root.join("composer.json"),
+            r#"{"autoload":{"psr-4":{"Alpha\\":"vendor/pkg/decoy/src/","Zeta\\":"vendor/pkg/target/src/"}}}"#,
+        )
+        .unwrap();
+
+        let map = Psr4Map::from_composer(&root).unwrap();
+        assert_eq!(
+            map.resolve("\\Zeta\\Widget"),
+            Some(target.join("Widget.php"))
+        );
+        assert_eq!(map.resolve("Alpha\\Widget"), Some(decoy.join("Widget.php")));
+    }
+
+    #[test]
     fn resolve_missing_file() {
         let root = make_temp_project("resolve_missing");
         fs::create_dir_all(root.join("src")).unwrap();
