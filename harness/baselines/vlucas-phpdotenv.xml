@@ -291,12 +291,6 @@
     </MissingClosureReturnType>
   </file>
   <file src="src/Util/Str.php">
-    <MixedArgument>
-      <code><![CDATA[\mb_list_encodings()]]></code>
-    </MixedArgument>
-    <MixedReturnStatement>
-      <code><![CDATA[return \mb_substr($input, $start, $length, 'UTF-8');]]></code>
-    </MixedReturnStatement>
     <RedundantCondition>
       <code><![CDATA[!is_string($converted)]]></code>
     </RedundantCondition>

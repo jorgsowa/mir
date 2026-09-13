@@ -75,7 +75,7 @@ foreach (require $here . '/packages.php' as ['slug' => $slug]) {
 
     if ($update) {
         [, $stderr, $code] = runMir(
-            [$mirBin, 'src', '--set-baseline', $baselineFile, '--no-progress', '-q'],
+            [$mirBin, 'src', '--baseline', $baselineFile, '--update-baseline', '--no-progress', '-q'],
             $fixtureDir
         );
         if ($code !== 0) {
