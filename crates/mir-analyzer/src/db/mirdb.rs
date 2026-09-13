@@ -178,7 +178,7 @@ pub struct MirDbStorage {
     workspace_index_walks: Arc<std::sync::atomic::AtomicU64>,
     /// Monotonic counter of subtype-edge mutations — class-like edge
     /// commits/clears ([`Self::set_file_class_edges`]) and anonymous-class
-    /// `impl:`/`implshort:` posting commits. These mutate query-visible
+    /// `impl:` posting commits. These mutate query-visible
     /// state off-salsa, so the session's revision-keyed memo caches include
     /// this epoch in their keys: a result cached before an edge lands
     /// (e.g. a member-references hierarchy fan-out) must not outlive it
@@ -1206,18 +1206,6 @@ impl MirDbStorage {
         self.subtype_index
             .lock()
             .subtypes_of(fqcn, include_trait_users)
-    }
-
-    /// Lenient variant of [`Self::subtype_sites_of`] (short-name root
-    /// fallback when the exact FQCN has no subtypes).
-    pub fn subtype_sites_of_lenient(
-        &self,
-        fqcn: &str,
-        include_trait_users: bool,
-    ) -> Vec<crate::db::subtype_index::SubtypeSite> {
-        self.subtype_index
-            .lock()
-            .subtypes_of_lenient(fqcn, include_trait_users)
     }
 
     /// Whether the subtype edge index has a declaration entry for `fqcn`.

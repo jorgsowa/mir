@@ -1236,7 +1236,7 @@ impl AnalysisSession {
         while !pending.is_empty() {
             // Use short names only to discover stale/uncommitted files worth
             // collecting. The query result itself comes from the subtype
-            // edge index (`subtype_sites_of_lenient`) below.
+            // edge index (`subtype_sites_of`) below.
             let needles: Vec<String> = pending
                 .drain(..)
                 .filter(|f| scanned.insert(f.clone()))
@@ -1247,7 +1247,7 @@ impl AnalysisSession {
             }
             sites = {
                 let guard = self.db.salsa.read();
-                guard.subtype_sites_of_lenient(class_fqn, include_trait_users)
+                guard.subtype_sites_of(class_fqn, include_trait_users)
             };
             pending = sites
                 .iter()
@@ -1271,25 +1271,16 @@ impl AnalysisSession {
             })
             .collect();
         // Anonymous classes never reach the definition collector; their
-        // `new class implements X {}` sites are recorded as `impl:` postings
-        // during body analysis (exact FQCN key plus a short-name key for the
-        // same written-form leniency named classes get above).
+        // `new class implements X {}` sites are recorded under the resolved
+        // canonical parent FQCN during body analysis.
         let root_lc = class_fqn.trim_start_matches('\\').to_ascii_lowercase();
-        let short_lc = crate::db::subtype_index::short_name_of(&root_lc).to_string();
         let scope: rustc_hash::FxHashSet<&str> = files.iter().map(|f| f.as_ref()).collect();
         let anon: Vec<(Arc<str>, u32, u16, u16)> = {
             let guard = self.db.salsa.read();
-            let mut key = String::with_capacity("implshort:".len() + root_lc.len());
+            let mut key = String::with_capacity("impl:".len() + root_lc.len());
             key.push_str("impl:");
             key.push_str(&root_lc);
-            let mut v = guard.reference_locations(&key);
-            key.clear();
-            key.push_str("implshort:");
-            key.push_str(&short_lc);
-            v.extend(guard.reference_locations(&key));
-            v.sort();
-            v.dedup();
-            v
+            guard.reference_locations(&key)
         };
         for (file, line, cs, ce) in anon {
             if !scope.contains(file.as_ref()) {

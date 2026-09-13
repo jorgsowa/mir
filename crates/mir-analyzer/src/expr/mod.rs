@@ -519,12 +519,6 @@ impl<'a> ExpressionAnalyzer<'a> {
                     let resolved = crate::db::resolve_name(self.db, self.file.as_ref(), &name);
                     let lc = resolved.trim_start_matches('\\').to_ascii_lowercase();
                     self.record_impl_ref(&lc, kw_span);
-                    let short = lc.rsplit('\\').next().unwrap_or(&lc);
-                    if short != lc {
-                        self.record_implshort_ref(short, kw_span);
-                    } else {
-                        self.record_implshort_ref(&lc, kw_span);
-                    }
                 }
                 let mut sa = crate::stmt::StatementsAnalyzer::new(
                     self.db,
@@ -1285,16 +1279,6 @@ impl<'a> ExpressionAnalyzer<'a> {
     pub(crate) fn record_impl_ref(&mut self, fqcn: impl AsRef<str>, span: php_ast::Span) {
         let fqcn = fqcn.as_ref();
         let key = Arc::<str>::from(format!("impl:{fqcn}"));
-        self.record_ref(key, span);
-    }
-
-    pub(crate) fn record_implshort_ref(
-        &mut self,
-        short_name: impl AsRef<str>,
-        span: php_ast::Span,
-    ) {
-        let short_name = short_name.as_ref();
-        let key = Arc::<str>::from(format!("implshort:{short_name}"));
         self.record_ref(key, span);
     }
 

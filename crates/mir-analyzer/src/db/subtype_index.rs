@@ -471,38 +471,6 @@ impl SubtypeIndex {
         out
     }
 
-    /// Like [`Self::subtypes_of`], but when the exact FQCN yields nothing,
-    /// retry from every parent key sharing the target's short name. This is
-    /// the written-form leniency the old name-matching implementation had:
-    /// `interface Runner {}` in the global namespace is matched by
-    /// `implements Runner` inside `namespace App`, and `use App\Animal` on
-    /// the cursor side still matches a bare `extends Animal` declared in the
-    /// global namespace.
-    pub fn subtypes_of_lenient(&self, fqcn: &str, include_trait_users: bool) -> Vec<SubtypeSite> {
-        let exact = self.subtypes_of(fqcn, include_trait_users);
-        if !exact.is_empty() {
-            return exact;
-        }
-        let root = edge_key(fqcn);
-        let short = short_name_of(&root).to_string();
-        let mut alt_roots: Vec<KeyId> = self
-            .children
-            .keys()
-            .filter(|k| {
-                let key = self.key_name(**k);
-                key != root.as_ref() && short_name_of(key) == short
-            })
-            .copied()
-            .collect();
-        alt_roots.sort_by(|a, b| self.key_name(*a).cmp(self.key_name(*b)));
-        let mut out: Vec<SubtypeSite> = Vec::new();
-        for key in alt_roots {
-            out.extend(self.subtypes_of_key(key, include_trait_users));
-        }
-        out.sort_by(|a, b| a.file.cmp(&b.file).then(a.fqcn.cmp(&b.fqcn)));
-        out.dedup_by(|a, b| a.fqcn == b.fqcn && a.file == b.file);
-        out
-    }
 
     /// FQCNs (display form) of every class-like currently missing a
     /// declaration entry but referenced as a parent from `fqcn`'s subtree.

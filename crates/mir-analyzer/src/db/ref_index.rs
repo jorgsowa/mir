@@ -96,7 +96,7 @@ impl RefIndex {
     /// the existing locations of the same symbol, preserving insertion order
     /// (mirrors the legacy `commit_reference_locations_batch` semantics).
     /// Returns whether the batch touched any anonymous-class subtype posting
-    /// (`impl:`/`implshort:`) — those participate in subtype queries, so the
+    /// (`impl:`) — those participate in subtype queries, so the
     /// caller bumps the subtype-edge epoch for them.
     pub fn append_batch(&mut self, locs: Vec<RefLoc>) -> bool {
         let mut touched_impl = false;
@@ -159,7 +159,7 @@ impl RefIndex {
     /// quadratic in the number of referencing files.
     ///
     /// Returns whether the replace touched any anonymous-class subtype
-    /// posting (`impl:`/`implshort:`), before or after — same contract as
+    /// posting (`impl:`), before or after — same contract as
     /// [`Self::append_batch`].
     pub fn set_file_refs(&mut self, file: &str, locs: Vec<RefLoc>) -> bool {
         let mut touched_impl = self
