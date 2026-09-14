@@ -196,11 +196,6 @@
       <code><![CDATA[$logging->getElementsByTagName('log')]]></code>
     </InvalidArgument>
   </file>
-  <file src="src/TextUI/Configuration/Xml/Validator/Validator.php">
-    <TooFewArguments>
-      <code><![CDATA[$document->schemaValidateSource($buffer)]]></code>
-    </TooFewArguments>
-  </file>
   <file src="src/TextUI/Output/TestDox/ResultPrinter.php">
     <InvalidArgument>
       <code><![CDATA[$previousPath]]></code>

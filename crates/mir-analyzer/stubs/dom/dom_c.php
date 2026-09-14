@@ -1291,7 +1291,7 @@ class DOMDocument extends DOMNode implements DOMParentNode
      * Available since PHP 5.5.2 and Libxml 2.6.14.</p>
      * @return bool true on success or false on failure.
      */
-    public function schemaValidateSource($source, $flags) {}
+    public function schemaValidateSource($source, $flags = 0) {}
 
     /**
      * Performs relaxNG validation on the document
