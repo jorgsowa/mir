@@ -871,8 +871,7 @@ class DOMDocument extends DOMNode implements DOMParentNode
      * The value of the element. By default, an empty element will be created.
      * You can also set the value later with DOMElement->nodeValue.
      * </p>
-     * @return DOMElement|false A new instance of class DOMElement or false
-     * if an error occurred.
+     * @return DOMElement A new instance of class DOMElement.
      * @throws DOMException If invalid $localName
      */
     public function createElement(
