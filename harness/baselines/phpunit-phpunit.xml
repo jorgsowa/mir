@@ -54,6 +54,15 @@
       <code><![CDATA[return $this->providedTests;]]></code>
     </NullableReturnStatement>
   </file>
+  <file src="src/Logging/JUnit/JunitXmlLogger.php">
+    <InvalidTemplateParam>
+      <code><![CDATA[$this->testSuites[$this->testSuiteLevel]->appendChild($testSuite)]]></code>
+      <code><![CDATA[$this->root->appendChild($testSuite)]]></code>
+      <code><![CDATA[$this->currentTestCase->appendChild($systemOut)]]></code>
+      <code><![CDATA[$this->currentTestCase->appendChild($fault)]]></code>
+      <code><![CDATA[$this->currentTestCase->appendChild($skipped)]]></code>
+    </InvalidTemplateParam>
+  </file>
   <file src="src/Metadata/Version/ConstraintRequirement.php">
     <ImpureMethodCall>
       <code><![CDATA[$this->constraint->complies(
@@ -148,6 +157,36 @@
     <UnusedVariable>
       <code><![CDATA[]]></code>
     </UnusedVariable>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/Migration/Migrations/IntroduceCoverageElement.php">
+    <InvalidTemplateParam>
+      <code><![CDATA[$documentElement->insertBefore(
+            $coverage,
+            $documentElement->firstChild,
+        )]]></code>
+    </InvalidTemplateParam>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/Migration/Migrations/LogToReportMigration.php">
+    <InvalidTemplateParam>
+      <code><![CDATA[$coverage->appendChild($document->createElement('report'))]]></code>
+    </InvalidTemplateParam>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/Migration/Migrations/MoveCoverageDirectoriesToSource.php">
+    <InvalidTemplateParam>
+      <code><![CDATA[$root->appendChild($source)]]></code>
+    </InvalidTemplateParam>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/Migration/Migrations/MoveWhitelistExcludesToCoverage.php">
+    <InvalidTemplateParam>
+      <code><![CDATA[$coverage->appendChild(
+                $document->createElement('exclude'),
+            )]]></code>
+    </InvalidTemplateParam>
+  </file>
+  <file src="src/TextUI/Configuration/Xml/Migration/Migrations/MoveWhitelistIncludesToCoverage.php">
+    <InvalidTemplateParam>
+      <code><![CDATA[$coverage->appendChild($include)]]></code>
+    </InvalidTemplateParam>
   </file>
   <file src="src/TextUI/Output/TestDox/ResultPrinter.php">
     <InvalidArgument>
