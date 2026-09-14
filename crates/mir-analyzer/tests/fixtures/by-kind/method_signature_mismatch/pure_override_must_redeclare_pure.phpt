@@ -1,9 +1,7 @@
 ===description===
-A @pure ancestor method establishes a contract that call/method.rs's
-purity/immutability safety checks rely on when a call resolves through
-the ancestor's (or an interface's) static type — an override that
-silently drops @pure without re-declaring it made that already-shipped
-enforcement unsound for any caller typed as the ancestor.
+An inherited @pure contract applies to an override without requiring a
+redundant child annotation. The child body must still be checked as pure,
+which prevents this from regressing into an unchecked implementation.
 ===file===
 <?php
 interface Calculator {
@@ -18,4 +16,4 @@ class Impure implements Calculator {
     }
 }
 ===expect===
-MethodSignatureMismatch@8:4-8:46: Method Impure::add() signature mismatch: Calculator::add() is declared @pure and must be re-declared @pure when overridden
+ImmutablePropertyModification@9:9-9:23: Assigning to property calls of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)

@@ -998,6 +998,25 @@ pub fn find_method_in_chain<'db>(
     find_method_in_mixins(db, fqcn, name, &mut visited_mixins)
 }
 
+/// Whether a method is pure by its own declaration or by an inheritable
+/// ancestor contract. A public/protected `@pure` method remains pure when an
+/// implementation overrides it: callers may hold the ancestor type, and the
+/// implementation must be checked against that promise. Private ancestor
+/// methods are deliberately excluded because they are not overridden in PHP.
+pub fn method_is_pure_in_chain(db: &dyn MirDatabase, fqcn: Fqcn<'_>, name: &str) -> bool {
+    class_ancestors_by_fqcn(db, fqcn)
+        .iter()
+        .enumerate()
+        .any(|(depth, ancestor)| {
+            let here = Fqcn::interned(db, Name::new(ancestor.as_ref()));
+            find_method_in_class(db, here, name).is_some_and(|method| {
+                method.is_pure
+                    && (depth == 0
+                        || method.visibility != mir_codebase::definitions::Visibility::Private)
+            })
+        })
+}
+
 /// If `method` has `@inheritDoc`, walks the ancestor chain of `receiver_fqcn`
 /// (the class where analysis is happening, which may differ from `owner_fqcn`
 /// when the method is pulled in from a trait) to find the best docblock parent.

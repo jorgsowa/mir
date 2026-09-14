@@ -1094,13 +1094,17 @@ impl<'a> BodyAnalyzer<'a> {
             crate::db::Fqcn::from_str(self.db, fqcn),
             &method_name.to_ascii_lowercase(),
         ) {
-            ctx.is_in_pure_fn = method_storage.is_pure;
+            ctx.is_in_pure_fn = crate::db::method_is_pure_in_chain(
+                self.db,
+                crate::db::Fqcn::from_str(self.db, fqcn),
+                &method_name.to_ascii_lowercase(),
+            );
             // @pure implies no side effects at all, including no `$this`
             // mutation — not just @mutation-free/@psalm-immutable, which
             // previously were the only tags that set this flag, silently
             // letting a @pure-only method (a very natural annotation on its
             // own, with no redundant @mutation-free) mutate `$this` freely.
-            if !is_ctor && (method_storage.is_mutation_free || method_storage.is_pure) {
+            if !is_ctor && (method_storage.is_mutation_free || ctx.is_in_pure_fn) {
                 ctx.is_in_immutable_method = true;
             }
             if !is_ctor && method_storage.is_external_mutation_free {

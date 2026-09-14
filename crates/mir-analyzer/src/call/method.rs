@@ -225,7 +225,11 @@ pub(crate) fn resolve_method_from_db(
             is_internal: storage.is_internal,
             is_static: storage.is_static,
             is_abstract: storage.is_abstract,
-            is_pure: storage.is_pure,
+            is_pure: crate::db::method_is_pure_in_chain(
+                db,
+                crate::db::Fqcn::from_str(db, fqcn.as_ref()),
+                method_name_lower,
+            ),
             // Native `readonly` classes forbid property reassignment after construction at
             // the language level, and PHP enums have no mutable instance state by definition.
             // For both kinds, any non-constructor instance method is mutation-free *by
