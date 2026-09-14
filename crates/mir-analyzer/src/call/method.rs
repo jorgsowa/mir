@@ -9,7 +9,7 @@ use mir_codebase::definitions::{
     Assertion, AssertionKind, DeclaredParam, TemplateParam, Visibility,
 };
 use mir_issues::{IssueKind, Severity};
-use mir_types::{Name, Type};
+use mir_types::{Atomic, Name, Type};
 
 use crate::expr::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
@@ -64,6 +64,30 @@ pub(crate) struct ResolvedMethod {
     pub(crate) assertions: Vec<Assertion>,
 }
 
+fn inferred_refines_native_bare_object_return(native: &Type, inferred: &Type) -> bool {
+    if native.from_docblock || inferred.is_mixed() {
+        return false;
+    }
+    let [Atomic::TNamedObject {
+        fqcn: native_fqcn,
+        type_params: native_params,
+    }] = native.types.as_slice()
+    else {
+        return false;
+    };
+    if !native_params.is_empty() {
+        return false;
+    }
+    let [Atomic::TNamedObject {
+        fqcn: inferred_fqcn,
+        type_params: inferred_params,
+    }] = inferred.types.as_slice()
+    else {
+        return false;
+    };
+    native_fqcn == inferred_fqcn && !inferred_params.is_empty()
+}
+
 /// Resolve a method via the Salsa db, walking the class ancestor chain.
 pub(crate) fn resolve_method_from_db(
     db: &dyn crate::db::MirDatabase,
@@ -101,15 +125,20 @@ pub(crate) fn resolve_method_from_db(
             .map(|t| t.from_docblock)
             .unwrap_or(false);
 
+        let own_return = storage.return_type.clone();
         let return_ty_raw = if own_has_docblock_return {
-            storage.return_type.clone()
+            own_return
+        } else if let Some(parent_return) = parent.as_ref().and_then(|p| p.return_type.clone()) {
+            Some(parent_return)
+        } else if let (Some(native), Some(inferred_return)) = (&own_return, &inferred) {
+            if inferred_refines_native_bare_object_return(native, inferred_return) {
+                inferred
+            } else {
+                own_return
+            }
         } else {
-            parent
-                .as_ref()
-                .and_then(|p| p.return_type.clone())
-                .or_else(|| storage.return_type.clone())
+            own_return.or(inferred)
         }
-        .or(inferred)
         .map(|t| (*t).clone())
         .unwrap_or_else(Type::mixed);
 

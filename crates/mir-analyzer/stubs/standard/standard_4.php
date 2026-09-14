@@ -448,7 +448,7 @@ function ini_get(string $option): string|false {}
  * why access shows the appropriate bitmask values.
  * </p>
  * @pure
- * @return ($details is true ? array<string, array{global_value: string, local_value: string, access: int}> : array<string, mixed>)|false Array of config options on success or <b>FALSE</b> on failure. When <code>$details</code> is <code>false</code> the value is the option's current value — a string in practice — but is documented as <code>mixed</code> so that scalar narrowing on that branch (e.g. <code>is_scalar()</code>) stays live.
+ * @return ($details is true ? array<string, array{global_value: string, local_value: string, access: int}> : array<string, scalar|array{global_value: string, local_value: string, access: int}>)|false Array of config options on success or <b>FALSE</b> on failure. When <code>$details</code> is <code>false</code> the value is the option's current scalar value, with the shaped value retained conservatively for narrowing.
  */
 #[ArrayShape(["global_value" => "string", "local_value" => "string", "access" => "int"])]
 function ini_get_all(?string $extension = null, #[PhpStormStubsElementAvailable(from: '7.0')] bool $details = true): array|false {}
