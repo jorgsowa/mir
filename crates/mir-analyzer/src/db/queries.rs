@@ -446,8 +446,16 @@ pub fn class_constant_exists_in_chain(db: &dyn MirDatabase, fqcn: &str, const_na
 /// memoized answer can't go stale. On the canonical / open-file db the cache is
 /// absent (`None`) and every call recomputes — correct under mid-analysis
 /// mutation, just not accelerated.
+///
+/// **Case semantics**: class names compare case-insensitively (PHP semantics;
+/// `class Base` / `class base` are the same class). The byte-exact comparisons
+/// below are kept as a zero-cost fast path; the `eq_ignore_ascii_case` fallback
+/// matches the ASCII-fold case of the workspace symbol index
+/// (`find_class_like`), which is the existing resolution standard. Case-variant
+/// spellings produce distinct subtype-cache entries (distinct hashes) but the
+/// same answer, so the cache stays sound.
 pub fn extends_or_implements(db: &dyn MirDatabase, child: &str, ancestor: &str) -> bool {
-    if child == ancestor {
+    if child == ancestor || child.eq_ignore_ascii_case(ancestor) {
         return true;
     }
     let Some(cache) = db.subtype_cache() else {
@@ -497,25 +505,32 @@ fn extends_or_implements_uncached(db: &dyn MirDatabase, child: &str, ancestor: &
     };
     let eff = short.unwrap_or(ancestor);
 
-    if child == eff {
+    if child == eff || child.eq_ignore_ascii_case(eff) {
         return true;
     }
 
     if class.is_enum() {
-        if class.interfaces().iter().any(|i| i.as_ref() == eff) {
+        if class
+            .interfaces()
+            .iter()
+            .any(|i| i.as_ref() == eff || i.as_ref().eq_ignore_ascii_case(eff))
+        {
             return true;
         }
-        if eff == "UnitEnum" || eff == "\\UnitEnum" {
+        if eff.eq_ignore_ascii_case("UnitEnum") || eff.eq_ignore_ascii_case("\\UnitEnum") {
             return true;
         }
-        if (eff == "BackedEnum" || eff == "\\BackedEnum") && class.is_backed_enum() {
+        if (eff.eq_ignore_ascii_case("BackedEnum")
+            || eff.eq_ignore_ascii_case("\\BackedEnum"))
+            && class.is_backed_enum()
+        {
             return true;
         }
         return false;
     }
     crate::db::class_ancestors_by_fqcn(db, here)
         .iter()
-        .any(|p| p.as_ref() == eff)
+        .any(|p| p.as_ref() == eff || p.as_ref().eq_ignore_ascii_case(eff))
 }
 
 // parse_file tracked query (S0 — owned parse, salsa-memoized)
