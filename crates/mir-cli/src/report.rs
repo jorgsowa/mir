@@ -102,6 +102,15 @@ pub fn run_output(
             std::collections::HashSet::new()
         };
 
+    let stale_baseline_entries = if cli.report_stale_baseline {
+        baseline_data
+            .as_ref()
+            .map(stale_entries)
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+
     // --update-baseline: write back only the issues still present in the baseline.
     if cli.update_baseline {
         let path = baseline_path.as_deref().map_or_else(
@@ -119,6 +128,25 @@ pub fn run_output(
                 }
             }
             Err(e) => eprintln!("mir: failed to update baseline: {e}"),
+        }
+    }
+
+    if !stale_baseline_entries.is_empty() {
+        eprintln!(
+            "mir: {} stale baseline issue(s) no longer emitted{}",
+            stale_baseline_entries.len(),
+            baseline_path
+                .as_ref()
+                .map(|path| format!(" in {}", path.display()))
+                .unwrap_or_default()
+        );
+        for entry in &stale_baseline_entries {
+            let suffix = if entry.snippet.is_empty() {
+                String::new()
+            } else {
+                format!(" ({})", entry.snippet)
+            };
+            eprintln!("  {}: {}{}", entry.file, entry.kind, suffix);
         }
     }
 
@@ -236,9 +264,35 @@ pub fn run_output(
     }
 
     let has_errors = display_issues.iter().any(|i| i.severity == Severity::Error);
-    if has_errors {
+    if has_errors || !stale_baseline_entries.is_empty() {
         process::exit(1);
     }
+}
+
+#[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct StaleBaselineEntry {
+    file: String,
+    kind: String,
+    snippet: String,
+}
+
+fn stale_entries(baseline: &Baseline) -> Vec<StaleBaselineEntry> {
+    let mut entries = Vec::new();
+
+    for (file, by_kind) in &baseline.entries {
+        for (kind, snippets) in by_kind {
+            for snippet in snippets {
+                entries.push(StaleBaselineEntry {
+                    file: file.clone(),
+                    kind: kind.clone(),
+                    snippet: snippet.clone(),
+                });
+            }
+        }
+    }
+
+    entries.sort();
+    entries
 }
 
 fn effective_severity(issue: &Issue, config: &Config) -> Option<Severity> {

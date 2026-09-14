@@ -90,6 +90,10 @@ struct Cli {
     #[arg(long)]
     update_baseline: bool,
 
+    /// Report baseline entries that no longer match emitted issues
+    #[arg(long)]
+    report_stale_baseline: bool,
+
     /// Ignore the baseline and report all issues
     #[arg(long)]
     ignore_baseline: bool,

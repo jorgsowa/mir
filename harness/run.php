@@ -41,24 +41,6 @@ function runMir(array $args, string $cwd): array
     return [$stdout, $stderr, $exitCode];
 }
 
-function countBaselineEntries(string $baselineFile): int
-{
-    if (!is_file($baselineFile)) {
-        return 0;
-    }
-    $xml = simplexml_load_file($baselineFile);
-    if ($xml === false) {
-        return 0;
-    }
-    $count = 0;
-    foreach ($xml->file as $file) {
-        foreach ($file->children() as $kind) {
-            $count += count($kind->code);
-        }
-    }
-    return $count;
-}
-
 $overallStatus = 0;
 
 foreach (require $here . '/packages.php' as ['slug' => $slug]) {
@@ -88,7 +70,7 @@ foreach (require $here . '/packages.php' as ['slug' => $slug]) {
     }
 
     [$stdout, $stderr] = runMir(
-        [$mirBin, 'src', '--baseline', $baselineFile, '--format', 'json', '--no-progress', '-q'],
+        [$mirBin, 'src', '--baseline', $baselineFile, '--report-stale-baseline', '--format', 'json', '--no-progress', '-q'],
         $fixtureDir
     );
 
@@ -109,7 +91,14 @@ foreach (require $here . '/packages.php' as ['slug' => $slug]) {
             echo "    $file: $kind$suffix\n";
         }
         $overallStatus = 1;
-    } else {
+    }
+
+    if ($stderr !== '') {
+        echo $stderr;
+        $overallStatus = 1;
+    }
+
+    if (count($issues) === 0 && $stderr === '') {
         echo "  clean\n";
     }
 }
