@@ -1913,7 +1913,7 @@ impl IssueKind {
             } => {
                 if actual.split('|').any(|part| part == "false") {
                     format!(
-                        "Template type '{name}' inferred as '{actual}' can be false and therefore does not satisfy bound '{expected_bound}'; check the result for false before passing it here"
+                        "Template type '{name}' inferred as '{actual}' can be false and therefore does not satisfy bound '{expected_bound}'"
                     )
                 } else {
                     format!(
