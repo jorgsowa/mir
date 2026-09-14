@@ -149,9 +149,6 @@
       <code><![CDATA[self::$files = new SplObjectStorage]]></code>
       <code><![CDATA[self::$files = new SplObjectStorage]]></code>
     </InvalidPropertyAssignment>
-    <InvalidReturnType>
-      <code><![CDATA[return array_values($aggregated);]]></code>
-    </InvalidReturnType>
   </file>
   <file src="src/TextUI/Configuration/Xml/Loader.php">
     <UnusedVariable>

@@ -2121,9 +2121,39 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 let nested_update = nested_path.and_then(|path| {
                                     super::helpers::set_nested_keyed_value(&current, &path, &ty)
                                 });
+                                // A dynamic outer key does not make every deeper key
+                                // unknowable. For `$rows[$id]['tags'][] = $tag`, preserve
+                                // the shape of each existing row and update its literal
+                                // `tags` path, rather than replacing the row with a partial
+                                // synthetic wrapper. Pushes are represented in the leaf as a
+                                // list update; literal keys form the path from the outer value
+                                // inward.
+                                let dynamic_outer_nested_update = if nested_update.is_none()
+                                    && key_chain.len() > 1
+                                    && literal_key_chain.last().is_some_and(Option::is_none)
+                                {
+                                    let mut leaf = ty.clone();
+                                    for key in key_chain[..key_chain.len() - 1].iter() {
+                                        if key.is_none() {
+                                            leaf = Type::single(Atomic::TList {
+                                                value: Box::new(leaf),
+                                            });
+                                        }
+                                    }
+                                    let path: Vec<_> = literal_key_chain[..literal_key_chain.len() - 1]
+                                        .iter()
+                                        .rev()
+                                        .filter_map(Clone::clone)
+                                        .collect();
+                                    super::helpers::set_nested_value_through_generic_array_key(
+                                        &current, &path, &leaf,
+                                    )
+                                } else {
+                                    None
+                                };
                                 let declared_ceiling =
                                     ctx.declared_var_types.get(&mir_types::Name::from(name_str));
-                                let updated = match nested_update {
+                                let updated = match nested_update.or(dynamic_outer_nested_update) {
                                     Some(updated) => updated,
                                     None => match &key_chain.last().unwrap() {
                                         None => widen_array_as_list(

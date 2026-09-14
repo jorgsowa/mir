@@ -196,6 +196,55 @@ pub fn set_nested_keyed_value(
     Some(result)
 }
 
+/// Update a literal nested path inside the *values* of a generic outer array.
+///
+/// A write such as `$by_name[$name]['tags'][] = $tag` has an unknown outer
+/// key, but its inner path is still known. When the outer array already holds
+/// a uniform keyed shape, replacing that shape with the synthetic
+/// `array<'tags', list<T>>` wrapper loses every sibling property. This is
+/// particularly common after an `isset()`-guarded initialization in a loop.
+/// Keep the generic container (and its list/non-empty status) and update the
+/// known shape carried by each value instead. Returning `None` deliberately
+/// leaves heterogeneous or non-shape values on the conservative widening
+/// path.
+pub fn set_nested_value_through_generic_array_key(
+    current: &Type,
+    path: &[ArrayKey],
+    leaf_value: &Type,
+) -> Option<Type> {
+    if path.is_empty() || current.types.is_empty() {
+        return None;
+    }
+
+    let mut result = Type::empty();
+    result.possibly_undefined = current.possibly_undefined;
+    result.from_docblock = current.from_docblock;
+
+    for atomic in &current.types {
+        match atomic {
+            Atomic::TArray { key, value } => result.add_type(Atomic::TArray {
+                key: key.clone(),
+                value: Box::new(set_nested_keyed_value(value, path, leaf_value)?),
+            }),
+            Atomic::TNonEmptyArray { key, value } => {
+                result.add_type(Atomic::TNonEmptyArray {
+                    key: key.clone(),
+                    value: Box::new(set_nested_keyed_value(value, path, leaf_value)?),
+                });
+            }
+            Atomic::TList { value } => result.add_type(Atomic::TList {
+                value: Box::new(set_nested_keyed_value(value, path, leaf_value)?),
+            }),
+            Atomic::TNonEmptyList { value } => result.add_type(Atomic::TNonEmptyList {
+                value: Box::new(set_nested_keyed_value(value, path, leaf_value)?),
+            }),
+            _ => return None,
+        }
+    }
+
+    Some(result)
+}
+
 /// Remove `key` from every `TKeyedArray` atomic in `ty`'s union that has it,
 /// leaving all other atoms and properties unchanged. Used for
 /// `unset($arr['key'])`, which genuinely removes the key from the array
