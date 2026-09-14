@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.74.0] - 2026-09-14
+
+### Added
+
+- **Stale-baseline reporting:** `mir --report-stale-baseline` now reports
+  baseline entries that no longer suppress visible diagnostics and exits with
+  a failure status, making obsolete suppressions straightforward to find in
+  CI.
+
+### Changed
+
+- **Workspace indexing:** subtype candidate discovery now uses short names
+  only to find pending files, while subtype identity remains strictly
+  canonical-FQCN based. Removed unused short-name workspace indexes and
+  test-only inspection helpers.
+- **Baseline harness:** consolidated the baseline and Salsa CI coverage, and
+  refreshed real-world baselines to match current analyzer output.
+- **Release version sync:** bumped the workspace and internal crate dependency
+  versions to `0.74.0` and refreshed `Cargo.lock` to match.
+
+### Fixed
+
+- **Analyzer inference:** `pathinfo()` component calls retain their string
+  return type; `array_keys()` preserves source keys; and `ini_get_all()` keeps
+  false-scalar narrowing available to argument checks.
+- **Callable guards and symbol resolution:** `method_exists()` guards now
+  correctly narrow callable values, and Composer resolution keeps exact
+  namespace matches distinct when classes share a short name.
+- **Incremental indexing:** workspace-index settling now retries cancelled
+  Salsa snapshots before applying declarations, preventing incomplete index
+  updates under concurrent edits.
+- **Cross-platform baselines:** equivalent path spellings are matched when
+  consuming baseline entries.
+
 ## [0.73.0] - 2026-09-11
 
 ### Added
