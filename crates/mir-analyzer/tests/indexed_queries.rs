@@ -321,7 +321,10 @@ fn subtype_classes_transitive_with_alias_and_fqn_forms() {
 #[test]
 fn subtype_classes_do_not_fall_back_to_another_namespace() {
     let files = [
-        ("app_shape.php", "<?php\nnamespace App;\ninterface Shape {}\n"),
+        (
+            "app_shape.php",
+            "<?php\nnamespace App;\ninterface Shape {}\n",
+        ),
         (
             "other_shape.php",
             "<?php\nnamespace Other;\ninterface Shape {}\nclass Circle implements Shape {}\n",
@@ -329,7 +332,10 @@ fn subtype_classes_do_not_fall_back_to_another_namespace() {
     ];
     let session = session_with(&files);
     let app = session.indexed_subtype_classes("App\\Shape", &paths(&files), false);
-    assert!(app.is_empty(), "exact query leaked across namespaces: {app:?}");
+    assert!(
+        app.is_empty(),
+        "exact query leaked across namespaces: {app:?}"
+    );
 
     let other = session.indexed_subtype_classes("Other\\Shape", &paths(&files), false);
     assert_eq!(
@@ -361,7 +367,10 @@ fn anonymous_subtype_uses_the_resolved_canonical_parent() {
     assert_eq!(app[0].fqcn.as_ref(), "class@anonymous");
 
     let other = session.indexed_subtype_classes("Other\\Shape", &paths(&files), false);
-    assert!(other.is_empty(), "anonymous edge leaked across namespaces: {other:?}");
+    assert!(
+        other.is_empty(),
+        "anonymous edge leaked across namespaces: {other:?}"
+    );
 }
 
 #[test]

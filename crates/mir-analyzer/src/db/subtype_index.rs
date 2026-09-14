@@ -470,7 +470,6 @@ impl SubtypeIndex {
         out.dedup_by(|a, b| a.fqcn == b.fqcn && a.file == b.file);
         out
     }
-
 }
 
 #[cfg(test)]
