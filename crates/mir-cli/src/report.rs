@@ -68,16 +68,31 @@ pub fn run_output(
         None => (None, None),
     };
 
-    // Suppress issues matched by the baseline. For --update-baseline, accumulate
-    // the consumed entries into a new baseline.
+    let show_info = cli.show_info || config.error_level >= 7;
+
+    let visible_candidates: Vec<(usize, &Issue, Severity)> = result
+        .issues
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, i)| {
+            let sev = effective_severity(i, config)?;
+            match sev {
+                Severity::Error | Severity::Warning => Some((idx, i, sev)),
+                Severity::Info if show_info => Some((idx, i, sev)),
+                Severity::Info => None,
+            }
+        })
+        .collect();
+
+    // Suppress visible issues matched by the baseline. For --update-baseline,
+    // accumulate the consumed entries into a new baseline. Hidden info-level
+    // diagnostics must not keep baseline entries fresh for default output.
     let mut new_baseline = Baseline::default();
     let suppressed_by_baseline: std::collections::HashSet<usize> =
         if let Some(bl) = &mut baseline_data {
-            result
-                .issues
+            visible_candidates
                 .iter()
-                .enumerate()
-                .filter_map(|(idx, issue)| {
+                .filter_map(|(idx, issue, _)| {
                     let file = issue.location.file.as_ref();
                     let kind = issue.kind.display_name();
                     let snippet = issue.snippet.as_deref().unwrap_or("");
@@ -92,7 +107,7 @@ pub fn run_output(
                                 .or_default()
                                 .push(snippet.to_string());
                         }
-                        Some(idx)
+                        Some(*idx)
                     } else {
                         None
                     }
@@ -150,27 +165,10 @@ pub fn run_output(
         }
     }
 
-    let show_info = cli.show_info || config.error_level >= 7;
-
-    let visible_issues: Vec<(&Issue, Severity)> = result
-        .issues
+    let visible_issues: Vec<(&Issue, Severity)> = visible_candidates
         .iter()
-        .enumerate()
-        .filter_map(|(idx, i)| {
-            if suppressed_by_baseline.contains(&idx) {
-                return None;
-            }
-            let sev = effective_severity(i, config)?;
-            match sev {
-                Severity::Error | Severity::Warning => Some((i, sev)),
-                Severity::Info => {
-                    if show_info {
-                        Some((i, sev))
-                    } else {
-                        None
-                    }
-                }
-            }
+        .filter_map(|(idx, issue, severity)| {
+            (!suppressed_by_baseline.contains(idx)).then_some((*issue, *severity))
         })
         .collect();
 
