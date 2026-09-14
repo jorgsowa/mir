@@ -975,12 +975,6 @@
     </RedundantCast>
   </file>
   <file src="src/TextUI/TestSuiteFilterProcessor.php">
-    <InvalidArgument>
-      <code><![CDATA[array_map(
-                    static fn (string $name): string => '__phpunit_requires_php_extension' . $name,
-                    $configuration->testsRequiringPhpExtension(),
-                )]]></code>
-    </InvalidArgument>
     <MixedAssignment>
       <code><![CDATA[$line]]></code>
     </MixedAssignment>
@@ -995,11 +989,6 @@
       <code><![CDATA[$maxBoxWidth = max(array_map(strlen(...), $lines))]]></code>
       <code><![CDATA[$maxBoxWidth = min($maxBoxWidth, $columns)]]></code>
     </MixedAssignment>
-  </file>
-  <file src="src/Util/Filesystem.php">
-    <InvalidReturnType>
-      <code><![CDATA[return realpath($directory) . DIRECTORY_SEPARATOR . basename($path);]]></code>
-    </InvalidReturnType>
   </file>
   <file src="src/Util/Filter.php">
     <MixedArgument>

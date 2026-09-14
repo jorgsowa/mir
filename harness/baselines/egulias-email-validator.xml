@@ -37,9 +37,6 @@
     </MissingPropertyType>
   </file>
   <file src="src/Validation/DNSCheckValidation.php">
-    <PossiblyInvalidArgument>
-      <code><![CDATA[idn_to_ascii($host, IDNA_DEFAULT, $variant)]]></code>
-    </PossiblyInvalidArgument>
     <WrongCaseMethod>
       <code><![CDATA[validateMXRecord]]></code>
     </WrongCaseMethod>

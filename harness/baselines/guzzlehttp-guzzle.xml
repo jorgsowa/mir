@@ -451,10 +451,6 @@
       <code><![CDATA[return $multiplex;]]></code>
       <code><![CDATA[return $mask;]]></code>
     </MixedReturnStatement>
-    <PossiblyInvalidArgument>
-      <code><![CDATA[$ext]]></code>
-      <code><![CDATA[$ext]]></code>
-    </PossiblyInvalidArgument>
     <PossiblyNullMethodCall>
       <code><![CDATA[$easy->response->getBody()]]></code>
     </PossiblyNullMethodCall>
