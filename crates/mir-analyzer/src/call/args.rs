@@ -60,16 +60,6 @@ pub struct CheckArgsParams<'a> {
     /// `call/method.rs` suppresses `UndefinedMethod` with) for callable
     /// *values* such as `[$obj, 'm']` / `'Class::m'`.
     pub ctx: &'a FlowState,
-    /// The receiver class this call is made on, when the receiver is
-    /// class-typed: the constructed class for `new`, the resolved callee
-    /// class for a static call, the receiver object's class for an instance
-    /// method call; `None` for free function calls. When that class is
-    /// behind a version-dependent existence guard — `class_exists()` /
-    /// `interface_exists()` / `extension_loaded()` active in the current
-    /// branch (see `FlowState::is_class_guarded`) — the snapshot's signature
-    /// may not match what is installed at runtime, so `check_args` skips all
-    /// arity and argument-type checks.
-    pub receiver_fqcn: Option<&'a str>,
     /// The call's AST arguments, positionally aligned with `arg_types` /
     /// `arg_spans`. A sole spread arg may be expanded into more `arg_types`
     /// entries than there are actual args — lookups past the end simply
@@ -454,19 +444,8 @@ pub(crate) fn check_args(ea: &mut ExpressionAnalyzer<'_>, p: CheckArgsParams<'_>
         template_params,
         no_named_arguments,
         ctx,
-        receiver_fqcn,
         args,
     } = p;
-
-    // The call's receiver class is behind a version-dependent existence
-    // guard (class_exists / interface_exists / extension_loaded in the
-    // active branch): the snapshot signature may not match the installed
-    // version at runtime, so skip the arity and argument-type checks
-    // entirely. Return-type inference (which runs after this function) is
-    // signature-independent and unaffected.
-    if receiver_fqcn.is_some_and(|fqcn| ctx.is_class_guarded(fqcn)) {
-        return;
-    }
 
     let bindings = counts::check_counts(
         ea,

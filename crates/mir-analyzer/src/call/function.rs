@@ -211,7 +211,6 @@ impl CallAnalyzer {
                             template_params: &[],
                             no_named_arguments: false,
                             ctx,
-                            receiver_fqcn: None,
                             args: &call.args,
                         },
                     );
@@ -858,7 +857,6 @@ impl CallAnalyzer {
                     template_params: &template_params,
                     no_named_arguments,
                     ctx,
-                    receiver_fqcn: None,
                     args: &call.args,
                 },
             );
