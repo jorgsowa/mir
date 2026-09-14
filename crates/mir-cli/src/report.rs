@@ -68,16 +68,31 @@ pub fn run_output(
         None => (None, None),
     };
 
-    // Suppress issues matched by the baseline. For --update-baseline, accumulate
-    // the consumed entries into a new baseline.
+    let show_info = cli.show_info || config.error_level >= 7;
+
+    let visible_candidates: Vec<(usize, &Issue, Severity)> = result
+        .issues
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, i)| {
+            let sev = effective_severity(i, config)?;
+            match sev {
+                Severity::Error | Severity::Warning => Some((idx, i, sev)),
+                Severity::Info if show_info => Some((idx, i, sev)),
+                Severity::Info => None,
+            }
+        })
+        .collect();
+
+    // Suppress visible issues matched by the baseline. For --update-baseline,
+    // accumulate the consumed entries into a new baseline. Hidden info-level
+    // diagnostics must not keep baseline entries fresh for default output.
     let mut new_baseline = Baseline::default();
     let suppressed_by_baseline: std::collections::HashSet<usize> =
         if let Some(bl) = &mut baseline_data {
-            result
-                .issues
+            visible_candidates
                 .iter()
-                .enumerate()
-                .filter_map(|(idx, issue)| {
+                .filter_map(|(idx, issue, _)| {
                     let file = issue.location.file.as_ref();
                     let kind = issue.kind.display_name();
                     let snippet = issue.snippet.as_deref().unwrap_or("");
@@ -92,7 +107,7 @@ pub fn run_output(
                                 .or_default()
                                 .push(snippet.to_string());
                         }
-                        Some(idx)
+                        Some(*idx)
                     } else {
                         None
                     }
@@ -101,6 +116,15 @@ pub fn run_output(
         } else {
             std::collections::HashSet::new()
         };
+
+    let stale_baseline_entries = if cli.report_stale_baseline {
+        baseline_data
+            .as_ref()
+            .map(stale_entries)
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
 
     // --update-baseline: write back only the issues still present in the baseline.
     if cli.update_baseline {
@@ -122,27 +146,29 @@ pub fn run_output(
         }
     }
 
-    let show_info = cli.show_info || config.error_level >= 7;
+    if !stale_baseline_entries.is_empty() {
+        eprintln!(
+            "mir: {} stale baseline issue(s) no longer emitted{}",
+            stale_baseline_entries.len(),
+            baseline_path
+                .as_ref()
+                .map(|path| format!(" in {}", path.display()))
+                .unwrap_or_default()
+        );
+        for entry in &stale_baseline_entries {
+            let suffix = if entry.snippet.is_empty() {
+                String::new()
+            } else {
+                format!(" ({})", entry.snippet)
+            };
+            eprintln!("  {}: {}{}", entry.file, entry.kind, suffix);
+        }
+    }
 
-    let visible_issues: Vec<(&Issue, Severity)> = result
-        .issues
+    let visible_issues: Vec<(&Issue, Severity)> = visible_candidates
         .iter()
-        .enumerate()
-        .filter_map(|(idx, i)| {
-            if suppressed_by_baseline.contains(&idx) {
-                return None;
-            }
-            let sev = effective_severity(i, config)?;
-            match sev {
-                Severity::Error | Severity::Warning => Some((i, sev)),
-                Severity::Info => {
-                    if show_info {
-                        Some((i, sev))
-                    } else {
-                        None
-                    }
-                }
-            }
+        .filter_map(|(idx, issue, severity)| {
+            (!suppressed_by_baseline.contains(idx)).then_some((*issue, *severity))
         })
         .collect();
 
@@ -236,9 +262,35 @@ pub fn run_output(
     }
 
     let has_errors = display_issues.iter().any(|i| i.severity == Severity::Error);
-    if has_errors {
+    if has_errors || !stale_baseline_entries.is_empty() {
         process::exit(1);
     }
+}
+
+#[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct StaleBaselineEntry {
+    file: String,
+    kind: String,
+    snippet: String,
+}
+
+fn stale_entries(baseline: &Baseline) -> Vec<StaleBaselineEntry> {
+    let mut entries = Vec::new();
+
+    for (file, by_kind) in &baseline.entries {
+        for (kind, snippets) in by_kind {
+            for snippet in snippets {
+                entries.push(StaleBaselineEntry {
+                    file: file.clone(),
+                    kind: kind.clone(),
+                    snippet: snippet.clone(),
+                });
+            }
+        }
+    }
+
+    entries.sort();
+    entries
 }
 
 fn effective_severity(issue: &Issue, config: &Config) -> Option<Severity> {

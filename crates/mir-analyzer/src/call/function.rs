@@ -1372,8 +1372,9 @@ impl CallAnalyzer {
                     // omitted or explicitly requests every path component. Any other
                     // literal flag selects a single component and therefore returns a
                     // string.
-                    "pathinfo" => super::callable::pathinfo_return_type(&arg_types)
-                        .unwrap_or(return_ty),
+                    "pathinfo" => {
+                        super::callable::pathinfo_return_type(&arg_types).unwrap_or(return_ty)
+                    }
                     // substr_replace: strip |array when $string is a scalar string.
                     "substr_replace" => {
                         super::callable::string_if_string_arg(&arg_types, 0).unwrap_or(return_ty)

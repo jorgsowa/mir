@@ -387,7 +387,18 @@ impl Baseline {
     /// in the baseline.  Each matching entry is consumed once so duplicate
     /// suppressions work correctly.
     pub fn consume(&mut self, file: &str, issue_kind: &str, snippet: &str) -> bool {
-        if let Some(by_kind) = self.entries.get_mut(file) {
+        let baseline_file = self
+            .entries
+            .contains_key(file)
+            .then(|| file.to_owned())
+            .or_else(|| {
+                self.entries
+                    .keys()
+                    .find(|candidate| std::path::Path::new(candidate) == std::path::Path::new(file))
+                    .cloned()
+            });
+
+        if let Some(by_kind) = baseline_file.and_then(|file| self.entries.get_mut(&file)) {
             if let Some(snippets) = by_kind.get_mut(issue_kind) {
                 if let Some(pos) = snippets.iter().position(|s| s == snippet) {
                     snippets.remove(pos);
@@ -661,5 +672,17 @@ mod tests {
         .unwrap();
         assert_eq!(cfg.project_dirs, vec!["src"]);
         assert_eq!(cfg.stub_dirs, vec!["stubs/ext"]);
+    }
+
+    #[test]
+    fn baseline_consumes_equivalent_platform_path() {
+        let mut baseline = Baseline::parse(
+            r#"<files><file src="./src/Foo.php"><UndefinedVariable><code><![CDATA[$x]]></code></UndefinedVariable></file></files>"#,
+        )
+        .unwrap();
+
+        let platform_path = std::path::Path::new(".").join("src").join("Foo.php");
+        assert!(baseline.consume(platform_path.to_str().unwrap(), "UndefinedVariable", "$x"));
+        assert!(baseline.entries["./src/Foo.php"]["UndefinedVariable"].is_empty());
     }
 }

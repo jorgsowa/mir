@@ -5,12 +5,14 @@ on:
     branches: [main]
     paths:
       - 'crates/**'
+      - 'harness/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - '.github/workflows/ci.yml'
   pull_request:
     paths:
       - 'crates/**'
+      - 'harness/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - '.github/workflows/ci.yml'
@@ -83,8 +85,8 @@ jobs:
         shell: bash
         run: cargo test --workspace --doc
 
-  symfony-salsa:
-    name: Symfony Salsa Queries
+  general-tests:
+    name: General tests
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -118,3 +120,26 @@ jobs:
             name="$(basename "${t%.rs}")"
             cargo test -p mir-analyzer --test "$name" -- --ignored --nocapture
           done
+
+      - name: Build mir
+        run: cargo build --release -p mir-php
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@2.37.2
+        with:
+          php-version: '8.3'
+          tools: composer
+
+      - name: Cache package fixtures
+        id: fixture-cache
+        uses: actions/cache@v6.1.0
+        with:
+          path: harness/fixtures
+          key: real-world-fixtures-${{ hashFiles('harness/packages.php') }}
+
+      - name: Download and install fixtures
+        if: steps.fixture-cache.outputs.cache-hit != 'true'
+        run: harness/download-fixtures.php
+
+      - name: Run baseline harness
+        run: harness/run.php

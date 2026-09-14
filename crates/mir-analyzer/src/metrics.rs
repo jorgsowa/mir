@@ -70,11 +70,6 @@ pub struct Counters {
     /// resolver-points-at-wrong-file.
     pub ll_fail_ingest_then_missing: AtomicU64,
 
-    /// Number of times `lookup_function_node_for_decl` fell through to the
-    /// O(N) short-name scan over all workspace functions. Non-zero means we
-    /// should build a short-name → FQN index.
-    pub fn_short_name_scans: AtomicU64,
-
     // FlowState::branch() clone profiling — upper bound on COW savings.
     // "upper bound" because COW only helps branches that never write the field;
     // branches that do write still pay the clone (just deferred to make_mut).
@@ -144,7 +139,6 @@ static COUNTERS: Counters = Counters {
     ll_fail_resolver_none: AtomicU64::new(0),
     ll_fail_source_unreadable: AtomicU64::new(0),
     ll_fail_ingest_then_missing: AtomicU64::new(0),
-    fn_short_name_scans: AtomicU64::new(0),
     flow_branch_calls: AtomicU64::new(0),
     flow_branch_read_vars_entries: AtomicU64::new(0),
     flow_branch_var_locs_entries: AtomicU64::new(0),
@@ -250,12 +244,6 @@ impl FailureSamples {
         if bucket.len() < 40 && !bucket.iter().any(|s| s == fqcn) {
             bucket.push(fqcn.to_string());
         }
-    }
-}
-
-pub fn record_fn_short_name_scan() {
-    if enabled() {
-        COUNTERS.fn_short_name_scans.fetch_add(1, Ordering::Relaxed);
     }
 }
 
@@ -537,7 +525,6 @@ pub fn dump() -> Option<String> {
     let ll_resolver_none = COUNTERS.ll_fail_resolver_none.load(Ordering::Relaxed);
     let ll_source_unreadable = COUNTERS.ll_fail_source_unreadable.load(Ordering::Relaxed);
     let ll_ingest_missing = COUNTERS.ll_fail_ingest_then_missing.load(Ordering::Relaxed);
-    let fn_short_scans = COUNTERS.fn_short_name_scans.load(Ordering::Relaxed);
     let branch_calls = COUNTERS.flow_branch_calls.load(Ordering::Relaxed);
     let branch_read_vars = COUNTERS
         .flow_branch_read_vars_entries
@@ -626,7 +613,6 @@ pub fn dump() -> Option<String> {
          lazy load failures   : no_resolver={ll_no_resolver}  resolver_none={ll_resolver_none}  \
          source_unreadable={ll_source_unreadable}  ingest_then_missing={ll_ingest_missing}\n  \
          stub cache           : hits {cache_hits}  misses {cache_misses}\n  \
-         fn short-name scans  : {fn_short_scans}\n  \
          retained/analyze_file: {analyze_file_retained_bytes} B  ({analyze_file_retained_samples} samples, avg {avg_analyze_file_retained} B)\n  \
          retained/infer_scope : {infer_scope_retained_bytes} B  ({infer_scope_retained_samples} samples, avg {avg_infer_scope_retained} B)\n  \
          retained/infer_fn    : {infer_function_retained_bytes} B  ({infer_function_retained_samples} samples, avg {avg_infer_function_retained} B)\n  \
@@ -655,7 +641,6 @@ pub(crate) fn test_reset() {
     COUNTERS
         .ll_fail_ingest_then_missing
         .store(0, Ordering::Relaxed);
-    COUNTERS.fn_short_name_scans.store(0, Ordering::Relaxed);
     COUNTERS.flow_branch_calls.store(0, Ordering::Relaxed);
     COUNTERS
         .flow_branch_read_vars_entries

@@ -1,8 +1,7 @@
 mod common_symfony;
 
 use common_symfony::load_full_symfony_fixture;
-use mir_analyzer::db::{workspace_symbol_index, MirDatabase};
-use mir_types::Name;
+use mir_analyzer::db::MirDatabase;
 
 #[test]
 #[ignore = "requires MIR_SYMFONY_FIXTURE or benches/fixtures/symfony"]
@@ -13,9 +12,6 @@ fn symfony_query_workspace_symbol_index() {
     };
 
     let db = fx.session.snapshot_db();
-    let index = workspace_symbol_index(&db);
-    assert!(index.class_like_len() > 1000);
-    assert!(index.function_len() > 100);
     assert_eq!(
         db.symbol_defining_file("Symfony\\Component\\HttpFoundation\\Request")
             .as_deref(),
@@ -25,15 +21,5 @@ fn symfony_query_workspace_symbol_index() {
         db.symbol_defining_file("Symfony\\Component\\String\\u")
             .as_deref(),
         Some(fx.string_functions.as_ref())
-    );
-    assert!(
-        index.contains_class_like(
-            Name::new("Symfony\\Component\\HttpFoundation\\Request").ascii_lowercase()
-        ),
-        "workspace class-like index should contain Request by its lowered FQCN key"
-    );
-    assert!(
-        index.contains_function(Name::new("Symfony\\Component\\String\\u").ascii_lowercase()),
-        "workspace function index should contain the u() helper by its lowered FQN key"
     );
 }

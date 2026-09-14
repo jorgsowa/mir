@@ -1,109 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <files>
-  <file src="src/Event/Dispatcher/CollectingDispatcher.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[$this->isolatedDirectDispatcher->dispatch($event)]]></code>
-    </MissingThrowsDocblock>
-  </file>
-  <file src="src/Event/Emitter/DispatchingEmitter.php">
-    <MixedAssignment>
-      <code><![CDATA[$messagePattern = $metadata[0]->messagePattern()]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/Event/TypeMap.php">
-    <PossiblyInvalidArgument>
-      <code><![CDATA[class_implements($subscriber)]]></code>
-      <code><![CDATA[class_implements($subscriberInterface)]]></code>
-      <code><![CDATA[class_implements($eventClass)]]></code>
-    </PossiblyInvalidArgument>
-  </file>
-  <file src="src/Event/Value/ComparisonFailureBuilder.php">
-    <PossiblyNullMethodCall>
-      <code><![CDATA[$t->getComparisonFailure()->getExpectedAsString()]]></code>
-      <code><![CDATA[$t->getComparisonFailure()->getExpected()]]></code>
-      <code><![CDATA[$t->getComparisonFailure()->getActualAsString()]]></code>
-      <code><![CDATA[$t->getComparisonFailure()->getActual()]]></code>
-      <code><![CDATA[$t->getComparisonFailure()->getDiff()]]></code>
-    </PossiblyNullMethodCall>
-  </file>
   <file src="src/Event/Value/Runtime/PHP.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->extensions = $extensions]]></code>
     </InvalidPropertyAssignment>
   </file>
-  <file src="src/Event/Value/Telemetry/SystemCpuTimeMeter.php">
-    <MixedAssignment>
-      <code><![CDATA[$seconds      = $usage[$secondsKey]]]></code>
-      <code><![CDATA[$microseconds = $usage[$microsecondsKey]]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/Event/Value/Telemetry/SystemStopWatch.php">
-    <MixedArgument>
-      <code><![CDATA[...hrtime()]]></code>
-    </MixedArgument>
-  </file>
-  <file src="src/Event/Value/Telemetry/SystemStopWatchWithOffset.php">
-    <MixedArgument>
-      <code><![CDATA[...hrtime()]]></code>
-    </MixedArgument>
-  </file>
-  <file src="src/Framework/Assert.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[array_combine($keysToBeConsidered, $keysToBeConsidered)]]></code>
-    </MissingThrowsDocblock>
-  </file>
-  <file src="src/Framework/Constraint/Array/ArrayComparison.php">
-    <MixedAssignment>
-      <code><![CDATA[$value]]></code>
-      <code><![CDATA[$expectedValue]]></code>
-      <code><![CDATA[$candidate]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/Framework/Constraint/Cardinality/Count.php">
-    <MixedArgument>
-      <code><![CDATA[$other]]></code>
-      <code><![CDATA[$e->getCode()]]></code>
-    </MixedArgument>
-  </file>
-  <file src="src/Framework/Constraint/Constraint.php">
-    <UnusedParam>
-      <code><![CDATA[$other]]></code>
-      <code><![CDATA[$other]]></code>
-      <code><![CDATA[$operator]]></code>
-      <code><![CDATA[$role]]></code>
-    </UnusedParam>
-  </file>
-  <file src="src/Framework/Constraint/Object/ObjectEquals.php">
-    <MixedAssignment>
-      <code><![CDATA[$result = $other->{$this->method}($this->expected)]]></code>
-    </MixedAssignment>
-  </file>
   <file src="src/Framework/Constraint/Operator/LogicalNot.php">
     <ImpossibleIdenticalComparison>
       <code><![CDATA[$negatedString !== null]]></code>
     </ImpossibleIdenticalComparison>
-  </file>
-  <file src="src/Framework/Constraint/String/StringContains.php">
-    <MixedAssignment>
-      <code><![CDATA[$haystack = $other]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/Framework/Constraint/Traversable/TraversableContainsEqual.php">
-    <MixedAssignment>
-      <code><![CDATA[$value = $this->value()]]></code>
-      <code><![CDATA[$element]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/Framework/Constraint/Traversable/TraversableContainsIdentical.php">
-    <MixedAssignment>
-      <code><![CDATA[$value = $this->value()]]></code>
-      <code><![CDATA[$element]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/Framework/Constraint/Traversable/TraversableContainsOnly.php">
-    <MixedAssignment>
-      <code><![CDATA[$item]]></code>
-    </MixedAssignment>
   </file>
   <file src="src/Framework/Exception/Exception.php">
     <InvalidPropertyAssignment>
@@ -111,149 +16,9 @@
     </InvalidPropertyAssignment>
   </file>
   <file src="src/Framework/MockObject/Generator/DoubledMethod.php">
-    <MixedArgument>
-      <code><![CDATA[$e->getCode()]]></code>
-    </MixedArgument>
-    <MixedAssignment>
-      <code><![CDATA[$defaultValue = $parameter->getDefaultValue()]]></code>
-    </MixedAssignment>
     <PossiblyUndefinedVariable>
       <code><![CDATA[$deprecation]]></code>
     </PossiblyUndefinedVariable>
-  </file>
-  <file src="src/Framework/MockObject/Generator/Generator.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[$class->getMethod('__clone')]]></code>
-      <code><![CDATA[$class->getMethod($methodName)]]></code>
-      <code><![CDATA[version_compare(PHP_VERSION, '8.5', '>=')]]></code>
-    </MissingThrowsDocblock>
-    <MixedArgument>
-      <code><![CDATA[$e->getCode()]]></code>
-      <code><![CDATA[$e->getCode()]]></code>
-      <code><![CDATA[$e->getCode()]]></code>
-    </MixedArgument>
-    <PossiblyInvalidArgument>
-      <code><![CDATA[$type]]></code>
-      <code><![CDATA[$additionalInterfaces]]></code>
-    </PossiblyInvalidArgument>
-    <PossiblyNullMethodCall>
-      <code><![CDATA[$reflector->getConstructor()->invokeArgs($object, $arguments)]]></code>
-    </PossiblyNullMethodCall>
-    <RedundantCast>
-      <code><![CDATA[$method]]></code>
-      <code><![CDATA[$method]]></code>
-    </RedundantCast>
-  </file>
-  <file src="src/Framework/MockObject/Runtime/AbstractInvocationImplementation.php">
-    <MixedArgument>
-      <code><![CDATA[$i]]></code>
-      <code><![CDATA[$i]]></code>
-    </MixedArgument>
-    <MixedArrayOffset>
-      <code><![CDATA[$i]]></code>
-      <code><![CDATA[$i]]></code>
-    </MixedArrayOffset>
-    <MixedAssignment>
-      <code><![CDATA[$returnValue = array_pop($mapping)]]></code>
-      <code><![CDATA[$i]]></code>
-      <code><![CDATA[$value]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/Framework/MockObject/Runtime/Api/DoubledCloneMethod.php">
-    <MixedClone>
-      <code><![CDATA[clone $this->__phpunit_state]]></code>
-    </MixedClone>
-  </file>
-  <file src="src/Framework/MockObject/Runtime/Api/Method.php">
-    <MixedReturnStatement>
-      <code><![CDATA[return $this
-            ->__phpunit_getInvocationHandler()
-            ->expects(new AnyInvokedCount)
-            ->method($constraint)
-            ->markAsCreatedWithoutExplicitExpects();]]></code>
-    </MixedReturnStatement>
-    <PossiblyInvalidArgument>
-      <code><![CDATA[$constraint]]></code>
-    </PossiblyInvalidArgument>
-  </file>
-  <file src="src/Framework/MockObject/Runtime/Api/MockObjectApi.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[$this->__phpunit_getInvocationHandler()->verify()]]></code>
-    </MissingThrowsDocblock>
-  </file>
-  <file src="src/Framework/MockObject/Runtime/Api/ProxiedCloneMethod.php">
-    <MixedClone>
-      <code><![CDATA[clone $this->__phpunit_state]]></code>
-    </MixedClone>
-  </file>
-  <file src="src/Framework/MockObject/Runtime/InvocationHandler.php">
-    <MixedAssignment>
-      <code><![CDATA[$value = $match->invoked($invocation)]]></code>
-      <code><![CDATA[$returnValue    = $value]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/Framework/MockObject/Runtime/Rule/InvocationOrder.php">
-    <UnusedParam>
-      <code><![CDATA[$invocation]]></code>
-    </UnusedParam>
-  </file>
-  <file src="src/Framework/MockObject/Runtime/Rule/OrderedParameterSets.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[$parameters->apply($invocation)]]></code>
-    </MissingThrowsDocblock>
-    <MixedAssignment>
-      <code><![CDATA[$parameters]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/Framework/MockObject/Runtime/Rule/Parameters.php">
-    <MixedAssignment>
-      <code><![CDATA[$parameter]]></code>
-      <code><![CDATA[$other = $invocationParameters[$i]]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/Framework/MockObject/Runtime/Rule/PartiallyOrderedParameterSets.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[$parameters->apply($invocation)]]></code>
-    </MissingThrowsDocblock>
-    <MixedAssignment>
-      <code><![CDATA[$parameters]]></code>
-      <code><![CDATA[$parameters = $parameters['pinned']]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/Framework/MockObject/Runtime/Rule/UnorderedParameterSets.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[$parameters->apply($invocation)]]></code>
-      <code><![CDATA[$parameters->apply($invocation)]]></code>
-    </MissingThrowsDocblock>
-    <MixedAssignment>
-      <code><![CDATA[$parameters]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/Framework/MockObject/Runtime/Stub/ConsecutiveCalls.php">
-    <MixedAssignment>
-      <code><![CDATA[$value = array_shift($this->stack)]]></code>
-      <code><![CDATA[$value = $value->invoke($invocation)]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/Framework/MockObject/Runtime/Stub/ReturnValueMap.php">
-    <MixedAssignment>
-      <code><![CDATA[$map]]></code>
-      <code><![CDATA[$return = array_pop($map)]]></code>
-      <code><![CDATA[$expected]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/Framework/MockObject/TestDoubleBuilder.php">
-    <MixedArgument>
-      <code><![CDATA[$e->getCode()]]></code>
-    </MixedArgument>
-  </file>
-  <file src="src/Framework/TestBuilder.php">
-    <PossiblyInvalidArgument>
-      <code><![CDATA[$class]]></code>
-    </PossiblyInvalidArgument>
-    <UnnecessaryVarAnnotation>
-      <code><![CDATA[]]></code>
-    </UnnecessaryVarAnnotation>
   </file>
   <file src="src/Framework/TestCase.php">
     <InvalidArgument>
@@ -267,70 +32,14 @@
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->backupEnvironmentVariables = [...$this->backupEnvironmentVariables, ...BackedUpEnvironmentVariable::create($environmentVariableName)]]]></code>
     </InvalidPropertyAssignment>
-    <MixedArrayAccess>
-      <code><![CDATA[$_ENV[$environmentVariableName]]]></code>
-    </MixedArrayAccess>
-    <MixedAssignment>
-      <code><![CDATA[$return]]></code>
-      <code><![CDATA[$testResult = $this->invokeTestMethod($this->methodName, $testArguments)]]></code>
-      <code><![CDATA[$returnValue = $passedTests->returnValue($dependencyTarget)]]></code>
-      <code><![CDATA[$return]]></code>
-    </MixedAssignment>
     <PossiblyUndefinedVariable>
       <code><![CDATA[$testResult]]></code>
     </PossiblyUndefinedVariable>
   </file>
-  <file src="src/Framework/TestCase/ErrorLogCapture.php">
-    <MixedArgument>
-      <code><![CDATA[$capturePath]]></code>
-      <code><![CDATA[$capturePath]]></code>
-    </MixedArgument>
-    <MixedAssignment>
-      <code><![CDATA[$captureHandle = tmpfile()]]></code>
-      <code><![CDATA[$capturePath = $meta['uri']]]></code>
-    </MixedAssignment>
-  </file>
   <file src="src/Framework/TestCase/GlobalStateCapture.php">
-    <MixedArgument>
-      <code><![CDATA[$GLOBALS]]></code>
-    </MixedArgument>
     <UnusedForeachValue>
       <code><![CDATA[]]></code>
     </UnusedForeachValue>
-  </file>
-  <file src="src/Framework/TestCase/HookMethodInvoker.php">
-    <MixedArgument>
-      <code><![CDATA[$hookMethods['beforeClass']]]></code>
-      <code><![CDATA[$hookMethods['before']]]></code>
-      <code><![CDATA[$hookMethods['preCondition']]]></code>
-      <code><![CDATA[$hookMethods['postCondition']]]></code>
-      <code><![CDATA[$hookMethods['after']]]></code>
-      <code><![CDATA[$hookMethods['afterClass']]]></code>
-    </MixedArgument>
-  </file>
-  <file src="src/Framework/TestRunner/ChildProcessResultProcessor.php">
-    <MixedArgument>
-      <code><![CDATA[$childResult->events]]></code>
-      <code><![CDATA[$childResult->passedTests]]></code>
-      <code><![CDATA[$childResult->codeCoverage]]></code>
-    </MixedArgument>
-    <MixedAssignment>
-      <code><![CDATA[$childResult = @unserialize($serializedProcessResult)]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/Framework/TestRunner/ErrorHandlerBootstrapper.php">
-    <PossiblyInvalidArgument>
-      <code><![CDATA[$deprecationTriggers]]></code>
-    </PossiblyInvalidArgument>
-  </file>
-  <file src="src/Framework/TestRunner/SeparateProcessTestRunner.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[random_bytes(16)]]></code>
-    </MissingThrowsDocblock>
-    <PossiblyInvalidArrayAccess>
-      <code><![CDATA[$offset[0]]]></code>
-      <code><![CDATA[$offset[1]]]></code>
-    </PossiblyInvalidArrayAccess>
   </file>
   <file src="src/Framework/TestRunner/TestRunner.php">
     <UnusedVariable>
@@ -341,40 +50,9 @@
     <InvalidArgument>
       <code><![CDATA[$iterator]]></code>
     </InvalidArgument>
-    <MixedArgument>
-      <code><![CDATA[$method]]></code>
-      <code><![CDATA[$method]]></code>
-      <code><![CDATA[$method]]></code>
-      <code><![CDATA[$method]]></code>
-      <code><![CDATA[$method]]></code>
-    </MixedArgument>
-    <MixedAssignment>
-      <code><![CDATA[$test = array_pop($tests)]]></code>
-      <code><![CDATA[$methods         = (new HookMethods)->hookMethods($this->name)['beforeClass']->methodNamesSortedByPriority()]]></code>
-      <code><![CDATA[$method]]></code>
-      <code><![CDATA[$methods       = (new HookMethods)->hookMethods($this->name)['afterClass']->methodNamesSortedByPriority()]]></code>
-      <code><![CDATA[$method]]></code>
-    </MixedAssignment>
-    <MixedMethodCall>
-      <code><![CDATA[$test->run()]]></code>
-    </MixedMethodCall>
     <NullableReturnStatement>
       <code><![CDATA[return $this->providedTests;]]></code>
     </NullableReturnStatement>
-    <PossiblyNullArgument>
-      <code><![CDATA[$this->providedTests]]></code>
-    </PossiblyNullArgument>
-    <RedundantCast>
-      <code><![CDATA[$filename]]></code>
-    </RedundantCast>
-    <RedundantCondition>
-      <code><![CDATA[$emitCalledEvent]]></code>
-    </RedundantCondition>
-  </file>
-  <file src="src/Logging/EventLogger.php">
-    <MixedArgument>
-      <code><![CDATA[$flags]]></code>
-    </MixedArgument>
   </file>
   <file src="src/Logging/JUnit/JunitXmlLogger.php">
     <InvalidTemplateParam>
@@ -384,82 +62,6 @@
       <code><![CDATA[$this->currentTestCase->appendChild($fault)]]></code>
       <code><![CDATA[$this->currentTestCase->appendChild($skipped)]]></code>
     </InvalidTemplateParam>
-    <MissingThrowsDocblock>
-      <code><![CDATA[$this->document->createElement('testsuite')]]></code>
-      <code><![CDATA[$this->document->createElement(
-                'system-out',
-                Xml::prepareString($this->unexpectedOutput),
-            )]]></code>
-      <code><![CDATA[$this->document->createElement('testsuites')]]></code>
-      <code><![CDATA[$this->document->createElement(
-            $type,
-            Xml::prepareString($buffer),
-        )]]></code>
-      <code><![CDATA[$this->document->createElement('skipped')]]></code>
-      <code><![CDATA[$this->document->createElement('testcase')]]></code>
-    </MissingThrowsDocblock>
-    <MixedArgument>
-      <code><![CDATA[$event->testSuite()->file()]]></code>
-    </MixedArgument>
-    <PossiblyNullMethodCall>
-      <code><![CDATA[$this->currentTestCase->appendChild($fault)]]></code>
-    </PossiblyNullMethodCall>
-    <PropertyTypeCoercion>
-      <code><![CDATA[$this->root = $this->document->createElement('testsuites')]]></code>
-      <code><![CDATA[$this->currentTestCase = $testCase]]></code>
-    </PropertyTypeCoercion>
-  </file>
-  <file src="src/Logging/OpenTestReporting/OtrXmlLogger.php">
-    <MixedArgument>
-      <code><![CDATA[$error['message']]]></code>
-    </MixedArgument>
-  </file>
-  <file src="src/Logging/TestDox/NamePrettifier.php">
-    <MixedArgument>
-      <code><![CDATA[$matches[1]]]></code>
-    </MixedArgument>
-    <MixedAssignment>
-      <code><![CDATA[$value = $providedDataValues[$parameter->getName()]]]></code>
-      <code><![CDATA[$value = $providedDataValues[$i]]]></code>
-      <code><![CDATA[$value = $parameter->getDefaultValue()]]></code>
-      <code><![CDATA[$result = $reflector->invokeArgs(null, $arguments)]]></code>
-    </MixedAssignment>
-    <PossiblyInvalidArgument>
-      <code><![CDATA[$test->dataName()]]></code>
-      <code><![CDATA[$position]]></code>
-    </PossiblyInvalidArgument>
-  </file>
-  <file src="src/Metadata/Api/DataProvider.php">
-    <MixedAssignment>
-      <code><![CDATA[$data = $className::$methodName()]]></code>
-      <code><![CDATA[$value]]></code>
-      <code><![CDATA[$data     = $callable()]]></code>
-      <code><![CDATA[$value]]></code>
-      <code><![CDATA[$value         = $_testWith->data()]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/Metadata/Api/Requirements.php">
-    <MixedArgument>
-      <code><![CDATA[$environmentVariables]]></code>
-    </MixedArgument>
-    <MixedArrayAccess>
-      <code><![CDATA[$environmentVariables[$environmentVariableName]]]></code>
-      <code><![CDATA[$environmentVariables[$environmentVariableName]]]></code>
-    </MixedArrayAccess>
-    <MixedAssignment>
-      <code><![CDATA[$environmentVariables    = $_ENV]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/Metadata/Parser/AttributeParser.php">
-    <MixedAssignment>
-      <code><![CDATA[$attributeInstance = $attribute->newInstance()]]></code>
-      <code><![CDATA[$attributeInstance = $attribute->newInstance()]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/Metadata/Version/ComparisonRequirement.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[version_compare($version, $this->version, $this->operator->asString())]]></code>
-    </MissingThrowsDocblock>
   </file>
   <file src="src/Metadata/Version/ConstraintRequirement.php">
     <ImpureMethodCall>
@@ -477,40 +79,8 @@
       <code><![CDATA[self::FROM_SUPERGLOBAL]]></code>
       <code><![CDATA[self::FROM_GETENV]]></code>
     </InvalidArgument>
-    <MixedArgument>
-      <code><![CDATA[$superglobalValue]]></code>
-    </MixedArgument>
-    <MixedArrayAccess>
-      <code><![CDATA[$_ENV[$name]]]></code>
-      <code><![CDATA[$_ENV[$name]]]></code>
-      <code><![CDATA[$_ENV[$name]]]></code>
-      <code><![CDATA[$_ENV[$this->name]]]></code>
-    </MixedArrayAccess>
-    <MixedAssignment>
-      <code><![CDATA[$superglobalValue = $_ENV[$name]]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/Runner/Baseline/Issue.php">
-    <MixedArgument>
-      <code><![CDATA[$lines[$key]]]></code>
-    </MixedArgument>
   </file>
   <file src="src/Runner/CodeCoverage.php">
-    <InternalMethod>
-      <code><![CDATA[$this->codeCoverage()->driverInformation()]]></code>
-    </InternalMethod>
-    <MixedAssignment>
-      <code><![CDATA[$lines]]></code>
-      <code><![CDATA[$lineStatus]]></code>
-    </MixedAssignment>
-    <PossiblyNullMethodCall>
-      <code><![CDATA[$this->test->status()]]></code>
-      <code><![CDATA[$this->codeCoverage->validate($covers)]]></code>
-      <code><![CDATA[$this->test->valueObjectForEvents()]]></code>
-      <code><![CDATA[$this->codeCoverage->validate($uses)]]></code>
-      <code><![CDATA[$this->test->valueObjectForEvents()]]></code>
-      <code><![CDATA[$this->codeCoverage->stop($append, $status, $covers, $uses, $time)]]></code>
-    </PossiblyNullMethodCall>
     <UnusedVariable>
       <code><![CDATA[]]></code>
     </UnusedVariable>
@@ -519,47 +89,14 @@
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->issueTriggerResolvers = [new DefaultIssueTriggerResolver]]]></code>
     </InvalidPropertyAssignment>
-    <MissingThrowsDocblock>
-      <code><![CDATA[]]></code>
-    </MissingThrowsDocblock>
-    <MixedArrayAccess>
-      <code><![CDATA[$trace[++$i]['class']]]></code>
-    </MixedArrayAccess>
-    <RedundantCondition>
-      <code><![CDATA[$position !== null]]></code>
-      <code><![CDATA[!is_callable($handler)]]></code>
-      <code><![CDATA[$invalidErrorHandlerStack]]></code>
-    </RedundantCondition>
     <UnusedForeachValue>
       <code><![CDATA[]]></code>
     </UnusedForeachValue>
-    <UnusedParam>
-      <code><![CDATA[$messages]]></code>
-    </UnusedParam>
   </file>
   <file src="src/Runner/Filter/GroupFilterIterator.php">
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->groupTests = $groupTests]]></code>
     </InvalidPropertyAssignment>
-  </file>
-  <file src="src/Runner/IssueTriggerResolver/DefaultResolver.php">
-    <PossiblyInvalidArgument>
-      <code><![CDATA[$callee]]></code>
-      <code><![CDATA[$caller]]></code>
-    </PossiblyInvalidArgument>
-  </file>
-  <file src="src/Runner/Phpt/Parser.php">
-    <MixedArgument>
-      <code><![CDATA[$line]]></code>
-    </MixedArgument>
-    <MixedAssignment>
-      <code><![CDATA[$line]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/Runner/Phpt/Renderer.php">
-    <MixedArgument>
-      <code><![CDATA[$files['job']]]></code>
-    </MixedArgument>
   </file>
   <file src="src/Runner/Phpt/TestCase.php">
     <ImpossibleIdenticalComparison>
@@ -568,51 +105,7 @@
     </ImpossibleIdenticalComparison>
     <InvalidArgument>
       <code><![CDATA[$this->coverageFiles()]]></code>
-      <code><![CDATA[[]]]></code>
     </InvalidArgument>
-    <MixedArrayAccess>
-      <code><![CDATA[$frame['file']]]></code>
-      <code><![CDATA[$frame['file']]]></code>
-      <code><![CDATA[$frame['line']]]></code>
-      <code><![CDATA[$frame['line']]]></code>
-      <code><![CDATA[$frame['type']]]></code>
-      <code><![CDATA[$frame['type']]]></code>
-      <code><![CDATA[$frame['function']]]></code>
-    </MixedArrayAccess>
-    <MixedAssignment>
-      <code><![CDATA[$frame]]></code>
-      <code><![CDATA[$file = $frame['file']]]></code>
-      <code><![CDATA[$line = $frame['line']]]></code>
-      <code><![CDATA[$type = $frame['type']]]></code>
-      <code><![CDATA[$unserialized = @unserialize(
-                $buffer,
-                [
-                    'allowed_classes' => [
-                        /** @phpstan-ignore classConstant.internalClass */
-                        RawCodeCoverageData::class,
-                    ],
-                ],
-            )]]></code>
-    </MixedAssignment>
-    <PossiblyInvalidArgument>
-      <code><![CDATA[$fileExternalPath]]></code>
-      <code><![CDATA[$input]]></code>
-    </PossiblyInvalidArgument>
-  </file>
-  <file src="src/Runner/ResultCache/DefaultResultCache.php">
-    <MixedAssignment>
-      <code><![CDATA[$data = json_decode(
-            $contents,
-            true,
-        )]]></code>
-      <code><![CDATA[$status]]></code>
-      <code><![CDATA[$time]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/Runner/TestResult/Collector.php">
-    <UnusedParam>
-      <code><![CDATA[$event]]></code>
-    </UnusedParam>
   </file>
   <file src="src/Runner/TestResult/Issue.php">
     <InvalidPropertyAssignment>
@@ -632,69 +125,12 @@
         )]]></code>
     </InvalidPropertyAssignment>
   </file>
-  <file src="src/Runner/TestSuiteSorter.php">
-    <MixedArgument>
-      <code><![CDATA[$tests[$i]->requires()]]></code>
-    </MixedArgument>
-    <MixedMethodCall>
-      <code><![CDATA[$tests[$i]->requires()]]></code>
-      <code><![CDATA[$tests[$i]->provides()]]></code>
-    </MixedMethodCall>
-  </file>
-  <file src="src/TextUI/Application.php">
-    <MixedAssignment>
-      <code><![CDATA[$composerInstall = PHPUNIT_COMPOSER_INSTALL]]></code>
-      <code><![CDATA[$classMap = require $classMapFile]]></code>
-      <code><![CDATA[$sourceCodeFile]]></code>
-    </MixedAssignment>
-    <PossiblyInvalidArgument>
-      <code><![CDATA[$deprecationTriggers]]></code>
-    </PossiblyInvalidArgument>
-  </file>
-  <file src="src/TextUI/Command/Commands/AtLeastVersionCommand.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[version_compare(Version::id(), $this->version, '>=')]]></code>
-    </MissingThrowsDocblock>
-  </file>
   <file src="src/TextUI/Command/Commands/ListTestsAsXmlCommand.php">
     <ImpossibleIdenticalComparison>
       <code><![CDATA[$test::class !== $currentTestClass]]></code>
     </ImpossibleIdenticalComparison>
-    <MixedArgument>
-      <code><![CDATA[$testId]]></code>
-    </MixedArgument>
-    <MixedAssignment>
-      <code><![CDATA[$testIds]]></code>
-      <code><![CDATA[$testId]]></code>
-    </MixedAssignment>
-    <RedundantCondition>
-      <code><![CDATA[$currentTestClass !== null]]></code>
-      <code><![CDATA[$currentTestClass !== null]]></code>
-      <code><![CDATA[$currentTestClass !== null]]></code>
-    </RedundantCondition>
-  </file>
-  <file src="src/TextUI/Command/Commands/VersionCheckCommand.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[version_compare($latestVersion, $this->versionId, '>')]]></code>
-      <code><![CDATA[version_compare($latestCompatibleVersion, $this->versionId, '>')]]></code>
-    </MissingThrowsDocblock>
-  </file>
-  <file src="src/TextUI/Configuration/Builder.php">
-    <MixedArgument>
-      <code><![CDATA[$e->getCode()]]></code>
-    </MixedArgument>
   </file>
   <file src="src/TextUI/Configuration/Cli/Builder.php">
-    <PossiblyInvalidArgument>
-      <code><![CDATA[$excludeGroups]]></code>
-      <code><![CDATA[$groups]]></code>
-      <code><![CDATA[$testsCovering]]></code>
-      <code><![CDATA[$testsUsing]]></code>
-      <code><![CDATA[$testsRequiringPhpExtension]]></code>
-      <code><![CDATA[$iniSettings]]></code>
-      <code><![CDATA[$testSuffixes]]></code>
-      <code><![CDATA[$coverageFilter]]></code>
-    </PossiblyInvalidArgument>
     <UnusedVariable>
       <code><![CDATA[]]></code>
       <code><![CDATA[]]></code>
@@ -703,74 +139,10 @@
     </UnusedVariable>
   </file>
   <file src="src/TextUI/Configuration/Merger.php">
-    <MixedArgument>
-      <code><![CDATA[$xmlConfiguration->filename()]]></code>
-      <code><![CDATA[$phpSelf]]></code>
-      <code><![CDATA[$xmlConfiguration->filename()]]></code>
-    </MixedArgument>
-    <MixedArrayAccess>
-      <code><![CDATA[$_SERVER['PHP_SELF']]]></code>
-      <code><![CDATA[$_SERVER['PHP_SELF']]]></code>
-      <code><![CDATA[$_SERVER['PHP_SELF']]]></code>
-    </MixedArrayAccess>
-    <MixedAssignment>
-      <code><![CDATA[$phpSelf = $_SERVER['PHP_SELF']]]></code>
-    </MixedAssignment>
     <UnusedVariable>
       <code><![CDATA[]]></code>
       <code><![CDATA[]]></code>
     </UnusedVariable>
-  </file>
-  <file src="src/TextUI/Configuration/PhpHandler.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[constant($value)]]></code>
-    </MissingThrowsDocblock>
-    <MixedArrayAccess>
-      <code><![CDATA[$GLOBALS[$target]]]></code>
-      <code><![CDATA[$GLOBALS[$target]]]></code>
-      <code><![CDATA[$GLOBALS[$target]]]></code>
-      <code><![CDATA[$_ENV[$name]]]></code>
-    </MixedArrayAccess>
-    <MixedAssignment>
-      <code><![CDATA[$constantValue = constant($value)]]></code>
-      <code><![CDATA[$values = $GLOBALS[$target]]]></code>
-      <code><![CDATA[$value = $variable->value()]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/TextUI/Configuration/Registry.php">
-    <MixedAssignment>
-      <code><![CDATA[$configuration = unserialize(
-            $buffer,
-            [
-                'allowed_classes' => [
-                    Configuration::class,
-                    Php::class,
-                    ConstantCollection::class,
-                    Constant::class,
-                    IniSettingCollection::class,
-                    IniSetting::class,
-                    VariableCollection::class,
-                    Variable::class,
-                    DirectoryCollection::class,
-                    Directory::class,
-                    FileCollection::class,
-                    File::class,
-                    FilterDirectoryCollection::class,
-                    FilterDirectory::class,
-                    FilterFileCollection::class,
-                    FilterFile::class,
-                    TestDirectoryCollection::class,
-                    TestDirectory::class,
-                    TestFileCollection::class,
-                    TestFile::class,
-                    TestSuiteCollection::class,
-                    TestSuite::class,
-                    VersionComparisonOperator::class,
-                    Source::class,
-                ],
-            ],
-        )]]></code>
-    </MixedAssignment>
   </file>
   <file src="src/TextUI/Configuration/SourceMapper.php">
     <InvalidPropertyAssignment>
@@ -780,82 +152,11 @@
     <InvalidReturnType>
       <code><![CDATA[return array_values($aggregated);]]></code>
     </InvalidReturnType>
-    <MixedAssignment>
-      <code><![CDATA[$map = unserialize($content, ['allowed_classes' => false])]]></code>
-      <code><![CDATA[$included]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/TextUI/Configuration/TestSuiteBuilder.php">
-    <MixedArgument>
-      <code><![CDATA[$file]]></code>
-    </MixedArgument>
-    <MixedAssignment>
-      <code><![CDATA[$file]]></code>
-    </MixedAssignment>
   </file>
   <file src="src/TextUI/Configuration/Xml/Loader.php">
-    <MixedArgument>
-      <code><![CDATA[$e->getCode()]]></code>
-      <code><![CDATA[$e->getCode()]]></code>
-    </MixedArgument>
-    <PossiblyInvalidArgument>
-      <code><![CDATA[$deprecationTriggers]]></code>
-    </PossiblyInvalidArgument>
     <UnusedVariable>
       <code><![CDATA[]]></code>
     </UnusedVariable>
-  </file>
-  <file src="src/TextUI/Configuration/Xml/Migration/MigrationBuilder.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[version_compare($version, $fromVersion, '<')]]></code>
-    </MissingThrowsDocblock>
-  </file>
-  <file src="src/TextUI/Configuration/Xml/Migration/Migrations/ConvertLogTypes.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[$document->createElement($types[$type])]]></code>
-    </MissingThrowsDocblock>
-    <PossiblyInvalidArgument>
-      <code><![CDATA[$newLogNode]]></code>
-    </PossiblyInvalidArgument>
-  </file>
-  <file src="src/TextUI/Configuration/Xml/Migration/Migrations/CoverageCloverToReport.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[$ownerDocument->createElement('clover')]]></code>
-    </MissingThrowsDocblock>
-  </file>
-  <file src="src/TextUI/Configuration/Xml/Migration/Migrations/CoverageCrap4jToReport.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[$ownerDocument->createElement('crap4j')]]></code>
-    </MissingThrowsDocblock>
-    <PossiblyInvalidArgument>
-      <code><![CDATA[$crap4j]]></code>
-    </PossiblyInvalidArgument>
-  </file>
-  <file src="src/TextUI/Configuration/Xml/Migration/Migrations/CoverageHtmlToReport.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[$ownerDocument->createElement('html')]]></code>
-    </MissingThrowsDocblock>
-    <PossiblyInvalidArgument>
-      <code><![CDATA[$html]]></code>
-    </PossiblyInvalidArgument>
-  </file>
-  <file src="src/TextUI/Configuration/Xml/Migration/Migrations/CoveragePhpToReport.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[$ownerDocument->createElement('php')]]></code>
-    </MissingThrowsDocblock>
-  </file>
-  <file src="src/TextUI/Configuration/Xml/Migration/Migrations/CoverageTextToReport.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[$ownerDocument->createElement('text')]]></code>
-    </MissingThrowsDocblock>
-    <PossiblyInvalidArgument>
-      <code><![CDATA[$text]]></code>
-    </PossiblyInvalidArgument>
-  </file>
-  <file src="src/TextUI/Configuration/Xml/Migration/Migrations/CoverageXmlToReport.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[$ownerDocument->createElement('xml')]]></code>
-    </MissingThrowsDocblock>
   </file>
   <file src="src/TextUI/Configuration/Xml/Migration/Migrations/IntroduceCoverageElement.php">
     <InvalidTemplateParam>
@@ -864,25 +165,16 @@
             $documentElement->firstChild,
         )]]></code>
     </InvalidTemplateParam>
-    <MissingThrowsDocblock>
-      <code><![CDATA[$document->createElement('coverage')]]></code>
-    </MissingThrowsDocblock>
   </file>
   <file src="src/TextUI/Configuration/Xml/Migration/Migrations/LogToReportMigration.php">
     <InvalidTemplateParam>
       <code><![CDATA[$coverage->appendChild($document->createElement('report'))]]></code>
     </InvalidTemplateParam>
-    <MissingThrowsDocblock>
-      <code><![CDATA[$document->createElement('report')]]></code>
-    </MissingThrowsDocblock>
   </file>
   <file src="src/TextUI/Configuration/Xml/Migration/Migrations/MoveCoverageDirectoriesToSource.php">
     <InvalidTemplateParam>
       <code><![CDATA[$root->appendChild($source)]]></code>
     </InvalidTemplateParam>
-    <MissingThrowsDocblock>
-      <code><![CDATA[$document->createElement('source')]]></code>
-    </MissingThrowsDocblock>
   </file>
   <file src="src/TextUI/Configuration/Xml/Migration/Migrations/MoveWhitelistExcludesToCoverage.php">
     <InvalidArgument>
@@ -893,215 +185,30 @@
                 $document->createElement('exclude'),
             )]]></code>
     </InvalidTemplateParam>
-    <MissingThrowsDocblock>
-      <code><![CDATA[$document->createElement('exclude')]]></code>
-    </MissingThrowsDocblock>
   </file>
   <file src="src/TextUI/Configuration/Xml/Migration/Migrations/MoveWhitelistIncludesToCoverage.php">
     <InvalidTemplateParam>
       <code><![CDATA[$coverage->appendChild($include)]]></code>
     </InvalidTemplateParam>
-    <MissingThrowsDocblock>
-      <code><![CDATA[$document->createElement('include')]]></code>
-    </MissingThrowsDocblock>
   </file>
   <file src="src/TextUI/Configuration/Xml/Migration/Migrations/RemoveLogTypes.php">
     <InvalidArgument>
       <code><![CDATA[$logging->getElementsByTagName('log')]]></code>
     </InvalidArgument>
   </file>
-  <file src="src/TextUI/Configuration/Xml/TestSuiteMapper.php">
-    <MissingThrowsDocblock>
-      <code><![CDATA[version_compare(PHP_VERSION, $directory->phpVersion(), $directory->phpVersionOperator()->asString())]]></code>
-      <code><![CDATA[version_compare(PHP_VERSION, $file->phpVersion(), $file->phpVersionOperator()->asString())]]></code>
-    </MissingThrowsDocblock>
-    <MixedArgument>
-      <code><![CDATA[$e->getCode()]]></code>
-    </MixedArgument>
-  </file>
   <file src="src/TextUI/Configuration/Xml/Validator/Validator.php">
     <TooFewArguments>
       <code><![CDATA[$document->schemaValidateSource($buffer)]]></code>
     </TooFewArguments>
   </file>
-  <file src="src/TextUI/Help.php">
-    <MixedArgument>
-      <code><![CDATA[$matches[0]]]></code>
-    </MixedArgument>
-  </file>
-  <file src="src/TextUI/Output/Default/ProgressPrinter/ProgressPrinter.php">
-    <UnusedParam>
-      <code><![CDATA[$event]]></code>
-      <code><![CDATA[$event]]></code>
-    </UnusedParam>
-  </file>
-  <file src="src/TextUI/Output/Default/ResultPrinter.php">
-    <MixedArrayOffset>
-      <code><![CDATA[$line]]></code>
-      <code><![CDATA[$line]]></code>
-    </MixedArrayOffset>
-    <MixedAssignment>
-      <code><![CDATA[$line]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/TextUI/Output/Facade.php">
-    <PossiblyNullArgument>
-      <code><![CDATA[self::$printer]]></code>
-    </PossiblyNullArgument>
-  </file>
-  <file src="src/TextUI/Output/Printer/DefaultPrinter.php">
-    <MixedAssignment>
-      <code><![CDATA[$stream = @fsockopen($tmp[0], (int) $tmp[1])]]></code>
-      <code><![CDATA[$stream = fopen($out, 'wb')]]></code>
-    </MixedAssignment>
-  </file>
   <file src="src/TextUI/Output/TestDox/ResultPrinter.php">
     <InvalidArgument>
       <code><![CDATA[$previousPath]]></code>
     </InvalidArgument>
-    <MixedArgument>
-      <code><![CDATA[$line]]></code>
-      <code><![CDATA[$line]]></code>
-      <code><![CDATA[$line]]></code>
-      <code><![CDATA[$line]]></code>
-    </MixedArgument>
-    <MixedAssignment>
-      <code><![CDATA[$line]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/TextUI/TestRunner.php">
-    <RedundantCast>
-      <code><![CDATA[$t->getCode()]]></code>
-    </RedundantCast>
-  </file>
-  <file src="src/TextUI/TestSuiteFilterProcessor.php">
-    <InvalidArgument>
-      <code><![CDATA[array_map(
-                    static fn (string $name): string => '__phpunit_requires_php_extension' . $name,
-                    $configuration->testsRequiringPhpExtension(),
-                )]]></code>
-    </InvalidArgument>
-    <MixedAssignment>
-      <code><![CDATA[$line]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/Util/Color.php">
-    <MixedArgument>
-      <code><![CDATA[$maxBoxWidth]]></code>
-      <code><![CDATA[$matches[0]]]></code>
-      <code><![CDATA[$matches[0]]]></code>
-    </MixedArgument>
-    <MixedAssignment>
-      <code><![CDATA[$maxBoxWidth = max(array_map(strlen(...), $lines))]]></code>
-      <code><![CDATA[$maxBoxWidth = min($maxBoxWidth, $columns)]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/Util/Filesystem.php">
-    <InvalidReturnType>
-      <code><![CDATA[return realpath($directory) . DIRECTORY_SEPARATOR . basename($path);]]></code>
-    </InvalidReturnType>
-  </file>
-  <file src="src/Util/Filter.php">
-    <MixedArgument>
-      <code><![CDATA[$prefix]]></code>
-      <code><![CDATA[$GLOBALS['_SERVER']['SCRIPT_NAME']]]></code>
-      <code><![CDATA[$GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST']]]></code>
-    </MixedArgument>
-    <MixedArrayAccess>
-      <code><![CDATA[$GLOBALS['_SERVER']]]></code>
-      <code><![CDATA[$GLOBALS['_SERVER']]]></code>
-      <code><![CDATA[$GLOBALS['_SERVER']]]></code>
-      <code><![CDATA[$GLOBALS['_SERVER']]]></code>
-      <code><![CDATA[$GLOBALS['_SERVER']]]></code>
-      <code><![CDATA[$GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST']]]></code>
-      <code><![CDATA[$GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST']]]></code>
-      <code><![CDATA[$GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST']]]></code>
-      <code><![CDATA[$GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST']]]></code>
-    </MixedArrayAccess>
-    <MixedAssignment>
-      <code><![CDATA[$prefix = __PHPUNIT_PHAR_ROOT__]]></code>
-    </MixedAssignment>
-    <PossiblyNullMethodCall>
-      <code><![CDATA[$t->getTrace()]]></code>
-      <code><![CDATA[$t->getFile()]]></code>
-      <code><![CDATA[$t->getLine()]]></code>
-    </PossiblyNullMethodCall>
-  </file>
-  <file src="src/Util/GlobalState.php">
-    <MixedArgument>
-      <code><![CDATA[$files[0]]]></code>
-      <code><![CDATA[$GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST']]]></code>
-      <code><![CDATA[$file]]></code>
-      <code><![CDATA[$file]]></code>
-      <code><![CDATA[$file]]></code>
-      <code><![CDATA[$file]]></code>
-    </MixedArgument>
-    <MixedArrayAccess>
-      <code><![CDATA[$GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST']]]></code>
-      <code><![CDATA[$GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST']]]></code>
-      <code><![CDATA[$GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST']]]></code>
-      <code><![CDATA[$GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST']]]></code>
-      <code><![CDATA[$GLOBALS[$superGlobalArray]]]></code>
-      <code><![CDATA[$GLOBALS[$superGlobalArray]]]></code>
-      <code><![CDATA[$GLOBALS[$superGlobalArray]]]></code>
-    </MixedArrayAccess>
-    <MixedAssignment>
-      <code><![CDATA[$file]]></code>
-      <code><![CDATA[$value]]></code>
-      <code><![CDATA[$value]]></code>
-      <code><![CDATA[$value]]></code>
-      <code><![CDATA[$element]]></code>
-    </MixedAssignment>
-  </file>
-  <file src="src/Util/Json.php">
-    <MixedAssignment>
-      <code><![CDATA[$decodedJson = json_decode($json, false)]]></code>
-      <code><![CDATA[$decodedJson = json_decode($json)]]></code>
-      <code><![CDATA[$value]]></code>
-    </MixedAssignment>
   </file>
   <file src="src/Util/PHP/JobRunner.php">
-    <MixedArrayAccess>
-      <code><![CDATA[$serverVariables['argv']]]></code>
-      <code><![CDATA[$serverVariables['argc']]]></code>
-    </MixedArrayAccess>
-    <MixedAssignment>
-      <code><![CDATA[$serverVariables = $_SERVER ?? []]]></code>
-      <code><![CDATA[$value]]></code>
-      <code><![CDATA[$mergedOutputStream = tmpfile()]]></code>
-      <code><![CDATA[$process = proc_open(
-            $this->buildCommand($job, $temporaryFile),
-            $pipeSpec,
-            $pipes,
-            null,
-            $environmentVariables,
-        )]]></code>
-    </MixedAssignment>
     <UnusedForeachValue>
       <code><![CDATA[]]></code>
     </UnusedForeachValue>
-  </file>
-  <file src="src/Util/Sanitizer.php">
-    <MixedArgument>
-      <code><![CDATA[$matches[0]]]></code>
-    </MixedArgument>
-  </file>
-  <file src="src/Util/Test.php">
-    <MixedArrayAccess>
-      <code><![CDATA[$frame['object']]]></code>
-      <code><![CDATA[$frame['object']]]></code>
-      <code><![CDATA[$frame['object']]]></code>
-    </MixedArrayAccess>
-    <MixedAssignment>
-      <code><![CDATA[$frame]]></code>
-    </MixedAssignment>
-    <MixedReturnStatement>
-      <code><![CDATA[return $frame['object'];]]></code>
-    </MixedReturnStatement>
-  </file>
-  <file src="src/Util/ThrowableToStringMapper.php">
-    <PossiblyNullMethodCall>
-      <code><![CDATA[$t->getComparisonFailure()->getDiff()]]></code>
-    </PossiblyNullMethodCall>
   </file>
 </files>

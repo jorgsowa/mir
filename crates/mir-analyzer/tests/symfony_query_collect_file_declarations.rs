@@ -17,16 +17,16 @@ fn symfony_query_collect_file_declarations() {
         .expect("Request file");
     let decls = collect_file_declarations(&db, file);
     assert_eq!(
-        decls.class_like_len(),
+        decls.class_like().count(),
         1,
         "Request.php should export one class-like symbol"
     );
     assert!(
-        decls.function_len() == 0,
+        decls.functions().count() == 0,
         "Request.php should not export free functions"
     );
     assert!(
-        decls.constant_len() == 0,
+        decls.constants().count() == 0,
         "Request.php should not export file-level constants"
     );
     let request = decls.class_like_at(0).expect("first class-like decl");

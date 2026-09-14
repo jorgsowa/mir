@@ -383,9 +383,7 @@ pub(crate) fn pathinfo_return_type(arg_types: &[Type]) -> Option<Type> {
 
     let flags = arg_types.get(1)?;
     match flags.types.as_slice() {
-        [Atomic::TLiteralInt(flag)] if *flag != PATHINFO_ALL => {
-            Some(Type::single(Atomic::TString))
-        }
+        [Atomic::TLiteralInt(flag)] if *flag != PATHINFO_ALL => Some(Type::single(Atomic::TString)),
         _ => None,
     }
 }
