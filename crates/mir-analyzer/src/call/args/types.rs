@@ -838,6 +838,19 @@ fn is_named_object_coercion(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_
             _ => return false,
         };
         let resolved_param = crate::db::resolve_name(ea.db, &ea.file, param_fqcn.as_ref());
+        // Same class spelled with different casing is not a coercion: PHP
+        // resolves `a` and `A` to one class, so the parameter check cannot
+        // fail at runtime (the `WrongCaseClass` style diagnostic owns the
+        // casing issue).
+        if param_fqcn
+            .as_ref()
+            .eq_ignore_ascii_case(arg_fqcn.as_ref())
+            || resolved_param
+                .as_str()
+                .eq_ignore_ascii_case(resolved_arg.as_str())
+        {
+            return false;
+        }
         // param is a subtype of arg = arg is the ancestor = coercion
         crate::db::extends_or_implements(ea.db, param_fqcn.as_ref(), &resolved_arg)
             || crate::db::extends_or_implements(ea.db, param_fqcn.as_ref(), arg_fqcn.as_ref())
