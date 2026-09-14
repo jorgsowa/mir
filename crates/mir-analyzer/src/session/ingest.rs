@@ -888,44 +888,52 @@ impl AnalysisSession {
     /// memos are pre-warmed on a snapshot (parallel, off the write lock);
     /// the per-file merge under the lock is then a memo hit.
     pub fn settle_workspace_index(&self) {
-        if self.db.salsa.read().index_pending_is_empty() {
-            return;
-        }
-        let pending = self.db.salsa.read().take_index_pending();
-        if pending.is_empty() {
-            return;
-        }
-        let snap = self.snapshot_db();
-        let sfs: Vec<crate::db::SourceFile> = pending
-            .iter()
-            .filter_map(|p| snap.lookup_source_file(p.as_ref()))
-            .collect();
-        let decls: Vec<(crate::db::SourceFile, crate::db::FileDeclarations)> = sfs
-            .iter()
-            .map(|&sf| (sf, crate::db::collect_file_declarations(&snap, sf).clone()))
-            .collect();
-        // Best-effort pre-warm; a concurrent write may cancel it, in which
-        // case the update below collects under the lock (single file, rare).
-        let _ = salsa::Cancelled::catch(std::panic::AssertUnwindSafe(|| {
-            use rayon::prelude::*;
-            sfs.par_iter().for_each_with(snap.clone(), |db, &sf| {
-                let _ = crate::db::collect_file_declarations(db, sf);
-            });
-        }));
-        drop(snap);
-        let mut guard = self.db.salsa.write();
-        // `update_workspace_index_for_file` clones the singleton maps per
-        // call; for a bulk arrival (branch switch) one full rebuild — memo
-        // validations plus a single map build, since the decls were just
-        // pre-warmed above — beats N clones under the write lock.
-        if sfs.len() > 32 {
-            guard.rebuild_workspace_symbol_index();
-            return;
-        }
-        for (sf, decls) in decls {
-            if !guard.update_workspace_index_for_file(sf, decls) {
-                guard.rebuild_workspace_symbol_index();
+        loop {
+            if self.db.salsa.read().index_pending_is_empty() {
+                return;
             }
+            let pending = self.db.salsa.read().take_index_pending();
+            if pending.is_empty() {
+                return;
+            }
+
+            let decls: Vec<(crate::db::SourceFile, crate::db::FileDeclarations)> = loop {
+                let snap = self.snapshot_db();
+                let attempt = salsa::Cancelled::catch(std::panic::AssertUnwindSafe(|| {
+                    use rayon::prelude::*;
+
+                    let sfs: Vec<crate::db::SourceFile> = pending
+                        .iter()
+                        .filter_map(|p| snap.lookup_source_file(p.as_ref()))
+                        .collect();
+
+                    sfs.par_iter()
+                        .map_with(snap.clone(), |db, &sf| {
+                            (sf, crate::db::collect_file_declarations(db, sf).clone())
+                        })
+                        .collect()
+                }));
+                match attempt {
+                    Ok(decls) => break decls,
+                    Err(_) => std::thread::yield_now(),
+                }
+            };
+
+            let mut guard = self.db.salsa.write();
+            // `update_workspace_index_for_file` clones the singleton maps per
+            // call; for a bulk arrival (branch switch) one full rebuild — memo
+            // validations plus a single map build, since the decls were just
+            // pre-warmed above — beats N clones under the write lock.
+            if decls.len() > 32 {
+                guard.rebuild_workspace_symbol_index();
+            } else {
+                for (sf, decls) in decls {
+                    if !guard.update_workspace_index_for_file(sf, decls) {
+                        guard.rebuild_workspace_symbol_index();
+                    }
+                }
+            }
+            drop(guard);
         }
     }
 
