@@ -177,9 +177,6 @@
     </InvalidTemplateParam>
   </file>
   <file src="src/TextUI/Configuration/Xml/Migration/Migrations/MoveWhitelistExcludesToCoverage.php">
-    <InvalidArgument>
-      <code><![CDATA[$whitelist->getElementsByTagName('exclude')]]></code>
-    </InvalidArgument>
     <InvalidTemplateParam>
       <code><![CDATA[$coverage->appendChild(
                 $document->createElement('exclude'),
@@ -190,11 +187,6 @@
     <InvalidTemplateParam>
       <code><![CDATA[$coverage->appendChild($include)]]></code>
     </InvalidTemplateParam>
-  </file>
-  <file src="src/TextUI/Configuration/Xml/Migration/Migrations/RemoveLogTypes.php">
-    <InvalidArgument>
-      <code><![CDATA[$logging->getElementsByTagName('log')]]></code>
-    </InvalidArgument>
   </file>
   <file src="src/TextUI/Output/TestDox/ResultPrinter.php">
     <InvalidArgument>

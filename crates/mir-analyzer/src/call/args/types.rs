@@ -641,8 +641,15 @@ fn named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -
                 Atomic::TParent { fqcn } => fqcn,
                 _ => return false,
             };
-            let resolved_param = crate::db::resolve_name(ea.db, &ea.file, param_fqcn.as_ref());
-            let resolved_arg = crate::db::resolve_name(ea.db, &ea.file, arg_fqcn.as_ref());
+            // These names come from inferred type atoms, including parameter
+            // types declared in another file. Resolve an already-known global
+            // class before applying the caller's namespace; otherwise a
+            // cross-file `DOMNodeList` parameter becomes
+            // `Current\\Namespace\\DOMNodeList`, hiding the stub's covariant
+            // template declaration.
+            let resolved_param =
+                crate::db::resolve_receiver_fqcn(ea.db, &ea.file, param_fqcn.as_ref());
+            let resolved_arg = crate::db::resolve_receiver_fqcn(ea.db, &ea.file, arg_fqcn.as_ref());
 
             let is_same_class = resolved_param == resolved_arg
                 || arg_fqcn.as_ref() == resolved_param.as_str()
@@ -858,8 +865,9 @@ fn strict_named_object_subtype(arg: &Type, param: &Type, ea: &ExpressionAnalyzer
                 Atomic::TNamedObject { fqcn, .. } => fqcn,
                 _ => return false,
             };
-            let resolved_param = crate::db::resolve_name(ea.db, &ea.file, param_fqcn.as_ref());
-            let resolved_arg = crate::db::resolve_name(ea.db, &ea.file, arg_fqcn.as_ref());
+            let resolved_param =
+                crate::db::resolve_receiver_fqcn(ea.db, &ea.file, param_fqcn.as_ref());
+            let resolved_arg = crate::db::resolve_receiver_fqcn(ea.db, &ea.file, arg_fqcn.as_ref());
             resolved_param == resolved_arg
                 || arg_fqcn.as_ref() == resolved_param.as_str()
                 || resolved_arg == param_fqcn.as_ref()
