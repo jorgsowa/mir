@@ -1148,6 +1148,7 @@ impl<'a> StatementsAnalyzer<'a> {
         let mut current = entry;
         current.inside_loop = true;
 
+        let mut stabilized = false;
         for iter_idx in 0..MAX_ITERS {
             let prev_vars = current.vars.clone();
 
@@ -1171,7 +1172,23 @@ impl<'a> StatementsAnalyzer<'a> {
             iter.inside_loop = true;
             body(self, &mut iter);
 
-            let mut next = FlowState::merge_branches(pre, iter.clone(), None);
+            // A guaranteed loop has no zero-iteration exit path.  Merging its
+            // first body pass with `pre` nevertheless used to resurrect every
+            // pre-loop type/refinement and pending write: `do { $x = new X; }
+            // while (...)` could leave `$x` nullable, and a write consumed in
+            // the body could be reported unused after the loop.  Start from the
+            // first completed iteration instead.  Subsequent passes merge the
+            // already-valid post-body state with one more iteration, accounting
+            // for any number of executions without inventing a zeroth one.
+            let mut next = if loop_guaranteed {
+                if iter_idx == 0 {
+                    iter.clone()
+                } else {
+                    FlowState::merge_branches(&current, iter.clone(), None)
+                }
+            } else {
+                FlowState::merge_branches(pre, iter.clone(), None)
+            };
 
             // When the loop body reads a variable that was pending before the loop,
             // the pre-loop write was consumed on the "loop ran" path.  The
@@ -1194,6 +1211,7 @@ impl<'a> StatementsAnalyzer<'a> {
 
             if vars_stabilized(&prev_vars, &next.vars) {
                 current = next;
+                stabilized = true;
                 break;
             }
             // Not the fixed point yet, and (since the loop keeps going) not
@@ -1207,12 +1225,16 @@ impl<'a> StatementsAnalyzer<'a> {
             current = next;
         }
 
-        // Widen any variable still unstable after MAX_ITERS to the union of types
-        widen_unstable(
-            &pre.vars,
-            std::sync::Arc::make_mut(&mut current.vars),
-            loop_guaranteed,
-        );
+        // Widen only if the bounded fixed-point search did not converge.  Doing
+        // this after a converged guaranteed loop used to merge stable body state
+        // back with `pre` anyway, recreating the impossible zero-iteration path.
+        if !stabilized {
+            widen_unstable(
+                &pre.vars,
+                std::sync::Arc::make_mut(&mut current.vars),
+                loop_guaranteed,
+            );
+        }
 
         // For infinite loops (while(true)/for(;;)) the normal-exit path is unreachable;
         // only break statements can leave the loop. Marking current as diverging causes
