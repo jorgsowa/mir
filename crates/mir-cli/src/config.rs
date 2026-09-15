@@ -176,9 +176,9 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
                     }
                 }
 
-                // <directory name="..."> inside <projectFiles> or <ignoreFiles>
-                if name == "directory" {
-                    collect_directory(&e, &path, &mut config);
+                // <file name="..."> or <directory name="..."> inside project files.
+                if name == "file" || name == "directory" {
+                    collect_project_file_entry(&e, &path, &mut config);
                 }
 
                 // <file name="..."> or <directory name="..."> inside <stubs>
@@ -234,8 +234,8 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
                     }
                 }
 
-                if name == "directory" {
-                    collect_directory(&e, &path, &mut config);
+                if name == "file" || name == "directory" {
+                    collect_project_file_entry(&e, &path, &mut config);
                 }
 
                 // <file name="..."/> or <directory name="..."/> inside <stubs>
@@ -298,9 +298,8 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
     Ok(config)
 }
 
-/// Extract `name` attribute from a `<directory name="..."/>` element and push to the
-/// right list based on the current element path.
-fn collect_directory<'a>(
+/// Extract a project or ignored file path from its `name` attribute.
+fn collect_project_file_entry<'a>(
     e: &quick_xml::events::BytesStart<'a>,
     path: &[String],
     config: &mut Config,

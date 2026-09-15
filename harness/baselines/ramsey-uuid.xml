@@ -5,13 +5,6 @@
       <code><![CDATA[new DegradedUuid(new Rfc4122Fields($bytes), $this->numberConverter, $codec, $this->timeConverter)]]></code>
     </ImpureFunctionCall>
   </file>
-  <file src="src/Generator/RandomLibAdapter.php">
-    <UndefinedClass>
-      <code><![CDATA[Generator]]></code>
-      <code><![CDATA[Generator]]></code>
-      <code><![CDATA[Factory]]></code>
-    </UndefinedClass>
-  </file>
   <file src="src/Generator/UnixTimeGenerator.php">
     <PropertyPossiblyUninitialized>
       <code><![CDATA[]]></code>

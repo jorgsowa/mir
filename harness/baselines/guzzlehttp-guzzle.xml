@@ -31,11 +31,6 @@
       <code><![CDATA['header']]></code>
     </NonExistentArrayOffset>
   </file>
-  <file src="src/Middleware.php">
-    <UndefinedClass>
-      <code><![CDATA[LoggerInterface]]></code>
-    </UndefinedClass>
-  </file>
   <file src="src/RetryMiddleware.php">
     <TooManyArguments>
       <code><![CDATA[$response]]></code>
