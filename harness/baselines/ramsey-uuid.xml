@@ -4,68 +4,6 @@
     <ImpureFunctionCall>
       <code><![CDATA[new DegradedUuid(new Rfc4122Fields($bytes), $this->numberConverter, $codec, $this->timeConverter)]]></code>
     </ImpureFunctionCall>
-    <MethodSignatureMismatch>
-      <code><![CDATA[public function build(CodecInterface $codec, string $bytes): UuidInterface]]></code>
-    </MethodSignatureMismatch>
-  </file>
-  <file src="src/Codec/GuidStringCodec.php">
-    <ImpureMethodCall>
-      <code><![CDATA[parent::decode(bin2hex($bytes))]]></code>
-    </ImpureMethodCall>
-    <MethodSignatureMismatch>
-      <code><![CDATA[public function encode(UuidInterface $uuid): string]]></code>
-      <code><![CDATA[public function decode(string $encodedUuid): UuidInterface]]></code>
-      <code><![CDATA[public function decodeBytes(string $bytes): UuidInterface]]></code>
-    </MethodSignatureMismatch>
-  </file>
-  <file src="src/Codec/OrderedTimeCodec.php">
-    <ImpureMethodCall>
-      <code><![CDATA[parent::decodeBytes($rearrangedBytes)]]></code>
-    </ImpureMethodCall>
-    <MethodSignatureMismatch>
-      <code><![CDATA[public function encodeBinary(UuidInterface $uuid): string]]></code>
-      <code><![CDATA[public function decodeBytes(string $bytes): UuidInterface]]></code>
-    </MethodSignatureMismatch>
-  </file>
-  <file src="src/Codec/StringCodec.php">
-    <MethodSignatureMismatch>
-      <code><![CDATA[public function encode(UuidInterface $uuid): string]]></code>
-      <code><![CDATA[public function encodeBinary(UuidInterface $uuid): string]]></code>
-      <code><![CDATA[public function decode(string $encodedUuid): UuidInterface]]></code>
-      <code><![CDATA[public function decodeBytes(string $bytes): UuidInterface]]></code>
-    </MethodSignatureMismatch>
-  </file>
-  <file src="src/Codec/TimestampFirstCombCodec.php">
-    <MethodSignatureMismatch>
-      <code><![CDATA[public function encode(UuidInterface $uuid): string]]></code>
-      <code><![CDATA[public function encodeBinary(UuidInterface $uuid): string]]></code>
-      <code><![CDATA[public function decode(string $encodedUuid): UuidInterface]]></code>
-      <code><![CDATA[public function decodeBytes(string $bytes): UuidInterface]]></code>
-    </MethodSignatureMismatch>
-  </file>
-  <file src="src/Converter/Time/BigNumberTimeConverter.php">
-    <MethodSignatureMismatch>
-      <code><![CDATA[public function calculateTime(string $seconds, string $microseconds): Hexadecimal]]></code>
-      <code><![CDATA[public function convertTime(Hexadecimal $uuidTimestamp): Time]]></code>
-    </MethodSignatureMismatch>
-  </file>
-  <file src="src/Converter/Time/GenericTimeConverter.php">
-    <MethodSignatureMismatch>
-      <code><![CDATA[public function calculateTime(string $seconds, string $microseconds): Hexadecimal]]></code>
-      <code><![CDATA[public function convertTime(Hexadecimal $uuidTimestamp): Time]]></code>
-    </MethodSignatureMismatch>
-  </file>
-  <file src="src/Converter/Time/PhpTimeConverter.php">
-    <MethodSignatureMismatch>
-      <code><![CDATA[public function calculateTime(string $seconds, string $microseconds): Hexadecimal]]></code>
-      <code><![CDATA[public function convertTime(Hexadecimal $uuidTimestamp): Time]]></code>
-    </MethodSignatureMismatch>
-  </file>
-  <file src="src/Converter/Time/UnixTimeConverter.php">
-    <MethodSignatureMismatch>
-      <code><![CDATA[public function calculateTime(string $seconds, string $microseconds): Hexadecimal]]></code>
-      <code><![CDATA[public function convertTime(Hexadecimal $uuidTimestamp): Time]]></code>
-    </MethodSignatureMismatch>
   </file>
   <file src="src/Generator/RandomLibAdapter.php">
     <UndefinedClass>
@@ -84,37 +22,12 @@
       <code><![CDATA[$this->getTimeHiAndVersion()]]></code>
       <code><![CDATA[$this->getTimeMid()]]></code>
       <code><![CDATA[$this->getTimeLow()]]></code>
-      <code><![CDATA[$this->isNil()]]></code>
-      <code><![CDATA[$this->isNil()]]></code>
-      <code><![CDATA[$this->isNil()]]></code>
       <code><![CDATA[$this->getVariant()]]></code>
     </ImpureMethodCall>
-    <MethodSignatureMismatch>
-      <code><![CDATA[public function getBytes(): string]]></code>
-      <code><![CDATA[public function getVersion(): ?int]]></code>
-    </MethodSignatureMismatch>
   </file>
   <file src="src/Lazy/LazyUuidFromString.php">
     <MethodSignatureMismatch>
       <code><![CDATA[unserialize]]></code>
-      <code><![CDATA[public function getBytes(): string]]></code>
-      <code><![CDATA[public function toString(): string]]></code>
-      <code><![CDATA[public function __toString(): string]]></code>
-    </MethodSignatureMismatch>
-  </file>
-  <file src="src/Math/BrickMathCalculator.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$this->fromBase($value->toString(), 16)]]></code>
-    </ImpureMethodCall>
-    <MethodSignatureMismatch>
-      <code><![CDATA[public function add(NumberInterface $augend, NumberInterface ...$addends): NumberInterface]]></code>
-      <code><![CDATA[public function subtract(NumberInterface $minuend, NumberInterface ...$subtrahends): NumberInterface]]></code>
-      <code><![CDATA[public function multiply(NumberInterface $multiplicand, NumberInterface ...$multipliers): NumberInterface]]></code>
-      <code><![CDATA[public function divide(]]></code>
-      <code><![CDATA[public function fromBase(string $value, int $base): IntegerObject]]></code>
-      <code><![CDATA[public function toBase(IntegerObject $value, int $base): string]]></code>
-      <code><![CDATA[public function toHexadecimal(IntegerObject $value): Hexadecimal]]></code>
-      <code><![CDATA[public function toInteger(Hexadecimal $value): IntegerObject]]></code>
     </MethodSignatureMismatch>
   </file>
   <file src="src/Nonstandard/Fields.php">
@@ -123,11 +36,6 @@
       <code><![CDATA[$this->getTimeMid()]]></code>
       <code><![CDATA[$this->getTimeLow()]]></code>
     </ImpureMethodCall>
-    <MethodSignatureMismatch>
-      <code><![CDATA[public function getBytes(): string]]></code>
-      <code><![CDATA[public function getVersion(): ?int]]></code>
-      <code><![CDATA[public function isNil(): bool]]></code>
-    </MethodSignatureMismatch>
   </file>
   <file src="src/Nonstandard/UuidV6.php">
     <ImpureMethodCall>
@@ -145,8 +53,6 @@
   </file>
   <file src="src/Rfc4122/Fields.php">
     <ImpureMethodCall>
-      <code><![CDATA[$this->isNil()]]></code>
-      <code><![CDATA[$this->getVersion()]]></code>
       <code><![CDATA[$this->getTimeHiAndVersion()]]></code>
       <code><![CDATA[$this->getTimeMid()]]></code>
       <code><![CDATA[$this->getTimeLow()]]></code>
@@ -157,19 +63,8 @@
       <code><![CDATA[$this->getTimeHiAndVersion()]]></code>
       <code><![CDATA[$this->getTimeMid()]]></code>
       <code><![CDATA[$this->getTimeLow()]]></code>
-      <code><![CDATA[$this->isNil()]]></code>
-      <code><![CDATA[$this->isNil()]]></code>
       <code><![CDATA[$this->getVariant()]]></code>
     </ImpureMethodCall>
-    <MethodSignatureMismatch>
-      <code><![CDATA[public function getVersion(): ?int]]></code>
-    </MethodSignatureMismatch>
-  </file>
-  <file src="src/Rfc4122/NilTrait.php">
-    <MethodSignatureMismatch>
-      <code><![CDATA[public function isNil(): bool]]></code>
-      <code><![CDATA[public function isNil(): bool]]></code>
-    </MethodSignatureMismatch>
   </file>
   <file src="src/Rfc4122/UuidV2.php">
     <ImpureMethodCall>
@@ -178,24 +73,11 @@
       <code><![CDATA[$this->getFields()]]></code>
     </ImpureMethodCall>
   </file>
-  <file src="src/Rfc4122/Validator.php">
-    <MethodSignatureMismatch>
-      <code><![CDATA[public function validate(string $uuid): bool]]></code>
-    </MethodSignatureMismatch>
-  </file>
   <file src="src/Type/Decimal.php">
     <ImpureMethodCall>
-      <code><![CDATA[$this->toString()]]></code>
-      <code><![CDATA[$this->toString()]]></code>
-      <code><![CDATA[$this->toString()]]></code>
-      <code><![CDATA[$this->toString()]]></code>
       <code><![CDATA[$this->__construct($data)]]></code>
       <code><![CDATA[$this->unserialize($data['string'])]]></code>
     </ImpureMethodCall>
-    <MethodSignatureMismatch>
-      <code><![CDATA[public function toString(): string]]></code>
-      <code><![CDATA[public function __toString(): string]]></code>
-    </MethodSignatureMismatch>
   </file>
   <file src="src/Type/Hexadecimal.php">
     <ImpureMethodCall>
@@ -205,9 +87,6 @@
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->value = $value instanceof self ? (string) $value : $this->prepareValue($value)]]></code>
     </InvalidPropertyAssignment>
-    <MethodSignatureMismatch>
-      <code><![CDATA[public function __toString(): string]]></code>
-    </MethodSignatureMismatch>
   </file>
   <file src="src/Type/Integer.php">
     <ImpureMethodCall>
@@ -217,55 +96,27 @@
     <InvalidPropertyAssignment>
       <code><![CDATA[$this->value = $value instanceof self ? (string) $value : $this->prepareValue($value)]]></code>
     </InvalidPropertyAssignment>
-    <MethodSignatureMismatch>
-      <code><![CDATA[public function __toString(): string]]></code>
-    </MethodSignatureMismatch>
   </file>
   <file src="src/Type/Time.php">
     <ImpureFunctionCall>
       <code><![CDATA[json_encode($this)]]></code>
     </ImpureFunctionCall>
     <ImpureMethodCall>
-      <code><![CDATA[$this->toString()]]></code>
       <code><![CDATA[$this->__construct($time['seconds'], $time['microseconds'])]]></code>
       <code><![CDATA[$this->__construct($data['seconds'], $data['microseconds'])]]></code>
     </ImpureMethodCall>
-    <MethodSignatureMismatch>
-      <code><![CDATA[public function toString(): string]]></code>
-      <code><![CDATA[public function __toString(): string]]></code>
-    </MethodSignatureMismatch>
   </file>
   <file src="src/Uuid.php">
     <ImpureMethodCall>
-      <code><![CDATA[$this->toString()]]></code>
-      <code><![CDATA[$this->toString()]]></code>
       <code><![CDATA[$this->serialize()]]></code>
       <code><![CDATA[$this->unserialize($data['bytes'])]]></code>
-      <code><![CDATA[$this->toString()]]></code>
       <code><![CDATA[$this->compareTo($other)]]></code>
-      <code><![CDATA[$this->toString()]]></code>
       <code><![CDATA[$this->getHex()]]></code>
-      <code><![CDATA[$this->toString()]]></code>
     </ImpureMethodCall>
     <ImpureStaticPropertyAssignment>
       <code><![CDATA[self::$factory = new UuidFactory()]]></code>
       <code><![CDATA[self::$factoryReplaced = ($factory != new UuidFactory())]]></code>
       <code><![CDATA[self::$factory = $factory]]></code>
     </ImpureStaticPropertyAssignment>
-    <MethodSignatureMismatch>
-      <code><![CDATA[public function __toString(): string]]></code>
-      <code><![CDATA[public function getBytes(): string]]></code>
-      <code><![CDATA[public function toString(): string]]></code>
-    </MethodSignatureMismatch>
-  </file>
-  <file src="src/UuidFactory.php">
-    <ImpureMethodCall>
-      <code><![CDATA[$hex->__toString()]]></code>
-    </ImpureMethodCall>
-  </file>
-  <file src="src/Validator/GenericValidator.php">
-    <MethodSignatureMismatch>
-      <code><![CDATA[public function validate(string $uuid): bool]]></code>
-    </MethodSignatureMismatch>
   </file>
 </files>

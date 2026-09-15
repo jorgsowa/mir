@@ -16,4 +16,4 @@ class Impure implements Calculator {
     }
 }
 ===expect===
-ImmutablePropertyModification@9:9-9:23: Assigning to property calls of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
+ImmutablePropertyModification@9:8-9:20: Assigning to property calls of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
