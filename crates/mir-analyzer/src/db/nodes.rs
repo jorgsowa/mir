@@ -69,23 +69,3 @@ impl PartialEq for FileDefinitions {
         *self.slice == *other.slice
     }
 }
-
-// Ancestors return type (S2)
-
-/// The computed ancestor list for a class or interface.
-///
-/// Uses content equality so Salsa's cycle-convergence check can detect
-/// fixpoints correctly (two empty lists from different iterations are equal).
-#[derive(Clone, Debug, Default)]
-pub struct Ancestors(pub Vec<Arc<str>>);
-
-impl PartialEq for Ancestors {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.len() == other.0.len()
-            && self
-                .0
-                .iter()
-                .zip(&other.0)
-                .all(|(a, b)| a.as_ref() == b.as_ref())
-    }
-}

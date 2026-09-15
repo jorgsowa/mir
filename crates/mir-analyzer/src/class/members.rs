@@ -7,12 +7,10 @@ impl<'a> ClassAnalyzer<'a> {
         cls_location: Option<&Location>,
         issues: &mut Vec<Issue>,
     ) {
-        // Walk every ancestor class and collect abstract methods. Uses the
+        // Walk every ancestor and collect abstract methods. Uses the
         // fully-recursive `class_ancestors_by_fqcn` (skipping index 0, `fqcn`
-        // itself) rather than the legacy `self.ancestors()`/`class_ancestors` —
-        // the legacy walker's trait branch doesn't recurse into a trait's own
-        // transitively-used traits, so an abstract method declared only in a
-        // trait-of-a-trait was never even considered here.
+        // itself) so an abstract method declared only in a trait-of-a-trait is
+        // still considered here.
         let here = crate::db::Fqcn::from_str(self.db, fqcn.as_ref());
         let ancestors = crate::db::class_ancestors_by_fqcn(self.db, here);
         for ancestor_fqcn in ancestors.iter().skip(1) {
@@ -67,11 +65,15 @@ impl<'a> ClassAnalyzer<'a> {
         issues: &mut Vec<Issue>,
     ) {
         // Collect all interfaces (direct + from ancestors)
-        let all_ifaces: Vec<Arc<str>> = self
-            .ancestors(fqcn)
-            .into_iter()
-            .filter(|p| crate::db::class_kind(self.db, p.as_ref()).is_some_and(|k| k.is_interface))
-            .collect();
+        let all_ifaces: Vec<Arc<str>> =
+            crate::db::class_ancestors_by_fqcn(self.db, crate::db::Fqcn::from_str(self.db, fqcn))
+                .iter()
+                .skip(1)
+                .filter(|p| {
+                    crate::db::class_kind(self.db, p.as_ref()).is_some_and(|k| k.is_interface)
+                })
+                .cloned()
+                .collect();
 
         for iface_fqcn in &all_ifaces {
             let here = crate::db::Fqcn::from_str(self.db, iface_fqcn.as_ref());

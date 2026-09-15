@@ -197,7 +197,6 @@ pub trait MirDatabase: salsa::Database {
 }
 
 // Re-export all public items from sub-modules to preserve the flat db::* namespace.
-pub use self::ancestors::*;
 pub use self::class_mention_index::{
     ClassMentionIndex, ClassMentionStats, MentionQuery, MentionScanner,
 };
@@ -245,7 +244,6 @@ pub use self::workspace::{
 };
 
 // Sub-modules
-mod ancestors;
 pub(crate) mod class_mention_index;
 mod deps;
 mod find_queries;

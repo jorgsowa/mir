@@ -1795,7 +1795,7 @@ impl<'a> BodyAnalyzer<'a> {
         };
         let trait_list: Vec<Arc<str>> = class.class_traits().to_vec();
         let trait_locs: Vec<(Arc<str>, mir_types::Location)> = class.trait_use_locations().to_vec();
-        let class_all_parents: Vec<Arc<str>> = crate::db::class_ancestors(self.db, here).0.clone();
+        let class_all_parents = crate::db::class_ancestors_by_fqcn(self.db, here);
 
         for trait_fqcn in trait_list.iter() {
             let tr_short: Arc<str> = trait_fqcn
@@ -1934,7 +1934,10 @@ impl<'a> BodyAnalyzer<'a> {
 
             for req in req_ext.iter() {
                 let satisfies = fqcn == req.as_ref()
-                    || class_all_parents.iter().any(|p| p.as_ref() == req.as_ref());
+                    || class_all_parents
+                        .iter()
+                        .skip(1)
+                        .any(|p| p.as_ref() == req.as_ref());
                 if !satisfies {
                     all_issues.push(mir_issues::Issue::new(
                         mir_issues::IssueKind::InvalidTraitUse {
@@ -1949,7 +1952,10 @@ impl<'a> BodyAnalyzer<'a> {
             }
 
             for req in req_impl.iter() {
-                let satisfies = class_all_parents.iter().any(|p| p.as_ref() == req.as_ref());
+                let satisfies = class_all_parents
+                    .iter()
+                    .skip(1)
+                    .any(|p| p.as_ref() == req.as_ref());
                 if !satisfies {
                     all_issues.push(mir_issues::Issue::new(
                         mir_issues::IssueKind::InvalidTraitUse {
@@ -1968,15 +1974,16 @@ impl<'a> BodyAnalyzer<'a> {
         // only transitively (`class C { use A; }` where `A` itself `use`s the
         // constrained trait) was never validated at `C` — the loop above only
         // walks `trait_list`, i.e. `C`'s own direct `use` clauses. Reuse the
-        // already-transitive `class_ancestors_by_fqcn` (also used for method/
-        // property resolution) to find those and re-run just the require-
-        // extends/implements satisfaction check for them; existence/kind/
-        // enum-readonly checks stay direct-only since those are the direct
-        // user's responsibility, not something a transitive re-export inherits.
+        // transitive `class_ancestors_by_fqcn` list fetched at the top of this
+        // function (also used for the require-extends/implements checks above)
+        // to find those and re-run just the require-extends/implements
+        // satisfaction check for them; existence/kind/enum-readonly checks
+        // stay direct-only since those are the direct user's responsibility,
+        // not something a transitive re-export inherits.
         if !class.is_trait() {
             let direct: std::collections::HashSet<&str> =
                 trait_list.iter().map(|t| t.as_ref()).collect();
-            for ancestor in crate::db::class_ancestors_by_fqcn(self.db, here).iter() {
+            for ancestor in class_all_parents.iter() {
                 if ancestor.as_ref() == fqcn || direct.contains(ancestor.as_ref()) {
                     continue;
                 }

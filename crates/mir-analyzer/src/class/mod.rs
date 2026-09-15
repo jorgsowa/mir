@@ -13,7 +13,7 @@ use std::sync::Arc;
 use mir_codebase::definitions::Visibility;
 use mir_issues::{Issue, IssueKind, Location};
 
-use crate::db::{class_ancestors, MirDatabase};
+use crate::db::MirDatabase;
 
 // ---------------------------------------------------------------------------
 // ClassAnalyzer
@@ -42,14 +42,6 @@ impl<'a> ClassAnalyzer<'a> {
             analyzed_files: files,
             sources,
         }
-    }
-
-    /// Ancestor chain for `fqcn` from the salsa db, or empty if the class
-    /// isn't registered.
-    fn ancestors(&self, fqcn: &str) -> Vec<Arc<str>> {
-        class_ancestors(self.db, crate::db::Fqcn::from_str(self.db, fqcn))
-            .0
-            .clone()
     }
 
     /// Build an `Issue` of `kind` at `location` (with a source snippet when
