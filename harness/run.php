@@ -41,17 +41,6 @@ function runMir(array $args, string $cwd): array
     return [$stdout, $stderr, $exitCode];
 }
 
-function writeHarnessConfig(string $fixtureDir): ?string
-{
-    if (!is_file($fixtureDir . '/psalm.xml')) {
-        return null;
-    }
-
-    $configPath = $fixtureDir . '/.mir-harness.xml';
-    file_put_contents($configPath, "<mir>\n    <stubs>\n        <file name=\"../../stubs/psalm-plugin.php\"/>\n    </stubs>\n</mir>\n");
-    return $configPath;
-}
-
 $overallStatus = 0;
 
 foreach (require $here . '/packages.php' as $package) {
@@ -67,20 +56,11 @@ foreach (require $here . '/packages.php' as $package) {
         continue;
     }
 
-    $configPath = writeHarnessConfig($fixtureDir);
-
     if ($update) {
-        $args = [$mirBin, 'src'];
-        if ($configPath !== null) {
-            $args = [...$args, '--config', $configPath];
-        }
         [, $stderr, $code] = runMir(
-            [...$args, '--baseline', $baselineFile, '--update-baseline', '--no-progress', '-q'],
+            [$mirBin, 'src', '--baseline', $baselineFile, '--update-baseline', '--no-progress', '-q'],
             $fixtureDir
         );
-        if ($configPath !== null) {
-            unlink($configPath);
-        }
         if ($code !== 0) {
             fwrite(STDERR, "  mir failed: $stderr\n");
             $overallStatus = 1;
@@ -90,17 +70,10 @@ foreach (require $here . '/packages.php' as $package) {
         continue;
     }
 
-    $args = [$mirBin, 'src'];
-    if ($configPath !== null) {
-        $args = [...$args, '--config', $configPath];
-    }
     [$stdout, $stderr] = runMir(
-        [...$args, '--baseline', $baselineFile, '--report-stale-baseline', '--format', 'json', '--no-progress', '-q'],
+        [$mirBin, 'src', '--baseline', $baselineFile, '--report-stale-baseline', '--format', 'json', '--no-progress', '-q'],
         $fixtureDir
     );
-    if ($configPath !== null) {
-        unlink($configPath);
-    }
 
     $issues = json_decode($stdout, true);
     if (!is_array($issues)) {
