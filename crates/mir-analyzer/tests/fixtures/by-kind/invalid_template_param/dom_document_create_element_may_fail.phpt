@@ -1,11 +1,15 @@
 ===description===
-DOMDocument::createElement() explains that its result must be checked for false before insertion
+DOMDocument::createElement() explains that a dynamically named result must be checked for false before insertion
 ===config===
 suppress=MissingThrowsDocblock
 ===file===
 <?php
 
+function elementName(): string {
+    return 'root';
+}
+
 $document = new DOMDocument();
-$document->appendChild($document->createElement('root'));
+$document->appendChild($document->createElement(elementName()));
 ===expect===
-InvalidTemplateParam@4:0-4:56: Template type 'TNode' inferred as 'DOMElement|false' can be false and therefore does not satisfy bound 'DOMNode'
+InvalidTemplateParam@8:0-8:63: Template type 'TNode' inferred as 'DOMElement|false' can be false and therefore does not satisfy bound 'DOMNode'
