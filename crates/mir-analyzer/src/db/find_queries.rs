@@ -1004,9 +1004,16 @@ pub fn find_method_in_chain<'db>(
 /// implementation must be checked against that promise. Private ancestor
 /// methods are deliberately excluded because they are not overridden in PHP.
 pub fn method_is_pure_in_chain(db: &dyn MirDatabase, fqcn: Fqcn<'_>, name: &str) -> bool {
-    // Constructors are not overrides, so ancestor purity does not apply to them.
+    // Constructors are not overrides, so a constructor declared on this class
+    // must not inherit an ancestor's purity contract. A class that does not
+    // declare one, however, executes its inherited constructor at runtime;
+    // preserve that implementation's purity for calls such as
+    // `parent::__construct()` through an intermediate exception class.
     if name.eq_ignore_ascii_case("__construct") {
-        return find_method_in_class(db, fqcn, name).is_some_and(|method| method.is_pure);
+        return find_method_in_class(db, fqcn, name)
+            .map(|method| method.is_pure)
+            .or_else(|| find_method_in_chain(db, fqcn, name).map(|(_, method)| method.is_pure))
+            .unwrap_or(false);
     }
 
     class_ancestors_by_fqcn(db, fqcn)
