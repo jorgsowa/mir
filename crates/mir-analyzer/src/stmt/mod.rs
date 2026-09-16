@@ -232,6 +232,10 @@ pub struct StatementsAnalyzer<'a> {
     /// Each entry collects the context states at every `break`/switch-scoped
     /// `continue` targeting that level.
     break_ctx_stack: Vec<Vec<FlowState>>,
+    /// Parallel to `break_ctx_stack`, collecting real-loop `continue` states.
+    /// A continue may still reach the normal exit of a finite loop, but must
+    /// not make the code after an infinite loop reachable.
+    continue_ctx_stack: Vec<Vec<FlowState>>,
     /// Parallel to `break_ctx_stack`: `true` if the corresponding level is a
     /// real loop, `false` if it's a `switch`. `continue` behaves differently
     /// depending on which kind its target level is — see `analyze_continue_stmt`.
@@ -290,6 +294,7 @@ impl<'a> StatementsAnalyzer<'a> {
             return_types: Vec::new(),
             yielded_types: Vec::new(),
             break_ctx_stack: Vec::new(),
+            continue_ctx_stack: Vec::new(),
             loop_kind_stack: Vec::new(),
             plugins: mir_plugin::snapshot(),
             class_like_cache: None,
@@ -1120,8 +1125,7 @@ impl<'a> StatementsAnalyzer<'a> {
     /// * `entry` — context on first iteration entry (may be narrowed / seeded)
     /// * `body`  — closure that analyses one loop iteration, receives `&mut Self`
     ///   and `&mut FlowState` for the current iteration context
-    /// * `replace_pre_loop_state` — whether the first body pass replaces pre-loop state
-    /// * `new_vars_guaranteed` — whether body-introduced variables are definitely assigned
+    /// * `loop_guaranteed` — whether the loop is guaranteed to execute at least once
     /// * `is_infinite` — whether the loop condition is always-true (while(true)/for(;;)),
     ///   meaning normal loop exit is unreachable and only break paths matter
     ///
@@ -1133,8 +1137,7 @@ impl<'a> StatementsAnalyzer<'a> {
         pre: &FlowState,
         entry: FlowState,
         mut body: F,
-        replace_pre_loop_state: bool,
-        new_vars_guaranteed: bool,
+        loop_guaranteed: bool,
         is_infinite: bool,
         exit_condition: Option<&Expr>,
     ) -> FlowState
@@ -1145,6 +1148,7 @@ impl<'a> StatementsAnalyzer<'a> {
 
         // Push a fresh break-context bucket for this loop level
         self.break_ctx_stack.push(Vec::new());
+        self.continue_ctx_stack.push(Vec::new());
         self.loop_kind_stack.push(true);
 
         let mut current = entry;
@@ -1174,6 +1178,18 @@ impl<'a> StatementsAnalyzer<'a> {
             iter.inside_loop = true;
             body(self, &mut iter);
 
+            // A `continue` skips the rest of this iteration but it remains a
+            // valid entry to a later iteration. Include its state in the
+            // fixed-point input now, rather than only when constructing the
+            // post-loop result. Otherwise a later pass can retain only the
+            // false edge of `if ($condition) { continue; }` and incorrectly
+            // mark following body code unreachable.
+            let continue_ctxs = self.continue_ctx_stack.last().cloned().unwrap_or_default();
+            for continue_ctx in continue_ctxs {
+                iter = FlowState::merge_branches(&current, iter, Some(continue_ctx));
+                iter.inside_loop = true;
+            }
+
             // A guaranteed loop has no zero-iteration exit path.  Merging its
             // first body pass with `pre` nevertheless used to resurrect every
             // pre-loop type/refinement and pending write: `do { $x = new X; }
@@ -1182,7 +1198,7 @@ impl<'a> StatementsAnalyzer<'a> {
             // first completed iteration instead.  Subsequent passes merge the
             // already-valid post-body state with one more iteration, accounting
             // for any number of executions without inventing a zeroth one.
-            let mut next = if replace_pre_loop_state {
+            let mut next = if loop_guaranteed {
                 if iter_idx == 0 {
                     iter.clone()
                 } else {
@@ -1234,7 +1250,7 @@ impl<'a> StatementsAnalyzer<'a> {
             widen_unstable(
                 &pre.vars,
                 std::sync::Arc::make_mut(&mut current.vars),
-                new_vars_guaranteed,
+                loop_guaranteed,
             );
         }
 
@@ -1256,9 +1272,19 @@ impl<'a> StatementsAnalyzer<'a> {
 
         // Pop break contexts and merge them into the post-loop result
         let break_ctxs = self.break_ctx_stack.pop().unwrap_or_default();
+        let continue_ctxs = self.continue_ctx_stack.pop().unwrap_or_default();
         self.loop_kind_stack.pop();
         for bctx in break_ctxs {
             current = FlowState::merge_branches(pre, current, Some(bctx));
+        }
+        // A real-loop `continue` returns to the next iteration and can reach
+        // the normal exit of a finite loop. It is not an exit from an infinite
+        // loop, whose post-loop state remains unreachable unless a `break`
+        // supplied one above.
+        if !is_infinite {
+            for cctx in continue_ctxs {
+                current = FlowState::merge_branches(pre, current, Some(cctx));
+            }
         }
 
         // Code after the loop is only "inside a loop" if an outer loop already

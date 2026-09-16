@@ -18,22 +18,7 @@ pub(super) fn loop_guaranteed_to_execute(arr_ty: &Type) -> bool {
                 Atomic::TNonEmptyArray { .. } | Atomic::TNonEmptyList { .. }
             ) || matches!(
                 atomic,
-                Atomic::TKeyedArray { properties, is_open: false, .. } if !properties.is_empty()
-            )
-        })
-}
-
-/// Returns true when a non-empty foreach type can replace pre-loop state with
-/// its first body pass. Array literals intentionally retain the traditional
-/// zero-iteration merge for existing variables and header bindings; explicit
-/// `non-empty-array` / `non-empty-list` annotations carry the stronger
-/// control-flow guarantee.
-pub(super) fn loop_guaranteed_to_replace_pre_loop_state(arr_ty: &Type) -> bool {
-    !arr_ty.types.is_empty()
-        && arr_ty.types.iter().all(|atomic| {
-            matches!(
-                atomic,
-                Atomic::TNonEmptyArray { .. } | Atomic::TNonEmptyList { .. }
+                Atomic::TKeyedArray { properties, .. } if properties.values().any(|property| !property.optional)
             )
         })
 }

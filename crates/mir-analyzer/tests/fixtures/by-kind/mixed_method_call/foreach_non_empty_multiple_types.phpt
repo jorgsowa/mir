@@ -13,10 +13,11 @@ foreach ($items as $i) {
     }
 }
 
-// After loop, result type still includes null since it was pre-initialized
-// This documents the current behavior - unconditional assignment detection
-// would require more complex control flow analysis
+// A non-empty literal guarantees one assignment, so null is eliminated.
+/** @mir-check $result is string|int */
 if (is_string($result) || is_int($result)) {
     echo "valid";
 }
 ===expect===
+UnusedVariable@4:0-4:7: Variable $result is never read
+RedundantCondition@15:4-15:41: Condition is always true/false for type 'bool'

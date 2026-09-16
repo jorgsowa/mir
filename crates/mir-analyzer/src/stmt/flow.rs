@@ -616,19 +616,22 @@ impl<'a> StatementsAnalyzer<'a> {
         // no enclosing loop, or any `continue N` whose Nth enclosing
         // construct is a switch rather than a real loop, behaves exactly
         // like `break`: it exits the switch, it does NOT continue an outer
-        // loop. Save the context into that level's break bucket, same as
-        // `analyze_break_stmt`, so a variable assigned only on this path
-        // still surfaces after the switch instead of vanishing entirely.
+        // loop. Real-loop continues are retained separately so finite-loop
+        // normal exits include them without making infinite loops reachable.
         let stack_len = self.loop_kind_stack.len();
-        let targets_switch =
-            level >= 1 && level <= stack_len && !self.loop_kind_stack[stack_len - level];
-        if targets_switch {
-            self.break_ctx_stack[stack_len - level].push(ctx.clone());
+        let target_idx = level
+            .checked_sub(1)
+            .and_then(|offset| stack_len.checked_sub(offset + 1));
+        if let Some(target_idx) = target_idx {
+            if self.loop_kind_stack[target_idx] {
+                self.continue_ctx_stack[target_idx].push(ctx.clone());
+            } else {
+                // A continue targeting a switch exits that switch, just like
+                // break, so it contributes to its break context instead.
+                self.break_ctx_stack[target_idx].push(ctx.clone());
+            }
         }
-        // Either way, this path doesn't fall through to the code after it —
-        // continue goes back to the loop condition (the widening pass
-        // already re-analyses the body, no context to save there) or, for a
-        // switch target, exits to the break bucket saved above.
+        // Either way, this path doesn't fall through to the code after it.
         ctx.diverges = true;
     }
 
