@@ -236,6 +236,7 @@ impl<'a> StatementsAnalyzer<'a> {
             },
             is_infinite,
             is_infinite,
+            is_infinite,
             Some(&w.condition),
         );
         *ctx = post;
@@ -267,6 +268,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 sa.expr_analyzer(iter).analyze(&dw.condition, iter);
                 sa.check_docblock_contradiction(&dw.condition, iter);
             },
+            true,
             true,
             false,
             Some(&dw.condition),
@@ -315,6 +317,7 @@ impl<'a> StatementsAnalyzer<'a> {
                     sa.expr_analyzer(iter).analyze(cond, iter);
                 }
             },
+            is_infinite,
             is_infinite,
             is_infinite,
             f.condition.last(),
@@ -444,6 +447,8 @@ impl<'a> StatementsAnalyzer<'a> {
         }
 
         let loop_guaranteed = super::loops::loop_guaranteed_to_execute(&arr_ty);
+        let replace_pre_loop_state =
+            super::loops::loop_guaranteed_to_replace_pre_loop_state(&arr_ty);
         // Snapshot after the key/value binding vars are set on `entry` but before
         // the body runs — used below as the "new since" baseline so the loop's
         // own iteration variables (always bound at the header, not first-assigned
@@ -479,6 +484,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 }
                 sa.analyze_stmt(&fe.body, iter);
             },
+            replace_pre_loop_state,
             loop_guaranteed,
             false,
             None,

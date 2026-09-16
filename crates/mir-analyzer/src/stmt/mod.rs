@@ -1120,7 +1120,8 @@ impl<'a> StatementsAnalyzer<'a> {
     /// * `entry` — context on first iteration entry (may be narrowed / seeded)
     /// * `body`  — closure that analyses one loop iteration, receives `&mut Self`
     ///   and `&mut FlowState` for the current iteration context
-    /// * `loop_guaranteed` — whether the loop is guaranteed to execute at least once
+    /// * `replace_pre_loop_state` — whether the first body pass replaces pre-loop state
+    /// * `new_vars_guaranteed` — whether body-introduced variables are definitely assigned
     /// * `is_infinite` — whether the loop condition is always-true (while(true)/for(;;)),
     ///   meaning normal loop exit is unreachable and only break paths matter
     ///
@@ -1132,7 +1133,8 @@ impl<'a> StatementsAnalyzer<'a> {
         pre: &FlowState,
         entry: FlowState,
         mut body: F,
-        loop_guaranteed: bool,
+        replace_pre_loop_state: bool,
+        new_vars_guaranteed: bool,
         is_infinite: bool,
         exit_condition: Option<&Expr>,
     ) -> FlowState
@@ -1180,7 +1182,7 @@ impl<'a> StatementsAnalyzer<'a> {
             // first completed iteration instead.  Subsequent passes merge the
             // already-valid post-body state with one more iteration, accounting
             // for any number of executions without inventing a zeroth one.
-            let mut next = if loop_guaranteed {
+            let mut next = if replace_pre_loop_state {
                 if iter_idx == 0 {
                     iter.clone()
                 } else {
@@ -1232,7 +1234,7 @@ impl<'a> StatementsAnalyzer<'a> {
             widen_unstable(
                 &pre.vars,
                 std::sync::Arc::make_mut(&mut current.vars),
-                loop_guaranteed,
+                new_vars_guaranteed,
             );
         }
 
