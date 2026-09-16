@@ -899,11 +899,15 @@ impl AnalysisSession {
         should_cancel: &(dyn Fn() -> bool + Sync),
     ) -> bool {
         loop {
-            if should_cancel() {
-                return false;
-            }
+            // A settled index needs no work, so it must not consume a
+            // caller's cancellation budget. In particular, reference queries
+            // can answer entirely from replayed postings after warm start.
+            // Poll only once there is pending reconciliation to perform.
             if self.db.salsa.read().index_pending_is_empty() {
                 return true;
+            }
+            if should_cancel() {
+                return false;
             }
             let pending = self.db.salsa.read().take_index_pending();
             if pending.is_empty() {

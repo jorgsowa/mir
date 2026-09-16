@@ -547,9 +547,6 @@ impl AnalysisSession {
         includes: crate::ReferenceIncludes,
         should_cancel: &(dyn Fn() -> bool + Sync),
     ) -> Option<Vec<(Arc<str>, crate::Range)>> {
-        if !self.settle_workspace_index_cancellable(should_cancel) {
-            return None;
-        }
         use std::panic::AssertUnwindSafe;
 
         let key = symbol.codebase_key();
@@ -626,9 +623,6 @@ impl AnalysisSession {
                 // contention instead of turning a short LSP deadline into an
                 // unbounded pool wait.
                 for f in files {
-                    if should_cancel() {
-                        return None;
-                    }
                     let Some(sf) = db_main.lookup_source_file(f.as_ref()) else {
                         continue;
                     };
@@ -700,6 +694,16 @@ impl AnalysisSession {
         }
 
         if !stale.is_empty() {
+            // Replayed postings which are already current answer directly
+            // below. Do not make that read-only path wait for (or consume the
+            // cancellation budget on) unrelated pending symbol-index work:
+            // warm start has already seeded the index needed to interpret its
+            // postings. A stale candidate, on the other hand, is about to
+            // analyze against the workspace, so reconcile first and retain
+            // the cancellable behavior for that potentially expensive work.
+            if !self.settle_workspace_index_cancellable(should_cancel) {
+                return None;
+            }
             // Phase 1 (serial, no live snapshot held): warm up stale
             // candidates. `prepare_file_for_analysis` mutates salsa inputs
             // (via `load_class`), so a concurrent writer — the background

@@ -14,7 +14,7 @@ interface Builder {
 final class LegacyBuilder implements Builder {
     /** @phpstan-impure */
     public function build(): string {
-        return bin2hex(random_bytes(1));
+        return uniqid();
     }
 }
 
