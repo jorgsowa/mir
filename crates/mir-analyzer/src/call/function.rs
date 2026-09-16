@@ -1384,6 +1384,9 @@ impl CallAnalyzer {
                     "filter_var" => {
                         super::callable::filter_var_return_type(&arg_types).unwrap_or(return_ty)
                     }
+                    "curl_getinfo" => {
+                        super::callable::curl_getinfo_return_type(&arg_types).unwrap_or(return_ty)
+                    }
                     _ => return_ty,
                 };
 
