@@ -888,16 +888,32 @@ impl AnalysisSession {
     /// memos are pre-warmed on a snapshot (parallel, off the write lock);
     /// the per-file merge under the lock is then a memo hit.
     pub fn settle_workspace_index(&self) {
+        let _ = self.settle_workspace_index_cancellable(&|| false);
+    }
+
+    /// Cancellable form of [`Self::settle_workspace_index`]. Returns `false`
+    /// when the caller's request was cancelled before the pending index work
+    /// could be reconciled.
+    pub(crate) fn settle_workspace_index_cancellable(
+        &self,
+        should_cancel: &(dyn Fn() -> bool + Sync),
+    ) -> bool {
         loop {
+            if should_cancel() {
+                return false;
+            }
             if self.db.salsa.read().index_pending_is_empty() {
-                return;
+                return true;
             }
             let pending = self.db.salsa.read().take_index_pending();
             if pending.is_empty() {
-                return;
+                return true;
             }
 
             let decls: Vec<(crate::db::SourceFile, crate::db::FileDeclarations)> = loop {
+                if should_cancel() {
+                    return false;
+                }
                 let snap = self.snapshot_db();
                 let attempt = salsa::Cancelled::catch(std::panic::AssertUnwindSafe(|| {
                     use rayon::prelude::*;
@@ -915,10 +931,14 @@ impl AnalysisSession {
                 }));
                 match attempt {
                     Ok(decls) => break decls,
+                    Err(_) if should_cancel() => return false,
                     Err(_) => std::thread::yield_now(),
                 }
             };
 
+            if should_cancel() {
+                return false;
+            }
             let mut guard = self.db.salsa.write();
             // `update_workspace_index_for_file` clones the singleton maps per
             // call; for a bulk arrival (branch switch) one full rebuild — memo
