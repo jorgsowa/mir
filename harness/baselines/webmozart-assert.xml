@@ -50,4 +50,13 @@
       <code><![CDATA[return $callable;]]></code>
     </InvalidReturnType>
   </file>
+  <file src="src/PsalmPlugin.php">
+    <UndefinedClass>
+      <code><![CDATA[PluginEntryPointInterface]]></code>
+      <code><![CDATA[AfterMethodCallAnalysisInterface]]></code>
+      <code><![CDATA[PluginRegistrationSocket]]></code>
+      <code><![CDATA[AfterMethodCallAnalysisEvent]]></code>
+      <code><![CDATA[ExpressionIdentifier]]></code>
+    </UndefinedClass>
+  </file>
 </files>

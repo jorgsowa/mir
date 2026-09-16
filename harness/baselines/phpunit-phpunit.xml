@@ -121,11 +121,6 @@
         )]]></code>
     </InvalidPropertyAssignment>
   </file>
-  <file src="src/TextUI/Command/Commands/ListTestsAsXmlCommand.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$test::class !== $currentTestClass]]></code>
-    </ImpossibleIdenticalComparison>
-  </file>
   <file src="src/TextUI/Configuration/Cli/Builder.php">
     <UnusedVariable>
       <code><![CDATA[]]></code>
@@ -145,16 +140,6 @@
       <code><![CDATA[self::$files = new SplObjectStorage]]></code>
       <code><![CDATA[self::$files = new SplObjectStorage]]></code>
     </InvalidPropertyAssignment>
-  </file>
-  <file src="src/TextUI/Configuration/Xml/Loader.php">
-    <UnusedVariable>
-      <code><![CDATA[]]></code>
-    </UnusedVariable>
-  </file>
-  <file src="src/TextUI/Output/TestDox/ResultPrinter.php">
-    <InvalidArgument>
-      <code><![CDATA[$previousPath]]></code>
-    </InvalidArgument>
   </file>
   <file src="src/Util/PHP/JobRunner.php">
     <UnusedForeachValue>
