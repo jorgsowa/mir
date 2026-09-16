@@ -717,6 +717,7 @@ pub fn find_method_in_class<'db>(
                 is_virtual: false,
                 is_internal: false,
                 is_pure: false,
+                is_impure: false,
                 no_named_arguments: false,
                 is_override: false,
                 deprecated: None,
@@ -779,6 +780,7 @@ pub fn find_method_in_class<'db>(
                 is_virtual: false,
                 is_internal: false,
                 is_pure: false,
+                is_impure: false,
                 no_named_arguments: false,
                 is_override: false,
                 deprecated: None,
@@ -1011,22 +1013,33 @@ pub fn method_is_pure_in_chain(db: &dyn MirDatabase, fqcn: Fqcn<'_>, name: &str)
     // `parent::__construct()` through an intermediate exception class.
     if name.eq_ignore_ascii_case("__construct") {
         return find_method_in_class(db, fqcn, name)
-            .map(|method| method.is_pure)
-            .or_else(|| find_method_in_chain(db, fqcn, name).map(|(_, method)| method.is_pure))
+            .map(|method| method.is_pure && !method.is_impure)
+            .or_else(|| {
+                find_method_in_chain(db, fqcn, name)
+                    .map(|(_, method)| method.is_pure && !method.is_impure)
+            })
             .unwrap_or(false);
     }
 
-    class_ancestors_by_fqcn(db, fqcn)
-        .iter()
-        .enumerate()
-        .any(|(depth, ancestor)| {
-            let here = Fqcn::interned(db, Name::new(ancestor.as_ref()));
-            find_method_in_class(db, here, name).is_some_and(|method| {
-                method.is_pure
-                    && (depth == 0
-                        || method.visibility != mir_codebase::definitions::Visibility::Private)
-            })
-        })
+    for (depth, ancestor) in class_ancestors_by_fqcn(db, fqcn).iter().enumerate() {
+        let here = Fqcn::interned(db, Name::new(ancestor.as_ref()));
+        if let Some(method) = find_method_in_class(db, here, name) {
+            // An explicit impure declaration is more specific than every
+            // inherited purity annotation. It is commonly used by adapters
+            // that deliberately implement a generally pure interface with an
+            // effectful legacy implementation.
+            if method.is_impure {
+                return false;
+            }
+            if method.is_pure
+                && (depth == 0
+                    || method.visibility != mir_codebase::definitions::Visibility::Private)
+            {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 /// If `method` has `@inheritDoc`, walks the ancestor chain of `receiver_fqcn`

@@ -125,6 +125,11 @@ pub(crate) fn resolve_method_from_db(
             .map(|t| t.from_docblock)
             .unwrap_or(false);
 
+        let return_type_file = storage
+            .location
+            .as_ref()
+            .map(|loc| loc.file.as_ref())
+            .unwrap_or(fqcn.as_ref());
         let own_return = storage.return_type.clone();
         let return_ty_raw = if own_has_docblock_return {
             own_return
@@ -139,7 +144,9 @@ pub(crate) fn resolve_method_from_db(
         } else {
             own_return.or(inferred)
         }
-        .map(|t| (*t).clone())
+        .map(|t| {
+            crate::util::reconcile_docblock_builtin_shadow(db, return_type_file, (*t).clone())
+        })
         .unwrap_or_else(Type::mixed);
 
         let params: Vec<DeclaredParam> = if let Some(ref p) = parent {
@@ -211,11 +218,7 @@ pub(crate) fn resolve_method_from_db(
         } else {
             storage.assertions.clone()
         };
-        let param_file = storage
-            .location
-            .as_ref()
-            .map(|loc| loc.file.as_ref())
-            .unwrap_or(fqcn.as_ref());
+        let param_file = return_type_file;
 
         return Some(ResolvedMethod {
             owner_fqcn: owner_fqcn.clone(),
