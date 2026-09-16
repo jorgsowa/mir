@@ -19,5 +19,4 @@ if (is_string($result) || is_int($result)) {
     echo "valid";
 }
 ===expect===
-UnusedVariable@4:0-4:7: Variable $result is never read
 RedundantCondition@15:4-15:41: Condition is always true/false for type 'bool'

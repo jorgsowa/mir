@@ -483,6 +483,35 @@ impl<'a> StatementsAnalyzer<'a> {
             false,
             None,
         );
+        // A guaranteed foreach has no zero-iteration type path, so the loop
+        // widening above correctly drops pre-loop types. Keep pre-loop writes
+        // that the body overwrote pending for unused-variable tracking,
+        // however: a later read of the variable is still a use of that
+        // variable, and must not turn its initialization into an
+        // `UnusedVariable` diagnostic. This deliberately keeps dead-write
+        // reporting conservative across a foreach boundary while preserving
+        // the stronger post-loop type.
+        if loop_guaranteed {
+            let resurrected_pre_writes: Vec<_> = post
+                .dead_writes
+                .iter()
+                .copied()
+                .filter(|(name, line, col_start, line_end, col_end)| {
+                    pre.last_write_locs.get(name).is_some_and(|locs| {
+                        locs.contains(&(*line, *col_start, *line_end, *col_end))
+                    })
+                })
+                .collect();
+            post.dead_writes
+                .retain(|write| !resurrected_pre_writes.contains(write));
+            for (name, line, col_start, line_end, col_end) in resurrected_pre_writes {
+                let loc = (line, col_start, line_end, col_end);
+                let writes = post.last_write_locs.entry(name).or_default();
+                if !writes.contains(&loc) {
+                    writes.push(loc);
+                }
+            }
+        }
         // A foreach proven to iterate at least once (loop_guaranteed) makes
         // variables first assigned in the body definitely defined afterward,
         // same as do-while's identical guarantee.
