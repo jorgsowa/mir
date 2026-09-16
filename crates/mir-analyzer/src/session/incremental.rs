@@ -189,13 +189,13 @@ impl AnalysisSession {
                 // marks below must record exactly this Arc, so a text write
                 // racing the sweep leaves the file dirty rather than
                 // wrongly marked fresh.
-                let text = sf
-                    .text(&db_main as &dyn crate::db::MirDatabase)
-                    .clone();
-                let out = crate::db::analyze_file(&db_main as &dyn crate::db::MirDatabase, sf)
-                    .clone();
-                let defs =
-                    crate::db::collect_file_definitions(&db_main as &dyn crate::db::MirDatabase, sf);
+                let text = sf.text(&db_main as &dyn crate::db::MirDatabase).clone();
+                let out =
+                    crate::db::analyze_file(&db_main as &dyn crate::db::MirDatabase, sf).clone();
+                let defs = crate::db::collect_file_definitions(
+                    &db_main as &dyn crate::db::MirDatabase,
+                    sf,
+                );
                 let entries = crate::db::subtype_index::entries_from_slice(&defs.slice);
                 // Stage the disk-cache write only when the postings commit
                 // below will actually rewrite — a no-op re-sweep (current

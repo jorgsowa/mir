@@ -144,9 +144,7 @@ pub(crate) fn resolve_method_from_db(
         } else {
             own_return.or(inferred)
         }
-        .map(|t| {
-            crate::util::reconcile_docblock_builtin_shadow(db, return_type_file, (*t).clone())
-        })
+        .map(|t| crate::util::reconcile_docblock_builtin_shadow(db, return_type_file, (*t).clone()))
         .unwrap_or_else(Type::mixed);
 
         let params: Vec<DeclaredParam> = if let Some(ref p) = parent {

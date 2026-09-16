@@ -2140,7 +2140,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                                             });
                                         }
                                     }
-                                    let path: Vec<_> = literal_key_chain[..literal_key_chain.len() - 1]
+                                    let path: Vec<_> = literal_key_chain
+                                        [..literal_key_chain.len() - 1]
                                         .iter()
                                         .rev()
                                         .filter_map(Clone::clone)

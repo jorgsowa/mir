@@ -849,9 +849,7 @@ fn is_named_object_coercion(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_
         // resolves `a` and `A` to one class, so the parameter check cannot
         // fail at runtime (the `WrongCaseClass` style diagnostic owns the
         // casing issue).
-        if param_fqcn
-            .as_ref()
-            .eq_ignore_ascii_case(arg_fqcn.as_ref())
+        if param_fqcn.as_ref().eq_ignore_ascii_case(arg_fqcn.as_ref())
             || resolved_param
                 .as_str()
                 .eq_ignore_ascii_case(resolved_arg.as_str())
