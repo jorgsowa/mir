@@ -523,6 +523,22 @@ impl AnalysisCache {
         count
     }
 
+    /// Evict every cached analysis result while retaining the reverse
+    /// dependency graph. This is required when the workspace grows through
+    /// mirror-only registration: an analysis may contain an unresolved name,
+    /// so no reverse-dependency edge exists yet for targeted invalidation to
+    /// find. The next analysis pass will rebuild the result against the
+    /// expanded workspace.
+    pub fn evict_all(&self) -> usize {
+        let mut entries = self.entries.lock();
+        let count = entries.len();
+        if count > 0 {
+            entries.clear();
+            self.dirty.store(true, Ordering::Relaxed);
+        }
+        count
+    }
+
     /// Remove a single file's cache entry.
     pub fn evict(&self, file_path: &str) {
         let Some(id) = self.file_id_map.lock().get(file_path) else {

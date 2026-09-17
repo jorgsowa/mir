@@ -349,11 +349,28 @@ impl AnalysisSession {
     /// resolve if its defining file is among the newly-registered set.
     pub fn set_file_text(&self, file: Arc<str>, source: Arc<str>) {
         self.clear_transient_batch_replay();
+        let index_was_initialized = self
+            .db
+            .salsa
+            .read()
+            .workspace_symbol_index_singleton()
+            .is_some();
         {
             let mut guard = self.db.salsa.write();
             guard.upsert_source_file(file.clone(), source);
         }
         self.clear_dependency_graph_cache();
+        // Before the workspace index singleton exists, mirror-only writes
+        // cannot be queued for `settle_workspace_index`. A newly registered
+        // file can nevertheless make an unresolved name in any cached
+        // analysis resolvable, so invalidate those results immediately. Once
+        // the singleton exists, reconciliation coalesces this invalidation
+        // across the pending batch.
+        if !index_was_initialized {
+            if let Some(cache) = self.cache.as_deref() {
+                cache.evict_all();
+            }
+        }
         self.evict_unresolvable_for_file(&file);
     }
 
@@ -958,6 +975,24 @@ impl AnalysisSession {
                 }
             }
             drop(guard);
+
+            // Mirror-only registration is the path used by LSP hosts while
+            // they populate a workspace. Unlike `ingest_file`, it does not
+            // have a per-file analysis result to invalidate at registration
+            // time: the declarations become visible only when this pending
+            // batch is reconciled into the workspace index. Evict cached
+            // analyses of dependents now, after the index update is complete,
+            // so a consumer analyzed against the partial workspace cannot be
+            // replayed forever with a stale UndefinedClass/UndefinedFunction.
+            if let Some(cache) = self.cache.as_deref() {
+                // A newly registered file can resolve an unresolved name in
+                // any previously cached analysis, so it may have no reverse
+                // dependency edge yet. Retain the graph, but invalidate all
+                // result entries after the mirror-only batch is reconciled.
+                // This is deliberately coalesced at the reconciliation
+                // boundary rather than performed once per source-file write.
+                cache.evict_all();
+            }
         }
     }
 

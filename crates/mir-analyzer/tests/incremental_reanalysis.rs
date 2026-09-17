@@ -157,15 +157,13 @@ fn re_analyze_file_fixes_error() {
     assert_eq!(undef_count2, 0, "after fix, no UndefinedFunction expected");
 }
 
-/// Verify that `re_analyze_file` takes the content-hash fast path when the
-/// cache already holds a valid entry for the unchanged content.
+/// A mirror-only workspace registration invalidates a cached analysis even
+/// when the consumer's content is unchanged.
 ///
-/// Strategy: after the initial analysis caches an `UndefinedFunction` issue,
-/// we manually insert the "missing" function into the codebase so that a slow-
-/// path re-analysis would find it and return *no* issues.  Re-analyzing with
-/// the same content then lets us distinguish the two paths:
-/// - fast path (cache hit)  → cached `UndefinedFunction` issue still returned
-/// - slow path (re-analyze) → no issue (function now exists in codebase)
+/// The dependency is registered through `set_file_text`, which is the
+/// mirror-only path used by workspace scanners. Re-analysis must therefore
+/// return the current clean result rather than replaying the old negative
+/// lookup from the content-hash cache.
 #[test]
 fn re_analyze_file_uses_cache_on_unchanged_content() {
     let src_dir = create_temp_dir("test");
@@ -199,7 +197,8 @@ fn re_analyze_file_uses_cache_on_unchanged_content() {
         Arc::from("<?php\nfunction ghost_fn(): void {}\n"),
     );
 
-    // Re-analyze with identical content — must hit the cache.
+    // Re-analyze with identical content — the workspace change must have
+    // invalidated the cache entry.
     let result2 =
         analyzer.re_analyze_file(&file_path, content, &BatchOptions::new().without_symbols());
 
@@ -209,9 +208,8 @@ fn re_analyze_file_uses_cache_on_unchanged_content() {
         .filter(|i| i.kind.name() == "UndefinedFunction")
         .count();
     assert_eq!(
-        undef_count2, undef_count,
-        "cache hit should return the same cached issues; slow-path would return 0 \
-         because ghost_fn was inserted into the codebase"
+        undef_count2, 0,
+        "mirror-only workspace registration must invalidate the cached UndefinedFunction"
     );
 }
 
@@ -462,6 +460,61 @@ fn re_analyze_file_evicts_dependents_after_ingest() {
         "re_analyze_file must re-analyse b.php after ingest_file updated a.php's return type; \
          expected InvalidArgument but got: {:?}",
         result
+            .issues
+            .iter()
+            .map(|i| i.kind.name())
+            .collect::<Vec<_>>()
+    );
+}
+
+/// A file registered through the mirror-only workspace path must invalidate
+/// cached analyses of files that reference it once the pending index update is
+/// reconciled. This is the path used by LSP workspace scanners; it does not go
+/// through `ingest_file`.
+#[test]
+fn settle_workspace_index_evicts_dependents_after_mirror_registration() {
+    let cache_dir = create_temp_dir("settle_evicts_dependents_cache");
+    let consumer_path = "/settle_evicts_dependents/app.php";
+    let dependency_path = "/settle_evicts_dependents/Mage.php";
+    let consumer_src = "<?php\nnew Mage();\n";
+    let dependency_src = "<?php\nclass Mage {}\n";
+
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+
+    // Analyze the consumer before its dependency is registered. The negative
+    // result is cached, and the ingest path records the consumer's dependency
+    // edge.
+    session.set_file_text(Arc::from(consumer_path), Arc::from(consumer_src));
+    let initial = session.re_analyze_file(
+        consumer_path,
+        consumer_src,
+        &BatchOptions::new().without_symbols(),
+    );
+    assert!(
+        initial
+            .issues
+            .iter()
+            .any(|i| i.kind.name() == "UndefinedClass"),
+        "sanity check: Mage must be missing before mirror registration"
+    );
+
+    // This is the workspace-scan path: source text is registered first, and
+    // declarations enter the workspace index only when the pending set is
+    // settled.
+    session.set_file_text(Arc::from(dependency_path), Arc::from(dependency_src));
+
+    let refreshed = session.re_analyze_file(
+        consumer_path,
+        consumer_src,
+        &BatchOptions::new().without_symbols(),
+    );
+    assert!(
+        !refreshed
+            .issues
+            .iter()
+            .any(|i| i.kind.name() == "UndefinedClass"),
+        "cached consumer analysis was not evicted after settling Mage.php: {:?}",
+        refreshed
             .issues
             .iter()
             .map(|i| i.kind.name())
