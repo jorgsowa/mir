@@ -17,6 +17,9 @@ struct WarmStartHit {
     )>,
 }
 
+type ChangedInput = (Arc<str>, Arc<str>, bool);
+type IndexedSources = (Vec<crate::db::SourceFile>, Vec<ChangedInput>, bool);
+
 /// Existing definitions that lost ownership of a name to this mirror batch.
 /// Cached resolved consumers point to the old owner, so invalidate those
 /// dependents when a new file shadows it.
@@ -526,7 +529,7 @@ impl AnalysisSession {
         // One revision bump for the batch, not one per registered file.
         let _deferred_bumps = self.defer_revision_bumps();
         let index_was_initialized = self.workspace_symbol_index_ready();
-        let (registered_paths, changed_inputs): (Vec<Arc<str>>, Vec<(Arc<str>, Arc<str>, bool)>) = {
+        let (registered_paths, changed_inputs): (Vec<Arc<str>>, Vec<ChangedInput>) = {
             let mut guard = self.db.salsa.write();
             let mut registered = Vec::new();
             let mut changed = Vec::new();
@@ -644,11 +647,7 @@ impl AnalysisSession {
         //    window, then release the lock so interactive requests interleave.
         //    One revision bump for the chunk, not one per new file: each bump
         //    is an input write that cancels in-flight readers.
-        let (sources, changed_inputs, had_index): (
-            Vec<crate::db::SourceFile>,
-            Vec<(Arc<str>, Arc<str>, bool)>,
-            bool,
-        ) = {
+        let (sources, changed_inputs, had_index): IndexedSources = {
             let _deferred_bumps = self.defer_revision_bumps();
             let mut guard = self.db.salsa.write();
             let had_index = guard.workspace_symbol_index_singleton().is_some();
