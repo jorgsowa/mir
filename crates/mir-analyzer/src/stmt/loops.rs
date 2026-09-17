@@ -18,7 +18,7 @@ pub(super) fn loop_guaranteed_to_execute(arr_ty: &Type) -> bool {
                 Atomic::TNonEmptyArray { .. } | Atomic::TNonEmptyList { .. }
             ) || matches!(
                 atomic,
-                Atomic::TKeyedArray { properties, is_open: false, .. } if !properties.is_empty()
+                Atomic::TKeyedArray { properties, .. } if properties.values().any(|property| !property.optional)
             )
         })
 }

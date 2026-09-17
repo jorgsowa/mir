@@ -29,15 +29,16 @@ foreach (require $here . '/packages.php' as ['slug' => $slug, 'url' => $url, 'ta
         }
     }
 
-    echo "== $slug: composer install (--no-dev) ...\n";
+    echo "== $slug: composer install ...\n";
     passthru(sprintf(
-        'composer install --working-dir=%s --no-dev --no-scripts --no-plugins --no-interaction --prefer-dist --ignore-platform-reqs --quiet',
+        'composer install --working-dir=%s --no-scripts --no-plugins --no-interaction --prefer-dist --ignore-platform-reqs --quiet',
         escapeshellarg($dest)
     ), $status);
     if ($status !== 0) {
         fwrite(STDERR, "== $slug: composer install failed\n");
         exit(1);
     }
+
 }
 
 echo "\nDone. Run the baseline harness with:\n  harness/run.php\n";

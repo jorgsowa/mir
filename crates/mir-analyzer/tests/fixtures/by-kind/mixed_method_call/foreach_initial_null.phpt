@@ -1,5 +1,8 @@
 ===description===
-Foreach initial null
+An initialization overwritten by a foreach that is known to execute is not an
+unused variable when the foreach result is read afterwards.
+===config===
+suppress=
 ===file===
 <?php
 class Item {
@@ -13,6 +16,6 @@ $result = null;
 foreach ($items as $item) {
     $result = $item->transform();
 }
-/** @mir-check $result is string|null */
+/** @mir-check $result is string */
 echo $result;
 ===expect===

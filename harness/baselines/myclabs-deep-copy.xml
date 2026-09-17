@@ -1,13 +1,3 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <files>
-  <file src="src/DeepCopy/Filter/Doctrine/DoctrineEmptyCollectionFilter.php">
-    <UndefinedClass>
-      <code><![CDATA[ArrayCollection]]></code>
-    </UndefinedClass>
-  </file>
-  <file src="src/DeepCopy/Matcher/Doctrine/DoctrineProxyMatcher.php">
-    <UndefinedClass>
-      <code><![CDATA[Proxy]]></code>
-    </UndefinedClass>
-  </file>
 </files>

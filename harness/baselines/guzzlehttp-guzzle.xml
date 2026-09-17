@@ -11,15 +11,6 @@
       <code><![CDATA[++$accepted === self::MAX_SET_COOKIE_FIELDS]]></code>
     </ImpossibleIdenticalComparison>
   </file>
-  <file src="src/Handler/CurlFactory.php">
-    <InvalidOperand>
-      <code><![CDATA[[
-            'errno' => $easy->errno,
-            'error' => \curl_error($easy->handle),
-            'appconnect_time' => \curl_getinfo($easy->handle, \CURLINFO_APPCONNECT_TIME),
-        ] + \curl_getinfo($easy->handle)]]></code>
-    </InvalidOperand>
-  </file>
   <file src="src/Handler/CurlMultiHandler.php">
     <ImpossibleIdenticalComparison>
       <code><![CDATA[false === $multiHandle]]></code>
@@ -30,11 +21,6 @@
       <code><![CDATA['header']]></code>
       <code><![CDATA['header']]></code>
     </NonExistentArrayOffset>
-  </file>
-  <file src="src/Middleware.php">
-    <UndefinedClass>
-      <code><![CDATA[LoggerInterface]]></code>
-    </UndefinedClass>
   </file>
   <file src="src/RetryMiddleware.php">
     <TooManyArguments>

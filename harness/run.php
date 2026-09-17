@@ -43,7 +43,8 @@ function runMir(array $args, string $cwd): array
 
 $overallStatus = 0;
 
-foreach (require $here . '/packages.php' as ['slug' => $slug]) {
+foreach (require $here . '/packages.php' as $package) {
+    $slug = $package['slug'];
     $fixtureDir = $fixturesDir . '/' . $slug;
     $baselineFile = $baselinesDir . '/' . $slug . '.xml';
 

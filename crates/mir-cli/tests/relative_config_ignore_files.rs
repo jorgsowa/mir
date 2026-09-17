@@ -54,6 +54,32 @@ fn fixture_with_ignored_directory() -> TempDir {
     dir
 }
 
+fn fixture_with_ignored_file() -> TempDir {
+    let dir = TempDir::new().expect("failed to create temp dir");
+    std::fs::create_dir_all(dir.path().join("src")).unwrap();
+    std::fs::write(
+        dir.path().join("composer.json"),
+        r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("mir.xml"),
+        r#"<mir>
+    <ignoreFiles>
+        <file name="src/Optional.php"/>
+    </ignoreFiles>
+</mir>"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("src/Optional.php"),
+        "<?php class Optional { public function f(): int { return 'not an int'; } }\n",
+    )
+    .unwrap();
+    std::fs::write(dir.path().join("src/Good.php"), "<?php class Good {}\n").unwrap();
+    dir
+}
+
 #[test]
 fn relative_bare_config_path_still_resolves_ignore_files() {
     let dir = fixture_with_ignored_directory();
@@ -63,5 +89,16 @@ fn relative_bare_config_path_still_resolves_ignore_files() {
         !combined.contains("InvalidReturnType"),
         "src/Ignored/Broken.php is under an <ignoreFiles> directory and must not be \
          analyzed even when -c is passed as a bare relative filename, got:\n{combined}"
+    );
+}
+
+#[test]
+fn ignore_files_accepts_an_individual_file() {
+    let dir = fixture_with_ignored_file();
+    let out = run_with_relative_config(dir.path());
+    let combined = stdout_and_stderr(&out);
+    assert!(
+        !combined.contains("InvalidReturnType"),
+        "src/Optional.php is under an <ignoreFiles> file entry and must not be analyzed, got:\n{combined}"
     );
 }

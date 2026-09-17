@@ -15,8 +15,6 @@ $result = null;
 foreach ($items as $item) {
     $result = $item->transform();
 }
-// After loop, $result is string|null
-// This should error because null doesn't have strlen
+// The literal array is non-empty, so the loop assigns string on every path.
 $len = strlen($result);
 ===expect===
-PossiblyNullArgument@15:14-15:21: Argument $string of strlen() might be null

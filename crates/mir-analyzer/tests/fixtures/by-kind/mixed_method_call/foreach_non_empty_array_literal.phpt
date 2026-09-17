@@ -19,3 +19,4 @@ if (is_string($result)) {
     echo $result;
 }
 ===expect===
+RedundantCondition@15:4-15:22: Condition is always true/false for type 'bool'

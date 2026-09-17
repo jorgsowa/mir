@@ -17,6 +17,54 @@ struct WarmStartHit {
     )>,
 }
 
+/// Existing definitions that lost ownership of a name to this mirror batch.
+/// Cached resolved consumers point to the old owner, so invalidate those
+/// dependents when a new file shadows it.
+fn displaced_cache_owners(
+    db: &MirDbStorage,
+    old_index: &crate::db::WorkspaceSymbolIndex,
+    decls: &[(crate::db::SourceFile, crate::db::FileDeclarations)],
+) -> Vec<String> {
+    let Some(singleton) = db.workspace_symbol_index_singleton() else {
+        return Vec::new();
+    };
+    let new_index = singleton.index(db);
+    let mut owners = HashSet::default();
+    for (_, file_decls) in decls {
+        for decl in file_decls.class_like() {
+            let key = decl.lookup_key();
+            if let (Some(old), Some(new)) =
+                (old_index.class_like_loc(key), new_index.class_like_loc(key))
+            {
+                if old.file() != new.file() {
+                    owners.insert(old.file().path(db).to_string());
+                }
+            }
+        }
+        for decl in file_decls.functions() {
+            let key = decl.lookup_key();
+            if let (Some(old), Some(new)) =
+                (old_index.function_loc(key), new_index.function_loc(key))
+            {
+                if old.file() != new.file() {
+                    owners.insert(old.file().path(db).to_string());
+                }
+            }
+        }
+        for decl in file_decls.constants() {
+            let key = decl.lookup_key();
+            if let (Some(old), Some(new)) =
+                (old_index.constant_loc(key), new_index.constant_loc(key))
+            {
+                if old.file() != new.file() {
+                    owners.insert(old.file().path(db).to_string());
+                }
+            }
+        }
+    }
+    owners.into_iter().collect()
+}
+
 impl AnalysisSession {
     fn snapshot_retry<R>(&self, mut f: impl FnMut(&MirDbStorage) -> R) -> R {
         loop {
@@ -56,7 +104,29 @@ impl AnalysisSession {
         durability: salsa::Durability,
     ) -> crate::db::SourceFile {
         self.clear_transient_batch_replay();
-        self.db.upsert_source_file(path, text, durability)
+        let (sf, changed, was_registered, had_index) = {
+            let mut guard = self.db.salsa.write();
+            let had_index = guard.workspace_symbol_index_singleton().is_some();
+            let existing = guard.lookup_source_file(path.as_ref());
+            let changed = existing.is_none_or(|sf| sf.text(&**guard).as_ref() != text.as_ref());
+            let sf =
+                guard.upsert_source_file_with_durability(path.clone(), text.clone(), durability);
+            (sf, changed, existing.is_some(), had_index)
+        };
+        if changed {
+            self.clear_dependency_graph_cache();
+            if let Some(cache) = self.cache.as_deref() {
+                let invalidate_path = was_registered || !cache.matches_content(&path, &text);
+                if invalidate_path {
+                    cache.evict_files_and_dependents(&[path.to_string()]);
+                }
+                if !had_index {
+                    cache.evict_unresolved();
+                }
+            }
+            self.evict_unresolvable_for_file(&path);
+        }
+        sf
     }
 
     /// Look up an existing [`crate::db::SourceFile`] handle by path.
@@ -349,11 +419,32 @@ impl AnalysisSession {
     /// resolve if its defining file is among the newly-registered set.
     pub fn set_file_text(&self, file: Arc<str>, source: Arc<str>) {
         self.clear_transient_batch_replay();
-        {
+        let (changed, was_registered, index_was_initialized) = {
             let mut guard = self.db.salsa.write();
-            guard.upsert_source_file(file.clone(), source);
-        }
+            let index_was_initialized = guard.workspace_symbol_index_singleton().is_some();
+            let existing = guard.lookup_source_file(file.as_ref());
+            let changed = existing.is_none_or(|sf| sf.text(&**guard).as_ref() != source.as_ref());
+            guard.upsert_source_file(file.clone(), source.clone());
+            (changed, existing.is_some(), index_was_initialized)
+        };
         self.clear_dependency_graph_cache();
+        // Before the workspace index singleton exists, mirror-only writes
+        // cannot be queued for `settle_workspace_index`. A newly registered
+        // file can nevertheless make an unresolved name in any cached
+        // analysis resolvable, so invalidate those results immediately. Once
+        // the singleton exists, reconciliation coalesces this invalidation
+        // across the pending batch.
+        if changed {
+            if let Some(cache) = self.cache.as_deref() {
+                let invalidate_path = was_registered || !cache.matches_content(&file, &source);
+                if invalidate_path {
+                    cache.evict_files_and_dependents(&[file.to_string()]);
+                }
+                if !index_was_initialized {
+                    cache.evict_unresolved();
+                }
+            }
+        }
         self.evict_unresolvable_for_file(&file);
     }
 
@@ -375,10 +466,27 @@ impl AnalysisSession {
         // scope must close after the guard drops (the flush takes the lock).
         let _deferred_bumps = self.defer_revision_bumps();
         let mut guard = self.db.salsa.write();
+        let index_was_initialized = guard.workspace_symbol_index_singleton().is_some();
+        let mut changed_inputs = Vec::new();
         for (file, source) in files {
+            let existing = guard.lookup_source_file(file.as_ref());
+            if existing.is_none_or(|sf| sf.text(&**guard).as_ref() != source.as_ref()) {
+                changed_inputs.push((file.clone(), source.clone(), existing.is_some()));
+            }
             guard.upsert_source_file_with_durability(file, source, salsa::Durability::HIGH);
         }
         drop(guard);
+        if let Some(cache) = self.cache.as_deref() {
+            let paths: Vec<String> = changed_inputs
+                .iter()
+                .filter(|(file, source, existed)| *existed || !cache.matches_content(file, source))
+                .map(|(file, _, _)| file.to_string())
+                .collect();
+            cache.evict_files_and_dependents(&paths);
+            if !index_was_initialized && !changed_inputs.is_empty() {
+                cache.evict_unresolved();
+            }
+        }
     }
 
     /// Build or refresh the `WorkspaceSymbolIndexSingleton` from all currently
@@ -417,16 +525,32 @@ impl AnalysisSession {
         self.clear_dependency_graph_cache();
         // One revision bump for the batch, not one per registered file.
         let _deferred_bumps = self.defer_revision_bumps();
-        let registered_paths: Vec<Arc<str>> = {
+        let index_was_initialized = self.workspace_symbol_index_ready();
+        let (registered_paths, changed_inputs): (Vec<Arc<str>>, Vec<(Arc<str>, Arc<str>, bool)>) = {
             let mut guard = self.db.salsa.write();
-            files
-                .into_iter()
-                .map(|(file, source)| {
-                    guard.upsert_source_file(file.clone(), source);
-                    file
-                })
-                .collect()
+            let mut registered = Vec::new();
+            let mut changed = Vec::new();
+            for (file, source) in files {
+                let existing = guard.lookup_source_file(file.as_ref());
+                if existing.is_none_or(|sf| sf.text(&**guard).as_ref() != source.as_ref()) {
+                    changed.push((file.clone(), source.clone(), existing.is_some()));
+                }
+                guard.upsert_source_file(file.clone(), source);
+                registered.push(file);
+            }
+            (registered, changed)
         };
+        if let Some(cache) = self.cache.as_deref() {
+            let paths: Vec<String> = changed_inputs
+                .iter()
+                .filter(|(file, source, existed)| *existed || !cache.matches_content(file, source))
+                .map(|(file, _, _)| file.to_string())
+                .collect();
+            cache.evict_files_and_dependents(&paths);
+            if !index_was_initialized && !changed_inputs.is_empty() {
+                cache.evict_unresolved();
+            }
+        }
         if !registered_paths.is_empty() && self.resolver.is_some() {
             self.evict_unresolvable_for_files(&registered_paths);
         }
@@ -520,21 +644,43 @@ impl AnalysisSession {
         //    window, then release the lock so interactive requests interleave.
         //    One revision bump for the chunk, not one per new file: each bump
         //    is an input write that cancels in-flight readers.
-        let sources: Vec<crate::db::SourceFile> = {
+        let (sources, changed_inputs, had_index): (
+            Vec<crate::db::SourceFile>,
+            Vec<(Arc<str>, Arc<str>, bool)>,
+            bool,
+        ) = {
             let _deferred_bumps = self.defer_revision_bumps();
             let mut guard = self.db.salsa.write();
-            files
+            let had_index = guard.workspace_symbol_index_singleton().is_some();
+            let mut changed_inputs = Vec::new();
+            let sources = files
                 .iter()
                 .map(|(file, source)| {
+                    let existing = guard.lookup_source_file(file.as_ref());
+                    if existing.is_none_or(|sf| sf.text(&**guard).as_ref() != source.as_ref()) {
+                        changed_inputs.push((file.clone(), source.clone(), existing.is_some()));
+                    }
                     guard.upsert_source_file_with_durability(
                         file.clone(),
                         source.clone(),
                         salsa::Durability::HIGH,
                     )
                 })
-                .collect()
+                .collect();
+            (sources, changed_inputs, had_index)
         };
         let registered = sources.len();
+        if let Some(cache) = self.cache.as_deref() {
+            let paths: Vec<String> = changed_inputs
+                .iter()
+                .filter(|(file, source, existed)| *existed || !cache.matches_content(file, source))
+                .map(|(file, _, _)| file.to_string())
+                .collect();
+            cache.evict_files_and_dependents(&paths);
+            if !had_index && !changed_inputs.is_empty() {
+                cache.evict_unresolved();
+            }
+        }
 
         if cancel.is_cancelled() {
             return crate::IndexBatchOutcome {
@@ -592,12 +738,34 @@ impl AnalysisSession {
 
         // 3. Apply to the singleton under a SHORT write window — only cheap map
         //    construction / merge runs here (no parse).
-        {
+        let (declarations_changed, displaced_owners) = {
             let mut guard = self.db.salsa.write();
+            let declarations_changed = decls
+                .iter()
+                .any(|(sf, decls)| !guard.file_declarations_match(*sf, decls));
+            let old_index = if declarations_changed && self.cache.is_some() {
+                guard
+                    .workspace_symbol_index_singleton()
+                    .map(|singleton| singleton.index(&**guard).clone())
+            } else {
+                None
+            };
+            let candidates = old_index.as_ref().map(|_| decls.clone());
             if guard.workspace_symbol_index_singleton().is_none() {
                 guard.build_workspace_index_from_decls(decls);
             } else {
                 guard.merge_precomputed_into_workspace_index(&decls);
+            }
+            let displaced_owners = old_index
+                .zip(candidates)
+                .map(|(old, candidates)| displaced_cache_owners(&guard, &old, &candidates))
+                .unwrap_or_default();
+            (declarations_changed, displaced_owners)
+        };
+        if let Some(cache) = self.cache.as_deref() {
+            cache.evict_with_dependents(&displaced_owners);
+            if declarations_changed {
+                cache.evict_unresolved();
             }
         }
 
@@ -888,16 +1056,36 @@ impl AnalysisSession {
     /// memos are pre-warmed on a snapshot (parallel, off the write lock);
     /// the per-file merge under the lock is then a memo hit.
     pub fn settle_workspace_index(&self) {
+        let _ = self.settle_workspace_index_cancellable(&|| false);
+    }
+
+    /// Cancellable form of [`Self::settle_workspace_index`]. Returns `false`
+    /// when the caller's request was cancelled before the pending index work
+    /// could be reconciled.
+    pub(crate) fn settle_workspace_index_cancellable(
+        &self,
+        should_cancel: &(dyn Fn() -> bool + Sync),
+    ) -> bool {
         loop {
+            // A settled index needs no work, so it must not consume a
+            // caller's cancellation budget. In particular, reference queries
+            // can answer entirely from replayed postings after warm start.
+            // Poll only once there is pending reconciliation to perform.
             if self.db.salsa.read().index_pending_is_empty() {
-                return;
+                return true;
+            }
+            if should_cancel() {
+                return false;
             }
             let pending = self.db.salsa.read().take_index_pending();
             if pending.is_empty() {
-                return;
+                return true;
             }
 
             let decls: Vec<(crate::db::SourceFile, crate::db::FileDeclarations)> = loop {
+                if should_cancel() {
+                    return false;
+                }
                 let snap = self.snapshot_db();
                 let attempt = salsa::Cancelled::catch(std::panic::AssertUnwindSafe(|| {
                     use rayon::prelude::*;
@@ -915,11 +1103,26 @@ impl AnalysisSession {
                 }));
                 match attempt {
                     Ok(decls) => break decls,
+                    Err(_) if should_cancel() => return false,
                     Err(_) => std::thread::yield_now(),
                 }
             };
 
+            if should_cancel() {
+                return false;
+            }
             let mut guard = self.db.salsa.write();
+            let declarations_changed = decls
+                .iter()
+                .any(|(sf, decls)| !guard.file_declarations_match(*sf, decls));
+            let old_index = if declarations_changed && self.cache.is_some() {
+                guard
+                    .workspace_symbol_index_singleton()
+                    .map(|singleton| singleton.index(&**guard).clone())
+            } else {
+                None
+            };
+            let candidates = old_index.as_ref().map(|_| decls.clone());
             // `update_workspace_index_for_file` clones the singleton maps per
             // call; for a bulk arrival (branch switch) one full rebuild — memo
             // validations plus a single map build, since the decls were just
@@ -933,7 +1136,20 @@ impl AnalysisSession {
                     }
                 }
             }
+            let displaced_owners = old_index
+                .zip(candidates)
+                .map(|(old, candidates)| displaced_cache_owners(&guard, &old, &candidates))
+                .unwrap_or_default();
             drop(guard);
+
+            // New declarations can satisfy negative lookups with no reverse
+            // dependency edge. Body-only edits leave these entries intact.
+            if let Some(cache) = self.cache.as_deref() {
+                cache.evict_with_dependents(&displaced_owners);
+                if declarations_changed {
+                    cache.evict_unresolved();
+                }
+            }
         }
     }
 

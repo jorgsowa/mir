@@ -244,6 +244,9 @@ pub struct AnalysisCache {
     /// maps can use 4-byte keys instead of heap-allocated path strings.
     file_id_map: Mutex<FileIdMap>,
     entries: Mutex<HashMap<FileId, CacheEntry>>,
+    /// Entries whose diagnostics contain a workspace-resolvable missing name.
+    /// Kept separately so workspace growth invalidates only this small set.
+    unresolved_entries: Mutex<HashSet<FileId>>,
     /// Reverse dependency graph loaded from disk (from the previous run).
     reverse_deps: Mutex<HashMap<FileId, HashSet<FileId>>>,
     /// Epoch this cache validates against (build fingerprint + PHP version).
@@ -281,10 +284,18 @@ impl AnalysisCache {
             })
             .collect();
 
+        let unresolved_entries = entries
+            .iter()
+            .filter_map(|(&id, entry)| {
+                crate::db::issues_have_unresolved_names(&entry.issues).then_some(id)
+            })
+            .collect();
+
         Self {
             cache_dir: cache_dir.to_path_buf(),
             file_id_map: Mutex::new(id_map),
             entries: Mutex::new(entries),
+            unresolved_entries: Mutex::new(unresolved_entries),
             reverse_deps: Mutex::new(reverse_deps),
             epoch,
             dirty: AtomicBool::new(false),
@@ -334,6 +345,21 @@ impl AnalysisCache {
             .is_some_and(|e| e.content_hash == content_hash)
     }
 
+    /// Check a mirror write against a persisted entry. Hash only files that
+    /// actually have a cached result; a large workspace scan may register
+    /// many files that were never analyzed.
+    pub fn matches_content(&self, file_path: &str, content: &str) -> bool {
+        let Some(id) = self.file_id_map.lock().get(file_path) else {
+            return false;
+        };
+        let stored_hash = self
+            .entries
+            .lock()
+            .get(&id)
+            .map(|entry| entry.content_hash.clone());
+        stored_hash.is_some_and(|hash| hash == hash_content(content))
+    }
+
     /// Return the paths of every file that currently has a cache entry.
     /// Used to detect files that were analyzed in a previous run but have since
     /// been deleted, so their dependents can be invalidated.
@@ -368,6 +394,12 @@ impl AnalysisCache {
                 surface_hash,
             },
         );
+        let mut unresolved = self.unresolved_entries.lock();
+        if crate::db::issues_have_unresolved_names(&entries[&id].issues) {
+            unresolved.insert(id);
+        } else {
+            unresolved.remove(&id);
+        }
         self.dirty.store(true, Ordering::Relaxed);
     }
 
@@ -482,6 +514,17 @@ impl AnalysisCache {
     /// Evicts every reachable dependent's cache entry.
     /// Returns the number of entries evicted.
     pub fn evict_with_dependents(&self, changed_files: &[String]) -> usize {
+        self.evict_reachable(changed_files, false)
+    }
+
+    /// Evict the changed files themselves as well as every known dependent.
+    /// Mirror writes use this because their file's cached result can be stale
+    /// even before the symbol-index reconciliation runs.
+    pub fn evict_files_and_dependents(&self, changed_files: &[String]) -> usize {
+        self.evict_reachable(changed_files, true)
+    }
+
+    fn evict_reachable(&self, changed_files: &[String], include_changed: bool) -> usize {
         // Resolve paths to FileIds; skip unknown files (no cache entry → nothing to evict).
         let seed_ids: Vec<FileId> = {
             let id_map = self.file_id_map.lock();
@@ -496,7 +539,11 @@ impl AnalysisCache {
             let deps = self.reverse_deps.lock();
             let mut visited: HashSet<FileId> = seed_ids.iter().copied().collect();
             let mut queue: std::collections::VecDeque<FileId> = seed_ids.iter().copied().collect();
-            let mut result = Vec::new();
+            let mut result = if include_changed {
+                seed_ids.clone()
+            } else {
+                Vec::new()
+            };
 
             while let Some(id) = queue.pop_front() {
                 if let Some(dependents) = deps.get(&id) {
@@ -512,12 +559,31 @@ impl AnalysisCache {
         };
 
         // Phase 2: evict (reverse_deps lock released above, entries lock taken per file).
-        let count = to_evict.len();
         let mut entries = self.entries.lock();
+        let mut count = 0;
         for id in &to_evict {
-            entries.remove(id);
+            count += usize::from(entries.remove(id).is_some());
+        }
+        let mut unresolved = self.unresolved_entries.lock();
+        for id in &to_evict {
+            unresolved.remove(id);
         }
         if count > 0 {
+            self.dirty.store(true, Ordering::Relaxed);
+        }
+        count
+    }
+
+    /// Evict results with missing workspace names. Such files have no reverse
+    /// dependency edge to a newly registered definition yet.
+    pub fn evict_unresolved(&self) -> usize {
+        let mut entries = self.entries.lock();
+        let mut unresolved = self.unresolved_entries.lock();
+        let count = unresolved.len();
+        if count > 0 {
+            for id in unresolved.drain() {
+                entries.remove(&id);
+            }
             self.dirty.store(true, Ordering::Relaxed);
         }
         count
@@ -530,6 +596,7 @@ impl AnalysisCache {
         };
         let mut entries = self.entries.lock();
         if entries.remove(&id).is_some() {
+            self.unresolved_entries.lock().remove(&id);
             self.dirty.store(true, Ordering::Relaxed);
         }
     }

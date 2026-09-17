@@ -572,6 +572,12 @@ impl AnalysisSession {
         self.clear_transient_batch_replay();
         let php_version = self.batch_php_version(opts);
 
+        // Mirror-only workspace files may be waiting in the pending index
+        // set. Reconcile them before the content-hash fast path; otherwise a
+        // cached result computed against a partial workspace could be replayed
+        // before `settle_workspace_index()` gets a chance to invalidate it.
+        self.settle_workspace_index();
+
         // Fast path: content unchanged and cache has a valid entry.
         if let Some(cache) = &self.cache {
             let h = hash_content(new_content);

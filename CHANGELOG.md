@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.75.0] - 2026-09-16
+
+### Changed
+
+- **Incremental analysis:** warm reference lookups now retain their cached
+  state, avoiding unnecessary work in interactive analysis, while CI and the
+  integration harness use more reliable dependency caching and installation.
+- **Release version sync:** bumped the workspace and internal crate dependency
+  versions to `0.75.0` and refreshed `Cargo.lock` to match.
+
+### Fixed
+
+- **Control-flow and inference:** guaranteed `foreach` iterations and loop
+  writes now retain their inferred state; dynamic nested array-shape updates,
+  `PHP_INT_SIZE`, and `curl_getinfo()` results are inferred more precisely.
+- **Method and purity analysis:** inherited constructor and override purity
+  contracts are handled consistently, preventing both missed impure calls and
+  false positives; explicit impure annotations continue to take precedence.
+- **PHP symbol and stub handling:** class and interface subtype comparisons
+  honor PHP's case-insensitive names, DOM stubs accurately model
+  `createElement()` and optional schema-validation flags, and DOM node-list
+  covariance is preserved across files.
+- **Configuration discovery:** relative paths in `ignoreFiles` are resolved
+  consistently from the configuration file's directory.
+
 ## [0.74.0] - 2026-09-14
 
 ### Added

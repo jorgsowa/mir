@@ -520,8 +520,7 @@ fn extends_or_implements_uncached(db: &dyn MirDatabase, child: &str, ancestor: &
         if eff.eq_ignore_ascii_case("UnitEnum") || eff.eq_ignore_ascii_case("\\UnitEnum") {
             return true;
         }
-        if (eff.eq_ignore_ascii_case("BackedEnum")
-            || eff.eq_ignore_ascii_case("\\BackedEnum"))
+        if (eff.eq_ignore_ascii_case("BackedEnum") || eff.eq_ignore_ascii_case("\\BackedEnum"))
             && class.is_backed_enum()
         {
             return true;

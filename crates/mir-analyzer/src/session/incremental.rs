@@ -11,12 +11,12 @@ impl AnalysisSession {
         Some(sf.text(&db).clone())
     }
 
-    /// Re-analyze every transitive dependent of `file` in parallel.
+    /// Re-analyze every transitive dependent of `file`.
     ///
     /// When the user saves a file that other files depend on (e.g. editing
     /// a base class, an interface, or a trait), those dependents may have
-    /// new diagnostics. This method computes them in parallel using rayon
-    /// and returns the per-file analysis results so the LSP server can
+    /// new diagnostics. Concurrent callers may run sweeps simultaneously;
+    /// each returns its per-file analysis results so the LSP server can
     /// publish updated diagnostics in one batch.
     ///
     /// Source text for dependents is retrieved from the session's salsa
@@ -91,8 +91,6 @@ impl AnalysisSession {
         files: Vec<Arc<str>>,
         cancel: &crate::IndexCancel,
     ) -> Vec<(Arc<str>, crate::FileAnalysis)> {
-        use rayon::prelude::*;
-
         let dependents = files;
 
         // Phase 2a: fault in each dependent's direct class references if the
@@ -135,15 +133,23 @@ impl AnalysisSession {
         }
 
         // Phase 2b: drive each dependent through the `analyze_file` tracked
-        // query in parallel. Salsa's memo validation does the real work
-        // here: after a body-only edit, a dependent whose tracked inputs are
-        // structurally unchanged (`FileDefinitions` backdating) returns its
-        // cached output without re-running body analysis — re-analysis cost
-        // scales with what actually changed, not with dependent count.
+        // query. Salsa's memo validation does the real work here: after a
+        // body-only edit, a dependent whose tracked inputs are structurally
+        // unchanged (`FileDefinitions` backdating) returns its cached output
+        // without re-running body analysis — re-analysis cost scales with
+        // what actually changed, not with dependent count.
         //
-        // The snapshot is taken AFTER the warm-up above so each worker observes
-        // the freshly-loaded classes. This loop is read-only on salsa: no
-        // worker mutates inputs, so the snapshots never contend on a write.
+        // The snapshot is taken AFTER the warm-up above so the loop observes
+        // the freshly-loaded classes. This loop is read-only on salsa: it does
+        // not mutate inputs, so its snapshot never contends on a write.
+        //
+        // Keep this loop on the caller thread. A request may already be one
+        // of several concurrent host threads, while background indexing uses
+        // the shared Rayon pool. Sending each sweep back through that pool
+        // creates a pool-fan-in deadlock: every worker can block on a writer
+        // while the thread that would release it waits for a worker. It also
+        // prevents a cancelled request from making progress. The caller-level
+        // concurrency preserves throughput without that dependency.
         //
         // Dependents' `FileAnalysis::symbols` are empty on this path:
         // per-expression symbols are intentionally not memoized (a typical
@@ -151,7 +157,7 @@ impl AnalysisSession {
         // diagnostics consumers don't read them. Hover / go-to-definition
         // flows analyze the open file directly via [`crate::FileAnalyzer`].
         //
-        // Each worker short-circuits when cancellation has been requested.
+        // The loop short-circuits when cancellation has been requested.
         // Generation before the snapshot: a file add racing the sweep leaves
         // the commits stale (self-healing), never wrongly fresh.
         let commit_gen = self.index_generation();
@@ -173,20 +179,23 @@ impl AnalysisSession {
             Option<Box<[mir_types::Name]>>,
         );
         let mut results: Vec<Analyzed> = dependents
-            .into_par_iter()
-            .map_with(db_main, |db, file| {
+            .into_iter()
+            .filter_map(|file| {
                 if cancel.is_cancelled() {
                     return None;
                 }
-                let sf = db.lookup_source_file(file.as_ref())?;
+                let sf = db_main.lookup_source_file(file.as_ref())?;
                 // Capture the text the analysis ran against: the freshness
                 // marks below must record exactly this Arc, so a text write
                 // racing the sweep leaves the file dirty rather than
                 // wrongly marked fresh.
-                let text = sf.text(&*db as &dyn crate::db::MirDatabase).clone();
-                let out = crate::db::analyze_file(&*db as &dyn crate::db::MirDatabase, sf).clone();
-                let defs =
-                    crate::db::collect_file_definitions(&*db as &dyn crate::db::MirDatabase, sf);
+                let text = sf.text(&db_main as &dyn crate::db::MirDatabase).clone();
+                let out =
+                    crate::db::analyze_file(&db_main as &dyn crate::db::MirDatabase, sf).clone();
+                let defs = crate::db::collect_file_definitions(
+                    &db_main as &dyn crate::db::MirDatabase,
+                    sf,
+                );
                 let entries = crate::db::subtype_index::entries_from_slice(&defs.slice);
                 // Stage the disk-cache write only when the postings commit
                 // below will actually rewrite — a no-op re-sweep (current
@@ -195,7 +204,7 @@ impl AnalysisSession {
                     None
                 } else {
                     self.stage_ref_cache_put(
-                        &*db as &dyn crate::db::MirDatabase,
+                        &db_main as &dyn crate::db::MirDatabase,
                         sf,
                         file.as_ref(),
                         &text,
@@ -203,12 +212,11 @@ impl AnalysisSession {
                     )
                 };
                 let mentions = mention_scanner.as_ref().and_then(|s| {
-                    (!db.class_mentions_current(file.as_ref(), &text, s.epoch()))
+                    (!db_main.class_mentions_current(file.as_ref(), &text, s.epoch()))
                         .then(|| s.scan(&text))
                 });
                 Some((file, text, out, entries, put, mentions))
             })
-            .flatten()
             .collect();
 
         // Serial commit: each dependent's output is its complete reference

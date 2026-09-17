@@ -1227,6 +1227,20 @@ pub(crate) fn filter_var_return_type(arg_types: &[Type]) -> Option<Type> {
     Some(ty)
 }
 
+/// Infer the all-information `curl_getinfo()` overload.
+pub(crate) fn curl_getinfo_return_type(arg_types: &[Type]) -> Option<Type> {
+    let all_info = arg_types.len() == 1
+        || arg_types
+            .get(1)
+            .is_some_and(|option| matches!(option.types.as_slice(), [Atomic::TNull]));
+    all_info.then(|| {
+        Type::single(Atomic::TArray {
+            key: Box::new(Type::array_key()),
+            value: Box::new(Type::mixed()),
+        })
+    })
+}
+
 /// Infer the return type of `preg_split($pattern, $subject, $limit?, $flags?)`.
 ///
 /// `preg_split` always produces at least one string unless `PREG_SPLIT_NO_EMPTY` (value 1) is

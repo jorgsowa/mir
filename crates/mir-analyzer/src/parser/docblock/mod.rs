@@ -488,6 +488,7 @@ impl DocblockParser {
                 }
                 "internal" | "psalm-internal" => result.is_internal = true,
                 "pure" | "psalm-pure" | "phpstan-pure" => result.is_pure = true,
+                "impure" | "psalm-impure" | "phpstan-impure" => result.is_impure = true,
                 "seal-properties" | "psalm-seal-properties" => result.seal_properties = true,
                 "no-named-arguments" => result.no_named_arguments = true,
                 "mutation-free" | "psalm-mutation-free" | "phpstan-mutation-free" => {
@@ -841,6 +842,9 @@ pub struct ParsedDocblock {
     pub is_deprecated: bool,
     pub is_internal: bool,
     pub is_pure: bool,
+    /// An explicit `@impure`/`@psalm-impure`/`@phpstan-impure` declaration.
+    /// This opts an implementation out of an inherited purity contract.
+    pub is_impure: bool,
     pub is_mutation_free: bool,
     pub is_external_mutation_free: bool,
     pub no_named_arguments: bool,

@@ -22,6 +22,22 @@ function non_empty_array_param_guaranteed(array $items): int {
     return $last;
 }
 
+/** @param array{id: int, name?: string} $items */
+function required_shape_guaranteed(array $items): int {
+    foreach ($items as $item) {
+        $last = $item;
+    }
+    return $last;
+}
+
+/** @param array{a?: int} $items */
+function all_optional_shape_not_guaranteed(array $items): int {
+    foreach ($items as $item) {
+        $last = $item;
+    }
+    return $last;
+}
+
 /** @param array{a: int}|array<int, int> $items */
 function mixed_shape_union_not_guaranteed(array $items): int {
     foreach ($items as $item) {
@@ -30,4 +46,5 @@ function mixed_shape_union_not_guaranteed(array $items): int {
     return $last;
 }
 ===expect===
-PossiblyUndefinedVariable@22:11-22:16: Variable $last might not be defined
+PossiblyUndefinedVariable@30:11-30:16: Variable $last might not be defined
+PossiblyUndefinedVariable@38:11-38:16: Variable $last might not be defined

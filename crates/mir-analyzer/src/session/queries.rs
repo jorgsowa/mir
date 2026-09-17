@@ -547,10 +547,7 @@ impl AnalysisSession {
         includes: crate::ReferenceIncludes,
         should_cancel: &(dyn Fn() -> bool + Sync),
     ) -> Option<Vec<(Arc<str>, crate::Range)>> {
-        self.settle_workspace_index();
         use std::panic::AssertUnwindSafe;
-
-        use rayon::prelude::*;
 
         let key = symbol.codebase_key();
 
@@ -615,70 +612,71 @@ impl AnalysisSession {
             let attempt = salsa::Cancelled::catch(AssertUnwindSafe(|| {
                 let current_gen = self.index_generation();
                 let db_main = self.snapshot_db();
-                files
-                    .par_iter()
-                    .map_with(db_main, |db, f| {
-                        let Some(sf) = db.lookup_source_file(f.as_ref()) else {
-                            return (None, None);
-                        };
-                        let text = sf.text(&*db as &dyn MirDatabase);
-                        if self.is_ref_committed(f.as_ref(), text, current_gen) {
-                            return (None, None);
-                        }
-                        if committed_any.contains(f.as_ref())
-                            && !self.ref_commit_stale_by_generation_only(f.as_ref(), text)
-                        {
-                            return (Some(f.clone()), None);
-                        }
-                        if has_needles && gate_complete {
-                            // Any needle answering `true` admits the file; an
-                            // unanswerable one forces the single recorded
-                            // scan, which settles every needle at once.
-                            let mut answer = Some(false);
-                            for q in &mention_queries {
-                                match db.class_mention_answer(f.as_ref(), q, text) {
-                                    Some(true) => {
-                                        answer = Some(true);
-                                        break;
-                                    }
-                                    Some(false) => {}
-                                    None => answer = None,
+                let mut stale = Vec::new();
+                let mut scanned = Vec::new();
+                // This pass is intentionally serial. Each request already runs
+                // on its caller thread; putting every concurrent request back
+                // onto the shared Rayon pool lets an index batch monopolize the
+                // workers while readers wait without polling `should_cancel`.
+                // The per-file work is mostly cache lookups, and keeping it on
+                // the caller thread makes cancellation responsive under write
+                // contention instead of turning a short LSP deadline into an
+                // unbounded pool wait.
+                for f in files {
+                    let Some(sf) = db_main.lookup_source_file(f.as_ref()) else {
+                        continue;
+                    };
+                    let text = sf.text(&db_main as &dyn MirDatabase);
+                    if self.is_ref_committed(f.as_ref(), text, current_gen) {
+                        continue;
+                    }
+                    if committed_any.contains(f.as_ref())
+                        && !self.ref_commit_stale_by_generation_only(f.as_ref(), text)
+                    {
+                        stale.push(f.clone());
+                        continue;
+                    }
+                    if has_needles && gate_complete {
+                        // Any needle answering `true` admits the file; an
+                        // unanswerable one forces the single recorded scan,
+                        // which settles every needle at once.
+                        let mut answer = Some(false);
+                        for q in &mention_queries {
+                            match db_main.class_mention_answer(f.as_ref(), q, text) {
+                                Some(true) => {
+                                    answer = Some(true);
+                                    break;
                                 }
-                            }
-                            match answer {
-                                Some(true) => {}
-                                Some(false) => return (None, None),
-                                None => {
-                                    let scanner = mention_scanner
-                                        .as_ref()
-                                        .expect("gate_complete implies a scanner");
-                                    let names = scanner.scan(text);
-                                    let hit = mention_queries
-                                        .iter()
-                                        .any(|q| names.binary_search(&q.name).is_ok());
-                                    let rec = (f.clone(), text.clone(), names);
-                                    return (hit.then(|| f.clone()), Some(rec));
-                                }
+                                Some(false) => {}
+                                None => answer = None,
                             }
                         }
-                        (Some(f.clone()), None)
-                    })
-                    .collect::<Vec<_>>()
-            }));
-            match attempt {
-                Ok(v) => {
-                    let mut stale = Vec::new();
-                    let mut scanned = Vec::new();
-                    for (s, rec) in v {
-                        if let Some(s) = s {
-                            stale.push(s);
-                        }
-                        if let Some(rec) = rec {
-                            scanned.push(rec);
+                        match answer {
+                            Some(true) => {}
+                            Some(false) => continue,
+                            None => {
+                                let scanner = mention_scanner
+                                    .as_ref()
+                                    .expect("gate_complete implies a scanner");
+                                let names = scanner.scan(text);
+                                let hit = mention_queries
+                                    .iter()
+                                    .any(|q| names.binary_search(&q.name).is_ok());
+                                scanned.push((f.clone(), text.clone(), names));
+                                if hit {
+                                    stale.push(f.clone());
+                                }
+                                continue;
+                            }
                         }
                     }
-                    break (stale, scanned);
+                    stale.push(f.clone());
                 }
+                Some((stale, scanned))
+            }));
+            match attempt {
+                Ok(Some(v)) => break v,
+                Ok(None) => return None,
                 Err(_) if should_cancel() => return None,
                 Err(_) => {}
             }
@@ -696,6 +694,16 @@ impl AnalysisSession {
         }
 
         if !stale.is_empty() {
+            // Replayed postings which are already current answer directly
+            // below. Do not make that read-only path wait for (or consume the
+            // cancellation budget on) unrelated pending symbol-index work:
+            // warm start has already seeded the index needed to interpret its
+            // postings. A stale candidate, on the other hand, is about to
+            // analyze against the workspace, so reconcile first and retain
+            // the cancellable behavior for that potentially expensive work.
+            if !self.settle_workspace_index_cancellable(should_cancel) {
+                return None;
+            }
             // Phase 1 (serial, no live snapshot held): warm up stale
             // candidates. `prepare_file_for_analysis` mutates salsa inputs
             // (via `load_class`), so a concurrent writer — the background

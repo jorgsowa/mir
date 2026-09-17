@@ -161,6 +161,10 @@ impl<'a> ExpressionAnalyzer<'a> {
         u: &UnaryPostfixExpr,
         ctx: &mut FlowState,
     ) -> Type {
+        let was_read_before = extract_simple_var(&u.operand).is_some_and(|name| {
+            ctx.read_vars
+                .contains(&mir_types::Name::from(name.as_str()))
+        });
         let operand_ty = self.analyze(&u.operand, ctx);
         match u.op {
             UnaryPostfixOp::PostIncrement | UnaryPostfixOp::PostDecrement => {
@@ -212,6 +216,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                     let (line, col_start) = self.offset_to_line_col(u.operand.span.start);
                     let (line_end, col_end) = self.offset_to_line_col(u.operand.span.end);
                     ctx.record_var_location(&var_name, line, col_start, line_end, col_end);
+                    if ctx.inside_loop && was_read_before {
+                        ctx.mark_consumed(&var_name);
+                    }
                 }
                 operand_ty
             }

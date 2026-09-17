@@ -612,12 +612,14 @@ pub(super) fn infer_const_value(
 /// (e.g. `PHP_OS = "Linux"`, `PHP_OS_FAMILY = "Linux"`, `DIRECTORY_SEPARATOR =
 /// "/"`), which would otherwise narrow the constant to that single literal
 /// and make every cross-platform/SAPI guard (`'\\' === DIRECTORY_SEPARATOR`)
-/// look "impossible". Widen to the constant's own base scalar type instead.
+/// look "impossible". Widen to the constant's own base scalar type instead,
+/// except for `PHP_INT_SIZE`: PHP only supports 32- and 64-bit integer sizes,
+/// so its precise finite domain is `4|8`.
 fn widen_environment_dependent_constant(name: &str, inferred: Type) -> Type {
     match name {
         "PHP_OS" | "PHP_OS_FAMILY" | "PHP_SAPI" => Type::single(Atomic::TString),
         "DIRECTORY_SEPARATOR" => Type::single(Atomic::TNonEmptyString),
-        "PHP_INT_SIZE" => Type::single(Atomic::TInt),
+        "PHP_INT_SIZE" => Type::from_vec(vec![Atomic::TLiteralInt(4), Atomic::TLiteralInt(8)]),
         _ => inferred,
     }
 }
@@ -1522,6 +1524,7 @@ impl<'a> DefinitionCollector<'a> {
                     deprecated: None,
                     is_internal: false,
                     is_pure: false,
+                    is_impure: false,
                     no_named_arguments: false,
                     is_override: false,
                     location: location.clone(),
@@ -2241,6 +2244,7 @@ impl<'a> DefinitionCollector<'a> {
             }),
             is_internal: doc.is_internal,
             is_pure: doc.is_pure || self.pure_attr(&m.attributes),
+            is_impure: doc.is_impure,
             no_named_arguments: doc.no_named_arguments,
             is_override,
             is_virtual: false,

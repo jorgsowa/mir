@@ -135,7 +135,17 @@ jobs:
         uses: actions/cache@v6.1.0
         with:
           path: harness/fixtures
-          key: real-world-fixtures-${{ hashFiles('harness/packages.php') }}
+          key: real-world-fixtures-${{ hashFiles('harness/packages.php', 'harness/download-fixtures.php') }}
+
+      - name: Resolve Composer cache directory
+        id: composer-cache
+        run: echo "path=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Composer packages
+        uses: actions/cache@v6.1.0
+        with:
+          path: ${{ steps.composer-cache.outputs.path }}
+          key: composer-packages-${{ runner.os }}-${{ hashFiles('harness/packages.php', 'harness/download-fixtures.php') }}
 
       - name: Download and install fixtures
         if: steps.fixture-cache.outputs.cache-hit != 'true'

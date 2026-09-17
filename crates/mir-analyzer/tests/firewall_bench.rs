@@ -11,6 +11,7 @@
 
 mod common;
 
+use mir_analyzer::cache::AnalysisCache;
 use mir_analyzer::{AnalysisSession, BatchOptions, PhpVersion};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -77,6 +78,50 @@ fn dependent_src(i: usize) -> String {
     }
     s.push_str("        return $acc;\n    }\n}\n");
     s
+}
+
+/// Measures mirror registration against a large cache. The assertion makes
+/// this a regression test as well as a timing probe: unrelated entries must
+/// remain available after a mirror update.
+#[test]
+#[ignore = "timing probe; run with --ignored --nocapture"]
+fn mirror_registration_scales_with_affected_entries() {
+    const CACHE_ENTRIES: usize = 10_000;
+    let cache_dir = create_temp_dir("mirror cache probe");
+    let cache = Arc::new(AnalysisCache::open(
+        cache_dir.path(),
+        PhpVersion::LATEST.cache_byte(),
+        0,
+    ));
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache(cache.clone());
+    session.set_file_text(
+        Arc::from("/mirror/edited.php"),
+        Arc::from("<?php class Existing { function a() {} }"),
+    );
+    session.rebuild_workspace_symbol_index();
+    for n in 0..CACHE_ENTRIES {
+        cache.put(
+            &format!("/mirror/file_{n}.php"),
+            "same-hash".into(),
+            "surface".into(),
+            Arc::from([]),
+            Arc::from([]),
+        );
+    }
+
+    let started = Instant::now();
+    session.set_file_text(
+        Arc::from("/mirror/edited.php"),
+        Arc::from("<?php class Existing { function b() {} }"),
+    );
+    session.settle_workspace_index();
+    let elapsed = started.elapsed();
+    let retained = cache.cached_files().len();
+    eprintln!("mirror body edit: {elapsed:?}, retained {retained}/{CACHE_ENTRIES} entries");
+    assert_eq!(
+        retained, CACHE_ENTRIES,
+        "unrelated cache entries must survive"
+    );
 }
 
 #[test]

@@ -456,6 +456,9 @@ pub struct MethodDef {
     pub deprecated: Option<Arc<str>>,
     pub is_internal: bool,
     pub is_pure: bool,
+    /// An explicit `@impure`/`@psalm-impure`/`@phpstan-impure` declaration.
+    #[serde(default)]
+    pub is_impure: bool,
     /// `@no-named-arguments` — callers must not use named argument syntax.
     #[serde(default)]
     pub no_named_arguments: bool,
