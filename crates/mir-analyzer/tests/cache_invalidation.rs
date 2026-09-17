@@ -5,7 +5,13 @@
 
 mod common;
 
-use mir_analyzer::{dead_code_issue_kinds, AnalysisSession, BatchOptions, PhpVersion};
+use std::sync::Arc;
+
+use mir_analyzer::cache::hash_content;
+use mir_analyzer::{
+    dead_code_issue_kinds, AnalysisSession, BatchOptions, IndexCancel, IndexParallelism, PhpVersion,
+};
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use self::common::{create_temp_dir, write_file};
 
@@ -265,4 +271,191 @@ fn warm_run_without_changes_does_not_rewrite_cache() {
         result2.issues.len(),
         "warm run must produce the same diagnostics"
     );
+}
+
+fn has_undefined_class(session: &AnalysisSession, path: &str, source: &str) -> bool {
+    session
+        .re_analyze_file(path, source, &BatchOptions::new().without_symbols())
+        .issues
+        .iter()
+        .any(|issue| issue.kind.name() == "UndefinedClass")
+}
+
+#[test]
+fn mirror_registration_evicts_only_negative_and_dependent_entries() {
+    let dir = create_temp_dir("mirror selective invalidation");
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    let consumer = "<?php\nnew Mage();\n";
+    let unrelated = "<?php\nfunction unrelated(): void {}\n";
+
+    assert!(has_undefined_class(&session, "/mirror/app.php", consumer));
+    assert!(!has_undefined_class(
+        &session,
+        "/mirror/unrelated.php",
+        unrelated
+    ));
+    let cache = session.cache().unwrap();
+    assert!(cache.is_valid("/mirror/app.php", &hash_content(consumer)));
+    assert!(cache.is_valid("/mirror/unrelated.php", &hash_content(unrelated)));
+
+    session.set_workspace_files(vec![(
+        Arc::from("/mirror/Mage.php"),
+        Arc::from("<?php\nclass Mage {}\n"),
+    )]);
+
+    assert!(
+        !cache.is_valid("/mirror/app.php", &hash_content(consumer)),
+        "negative lookup must be evicted when its missing class is registered"
+    );
+    assert!(
+        cache.is_valid("/mirror/unrelated.php", &hash_content(unrelated)),
+        "unrelated resolved cache entry must survive workspace growth"
+    );
+    assert!(
+        !has_undefined_class(&session, "/mirror/app.php", consumer),
+        "reanalysis after registration must resolve Mage"
+    );
+}
+
+#[test]
+fn body_only_mirror_edit_preserves_unrelated_cache_entry() {
+    let dir = create_temp_dir("mirror body-only invalidation");
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    session.set_file_text(
+        Arc::from("/mirror/edited.php"),
+        Arc::from("<?php class Existing { function a(): void {} }"),
+    );
+    session.rebuild_workspace_symbol_index();
+    let unrelated = "<?php\nfunction unrelated(): void {}\n";
+    assert!(!has_undefined_class(
+        &session,
+        "/mirror/unrelated.php",
+        unrelated
+    ));
+
+    session.set_file_text(
+        Arc::from("/mirror/edited.php"),
+        Arc::from("<?php class Existing { function b(): void {} }"),
+    );
+    session.settle_workspace_index();
+    assert!(
+        session
+            .cache()
+            .unwrap()
+            .is_valid("/mirror/unrelated.php", &hash_content(unrelated)),
+        "body-only mirror edits must not clear unrelated cache entries"
+    );
+}
+
+#[test]
+fn index_batch_registration_evicts_negative_but_keeps_unrelated_cache() {
+    let dir = create_temp_dir("mirror index batch invalidation");
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    let consumer = "<?php\nnew Mage();\n";
+    let unrelated = "<?php\nfunction unrelated(): void {}\n";
+    assert!(has_undefined_class(&session, "/mirror/app.php", consumer));
+    assert!(!has_undefined_class(
+        &session,
+        "/mirror/unrelated.php",
+        unrelated
+    ));
+
+    session.index_batch(
+        &[(
+            Arc::from("/mirror/Mage.php"),
+            Arc::from("<?php\nclass Mage {}\n"),
+        )],
+        IndexParallelism::Sequential,
+        &IndexCancel::new(),
+    );
+
+    let cache = session.cache().unwrap();
+    assert!(!cache.is_valid("/mirror/app.php", &hash_content(consumer)));
+    assert!(cache.is_valid("/mirror/unrelated.php", &hash_content(unrelated)));
+    assert!(!has_undefined_class(&session, "/mirror/app.php", consumer));
+}
+
+#[test]
+fn direct_input_registration_invalidates_persisted_negative_lookup() {
+    let dir = create_temp_dir("mirror direct input invalidation");
+    let consumer = "<?php\nnew Mage();\n";
+    {
+        let seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+        assert!(has_undefined_class(&seed, "/mirror/app.php", consumer));
+        seed.flush_analysis_cache();
+    }
+
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    session.upsert_source_file(
+        Arc::from("/mirror/Mage.php"),
+        Arc::from("<?php\nclass Mage {}\n"),
+        salsa::Durability::LOW,
+    );
+    assert!(!session
+        .cache()
+        .unwrap()
+        .is_valid("/mirror/app.php", &hash_content(consumer)));
+    assert!(!has_undefined_class(&session, "/mirror/app.php", consumer));
+}
+
+#[test]
+fn shadowed_definition_evicts_dependents_of_old_owner() {
+    let dir = create_temp_dir("mirror shadow invalidation");
+    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    let old_owner = "/mirror/old_mage.php";
+    let consumer_path = "/mirror/consumer.php";
+    let consumer = "<?php\n(new Mage())->spell();\n";
+    session.set_file_text(
+        Arc::from(old_owner),
+        Arc::from("<?php class Mage { function spell(): void {} }"),
+    );
+    session.rebuild_workspace_symbol_index();
+    assert!(!has_undefined_class(&session, consumer_path, consumer));
+    let cache = session.cache().unwrap();
+    assert!(cache.is_valid(consumer_path, &hash_content(consumer)));
+    let mut reverse_deps = FxHashMap::default();
+    reverse_deps.insert(
+        old_owner.to_string(),
+        FxHashSet::from_iter([consumer_path.to_string()]),
+    );
+    cache.set_reverse_deps(reverse_deps);
+
+    session.set_file_text(
+        Arc::from("/mirror/new_mage.php"),
+        Arc::from("<?php class Mage {}"),
+    );
+    session.settle_workspace_index();
+    assert!(
+        !cache.is_valid(consumer_path, &hash_content(consumer)),
+        "dependents of a shadowed definition must be invalidated"
+    );
+}
+
+#[test]
+fn matching_warm_cache_entries_survive_bulk_registration() {
+    let dir = create_temp_dir("mirror matching cache");
+    let files = [
+        ("/mirror/one.php", "<?php function one(): void {}"),
+        ("/mirror/two.php", "<?php function two(): void {}"),
+    ];
+    {
+        let seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+        for (path, source) in files {
+            assert!(!has_undefined_class(&seed, path, source));
+        }
+        seed.flush_analysis_cache();
+    }
+    let warm = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    warm.set_workspace_files(
+        files
+            .into_iter()
+            .map(|(path, source)| (Arc::from(path), Arc::from(source)))
+            .collect::<Vec<_>>(),
+    );
+    for (path, source) in files {
+        assert!(
+            warm.cache().unwrap().is_valid(path, &hash_content(source)),
+            "matching warm cache entry for {path} must survive registration"
+        );
+    }
 }

@@ -1014,6 +1014,18 @@ impl MirDbStorage {
         true
     }
 
+    /// Whether `decls` matches the names recorded at the last index update.
+    pub(crate) fn file_declarations_match(
+        &self,
+        file: SourceFile,
+        decls: &crate::db::FileDeclarations,
+    ) -> bool {
+        self.file_decl_snapshots
+            .read()
+            .get(&file)
+            .is_some_and(|old| old == decls)
+    }
+
     /// Check whether the declared names in `file` differ from the last
     /// snapshot captured by `rebuild_workspace_symbol_index`.
     ///
