@@ -835,7 +835,8 @@ impl AnalysisSession {
                 // Pointer-identical memo ⇒ identical postings: skip the
                 // index rewrite and only re-stamp the freshness mark.
                 if !self.ref_commit_is_current(file.as_ref(), text, out) {
-                    guard.set_file_reference_locations(file.as_ref(), out.ref_locs.to_vec());
+                    let file_no = guard.locked_ref_index().intern_path(file);
+                    guard.set_file_reference_locations(file_no, out.ref_locs.to_vec());
                 }
                 if let (Some(s), Some(m)) = (&mention_scanner, mentions.take()) {
                     guard.set_file_class_mentions(file, text, s.epoch(), m);
@@ -851,7 +852,8 @@ impl AnalysisSession {
                     !out.has_unresolved_names(),
                 );
                 if !self.is_defs_committed(file.as_ref(), text) {
-                    guard.set_file_class_edges(file, entries.clone());
+                    let file_no = guard.locked_ref_index().intern_path(file);
+                    guard.set_file_class_edges(file_no, entries.clone());
                     self.mark_defs_committed(file, text);
                 }
             }
@@ -1473,7 +1475,8 @@ impl AnalysisSession {
         }
         let guard = self.db.salsa.read();
         for (file, text, entries) in &work {
-            guard.set_file_class_edges(file, entries.clone());
+            let file_no = guard.locked_ref_index().intern_path(file);
+            guard.set_file_class_edges(file_no, entries.clone());
             self.mark_defs_committed(file, text);
         }
     }

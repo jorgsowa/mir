@@ -445,7 +445,10 @@ impl MirDatabase for MirDbStorage {
     }
 
     fn extract_file_reference_locations(&self, file: &str) -> Vec<(Arc<str>, u32, u16, u16)> {
-        self.locked_ref_index().file_locations(file)
+        let Some(file_no) = self.locked_ref_index().lookup_path(file) else {
+            return Vec::new();
+        };
+        self.locked_ref_index().file_locations(file_no)
     }
 
     fn reference_locations(&self, symbol: &str) -> Vec<(Arc<str>, u32, u16, u16)> {
@@ -457,7 +460,10 @@ impl MirDatabase for MirDbStorage {
     }
 
     fn clear_file_references(&self, file: &str) {
-        self.locked_ref_index().clear_file(file);
+        let Some(file_no) = self.locked_ref_index().lookup_path(file) else {
+            return;
+        };
+        self.locked_ref_index().clear_file(file_no);
     }
 
     fn all_reference_location_pairs(&self) -> Vec<(Arc<str>, Arc<str>)> {
@@ -465,7 +471,10 @@ impl MirDatabase for MirDbStorage {
     }
 
     fn file_referenced_symbols(&self, file: &str) -> Vec<Arc<str>> {
-        self.locked_ref_index().symbols_referenced_by(file)
+        let Some(file_no) = self.locked_ref_index().lookup_path(file) else {
+            return Vec::new();
+        };
+        self.locked_ref_index().symbols_referenced_by(file_no)
     }
 
     fn lookup_source_file(&self, path: &str) -> Option<SourceFile> {
@@ -543,7 +552,7 @@ impl MirDatabase for MirDbStorage {
 impl MirDbStorage {
     /// The single gateway to the reference index: every lock is counted so
     /// hosts can assert the index stays untouched on their hot paths.
-    fn locked_ref_index(&self) -> parking_lot::MutexGuard<'_, crate::db::ref_index::RefIndex> {
+    pub fn locked_ref_index(&self) -> parking_lot::MutexGuard<'_, crate::db::ref_index::RefIndex> {
         self.ref_index_locks
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         self.ref_index.lock()
@@ -1068,7 +1077,7 @@ impl MirDbStorage {
     /// disk-cache replay. Entries in `locs` belonging to other files (e.g.
     /// recorded by nested on-demand inference) are appended without
     /// clearing those files.
-    pub fn set_file_reference_locations(&self, file: &str, locs: Vec<RefLoc>) {
+    pub fn set_file_reference_locations(&self, file: crate::db::FileNo, locs: Vec<RefLoc>) {
         if self.locked_ref_index().set_file_refs(file, locs) {
             self.bump_subtype_edges_epoch();
         }
@@ -1079,11 +1088,13 @@ impl MirDbStorage {
     /// gate index can answer for them.
     pub fn set_file_class_edges(
         &self,
-        file: &Arc<str>,
+        file: crate::db::FileNo,
         entries: Vec<crate::db::subtype_index::SubtypeEntry>,
     ) {
+        let ref_index = self.locked_ref_index();
+        let file_path = ref_index.path_of(file);
         self.add_class_mention_names(entries.iter().map(|e| e.fqcn.as_ref()));
-        if self.subtype_index.lock().set_file_classes(file, entries) {
+        if self.subtype_index.lock().set_file_classes(file, file_path, entries) {
             self.bump_subtype_edges_epoch();
         }
     }
@@ -1170,13 +1181,17 @@ impl MirDbStorage {
         q: &crate::db::class_mention_index::MentionQuery,
         current_text: &Arc<str>,
     ) -> Option<bool> {
-        self.class_mentions.answer(file, q, current_text)
+        let file_no = self.locked_ref_index().lookup_path(file)?;
+        self.class_mentions.answer(file_no, q, current_text)
     }
 
     /// Whether `file` already holds a mention scan of exactly `text` at
     /// `epoch` or newer.
     pub fn class_mentions_current(&self, file: &str, text: &Arc<str>, epoch: u64) -> bool {
-        self.class_mentions.is_current(file, text, epoch)
+        let Some(file_no) = self.locked_ref_index().lookup_path(file) else {
+            return false;
+        };
+        self.class_mentions.is_current(file_no, text, epoch)
     }
 
     /// Record one file's mention-scan result.
@@ -1187,13 +1202,14 @@ impl MirDbStorage {
         epoch: u64,
         names: Box<[Name]>,
     ) {
+        let file_no = self.locked_ref_index().intern_path(file);
         self.class_mentions
-            .set_file(file.clone(), text.clone(), epoch, names);
+            .set_file(file_no, text.clone(), epoch, names);
     }
 
     /// Drop `file`'s mention entry (file removed, or its text replaced —
     /// frees the entry's pinned `Arc<str>`).
-    pub fn clear_file_class_mentions(&self, file: &str) {
+    pub fn clear_file_class_mentions(&self, file: crate::db::FileNo) {
         self.class_mentions.clear_file(file);
     }
 
@@ -1204,7 +1220,10 @@ impl MirDbStorage {
 
     /// Drop `file`'s class-like declarations from the subtype edge index.
     pub fn clear_file_class_edges(&self, file: &str) {
-        if self.subtype_index.lock().clear_file(file) {
+        let Some(file_no) = self.locked_ref_index().lookup_path(file) else {
+            return;
+        };
+        if self.subtype_index.lock().clear_file(file_no) {
             self.bump_subtype_edges_epoch();
         }
     }
@@ -1299,7 +1318,9 @@ impl MirDbStorage {
             if *sf.text(self) != text {
                 // Entry pins the old text Arc; the ptr guard would already
                 // sideline it, dropping it now frees the memory too.
-                self.clear_file_class_mentions(path.as_ref());
+                if let Some(file_no) = self.locked_ref_index().lookup_path(&path) {
+                    self.clear_file_class_mentions(file_no);
+                }
                 sf.set_text(self).with_durability(durability).to(text);
                 self.mark_index_pending(&path);
             }
@@ -1372,7 +1393,9 @@ impl MirDbStorage {
                 {
                     *self.workspace_symbol_index_input.write() = None;
                 }
-                self.clear_file_class_mentions(path);
+                if let Some(file_no) = self.locked_ref_index().lookup_path(path) {
+                    self.clear_file_class_mentions(file_no);
+                }
                 self.file_decl_snapshots.write().remove(&sf);
                 // Free the file text. The salsa input slot is immortal in 0.27
                 // (no delete API), but the Arc<str> content — potentially hundreds

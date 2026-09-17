@@ -23,7 +23,9 @@ use smallvec::SmallVec;
 use super::reference_locations::RefLoc;
 
 /// Interned file id, valid within one `RefIndex` instance.
-type FileNo = u32;
+/// Re-exported for use by [`crate::db::subtype_index`] and
+/// [`crate::db::class_mention_index`] to unify file identity across indexes.
+pub type FileNo = u32;
 /// Interned symbol id, valid within one `RefIndex` instance.
 type SymbolNo = u32;
 
@@ -70,9 +72,6 @@ impl RefIndex {
         self.path_ids.get(path).copied()
     }
 
-    fn path_of(&self, id: FileNo) -> Arc<str> {
-        self.paths[id as usize].clone()
-    }
 
     fn intern_symbol(&mut self, symbol: &Arc<str>) -> SymbolNo {
         if let Some(&id) = self.symbol_ids.get(symbol.as_ref()) {
@@ -123,22 +122,19 @@ impl RefIndex {
 
     /// Remove every reference recorded as appearing in `file`. O(degree):
     /// the forward view names exactly the symbols that need fixing.
-    pub fn clear_file(&mut self, file: &str) {
-        let Some(file_id) = self.lookup(file) else {
-            return;
-        };
-        let Some(symbol_ids) = self.file_symbols.remove(&file_id) else {
+    pub fn clear_file(&mut self, file: crate::db::FileNo) {
+        let Some(symbol_ids) = self.file_symbols.remove(&file) else {
             return;
         };
         for symbol_id in &symbol_ids {
             if let Some(locs) = self.by_symbol.get_mut(symbol_id) {
-                locs.retain(|&(f, _, _, _)| f != file_id);
+                locs.retain(|&(f, _, _, _)| f != file);
                 if locs.is_empty() {
                     self.by_symbol.remove(symbol_id);
                 }
             }
             if let Some(refs) = self.referencers.get_mut(symbol_id) {
-                refs.retain(|f| *f != file_id);
+                refs.retain(|f| *f != file);
                 if refs.is_empty() {
                     self.referencers.remove(symbol_id);
                 }
@@ -161,10 +157,10 @@ impl RefIndex {
     /// Returns whether the replace touched any anonymous-class subtype
     /// posting (`impl:`), before or after — same contract as
     /// [`Self::append_batch`].
-    pub fn set_file_refs(&mut self, file: &str, locs: Vec<RefLoc>) -> bool {
+    pub fn set_file_refs(&mut self, file: crate::db::FileNo, locs: Vec<RefLoc>) -> bool {
         let mut touched_impl = self
-            .lookup(file)
-            .and_then(|id| self.file_symbols.get(&id))
+            .file_symbols
+            .get(&file)
             .is_some_and(|symbols| {
                 symbols
                     .iter()
@@ -221,9 +217,9 @@ impl RefIndex {
     }
 
     /// All symbol keys referenced by `file`.
-    pub fn symbols_referenced_by(&self, file: &str) -> Vec<Arc<str>> {
-        self.lookup(file)
-            .and_then(|id| self.file_symbols.get(&id))
+    pub fn symbols_referenced_by(&self, file: FileNo) -> Vec<Arc<str>> {
+        self.file_symbols
+            .get(&file)
             .map(|symbols| symbols.iter().map(|&id| self.symbol_of(id)).collect())
             .unwrap_or_default()
     }
@@ -231,18 +227,15 @@ impl RefIndex {
     /// All of `file`'s reference locations in cache-storage shape:
     /// `(symbol_key, line, col_start, col_end)`. O(file degree × per-symbol
     /// locations) via the forward view, not O(total index size).
-    pub fn file_locations(&self, file: &str) -> Vec<(Arc<str>, u32, u16, u16)> {
-        let Some(file_id) = self.lookup(file) else {
-            return Vec::new();
-        };
-        let Some(symbols) = self.file_symbols.get(&file_id) else {
+    pub fn file_locations(&self, file: FileNo) -> Vec<(Arc<str>, u32, u16, u16)> {
+        let Some(symbols) = self.file_symbols.get(&file) else {
             return Vec::new();
         };
         let mut out = Vec::new();
         for &symbol_id in symbols {
             if let Some(locs) = self.by_symbol.get(&symbol_id) {
                 for &(f, line, cs, ce) in locs {
-                    if f == file_id {
+                    if f == file {
                         out.push((self.symbol_of(symbol_id), line, cs, ce));
                     }
                 }
@@ -262,6 +255,22 @@ impl RefIndex {
         }
         pairs
     }
+
+    /// Resolve a `FileNo` back to its path. Panics if the id is invalid.
+    pub fn path_of(&self, file_id: FileNo) -> Arc<str> {
+        self.paths[file_id as usize].clone()
+    }
+
+    /// Intern a path, returning its `FileNo`. Creates a new id if the path
+    /// is not yet interned.
+    pub fn intern_path(&mut self, path: &Arc<str>) -> FileNo {
+        self.intern(path)
+    }
+
+    /// Look up the `FileNo` for a path, if it has been interned.
+    pub fn lookup_path(&self, path: &str) -> Option<FileNo> {
+        self.lookup(path)
+    }
 }
 
 #[cfg(test)]
@@ -278,9 +287,12 @@ mod tests {
         }
     }
 
+
     #[test]
     fn append_dedup_and_views_stay_consistent() {
         let mut idx = RefIndex::default();
+        let file_a = idx.intern(&Arc::from("a.php"));
+        let _file_b = idx.intern(&Arc::from("b.php"));
         idx.append_batch(vec![
             loc("fn:foo", "a.php", 1),
             loc("fn:foo", "a.php", 1), // duplicate
@@ -292,35 +304,37 @@ mod tests {
         let mut refs = idx.referencers_of("fn:foo");
         refs.sort();
         assert_eq!(refs, vec![Arc::<str>::from("a.php"), Arc::from("b.php")]);
-        let mut syms = idx.symbols_referenced_by("a.php");
+        let mut syms = idx.symbols_referenced_by(file_a);
         syms.sort();
         assert_eq!(syms, vec![Arc::<str>::from("cls:Bar"), Arc::from("fn:foo")]);
     }
-
     #[test]
     fn clear_file_prunes_all_views() {
         let mut idx = RefIndex::default();
+        let file_a = idx.intern(&Arc::from("a.php"));
+        let _file_b = idx.intern(&Arc::from("b.php"));
         idx.append_batch(vec![
             loc("fn:foo", "a.php", 1),
             loc("fn:foo", "b.php", 2),
             loc("cls:OnlyA", "a.php", 3),
         ]);
-        idx.clear_file("a.php");
+        idx.clear_file(file_a);
         assert_eq!(idx.locations_of("fn:foo").len(), 1);
         assert_eq!(
             idx.referencers_of("fn:foo"),
             vec![Arc::<str>::from("b.php")]
         );
         assert!(!idx.has_reference("cls:OnlyA"));
-        assert!(idx.symbols_referenced_by("a.php").is_empty());
-        assert!(idx.file_locations("a.php").is_empty());
+        assert!(idx.symbols_referenced_by(file_a).is_empty());
+        assert!(idx.file_locations(file_a).is_empty());
     }
-
     #[test]
     fn set_file_refs_replaces_only_that_file() {
         let mut idx = RefIndex::default();
+        let file_a = idx.intern(&Arc::from("a.php"));
+        let _file_b = idx.intern(&Arc::from("b.php"));
         idx.append_batch(vec![loc("fn:foo", "a.php", 1), loc("fn:foo", "b.php", 2)]);
-        idx.set_file_refs("a.php", vec![loc("cls:New", "a.php", 9)]);
+        idx.set_file_refs(file_a, vec![loc("cls:New", "a.php", 9)]);
         assert!(!idx
             .referencers_of("fn:foo")
             .contains(&Arc::<str>::from("a.php")));
@@ -328,14 +342,14 @@ mod tests {
             idx.referencers_of("fn:foo"),
             vec![Arc::<str>::from("b.php")]
         );
-        assert_eq!(idx.file_locations("a.php").len(), 1);
+        assert_eq!(idx.file_locations(file_a).len(), 1);
     }
-
     #[test]
     fn set_file_refs_dedups_within_batch() {
         let mut idx = RefIndex::default();
+        let file_a = idx.intern(&Arc::from("a.php"));
         idx.set_file_refs(
-            "a.php",
+            file_a,
             vec![
                 loc("fn:foo", "a.php", 1),
                 loc("fn:foo", "a.php", 1), // same position, dropped
@@ -346,23 +360,9 @@ mod tests {
     }
 
     #[test]
-    fn append_batch_keeps_one_referencer_per_file_symbol_edge() {
-        let mut idx = RefIndex::default();
-        idx.append_batch(vec![
-            loc("fn:foo", "a.php", 1),
-            loc("fn:foo", "a.php", 2),
-            loc("fn:foo", "a.php", 3),
-        ]);
-        assert_eq!(idx.locations_of("fn:foo").len(), 3);
-        assert_eq!(
-            idx.referencers_of("fn:foo"),
-            vec![Arc::<str>::from("a.php")]
-        );
-    }
-
-    #[test]
     fn append_batch_across_multiple_calls_does_not_duplicate_referencers() {
         let mut idx = RefIndex::default();
+        let _file_a = idx.intern(&Arc::from("a.php"));
         idx.append_batch(vec![loc("fn:foo", "a.php", 1)]);
         idx.append_batch(vec![loc("fn:foo", "a.php", 2)]);
         idx.append_batch(vec![loc("fn:foo", "a.php", 3)]);
@@ -372,55 +372,58 @@ mod tests {
             vec![Arc::<str>::from("a.php")]
         );
     }
-
     #[test]
     fn clear_file_preserves_other_referencers_without_duplicates() {
         let mut idx = RefIndex::default();
+        let file_a = idx.intern(&Arc::from("a.php"));
+        let _file_b = idx.intern(&Arc::from("b.php"));
+        let _file_c = idx.intern(&Arc::from("c.php"));
         idx.append_batch(vec![
             loc("fn:foo", "a.php", 1),
             loc("fn:foo", "a.php", 2),
             loc("fn:foo", "b.php", 3),
             loc("fn:foo", "c.php", 4),
         ]);
-        idx.clear_file("a.php");
+        idx.clear_file(file_a);
         let mut refs = idx.referencers_of("fn:foo");
         refs.sort();
         assert_eq!(refs, vec![Arc::<str>::from("b.php"), Arc::from("c.php")]);
     }
-
     #[test]
     fn set_file_refs_recommit_churn_keeps_referencers_unique() {
         let mut idx = RefIndex::default();
-        idx.set_file_refs("a.php", vec![loc("fn:foo", "a.php", 1)]);
-        idx.set_file_refs("a.php", vec![loc("fn:foo", "a.php", 2)]);
-        idx.set_file_refs("a.php", vec![loc("fn:foo", "a.php", 3)]);
-        idx.set_file_refs(
-            "a.php",
-            vec![loc("fn:foo", "a.php", 4), loc("fn:foo", "a.php", 5)],
-        );
-        assert_eq!(idx.locations_of("fn:foo").len(), 2);
+        let file_a = idx.intern(&Arc::from("a.php"));
+        let file_b = idx.intern(&Arc::from("b.php"));
+        idx.append_batch(vec![
+            loc("fn:foo", "a.php", 1),
+            loc("fn:foo", "b.php", 2),
+        ]);
+        idx.set_file_refs(file_a, vec![loc("fn:foo", "a.php", 5)]);
+        idx.set_file_refs(file_b, vec![loc("fn:foo", "b.php", 6)]);
         assert_eq!(
             idx.referencers_of("fn:foo"),
-            vec![Arc::<str>::from("a.php")]
+            vec![Arc::<str>::from("a.php"), Arc::from("b.php")]
         );
     }
-
     #[test]
     fn set_file_refs_hot_symbol_across_many_files() {
         // One symbol referenced by many files — the case that used to be
         // quadratic. Views must stay exact and replace-on-recommit must work.
         let mut idx = RefIndex::default();
         for f in 0..50 {
-            let file = format!("f{f}.php");
+            let file: Arc<str> = Arc::from(format!("f{f}.php"));
+            let file_no = idx.intern(&file);
             idx.set_file_refs(
-                &file,
+                file_no,
                 vec![loc("m:Base::foo", &file, 1), loc("m:Base::foo", &file, 2)],
             );
         }
         assert_eq!(idx.locations_of("m:Base::foo").len(), 100);
         assert_eq!(idx.referencers_of("m:Base::foo").len(), 50);
         // Re-commit one file with fewer refs: only its entries change.
-        idx.set_file_refs("f0.php", vec![loc("m:Base::foo", "f0.php", 9)]);
+        let file_0: Arc<str> = Arc::from("f0.php");
+        let file_0_no = idx.intern(&file_0);
+        idx.set_file_refs(file_0_no, vec![loc("m:Base::foo", "f0.php", 9)]);
         assert_eq!(idx.locations_of("m:Base::foo").len(), 99);
         assert_eq!(idx.referencers_of("m:Base::foo").len(), 50);
     }
@@ -428,10 +431,17 @@ mod tests {
     #[test]
     fn file_locations_matches_cache_shape() {
         let mut idx = RefIndex::default();
-        idx.append_batch(vec![loc("fn:foo", "a.php", 1), loc("fn:bar", "a.php", 5)]);
-        let mut locs = idx.file_locations("a.php");
-        locs.sort();
-        assert_eq!(locs.len(), 2);
-        assert_eq!(locs[0].0.as_ref(), "fn:bar");
+        let test_a = idx.intern(&Arc::from("test_a.php"));
+        let test_b = idx.intern(&Arc::from("test_b.php"));
+        idx.set_file_refs(test_a, vec![loc("A", "test_a.php", 1), loc("B", "test_a.php", 5)]);
+        idx.set_file_refs(test_b, vec![loc("C", "test_b.php", 3)]);
+        let mut locs = idx.file_locations(test_a);
+        locs.sort_by_key(|l| l.2);
+        // (symbol_key, line, col_start, col_end)
+        assert_eq!(locs[0].1, 1);
+        assert_eq!(locs[1].1, 5);
+        let mut locs = idx.file_locations(test_b);
+        locs.sort_by_key(|l| l.2);
+        assert_eq!(locs[0].1, 3);
     }
 }

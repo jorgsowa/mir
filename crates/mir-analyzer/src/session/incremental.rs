@@ -233,7 +233,8 @@ impl AnalysisSession {
                 // index rewrite. The mark is re-stamped unconditionally so a
                 // no-op sweep still advances the commit's generation.
                 if !self.ref_commit_is_current(file.as_ref(), text, out) {
-                    guard.set_file_reference_locations(file.as_ref(), out.ref_locs.to_vec());
+                    let file_no = guard.locked_ref_index().intern_path(file);
+                    guard.set_file_reference_locations(file_no, out.ref_locs.to_vec());
                     dependency_graph_changed = true;
                 }
                 if let (Some(s), Some(m)) = (&mention_scanner, mentions.take()) {
@@ -250,7 +251,8 @@ impl AnalysisSession {
                     !out.has_unresolved_names(),
                 );
                 if !self.is_defs_committed(file.as_ref(), text) {
-                    guard.set_file_class_edges(file, entries.clone());
+                    let file_no = guard.locked_ref_index().intern_path(file);
+                    guard.set_file_class_edges(file_no, entries.clone());
                     self.mark_defs_committed(file, text);
                     dependency_graph_changed = true;
                 }

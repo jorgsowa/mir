@@ -200,6 +200,7 @@ pub trait MirDatabase: salsa::Database {
 pub use self::class_mention_index::{
     ClassMentionIndex, ClassMentionStats, MentionQuery, MentionScanner,
 };
+pub use self::ref_index::{FileNo, RefIndex};
 pub use self::deps::{file_structural_deps, file_structural_symbols};
 pub use self::find_queries::{
     analyzed_class_defs, analyzed_enum_defs, analyzed_interface_defs, analyzed_trait_defs,
@@ -228,7 +229,6 @@ pub use self::queries::{
     parse_file, prepare_analysis_file, resolve_docblock_type_name, resolve_name,
     resolve_receiver_fqcn, ClassKind, InferredFileTypes, TrackedParseResult,
 };
-pub use self::ref_index::RefIndex;
 pub use self::reference_locations::*;
 pub use self::resolver::{resolve_fqcn_to_path, source_file_for_fqcn, Fqcn, ResolverConfig};
 pub use self::scopes::{
@@ -251,7 +251,7 @@ mod mirdb;
 mod nodes;
 mod per_function;
 mod queries;
-pub(crate) mod ref_index;
+pub mod ref_index;
 mod reference_locations;
 mod resolver;
 mod scopes;

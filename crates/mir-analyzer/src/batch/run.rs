@@ -223,7 +223,8 @@ impl AnalysisSession {
                     }
                 }
                 let entries = crate::db::subtype_index::entries_from_slice(&defs.slice);
-                guard.set_file_class_edges(&parsed.file, entries);
+                let file_no = guard.locked_ref_index().intern_path(&parsed.file);
+                guard.set_file_class_edges(file_no, entries);
                 all_issues.extend(Arc::unwrap_or_clone(defs.issues));
             }
         }
@@ -461,7 +462,8 @@ impl AnalysisSession {
             for (file, issues, symbols, ref_locs) in body_results {
                 all_issues.extend(issues);
                 all_symbols.extend(symbols);
-                guard.set_file_reference_locations(file.as_ref(), ref_locs);
+                let file_no = guard.locked_ref_index().intern_path(&file);
+                guard.set_file_reference_locations(file_no, ref_locs);
             }
         }
 
@@ -598,7 +600,8 @@ impl AnalysisSession {
                     })
                     .collect();
                 let guard = self.db.salsa.read();
-                guard.set_file_reference_locations(file_path, locs);
+                let file_no = guard.locked_ref_index().intern_path(&file);
+                guard.set_file_reference_locations(file_no, locs);
                 drop(guard);
                 opts.apply(&mut issues);
                 self.apply_suppressions_and_emit_unused(&mut issues, std::slice::from_ref(&file));
@@ -651,7 +654,8 @@ impl AnalysisSession {
                 );
                 all_issues.extend(body_issues);
                 let pending = guard.take_pending_ref_locs();
-                guard.set_file_reference_locations(file.as_ref(), pending);
+                let file_no = guard.locked_ref_index().intern_path(&file);
+                guard.set_file_reference_locations(file_no, pending);
                 if opts.skip_symbols {
                     Vec::new()
                 } else {
@@ -804,7 +808,8 @@ impl AnalysisSession {
             let guard = self.db.salsa.read();
             for (file, slice) in &prepared {
                 let entries = crate::db::subtype_index::entries_from_slice(slice);
-                guard.set_file_class_edges(file, entries);
+                let file_no = guard.locked_ref_index().intern_path(file);
+                guard.set_file_class_edges(file_no, entries);
             }
         }
         drop(prepared);

@@ -194,7 +194,8 @@ impl AnalysisSession {
         self.clear_transient_batch_replay();
         {
             let guard = self.db.salsa.read();
-            guard.set_file_reference_locations(file.as_ref(), locs);
+            let file_no = guard.locked_ref_index().intern_path(file);
+            guard.set_file_reference_locations(file_no, locs);
         }
         self.clear_dependency_graph_cache();
         if let Some(text) = text {
@@ -376,7 +377,8 @@ impl AnalysisSession {
         {
             let entries = crate::db::subtype_index::entries_from_slice(&file_defs.slice);
             let guard = self.db.salsa.read();
-            guard.set_file_class_edges(&file, entries);
+            let file_no = guard.locked_ref_index().intern_path(&file);
+            guard.set_file_class_edges(file_no, entries);
         }
         // Freshness is keyed on the Arc actually stored on the input (the
         // upsert keeps the prior Arc when content is equal), so read it back.
@@ -942,7 +944,8 @@ impl AnalysisSession {
                     stub,
                 } = hit;
                 if let Some((locs, resolved)) = refs {
-                    guard.set_file_reference_locations(file.as_ref(), locs);
+                    let file_no = guard.locked_ref_index().intern_path(&file);
+                    guard.set_file_reference_locations(file_no, locs);
                     self.mark_ref_committed(&file, &stored_text, None, commit_gen, resolved);
                     dependency_graph_changed = true;
                     if !resolved {
@@ -950,7 +953,8 @@ impl AnalysisSession {
                     }
                 }
                 if let Some((entries, decls)) = stub {
-                    guard.set_file_class_edges(&file, entries);
+                    let file_no = guard.locked_ref_index().intern_path(&file);
+                    guard.set_file_class_edges(file_no, entries);
                     self.mark_defs_committed(&file, &stored_text);
                     structural_target_files.push(file.clone());
                     dependency_graph_changed = true;

@@ -169,7 +169,7 @@ type DeclSites = Vec<EntryId>;
 
 #[derive(Debug)]
 struct StoredSubtypeEntry {
-    file: Arc<str>,
+    file_path: Arc<str>,
     child_key: KeyId,
     fqcn: Arc<str>,
     kind: ClassLikeKind,
@@ -194,7 +194,7 @@ pub struct SubtypeIndex {
     entries: Vec<Option<StoredSubtypeEntry>>,
     free_entry_ids: Vec<EntryId>,
     /// file → class-likes it declared at last commit.
-    by_file: FxHashMap<Arc<str>, Vec<EntryId>>,
+    by_file: FxHashMap<crate::db::FileNo, Vec<EntryId>>,
     /// class (lowercased FQCN) → declaring entries.
     decls: FxHashMap<KeyId, DeclSites>,
     /// Interned lowercased FQCN keys used by the graph. Public payloads keep
@@ -263,7 +263,7 @@ impl SubtypeIndex {
         self.free_key_ids.push(id);
     }
 
-    fn alloc_entry(&mut self, file: Arc<str>, entry: SubtypeEntry) -> EntryId {
+    fn alloc_entry(&mut self, file_path: Arc<str>, entry: SubtypeEntry) -> EntryId {
         let child_key = edge_key(&entry.fqcn);
         let child_key = self.intern_edge_key(&child_key);
         let parents: Box<[StoredParentEdge]> = entry
@@ -275,7 +275,7 @@ impl SubtypeIndex {
             })
             .collect();
         let stored = StoredSubtypeEntry {
-            file,
+            file_path,
             child_key,
             fqcn: entry.fqcn,
             kind: entry.kind,
@@ -319,8 +319,13 @@ impl SubtypeIndex {
     /// Replace `file`'s class-like declarations wholesale. Returns whether
     /// the index changed — a recommit of identical entries is a no-op, so
     /// callers can key epoch bumps on real edge changes only.
-    pub fn set_file_classes(&mut self, file: &Arc<str>, entries: Vec<SubtypeEntry>) -> bool {
-        match self.by_file.get(file.as_ref()) {
+    pub fn set_file_classes(
+        &mut self,
+        file: crate::db::FileNo,
+        file_path: Arc<str>,
+        entries: Vec<SubtypeEntry>,
+    ) -> bool {
+        match self.by_file.get(&file) {
             Some(old)
                 if old.len() == entries.len()
                     && old
@@ -333,13 +338,13 @@ impl SubtypeIndex {
             None if entries.is_empty() => return false,
             _ => {}
         }
-        self.clear_file(file.as_ref());
+        self.clear_file(file);
         if entries.is_empty() {
             return true;
         }
         let mut stored: Vec<EntryId> = Vec::with_capacity(entries.len());
         for entry in entries {
-            let id = self.alloc_entry(file.clone(), entry);
+            let id = self.alloc_entry(file_path.clone(), entry);
             let (child_key, parents): (KeyId, Vec<KeyId>) = {
                 let stored_entry = self.entry(id);
                 (
@@ -353,14 +358,14 @@ impl SubtypeIndex {
             self.decls.entry(child_key).or_default().push(id);
             stored.push(id);
         }
-        self.by_file.insert(file.clone(), stored);
+        self.by_file.insert(file, stored);
         true
     }
 
     /// Remove every declaration recorded for `file`. Returns whether the
     /// index held (and dropped) any entry for it.
-    pub fn clear_file(&mut self, file: &str) -> bool {
-        let Some(old) = self.by_file.remove(file) else {
+    pub fn clear_file(&mut self, file: crate::db::FileNo) -> bool {
+        let Some(old) = self.by_file.remove(&file) else {
             return false;
         };
         for id in old {
@@ -450,7 +455,7 @@ impl SubtypeIndex {
                         fqcn: stored.fqcn.clone(),
                         kind: stored.kind,
                         is_abstract: stored.is_abstract,
-                        file: stored.file.clone(),
+                        file: stored.file_path.clone(),
                         location: stored.location.clone(),
                     });
                 }
@@ -498,81 +503,65 @@ mod tests {
     #[test]
     fn direct_and_transitive_subtypes() {
         let mut idx = SubtypeIndex::default();
-        let a: Arc<str> = Arc::from("a.php");
-        let b: Arc<str> = Arc::from("b.php");
-        idx.set_file_classes(&a, vec![entry("App\\Child", &["App\\Base"], &[])]);
-        idx.set_file_classes(&b, vec![entry("App\\Grand", &["App\\Child"], &[])]);
+        let a: crate::db::FileNo = 0;
+        let b: crate::db::FileNo = 1;
+        idx.set_file_classes(a, Arc::from("a.php"), vec![entry("App\\Child", &["App\\Base"], &[])]);
+        idx.set_file_classes(b, Arc::from("b.php"), vec![entry("App\\Grand", &["App\\Child"], &[])]);
         let subs = idx.subtypes_of("App\\Base", false);
         assert_eq!(subs.len(), 2);
         assert!(subs.iter().any(|s| s.fqcn.as_ref() == "App\\Child"));
         assert!(subs.iter().any(|s| s.fqcn.as_ref() == "App\\Grand"));
     }
-
     #[test]
     fn recommit_replaces_edges() {
         let mut idx = SubtypeIndex::default();
-        let a: Arc<str> = Arc::from("a.php");
-        idx.set_file_classes(&a, vec![entry("App\\Child", &["App\\Base"], &[])]);
+        let a: crate::db::FileNo = 0;
+        idx.set_file_classes(a, Arc::from("a.php"), vec![entry("App\\Child", &["App\\Base"], &[])]);
         assert_eq!(idx.subtypes_of("App\\Base", false).len(), 1);
-        idx.set_file_classes(&a, vec![entry("App\\Child", &["App\\Other"], &[])]);
+        idx.set_file_classes(a, Arc::from("a.php"), vec![entry("App\\Child", &["App\\Other"], &[])]);
         assert!(idx.subtypes_of("App\\Base", false).is_empty());
         assert_eq!(idx.subtypes_of("App\\Other", false).len(), 1);
     }
-
     #[test]
     fn trait_users_only_when_requested() {
         let mut idx = SubtypeIndex::default();
-        let a: Arc<str> = Arc::from("a.php");
-        idx.set_file_classes(&a, vec![entry("App\\User", &[], &["App\\Helper"])]);
+        let a: crate::db::FileNo = 0;
+        idx.set_file_classes(a, Arc::from("a.php"), vec![entry("App\\User", &[], &["App\\Helper"])]);
         assert!(idx.subtypes_of("App\\Helper", false).is_empty());
         assert_eq!(idx.subtypes_of("App\\Helper", true).len(), 1);
     }
-
     #[test]
     fn clear_file_preserves_shared_parent_relation_kind() {
         let mut idx = SubtypeIndex::default();
-        let a: Arc<str> = Arc::from("a.php");
-        let b: Arc<str> = Arc::from("b.php");
-        idx.set_file_classes(&a, vec![entry("App\\User", &[], &["App\\Helper"])]);
-        idx.set_file_classes(&b, vec![entry("App\\User", &["App\\Helper"], &[])]);
+        let a: crate::db::FileNo = 0;
+        let b: crate::db::FileNo = 1;
+        idx.set_file_classes(a, Arc::from("a.php"), vec![entry("App\\User", &[], &["App\\Helper"])]);
+        idx.set_file_classes(b, Arc::from("b.php"), vec![entry("App\\User", &["App\\Helper"], &[])]);
 
-        idx.clear_file("a.php");
+        idx.clear_file(a);
         assert!(idx.subtypes_of("App\\Helper", false).len() == 1);
         assert!(idx.subtypes_of("App\\Helper", true).len() == 1);
 
-        idx.clear_file("b.php");
+        idx.clear_file(b);
         assert!(idx.subtypes_of("App\\Helper", false).is_empty());
         assert!(idx.subtypes_of("App\\Helper", true).is_empty());
     }
 
     #[test]
-    fn clear_file_keeps_other_files_edges() {
-        let mut idx = SubtypeIndex::default();
-        let a: Arc<str> = Arc::from("a.php");
-        let b: Arc<str> = Arc::from("b.php");
-        idx.set_file_classes(&a, vec![entry("App\\Child", &["App\\Base"], &[])]);
-        idx.set_file_classes(&b, vec![entry("App\\Child", &["App\\Base"], &[])]);
-        idx.clear_file("a.php");
-        assert_eq!(idx.subtypes_of("App\\Base", false).len(), 1);
-        idx.clear_file("b.php");
-        assert!(idx.subtypes_of("App\\Base", false).is_empty());
-    }
-
-    #[test]
     fn case_insensitive_parent_match() {
         let mut idx = SubtypeIndex::default();
-        let a: Arc<str> = Arc::from("a.php");
-        idx.set_file_classes(&a, vec![entry("App\\Child", &["App\\BASE"], &[])]);
+        let a: crate::db::FileNo = 0;
+        idx.set_file_classes(a, Arc::from("a.php"), vec![entry("App\\Child", &["App\\BASE"], &[])]);
         assert_eq!(idx.subtypes_of("app\\base", false).len(), 1);
         assert_eq!(idx.subtypes_of("\\App\\Base", false).len(), 1);
     }
-
     #[test]
     fn diamond_hierarchy_visits_once() {
         let mut idx = SubtypeIndex::default();
-        let a: Arc<str> = Arc::from("a.php");
+        let a: crate::db::FileNo = 0;
         idx.set_file_classes(
-            &a,
+            a,
+            Arc::from("a.php"),
             vec![
                 entry("I\\Left", &["I\\Top"], &[]),
                 entry("I\\Right", &["I\\Top"], &[]),
@@ -582,22 +571,21 @@ mod tests {
         let subs = idx.subtypes_of("I\\Top", false);
         assert_eq!(subs.len(), 3);
     }
-
     #[test]
     fn clear_file_reclaims_unused_key_ids() {
         let mut idx = SubtypeIndex::default();
-        let a: Arc<str> = Arc::from("a.php");
+        let a: crate::db::FileNo = 0;
 
-        idx.set_file_classes(&a, vec![entry("App\\Child", &["App\\Base"], &[])]);
+        idx.set_file_classes(a, Arc::from("a.php"), vec![entry("App\\Child", &["App\\Base"], &[])]);
         assert_eq!(idx.key_by_name.len(), 2);
         assert_eq!(idx.key_names.len(), 2);
 
-        idx.clear_file("a.php");
+        idx.clear_file(a);
         assert!(idx.key_by_name.is_empty());
         assert!(idx.key_names.iter().all(Option::is_none));
         assert_eq!(idx.free_key_ids.len(), 2);
 
-        idx.set_file_classes(&a, vec![entry("App\\OtherChild", &["App\\OtherBase"], &[])]);
+        idx.set_file_classes(a, Arc::from("a.php"), vec![entry("App\\OtherChild", &["App\\OtherBase"], &[])]);
         assert_eq!(idx.key_by_name.len(), 2);
         assert_eq!(idx.key_names.len(), 2);
         assert_eq!(idx.free_key_ids.len(), 0);

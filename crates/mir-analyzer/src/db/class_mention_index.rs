@@ -161,7 +161,7 @@ pub struct ClassMentionIndex {
     universe: Mutex<Universe>,
     /// Sharded per-file entries: the gate loop's per-candidate lookups come
     /// from many rayon workers concurrently and must not serialize.
-    by_file: dashmap::DashMap<Arc<str>, FileMentions, FxBuildHasher>,
+    by_file: dashmap::DashMap<crate::db::FileNo, FileMentions, FxBuildHasher>,
     scans_recorded: AtomicU64,
 }
 
@@ -250,8 +250,8 @@ impl ClassMentionIndex {
     /// Whether `file`'s current text mentions the queried name. `None` when
     /// the entry can't answer (missing, text changed, or scanned before the
     /// name entered the universe) — the caller must fall back to a raw scan.
-    pub fn answer(&self, file: &str, q: &MentionQuery, current_text: &Arc<str>) -> Option<bool> {
-        let e = self.by_file.get(file)?;
+    pub fn answer(&self, file: crate::db::FileNo, q: &MentionQuery, current_text: &Arc<str>) -> Option<bool> {
+        let e = self.by_file.get(&file)?;
         if !Arc::ptr_eq(&e.text, current_text) || e.epoch < q.added_epoch {
             return None;
         }
@@ -260,15 +260,15 @@ impl ClassMentionIndex {
 
     /// Whether `file` already holds a scan of exactly `text` at `epoch` or
     /// newer (used by analyze sweeps to skip redundant rescans).
-    pub fn is_current(&self, file: &str, text: &Arc<str>, epoch: u64) -> bool {
+    pub fn is_current(&self, file: crate::db::FileNo, text: &Arc<str>, epoch: u64) -> bool {
         self.by_file
-            .get(file)
+            .get(&file)
             .is_some_and(|e| Arc::ptr_eq(&e.text, text) && e.epoch >= epoch)
     }
 
     /// Record a scan result. Never downgrades a same-text entry from a newer
     /// epoch.
-    pub fn set_file(&self, file: Arc<str>, text: Arc<str>, epoch: u64, names: Box<[Name]>) {
+    pub fn set_file(&self, file: crate::db::FileNo, text: Arc<str>, epoch: u64, names: Box<[Name]>) {
         match self.by_file.entry(file) {
             dashmap::mapref::entry::Entry::Occupied(mut o) => {
                 let prev = o.get();
@@ -284,8 +284,8 @@ impl ClassMentionIndex {
         self.scans_recorded.fetch_add(1, Ordering::Relaxed);
     }
 
-    pub fn clear_file(&self, file: &str) {
-        self.by_file.remove(file);
+    pub fn clear_file(&self, file: crate::db::FileNo) {
+        self.by_file.remove(&file);
     }
 
     pub fn stats(&self) -> ClassMentionStats {
@@ -369,16 +369,16 @@ mod tests {
         idx.add_names([lc("token")]);
         let s1 = scanner_for(&idx);
         let text: Arc<str> = Arc::from("xtoken");
-        let file: Arc<str> = Arc::from("upgrade.php");
+        let file: crate::db::FileNo = 0;
         // Bounded: "xtoken" has no boundary before "token", so it's a miss.
-        idx.set_file(file.clone(), text.clone(), s1.epoch(), s1.scan(&text));
+        idx.set_file(file, text.clone(), s1.epoch(), s1.scan(&text));
         let q = idx.prepare_query("token").unwrap();
-        assert_eq!(idx.answer(&file, &q, &text), Some(false));
+        assert_eq!(idx.answer(file, &q, &text), Some(false));
 
         idx.add_raw_names([lc("token")]);
         let q_after = idx.prepare_query("token").unwrap();
         assert_eq!(
-            idx.answer(&file, &q_after, &text),
+            idx.answer(file, &q_after, &text),
             None,
             "the pre-upgrade scan must no longer answer for this needle"
         );
@@ -396,23 +396,23 @@ mod tests {
         idx.add_names([lc("Alpha")]);
         let s1 = scanner_for(&idx);
         let text: Arc<str> = Arc::from("uses Alpha and Beta");
-        let file: Arc<str> = Arc::from("a.php");
-        idx.set_file(file.clone(), text.clone(), s1.epoch(), s1.scan(&text));
+        let file: crate::db::FileNo = 0;
+        idx.set_file(file, text.clone(), s1.epoch(), s1.scan(&text));
 
         let q_alpha = idx.prepare_query("Alpha").unwrap();
-        assert_eq!(idx.answer(&file, &q_alpha, &text), Some(true));
+        assert_eq!(idx.answer(file, &q_alpha, &text), Some(true));
 
         // Beta enters the universe later: the old scan can't answer for it.
         idx.add_names([lc("Beta")]);
         let q_beta = idx.prepare_query("Beta").unwrap();
-        assert_eq!(idx.answer(&file, &q_beta, &text), None);
+        assert_eq!(idx.answer(file, &q_beta, &text), None);
         // Old needles still answer.
-        assert_eq!(idx.answer(&file, &q_alpha, &text), Some(true));
+        assert_eq!(idx.answer(file, &q_alpha, &text), Some(true));
 
         // A rescan at the new epoch covers Beta.
         let s2 = scanner_for(&idx);
-        idx.set_file(file.clone(), text.clone(), s2.epoch(), s2.scan(&text));
-        assert_eq!(idx.answer(&file, &q_beta, &text), Some(true));
+        idx.set_file(file, text.clone(), s2.epoch(), s2.scan(&text));
+        assert_eq!(idx.answer(file, &q_beta, &text), Some(true));
     }
 
     #[test]
@@ -421,13 +421,13 @@ mod tests {
         idx.add_names([lc("Job")]);
         let s = scanner_for(&idx);
         let text: Arc<str> = Arc::from("new Job();");
-        let file: Arc<str> = Arc::from("a.php");
-        idx.set_file(file.clone(), text.clone(), s.epoch(), s.scan(&text));
+        let file: crate::db::FileNo = 0;
+        idx.set_file(file, text.clone(), s.epoch(), s.scan(&text));
         let q = idx.prepare_query("Job").unwrap();
-        assert_eq!(idx.answer(&file, &q, &text), Some(true));
+        assert_eq!(idx.answer(file, &q, &text), Some(true));
         // Content-equal but different Arc: not answerable (must rescan).
         let other: Arc<str> = Arc::from("new Job();");
-        assert_eq!(idx.answer(&file, &q, &other), None);
+        assert_eq!(idx.answer(file, &q, &other), None);
     }
 
     #[test]
@@ -456,12 +456,12 @@ mod tests {
         let idx = ClassMentionIndex::default();
         idx.add_names([lc("A")]);
         let text: Arc<str> = Arc::from("A");
-        let file: Arc<str> = Arc::from("f.php");
-        idx.set_file(file.clone(), text.clone(), 5, Box::new([lc("A")]));
+        let file: crate::db::FileNo = 0;
+        idx.set_file(file, text.clone(), 5, Box::new([lc("A")]));
         // A stale (older-epoch) commit racing in must not downgrade coverage.
-        idx.set_file(file.clone(), text.clone(), 3, Box::new([]));
+        idx.set_file(file, text.clone(), 3, Box::new([]));
         let q = idx.prepare_query("A").unwrap();
-        assert_eq!(idx.answer(&file, &q, &text), Some(true));
+        assert_eq!(idx.answer(file, &q, &text), Some(true));
     }
 
     #[test]
