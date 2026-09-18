@@ -13,8 +13,7 @@ return types (to resolve `get()`'s own `@return T`) also corrupts
 `makeRealT`'s unrelated, unambiguous native return type into `int`. A real
 fix needs the docblock/hint parser to be template-aware enough to never
 produce an ambiguous bare `TNamedObject` for a template reference in the
-first place (see the TODO in `Type::substitute_templates`'s `TNamedObject`
-arm) — the same underlying gap as
+first place — the same underlying gap as
 known_limitation_implements_template_name_collision, just reached through a
 native type hint instead of a second `@implements` source.
 ===config===

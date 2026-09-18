@@ -13,9 +13,7 @@ An argument is possibly `null` but the parameter type doesn't admit `null`.
 
 ```php
 <?php
-// TODO: minimal example that triggers PossiblyNullArgument.
 ```
 
 ## How to fix
 
-TODO: explain the typical fix or how to suppress.

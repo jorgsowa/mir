@@ -13,9 +13,7 @@ A function or method has no declared return type hint.
 
 ```php
 <?php
-// TODO: minimal example that triggers MissingReturnType.
 ```
 
 ## How to fix
 
-TODO: explain the typical fix or how to suppress.

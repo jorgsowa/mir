@@ -110,13 +110,7 @@ fn warm_cache(cache_dir: &TempDir, vendor_files: &[PathBuf], project_files: &[Pa
     let _ = analyzer.analyze_paths(project_files, &BatchOptions::new().without_symbols());
 }
 
-// ---------------------------------------------------------------------------
 // Benchmarks
-//
-// NOTE: Results are only meaningful under the `bench` profile (release-
-// equivalent). Running under debug (`cargo test --bench`) produces numbers
-// that are 5–10× slower and should be ignored.
-// ---------------------------------------------------------------------------
 
 /// Cold-start full pipeline: stubs + vendor type collection + Pass 1 +
 /// codebase finalization + Pass 2. No cache.

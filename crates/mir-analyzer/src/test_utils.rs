@@ -71,7 +71,6 @@
 //! **Skipped / WIP fixture** (`===ignore===`, must appear before file sections):
 //! ```text
 //! ===ignore===
-//! TODO: narrowing through loop variables not yet implemented
 //! ===file===
 //! <?php
 //! ...
@@ -1141,7 +1140,7 @@ mod parser_validation {
 
     #[test]
     fn valid_ignore_is_accepted() {
-        let f = p("===ignore===\nTODO: not yet implemented\n===file===\n<?php\n===expect===\n");
+        let f = p("===ignore===\n===file===\n<?php\n===expect===\n");
         assert!(f.description.is_none());
     }
 }

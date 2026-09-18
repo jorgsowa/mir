@@ -13,9 +13,7 @@ An argument with type `mixed` is passed to a parameter with a more specific type
 
 ```php
 <?php
-// TODO: minimal example that triggers MixedArgument.
 ```
 
 ## How to fix
 
-TODO: explain the typical fix or how to suppress.

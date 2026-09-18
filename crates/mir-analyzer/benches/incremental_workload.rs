@@ -7,10 +7,6 @@
 //! for both APIs) and `Database/Eloquent/Model.php` (high fanout — exercises
 //! cross-file invalidation).
 //!
-//! NOTE: `FileAnalyzer::analyze` resolves cross-file inferred return types on
-//! demand via salsa; no separate inference sweep is required.  The diagnostic
-//! outputs should be equivalent to `ProjectAnalyzer::re_analyze_file`.
-//! Run `analyze_real_world` for full-fidelity diagnostic benchmarks.
 
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::path::{Path, PathBuf};

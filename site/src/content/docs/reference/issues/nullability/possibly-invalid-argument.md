@@ -13,9 +13,7 @@ An argument may not match the parameter type on some code paths.
 
 ```php
 <?php
-// TODO: minimal example that triggers PossiblyInvalidArgument.
 ```
 
 ## How to fix
 
-TODO: explain the typical fix or how to suppress.

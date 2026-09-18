@@ -176,7 +176,6 @@ fn priority_index_resolves_direct_ref_before_background_walk() {
     .unwrap();
 
     let session = make_session(root.path());
-    // NOTE: no eager_index_vendor — exercise the priority-index path only.
     let open_path: Arc<str> = Arc::from(app_src.join("open.php").to_string_lossy().as_ref());
     let open_src = "<?php\nuse Vendor\\Service;\n$s = new Service();\n$s->go();\n";
 

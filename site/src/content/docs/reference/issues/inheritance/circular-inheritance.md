@@ -13,9 +13,7 @@ A class participates in a circular `extends`/`implements`/`use` chain.
 
 ```php
 <?php
-// TODO: minimal example that triggers CircularInheritance.
 ```
 
 ## How to fix
 
-TODO: explain the typical fix or how to suppress.

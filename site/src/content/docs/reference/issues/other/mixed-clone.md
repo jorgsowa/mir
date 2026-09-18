@@ -13,9 +13,7 @@ sidebar:
 
 ```php
 <?php
-// TODO: minimal example that triggers MixedClone.
 ```
 
 ## How to fix
 
-TODO: explain the typical fix or how to suppress.

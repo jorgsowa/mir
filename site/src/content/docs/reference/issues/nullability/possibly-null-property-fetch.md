@@ -13,9 +13,7 @@ A property is fetched from a value that may be `null`.
 
 ```php
 <?php
-// TODO: minimal example that triggers PossiblyNullPropertyFetch.
 ```
 
 ## How to fix
 
-TODO: explain the typical fix or how to suppress.

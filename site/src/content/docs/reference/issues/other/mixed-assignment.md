@@ -13,9 +13,7 @@ A value with type `mixed` is assigned, hiding its concrete type.
 
 ```php
 <?php
-// TODO: minimal example that triggers MixedAssignment.
 ```
 
 ## How to fix
 
-TODO: explain the typical fix or how to suppress.

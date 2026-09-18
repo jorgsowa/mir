@@ -13,9 +13,7 @@ A docblock `@param` type doesn't match the inferred type from the function body.
 
 ```php
 <?php
-// TODO: minimal example that triggers MismatchingDocblockParamType.
 ```
 
 ## How to fix
 
-TODO: explain the typical fix or how to suppress.

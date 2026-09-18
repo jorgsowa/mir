@@ -1180,11 +1180,6 @@ impl Type {
                     });
                 }
                 Atomic::TNamedObject { fqcn, type_params } => {
-                    // TODO: the docblock parser emits TNamedObject { fqcn: "T" } for bare @return T
-                    // annotations instead of TTemplateParam, because it lacks template context at
-                    // parse time. This block works around that by treating bare unqualified names
-                    // as template param references when they appear in the binding map. Proper fix:
-                    // make the docblock parser template-aware so it emits TTemplateParam directly.
                     // See issue #26 for context.
                     if type_params.is_empty() && !fqcn.contains('\\') {
                         if let Some(resolved) = bindings.get(fqcn) {

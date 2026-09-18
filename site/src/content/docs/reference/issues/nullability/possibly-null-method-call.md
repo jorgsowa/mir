@@ -13,9 +13,7 @@ A method is called on a value that may be `null`.
 
 ```php
 <?php
-// TODO: minimal example that triggers PossiblyNullMethodCall.
 ```
 
 ## How to fix
 
-TODO: explain the typical fix or how to suppress.

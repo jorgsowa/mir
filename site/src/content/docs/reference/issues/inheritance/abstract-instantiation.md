@@ -13,9 +13,7 @@ An abstract class is being instantiated with `new`.
 
 ```php
 <?php
-// TODO: minimal example that triggers AbstractInstantiation.
 ```
 
 ## How to fix
 
-TODO: explain the typical fix or how to suppress.

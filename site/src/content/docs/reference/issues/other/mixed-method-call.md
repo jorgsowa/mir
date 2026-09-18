@@ -13,9 +13,7 @@ A method is called on a value of type `mixed`.
 
 ```php
 <?php
-// TODO: minimal example that triggers MixedMethodCall.
 ```
 
 ## How to fix
 
-TODO: explain the typical fix or how to suppress.

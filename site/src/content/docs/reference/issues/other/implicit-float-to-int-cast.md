@@ -13,9 +13,7 @@ A float is implicitly cast to an int, potentially losing precision.
 
 ```php
 <?php
-// TODO: minimal example that triggers ImplicitFloatToIntCast.
 ```
 
 ## How to fix
 
-TODO: explain the typical fix or how to suppress.

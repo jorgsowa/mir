@@ -13,9 +13,7 @@ A property is fetched from a value of type `mixed`.
 
 ```php
 <?php
-// TODO: minimal example that triggers MixedPropertyFetch.
 ```
 
 ## How to fix
 
-TODO: explain the typical fix or how to suppress.

@@ -19,7 +19,6 @@ declare(strict_types=1);
  * when Psalm adds or changes interface methods.
  */
 
-error_reporting(E_ALL & ~E_DEPRECATED);
 ini_set('display_errors', 'stderr');
 
 final class MirShimGenerator

@@ -13,9 +13,7 @@ A template parameter shadows a name from an outer scope (class template hidden b
 
 ```php
 <?php
-// TODO: minimal example that triggers ShadowedTemplateParam.
 ```
 
 ## How to fix
 
-TODO: explain the typical fix or how to suppress.

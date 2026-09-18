@@ -13,9 +13,7 @@ A function marked `@deprecated` is called.
 
 ```php
 <?php
-// TODO: minimal example that triggers DeprecatedCall.
 ```
 
 ## How to fix
 
-TODO: explain the typical fix or how to suppress.

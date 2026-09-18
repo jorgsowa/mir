@@ -13,9 +13,7 @@ A parameter has no declared type hint.
 
 ```php
 <?php
-// TODO: minimal example that triggers MissingParamType.
 ```
 
 ## How to fix
 
-TODO: explain the typical fix or how to suppress.
