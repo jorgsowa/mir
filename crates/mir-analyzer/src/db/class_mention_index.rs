@@ -250,7 +250,12 @@ impl ClassMentionIndex {
     /// Whether `file`'s current text mentions the queried name. `None` when
     /// the entry can't answer (missing, text changed, or scanned before the
     /// name entered the universe) — the caller must fall back to a raw scan.
-    pub fn answer(&self, file: crate::db::FileNo, q: &MentionQuery, current_text: &Arc<str>) -> Option<bool> {
+    pub fn answer(
+        &self,
+        file: crate::db::FileNo,
+        q: &MentionQuery,
+        current_text: &Arc<str>,
+    ) -> Option<bool> {
         let e = self.by_file.get(&file)?;
         if !Arc::ptr_eq(&e.text, current_text) || e.epoch < q.added_epoch {
             return None;
@@ -268,7 +273,13 @@ impl ClassMentionIndex {
 
     /// Record a scan result. Never downgrades a same-text entry from a newer
     /// epoch.
-    pub fn set_file(&self, file: crate::db::FileNo, text: Arc<str>, epoch: u64, names: Box<[Name]>) {
+    pub fn set_file(
+        &self,
+        file: crate::db::FileNo,
+        text: Arc<str>,
+        epoch: u64,
+        names: Box<[Name]>,
+    ) {
         match self.by_file.entry(file) {
             dashmap::mapref::entry::Entry::Occupied(mut o) => {
                 let prev = o.get();
