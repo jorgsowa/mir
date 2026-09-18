@@ -252,6 +252,95 @@ pub(crate) fn is_subtype(db: &dyn MirDatabase, sub: &Type, sup: &Type) -> bool {
                         })
                     })
                 }
+                // TKeyedArray (array shape) satisfies TIntersection iff it satisfies every
+                // intersection part. This mirrors the atomic_subtype fix and handles
+                // the Psalm idiom of using intersection types for "shape plus extra keys
+                // allowed" patterns like:
+                // @psalm-type Context = array<string,mixed> & array{actor:...,target?:...,outcome:...}
+                (Atomic::TKeyedArray { properties, is_open, .. }, Atomic::TIntersection { parts }) => {
+                    parts.iter().all(|part| {
+                        part.types.iter().any(|part_atomic| {
+                            match part_atomic {
+                                Atomic::TKeyedArray {
+                                    properties: sup_props,
+                                    is_open: sup_open,
+                                    ..
+                                } => {
+                                    let keys_satisfied = sup_props
+                                        .iter()
+                                        .all(|(key, sup_prop)| match properties.get(key) {
+                                            Some(sub_prop) => {
+                                                if !sup_prop.optional && sub_prop.optional {
+                                                    return false;
+                                                }
+                                                let has_named_obj = sup_prop.ty.types.iter().any(|a| {
+                                                    matches!(
+                                                        a,
+                                                        Atomic::TNamedObject { .. }
+                                                            | Atomic::TSelf { .. }
+                                                            | Atomic::TStaticObject { .. }
+                                                            | Atomic::TClosure { .. }
+                                                            | Atomic::TTemplateParam { .. }
+                                                    )
+                                                });
+                                                has_named_obj || is_subtype(db, &sub_prop.ty, &sup_prop.ty)
+                                            }
+                                            None => *is_open || sup_prop.optional,
+                                        });
+                                    let has_array_part =
+                                        parts.iter().any(|part| part.types.iter().any(|t| matches!(t, Atomic::TArray { .. })));
+                                    let has_keyed_array_part =
+                                        parts.iter().any(|part| part.types.iter().any(|t| matches!(t, Atomic::TKeyedArray { .. })));
+                                    let keys_allowed_by_some_part = if has_array_part {
+                                        true
+                                    } else if has_keyed_array_part {
+                                        properties.keys().all(|k| {
+                                            parts.iter().any(|part| {
+                                                part.types.iter().any(|t| {
+                                                    if let Atomic::TKeyedArray { properties: part_props, .. } = t {
+                                                        part_props.contains_key(k)
+                                                    } else {
+                                                        false
+                                                    }
+                                                })
+                                            })
+                                        })
+                                    } else {
+                                        true
+                                    };
+                                    let no_undeclared_extras = *sup_open || keys_allowed_by_some_part;
+                                    keys_satisfied && no_undeclared_extras
+                                }
+                                Atomic::TArray { key, value } => properties.iter().all(|(prop_key, prop)| {
+                                    let key_atomic = match prop_key {
+                                        mir_types::atomic::ArrayKey::String(s) => Atomic::TLiteralString(s.clone()),
+                                        mir_types::atomic::ArrayKey::Int(n) => Atomic::TLiteralInt(*n),
+                                    };
+                                    if !is_subtype(db, &Type::single(key_atomic), key) {
+                                        return false;
+                                    }
+                                    let has_named_obj = prop.ty.types.iter().any(|a| {
+                                        matches!(
+                                            a,
+                                            Atomic::TNamedObject { .. }
+                                                | Atomic::TSelf { .. }
+                                                | Atomic::TStaticObject { .. }
+                                                | Atomic::TClosure { .. }
+                                                | Atomic::TTemplateParam { .. }
+                                        )
+                                    });
+                                    has_named_obj || is_subtype(db, &prop.ty, value)
+                                }),
+                                Atomic::TNamedObject { .. }
+                                | Atomic::TSelf { .. }
+                                | Atomic::TStaticObject { .. }
+                                | Atomic::TClosure { .. }
+                                | Atomic::TTemplateParam { .. } => true,
+                                _ => false
+                            }
+                        })
+                    })
+                }
                 // A&B&C satisfies a required X&Y iff every required part is
                 // covered by some part of sub — a value with MORE capabilities
                 // than required still satisfies the narrower requirement.
