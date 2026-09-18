@@ -197,8 +197,7 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
                     if let Some(class) = class {
                         // Raw inner XML (markup included) — passed through to
                         // the plugin verbatim as its config element body.
-                        let inner_raw = String::from_utf8_lossy(inner.as_ref());
-                        let inner = inner_raw.trim();
+                        let inner = inner.trim();
                         config.psalm_plugins.push(PsalmPluginEntry {
                             class,
                             config_xml: (!inner.is_empty())
@@ -260,10 +259,7 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
             }
 
             Ok(Event::Text(t)) => {
-                text_buf = t
-                    .xml_content(XmlVersion::Implicit1_0)
-                    .map_err(|e| ConfigError::Parse(e.to_string()))?
-                    .to_string();
+                text_buf = t.xml_content(XmlVersion::Implicit1_0).to_string();
             }
 
             Ok(Event::End(_)) => {
@@ -339,8 +335,8 @@ fn collect_stub_entry<'a>(
     }
 }
 
-fn bytes_to_string(b: &[u8]) -> String {
-    String::from_utf8_lossy(b).into_owned()
+fn bytes_to_string(s: impl AsRef<str>) -> String {
+    s.as_ref().to_owned()
 }
 
 /// Value of the named attribute on an element, if present.
@@ -494,12 +490,10 @@ fn parse_baseline_xml(xml: &str) -> Result<Baseline, ConfigError> {
                 }
             }
             Ok(Event::CData(cd)) => {
-                text_buf = String::from_utf8_lossy(cd.as_ref()).trim().to_string();
+                text_buf = cd.as_ref().trim().to_string();
             }
             Ok(Event::Text(t)) => {
-                let s = t
-                    .xml_content(XmlVersion::Implicit1_0)
-                    .map_err(|e| ConfigError::Parse(e.to_string()))?;
+                let s = t.xml_content(XmlVersion::Implicit1_0);
                 let trimmed = s.trim().to_string();
                 if !trimmed.is_empty() {
                     text_buf = trimmed;

@@ -24,7 +24,7 @@ php-ast     = { workspace = true }
 parking_lot = { workspace = true }
 rustc-hash  = { workspace = true }
 thiserror   = { workspace = true }
-libloading  = { version = "0.8", optional = true }
+libloading  = { version = "0.9", optional = true }
 serde       = { workspace = true, optional = true }
 serde_json  = { workspace = true, optional = true }
 

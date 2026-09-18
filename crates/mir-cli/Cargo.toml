@@ -25,7 +25,7 @@ owo-colors   = { workspace = true }
 anyhow       = { workspace = true }
 rayon        = { workspace = true }
 serde_json   = { workspace = true }
-quick-xml    = "0.41"
+quick-xml    = "0.42"
 thiserror    = { workspace = true }
 
 [dev-dependencies]
