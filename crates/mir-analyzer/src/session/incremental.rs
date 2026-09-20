@@ -79,7 +79,9 @@ impl AnalysisSession {
         if cancel.is_cancelled() || files.is_empty() {
             return Vec::new();
         }
-        self.settle_workspace_index();
+        if !self.settle_workspace_index_cancellable(&|| cancel.is_cancelled()) {
+            return Vec::new();
+        }
         self.reanalyze_file_set(files.to_vec(), cancel)
     }
 
@@ -128,7 +130,9 @@ impl AnalysisSession {
                 if cancel.is_cancelled() {
                     return Vec::new();
                 }
-                self.prepare_file_for_analysis(file);
+                if !self.prepare_file_for_analysis_cancellable(file, &|| cancel.is_cancelled()) {
+                    return Vec::new();
+                }
             }
         }
 
@@ -164,7 +168,9 @@ impl AnalysisSession {
         // Freeze on the pass-scoped snapshot: warm-up (2a) completed every
         // lazy load, and a concurrent index write cancels the pass, so the
         // frozen view is never stale. Same discipline as the batch body pass.
-        let mut db_main = self.snapshot_db();
+        let Some(mut db_main) = self.snapshot_db_cancellable(&|| cancel.is_cancelled()) else {
+            return Vec::new();
+        };
         db_main.freeze_workspace_index();
         // Sweeps are the steady-state population path for the mention index:
         // every analyzed file gets a current mention scan alongside its

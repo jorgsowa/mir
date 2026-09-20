@@ -31,6 +31,54 @@ const WRITERS: usize = 4;
 const READ_ITERS: usize = 60;
 const CALL_BUDGET: Duration = Duration::from_millis(80);
 
+#[test]
+fn cancelled_reanalysis_does_not_wait_behind_stub_writer_blocked_by_snapshot() {
+    // Keep a Salsa snapshot alive, then start stub ingestion. The writer takes
+    // the session write lock before Salsa waits for this snapshot to unwind.
+    // A reanalysis started afterwards is therefore queued at the RwLock. Its
+    // cancellation must release it even though the writer cannot proceed yet.
+    let session = Arc::new(AnalysisSession::new(PhpVersion::LATEST));
+    let file: Arc<str> = Arc::from("queued.php");
+    session.upsert_source_file(
+        file.clone(),
+        Arc::from("<?php class Queued {}\n"),
+        salsa::Durability::LOW,
+    );
+    let held_snapshot = session.snapshot_db();
+
+    let writer_session = Arc::clone(&session);
+    let writer = std::thread::spawn(move || writer_session.ensure_all_stubs());
+    // Give the writer time to acquire the outer lock and block in Salsa on
+    // `held_snapshot`. The snapshot is deliberately retained until after the
+    // reanalysis has proved it can observe cancellation.
+    std::thread::sleep(Duration::from_millis(30));
+
+    let cancel = IndexCancel::new();
+    let (done_tx, done_rx) = std::sync::mpsc::channel();
+    let reader_session = Arc::clone(&session);
+    let reader_file = file.clone();
+    let reader_cancel = cancel.clone();
+    let reader = std::thread::spawn(move || {
+        let result = reader_session.reanalyze_files_cancellable(&[reader_file], &reader_cancel);
+        done_tx.send(result).unwrap();
+    });
+
+    std::thread::sleep(Duration::from_millis(30));
+    assert!(
+        done_rx.try_recv().is_err(),
+        "reanalysis did not block behind the stub writer"
+    );
+    cancel.cancel();
+    let result = done_rx
+        .recv_timeout(Duration::from_secs(1))
+        .expect("cancelled reanalysis remained queued behind the stub writer");
+    assert!(result.is_empty());
+
+    drop(held_snapshot);
+    reader.join().unwrap();
+    writer.join().unwrap();
+}
+
 fn caller_path(i: usize) -> Arc<str> {
     Arc::from(format!("callers/C{i}.php").as_str())
 }
