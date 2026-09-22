@@ -123,6 +123,33 @@ impl AnalyzerDb {
         (**guard).clone()
     }
 
+    /// Acquire a read-only Salsa clone without making a cancellable caller wait
+    /// behind a pending writer forever.
+    ///
+    /// `parking_lot::RwLock` fairly blocks new readers once a writer is
+    /// queued. That is normally desirable, but a Salsa input writer can in
+    /// turn be waiting for existing database snapshots to unwind. A
+    /// cancellable analysis request queued for this lock must be able to
+    /// leave when its host cancels it, so it does not become the snapshot that
+    /// prevents that writer from completing.
+    pub(crate) fn snapshot_db_cancellable(
+        &self,
+        should_cancel: &(dyn Fn() -> bool + Sync),
+    ) -> Option<MirDbStorage> {
+        loop {
+            if should_cancel() {
+                return None;
+            }
+            // Bound the wait to keep this cheap under contention without a
+            // busy-spin, while still checking cancellation at editor-scale
+            // latency.
+            if let Some(guard) = self.salsa.try_read_for(std::time::Duration::from_millis(1)) {
+                return Some((**guard).clone());
+            }
+            std::thread::yield_now();
+        }
+    }
+
     /// Look up an existing [`crate::db::SourceFile`] handle by path. Reads the
     /// off-salsa path→handle registry (a plain map read — safe under the read
     /// lock, no `ZalsaLocal` access).

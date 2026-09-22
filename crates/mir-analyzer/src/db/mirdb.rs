@@ -1094,7 +1094,11 @@ impl MirDbStorage {
         let ref_index = self.locked_ref_index();
         let file_path = ref_index.path_of(file);
         self.add_class_mention_names(entries.iter().map(|e| e.fqcn.as_ref()));
-        if self.subtype_index.lock().set_file_classes(file, file_path, entries) {
+        if self
+            .subtype_index
+            .lock()
+            .set_file_classes(file, file_path, entries)
+        {
             self.bump_subtype_edges_epoch();
         }
     }

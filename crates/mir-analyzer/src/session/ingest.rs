@@ -91,6 +91,18 @@ impl AnalysisSession {
         self.db.snapshot_db()
     }
 
+    /// Cancellable counterpart to [`Self::snapshot_db`].
+    ///
+    /// This is deliberately internal: public read APIs retain their usual
+    /// blocking semantics, while background work with an `IndexCancel` can
+    /// abandon a lock wait when a workspace writer is pending.
+    pub(crate) fn snapshot_db_cancellable(
+        &self,
+        should_cancel: &(dyn Fn() -> bool + Sync),
+    ) -> Option<MirDbStorage> {
+        self.db.snapshot_db_cancellable(should_cancel)
+    }
+
     /// Register or update a [`crate::db::SourceFile`] salsa input and return its
     /// handle, without running definition collection or reference recording.
     ///
@@ -1074,13 +1086,16 @@ impl AnalysisSession {
             // caller's cancellation budget. In particular, reference queries
             // can answer entirely from replayed postings after warm start.
             // Poll only once there is pending reconciliation to perform.
-            if self.db.salsa.read().index_pending_is_empty() {
+            let Some(db) = self.snapshot_db_cancellable(should_cancel) else {
+                return false;
+            };
+            if db.index_pending_is_empty() {
                 return true;
             }
             if should_cancel() {
                 return false;
             }
-            let pending = self.db.salsa.read().take_index_pending();
+            let pending = db.take_index_pending();
             if pending.is_empty() {
                 return true;
             }

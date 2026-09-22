@@ -198,15 +198,33 @@ impl AnalysisSession {
     /// parse snapshot is scoped and dropped before the warm-up runs — callers
     /// must not hold a live snapshot across this call.
     pub fn prepare_file_for_analysis(&self, path: &std::sync::Arc<str>) {
+        let _ = self.prepare_file_for_analysis_cancellable(path, &|| false);
+    }
+
+    /// Cancellable variant of [`Self::prepare_file_for_analysis`].
+    ///
+    /// The scoped parse snapshot is acquired cooperatively so an obsolete
+    /// background reanalysis cannot remain queued behind a writer which is
+    /// itself waiting for another Salsa snapshot to end.
+    pub(crate) fn prepare_file_for_analysis_cancellable(
+        &self,
+        path: &std::sync::Arc<str>,
+        should_cancel: &(dyn Fn() -> bool + Sync),
+    ) -> bool {
+        if should_cancel() {
+            return false;
+        }
         let generation = self.prepare_generation_snapshot();
         let (parsed, text) = {
-            let db = self.snapshot_db();
+            let Some(db) = self.snapshot_db_cancellable(should_cancel) else {
+                return false;
+            };
             let Some(sf) = db.lookup_source_file(path.as_ref()) else {
-                return;
+                return true;
             };
             let text = sf.text(&db as &dyn crate::db::MirDatabase).clone();
             if self.is_prepared_for_analysis(path.as_ref(), &text, generation) {
-                return;
+                return true;
             }
             (
                 crate::db::parse_file(&db as &dyn crate::db::MirDatabase, sf)
@@ -221,6 +239,7 @@ impl AnalysisSession {
         let _deferred_bumps = self.defer_revision_bumps();
         self.prepare_ast_for_analysis(&parsed.program, path.as_ref());
         self.mark_prepared_for_analysis(path, text, generation);
+        true
     }
 
     /// Current warm-up generation; capture before a prepare + mark pair so a

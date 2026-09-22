@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.77.0] - 2026-09-18
+
+### Changed
+
+- **Rust and workflow dependencies:** refreshed workspace dependency pins,
+  CLI configuration handling, and the docs workflow dependency setup.
+- **Release version sync:** bumped the workspace and internal crate dependency
+  versions to `0.77.0` and refreshed `Cargo.lock` to match.
+
+### Fixed
+
+- **Incremental indexing:** resolved a deadlock in FileNo-interned index
+  commits during analyzer database updates.
+- **Array-shape subtype checks:** keyed arrays now satisfy intersections with
+  named object types in subtype comparisons.
+
 ## [0.76.0] - 2026-09-17
 
 ### Changed

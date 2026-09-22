@@ -505,8 +505,16 @@ mod tests {
         let mut idx = SubtypeIndex::default();
         let a: crate::db::FileNo = 0;
         let b: crate::db::FileNo = 1;
-        idx.set_file_classes(a, Arc::from("a.php"), vec![entry("App\\Child", &["App\\Base"], &[])]);
-        idx.set_file_classes(b, Arc::from("b.php"), vec![entry("App\\Grand", &["App\\Child"], &[])]);
+        idx.set_file_classes(
+            a,
+            Arc::from("a.php"),
+            vec![entry("App\\Child", &["App\\Base"], &[])],
+        );
+        idx.set_file_classes(
+            b,
+            Arc::from("b.php"),
+            vec![entry("App\\Grand", &["App\\Child"], &[])],
+        );
         let subs = idx.subtypes_of("App\\Base", false);
         assert_eq!(subs.len(), 2);
         assert!(subs.iter().any(|s| s.fqcn.as_ref() == "App\\Child"));
@@ -516,9 +524,17 @@ mod tests {
     fn recommit_replaces_edges() {
         let mut idx = SubtypeIndex::default();
         let a: crate::db::FileNo = 0;
-        idx.set_file_classes(a, Arc::from("a.php"), vec![entry("App\\Child", &["App\\Base"], &[])]);
+        idx.set_file_classes(
+            a,
+            Arc::from("a.php"),
+            vec![entry("App\\Child", &["App\\Base"], &[])],
+        );
         assert_eq!(idx.subtypes_of("App\\Base", false).len(), 1);
-        idx.set_file_classes(a, Arc::from("a.php"), vec![entry("App\\Child", &["App\\Other"], &[])]);
+        idx.set_file_classes(
+            a,
+            Arc::from("a.php"),
+            vec![entry("App\\Child", &["App\\Other"], &[])],
+        );
         assert!(idx.subtypes_of("App\\Base", false).is_empty());
         assert_eq!(idx.subtypes_of("App\\Other", false).len(), 1);
     }
@@ -526,7 +542,11 @@ mod tests {
     fn trait_users_only_when_requested() {
         let mut idx = SubtypeIndex::default();
         let a: crate::db::FileNo = 0;
-        idx.set_file_classes(a, Arc::from("a.php"), vec![entry("App\\User", &[], &["App\\Helper"])]);
+        idx.set_file_classes(
+            a,
+            Arc::from("a.php"),
+            vec![entry("App\\User", &[], &["App\\Helper"])],
+        );
         assert!(idx.subtypes_of("App\\Helper", false).is_empty());
         assert_eq!(idx.subtypes_of("App\\Helper", true).len(), 1);
     }
@@ -535,8 +555,16 @@ mod tests {
         let mut idx = SubtypeIndex::default();
         let a: crate::db::FileNo = 0;
         let b: crate::db::FileNo = 1;
-        idx.set_file_classes(a, Arc::from("a.php"), vec![entry("App\\User", &[], &["App\\Helper"])]);
-        idx.set_file_classes(b, Arc::from("b.php"), vec![entry("App\\User", &["App\\Helper"], &[])]);
+        idx.set_file_classes(
+            a,
+            Arc::from("a.php"),
+            vec![entry("App\\User", &[], &["App\\Helper"])],
+        );
+        idx.set_file_classes(
+            b,
+            Arc::from("b.php"),
+            vec![entry("App\\User", &["App\\Helper"], &[])],
+        );
 
         idx.clear_file(a);
         assert!(idx.subtypes_of("App\\Helper", false).len() == 1);
@@ -551,7 +579,11 @@ mod tests {
     fn case_insensitive_parent_match() {
         let mut idx = SubtypeIndex::default();
         let a: crate::db::FileNo = 0;
-        idx.set_file_classes(a, Arc::from("a.php"), vec![entry("App\\Child", &["App\\BASE"], &[])]);
+        idx.set_file_classes(
+            a,
+            Arc::from("a.php"),
+            vec![entry("App\\Child", &["App\\BASE"], &[])],
+        );
         assert_eq!(idx.subtypes_of("app\\base", false).len(), 1);
         assert_eq!(idx.subtypes_of("\\App\\Base", false).len(), 1);
     }
@@ -576,7 +608,11 @@ mod tests {
         let mut idx = SubtypeIndex::default();
         let a: crate::db::FileNo = 0;
 
-        idx.set_file_classes(a, Arc::from("a.php"), vec![entry("App\\Child", &["App\\Base"], &[])]);
+        idx.set_file_classes(
+            a,
+            Arc::from("a.php"),
+            vec![entry("App\\Child", &["App\\Base"], &[])],
+        );
         assert_eq!(idx.key_by_name.len(), 2);
         assert_eq!(idx.key_names.len(), 2);
 
@@ -585,7 +621,11 @@ mod tests {
         assert!(idx.key_names.iter().all(Option::is_none));
         assert_eq!(idx.free_key_ids.len(), 2);
 
-        idx.set_file_classes(a, Arc::from("a.php"), vec![entry("App\\OtherChild", &["App\\OtherBase"], &[])]);
+        idx.set_file_classes(
+            a,
+            Arc::from("a.php"),
+            vec![entry("App\\OtherChild", &["App\\OtherBase"], &[])],
+        );
         assert_eq!(idx.key_by_name.len(), 2);
         assert_eq!(idx.key_names.len(), 2);
         assert_eq!(idx.free_key_ids.len(), 0);

@@ -72,7 +72,6 @@ impl RefIndex {
         self.path_ids.get(path).copied()
     }
 
-
     fn intern_symbol(&mut self, symbol: &Arc<str>) -> SymbolNo {
         if let Some(&id) = self.symbol_ids.get(symbol.as_ref()) {
             return id;
@@ -158,14 +157,11 @@ impl RefIndex {
     /// posting (`impl:`), before or after — same contract as
     /// [`Self::append_batch`].
     pub fn set_file_refs(&mut self, file: crate::db::FileNo, locs: Vec<RefLoc>) -> bool {
-        let mut touched_impl = self
-            .file_symbols
-            .get(&file)
-            .is_some_and(|symbols| {
-                symbols
-                    .iter()
-                    .any(|&symbol_id| self.symbol_of(symbol_id).starts_with("impl"))
-            });
+        let mut touched_impl = self.file_symbols.get(&file).is_some_and(|symbols| {
+            symbols
+                .iter()
+                .any(|&symbol_id| self.symbol_of(symbol_id).starts_with("impl"))
+        });
         self.clear_file(file);
         let mut seen: FxHashSet<(SymbolNo, LocTuple)> = FxHashSet::default();
         for loc in locs {
@@ -287,7 +283,6 @@ mod tests {
         }
     }
 
-
     #[test]
     fn append_dedup_and_views_stay_consistent() {
         let mut idx = RefIndex::default();
@@ -394,10 +389,7 @@ mod tests {
         let mut idx = RefIndex::default();
         let file_a = idx.intern(&Arc::from("a.php"));
         let file_b = idx.intern(&Arc::from("b.php"));
-        idx.append_batch(vec![
-            loc("fn:foo", "a.php", 1),
-            loc("fn:foo", "b.php", 2),
-        ]);
+        idx.append_batch(vec![loc("fn:foo", "a.php", 1), loc("fn:foo", "b.php", 2)]);
         idx.set_file_refs(file_a, vec![loc("fn:foo", "a.php", 5)]);
         idx.set_file_refs(file_b, vec![loc("fn:foo", "b.php", 6)]);
         assert_eq!(
@@ -433,7 +425,10 @@ mod tests {
         let mut idx = RefIndex::default();
         let test_a = idx.intern(&Arc::from("test_a.php"));
         let test_b = idx.intern(&Arc::from("test_b.php"));
-        idx.set_file_refs(test_a, vec![loc("A", "test_a.php", 1), loc("B", "test_a.php", 5)]);
+        idx.set_file_refs(
+            test_a,
+            vec![loc("A", "test_a.php", 1), loc("B", "test_a.php", 5)],
+        );
         idx.set_file_refs(test_b, vec![loc("C", "test_b.php", 3)]);
         let mut locs = idx.file_locations(test_a);
         locs.sort_by_key(|l| l.2);
