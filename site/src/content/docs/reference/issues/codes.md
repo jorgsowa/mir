@@ -53,6 +53,8 @@ issues keep their code.
 | MIR0009  | UndefinedTrait                | [undefined/undefined-trait](../undefined/undefined-trait/) |
 | MIR0010  | ParentNotFound                | [undefined/parent-not-found](../undefined/parent-not-found/) |
 | MIR0011  | InaccessibleClassConstant     | [undefined/inaccessible-class-constant](../undefined/inaccessible-class-constant/) |
+| MIR0012  | TraitConstantAccessedDirectly | [undefined/trait-constant-accessed-directly](../undefined/trait-constant-accessed-directly/) |
+| MIR0013  | UndefinedTraitAliasMethod     | [undefined/undefined-trait-alias-method](../undefined/undefined-trait-alias-method/) |
 | MIR0014  | InaccessibleProperty          | [undefined/inaccessible-property](../undefined/inaccessible-property/) |
 | MIR0100  | NullArgument                  | [nullability/null-argument](../nullability/null-argument/) |
 | MIR0101  | NullPropertyFetch             | [nullability/null-property-fetch](../nullability/null-property-fetch/) |
@@ -92,9 +94,12 @@ issues keep their code.
 | MIR0225  | ArgumentTypeCoercion          | [type-mismatches/argument-type-coercion](../type-mismatches/argument-type-coercion/) |
 | MIR0226  | PropertyTypeCoercion          | [type-mismatches/property-type-coercion](../type-mismatches/property-type-coercion/) |
 | MIR0227  | PossiblyInvalidArrayAccess    | [type-mismatches/possibly-invalid-array-access](../type-mismatches/possibly-invalid-array-access/) |
+| MIR0228  | NotAnInterface                | [type-mismatches/not-an-interface](../type-mismatches/not-an-interface/) |
+| MIR0229  | DivisionByZero                | [type-mismatches/division-by-zero](../type-mismatches/division-by-zero/) |
 | MIR0300  | InvalidArrayOffset            | [array/invalid-array-offset](../array/invalid-array-offset/) |
 | MIR0301  | NonExistentArrayOffset        | [array/non-existent-array-offset](../array/non-existent-array-offset/) |
 | MIR0302  | PossiblyInvalidArrayOffset    | [array/possibly-invalid-array-offset](../array/possibly-invalid-array-offset/) |
+| MIR0303  | DuplicateArrayKey             | [array/duplicate-array-key](../array/duplicate-array-key/) |
 | MIR0400  | RedundantCondition            | [redundancy/redundant-condition](../redundancy/redundant-condition/) |
 | MIR0401  | RedundantCast                 | [redundancy/redundant-cast](../redundancy/redundant-cast/) |
 | MIR0402  | UnnecessaryVarAnnotation      | [redundancy/unnecessary-var-annotation](../redundancy/unnecessary-var-annotation/) |
@@ -103,6 +108,8 @@ issues keep their code.
 | MIR0405  | UnhandledMatchCondition       | [redundancy/unhandled-match-condition](../redundancy/unhandled-match-condition/) |
 | MIR0406  | DocblockTypeContradiction     | [redundancy/docblock-type-contradiction](../redundancy/docblock-type-contradiction/) |
 | MIR0407  | UnevaluatedCode               | [redundancy/unevaluated-code](../redundancy/unevaluated-code/) |
+| MIR0408  | ImpossibleIdenticalComparison | [redundancy/impossible-identical-comparison](../redundancy/impossible-identical-comparison/) |
+| MIR0409  | ImpossibleLooseComparison     | [redundancy/impossible-loose-comparison](../redundancy/impossible-loose-comparison/) |
 | MIR0500  | UnusedVariable                | [dead-code/unused-variable](../dead-code/unused-variable/) |
 | MIR0501  | UnusedParam                   | [dead-code/unused-param](../dead-code/unused-param/) |
 | MIR0502  | UnreachableCode               | [dead-code/unreachable-code](../dead-code/unreachable-code/) |
@@ -113,6 +120,7 @@ issues keep their code.
 | MIR0507  | UnusedClass                   | [dead-code/unused-class](../dead-code/unused-class/) |
 | MIR0508  | UnusedSuppress                | [dead-code/unused-suppress](../dead-code/unused-suppress/) |
 | MIR0600  | ReadonlyPropertyAssignment    | [other/readonly-property-assignment](../other/readonly-property-assignment/) |
+| MIR0601  | ReadonlyPropertyAlreadyInitialized | [other/readonly-property-already-initialized](../other/readonly-property-already-initialized/) |
 | MIR0700  | UnimplementedAbstractMethod   | [inheritance/unimplemented-abstract-method](../inheritance/unimplemented-abstract-method/) |
 | MIR0701  | UnimplementedInterfaceMethod  | [inheritance/unimplemented-interface-method](../inheritance/unimplemented-interface-method/) |
 | MIR0702  | MethodSignatureMismatch       | [inheritance/method-signature-mismatch](../inheritance/method-signature-mismatch/) |
@@ -125,6 +133,12 @@ issues keep their code.
 | MIR0709  | InterfaceInstantiation        | [inheritance/interface-instantiation](../inheritance/interface-instantiation/) |
 | MIR0710  | OverriddenPropertyAccess      | [inheritance/overridden-property-access](../inheritance/overridden-property-access/) |
 | MIR0711  | AbstractMethodCall            | [inheritance/abstract-method-call](../inheritance/abstract-method-call/) |
+| MIR0712  | PropertyTypeRedeclarationMismatch | [inheritance/property-type-redeclaration-mismatch](../inheritance/property-type-redeclaration-mismatch/) |
+| MIR0713  | BackedEnumCaseTypeMismatch    | [inheritance/backed-enum-case-type-mismatch](../inheritance/backed-enum-case-type-mismatch/) |
+| MIR0714  | ReadonlyPropertyRedeclarationMismatch | [inheritance/readonly-property-redeclaration-mismatch](../inheritance/readonly-property-redeclaration-mismatch/) |
+| MIR0715  | StaticPropertyRedeclarationMismatch | [inheritance/static-property-redeclaration-mismatch](../inheritance/static-property-redeclaration-mismatch/) |
+| MIR0716  | ReadonlyClassExtendsMismatch  | [inheritance/readonly-class-extends-mismatch](../inheritance/readonly-class-extends-mismatch/) |
+| MIR0717  | InvalidReadonlyPropertyDeclaration | [inheritance/invalid-readonly-property-declaration](../inheritance/invalid-readonly-property-declaration/) |
 | MIR0800  | TaintedInput                  | [security/tainted-input](../security/tainted-input/) |
 | MIR0801  | TaintedHtml                   | [security/tainted-html](../security/tainted-html/) |
 | MIR0802  | TaintedSql                    | [security/tainted-sql](../security/tainted-sql/) |
@@ -151,6 +165,8 @@ issues keep their code.
 | MIR1103  | InvalidDocblock               | [other/invalid-docblock](../other/invalid-docblock/) |
 | MIR1104  | MissingPropertyType           | [other/missing-property-type](../other/missing-property-type/) |
 | MIR1105  | MissingClosureReturnType      | [other/missing-closure-return-type](../other/missing-closure-return-type/) |
+| MIR1106  | UndefinedThrowsDocblock       | [other/undefined-throws-docblock](../other/undefined-throws-docblock/) |
+| MIR1107  | InvalidDocblockType           | [other/invalid-docblock-type](../other/invalid-docblock-type/) |
 | MIR1200  | MixedArgument                 | [other/mixed-argument](../other/mixed-argument/) |
 | MIR1201  | MixedAssignment               | [other/mixed-assignment](../other/mixed-assignment/) |
 | MIR1202  | MixedMethodCall               | [other/mixed-method-call](../other/mixed-method-call/) |
@@ -175,6 +191,9 @@ issues keep their code.
 | MIR1505  | UndefinedDocblockClass        | [other/undefined-docblock-class](../other/undefined-docblock-class/) |
 | MIR1506  | UnsupportedReferenceUsage     | [other/unsupported-reference-usage](../other/unsupported-reference-usage/) |
 | MIR1507  | MissingConstructor            | [other/missing-constructor](../other/missing-constructor/) |
+| MIR1508  | UnreachableCatch              | [other/unreachable-catch](../other/unreachable-catch/) |
+| MIR1509  | PluginIssue                   | [other/plugin-issue](../other/plugin-issue/) |
+| MIR1510  | PropertyPossiblyUninitialized | [other/property-possibly-uninitialized](../other/property-possibly-uninitialized/) |
 | MIR1600  | InvalidAttribute              | [attributes/invalid-attribute](../attributes/invalid-attribute/) |
 | MIR1601  | UndefinedAttributeClass       | [attributes/undefined-attribute-class](../attributes/undefined-attribute-class/) |
 | MIR1602  | DuplicateClass                | [attributes/duplicate-class](../attributes/duplicate-class/) |
@@ -187,3 +206,7 @@ issues keep their code.
 | MIR1702  | ImpureGlobalVariable          | [other/impure-global-variable](../other/impure-global-variable/) |
 | MIR1703  | ImpureStaticVariable          | [other/impure-static-variable](../other/impure-static-variable/) |
 | MIR1704  | ImpureFunctionCall            | [other/impure-function-call](../other/impure-function-call/) |
+| MIR1705  | ImmutablePropertyModification | [other/immutable-property-modification](../other/immutable-property-modification/) |
+| MIR1706  | ImpureStaticPropertyAssignment | [other/impure-static-property-assignment](../other/impure-static-property-assignment/) |
+| MIR1707  | ImpureByRefAssignment         | [other/impure-by-ref-assignment](../other/impure-by-ref-assignment/) |
+| MIR1708  | ImpureStaticPropertyAccess    | [other/impure-static-property-access](../other/impure-static-property-access/) |
