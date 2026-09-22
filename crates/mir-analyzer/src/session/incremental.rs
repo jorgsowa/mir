@@ -1,5 +1,8 @@
 use super::*;
 
+/// How many times the re-analysis pass re-runs after a concurrent write cancels it, then the sweep yields like an explicit cancellation.
+const PASS_ATTEMPTS: usize = 4;
+
 impl AnalysisSession {
     /// Retrieve the source text the session has registered for `file`, if
     /// any. Returns `None` when the file has never been ingested. Used by
@@ -164,18 +167,6 @@ impl AnalysisSession {
         // The loop short-circuits when cancellation has been requested.
         // Generation before the snapshot: a file add racing the sweep leaves
         // the commits stale (self-healing), never wrongly fresh.
-        let commit_gen = self.index_generation();
-        // Freeze on the pass-scoped snapshot: warm-up (2a) completed every
-        // lazy load, and a concurrent index write cancels the pass, so the
-        // frozen view is never stale. Same discipline as the batch body pass.
-        let Some(mut db_main) = self.snapshot_db_cancellable(&|| cancel.is_cancelled()) else {
-            return Vec::new();
-        };
-        db_main.freeze_workspace_index();
-        // Sweeps are the steady-state population path for the mention index:
-        // every analyzed file gets a current mention scan alongside its
-        // postings, so later reference-gate checks are set lookups.
-        let mention_scanner = db_main.class_mention_scanner();
         type Analyzed = (
             Arc<str>,
             Arc<str>,
@@ -184,46 +175,85 @@ impl AnalysisSession {
             Option<super::RefCachePut>,
             Option<Box<[mir_types::Name]>>,
         );
-        let mut results: Vec<Analyzed> = dependents
-            .into_iter()
-            .filter_map(|file| {
-                if cancel.is_cancelled() {
-                    return None;
-                }
-                let sf = db_main.lookup_source_file(file.as_ref())?;
-                // Capture the text the analysis ran against: the freshness
-                // marks below must record exactly this Arc, so a text write
-                // racing the sweep leaves the file dirty rather than
-                // wrongly marked fresh.
-                let text = sf.text(&db_main as &dyn crate::db::MirDatabase).clone();
-                let out =
-                    crate::db::analyze_file(&db_main as &dyn crate::db::MirDatabase, sf).clone();
-                let defs = crate::db::collect_file_definitions(
-                    &db_main as &dyn crate::db::MirDatabase,
-                    sf,
-                );
-                let entries = crate::db::subtype_index::entries_from_slice(&defs.slice);
-                // Stage the disk-cache write only when the postings commit
-                // below will actually rewrite — a no-op re-sweep (current
-                // commit) adds no hashing or parse-walk cost per file.
-                let put = if self.ref_commit_is_current(file.as_ref(), &text, &out) {
-                    None
-                } else {
-                    self.stage_ref_cache_put(
-                        &db_main as &dyn crate::db::MirDatabase,
-                        sf,
-                        file.as_ref(),
-                        &text,
-                        &out,
-                    )
-                };
-                let mentions = mention_scanner.as_ref().and_then(|s| {
-                    (!db_main.class_mentions_current(file.as_ref(), &text, s.epoch()))
-                        .then(|| s.scan(&text))
-                });
-                Some((file, text, out, entries, put, mentions))
-            })
-            .collect();
+        type Pass = (
+            Option<Arc<crate::db::class_mention_index::MentionScanner>>,
+            Vec<Analyzed>,
+        );
+        let mut attempts_left = PASS_ATTEMPTS;
+        let (commit_gen, mention_scanner, mut results) = loop {
+            if cancel.is_cancelled() || attempts_left == 0 {
+                return Vec::new();
+            }
+            attempts_left -= 1;
+            let gen = self.index_generation();
+            // The pass snapshot is created and dropped INSIDE this closure so no handle survives into the commit below — holding one there deadlocks a concurrent input writer waiting in `cancel_others`.
+            // A write landing mid-pass raises `salsa::Cancelled`; catch it and retry rather than discarding the whole sweep.
+            let attempt =
+                salsa::Cancelled::catch(std::panic::AssertUnwindSafe(|| -> Option<Pass> {
+                    // Freeze on the pass-scoped snapshot: warm-up (2a) completed
+                    // every lazy load, and a concurrent index write cancels the
+                    // pass, so the frozen view is never stale. Same discipline as
+                    // the batch body pass.
+                    let mut db_main = self.snapshot_db_cancellable(&|| cancel.is_cancelled())?;
+                    db_main.freeze_workspace_index();
+                    // Sweeps are the steady-state population path for the mention
+                    // index: every analyzed file gets a current mention scan
+                    // alongside its postings, so later reference-gate checks are
+                    // set lookups.
+                    let mention_scanner = db_main.class_mention_scanner();
+                    let analyzed: Vec<Analyzed> = dependents
+                        .iter()
+                        .filter_map(|file| {
+                            if cancel.is_cancelled() {
+                                return None;
+                            }
+                            let sf = db_main.lookup_source_file(file.as_ref())?;
+                            // Capture the text the analysis ran against: the
+                            // freshness marks below must record exactly this Arc,
+                            // so a text write racing the sweep leaves the file
+                            // dirty rather than wrongly marked fresh.
+                            let text = sf.text(&db_main as &dyn crate::db::MirDatabase).clone();
+                            let out = crate::db::analyze_file(
+                                &db_main as &dyn crate::db::MirDatabase,
+                                sf,
+                            )
+                            .clone();
+                            let defs = crate::db::collect_file_definitions(
+                                &db_main as &dyn crate::db::MirDatabase,
+                                sf,
+                            );
+                            let entries = crate::db::subtype_index::entries_from_slice(&defs.slice);
+                            // Stage the disk-cache write only when the postings
+                            // commit below will actually rewrite — a no-op
+                            // re-sweep (current commit) adds no hashing or
+                            // parse-walk cost per file.
+                            let put = if self.ref_commit_is_current(file.as_ref(), &text, &out) {
+                                None
+                            } else {
+                                self.stage_ref_cache_put(
+                                    &db_main as &dyn crate::db::MirDatabase,
+                                    sf,
+                                    file.as_ref(),
+                                    &text,
+                                    &out,
+                                )
+                            };
+                            let mentions = mention_scanner.as_ref().and_then(|s| {
+                                (!db_main.class_mentions_current(file.as_ref(), &text, s.epoch()))
+                                    .then(|| s.scan(&text))
+                            });
+                            Some((file.clone(), text, out, entries, put, mentions))
+                        })
+                        .collect();
+                    Some((mention_scanner, analyzed))
+                }));
+            match attempt {
+                Ok(Some((scanner, analyzed))) => break (gen, scanner, analyzed),
+                Ok(None) => return Vec::new(),
+                Err(_) if cancel.is_cancelled() => return Vec::new(),
+                Err(_) => std::thread::yield_now(),
+            }
+        };
 
         // Serial commit: each dependent's output is its complete reference
         // set, so replace rather than append. Both inverted indexes and their
@@ -231,7 +261,10 @@ impl AnalysisSession {
         // lookup-shaped instead of re-validating every candidate memo.
         // Unchanged files (same text, same memoized output) skip the rebuild
         // entirely, so a no-op re-sweep is a pointer compare per file.
+        //
+        // Runs with no live snapshot: see the pass closure above.
         {
+            self.fire_precommit_gate();
             let guard = self.db.salsa.read();
             let mut dependency_graph_changed = false;
             for (file, text, out, entries, put, mentions) in results.iter_mut() {
@@ -575,5 +608,88 @@ impl AnalysisSession {
         );
         *self.dependency_graph_cache.write() = Some(graph.clone());
         graph
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::mpsc;
+    use std::time::{Duration, Instant};
+
+    const BUDGET: Duration = Duration::from_secs(30);
+
+    /// The sweep must release its salsa snapshot before waiting for the session db lock, or it deadlocks against a concurrent buffer-mirror write.
+    #[test]
+    fn sweep_commit_does_not_deadlock_a_concurrent_file_write() {
+        let session = Arc::new(AnalysisSession::new(PhpVersion::LATEST));
+        let base: Arc<str> = Arc::from("Base.php");
+        let user: Arc<str> = Arc::from("User.php");
+        session.ingest_file(
+            base.clone(),
+            Arc::from("<?php class Base { public function run(): int { return 1; } }\n"),
+        );
+        session.ingest_file(
+            user.clone(),
+            Arc::from(
+                "<?php class User { public function go(Base $b): int { return $b->run(); } }\n",
+            ),
+        );
+
+        let (at_gate_tx, at_gate_rx) = mpsc::channel();
+        let (go_tx, go_rx) = mpsc::channel::<()>();
+        let go_rx = std::sync::Mutex::new(go_rx);
+        // Only the first sweep is held; a retry (or another caller's sweep)
+        // runs straight through.
+        let armed = AtomicBool::new(true);
+        session.set_precommit_gate(Arc::new(move || {
+            if !armed.swap(false, Ordering::SeqCst) {
+                return;
+            }
+            at_gate_tx.send(()).expect("gate receiver dropped");
+            let _ = go_rx.lock().expect("gate mutex poisoned").recv();
+        }));
+
+        let (swept_tx, swept_rx) = mpsc::channel();
+        let sweep_session = Arc::clone(&session);
+        let sweep_files = vec![user.clone()];
+        std::thread::spawn(move || {
+            let analyses =
+                sweep_session.reanalyze_files_cancellable(&sweep_files, &crate::IndexCancel::new());
+            let _ = swept_tx.send(analyses.len());
+        });
+        at_gate_rx
+            .recv_timeout(BUDGET)
+            .expect("sweep never reached its pre-commit gate");
+
+        let (written_tx, written_rx) = mpsc::channel();
+        let writer_session = Arc::clone(&session);
+        std::thread::spawn(move || {
+            writer_session.upsert_source_file(
+                Arc::from("Opened.php"),
+                Arc::from("<?php class Opened {}\n"),
+                salsa::Durability::LOW,
+            );
+            let _ = written_tx.send(());
+        });
+
+        // Hold the sweep until the writer owns the write lock — the interleaving that used to deadlock.
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while Instant::now() < deadline && session.db.salsa.try_read().is_some() {
+            std::thread::yield_now();
+        }
+        go_tx.send(()).expect("sweep gate closed early");
+
+        assert_eq!(
+            swept_rx
+                .recv_timeout(BUDGET)
+                .expect("sweep deadlocked against the concurrent file write"),
+            1,
+        );
+        written_rx
+            .recv_timeout(BUDGET)
+            .expect("file write deadlocked against the sweep");
+        assert!(session.lookup_source_file("Opened.php").is_some());
     }
 }

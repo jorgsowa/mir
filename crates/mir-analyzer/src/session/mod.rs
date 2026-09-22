@@ -165,6 +165,9 @@ pub struct AnalysisSession {
     /// on this session sees the same file set with identical bytes. Any
     /// mutation outside `analyze_paths` clears it.
     transient_batch_replay: BatchReplayCache,
+    /// Test-only hook fired between releasing the sweep's snapshot and taking the commit lock, for the writer-deadlock regression test.
+    #[cfg(test)]
+    precommit_gate: Arc<RwLock<Option<Arc<dyn Fn() + Send + Sync>>>>,
 }
 
 /// Which reference postings [`AnalysisSession::indexed_references_to`]
@@ -450,6 +453,8 @@ impl AnalysisSession {
             subtype_query_cache_hits: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             dependency_graph_cache: Arc::new(RwLock::new(None)),
             transient_batch_replay: Arc::new(RwLock::new(None)),
+            #[cfg(test)]
+            precommit_gate: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -490,6 +495,24 @@ impl AnalysisSession {
     pub(crate) fn clear_dependency_graph_cache(&self) {
         *self.dependency_graph_cache.write() = None;
     }
+
+    /// Install the sweep's pre-commit hold point (see `precommit_gate`).
+    #[cfg(test)]
+    pub(crate) fn set_precommit_gate(&self, gate: Arc<dyn Fn() + Send + Sync>) {
+        *self.precommit_gate.write() = Some(gate);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn fire_precommit_gate(&self) {
+        let gate = self.precommit_gate.read().clone();
+        if let Some(gate) = gate {
+            gate();
+        }
+    }
+
+    #[cfg(not(test))]
+    #[inline(always)]
+    pub(crate) fn fire_precommit_gate(&self) {}
 
     pub(crate) fn clear_transient_batch_replay(&self) {
         *self.transient_batch_replay.write() = None;

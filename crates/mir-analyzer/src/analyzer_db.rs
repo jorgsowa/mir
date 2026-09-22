@@ -118,6 +118,8 @@ impl AnalyzerDb {
     /// Acquire a cheap clone of the salsa db for read-only queries.
     /// Multiple callers may snapshot concurrently; the read lock is held
     /// only for the duration of the clone.
+    ///
+    /// Drop the returned handle before this thread takes `self.salsa`'s lock again — a live snapshot held across that acquisition deadlocks a concurrent writer waiting in `cancel_others`.
     pub fn snapshot_db(&self) -> MirDbStorage {
         let guard = self.salsa.read();
         (**guard).clone()

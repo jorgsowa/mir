@@ -1,22 +1,12 @@
-//! Regression guard for the salsa query-stack reentrancy abort.
-//!
-//! Root cause: `index_generation()` fetched the workspace epoch by running a
-//! salsa input read (`WorkspaceRevision::revision`) through the shared,
-//! non-snapshot db handle. That read borrows the handle's single `ZalsaLocal`
-//! query stack — a `RefCell` — so when a background indexer calls it while
-//! another thread runs any salsa read on the same handle, the two race on that
-//! `RefCell` and salsa's `try_borrow_mut().unwrap_unchecked()` hits a
-//! non-unwinding `unreachable_unchecked`, aborting the whole process (SIGABRT,
-//! gated on debug assertions so it fires under `cargo test`). The fix reads the
-//! epoch from an off-salsa atomic mirror instead, so it never touches salsa.
-//!
-//! This test runs several reader threads (parallel `indexed_references_to` /
-//! `reanalyze_dependents`) plus a background indexer looping `index_batch`
-//! (which calls `index_generation`) and a writer toggling a base class, all on
-//! the shared rayon pool. Before the fix it aborts deterministically within a
-//! few seconds; after it, it completes. `catch_unwind` in the readers absorbs
-//! the ordinary `salsa::Cancelled` unwinds (the abort is non-unwinding, so a
-//! regression still kills the test binary).
+//! Regression guards for the session's salsa locking hazards: the
+//! `index_generation()` query-stack reentrancy abort (fixed by reading the
+//! epoch from an off-salsa atomic mirror), plus stress coverage for a writer
+//! toggling a base class and an opener mirroring buffer text on the shared
+//! rayon pool. The two deadlock shapes those hazards can hide are pinned
+//! deterministically instead, since this stress run is too narrow a race to
+//! rely on: see `settle_workspace_index_does_not_deadlock_on_its_own_snapshot`
+//! below and `session::incremental`'s
+//! `sweep_commit_does_not_deadlock_a_concurrent_file_write` unit test.
 
 use std::panic::AssertUnwindSafe;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -30,9 +20,51 @@ const READERS: usize = 10;
 const WRITERS: usize = 4;
 const READ_ITERS: usize = 60;
 const CALL_BUDGET: Duration = Duration::from_millis(80);
+/// Distinct paths the opener thread cycles through — kept small since past 32 files reconciliation switches to a full rebuild.
+const OPENED_FILES: usize = 8;
+/// Gap between the opener's mirror writes, far above an editor's real rate.
+const OPEN_INTERVAL: Duration = Duration::from_millis(2);
+/// Budget for the single-threaded settle guard, which is sub-second when it is not deadlocked.
+const SETTLE_BUDGET: Duration = Duration::from_secs(30);
+/// Generous upper bound for the stress test — turns a deadlock into a reported failure, not a performance gate.
+const STRESS_BUDGET: Duration = Duration::from_secs(300);
+
+/// Kills the test binary if the guarded section outlives its budget, so a deadlock reports which test stalled instead of hanging until CI's own timeout.
+struct Watchdog {
+    finished: Arc<AtomicBool>,
+}
+
+impl Watchdog {
+    fn new(name: &'static str, budget: Duration) -> Self {
+        let finished = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&finished);
+        std::thread::spawn(move || {
+            let deadline = Instant::now() + budget;
+            while Instant::now() < deadline {
+                if flag.load(Ordering::Relaxed) {
+                    return;
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            eprintln!("{name}: no progress within {budget:?} — deadlocked");
+            std::process::exit(101);
+        });
+        Self { finished }
+    }
+}
+
+impl Drop for Watchdog {
+    fn drop(&mut self) {
+        self.finished.store(true, Ordering::Relaxed);
+    }
+}
 
 #[test]
 fn cancelled_reanalysis_does_not_wait_behind_stub_writer_blocked_by_snapshot() {
+    let _watchdog = Watchdog::new(
+        "cancelled_reanalysis_does_not_wait_behind_stub_writer_blocked_by_snapshot",
+        STRESS_BUDGET,
+    );
     // Keep a Salsa snapshot alive, then start stub ingestion. The writer takes
     // the session write lock before Salsa waits for this snapshot to unwind.
     // A reanalysis started afterwards is therefore queued at the RwLock. Its
@@ -79,6 +111,31 @@ fn cancelled_reanalysis_does_not_wait_behind_stub_writer_blocked_by_snapshot() {
     writer.join().unwrap();
 }
 
+/// Reconciling the symbol index must not hold a database handle across its own merge write, or it deadlocks itself once the symbol-index singleton exists.
+#[test]
+fn settle_workspace_index_does_not_deadlock_on_its_own_snapshot() {
+    let _watchdog = Watchdog::new(
+        "settle_workspace_index_does_not_deadlock_on_its_own_snapshot",
+        SETTLE_BUDGET,
+    );
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ingest_file(
+        Arc::from("Owner.php"),
+        Arc::from("<?php\nnamespace Lib;\nclass Owner {}\n"),
+    );
+    // Only a live singleton makes a mirror write pending.
+    session.rebuild_workspace_symbol_index();
+    session.upsert_source_file(
+        Arc::from("Mirrored.php"),
+        Arc::from("<?php\nnamespace Lib;\nclass Mirrored {}\n"),
+        salsa::Durability::LOW,
+    );
+
+    session.settle_workspace_index();
+
+    assert!(session.contains_class("Lib\\Mirrored"));
+}
+
 fn caller_path(i: usize) -> Arc<str> {
     Arc::from(format!("callers/C{i}.php").as_str())
 }
@@ -105,6 +162,10 @@ fn caller_source(i: usize, marker: usize) -> Arc<str> {
 
 #[test]
 fn concurrent_writes_do_not_abort_parallel_reference_reads() {
+    let _watchdog = Watchdog::new(
+        "concurrent_writes_do_not_abort_parallel_reference_reads",
+        STRESS_BUDGET,
+    );
     let session = Arc::new(AnalysisSession::new(PhpVersion::LATEST));
     session.ensure_all_stubs();
 
@@ -171,6 +232,25 @@ fn concurrent_writes_do_not_abort_parallel_reference_reads() {
         })
         .collect();
 
+    // Opener: the host's `did_open` write path, kept running as background pressure for the sweep/settle deadlocks pinned by the deterministic guards.
+    let opener = {
+        let session = Arc::clone(&session);
+        let writer_stop = Arc::clone(&writer_stop);
+        std::thread::spawn(move || {
+            let mut n: usize = 0;
+            while !writer_stop.load(Ordering::Relaxed) {
+                n += 1;
+                let slot = n % OPENED_FILES;
+                let path: Arc<str> = Arc::from(format!("opened/O{slot}.php").as_str());
+                let src: Arc<str> = Arc::from(
+                    format!("<?php\nnamespace Lib;\nclass O{slot} {{ const M = {n}; }}\n").as_str(),
+                );
+                session.upsert_source_file(path, src, salsa::Durability::LOW);
+                std::thread::sleep(OPEN_INTERVAL);
+            }
+        })
+    };
+
     // Background indexer: re-runs the parallel `index_batch` (rayon-side
     // `collect_file_declarations`) against the readers' parallel `analyze_file`
     // on the shared rayon pool — the frameworks-suite interleaving.
@@ -236,6 +316,7 @@ fn concurrent_writes_do_not_abort_parallel_reference_reads() {
         writer.join().expect("writer thread panicked");
     }
     indexer.join().expect("indexer thread panicked");
+    opener.join().expect("opener thread panicked");
 
     // Surviving to here without a process abort is the assertion. Confirm the
     // session is still usable after the concurrent churn.

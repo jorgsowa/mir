@@ -17,6 +17,9 @@ struct WarmStartHit {
     )>,
 }
 
+/// Reconciliation rounds `settle_workspace_index_cancellable` performs before handing the pending set to the next caller.
+const SETTLE_ROUNDS: usize = 4;
+
 type ChangedInput = (Arc<str>, Arc<str>, bool);
 type IndexedSources = (Vec<crate::db::SourceFile>, Vec<ChangedInput>, bool);
 
@@ -82,6 +85,8 @@ impl AnalysisSession {
     /// Cheap clone of the salsa db for a read-only query. The lock is held
     /// only for the duration of the clone, so concurrent readers never
     /// serialize on each other or on writes for longer than the clone itself.
+    ///
+    /// Drop the handle before this session takes the db lock again — see [`crate::analyzer_db::AnalyzerDb::snapshot_db`].
     ///
     /// **Internal API — exposes Salsa types.** Subject to change without
     /// notice. Public consumers should use the typed query methods
@@ -1081,21 +1086,26 @@ impl AnalysisSession {
         &self,
         should_cancel: &(dyn Fn() -> bool + Sync),
     ) -> bool {
+        // Bounded rounds: without a cap, a caller with no cancellation token would never return while a host keeps mirroring buffers.
+        let mut rounds_left = SETTLE_ROUNDS;
         loop {
-            // A settled index needs no work, so it must not consume a
-            // caller's cancellation budget. In particular, reference queries
-            // can answer entirely from replayed postings after warm start.
-            // Poll only once there is pending reconciliation to perform.
-            let Some(db) = self.snapshot_db_cancellable(should_cancel) else {
-                return false;
-            };
-            if db.index_pending_is_empty() {
+            if rounds_left == 0 {
                 return true;
             }
-            if should_cancel() {
-                return false;
-            }
-            let pending = db.take_index_pending();
+            rounds_left -= 1;
+            // Scoped to this block: the handle must not still be live when the merge below takes the db write lock.
+            let pending = {
+                let Some(db) = self.snapshot_db_cancellable(should_cancel) else {
+                    return false;
+                };
+                if db.index_pending_is_empty() {
+                    return true;
+                }
+                if should_cancel() {
+                    return false;
+                }
+                db.take_index_pending()
+            };
             if pending.is_empty() {
                 return true;
             }
