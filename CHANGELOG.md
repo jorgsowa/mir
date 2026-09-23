@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.78.0] - 2026-09-23
+
+### Changed
+
+- **Single-owner analyzer database (Phase 1):** `mir-analyzer`'s mutating
+  `AnalyzerDb`/`AnalysisSession` methods now take `&mut self` instead of
+  taking a write lock, removing the `RwLock<MirDbRw>` wrapper around
+  database storage.
+- **Release version sync:** bumped the workspace and internal crate dependency
+  versions to `0.78.0` and refreshed `Cargo.lock` to match.
+
+### Fixed
+
+- **Session write-path deadlocks:** resolved two Salsa handle deadlocks where
+  a live database snapshot outlived the point where the same thread waited
+  on the database lock, in reanalysis and in cancellable workspace-index
+  settling.
+- **Incremental ingestion deadlock:** resolved a deadlock where a live
+  snapshot was held across a later commit borrow during file ingestion.
+
 ## [0.77.0] - 2026-09-18
 
 ### Changed
