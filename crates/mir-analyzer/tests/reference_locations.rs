@@ -8,7 +8,7 @@ use mir_analyzer::{AnalysisSession, BatchOptions, PhpVersion};
 
 use self::common::{create_temp_dir, pathbuf_to_arc_str, write_file};
 
-fn analyze_single_file(analyzer: &AnalysisSession, file: &std::path::PathBuf) {
+fn analyze_single_file(analyzer: &mut AnalysisSession, file: &std::path::PathBuf) {
     analyzer.analyze_paths(
         std::slice::from_ref(file),
         &BatchOptions::new().without_symbols(),
@@ -33,8 +33,8 @@ fn function_call_records_reference_location() {
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs = analyzer.reference_locations("fn:greet");
     assert!(
@@ -56,8 +56,8 @@ fn function_call_span_covers_only_name() {
     let file = write_file(&dir, "b.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("fn:greet")
@@ -86,8 +86,8 @@ fn method_call_span_covers_only_name() {
     let file = write_file(&dir, "h.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("meth:Svc::run")
@@ -114,8 +114,8 @@ fn static_method_call_via_class_string_variable_records_reference() {
     let file = write_file(&dir, "dyn_static.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("meth:Math::sq")
@@ -139,8 +139,8 @@ fn dynamic_invoke_call_records_reference_to_invoke_method() {
     let file = write_file(&dir, "i.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("meth:Svc::__invoke")
@@ -166,8 +166,8 @@ fn property_access_span_covers_only_name() {
     let file = write_file(&dir, "i.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("prop:Counter::count")
@@ -197,8 +197,8 @@ fn nullsafe_property_access_records_reference_location() {
     let file = write_file(&dir, "j.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("prop:Box::val")
@@ -225,8 +225,8 @@ fn method_call_records_reference_location() {
         "<?php\nclass Svc { public function run(): void {} }\nfunction caller(): void { $s = new Svc(); $s->run(); }\n",
     );
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     assert!(
         !analyzer.reference_locations("meth:Svc::run").is_empty(),
@@ -244,8 +244,8 @@ fn multiple_calls_in_same_file_produce_multiple_spans() {
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let count = analyzer
         .reference_locations("fn:ping")
@@ -266,8 +266,8 @@ fn new_expression_records_class_reference() {
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs = analyzer.reference_locations("cls:Widget");
     assert!(
@@ -288,8 +288,8 @@ fn new_expression_via_class_string_variable_records_class_reference() {
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs = analyzer.reference_locations("cls:Widget");
     assert!(
@@ -306,8 +306,8 @@ fn new_expression_multibyte_prefix_uses_codepoint_columns() {
     let file = write_file(&dir, "unicode_ref.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("cls:Greeter")
@@ -336,8 +336,8 @@ fn instanceof_via_class_string_variable_records_class_reference() {
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs = analyzer.reference_locations("cls:Widget");
     assert!(
@@ -357,8 +357,8 @@ fn re_analyze_removes_stale_reference_locations() {
     let file_str = file.to_str().unwrap().to_string();
     let file_arc: Arc<str> = Arc::from(file_str.as_str());
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     assert!(
         analyzer
@@ -397,8 +397,8 @@ fn static_method_call_span_covers_only_name() {
     let file = write_file(&dir, "static_span.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("meth:Math::sq")
@@ -423,8 +423,8 @@ fn callable_string_function_reference_span_covers_only_name() {
     let file = write_file(&dir, "callable_string_span.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("fn:normalize")
@@ -448,8 +448,8 @@ fn callable_array_method_reference_spans_cover_only_method_name() {
     let file = write_file(&dir, "callable_array_span.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("meth:Handler::handle")
@@ -480,8 +480,8 @@ fn cache_hit_replays_reference_locations() {
 
     // First run — populates cache
     {
-        let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(&cache_dir);
-        analyze_single_file(&analyzer, &file);
+        let mut analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(&cache_dir);
+        analyze_single_file(&mut analyzer, &file);
         assert!(
             !analyzer.reference_locations("fn:cached_fn").is_empty(),
             "first run should record reference"
@@ -490,8 +490,8 @@ fn cache_hit_replays_reference_locations() {
 
     // Second run — file unchanged, cache hit
     {
-        let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(&cache_dir);
-        analyze_single_file(&analyzer, &file);
+        let mut analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(&cache_dir);
+        analyze_single_file(&mut analyzer, &file);
 
         let locs = analyzer.reference_locations("fn:cached_fn");
         assert!(
@@ -514,8 +514,8 @@ fn compact_index_preserves_reference_locations() {
     let file = write_file(&dir, "compact.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     // After analyze(), the reference index must hold both call sites.
     let locs: Vec<_> = analyzer
@@ -544,8 +544,8 @@ fn compact_index_survives_re_analyze() {
     let file_str = file.to_str().unwrap().to_string();
     let file_arc: Arc<str> = Arc::from(file_str.as_str());
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     // Index is now compact; verify initial state.
     assert!(
@@ -585,8 +585,8 @@ fn this_method_call_records_reference_location() {
         "<?php\nclass Svc { public function helper(): void {}\npublic function run(): void { $this->helper(); } }\n",
     );
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     assert!(
         !analyzer.reference_locations("meth:Svc::helper").is_empty(),
@@ -603,8 +603,8 @@ fn this_method_call_span_covers_only_name() {
     let file = write_file(&dir, "this_span.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("meth:Svc::helper")
@@ -633,8 +633,8 @@ fn nullsafe_method_call_records_reference_location() {
     let file = write_file(&dir, "nullsafe_method.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("meth:Svc::run")
@@ -661,8 +661,8 @@ fn instanceof_records_class_reference() {
         "<?php\nclass Widget {}\nfunction check(mixed $v): bool { return $v instanceof Widget; }\n",
     );
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     assert!(
         !analyzer.reference_locations("cls:Widget").is_empty(),
@@ -679,8 +679,8 @@ fn catch_type_records_class_reference() {
         "<?php\nclass AppEx extends \\Exception {}\nfunction run(): void { try {} catch (AppEx $e) { echo $e->getMessage(); } }\n",
     );
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     assert!(
         !analyzer.reference_locations("cls:AppEx").is_empty(),
@@ -698,8 +698,8 @@ fn multi_type_catch_records_all_class_references() {
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs_a: Vec<_> = analyzer
         .reference_locations("cls:ErrA")
@@ -731,8 +731,8 @@ fn class_const_syntax_records_class_reference() {
         "<?php\nclass Router {}\nfunction getClass(): string { return Router::class; }\n",
     );
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     assert!(
         !analyzer.reference_locations("cls:Router").is_empty(),
@@ -749,8 +749,8 @@ fn static_const_access_records_class_reference() {
         "<?php\nclass Config { const VERSION = '1.0'; }\nfunction ver(): string { return Config::VERSION; }\n",
     );
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     assert!(
         !analyzer.reference_locations("cls:Config").is_empty(),
@@ -768,8 +768,8 @@ fn function_param_type_hint_records_class_reference() {
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("cls:Service")
@@ -793,8 +793,8 @@ fn return_type_hint_records_class_reference() {
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("cls:Repo")
@@ -818,8 +818,8 @@ fn property_type_hint_records_class_reference() {
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("cls:Logger")
@@ -844,8 +844,8 @@ fn self_const_access_records_constant_reference() {
         "<?php\nfinal class Foo {\n    public const string SEP = ':';\n    public function build(string $a, string $b): string {\n        return $a . self::SEP . $b;\n    }\n}\n",
     );
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     assert!(
         !analyzer.reference_locations("cnst:Foo::SEP").is_empty(),
@@ -863,8 +863,8 @@ fn static_const_access_records_constant_reference() {
         "<?php\nclass Bar {\n    public const string PREFIX = 'x';\n    public function go(): string {\n        return static::PREFIX;\n    }\n}\n",
     );
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     assert!(
         !analyzer.reference_locations("cnst:Bar::PREFIX").is_empty(),
@@ -882,8 +882,8 @@ fn parent_const_access_records_constant_reference() {
         "<?php\nclass Base {\n    public const string TAG = 'base';\n}\nclass Child extends Base {\n    public function tag(): string {\n        return parent::TAG;\n    }\n}\n",
     );
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     assert!(
         !analyzer.reference_locations("cnst:Base::TAG").is_empty(),
@@ -904,8 +904,8 @@ fn trait_constant_accessed_via_consuming_class_records_reference_to_trait() {
         "<?php\ntrait HasVersion {\n    public const string VERSION = '1.0';\n}\nclass Config {\n    use HasVersion;\n}\nfunction ver(): string { return Config::VERSION; }\n",
     );
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     assert!(
         !analyzer
@@ -925,8 +925,8 @@ fn explicit_class_const_access_records_constant_reference() {
         "<?php\nclass Config {\n    public const string VERSION = '1.0';\n}\nfunction ver(): string { return Config::VERSION; }\n",
     );
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     assert!(
         !analyzer
@@ -947,8 +947,8 @@ fn inherited_static_method_call_keys_by_declaring_class() {
         "<?php\nclass Base { public static function foo(): void {} }\nclass Child extends Base {}\nfunction caller(): void { Child::foo(); }\n",
     );
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     assert!(
         !analyzer.reference_locations("meth:Base::foo").is_empty(),
@@ -972,8 +972,8 @@ fn static_property_access_records_class_reference() {
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let class_locs: Vec<_> = analyzer
         .reference_locations("cls:Config")
@@ -999,8 +999,8 @@ fn static_property_access_records_property_reference() {
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let prop_locs: Vec<_> = analyzer
         .reference_locations("prop:Config::timeout")
@@ -1026,8 +1026,8 @@ fn static_method_call_records_class_reference() {
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("cls:Widget")
@@ -1053,8 +1053,8 @@ fn closure_param_type_hint_records_class_reference() {
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("cls:Logger")
@@ -1079,8 +1079,8 @@ fn arrow_function_param_type_hint_records_class_reference() {
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("cls:Formatter")
@@ -1104,8 +1104,8 @@ fn anonymous_class_extends_records_class_reference() {
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("cls:Base")
@@ -1129,8 +1129,8 @@ fn anonymous_class_implements_records_class_reference() {
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("cls:Greets")
@@ -1154,8 +1154,8 @@ fn anonymous_class_use_trait_records_class_reference() {
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("cls:Helper")
@@ -1179,8 +1179,8 @@ fn interface_declared_property_access_records_reference_location() {
     let file = write_file(&dir, "k.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("prop:HasName::name")
@@ -1209,8 +1209,8 @@ fn inherited_static_property_access_via_subclass_name_keys_by_declaring_class() 
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let owner_locs: Vec<_> = analyzer
         .reference_locations("prop:ParentC::shared")
@@ -1245,8 +1245,8 @@ fn inherited_static_property_access_via_self_keys_by_declaring_class() {
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let owner_locs: Vec<_> = analyzer
         .reference_locations("prop:ParentC::shared")
@@ -1272,8 +1272,8 @@ fn attribute_argument_class_constant_records_constant_reference() {
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("cnst:Target::VERSION")
@@ -1299,8 +1299,8 @@ fn attribute_argument_enum_case_records_constant_reference() {
     );
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("cnst:Status::Active")
@@ -1334,8 +1334,8 @@ fn trait_composing_trait_records_reference_at_use_site() {
     let file = write_file(&dir, "a.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("cls:Greets")
@@ -1365,8 +1365,8 @@ fn trait_method_parameter_attribute_records_class_reference() {
     let file = write_file(&dir, "a.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("cls:Foo")
@@ -1389,8 +1389,8 @@ fn interface_method_parameter_attribute_records_class_reference() {
     let file = write_file(&dir, "a.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("cls:Foo")
@@ -1413,8 +1413,8 @@ fn interface_class_const_attribute_records_class_reference() {
     let file = write_file(&dir, "a.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("cls:Foo")
@@ -1437,8 +1437,8 @@ fn enum_method_parameter_attribute_records_class_reference() {
     let file = write_file(&dir, "a.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("cls:Foo")
@@ -1461,8 +1461,8 @@ fn enum_class_const_attribute_records_class_reference() {
     let file = write_file(&dir, "a.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("cls:Foo")
@@ -1486,8 +1486,8 @@ fn property_hook_attribute_records_class_reference() {
     let file = write_file(&dir, "a.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("cls:Foo")
@@ -1511,8 +1511,8 @@ fn property_hook_parameter_attribute_records_class_reference() {
     let file = write_file(&dir, "a.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("cls:Bar")
@@ -1535,8 +1535,8 @@ fn trait_property_hook_attribute_records_class_reference() {
     let file = write_file(&dir, "a.php", src);
     let file_arc = pathbuf_to_arc_str(&file);
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
-    analyze_single_file(&analyzer, &file);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    analyze_single_file(&mut analyzer, &file);
 
     let locs: Vec<_> = analyzer
         .reference_locations("cls:Foo")

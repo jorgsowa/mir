@@ -40,7 +40,7 @@ fn old_path_issues_for(
 ) -> (Vec<mir_issues::Issue>, std::ops::Range<u32>) {
     use mir_analyzer::{AnalysisSession, BatchOptions};
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let dir = tempfile::tempdir().unwrap();
@@ -87,7 +87,7 @@ fn old_path_issues_for(
 fn new_path_issues_for(fn_name: &str, source: &str) -> Vec<mir_issues::Issue> {
     // Mirror AnalysisSession setup minimally: ingest stubs so resolution works.
     use mir_analyzer::{AnalysisSession, BatchOptions};
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let dir = tempfile::tempdir().unwrap();

@@ -28,7 +28,7 @@ impl AnalysisSession {
     /// source are silently skipped (returns the analyzable subset).
     ///
     /// Cross-file inferred return types are resolved on demand via salsa.
-    pub fn reanalyze_dependents(&self, file: &str) -> Vec<(Arc<str>, crate::FileAnalysis)> {
+    pub fn reanalyze_dependents(&mut self, file: &str) -> Vec<(Arc<str>, crate::FileAnalysis)> {
         self.reanalyze_dependents_cancellable(file, &crate::IndexCancel::new())
     }
 
@@ -41,7 +41,7 @@ impl AnalysisSession {
     /// skipped due to cancellation are simply absent from the returned vec —
     /// the consumer should drop a stale flag and start fresh work on each edit.
     pub fn reanalyze_dependents_cancellable(
-        &self,
+        &mut self,
         file: &str,
         cancel: &crate::IndexCancel,
     ) -> Vec<(Arc<str>, crate::FileAnalysis)> {
@@ -64,18 +64,14 @@ impl AnalysisSession {
     /// Re-analyze an explicit file set — typically the editor's currently
     /// open files — after an edit elsewhere in the workspace.
     ///
-    /// This is the rust-analyzer diagnostics model: instead of computing the
-    /// edited file's transitive dependents (an O(all-ingested-files) graph
-    /// rebuild on every keystroke), the caller passes the handful of files it
-    /// actually publishes diagnostics for, and salsa memoization makes the
-    /// unaffected ones ~free — `analyze_file` re-validates each file's memo
-    /// against what actually changed and only re-executes bodies the edit
-    /// reaches. Per-edit cost is O(open files), independent of workspace size.
+    /// The caller passes the files it publishes diagnostics for instead of
+    /// computing the edited file's transitive dependents; salsa memoization
+    /// makes unaffected files ~free. Per-edit cost is O(open files).
     ///
     /// Files the session has no source for are silently skipped. Cancellation
     /// semantics match [`Self::reanalyze_dependents_cancellable`].
     pub fn reanalyze_files_cancellable(
-        &self,
+        &mut self,
         files: &[Arc<str>],
         cancel: &crate::IndexCancel,
     ) -> Vec<(Arc<str>, crate::FileAnalysis)> {
@@ -92,7 +88,7 @@ impl AnalysisSession {
     /// [`Self::reanalyze_files_cancellable`]: warm up, analyze in parallel,
     /// commit reference locations.
     fn reanalyze_file_set(
-        &self,
+        &mut self,
         files: Vec<Arc<str>>,
         cancel: &crate::IndexCancel,
     ) -> Vec<(Arc<str>, crate::FileAnalysis)> {
@@ -124,16 +120,14 @@ impl AnalysisSession {
         // `ingest_file_prepared` write path pre-pay this per edit, making the
         // whole loop a map-lookup sweep.
         {
-            // One revision bump for the whole warm-up sweep instead of one per
-            // lazily-loaded class (each bump cancels every in-flight salsa
-            // reader). Closed before `commit_gen` is read below, so commits
-            // are stamped with the post-load generation as before.
-            let _deferred_bumps = self.defer_revision_bumps();
+            // Closed before `commit_gen` is read, so commits carry the
+            // post-load generation.
+            let mut session = self.defer_revision_bumps();
             for file in &dependents {
                 if cancel.is_cancelled() {
                     return Vec::new();
                 }
-                if !self.prepare_file_for_analysis_cancellable(file, &|| cancel.is_cancelled()) {
+                if !session.prepare_file_for_analysis_cancellable(file, &|| cancel.is_cancelled()) {
                     return Vec::new();
                 }
             }
@@ -194,7 +188,10 @@ impl AnalysisSession {
                     // every lazy load, and a concurrent index write cancels the
                     // pass, so the frozen view is never stale. Same discipline as
                     // the batch body pass.
-                    let mut db_main = self.snapshot_db_cancellable(&|| cancel.is_cancelled())?;
+                    if cancel.is_cancelled() {
+                        return None;
+                    }
+                    let mut db_main = self.snapshot_db();
                     db_main.freeze_workspace_index();
                     // Sweeps are the steady-state population path for the mention
                     // index: every analyzed file gets a current mention scan
@@ -264,8 +261,7 @@ impl AnalysisSession {
         //
         // Runs with no live snapshot: see the pass closure above.
         {
-            self.fire_precommit_gate();
-            let guard = self.db.salsa.read();
+            let guard = &self.db.salsa;
             let mut dependency_graph_changed = false;
             for (file, text, out, entries, put, mentions) in results.iter_mut() {
                 // Pointer-identical memo ⇒ identical postings: skip the
@@ -376,20 +372,11 @@ impl AnalysisSession {
     /// Convenience: synchronously lazy-load every import of `file` that
     /// isn't already in the codebase. Returns the number successfully loaded.
     ///
-    /// For non-blocking prefetch, call this from a worker thread:
-    ///
-    /// ```ignore
-    /// let s = session.clone();  // AnalysisSession is wrapped in Arc by callers
-    /// std::thread::spawn(move || {
-    ///     s.prefetch_imports(&file_path);
-    /// });
-    /// ```
-    ///
     /// Uses a single shared-visited two-tier BFS across all pending imports
     /// (see [`Self::load_classes_transitive_bounded`]) with a shallow depth so
     /// member access on imported types type-checks without pulling in the
     /// entire vendor tree.
-    pub fn prefetch_imports(&self, file: &str) -> usize {
+    pub fn prefetch_imports(&mut self, file: &str) -> usize {
         let pending = self.pending_lazy_loads(file);
         if pending.is_empty() {
             return 0;
@@ -397,10 +384,10 @@ impl AnalysisSession {
         // Fault in each imported FQCN directly (single-file load + tier-merge).
         // Inheritance ancestors / signature types resolve through the eagerly
         // built workspace symbol index — no transitive walk needed here.
-        let _deferred_bumps = self.defer_revision_bumps();
+        let mut session = self.defer_revision_bumps();
         let mut loaded = 0;
         for fqcn in &pending {
-            if self.load_class(fqcn.as_ref()).is_loaded() {
+            if session.load_class(fqcn.as_ref()).is_loaded() {
                 loaded += 1;
             }
         }
@@ -608,88 +595,5 @@ impl AnalysisSession {
         );
         *self.dependency_graph_cache.write() = Some(graph.clone());
         graph
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::sync::atomic::{AtomicBool, Ordering};
-    use std::sync::mpsc;
-    use std::time::{Duration, Instant};
-
-    const BUDGET: Duration = Duration::from_secs(30);
-
-    /// The sweep must release its salsa snapshot before waiting for the session db lock, or it deadlocks against a concurrent buffer-mirror write.
-    #[test]
-    fn sweep_commit_does_not_deadlock_a_concurrent_file_write() {
-        let session = Arc::new(AnalysisSession::new(PhpVersion::LATEST));
-        let base: Arc<str> = Arc::from("Base.php");
-        let user: Arc<str> = Arc::from("User.php");
-        session.ingest_file(
-            base.clone(),
-            Arc::from("<?php class Base { public function run(): int { return 1; } }\n"),
-        );
-        session.ingest_file(
-            user.clone(),
-            Arc::from(
-                "<?php class User { public function go(Base $b): int { return $b->run(); } }\n",
-            ),
-        );
-
-        let (at_gate_tx, at_gate_rx) = mpsc::channel();
-        let (go_tx, go_rx) = mpsc::channel::<()>();
-        let go_rx = std::sync::Mutex::new(go_rx);
-        // Only the first sweep is held; a retry (or another caller's sweep)
-        // runs straight through.
-        let armed = AtomicBool::new(true);
-        session.set_precommit_gate(Arc::new(move || {
-            if !armed.swap(false, Ordering::SeqCst) {
-                return;
-            }
-            at_gate_tx.send(()).expect("gate receiver dropped");
-            let _ = go_rx.lock().expect("gate mutex poisoned").recv();
-        }));
-
-        let (swept_tx, swept_rx) = mpsc::channel();
-        let sweep_session = Arc::clone(&session);
-        let sweep_files = vec![user.clone()];
-        std::thread::spawn(move || {
-            let analyses =
-                sweep_session.reanalyze_files_cancellable(&sweep_files, &crate::IndexCancel::new());
-            let _ = swept_tx.send(analyses.len());
-        });
-        at_gate_rx
-            .recv_timeout(BUDGET)
-            .expect("sweep never reached its pre-commit gate");
-
-        let (written_tx, written_rx) = mpsc::channel();
-        let writer_session = Arc::clone(&session);
-        std::thread::spawn(move || {
-            writer_session.upsert_source_file(
-                Arc::from("Opened.php"),
-                Arc::from("<?php class Opened {}\n"),
-                salsa::Durability::LOW,
-            );
-            let _ = written_tx.send(());
-        });
-
-        // Hold the sweep until the writer owns the write lock — the interleaving that used to deadlock.
-        let deadline = Instant::now() + Duration::from_secs(2);
-        while Instant::now() < deadline && session.db.salsa.try_read().is_some() {
-            std::thread::yield_now();
-        }
-        go_tx.send(()).expect("sweep gate closed early");
-
-        assert_eq!(
-            swept_rx
-                .recv_timeout(BUDGET)
-                .expect("sweep deadlocked against the concurrent file write"),
-            1,
-        );
-        written_rx
-            .recv_timeout(BUDGET)
-            .expect("file write deadlocked against the sweep");
-        assert!(session.lookup_source_file("Opened.php").is_some());
     }
 }

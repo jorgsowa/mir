@@ -69,7 +69,7 @@ fn measure_mention_index() {
     }
 
     // Register the whole corpus the LSP way (bulk text + index batches).
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
     let mut files: Vec<(Arc<str>, Arc<str>)> = Vec::new();
     let mut total_bytes = 0usize;

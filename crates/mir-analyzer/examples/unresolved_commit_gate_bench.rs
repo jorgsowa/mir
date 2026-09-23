@@ -34,7 +34,7 @@ fn main() {
         mir_analyzer::composer::Psr4Map::from_composer(fixture_root)
             .expect("failed to load composer.json"),
     );
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
     session.ensure_all_stubs();
 
     let project_files = discover_files(&fixture.src_root());

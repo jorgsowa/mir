@@ -57,7 +57,7 @@ fn main() {
     );
 
     // 2. Build session.
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4.clone());
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4.clone());
 
     // 3. Bulk-register every file's source text.
     let project_files = discover_files(&fixture.src_root());
@@ -116,7 +116,7 @@ fn main() {
         session.ingest_file(file.clone(), Arc::<str>::from(source.as_str()));
 
         let parsed = php_rs_parser::parse(&source);
-        let analyzer = FileAnalyzer::new(&session);
+        let mut analyzer = FileAnalyzer::new(&mut session);
         let result =
             analyzer.analyze_diagnostics_only(file, &source, &parsed.program, &parsed.source_map);
         total_issues += result.issues.len();

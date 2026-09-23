@@ -21,7 +21,7 @@ fn no_cancel() -> impl Fn() -> bool + Sync {
 /// the LSP's index_batch/finalize path does); referencing files land via
 /// `set_file_text` only, so the gate is what admits them.
 fn build_session(declared: &[(&str, &str)], raw: &[(&str, &str)]) -> AnalysisSession {
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
     for (path, text) in declared {
         session.ingest_file(Arc::from(*path), Arc::from(*text));
@@ -65,7 +65,7 @@ fn warm_query_equals_cold_query() {
             "<?php\nnamespace App;\nfunction h(): void { $x = 'colorless color_save'; }\n",
         ),
     ];
-    let session = build_session(&declared, &raw);
+    let mut session = build_session(&declared, &raw);
     let files: Vec<Arc<str>> = declared
         .iter()
         .chain(raw.iter())
@@ -145,7 +145,7 @@ fn constructor_query_uses_class_needle_gate() {
             "<?php\nnamespace App;\nclass Other { public function __construct() {} }\n",
         ),
     ];
-    let session = build_session(&declared, &raw);
+    let mut session = build_session(&declared, &raw);
     let files: Vec<Arc<str>> = declared
         .iter()
         .chain(raw.iter())
@@ -193,7 +193,7 @@ fn class_declared_after_scan_falls_back_and_is_found() {
             "<?php\nnamespace App;\nfunction p(): int { return 42; }\n",
         ),
     ];
-    let session = build_session(&declared, &raw);
+    let mut session = build_session(&declared, &raw);
     let mut files: Vec<Arc<str>> = declared
         .iter()
         .chain(raw.iter())
@@ -261,7 +261,7 @@ fn edited_file_self_invalidates_its_mention_entry() {
         "buf.php",
         "<?php\nnamespace App;\nfunction b(): int { return 1; }\n",
     )];
-    let session = build_session(&declared, &raw);
+    let mut session = build_session(&declared, &raw);
     let files: Vec<Arc<str>> = declared
         .iter()
         .chain(raw.iter())
@@ -334,7 +334,7 @@ fn cold_and_warm_gate_agree_across_generated_workspace() {
         raw.push((format!("use_{i}.php"), body));
     }
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
     for (p, t) in &declared {
         session.ingest_file(Arc::from(p.as_str()), Arc::from(t.as_str()));
@@ -413,7 +413,7 @@ fn subtype_gate_shares_mention_cache_with_references_gate() {
             "<?php\nnamespace App;\nfunction g(): int { return 42; }\n",
         ),
     ];
-    let session = build_session(&declared, &raw);
+    let mut session = build_session(&declared, &raw);
     let files: Vec<Arc<str>> = [
         "base.php",
         "circle.php",
@@ -502,7 +502,7 @@ fn member_gate_admits_needle_and_amortizes_to_lookups() {
             "<?php\nnamespace App;\nfunction h(): int { return 1; }\n",
         ),
     ];
-    let session = build_session(&declared, &raw);
+    let mut session = build_session(&declared, &raw);
     let files: Vec<Arc<str>> = [
         "widget.php",
         "uses_render.php",
@@ -607,7 +607,7 @@ fn constructor_gate_raw_needles_via_mention_index() {
         ),
         ("unrelated.php", "<?php\nfunction n(): int { return 2; }\n"),
     ];
-    let session = build_session(&declared, &raw);
+    let mut session = build_session(&declared, &raw);
     let files: Vec<Arc<str>> = [
         "gadget.php",
         "makes_gadget.php",

@@ -73,7 +73,7 @@ impl Playground {
 }
 
 fn make_session(version: PhpVersion) -> AnalysisSession {
-    let session = AnalysisSession::new(version);
+    let mut session = AnalysisSession::new(version);
     session.ensure_all_stubs();
     session
 }

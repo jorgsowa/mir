@@ -360,11 +360,11 @@ fn resolve_scope_symbols(
 /// Per-file body analysis analyzer bound to an [`AnalysisSession`]. Cheap to
 /// construct — typically held transiently per analysis call.
 pub struct FileAnalyzer<'a> {
-    session: &'a AnalysisSession,
+    session: &'a mut AnalysisSession,
 }
 
 impl<'a> FileAnalyzer<'a> {
-    pub fn new(session: &'a AnalysisSession) -> Self {
+    pub fn new(session: &'a mut AnalysisSession) -> Self {
         Self { session }
     }
 
@@ -375,7 +375,7 @@ impl<'a> FileAnalyzer<'a> {
     /// one snapshot is analyzed and its reference locations committed. The lock
     /// is not held during analysis, so concurrent edits and reads proceed.
     pub fn analyze(
-        &self,
+        &mut self,
         file: Arc<str>,
         source: &str,
         program: &Program,
@@ -392,7 +392,7 @@ impl<'a> FileAnalyzer<'a> {
     /// symbol payloads are skipped and navigation can use [`Self::resolve_at`]
     /// on demand.
     pub fn analyze_diagnostics_only(
-        &self,
+        &mut self,
         file: Arc<str>,
         source: &str,
         program: &Program,
@@ -402,7 +402,7 @@ impl<'a> FileAnalyzer<'a> {
     }
 
     fn analyze_with_symbols(
-        &self,
+        &mut self,
         file: Arc<str>,
         source: &str,
         program: &Program,
@@ -473,11 +473,15 @@ impl<'a> FileAnalyzer<'a> {
     /// references, snapshots the current ingested text/AST, selects the
     /// smallest containing file-scope declaration (or `use` item / top-level
     /// exec region), and runs symbol recording only for that scope.
-    pub fn resolve_at(&self, file: Arc<str>, byte_offset: u32) -> Option<ResolvedSymbol> {
+    pub fn resolve_at(&mut self, file: Arc<str>, byte_offset: u32) -> Option<ResolvedSymbol> {
         self.resolve_at_with_symbol_types(file, byte_offset, true)
     }
 
-    pub(crate) fn resolve_name_at(&self, file: Arc<str>, byte_offset: u32) -> Option<crate::Name> {
+    pub(crate) fn resolve_name_at(
+        &mut self,
+        file: Arc<str>,
+        byte_offset: u32,
+    ) -> Option<crate::Name> {
         self.session.settle_workspace_index();
         self.session.prepare_file_for_analysis(&file);
 
@@ -515,7 +519,7 @@ impl<'a> FileAnalyzer<'a> {
     }
 
     fn resolve_at_with_symbol_types(
-        &self,
+        &mut self,
         file: Arc<str>,
         byte_offset: u32,
         capture_symbol_types: bool,
@@ -751,13 +755,13 @@ mod tests {
     use crate::{symbol::ReferenceKind, AnalysisSession, PhpVersion, ResolvedSymbol};
 
     fn session_for_source(path: &str, source: &str) -> (AnalysisSession, Arc<str>) {
-        let session = AnalysisSession::new(PhpVersion::LATEST);
+        let mut session = AnalysisSession::new(PhpVersion::LATEST);
         let file: Arc<str> = Arc::from(path);
         session.ingest_file(file.clone(), Arc::from(source));
         (session, file)
     }
 
-    fn analyze_diagnostics_only(session: &AnalysisSession, file: Arc<str>, source: &str) {
+    fn analyze_diagnostics_only(session: &mut AnalysisSession, file: Arc<str>, source: &str) {
         let parsed = php_rs_parser::parse(source);
         assert!(
             parsed.errors.is_empty(),
@@ -793,7 +797,7 @@ mod tests {
     }
 
     fn assert_resolve_at_compact_without_fallback(
-        session: &AnalysisSession,
+        session: &mut AnalysisSession,
         file: &Arc<str>,
         offset: u32,
         expected: impl FnOnce(&ResolvedSymbol),
@@ -820,8 +824,8 @@ mod tests {
         crate::metrics::test_reset();
 
         let src = "<?php\nfunction helper(): void {}\nfunction caller(): void { helper(); }\n";
-        let (session, file) = session_for_source("/proj/name_at_metrics.php", src);
-        analyze_diagnostics_only(&session, file.clone(), src);
+        let (mut session, file) = session_for_source("/proj/name_at_metrics.php", src);
+        analyze_diagnostics_only(&mut session, file.clone(), src);
 
         let offset = src.rfind("helper();").unwrap() as u32;
         let name = session
@@ -846,8 +850,8 @@ mod tests {
         crate::metrics::test_reset();
 
         let src = "<?php\nfunction helper(): void {}\nhelper();\n";
-        let (session, file) = session_for_source("/proj/name_at_top_level_metrics.php", src);
-        analyze_diagnostics_only(&session, file.clone(), src);
+        let (mut session, file) = session_for_source("/proj/name_at_top_level_metrics.php", src);
+        analyze_diagnostics_only(&mut session, file.clone(), src);
 
         let offset = src.find("helper();").unwrap() as u32;
         let name = session
@@ -870,11 +874,11 @@ mod tests {
     #[test]
     fn resolve_at_records_compact_path_without_fallback() {
         let src = "<?php\nclass Box { public int $value = 0; }\nfunction read(Box $box): void { $box->value; }\n";
-        let (session, file) = session_for_source("/proj/resolve_at_metrics.php", src);
-        analyze_diagnostics_only(&session, file.clone(), src);
+        let (mut session, file) = session_for_source("/proj/resolve_at_metrics.php", src);
+        analyze_diagnostics_only(&mut session, file.clone(), src);
 
         let offset = src.find("$box->value").unwrap() as u32 + "$box".len() as u32;
-        assert_resolve_at_compact_without_fallback(&session, &file, offset, |symbol| {
+        assert_resolve_at_compact_without_fallback(&mut session, &file, offset, |symbol| {
             assert!(matches!(symbol.kind, ReferenceKind::Receiver));
         });
     }
@@ -882,11 +886,11 @@ mod tests {
     #[test]
     fn resolve_at_top_level_exec_uses_compact_path_without_fallback() {
         let src = "<?php\nfunction helper(): void {}\nhelper();\n";
-        let (session, file) = session_for_source("/proj/resolve_top_level_metrics.php", src);
-        analyze_diagnostics_only(&session, file.clone(), src);
+        let (mut session, file) = session_for_source("/proj/resolve_top_level_metrics.php", src);
+        analyze_diagnostics_only(&mut session, file.clone(), src);
 
         let offset = src.find("helper();").unwrap() as u32;
-        assert_resolve_at_compact_without_fallback(&session, &file, offset, |symbol| {
+        assert_resolve_at_compact_without_fallback(&mut session, &file, offset, |symbol| {
             assert!(matches!(
                 &symbol.kind,
                 ReferenceKind::FunctionCall(name) if name.as_ref() == "helper"
@@ -897,11 +901,11 @@ mod tests {
     #[test]
     fn resolve_at_method_call_uses_compact_path_without_fallback() {
         let src = "<?php\nclass Dep { public function next(): int { return 1; } }\nfunction run(Dep $dep): int { return $dep->next(); }\n";
-        let (session, file) = session_for_source("/proj/resolve_method_metrics.php", src);
-        analyze_diagnostics_only(&session, file.clone(), src);
+        let (mut session, file) = session_for_source("/proj/resolve_method_metrics.php", src);
+        analyze_diagnostics_only(&mut session, file.clone(), src);
 
         let offset = src.find("->next()").unwrap() as u32 + 2;
-        assert_resolve_at_compact_without_fallback(&session, &file, offset, |symbol| {
+        assert_resolve_at_compact_without_fallback(&mut session, &file, offset, |symbol| {
             assert!(matches!(
                 &symbol.kind,
                 ReferenceKind::MethodCall { class, method }
@@ -913,11 +917,11 @@ mod tests {
     #[test]
     fn resolve_at_type_hint_uses_compact_path_without_fallback() {
         let src = "<?php\nclass Dep {}\nfunction run(Dep $dep): Dep { return $dep; }\n";
-        let (session, file) = session_for_source("/proj/resolve_type_hint_metrics.php", src);
-        analyze_diagnostics_only(&session, file.clone(), src);
+        let (mut session, file) = session_for_source("/proj/resolve_type_hint_metrics.php", src);
+        analyze_diagnostics_only(&mut session, file.clone(), src);
 
         let offset = src.find("run(Dep").unwrap() as u32 + "run(".len() as u32;
-        assert_resolve_at_compact_without_fallback(&session, &file, offset, |symbol| {
+        assert_resolve_at_compact_without_fallback(&mut session, &file, offset, |symbol| {
             assert!(matches!(
                 &symbol.kind,
                 ReferenceKind::ClassReference(name) if name.as_ref() == "Dep"
@@ -927,17 +931,17 @@ mod tests {
 
     #[test]
     fn resolve_at_use_import_uses_compact_path_without_fallback() {
-        let session = AnalysisSession::new(PhpVersion::LATEST);
+        let mut session = AnalysisSession::new(PhpVersion::LATEST);
         let dep_file: Arc<str> = Arc::from("/proj/Dep.php");
         let main_file: Arc<str> = Arc::from("/proj/Main.php");
         let dep_src = "<?php\nnamespace App;\nclass Dep {}\n";
         let main_src = "<?php\nuse App\\Dep;\nfunction run(): Dep { return new Dep(); }\n";
         session.ingest_file(dep_file, Arc::from(dep_src));
         session.ingest_file(main_file.clone(), Arc::from(main_src));
-        analyze_diagnostics_only(&session, main_file.clone(), main_src);
+        analyze_diagnostics_only(&mut session, main_file.clone(), main_src);
 
         let offset = main_src.find("App\\Dep").unwrap() as u32 + "App\\".len() as u32;
-        assert_resolve_at_compact_without_fallback(&session, &main_file, offset, |symbol| {
+        assert_resolve_at_compact_without_fallback(&mut session, &main_file, offset, |symbol| {
             assert!(matches!(
                 &symbol.kind,
                 ReferenceKind::UseImport(inner)
@@ -952,11 +956,11 @@ mod tests {
     #[test]
     fn resolve_at_catch_clause_type_uses_compact_path_without_fallback() {
         let src = "<?php\nfinal class MyException extends \\Exception {}\nfunction run(): void {\n    try {\n        throw new MyException();\n    } catch (MyException $e) {\n    }\n}\n";
-        let (session, file) = session_for_source("/proj/resolve_catch_metrics.php", src);
-        analyze_diagnostics_only(&session, file.clone(), src);
+        let (mut session, file) = session_for_source("/proj/resolve_catch_metrics.php", src);
+        analyze_diagnostics_only(&mut session, file.clone(), src);
 
         let offset = src.rfind("catch (MyException").unwrap() as u32 + "catch (".len() as u32;
-        assert_resolve_at_compact_without_fallback(&session, &file, offset, |symbol| {
+        assert_resolve_at_compact_without_fallback(&mut session, &file, offset, |symbol| {
             assert!(matches!(
                 &symbol.kind,
                 ReferenceKind::ClassReference(name) if name.as_ref() == "MyException"
@@ -967,11 +971,11 @@ mod tests {
     #[test]
     fn resolve_at_static_property_write_class_uses_compact_path_without_fallback() {
         let src = "<?php\nclass Counter {\n    public static int $count = 0;\n}\nfunction bump(): void {\n    Counter::$count = Counter::$count + 1;\n}\n";
-        let (session, file) = session_for_source("/proj/resolve_static_prop_metrics.php", src);
-        analyze_diagnostics_only(&session, file.clone(), src);
+        let (mut session, file) = session_for_source("/proj/resolve_static_prop_metrics.php", src);
+        analyze_diagnostics_only(&mut session, file.clone(), src);
 
         let offset = src.find("Counter::$count =").unwrap() as u32;
-        assert_resolve_at_compact_without_fallback(&session, &file, offset, |symbol| {
+        assert_resolve_at_compact_without_fallback(&mut session, &file, offset, |symbol| {
             assert!(matches!(
                 &symbol.kind,
                 ReferenceKind::ClassReference(name) if name.as_ref() == "Counter"
@@ -984,8 +988,8 @@ mod tests {
         crate::metrics::test_reset();
 
         let src = "<?php\nclass Dep {}\nfunction run(Dep $dep): Dep { return $dep; }\n";
-        let (session, file) = session_for_source("/proj/hover_metrics.php", src);
-        analyze_diagnostics_only(&session, file.clone(), src);
+        let (mut session, file) = session_for_source("/proj/hover_metrics.php", src);
+        analyze_diagnostics_only(&mut session, file.clone(), src);
 
         let offset = src.find("run(Dep").unwrap() as u32 + "run(".len() as u32;
         let hover = session
@@ -1010,8 +1014,8 @@ mod tests {
         crate::metrics::test_reset();
 
         let src = "<?php\nclass Dep {}\nfunction run(Dep $dep): Dep { return $dep; }\n";
-        let (session, file) = session_for_source("/proj/definition_metrics.php", src);
-        analyze_diagnostics_only(&session, file.clone(), src);
+        let (mut session, file) = session_for_source("/proj/definition_metrics.php", src);
+        analyze_diagnostics_only(&mut session, file.clone(), src);
 
         let offset = src.find("run(Dep").unwrap() as u32 + "run(".len() as u32;
         let loc = session
@@ -1036,8 +1040,8 @@ mod tests {
         crate::metrics::test_reset();
 
         let src = "<?php\nfunction helper(): void {}\nfunction caller(): void { helper(); }\n";
-        let (session, file) = session_for_source("/proj/references_metrics.php", src);
-        analyze_diagnostics_only(&session, file.clone(), src);
+        let (mut session, file) = session_for_source("/proj/references_metrics.php", src);
+        analyze_diagnostics_only(&mut session, file.clone(), src);
 
         let offset = src.find("helper();").unwrap() as u32 + 1;
         let refs = session
@@ -1088,8 +1092,8 @@ function read_box(Box $box): int {
     return $box->value;
 }
 ";
-        let (session, file) = session_for_source("/proj/perf_nav.php", src);
-        let import_session = AnalysisSession::new(PhpVersion::LATEST);
+        let (mut session, file) = session_for_source("/proj/perf_nav.php", src);
+        let mut import_session = AnalysisSession::new(PhpVersion::LATEST);
         let dep_file: Arc<str> = Arc::from("/proj/import/Dep.php");
         let main_file: Arc<str> = Arc::from("/proj/import/Main.php");
         let dep_src = "<?php\nnamespace App;\nclass Dep {}\n";
@@ -1106,7 +1110,7 @@ function read_box(Box $box): int {
         );
 
         let t0 = Instant::now();
-        let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        let analysis = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
             file.clone(),
             src,
             &parsed.program,
@@ -1116,7 +1120,7 @@ function read_box(Box $box): int {
         assert!(analysis.symbols.is_empty());
 
         let t0 = Instant::now();
-        let main_analysis = FileAnalyzer::new(&import_session).analyze_diagnostics_only(
+        let main_analysis = FileAnalyzer::new(&mut import_session).analyze_diagnostics_only(
             main_file.clone(),
             main_src,
             &main_parsed.program,
@@ -1421,7 +1425,7 @@ function read_box(Box $box): int {
     fn perf_report_edit_locality_micro() {
         crate::metrics::test_reset();
 
-        let session = AnalysisSession::new(PhpVersion::LATEST);
+        let mut session = AnalysisSession::new(PhpVersion::LATEST);
         let base_file: Arc<str> = Arc::from("/proj/edit/Base.php");
         let dep_a_file: Arc<str> = Arc::from("/proj/edit/DepA.php");
         let dep_b_file: Arc<str> = Arc::from("/proj/edit/DepB.php");
@@ -1458,19 +1462,19 @@ function leaf_value(int $n): int { return $n + 1; }
         assert!(dep_b_parsed.errors.is_empty());
         assert!(leaf_parsed.errors.is_empty());
 
-        let _ = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        let _ = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
             dep_a_file.clone(),
             dep_a_src,
             &dep_a_parsed.program,
             &dep_a_parsed.source_map,
         );
-        let _ = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        let _ = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
             dep_b_file.clone(),
             dep_b_src,
             &dep_b_parsed.program,
             &dep_b_parsed.source_map,
         );
-        let _ = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        let _ = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
             leaf_file.clone(),
             leaf_src,
             &leaf_parsed.program,

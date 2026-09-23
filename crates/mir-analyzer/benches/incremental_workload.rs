@@ -21,6 +21,7 @@ use mir_analyzer::{
     PhpVersion,
 };
 use mir_types::Name as MirSymbol;
+#[cfg(any())]
 use salsa::Cancelled;
 use tempfile::TempDir;
 
@@ -96,7 +97,7 @@ fn warm_project_analyzer(
     vendor_files: &[PathBuf],
     project_files: &[PathBuf],
 ) -> AnalysisSession {
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
     analyzer.ensure_all_stubs();
     analyzer.collect_definitions(vendor_files);
     let _ = analyzer.analyze_paths(project_files, &BatchOptions::new().without_symbols());
@@ -124,7 +125,7 @@ fn warm_session(
         PhpVersion::LATEST.cache_byte(),
         0,
     ));
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache(cache);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache(cache);
     session.ensure_all_stubs();
     // Vendor files: HIGH durability (stable within session).
     let vendor_pairs: Vec<(Arc<str>, Arc<str>)> = vendor_files
@@ -183,7 +184,7 @@ fn bench_single_file_edit(c: &mut Criterion) {
     // ----- A) ProjectAnalyzer::re_analyze_file -----
     {
         let cache: TempDir = tempfile::tempdir().unwrap();
-        let analyzer = warm_project_analyzer(&cache, &vendor_files, &project_files);
+        let mut analyzer = warm_project_analyzer(&cache, &vendor_files, &project_files);
         let mut counter = 0u32;
 
         group.bench_function("project_analyzer", |b| {
@@ -207,7 +208,7 @@ fn bench_single_file_edit(c: &mut Criterion) {
     // ----- B) AnalysisSession + FileAnalyzer (single-pass, no inference sweep) -----
     {
         let cache: TempDir = tempfile::tempdir().unwrap();
-        let session = warm_session(&cache, &vendor_files, &project_files);
+        let mut session = warm_session(&cache, &vendor_files, &project_files);
         let target_arc: Arc<str> = Arc::from(target_str.as_str());
         let mut counter = 0u32;
 
@@ -234,7 +235,7 @@ fn bench_single_file_edit(c: &mut Criterion) {
                         "bench source must parse (hard errors: {})",
                         hard_errors.len()
                     );
-                    FileAnalyzer::new(&session).analyze_diagnostics_only(
+                    FileAnalyzer::new(&mut session).analyze_diagnostics_only(
                         target_arc.clone(),
                         new_content.as_ref(),
                         &parsed.program,
@@ -286,7 +287,7 @@ fn bench_high_fanout_edit(c: &mut Criterion) {
 
     {
         let cache: TempDir = tempfile::tempdir().unwrap();
-        let analyzer = warm_project_analyzer(&cache, &vendor_files, &project_files);
+        let mut analyzer = warm_project_analyzer(&cache, &vendor_files, &project_files);
         let mut counter = 0u32;
 
         group.bench_function("project_analyzer", |b| {
@@ -309,7 +310,7 @@ fn bench_high_fanout_edit(c: &mut Criterion) {
 
     {
         let cache: TempDir = tempfile::tempdir().unwrap();
-        let session = warm_session(&cache, &vendor_files, &project_files);
+        let mut session = warm_session(&cache, &vendor_files, &project_files);
         let target_arc: Arc<str> = Arc::from(target_str.as_str());
         let mut counter = 0u32;
 
@@ -335,7 +336,7 @@ fn bench_high_fanout_edit(c: &mut Criterion) {
                         "bench source must parse (hard errors: {})",
                         hard_errors.len()
                     );
-                    FileAnalyzer::new(&session).analyze_diagnostics_only(
+                    FileAnalyzer::new(&mut session).analyze_diagnostics_only(
                         target_arc.clone(),
                         new_content.as_ref(),
                         &parsed.program,
@@ -370,7 +371,7 @@ fn bench_read_query_latency(c: &mut Criterion) {
 
     let (vendor_files, project_files) = split_vendor_project(fixture.root());
     let cache: TempDir = tempfile::tempdir().unwrap();
-    let analyzer = warm_project_analyzer(&cache, &vendor_files, &project_files);
+    let mut analyzer = warm_project_analyzer(&cache, &vendor_files, &project_files);
 
     let mut group = c.benchmark_group("read_query");
     group.sample_size(50);
@@ -408,7 +409,7 @@ fn bench_stub_loading(c: &mut Criterion) {
 
     group.bench_function("essential_only", |b| {
         b.iter(|| {
-            let session = AnalysisSession::new(PhpVersion::LATEST);
+            let mut session = AnalysisSession::new(PhpVersion::LATEST);
             session.ensure_all_stubs();
             session.loaded_stub_count()
         });
@@ -416,7 +417,7 @@ fn bench_stub_loading(c: &mut Criterion) {
 
     group.bench_function("all_stubs", |b| {
         b.iter(|| {
-            let session = AnalysisSession::new(PhpVersion::LATEST);
+            let mut session = AnalysisSession::new(PhpVersion::LATEST);
             session.ensure_all_stubs();
             session.loaded_stub_count()
         });
@@ -427,7 +428,7 @@ fn bench_stub_loading(c: &mut Criterion) {
     // full load.
     group.bench_function("essential_plus_a_few_lazy", |b| {
         b.iter(|| {
-            let session = AnalysisSession::new(PhpVersion::LATEST);
+            let mut session = AnalysisSession::new(PhpVersion::LATEST);
             session.ensure_all_stubs();
             let _ = session.ensure_stub_for_function("imagecreate"); // gd
             let _ = session.ensure_stub_for_function("openssl_encrypt"); // openssl
@@ -442,13 +443,11 @@ fn bench_stub_loading(c: &mut Criterion) {
 
 /// Concurrent-read workload: N reader threads do `definition_of` lookups in
 /// a tight loop while one writer thread re-ingests Login.php at editor-typing
-/// cadence. Validates the central architectural claim that
-/// `AnalysisSession::snapshot_db` lets readers proceed without blocking on
-/// the writer's brief lock.
-///
-/// Reports per-iteration wall time for a fixed batch of reads across all
-/// reader threads. Lower is better; flat scaling with reader count means
-/// the lock discipline is working.
+/// cadence. Lower is better; flat scaling with reader count means snapshot
+/// readers don't block on the writer.
+// Disabled: shares a mutating `AnalysisSession` across threads, which the
+// single-owner model forbids; needs a rewrite against a write actor.
+#[cfg(any())]
 fn bench_concurrent_read_under_edits(c: &mut Criterion) {
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::thread;
@@ -594,7 +593,7 @@ fn bench_lsp_cold_start_warm_cache(_c: &mut Criterion) {
         .collect();
 
     let measure = |label: &str| -> Duration {
-        let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+        let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
         session.ensure_all_stubs();
         let start = std::time::Instant::now();
         for (file, src) in &sources {
@@ -651,7 +650,7 @@ fn bench_file_analyzer_cache_hit(c: &mut Criterion) {
     let original = std::fs::read_to_string(&target).unwrap();
 
     let cache: TempDir = tempfile::tempdir().unwrap();
-    let session = warm_session(&cache, &vendor_files, &project_files);
+    let mut session = warm_session(&cache, &vendor_files, &project_files);
     let target_arc: Arc<str> = Arc::from(target_str.as_str());
     let source_arc: Arc<str> = Arc::from(original.as_str());
 
@@ -661,7 +660,7 @@ fn bench_file_analyzer_cache_hit(c: &mut Criterion) {
     session.ingest_file(target_arc.clone(), source_arc.clone());
 
     let parsed = php_rs_parser::parse(source_arc.as_ref());
-    let _ = FileAnalyzer::new(&session).analyze_diagnostics_only(
+    let _ = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         target_arc.clone(),
         source_arc.as_ref(),
         &parsed.program,
@@ -686,7 +685,7 @@ fn bench_file_analyzer_cache_hit(c: &mut Criterion) {
                 // contract, so measure it as part of the iteration body.
 
                 let parsed = php_rs_parser::parse(source_arc.as_ref());
-                FileAnalyzer::new(&session).analyze_diagnostics_only(
+                FileAnalyzer::new(&mut session).analyze_diagnostics_only(
                     target_arc.clone(),
                     source_arc.as_ref(),
                     &parsed.program,
@@ -717,13 +716,13 @@ function run(Dep $dep): int {
     cold_group.bench_function("first_diagnostics", |b| {
         b.iter_batched(
             || {
-                let session = AnalysisSession::new(PhpVersion::LATEST);
+                let mut session = AnalysisSession::new(PhpVersion::LATEST);
                 session.ingest_file(file.clone(), Arc::from(src));
                 let parsed = php_rs_parser::parse(src);
                 (session, parsed)
             },
-            |(session, parsed)| {
-                let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+            |(mut session, parsed)| {
+                let analysis = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
                     file.clone(),
                     src,
                     &parsed.program,
@@ -746,10 +745,10 @@ function run(Dep $dep): int {
     });
     cold_group.finish();
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ingest_file(file.clone(), Arc::from(src));
     let parsed = php_rs_parser::parse(src);
-    let first = FileAnalyzer::new(&session).analyze_diagnostics_only(
+    let first = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         file.clone(),
         src,
         &parsed.program,
@@ -763,7 +762,7 @@ function run(Dep $dep): int {
     warm_group.measurement_time(Duration::from_secs(10));
     warm_group.bench_function("repeat_diagnostics", |b| {
         b.iter(|| {
-            let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+            let analysis = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
                 file.clone(),
                 src,
                 &parsed.program,
@@ -799,10 +798,10 @@ function caller(): int { return helper(41); }
     cold_group.bench_function("first_name", |b| {
         b.iter_batched(
             || {
-                let session = AnalysisSession::new(PhpVersion::LATEST);
+                let mut session = AnalysisSession::new(PhpVersion::LATEST);
                 session.ingest_file(file.clone(), Arc::from(src));
                 let parsed = php_rs_parser::parse(src);
-                let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+                let analysis = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
                     file.clone(),
                     src,
                     &parsed.program,
@@ -814,7 +813,7 @@ function caller(): int { return helper(41); }
                 );
                 session
             },
-            |session| {
+            |mut session| {
                 let name = session
                     .name_at(file.as_ref(), offset)
                     .expect("name_at should find helper call");
@@ -825,10 +824,10 @@ function caller(): int { return helper(41); }
     });
     cold_group.finish();
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ingest_file(file.clone(), Arc::from(src));
     let parsed = php_rs_parser::parse(src);
-    let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+    let analysis = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         file.clone(),
         src,
         &parsed.program,
@@ -865,10 +864,10 @@ function caller(): int { return helper(41); }
     cold_group.bench_function("first_resolve", |b| {
         b.iter_batched(
             || {
-                let session = AnalysisSession::new(PhpVersion::LATEST);
+                let mut session = AnalysisSession::new(PhpVersion::LATEST);
                 session.ingest_file(file.clone(), Arc::from(src));
                 let parsed = php_rs_parser::parse(src);
-                let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+                let analysis = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
                     file.clone(),
                     src,
                     &parsed.program,
@@ -880,7 +879,7 @@ function caller(): int { return helper(41); }
                 );
                 session
             },
-            |session| {
+            |mut session| {
                 session
                     .resolve_at(file.as_ref(), offset)
                     .expect("resolve_at should find helper call")
@@ -890,10 +889,10 @@ function caller(): int { return helper(41); }
     });
     cold_group.finish();
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ingest_file(file.clone(), Arc::from(src));
     let parsed = php_rs_parser::parse(src);
-    let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+    let analysis = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         file.clone(),
         src,
         &parsed.program,
@@ -929,10 +928,10 @@ function caller(): int { return helper(41); }
     cold_group.bench_function("first_hover", |b| {
         b.iter_batched(
             || {
-                let session = AnalysisSession::new(PhpVersion::LATEST);
+                let mut session = AnalysisSession::new(PhpVersion::LATEST);
                 session.ingest_file(file.clone(), Arc::from(src));
                 let parsed = php_rs_parser::parse(src);
-                let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+                let analysis = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
                     file.clone(),
                     src,
                     &parsed.program,
@@ -944,7 +943,7 @@ function caller(): int { return helper(41); }
                 );
                 session
             },
-            |session| {
+            |mut session| {
                 session
                     .hover_at(file.as_ref(), offset)
                     .expect("hover_at should find helper call")
@@ -954,10 +953,10 @@ function caller(): int { return helper(41); }
     });
     cold_group.finish();
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ingest_file(file.clone(), Arc::from(src));
     let parsed = php_rs_parser::parse(src);
-    let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+    let analysis = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         file.clone(),
         src,
         &parsed.program,
@@ -993,10 +992,10 @@ function caller(): int { return helper(41); }
     cold_group.bench_function("first_definition", |b| {
         b.iter_batched(
             || {
-                let session = AnalysisSession::new(PhpVersion::LATEST);
+                let mut session = AnalysisSession::new(PhpVersion::LATEST);
                 session.ingest_file(file.clone(), Arc::from(src));
                 let parsed = php_rs_parser::parse(src);
-                let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+                let analysis = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
                     file.clone(),
                     src,
                     &parsed.program,
@@ -1008,7 +1007,7 @@ function caller(): int { return helper(41); }
                 );
                 session
             },
-            |session| {
+            |mut session| {
                 let definition = session
                     .definition_at(file.as_ref(), offset)
                     .expect("definition_at should find helper call");
@@ -1019,10 +1018,10 @@ function caller(): int { return helper(41); }
     });
     cold_group.finish();
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ingest_file(file.clone(), Arc::from(src));
     let parsed = php_rs_parser::parse(src);
-    let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+    let analysis = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         file.clone(),
         src,
         &parsed.program,
@@ -1058,10 +1057,10 @@ function helper(int $value): int { return $value + 1; }
     cold_group.bench_function("first_variable", |b| {
         b.iter_batched(
             || {
-                let session = AnalysisSession::new(PhpVersion::LATEST);
+                let mut session = AnalysisSession::new(PhpVersion::LATEST);
                 session.ingest_file(file.clone(), Arc::from(src));
                 let parsed = php_rs_parser::parse(src);
-                let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+                let analysis = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
                     file.clone(),
                     src,
                     &parsed.program,
@@ -1070,7 +1069,7 @@ function helper(int $value): int { return $value + 1; }
                 assert!(analysis.symbols.is_empty());
                 session
             },
-            |session| {
+            |mut session| {
                 let sym = session
                     .resolve_at(file.as_ref(), offset)
                     .expect("resolve_at should find $value");
@@ -1084,10 +1083,10 @@ function helper(int $value): int { return $value + 1; }
     });
     cold_group.finish();
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ingest_file(file.clone(), Arc::from(src));
     let parsed = php_rs_parser::parse(src);
-    let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+    let analysis = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         file.clone(),
         src,
         &parsed.program,
@@ -1127,10 +1126,10 @@ function read(Box $box): void { $box->value; }
     cold_group.bench_function("first_receiver_gap", |b| {
         b.iter_batched(
             || {
-                let session = AnalysisSession::new(PhpVersion::LATEST);
+                let mut session = AnalysisSession::new(PhpVersion::LATEST);
                 session.ingest_file(file.clone(), Arc::from(src));
                 let parsed = php_rs_parser::parse(src);
-                let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+                let analysis = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
                     file.clone(),
                     src,
                     &parsed.program,
@@ -1139,7 +1138,7 @@ function read(Box $box): void { $box->value; }
                 assert!(analysis.symbols.is_empty());
                 session
             },
-            |session| {
+            |mut session| {
                 let sym = session
                     .resolve_at(file.as_ref(), offset)
                     .expect("resolve_at should find the receiver gap");
@@ -1150,10 +1149,10 @@ function read(Box $box): void { $box->value; }
     });
     cold_group.finish();
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ingest_file(file.clone(), Arc::from(src));
     let parsed = php_rs_parser::parse(src);
-    let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+    let analysis = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         file.clone(),
         src,
         &parsed.program,
@@ -1191,10 +1190,10 @@ function caller(): int { return helper(41); }
     cold_group.bench_function("first_references", |b| {
         b.iter_batched(
             || {
-                let session = AnalysisSession::new(PhpVersion::LATEST);
+                let mut session = AnalysisSession::new(PhpVersion::LATEST);
                 session.ingest_file(file.clone(), Arc::from(src));
                 let parsed = php_rs_parser::parse(src);
-                let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+                let analysis = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
                     file.clone(),
                     src,
                     &parsed.program,
@@ -1206,7 +1205,7 @@ function caller(): int { return helper(41); }
                 );
                 session
             },
-            |session| {
+            |mut session| {
                 let refs = session
                     .references_at(
                         file.as_ref(),
@@ -1226,10 +1225,10 @@ function caller(): int { return helper(41); }
     });
     cold_group.finish();
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ingest_file(file.clone(), Arc::from(src));
     let parsed = php_rs_parser::parse(src);
-    let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+    let analysis = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         file.clone(),
         src,
         &parsed.program,
@@ -1280,7 +1279,7 @@ fn bench_file_analyzer_memory_probe(_c: &mut Criterion) {
     }
     let (vendor_files, project_files) = split_vendor_project(fixture.root());
     let cache: TempDir = tempfile::tempdir().unwrap();
-    let session = warm_session(&cache, &vendor_files, &project_files);
+    let mut session = warm_session(&cache, &vendor_files, &project_files);
 
     // Pre-load all project sources to remove I/O variance from the timed loop.
     let sources: Vec<(Arc<str>, Arc<str>)> = project_files
@@ -1313,7 +1312,7 @@ fn bench_file_analyzer_memory_probe(_c: &mut Criterion) {
         if !parsed.errors.is_empty() {
             continue;
         }
-        let _ = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        let _ = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
             file.clone(),
             source.as_ref(),
             &parsed.program,
@@ -1356,7 +1355,6 @@ criterion_group!(
     bench_file_analyzer_memory_probe,
     bench_read_query_latency,
     bench_stub_loading,
-    bench_concurrent_read_under_edits,
     bench_lsp_cold_start_warm_cache,
 );
 criterion_main!(benches);

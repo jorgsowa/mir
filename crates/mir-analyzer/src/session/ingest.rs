@@ -96,18 +96,6 @@ impl AnalysisSession {
         self.db.snapshot_db()
     }
 
-    /// Cancellable counterpart to [`Self::snapshot_db`].
-    ///
-    /// This is deliberately internal: public read APIs retain their usual
-    /// blocking semantics, while background work with an `IndexCancel` can
-    /// abandon a lock wait when a workspace writer is pending.
-    pub(crate) fn snapshot_db_cancellable(
-        &self,
-        should_cancel: &(dyn Fn() -> bool + Sync),
-    ) -> Option<MirDbStorage> {
-        self.db.snapshot_db_cancellable(should_cancel)
-    }
-
     /// Register or update a [`crate::db::SourceFile`] salsa input and return its
     /// handle, without running definition collection or reference recording.
     ///
@@ -118,17 +106,17 @@ impl AnalysisSession {
     /// **Internal API — exposes Salsa types.** Subject to change without notice.
     #[doc(hidden)]
     pub fn upsert_source_file(
-        &self,
+        &mut self,
         path: Arc<str>,
         text: Arc<str>,
         durability: salsa::Durability,
     ) -> crate::db::SourceFile {
         self.clear_transient_batch_replay();
         let (sf, changed, was_registered, had_index) = {
-            let mut guard = self.db.salsa.write();
+            let guard = &mut self.db.salsa;
             let had_index = guard.workspace_symbol_index_singleton().is_some();
             let existing = guard.lookup_source_file(path.as_ref());
-            let changed = existing.is_none_or(|sf| sf.text(&**guard).as_ref() != text.as_ref());
+            let changed = existing.is_none_or(|sf| sf.text(&*guard).as_ref() != text.as_ref());
             let sf =
                 guard.upsert_source_file_with_durability(path.clone(), text.clone(), durability);
             (sf, changed, existing.is_some(), had_index)
@@ -161,38 +149,30 @@ impl AnalysisSession {
     ///
     /// **Internal API — exposes Salsa types.** Subject to change without notice.
     #[doc(hidden)]
-    pub fn remove_source_file_input(&self, path: &str) {
+    pub fn remove_source_file_input(&mut self, path: &str) {
         self.clear_transient_batch_replay();
         self.db.remove_source_file(path);
     }
 
     /// Run `f` with exclusive `&mut` access to the shared salsa db, for a host
     /// that owns additional salsa ingredients (inputs/tracked fns) on this db
-    /// and needs to create or mutate them. Held under the db write lock, so it
-    /// serialises with all other writers.
+    /// and needs to create or mutate them.
     ///
     /// **Internal API — exposes Salsa types.** Subject to change without notice.
     #[doc(hidden)]
-    pub fn with_db_mut<R>(&self, f: impl FnOnce(&mut MirDbStorage) -> R) -> R {
+    pub fn with_db_mut<R>(&mut self, f: impl FnOnce(&mut MirDbStorage) -> R) -> R {
         self.clear_transient_batch_replay();
-        let mut guard = self.db.salsa.write();
-        f(&mut guard)
+        f(&mut self.db.salsa)
     }
 
-    /// Run `f` with shared access to the canonical (non-snapshot) salsa db,
-    /// under the read lock. For host-owned reads of off-salsa state that must
-    /// observe the live db rather than a clone.
-    ///
-    /// `f` MUST NOT run salsa queries/input reads (tracked fns, `X.field(db)`):
-    /// the shared handle has one `ZalsaLocal` query stack, so doing so races any
-    /// concurrent salsa read on this handle and aborts the process. Use
-    /// [`Self::snapshot_db`] for salsa queries.
+    /// Run `f` with shared access to the canonical (non-snapshot) salsa db.
+    /// For host-owned reads of off-salsa state that must observe the live db
+    /// rather than a clone.
     ///
     /// **Internal API — exposes Salsa types.** Subject to change without notice.
     #[doc(hidden)]
     pub fn with_db_ref<R>(&self, f: impl FnOnce(&MirDbStorage) -> R) -> R {
-        let guard = self.db.salsa.read();
-        f(&guard)
+        f(&self.db.salsa)
     }
 
     /// Replace `file`'s reference postings with `locs` (its complete set from
@@ -210,7 +190,7 @@ impl AnalysisSession {
     ) {
         self.clear_transient_batch_replay();
         {
-            let guard = self.db.salsa.read();
+            let guard = &self.db.salsa;
             let file_no = guard.locked_ref_index().intern_path(file);
             guard.set_file_reference_locations(file_no, locs);
         }
@@ -243,7 +223,7 @@ impl AnalysisSession {
     /// locations are removed first so renames / deletions don't leave stale
     /// state in the codebase. (Without this, long-running sessions would
     /// accumulate dead reference-location entries indefinitely.)
-    pub fn ingest_file(&self, file: Arc<str>, source: Arc<str>) {
+    pub fn ingest_file(&mut self, file: Arc<str>, source: Arc<str>) {
         self.ensure_all_stubs();
         let existing_text = self.snapshot_retry(|db| {
             db.lookup_source_file(file.as_ref())
@@ -281,7 +261,7 @@ impl AnalysisSession {
             .unwrap_or_default();
 
         {
-            let mut guard = self.db.salsa.write();
+            let guard = &mut self.db.salsa;
             guard.remove_file_definitions(file.as_ref());
         }
         let file_defs =
@@ -295,11 +275,8 @@ impl AnalysisSession {
         };
 
         // Derive this file's defined symbols from the `FileDefinitions` just
-        // computed above — do NOT re-read them via a salsa query on the shared
-        // `.salsa.read()` handle. That query (`collect_file_definitions`) borrows
-        // the handle's single `ZalsaLocal` query stack, so two concurrent
-        // `ingest_file` calls doing it would race and abort the process under
-        // debug assertions. Reusing `file_defs` needs no db access at all.
+        // computed above rather than re-reading them via a salsa query —
+        // `file_defs` already has them, so this needs no db access at all.
         let new_symbols: HashSet<Arc<str>> = file_defs.defined_symbols();
         self.last_ingested_symbols
             .write()
@@ -333,7 +310,7 @@ impl AnalysisSession {
             // their freshness passes re-verify. New-file registration bumps
             // on its own — this covers definitions appearing in an
             // already-registered file (edits, `set_file_text` lazy loads).
-            self.db.salsa.write().bump_workspace_revision();
+            self.db.salsa.bump_workspace_revision();
         }
 
         // Structural edges depend only on declaration-shaped data already
@@ -376,7 +353,7 @@ impl AnalysisSession {
         // case (a removed name still declared by another file, where this file
         // owned the winning entry) falls back to a full O(N) rebuild.
         {
-            let mut guard = self.db.salsa.write();
+            let guard = &mut self.db.salsa;
             if guard.workspace_symbol_index_singleton().is_some() {
                 if let Some(sf) = guard.lookup_source_file(file.as_ref()) {
                     if !guard.update_workspace_index_for_file(sf, new_decls.clone()) {
@@ -393,7 +370,7 @@ impl AnalysisSession {
         // so the file's freshness mark is dropped rather than updated.
         {
             let entries = crate::db::subtype_index::entries_from_slice(&file_defs.slice);
-            let guard = self.db.salsa.read();
+            let guard = &self.db.salsa;
             let file_no = guard.locked_ref_index().intern_path(&file);
             guard.set_file_class_edges(file_no, entries);
         }
@@ -411,12 +388,12 @@ impl AnalysisSession {
     /// resolved and lazy-loaded *now*, at write time, instead of serially at
     /// the front of the next references / re-analysis read.
     ///
-    /// This is the host edit-path entry point (rust-analyzer's discipline:
-    /// mutation happens only when text changes; requests are pure reads).
+    /// The host edit-path entry point: mutation happens only when text
+    /// changes; requests are pure reads.
     /// Lazy loads triggered by the warm-up go through plain
     /// [`Self::ingest_file`], so faulting in a dependency never cascades into
     /// preparing *its* dependencies — the load frontier stays one file wide.
-    pub fn ingest_file_prepared(&self, file: Arc<str>, source: Arc<str>) {
+    pub fn ingest_file_prepared(&mut self, file: Arc<str>, source: Arc<str>) {
         self.clear_transient_batch_replay();
         self.ingest_file(file.clone(), source);
         self.prepare_file_for_analysis(&file);
@@ -439,13 +416,13 @@ impl AnalysisSession {
     ///
     /// Clears the negative cache: a previously-unresolvable FQCN may now
     /// resolve if its defining file is among the newly-registered set.
-    pub fn set_file_text(&self, file: Arc<str>, source: Arc<str>) {
+    pub fn set_file_text(&mut self, file: Arc<str>, source: Arc<str>) {
         self.clear_transient_batch_replay();
         let (changed, was_registered, index_was_initialized) = {
-            let mut guard = self.db.salsa.write();
+            let guard = &mut self.db.salsa;
             let index_was_initialized = guard.workspace_symbol_index_singleton().is_some();
             let existing = guard.lookup_source_file(file.as_ref());
-            let changed = existing.is_none_or(|sf| sf.text(&**guard).as_ref() != source.as_ref());
+            let changed = existing.is_none_or(|sf| sf.text(&*guard).as_ref() != source.as_ref());
             guard.upsert_source_file(file.clone(), source.clone());
             (changed, existing.is_some(), index_was_initialized)
         };
@@ -478,27 +455,25 @@ impl AnalysisSession {
     /// `workspace_symbol_index` re-verification cost to O(project files only).
     ///
     /// Definition collection runs lazily on first symbol access; no parsing at call time.
-    pub fn set_vendor_files<I>(&self, files: I)
+    pub fn set_vendor_files<I>(&mut self, files: I)
     where
         I: IntoIterator<Item = (Arc<str>, Arc<str>)>,
     {
         self.clear_transient_batch_replay();
         self.clear_dependency_graph_cache();
-        // One revision bump for the batch, not one per registered file. The
-        // scope must close after the guard drops (the flush takes the lock).
-        let _deferred_bumps = self.defer_revision_bumps();
-        let mut guard = self.db.salsa.write();
+        // One revision bump for the batch, not one per registered file.
+        let mut session = self.defer_revision_bumps();
+        let guard = &mut session.db.salsa;
         let index_was_initialized = guard.workspace_symbol_index_singleton().is_some();
         let mut changed_inputs = Vec::new();
         for (file, source) in files {
             let existing = guard.lookup_source_file(file.as_ref());
-            if existing.is_none_or(|sf| sf.text(&**guard).as_ref() != source.as_ref()) {
+            if existing.is_none_or(|sf| sf.text(&*guard).as_ref() != source.as_ref()) {
                 changed_inputs.push((file.clone(), source.clone(), existing.is_some()));
             }
             guard.upsert_source_file_with_durability(file, source, salsa::Durability::HIGH);
         }
-        drop(guard);
-        if let Some(cache) = self.cache.as_deref() {
+        if let Some(cache) = session.cache.as_deref() {
             let paths: Vec<String> = changed_inputs
                 .iter()
                 .filter(|(file, source, existed)| *existed || !cache.matches_content(file, source))
@@ -523,12 +498,12 @@ impl AnalysisSession {
     /// Call this once after all vendor + stub + project files have been
     /// ingested (end of workspace warm-up). Also called automatically by
     /// [`Self::ingest_file`] when a file's declared names change.
-    pub fn rebuild_workspace_symbol_index(&self) {
-        self.db.salsa.write().rebuild_workspace_symbol_index();
+    pub fn rebuild_workspace_symbol_index(&mut self) {
+        self.db.salsa.rebuild_workspace_symbol_index();
     }
 
-    /// Bulk variant of [`Self::set_file_text`]. Acquires the salsa write lock
-    /// once for the entire batch instead of once per file.
+    /// Bulk variant of [`Self::set_file_text`], with one revision bump for the
+    /// whole batch.
     ///
     /// The intended LSP scan loop is:
     /// ```text
@@ -540,21 +515,21 @@ impl AnalysisSession {
     /// After this call, every file's source text is known to salsa. No
     /// parsing has happened yet — Definition collection runs per file on the first
     /// `load_class` that needs to consult it.
-    pub fn set_workspace_files<I>(&self, files: I)
+    pub fn set_workspace_files<I>(&mut self, files: I)
     where
         I: IntoIterator<Item = (Arc<str>, Arc<str>)>,
     {
         self.clear_dependency_graph_cache();
         // One revision bump for the batch, not one per registered file.
-        let _deferred_bumps = self.defer_revision_bumps();
-        let index_was_initialized = self.workspace_symbol_index_ready();
+        let mut session = self.defer_revision_bumps();
+        let index_was_initialized = session.workspace_symbol_index_ready();
         let (registered_paths, changed_inputs): (Vec<Arc<str>>, Vec<ChangedInput>) = {
-            let mut guard = self.db.salsa.write();
+            let guard = &mut session.db.salsa;
             let mut registered = Vec::new();
             let mut changed = Vec::new();
             for (file, source) in files {
                 let existing = guard.lookup_source_file(file.as_ref());
-                if existing.is_none_or(|sf| sf.text(&**guard).as_ref() != source.as_ref()) {
+                if existing.is_none_or(|sf| sf.text(&*guard).as_ref() != source.as_ref()) {
                     changed.push((file.clone(), source.clone(), existing.is_some()));
                 }
                 guard.upsert_source_file(file.clone(), source);
@@ -562,7 +537,7 @@ impl AnalysisSession {
             }
             (registered, changed)
         };
-        if let Some(cache) = self.cache.as_deref() {
+        if let Some(cache) = session.cache.as_deref() {
             let paths: Vec<String> = changed_inputs
                 .iter()
                 .filter(|(file, source, existed)| *existed || !cache.matches_content(file, source))
@@ -573,18 +548,17 @@ impl AnalysisSession {
                 cache.evict_unresolved();
             }
         }
-        if !registered_paths.is_empty() && self.resolver.is_some() {
-            self.evict_unresolvable_for_files(&registered_paths);
+        if !registered_paths.is_empty() && session.resolver.is_some() {
+            session.evict_unresolvable_for_files(&registered_paths);
         }
     }
 
-    /// The workspace generation epoch — the rust-analyzer-style "are we up to
-    /// date" counter. Bumped whenever a file is added or removed. A consumer
+    /// The workspace generation epoch ("are we up to date" counter). Bumped whenever a file is added or removed. A consumer
     /// records this alongside the diagnostics it publishes for a file; when the
     /// value later advances (background indexing registered more files), those
     /// files become candidates for re-analysis + re-publish.
     pub fn index_generation(&self) -> u64 {
-        self.db.salsa.read().workspace_revision_value()
+        self.db.salsa.workspace_revision_value()
     }
 
     /// The text-write epoch — salsa's own global revision, which bumps on
@@ -599,7 +573,7 @@ impl AnalysisSession {
     /// doc comment for why this must be salsa's own revision rather than a
     /// hand-rolled counter.
     pub fn text_revision(&self) -> salsa::Revision {
-        self.db.salsa.read().current_revision()
+        self.db.salsa.current_revision()
     }
 
     /// The combined generation the session's memo caches key on: salsa's
@@ -609,7 +583,7 @@ impl AnalysisSession {
     /// admitting a file the reference gate skipped), which change a member
     /// query's hierarchy fan-out without any text write.
     pub(crate) fn query_cache_generation(&self) -> (salsa::Revision, u64) {
-        let guard = self.db.salsa.read();
+        let guard = &self.db.salsa;
         (guard.current_revision(), guard.subtype_edges_epoch())
     }
 
@@ -636,18 +610,12 @@ impl AnalysisSession {
     /// the first call cheap. Call [`Self::finalize_index`] once after the last
     /// chunk to reconcile authoritatively.
     ///
-    /// **Responsiveness:** parsing / declaration collection happens off the
-    /// salsa write lock (on a snapshot); only the cheap symbol-map merge runs
-    /// under the lock, so the write window per chunk is short and an interactive
-    /// read on another thread blocks at most that long. Note that, per salsa's
-    /// snapshot model, a *cancellable query* in flight on another thread (e.g.
-    /// `hover`, `definition_of`, `FileAnalyzer::analyze_diagnostics_only`) when this batch takes
-    /// the write lock may unwind with `salsa::Cancelled`; a multi-threaded
-    /// consumer should catch that and retry the request (the rust-analyzer
-    /// pattern). A single-threaded consumer that interleaves requests *between*
-    /// `index_batch` calls never observes cancellation.
+    /// **Responsiveness:** parsing runs on a snapshot; only the cheap
+    /// symbol-map merge writes salsa. Queries running on other threads'
+    /// snapshots during that write may unwind with `salsa::Cancelled` and
+    /// should be retried.
     pub fn index_batch(
-        &self,
+        &mut self,
         files: &[(Arc<str>, Arc<str>)],
         parallelism: crate::IndexParallelism,
         cancel: &crate::IndexCancel,
@@ -662,20 +630,18 @@ impl AnalysisSession {
         self.ensure_all_stubs();
         self.clear_dependency_graph_cache();
 
-        // 1. Register the chunk as HIGH-durability inputs — one short write
-        //    window, then release the lock so interactive requests interleave.
-        //    One revision bump for the chunk, not one per new file: each bump
-        //    is an input write that cancels in-flight readers.
+        // 1. Register the chunk as HIGH-durability inputs, with one revision
+        //    bump for the chunk rather than one per new file.
         let (sources, changed_inputs, had_index): IndexedSources = {
-            let _deferred_bumps = self.defer_revision_bumps();
-            let mut guard = self.db.salsa.write();
+            let mut session = self.defer_revision_bumps();
+            let guard = &mut session.db.salsa;
             let had_index = guard.workspace_symbol_index_singleton().is_some();
             let mut changed_inputs = Vec::new();
             let sources = files
                 .iter()
                 .map(|(file, source)| {
                     let existing = guard.lookup_source_file(file.as_ref());
-                    if existing.is_none_or(|sf| sf.text(&**guard).as_ref() != source.as_ref()) {
+                    if existing.is_none_or(|sf| sf.text(&*guard).as_ref() != source.as_ref()) {
                         changed_inputs.push((file.clone(), source.clone(), existing.is_some()));
                     }
                     guard.upsert_source_file_with_durability(
@@ -711,12 +677,7 @@ impl AnalysisSession {
         // Is this the seed chunk (no singleton yet)? If so we must collect decls
         // for the whole currently-registered set (stubs + this chunk); otherwise
         // just this chunk.
-        let seed = self
-            .db
-            .salsa
-            .read()
-            .workspace_symbol_index_singleton()
-            .is_none();
+        let seed = self.db.salsa.workspace_symbol_index_singleton().is_none();
         let snap = self.db.snapshot_db();
         let to_collect: Vec<crate::db::SourceFile> = if seed {
             snap.all_source_files()
@@ -724,10 +685,8 @@ impl AnalysisSession {
             sources.clone()
         };
 
-        // 2. Collect per-file declarations OFF the write lock (on a snapshot).
-        //    This is where parsing happens — crucially NOT while holding the
-        //    write lock, so concurrent interactive reads are not blocked for the
-        //    parse duration. Also primes the shared parse/disk caches.
+        // 2. Collect per-file declarations on a snapshot (this is where parsing
+        //    happens); also primes the shared parse/disk caches.
         let collect_one = |db: &crate::db::MirDbStorage, sf: crate::db::SourceFile| {
             (sf, crate::db::collect_file_declarations(db, sf).clone())
         };
@@ -757,14 +716,14 @@ impl AnalysisSession {
         // 3. Apply to the singleton under a SHORT write window — only cheap map
         //    construction / merge runs here (no parse).
         let (declarations_changed, displaced_owners) = {
-            let mut guard = self.db.salsa.write();
+            let guard = &mut self.db.salsa;
             let declarations_changed = decls
                 .iter()
                 .any(|(sf, decls)| !guard.file_declarations_match(*sf, decls));
             let old_index = if declarations_changed && self.cache.is_some() {
                 guard
                     .workspace_symbol_index_singleton()
-                    .map(|singleton| singleton.index(&**guard).clone())
+                    .map(|singleton| singleton.index(&*guard).clone())
             } else {
                 None
             };
@@ -776,7 +735,7 @@ impl AnalysisSession {
             }
             let displaced_owners = old_index
                 .zip(candidates)
-                .map(|(old, candidates)| displaced_cache_owners(&guard, &old, &candidates))
+                .map(|(old, candidates)| displaced_cache_owners(guard, &old, &candidates))
                 .unwrap_or_default();
             (declarations_changed, displaced_owners)
         };
@@ -799,8 +758,8 @@ impl AnalysisSession {
     /// warm-up) to reconcile the incrementally-merged index against the full
     /// registered set. Cheap after indexing — every file's declarations are
     /// already cached.
-    pub fn finalize_index(&self) {
-        self.db.salsa.write().rebuild_workspace_symbol_index();
+    pub fn finalize_index(&mut self) {
+        self.db.salsa.rebuild_workspace_symbol_index();
     }
 
     /// Replay disk-cached reference-location postings and subtype-index class
@@ -851,7 +810,7 @@ impl AnalysisSession {
     /// This only relocates cost that would otherwise land on a user-facing
     /// query — it cannot eliminate the freshness check itself, since an
     /// unresolved posting is workspace-generation-sensitive by design.
-    pub fn warm_start_files(&self, files: &[(Arc<str>, Arc<str>)]) -> Vec<Arc<str>> {
+    pub fn warm_start_files(&mut self, files: &[(Arc<str>, Arc<str>)]) -> Vec<Arc<str>> {
         let Some(cache) = self.cache.clone() else {
             return Vec::new();
         };
@@ -867,7 +826,7 @@ impl AnalysisSession {
         self.ensure_all_stubs();
 
         {
-            let mut guard = self.db.salsa.write();
+            let guard = &mut self.db.salsa;
             for (file, text) in files {
                 guard.upsert_source_file_with_durability(
                     file.clone(),
@@ -951,7 +910,7 @@ impl AnalysisSession {
         let mut structural_target_files: Vec<Arc<str>> = Vec::new();
         let mut dependency_graph_changed = false;
         {
-            let guard = self.db.salsa.read();
+            let guard = &self.db.salsa;
             for hit in hits {
                 let WarmStartHit {
                     file,
@@ -1009,7 +968,7 @@ impl AnalysisSession {
     /// seed is skipped entirely when the gap is large (a first-ever boot,
     /// where the parse bill belongs to the background sweep, not startup).
     fn seed_workspace_index_from_warm_start(
-        &self,
+        &mut self,
         covered: Vec<(crate::db::SourceFile, crate::db::FileDeclarations)>,
     ) {
         use rustc_hash::FxHashSet;
@@ -1036,8 +995,8 @@ impl AnalysisSession {
             return;
         }
 
-        // Parse/collect the gap off the write lock, in parallel, on one
-        // snapshot — the `index_batch` pattern. `collect_file_declarations`
+        // Parse/collect the gap in parallel on one snapshot, as `index_batch`
+        // does. `collect_file_declarations`
         // is disk-slice-accelerated itself, so "missing" here often means a
         // cheap deserialization rather than a parse.
         let gap_decls: Vec<(crate::db::SourceFile, crate::db::FileDeclarations)> = {
@@ -1054,7 +1013,7 @@ impl AnalysisSession {
         let mut decls = covered;
         decls.extend(gap_decls);
 
-        let mut guard = self.db.salsa.write();
+        let guard = &mut self.db.salsa;
         if guard.workspace_symbol_index_singleton().is_none() {
             guard.build_workspace_index_from_decls(decls);
         } else {
@@ -1073,9 +1032,9 @@ impl AnalysisSession {
     /// `ingest_file`'s incremental index maintenance; those files accumulate
     /// in a pending set while a singleton exists. Query entry points call
     /// this first so the singleton is never consulted stale. Declaration
-    /// memos are pre-warmed on a snapshot (parallel, off the write lock);
-    /// the per-file merge under the lock is then a memo hit.
-    pub fn settle_workspace_index(&self) {
+    /// memos are pre-warmed on a snapshot in parallel, so the per-file merge
+    /// is a memo hit.
+    pub fn settle_workspace_index(&mut self) {
         let _ = self.settle_workspace_index_cancellable(&|| false);
     }
 
@@ -1083,7 +1042,7 @@ impl AnalysisSession {
     /// when the caller's request was cancelled before the pending index work
     /// could be reconciled.
     pub(crate) fn settle_workspace_index_cancellable(
-        &self,
+        &mut self,
         should_cancel: &(dyn Fn() -> bool + Sync),
     ) -> bool {
         // Bounded rounds: without a cap, a caller with no cancellation token would never return while a host keeps mirroring buffers.
@@ -1093,11 +1052,11 @@ impl AnalysisSession {
                 return true;
             }
             rounds_left -= 1;
-            // Scoped to this block: the handle must not still be live when the merge below takes the db write lock.
             let pending = {
-                let Some(db) = self.snapshot_db_cancellable(should_cancel) else {
+                if should_cancel() {
                     return false;
-                };
+                }
+                let db = self.snapshot_db();
                 if db.index_pending_is_empty() {
                     return true;
                 }
@@ -1139,14 +1098,14 @@ impl AnalysisSession {
             if should_cancel() {
                 return false;
             }
-            let mut guard = self.db.salsa.write();
+            let guard = &mut self.db.salsa;
             let declarations_changed = decls
                 .iter()
                 .any(|(sf, decls)| !guard.file_declarations_match(*sf, decls));
             let old_index = if declarations_changed && self.cache.is_some() {
                 guard
                     .workspace_symbol_index_singleton()
-                    .map(|singleton| singleton.index(&**guard).clone())
+                    .map(|singleton| singleton.index(&*guard).clone())
             } else {
                 None
             };
@@ -1154,7 +1113,7 @@ impl AnalysisSession {
             // `update_workspace_index_for_file` clones the singleton maps per
             // call; for a bulk arrival (branch switch) one full rebuild — memo
             // validations plus a single map build, since the decls were just
-            // pre-warmed above — beats N clones under the write lock.
+            // pre-warmed above — beats N clones.
             if decls.len() > 32 {
                 guard.rebuild_workspace_symbol_index();
             } else {
@@ -1166,9 +1125,8 @@ impl AnalysisSession {
             }
             let displaced_owners = old_index
                 .zip(candidates)
-                .map(|(old, candidates)| displaced_cache_owners(&guard, &old, &candidates))
+                .map(|(old, candidates)| displaced_cache_owners(guard, &old, &candidates))
                 .unwrap_or_default();
-            drop(guard);
 
             // New declarations can satisfy negative lookups with no reverse
             // dependency edge. Body-only edits leave these entries intact.
@@ -1190,11 +1148,11 @@ impl AnalysisSession {
     /// of substantially changed content. (Plain re-ingest via
     /// [`Self::ingest_file`] also drops old definitions, but does not
     /// remove the salsa input handle — call this for full cleanup.)
-    pub fn invalidate_file(&self, file: &str) {
+    pub fn invalidate_file(&mut self, file: &str) {
         self.clear_transient_batch_replay();
         self.clear_dependency_graph_cache();
         {
-            let mut guard = self.db.salsa.write();
+            let guard = &mut self.db.salsa;
             guard.remove_file_definitions(file);
             guard.remove_source_file(file);
             guard.clear_file_class_edges(file);
@@ -1228,7 +1186,7 @@ impl AnalysisSession {
     /// Number of files currently tracked in this session's salsa input set.
     /// Stable across reads; useful for diagnostics and memory bounds checks.
     pub fn tracked_file_count(&self) -> usize {
-        let guard = self.db.salsa.read();
+        let guard = &self.db.salsa;
         guard.source_file_count()
     }
 

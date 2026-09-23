@@ -43,7 +43,7 @@ fn workspace_with_lazy_classes() -> (AnalysisSession, Vec<Arc<str>>) {
     let psr4 =
         Arc::new(mir_analyzer::composer::Psr4Map::from_composer(root.path()).expect("psr4 map"));
 
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
     let main_path: Arc<str> = Arc::from(main.to_string_lossy().as_ref());
     session.set_workspace_files(vec![(main_path.clone(), Arc::from(main_src.as_str()))]);
     // The batching only engages while the symbol-index singleton exists
@@ -58,7 +58,7 @@ fn workspace_with_lazy_classes() -> (AnalysisSession, Vec<Arc<str>>) {
 
 #[test]
 fn cold_references_query_bumps_generation_once_for_all_lazy_loads() {
-    let (session, paths) = workspace_with_lazy_classes();
+    let (mut session, paths) = workspace_with_lazy_classes();
     let target = Name::class("App\\Lib0");
 
     let gen_before = session.index_generation();
@@ -112,7 +112,7 @@ fn cold_references_query_bumps_generation_once_for_all_lazy_loads() {
 
 #[test]
 fn bulk_registration_bumps_generation_once_per_batch() {
-    let (session, _paths) = workspace_with_lazy_classes();
+    let (mut session, _paths) = workspace_with_lazy_classes();
 
     let batch: Vec<(Arc<str>, Arc<str>)> = (0..20)
         .map(|i| {
@@ -168,7 +168,7 @@ fn prefetch_imports_batches_generation_bumps() {
     let psr4 =
         Arc::new(mir_analyzer::composer::Psr4Map::from_composer(root.path()).expect("psr4 map"));
 
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
     let opened: Arc<str> = Arc::from("opened.php");
     session.ingest_file(opened.clone(), Arc::from(opened_src.as_str()));
     session.rebuild_workspace_symbol_index();

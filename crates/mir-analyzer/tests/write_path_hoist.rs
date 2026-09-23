@@ -59,7 +59,7 @@ fn ingest_file_prepared_faults_in_direct_references_at_write_time() {
 
     // Plain ingest_file must NOT chase references (that's what keeps
     // load_class cascades one file wide).
-    let session = make_session(root);
+    let mut session = make_session(root);
     session.ingest_file(consumer.clone(), src.clone());
     assert!(
         !session.contains_class("Vendor\\Dep"),
@@ -67,7 +67,7 @@ fn ingest_file_prepared_faults_in_direct_references_at_write_time() {
     );
 
     // The prepared variant faults them in at write time.
-    let session = make_session(root);
+    let mut session = make_session(root);
     session.ingest_file_prepared(consumer.clone(), src.clone());
     assert!(
         session.contains_class("Vendor\\Dep"),
@@ -84,7 +84,7 @@ fn indexed_references_warm_repeat_is_pure_lookup() {
     let src_a = "<?php\nclass HoistBase { public function m(): int { return 1; } }\n";
     let src_b = "<?php\nclass HoistDep extends HoistBase {}\nfunction hb(): int { $x = new HoistBase(); return $x->m(); }\n";
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
     // Re-ingest exercises the definition-removal branch; both files land
     // through the ordinary edit path.
@@ -164,7 +164,7 @@ fn indexed_references_warm_repeat_is_pure_lookup() {
 
     // FileAnalyzer (the open-file flow) also commits with replace semantics.
     let parsed = php_rs_parser::parse(src_a);
-    let _ = FileAnalyzer::new(&session).analyze_diagnostics_only(
+    let _ = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         file_a.clone(),
         src_a,
         &parsed.program,
@@ -183,7 +183,7 @@ fn warm_repeat_stays_pure_lookup_after_unrelated_file_add() {
     let src_a = "<?php\nclass ImmuneBase { public function m(): int { return 1; } }\n";
     let src_b = "<?php\nfunction ib(): int { $x = new ImmuneBase(); return $x->m(); }\n";
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
     session.ingest_file(file_a.clone(), Arc::from(src_a));
     session.ingest_file(file_b.clone(), Arc::from(src_b));
@@ -238,7 +238,7 @@ fn indexed_references_repeat_query_hits_cache() {
     let src_a = "<?php\nclass CacheBase { public function m(): int { return 1; } }\n";
     let src_b = "<?php\nfunction cb(): int { $x = new CacheBase(); return $x->m(); }\n";
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
     session.ingest_file(file_a.clone(), Arc::from(src_a));
     session.ingest_file_prepared(file_b.clone(), Arc::from(src_b));
@@ -292,7 +292,7 @@ fn indexed_references_repeat_query_hits_cache() {
 /// The cross-symbol accumulation is asserted at a fixed revision at the end.
 #[test]
 fn indexed_references_cache_tracks_total_locations_not_entry_count() {
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let mut file_sets: Vec<(&str, usize, Vec<Arc<str>>)> = Vec::new();
@@ -375,7 +375,7 @@ fn files_mentioning_class_repeat_query_is_pure_lookup() {
     let src_a = "<?php\nclass MentionOwner { public function m(): int { return 1; } }\n";
     let src_b = "<?php\nfunction mb(): int { $x = new MentionOwner(); return $x->m(); }\n";
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
     session.ingest_file(file_a.clone(), Arc::from(src_a));
     session.ingest_file(file_b.clone(), Arc::from(src_b));
@@ -408,7 +408,7 @@ fn files_mentioning_class_unknown_needle_gets_a_real_scan() {
     let file_a: Arc<str> = Arc::from("unknown_a.php");
     let file_b: Arc<str> = Arc::from("unknown_b.php");
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
     session.ingest_file(
         file_a.clone(),
@@ -439,7 +439,7 @@ fn files_mentioning_any_matches_if_any_needle_hits() {
     let file_b: Arc<str> = Arc::from("any_b.php");
     let file_c: Arc<str> = Arc::from("any_c.php");
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
     session.ingest_file(
         file_a.clone(),
@@ -475,7 +475,7 @@ fn files_mentioning_any_fqn_literal_needle_matches_across_boundaries() {
     let file_a: Arc<str> = Arc::from("fqn_a.php");
     let file_b: Arc<str> = Arc::from("fqn_b.php");
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
     session.ingest_file(
         file_a.clone(),
@@ -503,7 +503,7 @@ fn files_mentioning_any_repeat_query_is_pure_lookup() {
     let file_a: Arc<str> = Arc::from("any_repeat_a.php");
     let file_b: Arc<str> = Arc::from("any_repeat_b.php");
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
     session.ingest_file(
         file_a.clone(),
@@ -548,7 +548,7 @@ fn indexed_references_cache_invalidates_on_body_only_edit() {
     let src_b_v2 =
         "<?php\nfunction ib(): int { $x = new InvalidateBase(); $x->m(); return $x->m(); }\n";
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
     session.ingest_file(file_a.clone(), Arc::from(src_a));
     session.ingest_file_prepared(file_b.clone(), Arc::from(src_b_v1));
@@ -612,7 +612,7 @@ fn references_cache_invalidates_when_subtype_query_grows_hierarchy() {
     let grandchild: Arc<str> = Arc::from("epoch_grandchild.php");
     let caller: Arc<str> = Arc::from("epoch_caller.php");
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
     session.ingest_file(
         base.clone(),
@@ -717,7 +717,7 @@ fn indexed_subtype_classes_repeat_query_hits_cache() {
     let src_a = "<?php\nclass SubtypeCacheBase {}\n";
     let src_b = "<?php\nclass SubtypeCacheChild extends SubtypeCacheBase {}\n";
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
     session.ingest_file(file_a.clone(), Arc::from(src_a));
     session.ingest_file(file_b.clone(), Arc::from(src_b));
@@ -750,7 +750,7 @@ fn indexed_subtype_classes_cache_invalidates_on_new_file() {
     let src_a = "<?php\nclass SubtypeNewBase {}\n";
     let src_b = "<?php\nclass SubtypeNewChild1 extends SubtypeNewBase {}\n";
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
     session.ingest_file(file_a.clone(), Arc::from(src_a));
     session.ingest_file(file_b.clone(), Arc::from(src_b));
@@ -786,7 +786,7 @@ fn indexed_subtype_classes_cache_invalidates_on_new_file() {
 /// The cross-symbol accumulation is asserted at a fixed revision at the end.
 #[test]
 fn indexed_subtype_classes_cache_tracks_total_sites_not_entry_count() {
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let mut file_sets: Vec<(&str, usize, Vec<Arc<str>>)> = Vec::new();

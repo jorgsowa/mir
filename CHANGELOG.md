@@ -1972,7 +1972,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **`reanalyze_files_cancellable`:** re-analyzes a caller-supplied set of files instead of the edited file's transitive dependents. Matches the rust-analyzer LSP model — the host passes the files it publishes diagnostics for (its open editors), so per-edit cost is O(open files) instead of O(all-ingested-files), independent of workspace size. `reanalyze_dependents_cancellable` keeps its existing behavior; both now share the same warm-up / parallel-analyze / ref-loc-commit implementation.
+- **`reanalyze_files_cancellable`:** re-analyzes a caller-supplied set of files instead of the edited file's transitive dependents. The host passes the files it publishes diagnostics for (its open editors), so per-edit cost is O(open files) instead of O(all-ingested-files), independent of workspace size. `reanalyze_dependents_cancellable` keeps its existing behavior; both now share the same warm-up / parallel-analyze / ref-loc-commit implementation.
 - **Write-path warm-up and an opt-out of the legacy reference index for LSP hosts:** `ingest_file_prepared` now runs a file's Phase-1 warm-up (resolve + lazy-load its direct class references) at write time, so subsequent reference lookups and re-analysis reads find every candidate already prepared. `without_reference_index()` lets a host stop maintaining the imperative `RefIndex` on the incremental paths entirely for sessions that read references exclusively through the memoized `references_to_in_files` path, cutting a lock acquisition per edit.
 
 ### Fixed

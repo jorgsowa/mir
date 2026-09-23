@@ -70,7 +70,7 @@ fn incremental_index_matches_full_rebuild() {
     files.reverse();
 
     // Incremental: chunks of 3, no finalize.
-    let inc = make_session(root.path());
+    let mut inc = make_session(root.path());
     let cancel = IndexCancel::new();
     for chunk in files.chunks(3) {
         inc.index_batch(chunk, IndexParallelism::Sequential, &cancel);
@@ -83,7 +83,7 @@ fn incremental_index_matches_full_rebuild() {
     }
 
     // Full rebuild in a fresh session.
-    let full = make_session(root.path());
+    let mut full = make_session(root.path());
     for chunk in files.chunks(3) {
         full.index_batch(chunk, IndexParallelism::Sequential, &cancel);
     }
@@ -124,7 +124,7 @@ fn body_only_edits_do_not_churn_workspace_index() {
     )
     .unwrap();
 
-    let session = make_session(root.path());
+    let mut session = make_session(root.path());
     let cancel = IndexCancel::new();
     let vfiles = indexable_files(root.path());
     session.index_batch(&vfiles, IndexParallelism::Sequential, &cancel);
@@ -160,7 +160,7 @@ fn declaration_change_updates_index_incrementally() {
     fs::create_dir_all(&app_src).unwrap();
     write_composer(root.path());
 
-    let session = make_session(root.path());
+    let mut session = make_session(root.path());
     session.ensure_all_stubs();
     session.finalize_index();
 
@@ -196,7 +196,7 @@ fn duplicate_winner_rename_preserves_surviving_symbol() {
     fs::create_dir_all(&app_src).unwrap();
     write_composer(root.path());
 
-    let session = make_session(root.path());
+    let mut session = make_session(root.path());
     session.ensure_all_stubs();
     session.finalize_index();
 
@@ -243,7 +243,7 @@ fn index_batch_honours_cancellation() {
     )
     .unwrap();
 
-    let session = make_session(root.path());
+    let mut session = make_session(root.path());
     let files: Vec<(Arc<str>, Arc<str>)> = vec![(
         Arc::from("x"),
         Arc::from("<?php\nnamespace Vendor;\nclass X {}\n"),

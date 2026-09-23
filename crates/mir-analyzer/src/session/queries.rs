@@ -10,7 +10,7 @@ impl AnalysisSession {
     /// and definition queries for syntax/collector diagnostics, then runs the
     /// targeted open-file body-analysis path without retaining whole-file
     /// `ResolvedSymbol` payloads.
-    pub fn analyze_file_diagnostics(&self, file: &str, source: &str) -> crate::FileAnalysis {
+    pub fn analyze_file_diagnostics(&mut self, file: &str, source: &str) -> crate::FileAnalysis {
         let file: Arc<str> = Arc::from(file);
         self.ingest_file(file.clone(), Arc::from(source));
 
@@ -44,7 +44,7 @@ impl AnalysisSession {
     }
 
     fn codebase_name_at_via_resolve(
-        &self,
+        &mut self,
         file: &str,
         byte_offset: u32,
     ) -> Result<crate::Name, crate::SymbolLookupError> {
@@ -59,7 +59,7 @@ impl AnalysisSession {
     /// This is the compact cursor-navigation helper for consumers that only
     /// need symbol identity (for example, references queries) and not the full
     /// `ResolvedSymbol` payload.
-    pub fn name_at(&self, file: &str, byte_offset: u32) -> Option<crate::Name> {
+    pub fn name_at(&mut self, file: &str, byte_offset: u32) -> Option<crate::Name> {
         let started = Instant::now();
         let name = crate::FileAnalyzer::new(self).resolve_name_at(Arc::from(file), byte_offset);
         crate::metrics::record_name_at(started.elapsed().as_micros() as u64);
@@ -71,7 +71,7 @@ impl AnalysisSession {
     /// Canonical open-file navigation entrypoint: unlike
     /// [`crate::FileAnalysis::symbol_at`], this does not require the caller to
     /// retain a whole-file symbol list from diagnostics.
-    pub fn symbol_at(&self, file: &str, byte_offset: u32) -> Option<crate::ResolvedSymbol> {
+    pub fn symbol_at(&mut self, file: &str, byte_offset: u32) -> Option<crate::ResolvedSymbol> {
         self.resolve_at(file, byte_offset)
     }
 
@@ -84,7 +84,7 @@ impl AnalysisSession {
     /// **Side effects:** like [`Self::definition_of`] and [`Self::hover`], this
     /// may fault in direct dependencies of `file` by running the open-file
     /// warm-up path (`prepare_file_for_analysis`) before snapshotting.
-    pub fn resolve_at(&self, file: &str, byte_offset: u32) -> Option<crate::ResolvedSymbol> {
+    pub fn resolve_at(&mut self, file: &str, byte_offset: u32) -> Option<crate::ResolvedSymbol> {
         let started = Instant::now();
         let sym = crate::FileAnalyzer::new(self).resolve_at(Arc::from(file), byte_offset);
         crate::metrics::record_resolve_at(started.elapsed().as_micros() as u64);
@@ -96,7 +96,7 @@ impl AnalysisSession {
     /// Uses the targeted [`Self::resolve_at`] navigation path, then resolves
     /// the resulting symbol's hover payload.
     pub fn hover_at(
-        &self,
+        &mut self,
         file: &str,
         byte_offset: u32,
     ) -> Result<crate::HoverInfo, crate::SymbolLookupError> {
@@ -131,7 +131,7 @@ impl AnalysisSession {
     /// Uses the targeted [`Self::resolve_at`] navigation path, then resolves
     /// the resulting symbol to its declaration site.
     pub fn definition_at(
-        &self,
+        &mut self,
         file: &str,
         byte_offset: u32,
     ) -> Result<mir_types::Location, crate::SymbolLookupError> {
@@ -150,7 +150,7 @@ impl AnalysisSession {
     /// resolve a typed symbol identity with [`Self::name_at`], then answer the
     /// query from the maintained reference index.
     pub fn references_at(
-        &self,
+        &mut self,
         file: &str,
         byte_offset: u32,
         files: &[Arc<str>],
@@ -174,7 +174,7 @@ impl AnalysisSession {
     /// `Ok(None)` when `should_cancel` aborts the underlying indexed query.
     #[allow(clippy::type_complexity)]
     pub fn references_at_cancellable(
-        &self,
+        &mut self,
         file: &str,
         byte_offset: u32,
         files: &[Arc<str>],
@@ -202,7 +202,7 @@ impl AnalysisSession {
     /// - `Err(NoSourceLocation)` — symbol exists but has no recorded span
     ///   (e.g. some stub-only declarations)
     pub fn definition_of(
-        &self,
+        &mut self,
         symbol: &crate::Name,
     ) -> Result<mir_types::Location, crate::SymbolLookupError> {
         // Trigger any necessary lazy-load mutations before snapshotting.
@@ -276,7 +276,7 @@ impl AnalysisSession {
     /// `Ok` with `docstring: None` or `definition: None` if those specific
     /// pieces aren't available.
     pub fn hover(
-        &self,
+        &mut self,
         symbol: &crate::Name,
     ) -> Result<crate::HoverInfo, crate::SymbolLookupError> {
         // Trigger lazy loading for class-rooted symbols before snapshotting.
@@ -408,7 +408,7 @@ impl AnalysisSession {
     /// aliased `use` forms are all found. Read-only from the caller's
     /// perspective; may trigger an on-demand commit of stale/uncommitted
     /// candidates' class edges (same self-heal `indexed_subtype_classes` uses).
-    pub fn subtype_files(&self, class_fqn: &str) -> Vec<Arc<str>> {
+    pub fn subtype_files(&mut self, class_fqn: &str) -> Vec<Arc<str>> {
         self.settle_workspace_index();
         let files = self.snapshot_db().source_file_paths();
         let mut out: Vec<Arc<str>> = self
@@ -426,7 +426,7 @@ impl AnalysisSession {
     /// the same freshness/self-heal path, scope filtering, and memoization
     /// boundary as every other reference query.
     pub fn indexed_use_import_locations(
-        &self,
+        &mut self,
         symbol: &crate::Name,
         files: &[Arc<str>],
     ) -> Vec<(Arc<str>, crate::Range)> {
@@ -475,7 +475,7 @@ impl AnalysisSession {
     /// a code-lens refresh) would otherwise re-pay that scan on every call;
     /// this makes the repeat a single hashmap lookup instead.
     pub fn indexed_references_to(
-        &self,
+        &mut self,
         symbol: &crate::Name,
         files: &[Arc<str>],
         include_declaration: bool,
@@ -540,7 +540,7 @@ impl AnalysisSession {
     /// check/populate logic doesn't have to interleave with the retry loops
     /// below.
     fn indexed_references_to_uncached(
-        &self,
+        &mut self,
         symbol: &crate::Name,
         files: &[Arc<str>],
         include_declaration: bool,
@@ -584,7 +584,7 @@ impl AnalysisSession {
         // time before.
         let has_needles = !gate.idents.is_empty() || !gate.raw.is_empty();
         let (mention_queries, mention_scanner) = if has_needles {
-            let guard = self.db.salsa.read();
+            let guard = &self.db.salsa;
             guard.add_literal_mention_names(gate.idents.iter().map(|s| s.as_str()));
             guard.add_raw_mention_needles(gate.raw.iter().map(|s| s.as_str()));
             let queries: Vec<_> = gate
@@ -686,7 +686,7 @@ impl AnalysisSession {
         // each is a complete, current mention set for its file.
         if let Some(scanner) = &mention_scanner {
             if !scanned.is_empty() {
-                let guard = self.db.salsa.read();
+                let guard = &self.db.salsa;
                 for (file, text, names) in scanned {
                     guard.set_file_class_mentions(&file, &text, scanner.epoch(), names);
                 }
@@ -705,60 +705,19 @@ impl AnalysisSession {
                 return None;
             }
             // Phase 1 (serial, no live snapshot held): warm up stale
-            // candidates. `prepare_file_for_analysis` mutates salsa inputs
-            // (via `load_class`), so a concurrent writer — the background
-            // warm sweep, or another request — can raise `salsa::Cancelled`
-            // partway through a file. Catch and retry the SAME file here
-            // rather than letting the panic escape: uncaught, it would force
-            // the caller's outer retry loop (`indexed_references`) to
-            // re-enter from scratch, redoing the freshness pass and
-            // re-walking every already-warmed file in `stale` (cheap no-ops
-            // via the `prepared_files` cache, but not free) before it even
-            // gets back to the file that was interrupted. This doesn't
-            // change how many times a write is ultimately attempted (the
-            // outer loop already retries indefinitely on `Cancelled`); it
-            // only narrows what a single cancellation discards from "the
-            // whole query so far" to "the one file that was mid-flight".
-            //
-            // Tried and reverted TWICE: running this loop itself in parallel
-            // (rayon; per-file and whole-batch retry variants, and again as
-            // a `try_for_each` after the deferred-bump scope landed). Each
-            // file's warm-up is individually safe under concurrent access
-            // (every shared registry it touches — `prepared_files`,
-            // `unresolvable_fqcns`, `pending_eager_function_files`, the
-            // salsa db via `with_db_mut` — is lock-protected), but under the
-            // `concurrent_reference_cancel` stress test (sustained
-            // multi-thread writers + a background indexer, both hammering
-            // the same db while several readers each run this phase
-            // concurrently) every parallel variant deadlocks: CPU usage
-            // drops to ~0 while wall time keeps climbing — OS threads parked
-            // on a lock, most likely the fixed-size rayon pool saturated
-            // with workers blocked on `with_db_mut`'s `RwLock` write lock
-            // (an OS-level block, invisible to rayon's cooperative
-            // scheduler) while the thread that would release it is itself
-            // queued waiting for a free pool worker. Coalescing the
-            // per-load revision bumps into one per pass (the deferred scope
-            // below) did NOT fix it — the re-attempt hung the same way
-            // (>590s for a ~5s test), so the cancellation storm was not the
-            // trigger. Serial execution never contends for the pool this
-            // way, so it stays the safe choice here even though it forgoes
-            // the extra wall-clock parallelism a large stale set could
-            // otherwise use.
+            // candidates, retrying a cancelled file in place rather than
+            // restarting the whole query. Parallel variants deadlocked under
+            // `concurrent_reference_cancel`; keep it serial. The bump scope
+            // closes before Phase 2 reads `index_generation`.
             {
-                // One revision bump for the whole warm-up loop instead of one
-                // per lazily-loaded class: each bump is a salsa input write
-                // that cancels every in-flight reader (a concurrent request's
-                // Phase 2 pass restarts per bump). The scope closes before
-                // Phase 2 reads `index_generation`, so commits below are
-                // stamped with the post-load generation as before.
-                let _deferred_bumps = self.defer_revision_bumps();
+                let mut session = self.defer_revision_bumps();
                 for path in &stale {
                     loop {
                         if should_cancel() {
                             return None;
                         }
                         match salsa::Cancelled::catch(AssertUnwindSafe(|| {
-                            self.prepare_file_for_analysis(path)
+                            session.prepare_file_for_analysis(path)
                         })) {
                             Ok(()) => break,
                             Err(_) if should_cancel() => return None,
@@ -830,7 +789,7 @@ impl AnalysisSession {
                 }
             };
             let mut analyzed = analyzed;
-            let guard = self.db.salsa.read();
+            let guard = &self.db.salsa;
             for (file, text, out, entries, put, mentions) in analyzed.iter_mut() {
                 // Pointer-identical memo ⇒ identical postings: skip the
                 // index rewrite and only re-stamp the freshness mark.
@@ -894,7 +853,7 @@ impl AnalysisSession {
         };
         let scope: rustc_hash::FxHashSet<&str> = files.iter().map(|f| f.as_ref()).collect();
         let read_symbol_key = |symbol_key: &str| -> Vec<(Arc<str>, crate::Range)> {
-            let guard = self.db.salsa.read();
+            let guard = &self.db.salsa;
             guard
                 .reference_locations(symbol_key)
                 .into_iter()
@@ -1044,7 +1003,7 @@ impl AnalysisSession {
         .unwrap_or_default();
         out.extend(ancestors);
         let subs = {
-            let guard = self.db.salsa.read();
+            let guard = &self.db.salsa;
             guard.subtype_sites_of(&target, true)
         };
         out.extend(
@@ -1101,7 +1060,10 @@ impl AnalysisSession {
     /// The symbol's declaration site, narrowed from the collector's
     /// whole-declaration span to the declared name's own token (matching the
     /// span shape of recorded references).
-    pub fn declaration_name_range(&self, symbol: &crate::Name) -> Option<(Arc<str>, crate::Range)> {
+    pub fn declaration_name_range(
+        &mut self,
+        symbol: &crate::Name,
+    ) -> Option<(Arc<str>, crate::Range)> {
         if let crate::Name::GlobalConstant(fqn) = symbol {
             return self.global_constant_decl_range(fqn);
         }
@@ -1186,7 +1148,7 @@ impl AnalysisSession {
     /// resolving a protected/static method's reference scope on every
     /// code-lens refresh) would otherwise re-pay it every time.
     pub fn indexed_subtype_classes(
-        &self,
+        &mut self,
         class_fqn: &str,
         files: &[Arc<str>],
         include_trait_users: bool,
@@ -1234,7 +1196,7 @@ impl AnalysisSession {
     /// Uncached implementation of [`Self::indexed_subtype_classes`]. Callers
     /// should use the memoizing wrapper.
     fn indexed_subtype_classes_uncached(
-        &self,
+        &mut self,
         class_fqn: &str,
         files: &[Arc<str>],
         include_trait_users: bool,
@@ -1256,7 +1218,7 @@ impl AnalysisSession {
                 self.commit_defs_for_matching(files, &needles);
             }
             sites = {
-                let guard = self.db.salsa.read();
+                let guard = &self.db.salsa;
                 guard.subtype_sites_of(class_fqn, include_trait_users)
             };
             pending = sites
@@ -1286,7 +1248,7 @@ impl AnalysisSession {
         let root_lc = class_fqn.trim_start_matches('\\').to_ascii_lowercase();
         let scope: rustc_hash::FxHashSet<&str> = files.iter().map(|f| f.as_ref()).collect();
         let anon: Vec<(Arc<str>, u32, u16, u16)> = {
-            let guard = self.db.salsa.read();
+            let guard = &self.db.salsa;
             let mut key = String::with_capacity("impl:".len() + root_lc.len());
             key.push_str("impl:");
             key.push_str(&root_lc);
@@ -1317,7 +1279,7 @@ impl AnalysisSession {
     /// or mixin), as `(subtype fqcn, file, name range)`. Subtypes resolving to
     /// the same declaring location collapse to a single entry.
     pub fn indexed_method_implementations(
-        &self,
+        &mut self,
         class_fqn: &str,
         method: &str,
         files: &[Arc<str>],
@@ -1377,7 +1339,7 @@ impl AnalysisSession {
         // real query (a declared class's short name is already in the
         // universe from indexing — admission then changes nothing).
         let (queries, mention_scanner) = {
-            let guard = self.db.salsa.read();
+            let guard = &self.db.salsa;
             guard.add_literal_mention_names(shorts.iter().map(|s| s.as_str()));
             let queries: Vec<_> = shorts
                 .iter()
@@ -1391,6 +1353,8 @@ impl AnalysisSession {
         let use_mentions = queries.len() == shorts.len() && mention_scanner.is_some();
         type Work = (Arc<str>, Arc<str>, Vec<crate::db::SubtypeEntry>);
         type MentionScanRec = (Arc<str>, Arc<str>, Box<[mir_types::Name]>);
+        // Cloned out: the rayon closure can't capture the non-`Sync` session.
+        let defs_committed = Arc::clone(&self.defs_committed);
         let (work, scanned): (Vec<Work>, Vec<MentionScanRec>) = loop {
             let attempt = salsa::Cancelled::catch(AssertUnwindSafe(|| {
                 let db_main = self.snapshot_db();
@@ -1401,7 +1365,11 @@ impl AnalysisSession {
                             return (None, None);
                         };
                         let text = sf.text(&*db as &dyn MirDatabase).clone();
-                        if self.is_defs_committed(path.as_ref(), &text) {
+                        let already_committed = defs_committed
+                            .read()
+                            .get(path.as_ref())
+                            .is_some_and(|t| Arc::ptr_eq(t, &text));
+                        if already_committed {
                             return (None, None);
                         }
                         // Never-committed files must mention a frontier name;
@@ -1464,7 +1432,7 @@ impl AnalysisSession {
         // (and the references gate's) checks become set lookups.
         if let Some(scanner) = &mention_scanner {
             if !scanned.is_empty() {
-                let guard = self.db.salsa.read();
+                let guard = &self.db.salsa;
                 for (file, text, names) in scanned {
                     guard.set_file_class_mentions(&file, &text, scanner.epoch(), names);
                 }
@@ -1473,7 +1441,7 @@ impl AnalysisSession {
         if work.is_empty() {
             return;
         }
-        let guard = self.db.salsa.read();
+        let guard = &self.db.salsa;
         for (file, text, entries) in &work {
             let file_no = guard.locked_ref_index().intern_path(file);
             guard.set_file_class_edges(file_no, entries.clone());
@@ -1523,15 +1491,11 @@ impl AnalysisSession {
     ///
     /// Circular-inheritance checks always run against the full workspace graph
     /// regardless of the `files` filter — a cycle is a workspace-wide problem.
-    pub fn class_issues(&self, files: &[Arc<str>]) -> Vec<crate::Issue> {
+    pub fn class_issues(&mut self, files: &[Arc<str>]) -> Vec<crate::Issue> {
         self.settle_workspace_index();
         let db = self.snapshot_db();
         let file_set: HashSet<Arc<str>> = files.iter().cloned().collect();
-        // Read source texts through the snapshot already in hand — calling
-        // `source_of` here would re-enter the session RwLock while this
-        // snapshot is live, and a concurrent salsa write (which blocks new
-        // readers behind the fair write lock while waiting for existing
-        // snapshots to drop) turns that into a deadlock.
+        // Read source texts through the snapshot already in hand.
         let file_data: Vec<(Arc<str>, Arc<str>)> = files
             .iter()
             .filter_map(|f| {
@@ -2014,7 +1978,7 @@ mod tests {
     }
 
     fn session_with(files: &[(&str, &str)]) -> crate::AnalysisSession {
-        let session = crate::AnalysisSession::new(crate::PhpVersion::LATEST);
+        let mut session = crate::AnalysisSession::new(crate::PhpVersion::LATEST);
         for (path, text) in files {
             session.set_file_text(Arc::from(*path), Arc::from(*text));
         }

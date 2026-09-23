@@ -43,7 +43,7 @@ fn main() {
         mir_analyzer::composer::Psr4Map::from_composer(fixture_root)
             .expect("failed to load composer.json"),
     );
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
     session.ensure_all_stubs();
 
     let project_files = discover_files(&fixture.src_root());
@@ -172,7 +172,7 @@ fn main() {
         mir_analyzer::composer::Psr4Map::from_composer(fixture_root)
             .expect("failed to load composer.json"),
     );
-    let session2 = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4b);
+    let mut session2 = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4b);
     session2.ensure_all_stubs();
     let project_only: Vec<(Arc<str>, Arc<str>)> = project_files
         .iter()
@@ -213,7 +213,7 @@ fn main() {
         mir_analyzer::composer::Psr4Map::from_composer(fixture_root)
             .expect("failed to load composer.json"),
     );
-    let session3 = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4c);
+    let mut session3 = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4c);
     session3.ensure_all_stubs();
     let workspace3: Vec<(Arc<str>, Arc<str>)> = project_files
         .iter()

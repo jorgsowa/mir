@@ -10,7 +10,5 @@ Value of unit enum
 
     /** @param value-of<Foo> $arg */
     function foobar(string $arg): void {}
-'
 ===expect===
-ParseError@10:0-12:98: Parse error: unterminated string literal
-ParseError@12:98-12:98: Parse error: expected ';' after expression
+UnusedParam@9:20-9:31: Parameter $arg is never used

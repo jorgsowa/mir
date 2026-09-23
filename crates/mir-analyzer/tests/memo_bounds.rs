@@ -30,7 +30,7 @@ fn storm_source(n: usize) -> String {
 }
 
 fn storm_session() -> (AnalysisSession, Arc<str>) {
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     let path: Arc<str> = Arc::from("/memo_bounds/storm.php");
     session.ingest_file(path.clone(), Arc::from(storm_source(STORM)));
     (session, path)
@@ -42,7 +42,7 @@ fn alive_count<T>(weaks: &[Weak<T>]) -> usize {
 
 #[test]
 fn infer_function_memos_bounded_under_rename_storm() {
-    let (session, path) = storm_session();
+    let (mut session, path) = storm_session();
 
     let weaks: Vec<Weak<FunctionInferenceResult>> = {
         let db = session.snapshot_db();
@@ -79,7 +79,7 @@ fn analyze_file_memos_bounded_under_file_storm() {
     const FILE_CAP: usize = 16384;
     const FILE_STORM: usize = FILE_CAP + 300;
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     let paths: Vec<Arc<str>> = (0..FILE_STORM)
         .map(|i| Arc::<str>::from(format!("/memo_bounds/files/f{i}.php")))
         .collect();
@@ -121,7 +121,7 @@ fn analyze_file_memos_bounded_under_file_storm() {
 
 #[test]
 fn infer_scope_memos_bounded_under_rename_storm() {
-    let (session, path) = storm_session();
+    let (mut session, path) = storm_session();
 
     let weaks: Vec<Weak<ScopeInferenceResult>> = {
         let db = session.snapshot_db();

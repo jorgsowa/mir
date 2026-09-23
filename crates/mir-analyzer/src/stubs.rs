@@ -613,7 +613,7 @@ mod tests {
         let src = "<?php\nfunction test($str) {\n    sscanf($str, \"%d %d\", $row, $col);\n    return $row + $col;\n}\n";
         let tmp = std::env::temp_dir().join("mir_test_sscanf_undefined.php");
         std::fs::write(&tmp, src).unwrap();
-        let session = AnalysisSession::new(PhpVersion::LATEST);
+        let mut session = AnalysisSession::new(PhpVersion::LATEST);
         let result = session.analyze_paths(
             std::slice::from_ref(&tmp),
             &BatchOptions::new().without_symbols(),

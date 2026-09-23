@@ -100,7 +100,7 @@ class User {
 #[test]
 #[ignore]
 fn benchmark_no_op_file_save() {
-    let session = AnalysisSession::new(mir_analyzer::PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(mir_analyzer::PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let file: Arc<str> = Arc::from("app/Http/Controllers/UserController.php");
@@ -214,7 +214,7 @@ fn benchmark_no_op_file_save() {
 #[test]
 fn verify_no_op_correctness() {
     // Verify that no-op file saves produce identical results
-    let session = AnalysisSession::new(mir_analyzer::PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(mir_analyzer::PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let file: Arc<str> = Arc::from("test_file.php");
@@ -240,7 +240,7 @@ fn verify_no_op_correctness() {
 
 #[test]
 fn no_op_ingest_preserves_reference_postings() {
-    let session = AnalysisSession::new(mir_analyzer::PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(mir_analyzer::PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let base: Arc<str> = Arc::from("base.php");
@@ -252,7 +252,7 @@ fn no_op_ingest_preserves_reference_postings() {
     session.ingest_file(caller.clone(), Arc::from(caller_src));
 
     let parsed = php_rs_parser::parse(caller_src);
-    let _ = mir_analyzer::FileAnalyzer::new(&session).analyze_diagnostics_only(
+    let _ = mir_analyzer::FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         caller.clone(),
         caller_src,
         &parsed.program,

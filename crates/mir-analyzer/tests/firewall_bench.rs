@@ -29,7 +29,7 @@ fn run(cache_dir: &Path, paths: &[PathBuf]) -> (Duration, usize) {
     let opts = BatchOptions::new().with_progress_callback(Arc::new(move || {
         counter.fetch_add(1, Ordering::Relaxed);
     }));
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir);
     let t = Instant::now();
     session.analyze_paths(paths, &opts);
     (t.elapsed(), n.load(Ordering::Relaxed))
@@ -93,7 +93,7 @@ fn mirror_registration_scales_with_affected_entries() {
         PhpVersion::LATEST.cache_byte(),
         0,
     ));
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache(cache.clone());
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache(cache.clone());
     session.set_file_text(
         Arc::from("/mirror/edited.php"),
         Arc::from("<?php class Existing { function a() {} }"),

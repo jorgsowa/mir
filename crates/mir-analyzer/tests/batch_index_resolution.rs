@@ -84,7 +84,7 @@ fn batch_resolves_project_and_lazy_classes_with_prebuilt_index() {
     .unwrap();
 
     let psr4 = mir_analyzer::composer::Psr4Map::from_composer(root).expect("psr4");
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
     session.ensure_all_stubs();
 
     // PRE-BUILD the workspace index singleton from a vendor file, exactly as the

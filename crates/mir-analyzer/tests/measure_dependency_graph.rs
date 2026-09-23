@@ -38,7 +38,7 @@ fn measure_dependency_graph() {
 
     let vendor_files = discover_files(&fixture.vendor_root());
     let project_files = discover_files(&fixture.src_root());
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
     session.collect_definitions(&vendor_files);
     let _ = session.analyze_paths(&project_files, &BatchOptions::new().without_symbols());

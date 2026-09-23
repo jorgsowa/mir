@@ -2,7 +2,7 @@ use super::*;
 
 impl AnalysisSession {
     /// Run the full batch analysis pipeline on a set of file paths.
-    pub fn analyze_paths(&self, paths: &[PathBuf], opts: &BatchOptions) -> AnalysisResult {
+    pub fn analyze_paths(&mut self, paths: &[PathBuf], opts: &BatchOptions) -> AnalysisResult {
         let php_version = self.batch_php_version(opts);
         let mut all_issues = Vec::new();
         let _t0 = std::time::Instant::now();
@@ -66,7 +66,7 @@ impl AnalysisSession {
 
         // ---- Register Salsa source inputs for incremental follow-up calls ----
         {
-            let mut guard = self.db.salsa.write();
+            let guard = &mut self.db.salsa;
             for parsed in &parsed_files {
                 guard.upsert_source_file(parsed.file.clone(), parsed.source.clone());
             }
@@ -193,7 +193,7 @@ impl AnalysisSession {
         // Prime the in-process parse cache so the pre-warm loop below avoids
         // re-parsing every project file through collect_file_definitions.
         {
-            let guard = self.db.salsa.read();
+            let guard = &self.db.salsa;
             let php_v = php_version.cache_byte();
             for (defs, hash, has_hard_parse_errors, _surface) in &file_defs {
                 if !*has_hard_parse_errors {
@@ -213,7 +213,7 @@ impl AnalysisSession {
             // parity with `ingest_file`'s single-file path, so goto-implementation
             // sees implementors from a batch/vendor run without waiting for
             // each file to be individually touched by an on-demand commit path.
-            let guard = self.db.salsa.read();
+            let guard = &self.db.salsa;
             for (parsed, (defs, _hash, _hard_err, _surface)) in parsed_files.iter().zip(file_defs) {
                 for issue in defs.issues.iter() {
                     if matches!(issue.kind, mir_issues::IssueKind::ParseError { .. })
@@ -233,14 +233,14 @@ impl AnalysisSession {
         // ---- Pre-warm collect_file_definitions for project files -------------
         {
             let db_prewarm = {
-                let guard = self.db.salsa.read();
-                (**guard).clone()
+                let guard = &self.db.salsa;
+                (*guard).clone()
             };
             let project_source_files: Vec<SourceFile> = {
-                let guard = self.db.salsa.read();
+                let guard = &self.db.salsa;
                 parsed_files
                     .iter()
-                    .filter_map(|p| (**guard).lookup_source_file(&p.file))
+                    .filter_map(|p| (*guard).lookup_source_file(&p.file))
                     .collect()
             };
             project_source_files
@@ -282,8 +282,8 @@ impl AnalysisSession {
         let _t_class_analyzer = std::time::Instant::now();
         {
             let class_db = {
-                let guard = self.db.salsa.read();
-                (**guard).clone()
+                let guard = &self.db.salsa;
+                (*guard).clone()
             };
             let class_issues = crate::class::ClassAnalyzer::with_files(
                 &class_db,
@@ -298,8 +298,8 @@ impl AnalysisSession {
         let _t_class_checks = _t0.elapsed();
 
         let mut db_main = {
-            let guard = self.db.salsa.read();
-            (**guard).clone()
+            let guard = &self.db.salsa;
+            (*guard).clone()
         };
         // All index mutation for the body pass is done (lazy_load_missing_classes
         // + refresh ran above; lazy_load_from_body_issues runs *after* this pass
@@ -318,7 +318,7 @@ impl AnalysisSession {
         let body_results: Vec<BodyResult> = parsed_files
             .par_iter()
             .filter(|parsed| !files_with_parse_errors.contains(&parsed.file))
-            .map_with(db_main, |db, parsed| {
+            .map_with((db_main, self.cache.clone()), |(db, cache), parsed| {
                 let mut driver = BodyAnalyzer::new(&*db as &dyn MirDatabase, php_version);
                 // Diagnostics-only consumers never read the symbol vecs —
                 // don't build them (a Type clone per reference) at all.
@@ -344,7 +344,7 @@ impl AnalysisSession {
                         );
                     }
                 }
-                let (issues, symbols) = if let Some(cache) = &self.cache {
+                let (issues, symbols) = if let Some(cache) = cache.as_ref() {
                     let h = content_hexes
                         .get(parsed.file.as_ref())
                         .cloned()
@@ -458,7 +458,7 @@ impl AnalysisSession {
         // prior run cannot survive an append.
         let mut all_symbols = Vec::new();
         {
-            let guard = self.db.salsa.read();
+            let guard = &self.db.salsa;
             for (file, issues, symbols, ref_locs) in body_results {
                 all_issues.extend(issues);
                 all_symbols.extend(symbols);
@@ -490,8 +490,8 @@ impl AnalysisSession {
         if topology_changed {
             if let Some(cache) = &self.cache {
                 let db_snapshot = {
-                    let guard = self.db.salsa.read();
-                    (**guard).clone()
+                    let guard = &self.db.salsa;
+                    (*guard).clone()
                 };
                 let rev = build_reverse_deps(&db_snapshot);
                 cache.set_reverse_deps(rev);
@@ -554,7 +554,7 @@ impl AnalysisSession {
 
         // ---- Build workspace symbol index singleton -------------------------
         {
-            let mut guard = self.db.salsa.write();
+            let guard = &mut self.db.salsa;
             guard.rebuild_workspace_symbol_index();
         }
 
@@ -566,7 +566,7 @@ impl AnalysisSession {
     /// Use [`Self::reanalyze_dependents`] for LSP-style per-file flows that
     /// don't need batch options.
     pub fn re_analyze_file(
-        &self,
+        &mut self,
         file_path: &str,
         new_content: &str,
         opts: &BatchOptions,
@@ -599,10 +599,9 @@ impl AnalysisSession {
                         col_end: *col_end,
                     })
                     .collect();
-                let guard = self.db.salsa.read();
+                let guard = &self.db.salsa;
                 let file_no = guard.locked_ref_index().intern_path(&file);
                 guard.set_file_reference_locations(file_no, locs);
-                drop(guard);
                 opts.apply(&mut issues);
                 self.apply_suppressions_and_emit_unused(&mut issues, std::slice::from_ref(&file));
                 return AnalysisResult::build(issues, HashMap::default(), Vec::new());
@@ -612,7 +611,7 @@ impl AnalysisSession {
         let file: Arc<str> = Arc::from(file_path);
 
         {
-            let mut guard = self.db.salsa.write();
+            let guard = &mut self.db.salsa;
             guard.remove_file_definitions(file_path);
         }
 
@@ -624,7 +623,7 @@ impl AnalysisSession {
         let mut all_issues: Vec<Issue> = Arc::unwrap_or_clone(file_defs.issues.clone());
 
         {
-            let mut guard = self.db.salsa.write();
+            let guard = &mut self.db.salsa;
             if guard.workspace_symbol_index_singleton().is_some() {
                 if let Some(sf) = guard.lookup_source_file(file.as_ref()) {
                     if guard.file_declarations_changed(sf) {
@@ -635,7 +634,7 @@ impl AnalysisSession {
         }
 
         let (symbols, surface_hash) = {
-            let guard = self.db.salsa.write();
+            let guard = &mut self.db.salsa;
             let parsed = collected
                 .parsed
                 .unwrap_or_else(|| php_rs_parser::parse(new_content));
@@ -643,7 +642,7 @@ impl AnalysisSession {
 
             let has_hard_errors = parsed.errors.iter().any(crate::parser::is_hard_parse_error);
             let symbols = if !has_hard_errors {
-                let db_ref: &dyn MirDatabase = &**guard;
+                let db_ref: &dyn MirDatabase = &*guard;
                 let mut driver = BodyAnalyzer::new(db_ref, php_version);
                 driver.collect_symbols = !opts.skip_symbols;
                 let (body_issues, symbols) = driver.analyze_bodies(
@@ -722,7 +721,7 @@ impl AnalysisSession {
     /// from previous runs are reused on a content-hash match, eliminating
     /// the parse + definition-collection step. Cache misses run the normal
     /// pipeline and write back so subsequent runs hit.
-    pub fn collect_definitions(&self, paths: &[PathBuf]) {
+    pub fn collect_definitions(&mut self, paths: &[PathBuf]) {
         self.clear_transient_batch_replay();
         let _timing = std::env::var("MIR_TIMING").is_ok();
         let _t0 = std::time::Instant::now();
@@ -735,6 +734,7 @@ impl AnalysisSession {
             hash: [u8; 32],
             cached: Option<mir_codebase::definitions::StubSlice>,
         }
+        let stub_cache = self.db.stub_cache.clone();
         let entries: Vec<FileEntry> = paths
             .par_iter()
             .filter_map(|path| {
@@ -742,7 +742,7 @@ impl AnalysisSession {
                 let file: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
                 let src: Arc<str> = Arc::from(src);
                 let hash = hash_source(&src);
-                let cached = self.db.stub_cache.as_ref().and_then(|c| {
+                let cached = stub_cache.as_ref().and_then(|c| {
                     let (mut slice, _issues) = c.get(&file, &hash, php_v)?;
                     prepare_for_ingest(&mut slice);
                     Some(slice)
@@ -758,7 +758,7 @@ impl AnalysisSession {
         let _t_read = _t0.elapsed();
 
         let source_files: Vec<SourceFile> = {
-            let mut guard = self.db.salsa.write();
+            let guard = &mut self.db.salsa;
             entries
                 .iter()
                 .map(|e| {
@@ -773,8 +773,8 @@ impl AnalysisSession {
         let _t_reg = _t0.elapsed();
 
         let db_pass1 = {
-            let guard = self.db.salsa.read();
-            (**guard).clone()
+            let guard = &self.db.salsa;
+            (*guard).clone()
         };
         let stub_cache = self.db.stub_cache.clone();
         let prepared: Vec<(Arc<str>, mir_codebase::definitions::StubSlice)> = entries
@@ -805,7 +805,7 @@ impl AnalysisSession {
         // project files, but no StubSlice is cheaply available there — see
         // the persistence work tracked separately).
         {
-            let guard = self.db.salsa.read();
+            let guard = &self.db.salsa;
             for (file, slice) in &prepared {
                 let entries = crate::db::subtype_index::entries_from_slice(slice);
                 let file_no = guard.locked_ref_index().intern_path(file);
@@ -828,7 +828,7 @@ impl AnalysisSession {
         }
 
         {
-            let mut guard = self.db.salsa.write();
+            let guard = &mut self.db.salsa;
             guard.rebuild_workspace_symbol_index();
         }
 
@@ -864,7 +864,7 @@ mod tests {
             "Example.php",
             "<?php\nclass Example {\n    public function answer(): int { return 42; }\n}\n(new Example())->answer();\n",
         );
-        let session = AnalysisSession::new(PhpVersion::LATEST);
+        let mut session = AnalysisSession::new(PhpVersion::LATEST);
         let opts = BatchOptions::new().without_symbols();
         let hash = crate::cache::hash_content(
             "<?php\nclass Example {\n    public function answer(): int { return 42; }\n}\n(new Example())->answer();\n",
@@ -905,7 +905,7 @@ mod tests {
             "Example.php",
             "<?php\nclass Example {\n    public function answer(): int { return 42; }\n}\n(new Example())->answer();\n",
         );
-        let session = AnalysisSession::new(PhpVersion::LATEST);
+        let mut session = AnalysisSession::new(PhpVersion::LATEST);
         let opts = BatchOptions::new();
         let hash = crate::cache::hash_content(
             "<?php\nclass Example {\n    public function answer(): int { return 42; }\n}\n(new Example())->answer();\n",
@@ -945,7 +945,7 @@ mod tests {
             "<?php\nclass Example {\n    public function answer(): int { return 42; }\n}\n(new Example())->answer();\n",
         );
         let file_arc: Arc<str> = Arc::from(file.to_string_lossy().as_ref());
-        let session = AnalysisSession::new(PhpVersion::LATEST);
+        let mut session = AnalysisSession::new(PhpVersion::LATEST);
         let opts = BatchOptions::new().without_symbols();
 
         let _ = session.analyze_paths(std::slice::from_ref(&file), &opts);

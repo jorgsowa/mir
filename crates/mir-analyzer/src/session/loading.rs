@@ -35,7 +35,7 @@ impl AnalysisSession {
     /// Returns a [`crate::LoadOutcome`] distinguishing
     /// already-loaded / freshly-loaded / not-resolvable. Use
     /// [`crate::LoadOutcome::is_loaded`] when only success matters.
-    pub fn load_class(&self, fqcn: &str) -> crate::LoadOutcome {
+    pub fn load_class(&mut self, fqcn: &str) -> crate::LoadOutcome {
         if self.contains_class(fqcn) {
             return crate::LoadOutcome::AlreadyLoaded;
         }
@@ -65,7 +65,7 @@ impl AnalysisSession {
     /// Inner load path: resolver lookup + ingest, no caching. Returns `true`
     /// iff `fqcn` ends up registered. Failure buckets are recorded for
     /// telemetry.
-    fn try_resolve_and_ingest(&self, fqcn: &str) -> bool {
+    fn try_resolve_and_ingest(&mut self, fqcn: &str) -> bool {
         use crate::metrics::{record_lazy_load_failure, LazyLoadFailure};
         let Some(resolver) = &self.resolver else {
             record_lazy_load_failure(LazyLoadFailure::NoResolver, fqcn);

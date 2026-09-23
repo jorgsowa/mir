@@ -40,7 +40,7 @@ fn open_file_analyze_closure_cost() {
             continue;
         }
 
-        let session = match Psr4Map::from_composer(root) {
+        let mut session = match Psr4Map::from_composer(root) {
             Ok(map) => AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(map)),
             Err(_) => AnalysisSession::new(PhpVersion::LATEST),
         };
@@ -52,7 +52,7 @@ fn open_file_analyze_closure_cost() {
 
         // Cold analyze: triggers preload of the file's declared-type closure.
         let t0 = Instant::now();
-        let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        let analysis = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
             file.clone(),
             &src,
             &parsed.program,
@@ -64,7 +64,7 @@ fn open_file_analyze_closure_cost() {
 
         // Warm analyze: closure already loaded; measures steady-state per-edit cost.
         let t0 = Instant::now();
-        let _ = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        let _ = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
             file.clone(),
             &src,
             &parsed.program,

@@ -32,7 +32,7 @@ fn dependent_file_is_reanalyzed_when_base_changes() {
         "<?php\nclass Child extends Base {}\nfunction test(): void {\n    $c = new Child();\n    $c->foo();\n}\n",
     );
 
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
     let result1 = session.analyze_paths(
         &[base.clone(), child.clone()],
         &BatchOptions::new().without_symbols(),
@@ -52,7 +52,7 @@ fn dependent_file_is_reanalyzed_when_base_changes() {
     );
 
     // Second run with a fresh analyzer (simulates a new CLI invocation) but same cache.
-    let session2 = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    let mut session2 = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
     let result2 = session2.analyze_paths(
         &[base.clone(), child.clone()],
         &BatchOptions::new().without_symbols(),
@@ -88,7 +88,7 @@ fn unrelated_file_cache_entry_survives() {
     // First run — populate cache for both files. Suppress the dead-code
     // group so the bare `helper()` function in Unrelated.php doesn't
     // surface as `UnusedFunction` in the assertions below.
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
     let opts = BatchOptions::new()
         .without_symbols()
         .with_suppressed(dead_code_issue_kinds().iter().copied());
@@ -104,7 +104,7 @@ fn unrelated_file_cache_entry_survives() {
     // Second run — Unrelated.php did not change and has no dependency on Base.
     // Its cache entry should survive (we cannot observe this directly from the
     // public API, but we verify no issues are raised for it and the run succeeds).
-    let session2 = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    let mut session2 = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
     let opts2 = BatchOptions::new()
         .without_symbols()
         .with_suppressed(dead_code_issue_kinds().iter().copied());
@@ -135,7 +135,7 @@ fn reanalyzed_count(cache_dir: &std::path::Path, paths: &[std::path::PathBuf]) -
         .with_progress_callback(Arc::new(move || {
             counter.fetch_add(1, Ordering::Relaxed);
         }));
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir);
     session.analyze_paths(paths, &opts);
     n.load(Ordering::Relaxed)
 }
@@ -160,7 +160,7 @@ fn body_only_change_to_base_does_not_reanalyze_dependent() {
     );
 
     // Cold run populates the cache for both files.
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
     session.analyze_paths(
         &[base.clone(), child.clone()],
         &BatchOptions::new().without_symbols(),
@@ -198,7 +198,7 @@ fn signature_change_to_base_reanalyzes_dependent() {
         "<?php\nclass Child extends Base {\n    public function bar(): int { return $this->foo(); }\n}\n",
     );
 
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
     session.analyze_paths(
         &[base.clone(), child.clone()],
         &BatchOptions::new().without_symbols(),
@@ -238,7 +238,7 @@ fn warm_run_without_changes_does_not_rewrite_cache() {
         "<?php\nclass Child extends Base {}\nfunction test(): void {\n    (new Child())->foo();\n}\n",
     );
 
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
     let result1 = session.analyze_paths(
         &[base.clone(), child.clone()],
         &BatchOptions::new().without_symbols(),
@@ -254,7 +254,7 @@ fn warm_run_without_changes_does_not_rewrite_cache() {
     // during the second run would be observable.
     std::thread::sleep(std::time::Duration::from_millis(20));
 
-    let session2 = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    let mut session2 = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
     let result2 = session2.analyze_paths(
         &[base.clone(), child.clone()],
         &BatchOptions::new().without_symbols(),
@@ -273,7 +273,7 @@ fn warm_run_without_changes_does_not_rewrite_cache() {
     );
 }
 
-fn has_undefined_class(session: &AnalysisSession, path: &str, source: &str) -> bool {
+fn has_undefined_class(session: &mut AnalysisSession, path: &str, source: &str) -> bool {
     session
         .re_analyze_file(path, source, &BatchOptions::new().without_symbols())
         .issues
@@ -284,19 +284,28 @@ fn has_undefined_class(session: &AnalysisSession, path: &str, source: &str) -> b
 #[test]
 fn mirror_registration_evicts_only_negative_and_dependent_entries() {
     let dir = create_temp_dir("mirror selective invalidation");
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
     let consumer = "<?php\nnew Mage();\n";
     let unrelated = "<?php\nfunction unrelated(): void {}\n";
 
-    assert!(has_undefined_class(&session, "/mirror/app.php", consumer));
+    assert!(has_undefined_class(
+        &mut session,
+        "/mirror/app.php",
+        consumer
+    ));
     assert!(!has_undefined_class(
-        &session,
+        &mut session,
         "/mirror/unrelated.php",
         unrelated
     ));
-    let cache = session.cache().unwrap();
-    assert!(cache.is_valid("/mirror/app.php", &hash_content(consumer)));
-    assert!(cache.is_valid("/mirror/unrelated.php", &hash_content(unrelated)));
+    assert!(session
+        .cache()
+        .unwrap()
+        .is_valid("/mirror/app.php", &hash_content(consumer)));
+    assert!(session
+        .cache()
+        .unwrap()
+        .is_valid("/mirror/unrelated.php", &hash_content(unrelated)));
 
     session.set_workspace_files(vec![(
         Arc::from("/mirror/Mage.php"),
@@ -304,15 +313,21 @@ fn mirror_registration_evicts_only_negative_and_dependent_entries() {
     )]);
 
     assert!(
-        !cache.is_valid("/mirror/app.php", &hash_content(consumer)),
+        !session
+            .cache()
+            .unwrap()
+            .is_valid("/mirror/app.php", &hash_content(consumer)),
         "negative lookup must be evicted when its missing class is registered"
     );
     assert!(
-        cache.is_valid("/mirror/unrelated.php", &hash_content(unrelated)),
+        session
+            .cache()
+            .unwrap()
+            .is_valid("/mirror/unrelated.php", &hash_content(unrelated)),
         "unrelated resolved cache entry must survive workspace growth"
     );
     assert!(
-        !has_undefined_class(&session, "/mirror/app.php", consumer),
+        !has_undefined_class(&mut session, "/mirror/app.php", consumer),
         "reanalysis after registration must resolve Mage"
     );
 }
@@ -320,7 +335,7 @@ fn mirror_registration_evicts_only_negative_and_dependent_entries() {
 #[test]
 fn body_only_mirror_edit_preserves_unrelated_cache_entry() {
     let dir = create_temp_dir("mirror body-only invalidation");
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
     session.set_file_text(
         Arc::from("/mirror/edited.php"),
         Arc::from("<?php class Existing { function a(): void {} }"),
@@ -328,7 +343,7 @@ fn body_only_mirror_edit_preserves_unrelated_cache_entry() {
     session.rebuild_workspace_symbol_index();
     let unrelated = "<?php\nfunction unrelated(): void {}\n";
     assert!(!has_undefined_class(
-        &session,
+        &mut session,
         "/mirror/unrelated.php",
         unrelated
     ));
@@ -350,12 +365,16 @@ fn body_only_mirror_edit_preserves_unrelated_cache_entry() {
 #[test]
 fn index_batch_registration_evicts_negative_but_keeps_unrelated_cache() {
     let dir = create_temp_dir("mirror index batch invalidation");
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
     let consumer = "<?php\nnew Mage();\n";
     let unrelated = "<?php\nfunction unrelated(): void {}\n";
-    assert!(has_undefined_class(&session, "/mirror/app.php", consumer));
+    assert!(has_undefined_class(
+        &mut session,
+        "/mirror/app.php",
+        consumer
+    ));
     assert!(!has_undefined_class(
-        &session,
+        &mut session,
         "/mirror/unrelated.php",
         unrelated
     ));
@@ -372,7 +391,11 @@ fn index_batch_registration_evicts_negative_but_keeps_unrelated_cache() {
     let cache = session.cache().unwrap();
     assert!(!cache.is_valid("/mirror/app.php", &hash_content(consumer)));
     assert!(cache.is_valid("/mirror/unrelated.php", &hash_content(unrelated)));
-    assert!(!has_undefined_class(&session, "/mirror/app.php", consumer));
+    assert!(!has_undefined_class(
+        &mut session,
+        "/mirror/app.php",
+        consumer
+    ));
 }
 
 #[test]
@@ -380,12 +403,12 @@ fn direct_input_registration_invalidates_persisted_negative_lookup() {
     let dir = create_temp_dir("mirror direct input invalidation");
     let consumer = "<?php\nnew Mage();\n";
     {
-        let seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
-        assert!(has_undefined_class(&seed, "/mirror/app.php", consumer));
+        let mut seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+        assert!(has_undefined_class(&mut seed, "/mirror/app.php", consumer));
         seed.flush_analysis_cache();
     }
 
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
     session.upsert_source_file(
         Arc::from("/mirror/Mage.php"),
         Arc::from("<?php\nclass Mage {}\n"),
@@ -395,13 +418,17 @@ fn direct_input_registration_invalidates_persisted_negative_lookup() {
         .cache()
         .unwrap()
         .is_valid("/mirror/app.php", &hash_content(consumer)));
-    assert!(!has_undefined_class(&session, "/mirror/app.php", consumer));
+    assert!(!has_undefined_class(
+        &mut session,
+        "/mirror/app.php",
+        consumer
+    ));
 }
 
 #[test]
 fn shadowed_definition_evicts_dependents_of_old_owner() {
     let dir = create_temp_dir("mirror shadow invalidation");
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
     let old_owner = "/mirror/old_mage.php";
     let consumer_path = "/mirror/consumer.php";
     let consumer = "<?php\n(new Mage())->spell();\n";
@@ -410,15 +437,17 @@ fn shadowed_definition_evicts_dependents_of_old_owner() {
         Arc::from("<?php class Mage { function spell(): void {} }"),
     );
     session.rebuild_workspace_symbol_index();
-    assert!(!has_undefined_class(&session, consumer_path, consumer));
-    let cache = session.cache().unwrap();
-    assert!(cache.is_valid(consumer_path, &hash_content(consumer)));
+    assert!(!has_undefined_class(&mut session, consumer_path, consumer));
+    assert!(session
+        .cache()
+        .unwrap()
+        .is_valid(consumer_path, &hash_content(consumer)));
     let mut reverse_deps = FxHashMap::default();
     reverse_deps.insert(
         old_owner.to_string(),
         FxHashSet::from_iter([consumer_path.to_string()]),
     );
-    cache.set_reverse_deps(reverse_deps);
+    session.cache().unwrap().set_reverse_deps(reverse_deps);
 
     session.set_file_text(
         Arc::from("/mirror/new_mage.php"),
@@ -426,7 +455,10 @@ fn shadowed_definition_evicts_dependents_of_old_owner() {
     );
     session.settle_workspace_index();
     assert!(
-        !cache.is_valid(consumer_path, &hash_content(consumer)),
+        !session
+            .cache()
+            .unwrap()
+            .is_valid(consumer_path, &hash_content(consumer)),
         "dependents of a shadowed definition must be invalidated"
     );
 }
@@ -439,13 +471,13 @@ fn matching_warm_cache_entries_survive_bulk_registration() {
         ("/mirror/two.php", "<?php function two(): void {}"),
     ];
     {
-        let seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+        let mut seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
         for (path, source) in files {
-            assert!(!has_undefined_class(&seed, path, source));
+            assert!(!has_undefined_class(&mut seed, path, source));
         }
         seed.flush_analysis_cache();
     }
-    let warm = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    let mut warm = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
     warm.set_workspace_files(
         files
             .into_iter()

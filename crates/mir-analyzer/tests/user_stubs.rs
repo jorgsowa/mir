@@ -35,7 +35,7 @@ fn stub_file_function_resolves_without_undefined_function_error() {
         "<?php\n$result = my_helper('hello');\n",
     );
 
-    let analyzer =
+    let mut analyzer =
         AnalysisSession::new(PhpVersion::LATEST).with_user_stubs(vec![stub_file], Vec::new());
     let result = analyzer.analyze_paths(&[src_file], &BatchOptions::new().without_symbols());
 
@@ -63,7 +63,7 @@ fn stub_directory_function_resolves_without_undefined_function_error() {
     );
     let src_file = write(&src_dir, "main.php", "<?php\n$v = framework_fn(42);\n");
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST)
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST)
         .with_user_stubs(Vec::new(), vec![stubs_dir.path().to_path_buf()]);
     let result = analyzer.analyze_paths(&[src_file], &BatchOptions::new().without_symbols());
 

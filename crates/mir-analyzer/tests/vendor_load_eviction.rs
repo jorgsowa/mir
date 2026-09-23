@@ -44,7 +44,7 @@ fn write_composer(root: &std::path::Path) {
     .unwrap();
 }
 
-fn analyze(session: &AnalysisSession, path: Arc<str>, src: &str) -> mir_analyzer::FileAnalysis {
+fn analyze(session: &mut AnalysisSession, path: Arc<str>, src: &str) -> mir_analyzer::FileAnalysis {
     let parsed = php_rs_parser::parse(src);
     assert!(
         parsed.errors.is_empty(),
@@ -84,9 +84,9 @@ fn indexable_files(root: &std::path::Path) -> Vec<(Arc<str>, Arc<str>)> {
         .collect()
 }
 
-/// Drive the chunked background indexer over every file, then finalize — the
-/// rust-analyzer-style eager warm-up a consumer performs at session start.
-fn eager_index_vendor(session: &AnalysisSession, root: &std::path::Path) {
+/// Drive the chunked background indexer over every file, then finalize, as a
+/// consumer does at session start.
+fn eager_index_vendor(session: &mut AnalysisSession, root: &std::path::Path) {
     let cancel = IndexCancel::new();
     let files = indexable_files(root);
     for chunk in files.chunks(2) {
@@ -127,8 +127,8 @@ fn eager_index_resolves_inherited_return_type_member() {
     )
     .unwrap();
 
-    let session = make_session(root.path());
-    eager_index_vendor(&session, root.path());
+    let mut session = make_session(root.path());
+    eager_index_vendor(&mut session, root.path());
 
     let open_path: Arc<str> = Arc::from(app_src.join("open.php").to_string_lossy().as_ref());
     let open_src = "<?php\n\
@@ -137,7 +137,7 @@ fn eager_index_resolves_inherited_return_type_member() {
         $u = $c->getUser();\n\
         $u->nope();\n";
 
-    let analysis = analyze(&session, open_path, open_src);
+    let analysis = analyze(&mut session, open_path, open_src);
     let undefined_method = analysis
         .issues
         .iter()
@@ -175,11 +175,11 @@ fn priority_index_resolves_direct_ref_before_background_walk() {
     )
     .unwrap();
 
-    let session = make_session(root.path());
+    let mut session = make_session(root.path());
     let open_path: Arc<str> = Arc::from(app_src.join("open.php").to_string_lossy().as_ref());
     let open_src = "<?php\nuse Vendor\\Service;\n$s = new Service();\n$s->go();\n";
 
-    let analysis = analyze(&session, open_path, open_src);
+    let analysis = analyze(&mut session, open_path, open_src);
     assert!(
         session.contains_class("Vendor\\Service"),
         "priority indexing must fault in the open file's direct reference"
@@ -238,13 +238,13 @@ fn priority_index_is_bounded_to_direct_refs() {
     )
     .unwrap();
 
-    let session = make_session(root.path());
+    let mut session = make_session(root.path());
     session.ensure_all_stubs();
     let stub_baseline = session.tracked_file_count();
 
     let open_path: Arc<str> = Arc::from(app_src.join("open.php").to_string_lossy().as_ref());
     let open_src = "<?php\nuse Vendor\\Root;\n$r = new Root();\n$r->nope();\n";
-    analyze(&session, open_path, open_src);
+    analyze(&mut session, open_path, open_src);
 
     let vendor_loaded = session.tracked_file_count().saturating_sub(stub_baseline);
     assert!(
@@ -277,13 +277,13 @@ fn invalidate_file_keeps_vendor_static() {
     )
     .unwrap();
 
-    let session = make_session(root.path());
-    eager_index_vendor(&session, root.path());
+    let mut session = make_session(root.path());
+    eager_index_vendor(&mut session, root.path());
     assert!(session.contains_class("Vendor\\Service"));
 
     let open_path: Arc<str> = Arc::from(app_src.join("open.php").to_string_lossy().as_ref());
     let open_src = "<?php\nuse Vendor\\Service;\n$s = new Service();\n$s->foo();\n";
-    analyze(&session, open_path.clone(), open_src);
+    analyze(&mut session, open_path.clone(), open_src);
 
     session.invalidate_file(open_path.as_ref());
 

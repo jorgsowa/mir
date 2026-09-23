@@ -1,6 +1,6 @@
 //! Measurement: estimate per-function memory cost if we added
 //! `infer_function(fn_id) -> Arc<FunctionInferenceResult>` as a salsa
-//! tracked query (rust-analyzer-style per-function inference).
+//! tracked query.
 //!
 //! Decision-input for whether to pursue the larger refactor. Runs the
 //! existing batch analyzer on the Laravel fixture, then divides totals
@@ -49,7 +49,7 @@ fn measure_per_function_inference_size() {
     );
 
     let t_start = std::time::Instant::now();
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
     let result = session.analyze_paths(&all_files, &BatchOptions::new());
     let elapsed = t_start.elapsed();

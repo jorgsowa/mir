@@ -80,7 +80,7 @@ function caller(): void
     let file_a = path_to_arc_str(&path_a);
     let file_b = path_to_arc_str(&path_b);
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     // One full pass over both files: populates diagnostics, inferred types,
@@ -125,7 +125,7 @@ fn assert_instant(label: &str, mut call: impl FnMut()) {
 
 #[test]
 fn go_to_definition_is_instant_on_warm_cache() {
-    let p = warm_project();
+    let mut p = warm_project();
     assert_instant("definition_at(Greeter::greet call)", || {
         let def = p
             .session
@@ -137,7 +137,7 @@ fn go_to_definition_is_instant_on_warm_cache() {
 
 #[test]
 fn find_references_usages_is_instant_on_warm_cache() {
-    let p = warm_project();
+    let mut p = warm_project();
     let files = vec![p.file_a.clone(), p.file_b.clone()];
     assert_instant("references_at(helper usages)", || {
         let refs = p
@@ -159,7 +159,7 @@ fn find_references_usages_is_instant_on_warm_cache() {
 
 #[test]
 fn hover_is_instant_on_warm_cache() {
-    let p = warm_project();
+    let mut p = warm_project();
     assert_instant("hover_at(helper call)", || {
         p.session
             .hover_at(p.file_b.as_ref(), p.fn_call_offset)
@@ -205,7 +205,7 @@ mod full_corpus {
             PhpVersion::LATEST.cache_byte(),
             0,
         ));
-        let session = AnalysisSession::new(PhpVersion::LATEST).with_cache(cache);
+        let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache(cache);
         session.ensure_all_stubs();
 
         let vendor_pairs: Vec<(Arc<str>, Arc<str>)> = vendor_files
@@ -260,7 +260,7 @@ mod full_corpus {
     #[test]
     #[ignore = "needs a real fixture (Laravel/Symfony); run explicitly with --ignored --nocapture"]
     fn go_to_definition_stays_instant_on_full_workspace_index() {
-        let Some((session, file, offset)) = warm_full_corpus_session() else {
+        let Some((mut session, file, offset)) = warm_full_corpus_session() else {
             return;
         };
         assert_instant("definition_at(full corpus)", || {
@@ -271,7 +271,7 @@ mod full_corpus {
     #[test]
     #[ignore = "needs a real fixture (Laravel/Symfony); run explicitly with --ignored --nocapture"]
     fn find_references_stays_instant_on_full_workspace_index() {
-        let Some((session, file, offset)) = warm_full_corpus_session() else {
+        let Some((mut session, file, offset)) = warm_full_corpus_session() else {
             return;
         };
         let files = vec![file.clone()];

@@ -2,7 +2,7 @@ use super::*;
 
 impl AnalysisSession {
     pub(super) fn lazy_load_missing_classes(
-        &self,
+        &mut self,
         psr4: Arc<crate::composer::Psr4Map>,
         php_version: PhpVersion,
         all_issues: &mut Vec<Issue>,
@@ -65,31 +65,37 @@ impl AnalysisSession {
                 loaded.insert(fqcn.clone());
             }
 
-            // Read + parse + ingest the missing classes in parallel. The parse
-            // and definition walk inside `collect_and_ingest_source` already run
-            // off the salsa write lock (it takes the lock only for the brief
-            // input upsert), so fanning the per-file work across the rayon pool
-            // turns this previously-serial phase — the dominant cost on the lazy
-            // path — concurrent. `collect()` on a rayon map preserves input
-            // order, so the resulting issue ordering matches the serial version.
-            let per_file_issues: Vec<Vec<Issue>> = to_load
+            // Parse + collect in parallel on per-thread snapshots, then
+            // register serially; `collect()` keeps input order, so issue
+            // ordering is deterministic.
+            let db_template = self.snapshot_db();
+            let stub_cache = self.db.stub_cache.clone();
+            let prepared: Vec<Option<(bool, crate::analyzer_db::PreparedIngest)>> = to_load
                 .par_iter()
-                .map(|(_, path)| -> Vec<Issue> {
+                .map_with(db_template, |db, (_, path)| {
                     let Ok(src) = std::fs::read_to_string(path) else {
-                        return Vec::new();
+                        return None;
                     };
                     let file: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
                     let is_vendor = file.contains("/vendor/") || file.contains("\\vendor\\");
-                    let defs = self.collect_and_ingest_source(file, &src, php_version);
-                    if is_vendor {
-                        Vec::new()
-                    } else {
-                        Arc::unwrap_or_clone(defs.issues)
-                    }
+                    let prepared = crate::analyzer_db::AnalyzerDb::prepare_ingest(
+                        db,
+                        stub_cache.as_ref(),
+                        file,
+                        &src,
+                        php_version,
+                    );
+                    Some((is_vendor, prepared))
                 })
                 .collect();
-            for mut issues in per_file_issues {
-                all_issues.append(&mut issues);
+            for entry in prepared {
+                let Some((is_vendor, prepared)) = entry else {
+                    continue;
+                };
+                let collected = self.db.commit_ingest(prepared);
+                if !is_vendor {
+                    all_issues.append(&mut Arc::unwrap_or_clone(collected.file_defs.issues));
+                }
             }
 
             // Make the just-loaded classes visible to the next iteration's
@@ -100,7 +106,7 @@ impl AnalysisSession {
 
     #[allow(clippy::too_many_arguments)]
     pub(super) fn lazy_load_from_body_issues(
-        &self,
+        &mut self,
         psr4: Arc<crate::composer::Psr4Map>,
         php_version: PhpVersion,
         file_data: &[(Arc<str>, Arc<str>)],
@@ -166,8 +172,8 @@ impl AnalysisSession {
             all_symbols.retain(|s| !files_to_reanalyze.contains(&s.file));
 
             let mut db_full = {
-                let guard = self.db.salsa.read();
-                (**guard).clone()
+                let guard = &self.db.salsa;
+                (*guard).clone()
             };
             // This round's index mutation is done (ingest + refresh +
             // lazy_load_missing_classes ran above). Freeze on the ephemeral
@@ -203,7 +209,7 @@ impl AnalysisSession {
                 reanalysis_ref_locs.extend(ref_locs);
             }
             {
-                let guard = self.db.salsa.read();
+                let guard = &self.db.salsa;
                 guard.commit_reference_locations_batch(reanalysis_ref_locs);
             }
         }

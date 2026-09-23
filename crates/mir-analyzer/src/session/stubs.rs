@@ -7,14 +7,14 @@ impl AnalysisSession {
     /// compatibility. Internal analysis paths use [`Self::prepare_ast_for_analysis`]
     /// which loads only the stubs referenced by the file under analysis.
     #[deprecated(note = "use ensure_all_stubs() or ensure_stubs_for_ast() instead")]
-    pub fn ensure_essential_stubs(&self) {
+    pub fn ensure_essential_stubs(&mut self) {
         self.ensure_all_stubs();
     }
 
     /// Load every embedded PHP stub plus any configured user stubs.
     /// Use for batch tools (CLI, full project analysis) where comprehensive
     /// symbol coverage matters more than cold-start latency.
-    pub fn ensure_all_stubs(&self) {
+    pub fn ensure_all_stubs(&mut self) {
         let paths: Vec<&'static str> = crate::stubs::stub_files().iter().map(|&(p, _)| p).collect();
         self.db.ingest_stub_paths(&paths, self.php_version);
         self.ensure_user_stubs_loaded();
@@ -27,7 +27,7 @@ impl AnalysisSession {
     /// Most callers should use [`Self::ensure_stubs_for_ast`] instead —
     /// it auto-discovers needed stubs from a parsed file.
     #[doc(hidden)]
-    pub fn ensure_stub_for_function(&self, name: &str) -> bool {
+    pub fn ensure_stub_for_function(&mut self, name: &str) -> bool {
         match crate::stubs::stub_path_for_function(name) {
             Some(path) => {
                 self.db.ingest_stub_paths(&[path], self.php_version);
@@ -43,7 +43,7 @@ impl AnalysisSession {
     ///
     /// Most callers should use [`Self::ensure_stubs_for_ast`] instead.
     #[doc(hidden)]
-    pub fn ensure_stub_for_class(&self, fqcn: &str) -> bool {
+    pub fn ensure_stub_for_class(&mut self, fqcn: &str) -> bool {
         match crate::stubs::stub_path_for_class(fqcn) {
             Some(path) => {
                 self.db.ingest_stub_paths(&[path], self.php_version);
@@ -57,7 +57,7 @@ impl AnalysisSession {
     ///
     /// Most callers should use [`Self::ensure_stubs_for_ast`] instead.
     #[doc(hidden)]
-    pub fn ensure_stub_for_constant(&self, name: &str) -> bool {
+    pub fn ensure_stub_for_constant(&mut self, name: &str) -> bool {
         match crate::stubs::stub_path_for_constant(name) {
             Some(path) => {
                 self.db.ingest_stub_paths(&[path], self.php_version);
@@ -91,7 +91,7 @@ impl AnalysisSession {
     /// Fast path: if every embedded stub is already loaded (e.g. after a
     /// batch tool called [`Self::ensure_all_stubs`]), the source scan
     /// is skipped entirely.
-    pub fn ensure_stubs_for_source(&self, source: &str) {
+    pub fn ensure_stubs_for_source(&mut self, source: &str) {
         // Cheap check first: skip the scan entirely when we already know we
         // have everything. Avoids a ~50-500µs source walk on every analyze
         // call in batch / warm-session scenarios.
@@ -117,7 +117,7 @@ impl AnalysisSession {
     /// already available (e.g., in [`crate::FileAnalyzer`]).
     ///
     /// Idempotent and skips the scan if all stubs are already loaded.
-    pub fn ensure_stubs_for_ast(&self, program: &php_ast::owned::Program) {
+    pub fn ensure_stubs_for_ast(&mut self, program: &php_ast::owned::Program) {
         {
             let loaded = self.db.loaded_stubs.lock();
             if loaded.len() >= crate::stubs::stub_files().len() {
@@ -148,19 +148,15 @@ impl AnalysisSession {
     /// loads all pending vendor eager files at once on the first
     /// [`Self::prepare_ast_for_analysis`] call.
     ///
-    /// The mutex is held for the duration of the load, so concurrent callers
-    /// block here until the files are indexed.  Subsequent calls see `None`
-    /// and return immediately (O(1)).  Files are read via the session's
-    /// [`crate::SourceProvider`], so LSP VFS overrides are respected.
-    pub(crate) fn ensure_vendor_eager_functions(&self) {
-        let mut guard = self.pending_eager_function_files.lock();
-        let files = match guard.take() {
+    /// Subsequent calls see `None` and return immediately (O(1)). Files are
+    /// read via the session's [`crate::SourceProvider`], so LSP VFS overrides
+    /// are respected.
+    pub(crate) fn ensure_vendor_eager_functions(&mut self) {
+        let files = match self.pending_eager_function_files.lock().take() {
             None => return,
             Some(f) if f.is_empty() => return,
             Some(f) => f,
         };
-        // Guard remains held (now `None`) — concurrent callers block here
-        // until `index_batch` returns and all functions are indexed.
         let sources: Vec<(std::sync::Arc<str>, std::sync::Arc<str>)> = files
             .iter()
             .filter_map(|p| {
@@ -181,7 +177,7 @@ impl AnalysisSession {
     ///
     /// Replaces the two separate `ensure_stubs_for_ast` /
     /// `preload_psr4_classes_for_ast` calls at every open-file analysis site.
-    pub fn prepare_ast_for_analysis(&self, program: &php_ast::owned::Program, file: &str) {
+    pub fn prepare_ast_for_analysis(&mut self, program: &php_ast::owned::Program, file: &str) {
         self.ensure_stubs_for_ast(program);
         self.ensure_vendor_eager_functions();
         self.priority_index_for_ast(program, file);
@@ -197,7 +193,7 @@ impl AnalysisSession {
     /// candidate prepared and stay pure. Loading mutates salsa inputs, so the
     /// parse snapshot is scoped and dropped before the warm-up runs — callers
     /// must not hold a live snapshot across this call.
-    pub fn prepare_file_for_analysis(&self, path: &std::sync::Arc<str>) {
+    pub fn prepare_file_for_analysis(&mut self, path: &std::sync::Arc<str>) {
         let _ = self.prepare_file_for_analysis_cancellable(path, &|| false);
     }
 
@@ -207,7 +203,7 @@ impl AnalysisSession {
     /// background reanalysis cannot remain queued behind a writer which is
     /// itself waiting for another Salsa snapshot to end.
     pub(crate) fn prepare_file_for_analysis_cancellable(
-        &self,
+        &mut self,
         path: &std::sync::Arc<str>,
         should_cancel: &(dyn Fn() -> bool + Sync),
     ) -> bool {
@@ -216,9 +212,10 @@ impl AnalysisSession {
         }
         let generation = self.prepare_generation_snapshot();
         let (parsed, text) = {
-            let Some(db) = self.snapshot_db_cancellable(should_cancel) else {
+            if should_cancel() {
                 return false;
-            };
+            }
+            let db = self.snapshot_db();
             let Some(sf) = db.lookup_source_file(path.as_ref()) else {
                 return true;
             };
@@ -233,12 +230,10 @@ impl AnalysisSession {
                 text,
             )
         };
-        // One revision bump per prepared file instead of one per loaded
-        // class; nests under a pass-level scope (references Phase 1, the
-        // reanalyze sweep), which then coalesces the whole pass into one.
-        let _deferred_bumps = self.defer_revision_bumps();
-        self.prepare_ast_for_analysis(&parsed.program, path.as_ref());
-        self.mark_prepared_for_analysis(path, text, generation);
+        // Nests under pass-level scopes, which coalesce the whole pass.
+        let mut session = self.defer_revision_bumps();
+        session.prepare_ast_for_analysis(&parsed.program, path.as_ref());
+        session.mark_prepared_for_analysis(path, text, generation);
         true
     }
 
@@ -317,7 +312,7 @@ impl AnalysisSession {
     /// invalidating just the actively-analyzed file's memo once — not the whole
     /// cache. Once background indexing completes this is a no-op (every
     /// reference already resolves).
-    pub fn priority_index_for_ast(&self, program: &php_ast::owned::Program, file: &str) {
+    pub fn priority_index_for_ast(&mut self, program: &php_ast::owned::Program, file: &str) {
         if self.resolver.is_none() {
             return;
         }
@@ -340,7 +335,7 @@ impl AnalysisSession {
         }
     }
 
-    fn ensure_user_stubs_loaded(&self) {
+    fn ensure_user_stubs_loaded(&mut self) {
         self.db
             .ingest_user_stubs(&self.user_stub_files, &self.user_stub_dirs);
     }

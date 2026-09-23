@@ -1,7 +1,6 @@
 //! Per-function inference tracked query (free functions only — prototype).
 //!
-//! [`infer_function`] is the rust-analyzer-style primitive: salsa memoizes
-//! one function's diagnostics + inferred return type at function granularity.
+//! [`infer_function`]: salsa memoizes one function's diagnostics + inferred return type at function granularity.
 //! Editing file A's `bar()` does not invalidate cached results for `foo()`.
 //!
 //! Today the query is keyed by `(SourceFile, fn_fqn)`; the PHP version is

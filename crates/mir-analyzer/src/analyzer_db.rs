@@ -13,56 +13,16 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::db::MirDatabase;
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 
 use crate::db::MirDbStorage;
 use crate::php_version::PhpVersion;
 
-/// Newtype that allows `RwLock<MirDbRw>` in `AnalyzerDb`.
-///
-/// SAFETY: Under the *read* lock only these operations are performed on the
-/// shared `&MirDbStorage`:
-///
-///   1. `clone()` — increments `Arc` refcounts; allocates a fresh `ZalsaLocal`
-///      for the clone without touching the original `ZalsaLocal`.
-///   2. `source_file_count()` — reads `self.source_files.len()`, a plain
-///      `HashMap` field, no Salsa involvement.
-///   3. `set_file_reference_locations()` / `set_file_class_edges()` — write
-///      into the `Arc<Mutex<RefIndex>>` / `Arc<Mutex<SubtypeIndex>>` fields,
-///      no `ZalsaLocal` access.
-///   4. The `class_mention*` accessors — same shape as (3), all state lives
-///      behind `Arc<Mutex<ClassMentionIndex>>`, no `ZalsaLocal` access.
-///
-/// None of these touch the `RefCell<QueryStack>` inside `ZalsaLocal`, so
-/// concurrent read-lock holders are data-race-free. Under the *write* lock
-/// access is exclusive, so there is no aliasing.
-///
-/// Callers MUST NOT call Salsa input-field getters (e.g. `node.text(db)`,
-/// `node.is_interface(db)`) on a shared `&MirDbRw` under the read lock —
-/// those write to `ZalsaLocal`. Use `snapshot_db()` for all other reads.
-pub(crate) struct MirDbRw(MirDbStorage);
-
-unsafe impl Sync for MirDbRw {}
-
-impl std::ops::Deref for MirDbRw {
-    type Target = MirDbStorage;
-    fn deref(&self) -> &MirDbStorage {
-        &self.0
-    }
-}
-
-impl std::ops::DerefMut for MirDbRw {
-    fn deref_mut(&mut self) -> &mut MirDbStorage {
-        &mut self.0
-    }
-}
-
 /// Shared database holder with stub tracking. Owned by both ProjectAnalyzer and
 /// AnalysisSession, providing a common point for their database operations.
 pub struct AnalyzerDb {
-    /// Salsa database (source file handles live inside MirDbStorage.source_files).
-    /// RwLock: multiple concurrent snapshot_db() reads; exclusive for writes.
-    pub(crate) salsa: RwLock<MirDbRw>,
+    /// Salsa database, owned by the single writer; readers use `snapshot_db()`.
+    pub(crate) salsa: MirDbStorage,
     /// Stubs that have been ingested (for idempotency).
     pub(crate) loaded_stubs: Mutex<HashSet<&'static str>>,
     /// Whether user stubs have been ingested.
@@ -78,6 +38,14 @@ pub(crate) struct CollectedIngest {
     pub parsed: Option<php_rs_parser::ParseResult>,
 }
 
+/// Output of [`AnalyzerDb::prepare_ingest`], registered by [`AnalyzerDb::commit_ingest`].
+pub(crate) struct PreparedIngest {
+    file: Arc<str>,
+    source: Arc<str>,
+    durability: salsa::Durability,
+    collected: CollectedIngest,
+}
+
 impl AnalyzerDb {
     pub fn new() -> Self {
         let mut db = MirDbStorage::default();
@@ -88,7 +56,7 @@ impl AnalyzerDb {
         // (because the query never read the revision during that execution).
         db.init_workspace_revision();
         Self {
-            salsa: RwLock::new(MirDbRw(db)),
+            salsa: db,
             loaded_stubs: Mutex::new(HashSet::new()),
             user_stubs_loaded: std::sync::atomic::AtomicBool::new(false),
             stub_cache: None,
@@ -103,7 +71,7 @@ impl AnalyzerDb {
     pub fn with_cache_dir(mut self, cache_dir: &std::path::Path) -> Self {
         let cache = Arc::new(crate::stub_cache::StubSliceCache::open(cache_dir));
         // Wire cache into the salsa db so collect_file_definitions can use it.
-        self.salsa.write().set_stub_cache(cache.clone());
+        self.salsa.set_stub_cache(cache.clone());
         self.stub_cache = Some(cache);
         self
     }
@@ -112,61 +80,27 @@ impl AnalyzerDb {
     /// Used by upstream cache-attach guards to detect "wire the cache
     /// before ingesting" violations.
     pub fn source_file_count(&self) -> usize {
-        self.salsa.read().source_file_count()
+        self.salsa.source_file_count()
     }
 
-    /// Acquire a cheap clone of the salsa db for read-only queries.
-    /// Multiple callers may snapshot concurrently; the read lock is held
-    /// only for the duration of the clone.
-    ///
-    /// Drop the returned handle before this thread takes `self.salsa`'s lock again — a live snapshot held across that acquisition deadlocks a concurrent writer waiting in `cancel_others`.
+    /// Cheap read-only clone of the salsa storage; never blocks.
     pub fn snapshot_db(&self) -> MirDbStorage {
-        let guard = self.salsa.read();
-        (**guard).clone()
+        self.salsa.clone()
     }
 
-    /// Acquire a read-only Salsa clone without making a cancellable caller wait
-    /// behind a pending writer forever.
-    ///
-    /// `parking_lot::RwLock` fairly blocks new readers once a writer is
-    /// queued. That is normally desirable, but a Salsa input writer can in
-    /// turn be waiting for existing database snapshots to unwind. A
-    /// cancellable analysis request queued for this lock must be able to
-    /// leave when its host cancels it, so it does not become the snapshot that
-    /// prevents that writer from completing.
-    pub(crate) fn snapshot_db_cancellable(
-        &self,
-        should_cancel: &(dyn Fn() -> bool + Sync),
-    ) -> Option<MirDbStorage> {
-        loop {
-            if should_cancel() {
-                return None;
-            }
-            // Bound the wait to keep this cheap under contention without a
-            // busy-spin, while still checking cancellation at editor-scale
-            // latency.
-            if let Some(guard) = self.salsa.try_read_for(std::time::Duration::from_millis(1)) {
-                return Some((**guard).clone());
-            }
-            std::thread::yield_now();
-        }
-    }
-
-    /// Look up an existing [`crate::db::SourceFile`] handle by path. Reads the
-    /// off-salsa path→handle registry (a plain map read — safe under the read
-    /// lock, no `ZalsaLocal` access).
+    /// Look up an existing [`crate::db::SourceFile`] handle by path.
     pub fn lookup_source_file(&self, path: &str) -> Option<crate::db::SourceFile> {
         use crate::db::MirDatabase as _;
-        self.salsa.read().lookup_source_file(path)
+        self.salsa.lookup_source_file(path)
     }
 
     /// Mark a [`crate::db::SourceFile`] as removed from the workspace.
-    pub fn remove_source_file(&self, path: &str) {
-        self.salsa.write().remove_source_file(path);
+    pub fn remove_source_file(&mut self, path: &str) {
+        self.salsa.remove_source_file(path);
     }
 
     /// Ingest multiple stub paths. Idempotent — already-loaded stubs are skipped.
-    pub fn ingest_stub_paths(&self, paths: &[&'static str], _php_version: PhpVersion) {
+    pub fn ingest_stub_paths(&mut self, paths: &[&'static str], _php_version: PhpVersion) {
         // Identify needed paths (filter to those not yet loaded).
         let needed: Vec<&'static str> = {
             let loaded = self.loaded_stubs.lock();
@@ -181,7 +115,6 @@ impl AnalyzerDb {
             return;
         }
 
-        let mut guard = self.salsa.write();
         let mut loaded = self.loaded_stubs.lock();
         for path in &needed {
             if loaded.insert(*path) {
@@ -191,7 +124,7 @@ impl AnalyzerDb {
                 // db.php_version_str() / .with_php_version().
                 // HIGH durability: built-in stubs never change within a session.
                 if let Some(content) = crate::stubs::stub_content_for_path(path) {
-                    guard.upsert_source_file_with_durability(
+                    self.salsa.upsert_source_file_with_durability(
                         Arc::from(*path),
                         Arc::from(content),
                         salsa::Durability::HIGH,
@@ -202,7 +135,7 @@ impl AnalyzerDb {
     }
 
     /// Ingest user stub slices from configured files and directories.
-    pub fn ingest_user_stubs(&self, files: &[PathBuf], dirs: &[PathBuf]) {
+    pub fn ingest_user_stubs(&mut self, files: &[PathBuf], dirs: &[PathBuf]) {
         if files.is_empty() && dirs.is_empty() {
             return;
         }
@@ -233,7 +166,6 @@ impl AnalyzerDb {
             })
             .collect();
 
-        let mut guard = self.salsa.write();
         // Register each user stub as a SourceFile so workspace_symbol_index
         // can index its functions, classes, etc. via the pull path.
         // Also mark each path as a user stub so user stubs take priority
@@ -243,12 +175,12 @@ impl AnalyzerDb {
             // HIGH durability: user stubs are loaded once and never change within
             // a session (guarded by user_stubs_loaded). This lets salsa skip
             // O(N_user_stubs) dep-verification on every project-file edit.
-            guard.upsert_source_file_with_durability(
+            self.salsa.upsert_source_file_with_durability(
                 path_arc.clone(),
                 Arc::from(source.as_str()),
                 salsa::Durability::HIGH,
             );
-            guard.register_user_stub_path(path_arc);
+            self.salsa.register_user_stub_path(path_arc);
         }
         self.user_stubs_loaded
             .store(true, std::sync::atomic::Ordering::Relaxed);
@@ -256,15 +188,8 @@ impl AnalyzerDb {
 
     /// Collect definitions from a file and ingest its stub slice.
     /// Used by both ProjectAnalyzer and AnalysisSession during file ingestion.
-    ///
-    /// **Lock discipline:** parsing and definition collection happen *outside*
-    /// the salsa write lock — they don't need the db beyond reading the source
-    /// text we already have in hand. Only the salsa input update and the slice
-    /// ingestion happen under the lock. This lets concurrent readers (e.g. an
-    /// LSP serving hover requests on a snapshot) proceed in parallel with the
-    /// expensive parse step.
     pub fn collect_and_ingest_file(
-        &self,
+        &mut self,
         file: Arc<str>,
         source: &str,
         php_version: PhpVersion,
@@ -274,11 +199,43 @@ impl AnalyzerDb {
     }
 
     pub(crate) fn collect_and_ingest_file_with_parsed(
-        &self,
+        &mut self,
         file: Arc<str>,
         source: &str,
         php_version: PhpVersion,
     ) -> CollectedIngest {
+        let snapshot = self.snapshot_db();
+        let prepared = Self::prepare_ingest(
+            &snapshot,
+            self.stub_cache.as_ref(),
+            file,
+            source,
+            php_version,
+        );
+        // A salsa write waits for every other storage clone to drop.
+        drop(snapshot);
+        self.commit_ingest(prepared)
+    }
+
+    /// Register a [`PreparedIngest`]'s salsa input.
+    pub(crate) fn commit_ingest(&mut self, prepared: PreparedIngest) -> CollectedIngest {
+        self.salsa.upsert_source_file_with_durability(
+            prepared.file,
+            prepared.source,
+            prepared.durability,
+        );
+        prepared.collected
+    }
+
+    /// Parse (or cache-hit) `source` and collect its definitions without
+    /// writing salsa; safe to run concurrently on separate snapshots.
+    pub(crate) fn prepare_ingest(
+        db_snapshot: &MirDbStorage,
+        stub_cache: Option<&Arc<crate::stub_cache::StubSliceCache>>,
+        file: Arc<str>,
+        source: &str,
+        php_version: PhpVersion,
+    ) -> PreparedIngest {
         use mir_issues::Issue;
 
         let php_v = php_version.cache_byte();
@@ -293,6 +250,7 @@ impl AnalyzerDb {
         // for priming the in-process parse cache that collect_file_definitions
         // checks to avoid re-parsing in the same session.
         let content_hash = crate::stub_cache::hash_source(source);
+        let source_arc: Arc<str> = Arc::from(source);
 
         // Vendor and user-stub files won't change within a session; project
         // files may be edited repeatedly. HIGH durability tells salsa it can
@@ -306,48 +264,41 @@ impl AnalyzerDb {
         };
 
         // Check in-process parse cache first (fastest path, avoids even disk I/O).
-        {
-            let guard = self.salsa.read();
-            let cached = guard.parse_cache().get(&content_hash, php_v);
-            drop(guard);
-            if let Some(cached) = cached {
-                crate::metrics::record_stub_cache_hit();
-                let same_path = cached.slice.file.as_deref() == Some(&*file);
-                let slice_arc = if same_path {
-                    // Path matches — share the Arc directly (no data clone needed).
-                    cached.slice
-                } else {
-                    // Different path — fix the `file` field.
-                    let mut owned = (*cached.slice).clone();
-                    owned.file = Some(file.clone());
-                    Arc::new(owned)
-                };
-                let issues = if same_path {
-                    cached.issues
-                } else {
-                    Arc::new(crate::parse_cache::patch_issue_locations(
-                        &cached.issues,
-                        &file,
-                    ))
-                };
-                let file_defs = crate::db::FileDefinitions {
-                    slice: slice_arc,
-                    issues,
-                };
-                let mut write_guard = self.salsa.write();
-                write_guard.upsert_source_file_with_durability(
-                    file.clone(),
-                    Arc::from(source),
-                    durability,
-                );
-                return CollectedIngest {
+        let cached = db_snapshot.parse_cache().get(&content_hash, php_v);
+        if let Some(cached) = cached {
+            crate::metrics::record_stub_cache_hit();
+            let same_path = cached.slice.file.as_deref() == Some(&*file);
+            let slice_arc = if same_path {
+                cached.slice
+            } else {
+                let mut owned = (*cached.slice).clone();
+                owned.file = Some(file.clone());
+                Arc::new(owned)
+            };
+            let issues = if same_path {
+                cached.issues
+            } else {
+                Arc::new(crate::parse_cache::patch_issue_locations(
+                    &cached.issues,
+                    &file,
+                ))
+            };
+            let file_defs = crate::db::FileDefinitions {
+                slice: slice_arc,
+                issues,
+            };
+            return PreparedIngest {
+                file,
+                source: source_arc,
+                durability,
+                collected: CollectedIngest {
                     file_defs,
                     parsed: None,
-                };
-            }
+                },
+            };
         }
 
-        let cache_hit = self.stub_cache.as_ref().and_then(|cache| {
+        let cache_hit = stub_cache.and_then(|cache| {
             let (mut slice, issues) = cache.get(&file, &content_hash, php_v)?;
             crate::stub_cache::prepare_for_ingest(&mut slice);
             Some((slice, issues))
@@ -358,7 +309,7 @@ impl AnalyzerDb {
             let slice_arc = Arc::new(slice);
             let issues_arc = Arc::new(issues);
             // Prime the in-process cache so later collect_file_definitions calls hit.
-            self.salsa.read().prime_parse_cache(
+            db_snapshot.prime_parse_cache(
                 content_hash,
                 php_v,
                 slice_arc.clone(),
@@ -368,16 +319,18 @@ impl AnalyzerDb {
                 slice: slice_arc,
                 issues: issues_arc,
             };
-            let mut guard = self.salsa.write();
-            guard.upsert_source_file_with_durability(file.clone(), Arc::from(source), durability);
-            return CollectedIngest {
-                file_defs,
-                parsed: None,
+            return PreparedIngest {
+                file,
+                source: source_arc,
+                durability,
+                collected: CollectedIngest {
+                    file_defs,
+                    parsed: None,
+                },
             };
         }
         crate::metrics::record_stub_cache_miss();
 
-        // ---- Phase 1: parse + collect outside the lock ---------------------
         let parsed = php_rs_parser::parse(source);
 
         let has_hard_parse_errors = parsed.errors.iter().any(crate::parser::is_hard_parse_error);
@@ -409,14 +362,14 @@ impl AnalyzerDb {
             // In-process cache: prevents re-parsing in the same session, and
             // preserves these exact issues for a later hit (re-ingesting this
             // same file unchanged, or a different consumer querying it).
-            self.salsa.read().prime_parse_cache(
+            db_snapshot.prime_parse_cache(
                 content_hash,
                 php_v,
                 Arc::clone(&slice_arc),
                 Arc::clone(&issues_arc),
             );
             // Disk cache: prevents re-parsing in future sessions.
-            if let Some(cache) = &self.stub_cache {
+            if let Some(cache) = stub_cache {
                 cache.put(&file, &content_hash, php_v, &slice_arc, &issues_arc);
             }
         }
@@ -426,16 +379,14 @@ impl AnalyzerDb {
             issues: issues_arc,
         };
 
-        // ---- Phase 2: register the salsa input under the write lock --
-        // The expensive parse and AST walk above ran lock-free.
-        {
-            let mut guard = self.salsa.write();
-            guard.upsert_source_file_with_durability(file.clone(), Arc::from(source), durability);
-        }
-
-        CollectedIngest {
-            file_defs,
-            parsed: Some(parsed),
+        PreparedIngest {
+            file,
+            source: source_arc,
+            durability,
+            collected: CollectedIngest {
+                file_defs,
+                parsed: Some(parsed),
+            },
         }
     }
 }

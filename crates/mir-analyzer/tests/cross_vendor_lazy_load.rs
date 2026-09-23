@@ -141,7 +141,7 @@ fn cross_vendor_psr4_resolves_sibling_package_class() {
         mir_analyzer::composer::Psr4Map::from_composer(root.path())
             .expect("Psr4Map from project root"),
     );
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
     let result = session.analyze_paths(&[consumer_path], &BatchOptions::new().without_symbols());
 
     let undefined = undefined_class_names(&result);
@@ -164,7 +164,7 @@ fn cross_vendor_psr4_resolves_fqcn_without_use_import() {
         mir_analyzer::composer::Psr4Map::from_composer(root.path())
             .expect("Psr4Map from project root"),
     );
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
     let result = session.analyze_paths(&[consumer_path], &BatchOptions::new().without_symbols());
 
     let undefined = undefined_class_names(&result);
@@ -186,7 +186,7 @@ fn cross_vendor_psr4_resolves_multiple_sibling_packages_in_one_file() {
         mir_analyzer::composer::Psr4Map::from_composer(root.path())
             .expect("Psr4Map from project root"),
     );
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
     let result = session.analyze_paths(&[consumer_path], &BatchOptions::new().without_symbols());
 
     let undefined = undefined_class_names(&result);
@@ -222,7 +222,7 @@ fn cross_vendor_sub_package_root_produces_undefined_class() {
         mir_analyzer::composer::Psr4Map::from_composer(&sub_pkg_root)
             .expect("Psr4Map from sub-package root"),
     );
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
     let result = session.analyze_paths(&[consumer_path], &BatchOptions::new().without_symbols());
 
     let undefined = undefined_class_names(&result);
@@ -285,7 +285,7 @@ fn cross_vendor_classmap_resolves_non_psr4_package() {
         mir_analyzer::composer::Psr4Map::from_composer(root.path())
             .expect("Psr4Map from project root"),
     );
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
     let result = session.analyze_paths(&[consumer_path], &BatchOptions::new().without_symbols());
 
     let undefined = undefined_class_names(&result);

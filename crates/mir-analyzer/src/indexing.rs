@@ -1,7 +1,7 @@
 //! Chunked, cancellable workspace-indexing primitives.
 //!
-//! These types support the rust-analyzer-style **eager background indexing**
-//! model: at session start the consumer enumerates every project + vendor file
+//! These types support **eager background indexing**: at session start the
+//! consumer enumerates every project + vendor file
 //! (see [`crate::composer::Psr4Map::all_vendor_files`]) and pumps them through
 //! [`crate::AnalysisSession::index_batch`] in bounded chunks. Each chunk takes
 //! one short write window and merges its declarations into the workspace symbol

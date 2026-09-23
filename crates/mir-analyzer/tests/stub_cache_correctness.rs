@@ -46,7 +46,7 @@ fn project_analyzer_cold_and_warm_produce_identical_symbol_table() {
     let paths = [a.clone(), b.clone()];
 
     // --- Cold: populate the cache. -------------------------------------
-    let cold = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    let mut cold = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
     let cold_result = cold.analyze_paths(&paths, &BatchOptions::new().without_symbols());
     let cold_issues = cold_result.issues.len();
     assert!(
@@ -71,7 +71,7 @@ fn project_analyzer_cold_and_warm_produce_identical_symbol_table() {
     // so this run should observe hits. Even if re_analyze_file produces
     // no hits the assertion below catches regressions: cold and warm
     // must agree on the observable analyzer state.
-    let warm = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    let mut warm = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
     let warm_result = warm.analyze_paths(&paths, &BatchOptions::new().without_symbols());
     assert_eq!(
         warm_result.issues.len(),
@@ -107,7 +107,7 @@ fn analysis_session_warm_cache_observes_hits_and_preserves_symbols() {
 
     // --- Cold session: ingest both files, populating the cache. --------
     {
-        let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+        let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
         session.ensure_all_stubs();
         session.ingest_file(a_path.clone(), a_src.clone());
         session.ingest_file(b_path.clone(), b_src.clone());
@@ -120,7 +120,7 @@ fn analysis_session_warm_cache_observes_hits_and_preserves_symbols() {
     }
 
     // --- Warm session: same content -> every cache lookup must hit. ---
-    let session2 = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    let mut session2 = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
     session2.ensure_all_stubs();
     session2.ingest_file(a_path.clone(), a_src.clone());
     session2.ingest_file(b_path.clone(), b_src.clone());
@@ -158,7 +158,7 @@ fn cache_miss_after_content_change() {
         std::sync::Arc::from(std::fs::read_to_string(&a_path).unwrap().as_str());
 
     {
-        let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+        let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
         session.ensure_all_stubs();
         session.ingest_file(a_arc.clone(), v1);
         // v1: v1() exists, v2() doesn't.
@@ -174,7 +174,7 @@ fn cache_miss_after_content_change() {
     let v2: std::sync::Arc<str> =
         std::sync::Arc::from(std::fs::read_to_string(&a_path).unwrap().as_str());
 
-    let session2 = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    let mut session2 = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
     session2.ensure_all_stubs();
     session2.ingest_file(a_arc.clone(), v2);
 

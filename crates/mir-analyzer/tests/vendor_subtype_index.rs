@@ -34,7 +34,7 @@ fn vendor_tree_implementor_reaches_subtype_index() {
     )
     .unwrap();
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     // Vendor ingestion: type definitions only, no body analysis.
@@ -75,7 +75,7 @@ fn batch_project_implementor_reaches_subtype_index_without_ingest_file() {
     )
     .unwrap();
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     // Pure CLI batch pipeline — no `ingest_file` call anywhere.

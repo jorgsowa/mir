@@ -50,7 +50,7 @@ fn measure_baseline() {
         project_files.len()
     );
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let opts = BatchOptions::new().without_symbols();

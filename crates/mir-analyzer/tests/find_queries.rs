@@ -43,7 +43,7 @@ fn make_resolver(entries: &[(&str, &str)]) -> Arc<dyn ClassResolver> {
 
 #[test]
 fn class_in_file_finds_class_after_set_file_text_only() {
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.set_file_text(
         Arc::from("/proj/Foo.php"),
         Arc::from("<?php\nnamespace App;\nclass Foo {}\n"),
@@ -64,7 +64,7 @@ fn class_in_file_finds_class_after_set_file_text_only() {
 
 #[test]
 fn function_in_file_finds_function_after_set_file_text_only() {
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.set_file_text(
         Arc::from("/proj/helpers.php"),
         Arc::from("<?php\nnamespace App;\nfunction greet(string $n): string { return $n; }\n"),
@@ -87,7 +87,7 @@ fn find_class_like_combines_resolution_and_extraction() {
     // The headline test for the pull architecture: set up a resolver +
     // register file text, then ask find_class_like to do the whole thing
     // in one call. No `ingest_file` involved.
-    let session = AnalysisSession::new(PhpVersion::LATEST)
+    let mut session = AnalysisSession::new(PhpVersion::LATEST)
         .with_class_resolver(make_resolver(&[("App\\Foo", "/proj/Foo.php")]));
     session.set_file_text(
         Arc::from("/proj/Foo.php"),
@@ -107,7 +107,7 @@ fn find_class_like_combines_resolution_and_extraction() {
 
 #[test]
 fn find_class_like_returns_interface_kind() {
-    let session = AnalysisSession::new(PhpVersion::LATEST)
+    let mut session = AnalysisSession::new(PhpVersion::LATEST)
         .with_class_resolver(make_resolver(&[("App\\HasFoo", "/proj/HasFoo.php")]));
     session.set_file_text(
         Arc::from("/proj/HasFoo.php"),
@@ -124,7 +124,7 @@ fn find_class_like_returns_interface_kind() {
 
 #[test]
 fn find_function_finds_via_resolver() {
-    let session = AnalysisSession::new(PhpVersion::LATEST)
+    let mut session = AnalysisSession::new(PhpVersion::LATEST)
         .with_class_resolver(make_resolver(&[("App\\greet", "/proj/helpers.php")]));
     session.set_file_text(
         Arc::from("/proj/helpers.php"),
@@ -143,7 +143,7 @@ fn find_function_finds_via_resolver() {
 
 #[test]
 fn find_global_constant_finds_via_workspace_index() {
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.set_file_text(
         Arc::from("/proj/constants.php"),
         Arc::from("<?php\nnamespace App;\nconst ANSWER = 42;\n"),
@@ -187,7 +187,7 @@ fn find_class_like_resolves_php_builtin_via_stub_resolver() {
     // `with_class_resolver`. The stub resolver maps "ArrayObject" →
     // its bundled stub path; `ensure_all_stubs` registers that path
     // as a SourceFile so `find_class_like` finds it.
-    let session =
+    let mut session =
         AnalysisSession::new(PhpVersion::LATEST).with_class_resolver(Arc::new(EmptyResolver));
     session.ensure_all_stubs();
 
@@ -206,7 +206,7 @@ fn find_class_like_resolves_php_builtin_via_stub_resolver() {
 fn find_returns_class_from_set_file_text() {
     // With the pull-based architecture, set_file_text is enough to make a
     // class findable via workspace_symbol_index — no resolver needed.
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.set_file_text(
         Arc::from("/proj/Foo.php"),
         Arc::from("<?php\nclass Foo {}\n"),
@@ -231,7 +231,7 @@ fn find_returns_none_for_unregistered_class() {
 
 #[test]
 fn find_method_in_class_finds_own_method() {
-    let session = AnalysisSession::new(PhpVersion::LATEST)
+    let mut session = AnalysisSession::new(PhpVersion::LATEST)
         .with_class_resolver(make_resolver(&[("App\\Foo", "/proj/Foo.php")]));
     session.set_file_text(
         Arc::from("/proj/Foo.php"),
@@ -245,7 +245,7 @@ fn find_method_in_class_finds_own_method() {
 
 #[test]
 fn find_method_in_class_is_case_insensitive() {
-    let session = AnalysisSession::new(PhpVersion::LATEST)
+    let mut session = AnalysisSession::new(PhpVersion::LATEST)
         .with_class_resolver(make_resolver(&[("App\\Foo", "/proj/Foo.php")]));
     session.set_file_text(
         Arc::from("/proj/Foo.php"),
@@ -260,7 +260,7 @@ fn find_method_in_class_is_case_insensitive() {
 
 #[test]
 fn find_property_in_class_finds_own_property() {
-    let session = AnalysisSession::new(PhpVersion::LATEST)
+    let mut session = AnalysisSession::new(PhpVersion::LATEST)
         .with_class_resolver(make_resolver(&[("App\\Foo", "/proj/Foo.php")]));
     session.set_file_text(
         Arc::from("/proj/Foo.php"),
@@ -273,7 +273,7 @@ fn find_property_in_class_finds_own_property() {
 
 #[test]
 fn find_class_constant_in_class_finds_own_constant() {
-    let session = AnalysisSession::new(PhpVersion::LATEST)
+    let mut session = AnalysisSession::new(PhpVersion::LATEST)
         .with_class_resolver(make_resolver(&[("App\\Foo", "/proj/Foo.php")]));
     session.set_file_text(
         Arc::from("/proj/Foo.php"),
@@ -286,11 +286,12 @@ fn find_class_constant_in_class_finds_own_constant() {
 
 #[test]
 fn class_ancestors_walks_parent_chain() {
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_class_resolver(make_resolver(&[
-        ("App\\Base", "/proj/Base.php"),
-        ("App\\Mid", "/proj/Mid.php"),
-        ("App\\Leaf", "/proj/Leaf.php"),
-    ]));
+    let mut session =
+        AnalysisSession::new(PhpVersion::LATEST).with_class_resolver(make_resolver(&[
+            ("App\\Base", "/proj/Base.php"),
+            ("App\\Mid", "/proj/Mid.php"),
+            ("App\\Leaf", "/proj/Leaf.php"),
+        ]));
     session.set_file_text(
         Arc::from("/proj/Base.php"),
         Arc::from("<?php\nnamespace App;\nclass Base {}\n"),
@@ -312,10 +313,11 @@ fn class_ancestors_walks_parent_chain() {
 
 #[test]
 fn find_method_in_chain_finds_inherited_method() {
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_class_resolver(make_resolver(&[
-        ("App\\Base", "/proj/Base.php"),
-        ("App\\Child", "/proj/Child.php"),
-    ]));
+    let mut session =
+        AnalysisSession::new(PhpVersion::LATEST).with_class_resolver(make_resolver(&[
+            ("App\\Base", "/proj/Base.php"),
+            ("App\\Child", "/proj/Child.php"),
+        ]));
     session.set_file_text(
         Arc::from("/proj/Base.php"),
         Arc::from("<?php\nnamespace App;\nclass Base { public function inherited(): void {} }\n"),
@@ -333,10 +335,11 @@ fn find_method_in_chain_finds_inherited_method() {
 
 #[test]
 fn find_property_in_chain_finds_inherited_property() {
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_class_resolver(make_resolver(&[
-        ("App\\Base", "/proj/Base.php"),
-        ("App\\Child", "/proj/Child.php"),
-    ]));
+    let mut session =
+        AnalysisSession::new(PhpVersion::LATEST).with_class_resolver(make_resolver(&[
+            ("App\\Base", "/proj/Base.php"),
+            ("App\\Child", "/proj/Child.php"),
+        ]));
     session.set_file_text(
         Arc::from("/proj/Base.php"),
         Arc::from("<?php\nnamespace App;\nclass Base { public string $name = ''; }\n"),
@@ -354,10 +357,11 @@ fn find_property_in_chain_finds_inherited_property() {
 
 #[test]
 fn find_class_constant_in_chain_finds_inherited_constant() {
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_class_resolver(make_resolver(&[
-        ("App\\Base", "/proj/Base.php"),
-        ("App\\Child", "/proj/Child.php"),
-    ]));
+    let mut session =
+        AnalysisSession::new(PhpVersion::LATEST).with_class_resolver(make_resolver(&[
+            ("App\\Base", "/proj/Base.php"),
+            ("App\\Child", "/proj/Child.php"),
+        ]));
     session.set_file_text(
         Arc::from("/proj/Base.php"),
         Arc::from("<?php\nnamespace App;\nclass Base { const ANSWER = 42; }\n"),
@@ -378,10 +382,11 @@ fn ancestor_walk_handles_cycles() {
     // Intentional cycle in @extends-style docblock or genuinely circular
     // PHP code: A extends B, B extends A. We should not loop forever; the
     // walk should terminate at the first duplicate.
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_class_resolver(make_resolver(&[
-        ("App\\A", "/proj/A.php"),
-        ("App\\B", "/proj/B.php"),
-    ]));
+    let mut session =
+        AnalysisSession::new(PhpVersion::LATEST).with_class_resolver(make_resolver(&[
+            ("App\\A", "/proj/A.php"),
+            ("App\\B", "/proj/B.php"),
+        ]));
     session.set_file_text(
         Arc::from("/proj/A.php"),
         Arc::from("<?php\nnamespace App;\nclass A extends B {}\n"),
@@ -401,7 +406,7 @@ fn ancestor_walk_handles_cycles() {
 
 #[test]
 fn subtype_files_resolves_plain_fqn_and_aliased_extends() {
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.set_file_text(
         Arc::from("/proj/Base.php"),
         Arc::from("<?php\nnamespace App;\nclass Base { protected function boot() {} }\n"),

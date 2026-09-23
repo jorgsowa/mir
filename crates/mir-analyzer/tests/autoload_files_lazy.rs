@@ -92,14 +92,14 @@ fn file_analyzer_lazy_loads_vendor_autoload_files_functions() {
     let psr4 =
         mir_analyzer::composer::Psr4Map::from_composer(root.path()).expect("psr4 from composer");
     // No manual index_batch / index_vendor_eager_files call.
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
 
     let src = "<?php\nvendor_helper('test');\n";
     let path: Arc<str> = Arc::from("consumer.php");
     session.ingest_file(path.clone(), Arc::from(src));
 
     let parsed = php_rs_parser::parse(src);
-    let result = FileAnalyzer::new(&session).analyze_diagnostics_only(
+    let result = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         path,
         src,
         &parsed.program,
@@ -128,7 +128,7 @@ fn file_analyzer_lazy_load_is_idempotent_across_calls() {
 
     let psr4 =
         mir_analyzer::composer::Psr4Map::from_composer(root.path()).expect("psr4 from composer");
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
 
     let src = "<?php\nidem_fn();\n";
     let path: Arc<str> = Arc::from("a.php");
@@ -136,7 +136,7 @@ fn file_analyzer_lazy_load_is_idempotent_across_calls() {
     for _ in 0..3 {
         session.ingest_file(path.clone(), Arc::from(src));
         let parsed = php_rs_parser::parse(src);
-        let result = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        let result = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
             path.clone(),
             src,
             &parsed.program,
@@ -155,12 +155,12 @@ fn file_analyzer_lazy_load_is_idempotent_across_calls() {
 /// no psr4 map is attached.
 #[test]
 fn file_analyzer_no_psr4_does_not_panic() {
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     let src = "<?php\necho 1 + 1;\n";
     let path: Arc<str> = Arc::from("plain.php");
     session.ingest_file(path.clone(), Arc::from(src));
     let parsed = php_rs_parser::parse(src);
-    let result = FileAnalyzer::new(&session).analyze_diagnostics_only(
+    let result = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         path,
         src,
         &parsed.program,
@@ -215,7 +215,7 @@ fn project_autoload_files_indexed_via_project_files() {
         })
         .collect();
 
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
     let cancel = IndexCancel::new();
     session.index_batch(&index_files, IndexParallelism::Sequential, &cancel);
     session.finalize_index();
@@ -224,7 +224,7 @@ fn project_autoload_files_indexed_via_project_files() {
     let path: Arc<str> = Arc::from("consumer.php");
     session.ingest_file(path.clone(), Arc::from(src));
     let parsed = php_rs_parser::parse(src);
-    let result = FileAnalyzer::new(&session).analyze_diagnostics_only(
+    let result = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         path,
         src,
         &parsed.program,
@@ -255,13 +255,13 @@ fn vendor_autoload_files_function_exists_guard_is_transparent() {
 
     let psr4 =
         mir_analyzer::composer::Psr4Map::from_composer(root.path()).expect("psr4 from composer");
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
 
     let src = "<?php\nguarded_fn('hello');\n";
     let path: Arc<str> = Arc::from("consumer.php");
     session.ingest_file(path.clone(), Arc::from(src));
     let parsed = php_rs_parser::parse(src);
-    let result = FileAnalyzer::new(&session).analyze_diagnostics_only(
+    let result = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         path,
         src,
         &parsed.program,

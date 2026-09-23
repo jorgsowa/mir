@@ -15,7 +15,7 @@ fn definition_of_finds_class() {
     let file = write_file(&dir, "Foo.php", "<?php\nclass Foo {}\n");
     let file_str = path_to_str(&file).to_string();
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
     analyzer.analyze_paths(&[file], &BatchOptions::new().without_symbols());
 
     let loc = analyzer
@@ -33,7 +33,7 @@ fn definition_of_finds_function() {
         "<?php\nfunction my_func(): int { return 1; }\n",
     );
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
     analyzer.analyze_paths(&[file], &BatchOptions::new().without_symbols());
 
     assert!(
@@ -51,7 +51,7 @@ fn definition_of_finds_interface() {
         "<?php\ninterface Renderable { public function render(): string; }\n",
     );
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
     analyzer.analyze_paths(&[file], &BatchOptions::new().without_symbols());
 
     assert!(
@@ -69,7 +69,7 @@ fn definition_of_finds_method() {
         "<?php\nclass Bar {\n    public function baz(): void {}\n}\n",
     );
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
     analyzer.analyze_paths(&[file], &BatchOptions::new().without_symbols());
 
     assert!(
@@ -87,7 +87,7 @@ fn definition_of_finds_property() {
         "<?php\nclass Qux {\n    public string $name = '';\n}\n",
     );
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
     analyzer.analyze_paths(&[file], &BatchOptions::new().without_symbols());
 
     assert!(
@@ -107,7 +107,7 @@ fn definition_of_promoted_property_points_at_own_param_not_constructor() {
         "<?php\nclass Point {\n    public function __construct(\n        public readonly int $x,\n        public readonly int $y,\n    ) {}\n}\n",
     );
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
     analyzer.analyze_paths(&[file], &BatchOptions::new().without_symbols());
 
     let x_loc = analyzer
@@ -140,7 +140,7 @@ fn definition_of_finds_trait_constant_via_consuming_class_usage() {
         "<?php\ntrait HasVersion {\n    public const string VERSION = '1.0';\n}\nclass Config {\n    use HasVersion;\n}\nfunction ver(): string { return Config::VERSION; }\n",
     );
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
     analyzer.analyze_paths(&[file], &BatchOptions::new().without_symbols());
 
     assert!(
@@ -160,7 +160,7 @@ fn definition_of_finds_trait_aliased_method() {
         "<?php\ntrait Greetable {\n    public function sayHello(): void {}\n}\nclass Greeter {\n    use Greetable { sayHello as greet; }\n}\n",
     );
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
     analyzer.analyze_paths(&[file], &BatchOptions::new().without_symbols());
 
     assert!(
@@ -181,7 +181,7 @@ fn definition_of_trait_conflict_resolves_to_insteadof_winner() {
         "<?php\ntrait A {\n    public function hello(): void {}\n}\ntrait B {\n    public function hello(): void {}\n}\nclass C {\n    use A, B {\n        B::hello insteadof A;\n    }\n}\n",
     );
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
     analyzer.analyze_paths(&[file], &BatchOptions::new().without_symbols());
 
     let loc = analyzer
@@ -195,7 +195,7 @@ fn definition_of_trait_conflict_resolves_to_insteadof_winner() {
 
 #[test]
 fn definition_of_returns_not_found_for_unknown() {
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
     assert_eq!(
         analyzer
             .definition_of(&Name::class("NonExistent"))
@@ -231,7 +231,7 @@ fn laravel_definition_on_new_expression() {
     let auth_file = write_file(&dir, "AuthManager.php", auth_src);
     let auth_file_str = path_to_str(&auth_file).to_string();
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
     let _result = analyzer.analyze_paths(
         &[guard_file, auth_file],
         &BatchOptions::new().without_symbols(),
@@ -267,7 +267,7 @@ fn class_imports_returns_alias_to_fqn_map() {
     let gate_file = write_file(&dir, "Gate.php", gate_src);
     let gate_file_str = path_to_str(&gate_file).to_string();
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
     analyzer.analyze_paths(
         &[str_file, gate_file],
         &BatchOptions::new().without_symbols(),
@@ -296,7 +296,7 @@ fn class_imports_handles_renamed_alias() {
     let caller_file = write_file(&dir, "Caller.php", caller_src);
     let caller_file_str = path_to_str(&caller_file).to_string();
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
     analyzer.analyze_paths(
         &[bar_file, caller_file],
         &BatchOptions::new().without_symbols(),

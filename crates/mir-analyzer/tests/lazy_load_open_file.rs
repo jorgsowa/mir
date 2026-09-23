@@ -61,7 +61,7 @@ fn analyze_open_file_with_psr4(
         })
         .collect();
 
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
 
     // Eager background-index pass over the project's library files.
     let cancel = IndexCancel::new();
@@ -78,7 +78,7 @@ fn analyze_open_file_with_psr4(
         "parser errors in open-file source: {:?}",
         parsed.errors
     );
-    FileAnalyzer::new(&session).analyze_diagnostics_only(
+    FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         open_path,
         open_src,
         &parsed.program,
@@ -117,7 +117,7 @@ fn analyze_open_file_unindexed(
     .unwrap();
 
     let psr4 = mir_analyzer::composer::Psr4Map::from_composer(root.path()).expect("psr4 map");
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
 
     let open_path: Arc<str> = Arc::from(
         root.path()
@@ -134,7 +134,7 @@ fn analyze_open_file_unindexed(
         "parse errors: {:?}",
         parsed.errors
     );
-    FileAnalyzer::new(&session).analyze_diagnostics_only(
+    FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         open_path,
         open_src,
         &parsed.program,
@@ -319,7 +319,7 @@ fn priority_index_pre_loads_docblock_only_param_class() {
 
     let psr4 = mir_analyzer::composer::Psr4Map::from_composer(root.path()).expect("psr4 map");
     // Widget.php is NOT eagerly indexed — only the ClassResolver can find it.
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
 
     let open_src = "<?php\n\
         namespace App;\n\
@@ -347,7 +347,7 @@ fn priority_index_pre_loads_docblock_only_param_class() {
         parsed.errors
     );
 
-    let analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+    let analysis = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         open_path,
         open_src,
         &parsed.program,
@@ -407,7 +407,7 @@ fn analyze_open_file_unindexed_psr0(
     .unwrap();
 
     let psr4 = mir_analyzer::composer::Psr4Map::from_composer(root.path()).expect("psr4 map");
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
 
     let open_path: Arc<str> = Arc::from(root.path().join(open_name).to_string_lossy().as_ref());
     session.ingest_file(open_path.clone(), Arc::from(open_src));
@@ -418,7 +418,7 @@ fn analyze_open_file_unindexed_psr0(
         "parse errors: {:?}",
         parsed.errors
     );
-    FileAnalyzer::new(&session).analyze_diagnostics_only(
+    FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         open_path,
         open_src,
         &parsed.program,

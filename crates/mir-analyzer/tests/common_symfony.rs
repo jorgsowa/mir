@@ -81,7 +81,7 @@ pub fn load_full_symfony_fixture() -> Option<FullSymfonyFixture> {
         })
         .collect();
 
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
     session.ensure_all_stubs();
 
     let cancel = IndexCancel::new();
@@ -109,7 +109,7 @@ pub fn load_full_symfony_fixture() -> Option<FullSymfonyFixture> {
     let truncate_mode = arc_path(root.join("src/Symfony/Component/String/TruncateMode.php"));
     let router = arc_path(root.join("src/Symfony/Component/Routing/Router.php"));
 
-    let fx = FullSymfonyFixture {
+    let mut fx = FullSymfonyFixture {
         root,
         session,
         request,
@@ -126,19 +126,19 @@ pub fn load_full_symfony_fixture() -> Option<FullSymfonyFixture> {
     };
 
     let analysis_files = fx.analysis_target_files();
-    analyze_fixture_files(&fx, &analysis_files);
+    analyze_fixture_files(&mut fx, &analysis_files);
 
     Some(fx)
 }
 
-pub fn analyze_fixture_files(fx: &FullSymfonyFixture, files: &[Arc<str>]) {
+pub fn analyze_fixture_files(fx: &mut FullSymfonyFixture, files: &[Arc<str>]) {
     let paths: Vec<PathBuf> = files.iter().map(|f| PathBuf::from(f.as_ref())).collect();
     let _ = fx
         .session
         .analyze_paths(&paths, &mir_analyzer::BatchOptions::new().without_symbols());
 }
 
-pub fn reanalyze_fixture_files(fx: &FullSymfonyFixture, files: &[Arc<str>]) {
+pub fn reanalyze_fixture_files(fx: &mut FullSymfonyFixture, files: &[Arc<str>]) {
     let cancel = IndexCancel::new();
     let _ = fx.session.reanalyze_files_cancellable(files, &cancel);
 }

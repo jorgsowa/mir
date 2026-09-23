@@ -122,7 +122,7 @@ fn perf_analysis_full_report() {
     println!();
 
     let t0 = Instant::now();
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
     let init_time = t0.elapsed();
     print_row("AnalysisSession::new(PhpVersion::LATEST)", init_time, "");
 
@@ -153,7 +153,7 @@ fn perf_analysis_full_report() {
 
     let composer_root = root.to_path_buf();
     let t0 = Instant::now();
-    let session = match Psr4Map::from_composer(&composer_root) {
+    let mut session = match Psr4Map::from_composer(&composer_root) {
         Ok(map) => AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(map)),
         Err(_) => AnalysisSession::new(PhpVersion::LATEST),
     };
@@ -298,7 +298,7 @@ fn perf_analysis_full_report() {
 
     let parsed = php_rs_parser::parse(&open_source);
     let t0 = Instant::now();
-    let first_diagnostics = mir_analyzer::FileAnalyzer::new(&session).analyze_diagnostics_only(
+    let first_diagnostics = mir_analyzer::FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         open_arc.clone(),
         &open_source,
         &parsed.program,
@@ -312,12 +312,13 @@ fn perf_analysis_full_report() {
     );
 
     let t0 = Instant::now();
-    let second_diagnostics = mir_analyzer::FileAnalyzer::new(&session).analyze_diagnostics_only(
-        open_arc.clone(),
-        &open_source,
-        &parsed.program,
-        &parsed.source_map,
-    );
+    let second_diagnostics = mir_analyzer::FileAnalyzer::new(&mut session)
+        .analyze_diagnostics_only(
+            open_arc.clone(),
+            &open_source,
+            &parsed.program,
+            &parsed.source_map,
+        );
     let second_diagnostics_time = t0.elapsed();
     print_row(
         "repeat diagnostics_only",

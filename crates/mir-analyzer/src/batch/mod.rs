@@ -302,7 +302,7 @@ impl AnalysisSession {
     }
 
     fn collect_and_ingest_source(
-        &self,
+        &mut self,
         file: Arc<str>,
         src: &str,
         php_version: PhpVersion,
@@ -317,20 +317,20 @@ impl AnalysisSession {
     /// in referenced classes). Without refreshing it, `find_class_like` /
     /// `class_exists` miss every project and lazy-loaded class, yielding false
     /// `UndefinedClass`. Cheap after the definition caches are warm (no parsing).
-    fn refresh_workspace_index(&self) {
-        let mut guard = self.db.salsa.write();
+    fn refresh_workspace_index(&mut self) {
+        let guard = &mut self.db.salsa;
         guard.rebuild_workspace_symbol_index();
     }
 
     /// Load the configured PHP version + built-in stubs + user stubs into
     /// the shared db. Called by [`Self::analyze_paths`] and
     /// [`Self::collect_definitions`].
-    fn load_batch_stubs(&self, php_version: PhpVersion) {
+    fn load_batch_stubs(&mut self, php_version: PhpVersion) {
         // Wire the PHP version into the db before any SourceFile inputs are
         // registered — collect_file_definitions reads it for @since/@removed filtering.
         {
             let version_str = Arc::from(php_version.to_string());
-            self.db.salsa.write().set_php_version(version_str);
+            self.db.salsa.set_php_version(version_str);
         }
 
         // Built-in stubs for the configured PHP version.
@@ -343,7 +343,7 @@ impl AnalysisSession {
 
         // Ensure a resolver is configured so pull-path lookups can map
         // built-in FQCNs to the stub VFS paths registered above.
-        let mut guard = self.db.salsa.write();
+        let guard = &mut self.db.salsa;
         if guard.current_resolver().is_none() {
             let resolver: Arc<dyn crate::ClassResolver> = Arc::new(crate::StubClassResolver);
             guard.set_resolver(Some(resolver));

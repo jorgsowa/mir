@@ -51,7 +51,7 @@ fn analyze_with_psr4(
     fs::write(root.path().join("src").join(lib_file), lib_src).unwrap();
     let consumer_path = write(&root, consumer_file, consumer_src);
     let psr4 = make_psr4(&root, "App\\\\", "src");
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
     analyzer.analyze_paths(&[consumer_path], &BatchOptions::new().without_symbols())
 }
 
@@ -111,7 +111,7 @@ fn does_not_loop_when_class_has_no_psr4_match() {
     );
 
     let psr4 = make_psr4(&root, "App\\\\", "src");
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
 
     // Should terminate without hanging or panicking
     let _result = analyzer.analyze_paths(&[child_path], &BatchOptions::new().without_symbols());
@@ -244,7 +244,7 @@ fn lazy_loads_fqcn_with_inherited_parent_used_without_use_import() {
         "<?php\nfunction run(): string { return (new \\App\\Child())->hello(); }\n",
     );
     let psr4 = make_psr4(&root, "App\\\\", "src");
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
     let result = analyzer.analyze_paths(&[consumer_path], &BatchOptions::new().without_symbols());
 
     let issues: Vec<_> = result
@@ -299,7 +299,7 @@ fn lazy_loads_fqcn_new_expression_in_namespaced_file() {
     .unwrap();
 
     let psr4 = make_psr4(&root, "App\\\\", "src");
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4.clone());
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4.clone());
 
     let files = psr4.project_files();
     let result = analyzer.analyze_paths(&files, &BatchOptions::new().without_symbols());
@@ -327,7 +327,7 @@ fn load_class_negative_cache_clears_on_ingest() {
     let root = create_temp_dir("negcache_clear");
     fs::create_dir_all(root.path().join("src")).unwrap();
     let psr4 = make_psr4(&root, "App\\\\", "src");
-    let session = AnalysisSession::new(PhpVersion::new(8, 2)).with_psr4(psr4);
+    let mut session = AnalysisSession::new(PhpVersion::new(8, 2)).with_psr4(psr4);
 
     // First miss populates the negative cache.
     assert!(!session.load_class("App\\LateArrival").is_loaded());
@@ -359,7 +359,7 @@ fn load_class_negative_cache_clears_on_ingest() {
 fn set_workspace_files_registers_sources_without_parsing() {
     use mir_analyzer::{AnalysisSession, PhpVersion};
 
-    let session = AnalysisSession::new(PhpVersion::new(8, 2));
+    let mut session = AnalysisSession::new(PhpVersion::new(8, 2));
 
     let before = session.tracked_file_count();
 

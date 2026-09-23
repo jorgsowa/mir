@@ -11,7 +11,7 @@ use mir_analyzer::{AnalysisSession, BatchOptions, PhpVersion};
 
 /// Run both paths over `source` and assert exact equality.
 fn assert_scope_parity(name: &str, source: &str) {
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let dir = tempfile::tempdir().unwrap();
@@ -33,7 +33,7 @@ fn assert_scope_parity(name: &str, source: &str) {
         // re-run the whole-file walk via a second analyze on a fresh frame.
         // Diagnostics-only open-file analysis still wraps analyze_bodies 1:1
         // for issue emission and committed body-reference postings.
-        let analyzer = mir_analyzer::FileAnalyzer::new(&session);
+        let mut analyzer = mir_analyzer::FileAnalyzer::new(&mut session);
         let analysis = analyzer.analyze_diagnostics_only(
             path_str.clone(),
             source,

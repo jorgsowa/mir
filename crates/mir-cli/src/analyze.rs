@@ -113,7 +113,7 @@ pub fn run_composer_flow(
                     vendor_files.len()
                 );
             }
-            index_vendor_chunked(&session, &vendor_files);
+            index_vendor_chunked(&mut session, &vendor_files);
         }
     } else {
         let eager_files = map.vendor_eager_files();
@@ -204,7 +204,7 @@ pub fn run_plain_flow(
         cli.cache_dir.clone().or_else(default_cache_dir)
     };
     let (stub_files, stub_dirs) = collect_stub_paths(config, config_base);
-    let session = build_session(version, cache_dir, stub_files, stub_dirs);
+    let mut session = build_session(version, cache_dir, stub_files, stub_dirs);
     let opts = build_batch_opts(cli.find_dead_code);
 
     session.ensure_all_stubs();
@@ -220,7 +220,7 @@ pub fn run_plain_flow(
                     vendor_files.len()
                 );
             }
-            index_vendor_chunked(&session, &vendor_files);
+            index_vendor_chunked(&mut session, &vendor_files);
         }
     }
 
@@ -234,8 +234,8 @@ pub fn run_plain_flow(
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-/// Default number of vendor files indexed per `index_batch` chunk. Sized for a
-/// short write-lock window; override with `MIR_INDEX_CHUNK` for tuning.
+/// Default number of vendor files indexed per `index_batch` chunk; override
+/// with `MIR_INDEX_CHUNK` for tuning.
 const VENDOR_INDEX_CHUNK: usize = 512;
 
 /// Build the workspace symbol index from vendor files via the chunked
@@ -255,7 +255,7 @@ const VENDOR_INDEX_CHUNK: usize = 512;
 /// arbitrary chunk order — so a trailing rebuild here would be pure duplicate
 /// work. (A long-lived consumer that *edits* after warm-up still calls
 /// `finalize_index` once; a one-shot batch run that only reads does not.)
-fn index_vendor_chunked(session: &AnalysisSession, vendor_files: &[PathBuf]) {
+fn index_vendor_chunked(session: &mut AnalysisSession, vendor_files: &[PathBuf]) {
     use rayon::prelude::*;
 
     let chunk_size = std::env::var("MIR_INDEX_CHUNK")
@@ -506,7 +506,7 @@ fn filter_to_dirs(files: Vec<PathBuf>, roots: &[PathBuf], base: &std::path::Path
 }
 
 fn run_with_progress(
-    session: AnalysisSession,
+    mut session: AnalysisSession,
     files: &[PathBuf],
     mut opts: BatchOptions,
     show_progress: bool,

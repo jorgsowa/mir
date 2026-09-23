@@ -18,7 +18,7 @@ fn codepoint_span(line: &str, needle: &str) -> (u32, u32) {
 }
 
 fn session_with(files: &[(&str, &str)]) -> AnalysisSession {
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
     for (path, text) in files {
         session.set_file_text(Arc::from(*path), Arc::from(*text));
@@ -46,7 +46,7 @@ fn method_references_across_uncommitted_files() {
             "<?php\nnamespace Other;\nclass Free { public function process(): void {} public function go(): void { $this->process(); } }\n",
         ),
     ];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let refs = session
         .indexed_references_to(
             &Name::method("App\\Service", "process"),
@@ -89,7 +89,7 @@ fn include_declaration_appends_name_span() {
             "<?php\nfunction f(Widget $w): void { $w->render(); }\n",
         ),
     ];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let refs = session
         .indexed_references_to(
             &Name::method("Widget", "render"),
@@ -122,7 +122,7 @@ fn constructor_references_at_new_sites() {
             "<?php\nnamespace Shop;\nclass Checkout { public function run(): Order { return new Order(1); } }\n",
         ),
     ];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let refs = session
         .indexed_references_to(
             &Name::method("Shop\\Order", "__construct"),
@@ -142,7 +142,7 @@ fn trait_alias_references_include_adaptation_and_alias_calls() {
         "post.php",
         "<?php\ntrait Auditable { public function record(): void {} }\nclass Post { use Auditable { record as audit; }\n    public function save(): void { $this->record(); $this->audit(); }\n}\n",
     )];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let refs = session
         .indexed_references_to(
             &Name::method("Auditable", "record"),
@@ -172,7 +172,7 @@ fn class_function_property_constant_references() {
             "<?php\nnamespace App;\nfunction consume(Cfg $c): string {\n    helper();\n    $m = Cfg::MODE;\n    $l = LIMIT;\n    return $c->name;\n}\n",
         ),
     ];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let all = paths(&files);
 
     let cls = session
@@ -238,7 +238,7 @@ fn freshness_edit_updates_postings() {
         ),
         ("caller.php", "<?php\nfunction c(B $b): void { $b->m(); }\n"),
     ];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let sym = Name::method("B", "m");
     let all = paths(&files);
     let refs = session
@@ -300,7 +300,7 @@ fn subtype_classes_transitive_with_alias_and_fqn_forms() {
         ),
         ("rock.php", "<?php\nnamespace Geo;\nclass Rock {}\n"),
     ];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let subs = session.indexed_subtype_classes("Zoo\\Animal", &paths(&files), false);
     let names: Vec<&str> = subs.iter().map(|s| s.fqcn.as_ref()).collect();
     assert!(
@@ -330,7 +330,7 @@ fn subtype_classes_do_not_fall_back_to_another_namespace() {
             "<?php\nnamespace Other;\ninterface Shape {}\nclass Circle implements Shape {}\n",
         ),
     ];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let app = session.indexed_subtype_classes("App\\Shape", &paths(&files), false);
     assert!(
         app.is_empty(),
@@ -357,7 +357,7 @@ fn anonymous_subtype_uses_the_resolved_canonical_parent() {
             "<?php\nnamespace Consumer;\nuse App\\Shape;\nfunction make(): object { return new class implements Shape {}; }\n",
         ),
     ];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     // Anonymous-class edges are emitted by body analysis, unlike named
     // class-like edges which are available after definition collection.
     session.analyze_file_diagnostics("use.php", files[2].1);
@@ -393,7 +393,7 @@ fn method_implementations_across_subtypes() {
             "<?php\nclass Cube extends Box { public function area(): float { return 6.0; } }\n",
         ),
     ];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let impls = session.indexed_method_implementations("Shape", "area", &paths(&files));
     let files_hit: Vec<&str> = impls.iter().map(|(_, f, _)| f.as_ref()).collect();
     assert!(
@@ -433,7 +433,7 @@ fn method_implementations_trait_composed_are_found() {
             "<?php\nclass Circle implements Shape {\n    use AreaFromRadius;\n    public function __construct(public float $radius) {}\n}\n",
         ),
     ];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let impls = session.indexed_method_implementations("Shape", "area", &paths(&files));
     assert_eq!(
         impls.len(),
@@ -467,7 +467,7 @@ fn method_implementations_multilevel_inheritance_dedups_to_declaring_site() {
         ),
         ("square.php", "<?php\nclass Square extends ConcreteBox {}\n"),
     ];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let impls = session.indexed_method_implementations("Shape", "area", &paths(&files));
     assert_eq!(
         impls.len(),
@@ -500,7 +500,7 @@ fn method_implementations_trait_shared_by_siblings_dedups_to_one_entry() {
             "<?php\nclass BigSquare implements Shape {\n    use AreaFromSide;\n    public function __construct(public float $side = 10.0) {}\n}\n",
         ),
     ];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let impls = session.indexed_method_implementations("Shape", "area", &paths(&files));
     assert_eq!(
         impls.len(),
@@ -519,7 +519,7 @@ fn static_call_on_unresolved_class_scopes_to_that_class() {
         "caller.php",
         "<?php\nfunction c(): void { UnknownClass::doThing(); }\n",
     )];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let refs = session
         .indexed_references_to(
             &Name::method("UnknownClass", "doThing"),
@@ -564,7 +564,7 @@ fn static_call_on_undefined_method_scopes_to_the_class() {
         "caller.php",
         "<?php\nclass Known {}\nfunction c(): void { Known::doThing(); }\n",
     )];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let refs = session
         .indexed_references_to(
             &Name::method("Known", "doThing"),
@@ -588,7 +588,7 @@ fn unknown_owner_property_declaration_reachable() {
         "widget.php",
         "<?php\nclass Widget { public string $label = ''; }\n",
     )];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let refs = session
         .indexed_references_to(
             &Name::property("", "label"),
@@ -610,7 +610,7 @@ fn unknown_owner_property_declaration_reachable() {
 #[test]
 fn unknown_owner_constant_declaration_reachable() {
     let files = [("cfg.php", "<?php\nclass Cfg { public const MODE = 'x'; }\n")];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let refs = session
         .indexed_references_to(
             &Name::class_constant("", "MODE"),
@@ -634,7 +634,7 @@ fn interface_method_declaration_reachable_with_unknown_owner() {
         "shape.php",
         "<?php\ninterface Shape { public function area(): float; }\n",
     )];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let refs = session
         .indexed_references_to(
             &Name::method("", "area"),
@@ -658,7 +658,7 @@ fn enum_constant_declaration_reachable_with_unknown_owner() {
         "suit.php",
         "<?php\nenum Suit { case Hearts; const DEFAULT = self::Hearts; }\n",
     )];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let refs = session
         .indexed_references_to(
             &Name::class_constant("", "DEFAULT"),
@@ -688,7 +688,7 @@ fn use_import_locations_reachable_but_excluded_from_plain_references() {
             "<?php\nnamespace Other;\nuse App\\Widget;\nuse function App\\helper;\nuse const App\\LIMIT;\nfunction go(): void {}\n",
         ),
     ];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let all = paths(&files);
 
     // `indexed_use_import_locations` is a pure posting read with no freshness
@@ -749,7 +749,7 @@ fn indexed_queries_use_codepoint_columns_in_multibyte_and_crlf_files() {
             "<?php\r\nuse App\\Greeter;\r\necho \"hé\"; $g = new Greeter();\r\n",
         ),
     ];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let all = paths(&files);
 
     let refs = session
@@ -785,7 +785,7 @@ fn subtype_index_follows_reparenting_edit() {
         ("a.php", "<?php\nclass Base {}\nclass Other {}\n"),
         ("b.php", "<?php\nclass Kid extends Base {}\n"),
     ];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let all = paths(&files);
     let subs = session.indexed_subtype_classes("Base", &all, false);
     assert_eq!(subs.len(), 1);
@@ -822,7 +822,7 @@ fn subtype_scan_survives_multibyte_identifier_false_match() {
             "<?php\nnamespace Pets;\nfunction xÉclairFoo(): void {}\nclass Cat implements \\Zoo\\Éclair {}\n",
         ),
     ];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let subs = session.indexed_subtype_classes("Zoo\\Éclair", &paths(&files), false);
     let names: Vec<&str> = subs.iter().map(|s| s.fqcn.as_ref()).collect();
     assert_eq!(names, vec!["Pets\\Cat"], "{names:?}");
@@ -842,7 +842,7 @@ fn subtype_scan_multibyte_identifier_with_only_false_match_does_not_panic() {
             "<?php\nnamespace Pets;\nfunction xÉclairFoo(): void {}\n",
         ),
     ];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let subs = session.indexed_subtype_classes("Zoo\\Éclair", &paths(&files), false);
     assert!(subs.is_empty(), "{subs:?}");
 }
@@ -865,7 +865,7 @@ fn subtype_scan_survives_three_and_four_byte_leading_char_identifiers() {
             "<?php\nnamespace Pets;\nfunction x书ShapeFoo(): void {}\nfunction x😀ShapeFoo(): void {}\nclass Box implements \\Zoo\\书Shape, \\Zoo\\😀Shape {}\n",
         ),
     ];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let three_byte = session.indexed_subtype_classes("Zoo\\书Shape", &paths(&files), false);
     let four_byte = session.indexed_subtype_classes("Zoo\\😀Shape", &paths(&files), false);
     assert_eq!(
@@ -894,7 +894,7 @@ fn use_import_postings_recorded_for_unresolvable_targets() {
         "main.php",
         "<?php\nuse App\\Ghost;\nuse function App\\phantom;\nuse const App\\SPOOKY;\n$g = new Ghost();\n",
     )];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let all = paths(&files);
 
     // Freshness pass commits main.php's postings (the class never resolves).
@@ -948,7 +948,7 @@ fn cold_constructor_query_admits_files_naming_only_the_class() {
             "<?php\nnamespace App;\nfunction spawn(): Job { return new Job(); }\n",
         ),
     ];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let refs = session
         .indexed_references_to(
             &Name::method("App\\Job", "__construct"),
@@ -974,7 +974,7 @@ fn gated_file_participates_after_edit_introduces_mention() {
         ),
         ("idle.php", "<?php\nnamespace App;\nclass Idle {}\n"),
     ];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let sym = Name::method("App\\Service", "run");
     let refs = session
         .indexed_references_to(
@@ -1016,7 +1016,7 @@ fn static_call_bare_fallback_when_self_unresolved() {
         "caller.php",
         "<?php\nfunction c(): void { self::doThing(); }\n",
     )];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let refs = session
         .indexed_references_to(
             &Name::method("", "doThing"),
@@ -1053,7 +1053,7 @@ fn static_call_on_unresolved_ancestor_does_not_collide_with_unrelated_class() {
             "<?php\nclass Child extends BaseThing { function __construct() { parent::__construct(); } }\n",
         ),
     ];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let refs = session
         .indexed_references_to(
             &Name::method("Foo", "__construct"),
@@ -1121,7 +1121,7 @@ fn static_method_inherited_via_subclass_is_found_without_naming_owner() {
             "<?php\nnamespace Noise;\nclass Widget {\n    public static function m(): void {}\n    public static function go(): void { self::m(); }\n}\n",
         ),
     ];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let refs = session
         .indexed_references_to(
             &Name::method("App\\Owner", "m"),
@@ -1163,7 +1163,7 @@ fn static_call_via_instance_receiver_is_found_without_naming_owner() {
             "<?php\nnamespace Other;\nclass Caller extends Base {\n    public function run(): void {\n        $this->w::m();\n    }\n}\n",
         ),
     ];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let refs = session
         .indexed_references_to(
             &Name::method("App\\Owner", "m"),
@@ -1200,7 +1200,7 @@ fn constructor_reinit_via_instance_receiver_is_found_without_naming_owner() {
             "<?php\nnamespace Other;\nclass Caller extends Base {\n    public function run(): void {\n        $this->w->__construct();\n    }\n}\n",
         ),
     ];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let refs = session
         .indexed_references_to(
             &Name::method("App\\Owner", "__construct"),
@@ -1230,7 +1230,7 @@ fn static_call_with_case_mismatched_fqcn_is_found() {
             "<?php\nnamespace Other;\n\\app\\owner::m();\n",
         ),
     ];
-    let session = session_with(&files);
+    let mut session = session_with(&files);
     let refs = session
         .indexed_references_to(
             &Name::method("App\\Owner", "m"),

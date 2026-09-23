@@ -64,7 +64,7 @@ fn resolve_fqcn_to_path_returns_none_for_unknown_name() {
 
 #[test]
 fn source_file_for_fqcn_finds_registered_file() {
-    let session = AnalysisSession::new(PhpVersion::LATEST)
+    let mut session = AnalysisSession::new(PhpVersion::LATEST)
         .with_class_resolver(make_resolver(&[("App\\Foo", "/proj/Foo.php")]));
     session.set_file_text(
         Arc::from("/proj/Foo.php"),

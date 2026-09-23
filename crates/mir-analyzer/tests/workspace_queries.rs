@@ -20,7 +20,7 @@ fn workspace_classes_empty_for_empty_session() {
 
 #[test]
 fn workspace_classes_aggregates_across_files() {
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.set_file_text(
         Arc::from("/proj/A.php"),
         Arc::from("<?php\nnamespace App;\nclass A {}\ninterface IFoo {}\n"),
@@ -42,7 +42,7 @@ fn workspace_classes_aggregates_across_files() {
 
 #[test]
 fn workspace_functions_aggregates_across_files() {
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.set_file_text(
         Arc::from("/proj/helpers.php"),
         Arc::from(
@@ -60,7 +60,7 @@ fn workspace_functions_aggregates_across_files() {
 #[test]
 fn workspace_revision_bumps_on_remove() {
     // workspace_classes must invalidate when a file is removed.
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.set_file_text(
         Arc::from("/proj/A.php"),
         Arc::from("<?php\nnamespace App;\nclass A {}\n"),

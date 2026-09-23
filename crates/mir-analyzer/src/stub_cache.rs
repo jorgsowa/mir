@@ -138,8 +138,8 @@ impl StubSliceCache {
     /// caller-supplied `path` (we don't trust paths from disk), same for
     /// every issue's `location.file`, and the slice's `is_deduped` flag is
     /// preserved as `false`; callers running in parallel should re-run
-    /// [`deduplicate_params_in_slice`] before ingest so the serial
-    /// write-lock section doesn't pay dedup costs (commit 3018a1d).
+    /// [`deduplicate_params_in_slice`] before ingest so the serial commit
+    /// doesn't pay dedup costs.
     pub fn get(
         &self,
         path: &str,
@@ -338,7 +338,7 @@ pub fn hash_source(source: &str) -> [u8; 32] {
 
 /// Convert a slice produced by [`StubSliceCache::get`] into one that's safe
 /// to consume immediately without paying dedup cost inside the serial
-/// write-lock section. Call from a parallel worker.
+/// commit. Call from a parallel worker.
 pub fn prepare_for_ingest(slice: &mut StubSlice) {
     if !slice.is_deduped {
         deduplicate_params_in_slice(slice);

@@ -549,8 +549,7 @@ impl Psr4Map {
         self.vendor_eager_files.clone()
     }
 
-    /// Every vendor file the analyzer should index eagerly, for the
-    /// rust-analyzer-style static-input model: the union of
+    /// Every vendor file the analyzer should index eagerly: the union of
     ///
     /// 1. [`Self::vendor_files`] — PSR-4 / PSR-0 walked directories + extra paths,
     /// 2. classmap file targets — packages that use `classmap:` autoload (no

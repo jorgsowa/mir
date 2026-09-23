@@ -40,7 +40,7 @@ fn warm_start_files_replays_reference_locations_from_disk_cache() {
         disk_cache.flush();
     }
 
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
     session.ensure_all_stubs();
     session.warm_start_files(&[(Arc::from(file_path), Arc::from(text))]);
 
@@ -71,14 +71,14 @@ fn warm_start_files_replays_subtype_edges_from_disk_definition_cache() {
     // AnalysisSession) populates the on-disk StubSlice definition cache for
     // impl.php: `ingest_file` -> `collect_and_ingest_file` writes it on a miss.
     {
-        let seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+        let mut seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
         seed.ensure_all_stubs();
         seed.ingest_file(Arc::from(impl_path), Arc::from(impl_text));
     }
 
     // A fresh session against the same cache dir. Never runs definition
     // collection on impl.php itself — only `warm_start_files`.
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
     session.ensure_all_stubs();
     session.warm_start_files(&[(Arc::from(impl_path), Arc::from(impl_text))]);
 
@@ -122,7 +122,7 @@ fn warm_start_replay_survives_workspace_growth_when_resolved() {
         disk_cache.flush();
     }
 
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
     session.ensure_all_stubs();
     session.warm_start_files(&[(Arc::from(file_path), Arc::from(text))]);
 
@@ -176,7 +176,7 @@ fn warm_start_replay_reverifies_unresolved_files_after_growth() {
         disk_cache.flush();
     }
 
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
     session.ensure_all_stubs();
     let unresolved = session.warm_start_files(&[(Arc::from(file_path), Arc::from(text))]);
     assert_eq!(
@@ -240,7 +240,7 @@ fn warm_start_files_returns_only_unresolved_replays() {
         disk_cache.flush();
     }
 
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
     session.ensure_all_stubs();
     let unresolved = session.warm_start_files(&[
         (Arc::from("resolved.php"), Arc::from(resolved_text)),
@@ -271,7 +271,7 @@ fn session_sweep_persists_postings_for_next_launch() {
     let caller_text = "<?php\n$w = new Widget();\n$w->spin();\n";
 
     {
-        let seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+        let mut seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
         seed.ensure_all_stubs();
         seed.ingest_file(Arc::from(widget_path), Arc::from(widget_text));
         seed.ingest_file(Arc::from(caller_path), Arc::from(caller_text));
@@ -296,7 +296,7 @@ fn session_sweep_persists_postings_for_next_launch() {
         );
     }
 
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
     session.ensure_all_stubs();
     session.warm_start_files(&[
         (Arc::from(widget_path), Arc::from(widget_text)),
@@ -331,7 +331,7 @@ fn on_demand_query_commit_persists_postings_for_next_launch() {
     let caller_text = "<?php\n$w = new Widget();\n$w->spin();\n";
 
     {
-        let seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+        let mut seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
         seed.ensure_all_stubs();
         seed.ingest_file(Arc::from(widget_path), Arc::from(widget_text));
         seed.ingest_file(Arc::from(caller_path), Arc::from(caller_text));
@@ -381,7 +381,7 @@ fn session_sweep_does_not_clobber_valid_batch_entries() {
         disk_cache.flush();
     }
 
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
     session.ensure_all_stubs();
     session.ingest_file(Arc::from(file_path), Arc::from(text));
     session.reanalyze_files_cancellable(&[Arc::from(file_path)], &mir_analyzer::IndexCancel::new());
@@ -407,7 +407,7 @@ fn session_sweep_does_not_clobber_valid_batch_entries() {
 fn warm_start_files_is_a_no_op_without_a_cache() {
     // No `with_cache`/`with_cache_dir` attached — must not panic, and must
     // leave the file queryable (falling through to the normal lazy path).
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
     let file_path = "plain.php";
     let text = "<?php\nclass Plain {}\n";
@@ -435,7 +435,7 @@ fn warm_start_files_is_a_no_op_without_a_cache() {
 /// Simulated "session 1": ingest files against a cache dir so their
 /// StubSlices land on disk, then drop the session.
 fn seed_disk_caches(dir: &std::path::Path, files: &[(&str, &str)]) {
-    let seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir);
+    let mut seed = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir);
     seed.ensure_all_stubs();
     for (path, text) in files {
         seed.ingest_file(Arc::from(*path), Arc::from(*text));
@@ -458,7 +458,7 @@ fn warm_start_seeds_workspace_symbol_index_without_tracked_walk() {
     ];
     seed_disk_caches(dir.path(), &files);
 
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
     let warm: Vec<(Arc<str>, Arc<str>)> = files
         .iter()
         .map(|(p, t)| (Arc::from(*p), Arc::from(*t)))
@@ -496,7 +496,7 @@ fn warm_start_seed_skipped_when_slices_missing() {
     // workspace and seeding must be skipped (first-ever boot keeps the lazy
     // behavior; the background sweep owns the parse bill).
     let dir = create_temp_dir("warm_start_seed_skipped");
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
     let files: Vec<(Arc<str>, Arc<str>)> = (0..8)
         .map(|i| {
             (
@@ -532,7 +532,7 @@ fn mirror_only_new_file_is_visible_after_settle() {
     )];
     seed_disk_caches(dir.path(), &files);
 
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
     session.warm_start_files(&[(Arc::from("base.php"), Arc::from(files[0].1))]);
     assert!(session.workspace_symbol_index_ready());
 
@@ -583,7 +583,7 @@ fn mirror_only_class_rename_updates_index_after_settle() {
     ];
     seed_disk_caches(dir.path(), &files);
 
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
     let warm: Vec<(Arc<str>, Arc<str>)> = files
         .iter()
         .map(|(p, t)| (Arc::from(*p), Arc::from(*t)))

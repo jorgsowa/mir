@@ -59,7 +59,7 @@ fn measure_batch() {
     );
 
     let mut cache_dir = None;
-    let session = if std::env::var("MIR_MEASURE_CACHE").is_ok() {
+    let mut session = if std::env::var("MIR_MEASURE_CACHE").is_ok() {
         let dir = tempfile::tempdir().expect("create temporary cache dir");
         let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
         cache_dir = Some(dir);

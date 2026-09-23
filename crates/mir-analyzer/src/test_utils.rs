@@ -757,7 +757,7 @@ fn run_analyzer(files: &[(&str, &str)], config: &FixtureConfig) -> Vec<Issue> {
         stub_files.is_empty() && stub_dirs.is_empty() && !has_composer && session_pool_enabled();
 
     let result = if reusable {
-        let session = checkout_base_session(version);
+        let mut session = checkout_base_session(version);
         let result = session.analyze_paths(&explicit_paths, &opts);
         for p in &explicit_paths {
             session.invalidate_file(&p.to_string_lossy());

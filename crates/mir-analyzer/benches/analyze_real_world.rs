@@ -104,7 +104,7 @@ fn split_vendor_project(root: &Path) -> (Vec<PathBuf>, Vec<PathBuf>) {
 /// Run the full pipeline once into `cache_dir` so subsequent analyses can use
 /// cached results.
 fn warm_cache(cache_dir: &TempDir, vendor_files: &[PathBuf], project_files: &[PathBuf]) {
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
     analyzer.ensure_all_stubs();
     analyzer.collect_definitions(vendor_files);
     let _ = analyzer.analyze_paths(project_files, &BatchOptions::new().without_symbols());
@@ -139,7 +139,7 @@ fn bench_full_analysis(c: &mut Criterion) {
     // Print memory stats once before the Criterion loop.
     reset_alloc_counters();
     {
-        let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+        let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
         checkpoint_alloc("after new analyzer");
         analyzer.ensure_all_stubs();
         checkpoint_alloc("after load_stubs");
@@ -169,7 +169,7 @@ fn bench_full_analysis(c: &mut Criterion) {
         group.bench_function(BenchmarkId::new(fixture.id(), format!("{threads}t")), |b| {
             b.iter(|| {
                 pool.install(|| {
-                    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+                    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
                     analyzer.ensure_all_stubs();
                     analyzer.collect_definitions(&vendor_files);
                     analyzer.analyze_paths(&project_files, &BatchOptions::new().without_symbols())
@@ -230,7 +230,7 @@ fn bench_reanalysis(c: &mut Criterion) {
         std::fs::write(&model_path, format!("{original}\n// memory-check")).unwrap();
         reset_alloc_counters();
         {
-            let analyzer =
+            let mut analyzer =
                 AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_mem.path());
             analyzer.ensure_all_stubs();
             analyzer.collect_definitions(&vendor_files);
@@ -245,7 +245,7 @@ fn bench_reanalysis(c: &mut Criterion) {
         std::fs::write(&leaf_path, format!("{original}\n// memory-check")).unwrap();
         reset_alloc_counters();
         {
-            let analyzer =
+            let mut analyzer =
                 AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_mem.path());
             analyzer.ensure_all_stubs();
             analyzer.collect_definitions(&vendor_files);
@@ -283,7 +283,7 @@ fn bench_reanalysis(c: &mut Criterion) {
                         .unwrap();
                 },
                 |_| {
-                    let analyzer =
+                    let mut analyzer =
                         AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_model.path());
                     analyzer.ensure_all_stubs();
                     analyzer.collect_definitions(&vendor_files);
@@ -304,7 +304,7 @@ fn bench_reanalysis(c: &mut Criterion) {
                         .unwrap();
                 },
                 |_| {
-                    let analyzer =
+                    let mut analyzer =
                         AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_leaf.path());
                     analyzer.ensure_all_stubs();
                     analyzer.collect_definitions(&vendor_files);
@@ -354,7 +354,7 @@ fn bench_reanalysis_project_only(c: &mut Criterion) {
         let cache_mem: TempDir = tempfile::tempdir().unwrap();
         warm_cache(&cache_mem, &vendor_files, &project_files);
         std::fs::write(&model_path, format!("{original}\n// memory-check")).unwrap();
-        let mem_analyzer =
+        let mut mem_analyzer =
             AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_mem.path());
         mem_analyzer.ensure_all_stubs();
         mem_analyzer.collect_definitions(&vendor_files);
@@ -370,7 +370,7 @@ fn bench_reanalysis_project_only(c: &mut Criterion) {
         let cache_mem: TempDir = tempfile::tempdir().unwrap();
         warm_cache(&cache_mem, &vendor_files, &project_files);
         std::fs::write(&leaf_path, format!("{original}\n// memory-check")).unwrap();
-        let mem_analyzer =
+        let mut mem_analyzer =
             AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_mem.path());
         mem_analyzer.ensure_all_stubs();
         mem_analyzer.collect_definitions(&vendor_files);
@@ -409,13 +409,13 @@ fn bench_reanalysis_project_only(c: &mut Criterion) {
                     counter_model += 1;
                     std::fs::write(&model_path, format!("{original}\n// bench {counter_model}"))
                         .unwrap();
-                    let analyzer =
+                    let mut analyzer =
                         AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_model.path());
                     analyzer.ensure_all_stubs();
                     analyzer.collect_definitions(&vendor_files);
                     analyzer
                 },
-                |analyzer| {
+                |mut analyzer| {
                     analyzer.analyze_paths(&project_files, &BatchOptions::new().without_symbols())
                 },
                 BatchSize::LargeInput,
@@ -431,13 +431,13 @@ fn bench_reanalysis_project_only(c: &mut Criterion) {
                     counter_leaf += 1;
                     std::fs::write(&leaf_path, format!("{original}\n// bench {counter_leaf}"))
                         .unwrap();
-                    let analyzer =
+                    let mut analyzer =
                         AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_leaf.path());
                     analyzer.ensure_all_stubs();
                     analyzer.collect_definitions(&vendor_files);
                     analyzer
                 },
-                |analyzer| {
+                |mut analyzer| {
                     analyzer.analyze_paths(&project_files, &BatchOptions::new().without_symbols())
                 },
                 BatchSize::LargeInput,
@@ -468,7 +468,7 @@ fn bench_vendor_collection(c: &mut Criterion) {
 
     reset_alloc_counters();
     {
-        let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+        let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
         analyzer.ensure_all_stubs();
         analyzer.collect_definitions(&vendor_files);
     }
@@ -481,7 +481,7 @@ fn bench_vendor_collection(c: &mut Criterion) {
 
     group.bench_function(fixture.id(), |b| {
         b.iter(|| {
-            let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+            let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
             analyzer.ensure_all_stubs();
             analyzer.collect_definitions(&vendor_files)
         });
@@ -505,7 +505,7 @@ fn bench_vendor_collection_detailed(_c: &mut Criterion) {
     eprintln!("\n=== VENDOR COLLECTION DETAILED PROFILING ===\n");
 
     reset_alloc_counters();
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
     checkpoint_alloc("After analyzer::new()");
 
     analyzer.ensure_all_stubs();
@@ -559,7 +559,7 @@ fn bench_full_analysis_detailed(_c: &mut Criterion) {
     eprintln!();
 
     reset_alloc_counters();
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
     checkpoint_alloc("After analyzer::new()");
 
     analyzer.ensure_all_stubs();
@@ -590,7 +590,7 @@ fn bench_vendor_collection_phase_breakdown(_c: &mut Criterion) {
 
     reset_alloc_counters();
     {
-        let analyzer = AnalysisSession::new(PhpVersion::LATEST);
+        let mut analyzer = AnalysisSession::new(PhpVersion::LATEST);
         analyzer.ensure_all_stubs();
         checkpoint_alloc("After load_stubs()");
 
@@ -630,7 +630,8 @@ fn bench_vendor_collection_cache_cold_vs_warm(_c: &mut Criterion) {
     reset_alloc_counters();
     let cold_start = std::time::Instant::now();
     {
-        let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+        let mut analyzer =
+            AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
         analyzer.ensure_all_stubs();
         analyzer.collect_definitions(&vendor_files);
     }
@@ -648,7 +649,8 @@ fn bench_vendor_collection_cache_cold_vs_warm(_c: &mut Criterion) {
     reset_alloc_counters();
     let warm_start = std::time::Instant::now();
     let (hits, misses) = {
-        let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+        let mut analyzer =
+            AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
         analyzer.ensure_all_stubs();
         analyzer.collect_definitions(&vendor_files);
         analyzer.stub_cache_stats()
@@ -719,7 +721,7 @@ fn bench_file_removal_memory_probe(_c: &mut Criterion) {
         total_text_bytes as f64 / 1_048_576.0,
     );
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
     for (path, text) in &sources {
         session.ingest_file(path.clone(), text.clone());

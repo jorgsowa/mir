@@ -15,7 +15,7 @@ use std::sync::Arc;
 use mir_analyzer::{AnalysisSession, FileAnalyzer, PhpVersion};
 
 fn issues_for(source: &str) -> Vec<String> {
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     let file: Arc<str> = Arc::from("<test>");
     session.ingest_file(file.clone(), Arc::from(source));
 
@@ -26,7 +26,7 @@ fn issues_for(source: &str) -> Vec<String> {
         parsed.errors
     );
 
-    FileAnalyzer::new(&session)
+    FileAnalyzer::new(&mut session)
         .analyze_diagnostics_only(file, source, &parsed.program, &parsed.source_map)
         .issues
         .iter()

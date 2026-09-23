@@ -23,7 +23,7 @@ fn re_analyze_file_picks_up_new_error() {
         "<?php\nfunction greet(): string { return 'hello'; }\n",
     );
 
-    let analyzer = new_session();
+    let mut analyzer = new_session();
     let result1 = analyzer.analyze_paths(
         std::slice::from_ref(&file_a),
         &BatchOptions::new().without_symbols(),
@@ -81,7 +81,7 @@ fn re_analyze_file_removes_old_definitions() {
         "<?php\nfunction test(): void { $f = new Foo(); $f->bar(); }\n",
     );
 
-    let analyzer = new_session();
+    let mut analyzer = new_session();
     let result1 = analyzer.analyze_paths(
         &[file_a.clone(), file_b.clone()],
         &BatchOptions::new().without_symbols(),
@@ -126,7 +126,7 @@ fn re_analyze_file_fixes_error() {
         "<?php\nfunction test(): void { missing_fn(); }\n",
     );
 
-    let analyzer = new_session();
+    let mut analyzer = new_session();
     let result1 = analyzer.analyze_paths(
         std::slice::from_ref(&file_a),
         &BatchOptions::new().without_symbols(),
@@ -174,7 +174,7 @@ fn re_analyze_file_uses_cache_on_unchanged_content() {
     let file_a = write_file(&src_dir, "A.php", content);
     let file_path = file_a.to_string_lossy().to_string();
 
-    let analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
     let result1 = analyzer.analyze_paths(
         std::slice::from_ref(&file_a),
         &BatchOptions::new().without_symbols(),
@@ -223,7 +223,7 @@ fn re_analyze_file_without_symbols_skips_symbol_retention() {
     );
     let file_path = file_a.to_string_lossy().to_string();
 
-    let analyzer = new_session();
+    let mut analyzer = new_session();
     let result = analyzer.re_analyze_file(
         &file_path,
         "<?php\nfunction test(): void { missing_fn(); }\n",
@@ -270,7 +270,7 @@ fn re_analyze_preserves_namespace_and_use_alias_resolution() {
         function handle(): void { $e = new Entity(); }\n";
     let handler = write_file(&src_dir, "Handler.php", handler_src);
 
-    let analyzer = new_session();
+    let mut analyzer = new_session();
     let result1 = analyzer.analyze_paths(
         &[src_dir.path().join("Entity.php"), handler.clone()],
         &BatchOptions::new().without_symbols(),
@@ -325,7 +325,7 @@ fn re_analyze_file_primes_inferred_return_type_for_same_file_calls() {
     let file = write_file(&src_dir, "A.php", content);
     let file_path = file.to_string_lossy().to_string();
 
-    let analyzer = new_session();
+    let mut analyzer = new_session();
     let result1 = analyzer.analyze_paths(
         std::slice::from_ref(&file),
         &BatchOptions::new().without_symbols(),
@@ -373,7 +373,7 @@ fn file_analyzer_sees_fresh_return_type_after_ingest() {
     // Read $x so that a Variable("x") symbol is emitted by body analysis.
     let b_src = "<?php\n$x = (new Maker)->make();\n$_ = $x;\n";
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     let file_a: Arc<str> = Arc::from("a.php");
     let file_b: Arc<str> = Arc::from("b.php");
 
@@ -424,7 +424,7 @@ fn re_analyze_file_evicts_dependents_after_ingest() {
     let file_b_path = file_b.to_string_lossy().to_string();
 
     // First pass: populate the cache. b.php is valid (no issues) and gets cached.
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
     let initial = session.analyze_paths(
         &[file_a.clone(), file_b.clone()],
         &BatchOptions::new().without_symbols(),
@@ -479,7 +479,7 @@ fn settle_workspace_index_evicts_dependents_after_mirror_registration() {
     let consumer_src = "<?php\nnew Mage();\n";
     let dependency_src = "<?php\nclass Mage {}\n";
 
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
 
     // Analyze the consumer before its dependency is registered. The negative
     // result is cached, and the ingest path records the consumer's dependency
@@ -530,7 +530,7 @@ fn settle_workspace_index_evicts_dependents_after_mirror_registration() {
 fn re_analyze_file_flags_unused_suppress_without_cache() {
     let source = "<?php\nclass Foo {\n    /**\n     * @suppress UndefinedClass\n     */\n    public string $bar = \"baz\";\n}\n";
 
-    let analyzer = new_session();
+    let mut analyzer = new_session();
     let result =
         analyzer.re_analyze_file("Foo.php", source, &BatchOptions::new().without_symbols());
 

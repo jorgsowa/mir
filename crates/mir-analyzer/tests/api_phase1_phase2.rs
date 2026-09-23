@@ -18,7 +18,7 @@ use mir_analyzer::{AnalysisSession, Name, PhpVersion, SymbolLookupError};
 
 #[test]
 fn hover_returns_real_info_for_function() {
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let file: Arc<str> = Arc::from("test.php");
@@ -57,7 +57,7 @@ fn hover_returns_real_info_for_function() {
 
 #[test]
 fn hover_returns_not_found_for_unknown_symbol() {
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     let result = session.hover(&Name::function("nonexistent_function_xyz"));
     assert_eq!(result.unwrap_err(), SymbolLookupError::NotFound);
 }
@@ -76,7 +76,7 @@ fn symbol_method_normalizes_case() {
 
 #[test]
 fn definition_of_returns_result_with_distinct_errors() {
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
 
     // Class never registered → NotFound
     let err = session
@@ -89,7 +89,7 @@ fn definition_of_returns_result_with_distinct_errors() {
 fn document_symbols_returns_hierarchical_tree() {
     use mir_analyzer::symbol::DeclarationKind;
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let file: Arc<str> = Arc::from("hierarchy.php");
@@ -127,7 +127,7 @@ fn document_symbols_returns_hierarchical_tree() {
 
 #[test]
 fn references_to_takes_typed_symbol() {
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let file: Arc<str> = Arc::from("refs.php");
@@ -142,7 +142,7 @@ fn references_to_takes_typed_symbol() {
     // Now run pass 2 to record references
     use mir_analyzer::FileAnalyzer;
     let parsed = php_rs_parser::parse(&source);
-    let _analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+    let _analysis = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         file.clone(),
         &source,
         &parsed.program,
@@ -215,7 +215,7 @@ fn re_exports_available_at_crate_root() {
 
 #[test]
 fn contains_function_class_method_typed_queries() {
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ingest_file(
         Arc::from("typed.php"),
         Arc::from(
@@ -243,7 +243,7 @@ fn resolved_symbol_to_symbol_bridges_pass2_with_queries() {
     use mir_analyzer::symbol::ReferenceKind;
     use mir_analyzer::FileAnalyzer;
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let file: Arc<str> = Arc::from("bridge.php");
@@ -256,7 +256,7 @@ fn resolved_symbol_to_symbol_bridges_pass2_with_queries() {
     session.ingest_file(file.clone(), source.clone());
 
     let parsed = php_rs_parser::parse(&source);
-    let _analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+    let _analysis = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         file.clone(),
         &source,
         &parsed.program,
@@ -298,7 +298,7 @@ fn method_references_scoped_by_declaring_class() {
     // its call sites — they are unrelated classes with no common ancestor.
     use mir_analyzer::FileAnalyzer;
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let file: Arc<str> = Arc::from("scope.php");
@@ -311,7 +311,7 @@ fn method_references_scoped_by_declaring_class() {
 
     session.ingest_file(file.clone(), source.clone());
     let parsed = php_rs_parser::parse(&source);
-    let _ = FileAnalyzer::new(&session).analyze_diagnostics_only(
+    let _ = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         file.clone(),
         &source,
         &parsed.program,
@@ -360,7 +360,7 @@ fn method_references_end_to_end_symbol_at_flow() {
     // the same reference without a retained whole-file symbol list.
     use mir_analyzer::symbol::ReferenceKind;
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let file: Arc<str> = Arc::from("e2e.php");
@@ -406,7 +406,7 @@ fn global_constant_references_end_to_end_symbol_at_flow() {
     // functions/methods/properties/class constants.
     use mir_analyzer::symbol::ReferenceKind;
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let file: Arc<str> = Arc::from("gcnst.php");
@@ -452,7 +452,7 @@ fn method_references_inherited_method_end_to_end() {
     // nothing. After the fix both keys agree on the declaring class.
     use mir_analyzer::symbol::ReferenceKind;
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let file: Arc<str> = Arc::from("inherit.php");
@@ -505,7 +505,7 @@ fn property_references_inherited_property_end_to_end() {
     // references_to(Base::count) finds the access site.
     use mir_analyzer::symbol::ReferenceKind;
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let file: Arc<str> = Arc::from("inherit_prop.php");
@@ -556,7 +556,7 @@ fn property_write_target_appears_in_references() {
     use mir_analyzer::FileAnalyzer;
     use mir_analyzer::Name;
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let file: Arc<str> = Arc::from("prop_write.php");
@@ -571,7 +571,7 @@ fn property_write_target_appears_in_references() {
 
     session.ingest_file(file.clone(), source.clone());
     let parsed = php_rs_parser::parse(&source);
-    let _analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+    let _analysis = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         file.clone(),
         &source,
         &parsed.program,
@@ -606,7 +606,7 @@ fn static_property_write_target_appears_in_references() {
     use mir_analyzer::FileAnalyzer;
     use mir_analyzer::Name;
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let file: Arc<str> = Arc::from("static_prop_write.php");
@@ -622,7 +622,7 @@ fn static_property_write_target_appears_in_references() {
 
     session.ingest_file(file.clone(), source.clone());
     let parsed = php_rs_parser::parse(&source);
-    let _analysis = FileAnalyzer::new(&session).analyze_diagnostics_only(
+    let _analysis = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         file.clone(),
         &source,
         &parsed.program,
@@ -655,7 +655,7 @@ fn property_references_direct_property_end_to_end() {
     // Non-inherited property: references_to(Foo::value) finds the access site.
     use mir_analyzer::FileAnalyzer;
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let file: Arc<str> = Arc::from("direct_prop.php");
@@ -667,7 +667,7 @@ fn property_references_direct_property_end_to_end() {
 
     session.ingest_file(file.clone(), source.clone());
     let parsed = php_rs_parser::parse(&source);
-    let _ = FileAnalyzer::new(&session).analyze_diagnostics_only(
+    let _ = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         file.clone(),
         &source,
         &parsed.program,
@@ -713,7 +713,7 @@ fn load_class_with_custom_resolver() {
         path: file_path.clone(),
     });
 
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_class_resolver(resolver);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_class_resolver(resolver);
 
     // Class is not yet known
     assert!(!session.contains_class("ResolvedByCustom"));
@@ -761,7 +761,8 @@ fn prefetch_imports_loads_unresolved_use_statements() {
         map,
         calls: Mutex::new(Vec::new()),
     });
-    let session = AnalysisSession::new(PhpVersion::LATEST).with_class_resolver(resolver.clone());
+    let mut session =
+        AnalysisSession::new(PhpVersion::LATEST).with_class_resolver(resolver.clone());
 
     // User opens a file that imports App\Dep but doesn't have Dep in the
     // session yet.
@@ -796,7 +797,7 @@ fn prefetch_imports_loads_unresolved_use_statements() {
 fn reanalyze_dependents_runs_in_parallel() {
     use mir_analyzer::FileAnalyzer;
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     // base.php defines Base. dep_a.php and dep_b.php extend Base.
@@ -815,7 +816,7 @@ fn reanalyze_dependents_runs_in_parallel() {
         (&dep_b, "<?php\nclass B extends Base {}\n"),
     ] {
         let parsed = php_rs_parser::parse(src);
-        let _ = FileAnalyzer::new(&session).analyze_diagnostics_only(
+        let _ = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
             file.clone(),
             src,
             &parsed.program,
@@ -839,7 +840,7 @@ fn reanalyze_dependents_runs_in_parallel() {
 
 #[test]
 fn reanalyze_files_recomputes_the_given_set_only() {
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let base: Arc<str> = Arc::from("rf_base.php");
@@ -901,14 +902,14 @@ fn reanalyze_files_recomputes_the_given_set_only() {
 fn load_class_not_resolvable_without_resolver() {
     use mir_analyzer::LoadOutcome;
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     let outcome = session.load_class("Some\\Unknown\\Class");
     assert_eq!(outcome, LoadOutcome::NotResolvable);
 }
 
 #[test]
 fn all_classes_and_all_functions_workspace_iteration() {
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ingest_file(
         Arc::from("ws.php"),
         Arc::from(
@@ -931,7 +932,7 @@ fn all_classes_and_all_functions_workspace_iteration() {
 
 #[test]
 fn ancestors_of_and_function_signature() {
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ingest_file(
         Arc::from("ws2.php"),
         Arc::from(
@@ -965,7 +966,7 @@ fn ancestors_of_and_function_signature() {
 fn reanalyze_dependents_tracks_bare_fqn_new() {
     use mir_analyzer::FileAnalyzer;
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let service: Arc<str> = Arc::from("service.php");
@@ -982,7 +983,7 @@ fn reanalyze_dependents_tracks_bare_fqn_new() {
 
     let consumer_src = "<?php\nfunction consume(): void { $s = new \\Service(); $s->run(); }\n";
     let parsed = php_rs_parser::parse(consumer_src);
-    FileAnalyzer::new(&session).analyze_diagnostics_only(
+    FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         consumer.clone(),
         consumer_src,
         &parsed.program,
@@ -1002,7 +1003,7 @@ fn reanalyze_dependents_tracks_bare_fqn_new() {
 fn reanalyze_dependents_tracks_bare_fqn_static_call() {
     use mir_analyzer::FileAnalyzer;
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let helper: Arc<str> = Arc::from("helper.php");
@@ -1019,7 +1020,7 @@ fn reanalyze_dependents_tracks_bare_fqn_static_call() {
 
     let caller_src = "<?php\nfunction call_it(): void { \\Helper::go(); }\n";
     let parsed = php_rs_parser::parse(caller_src);
-    FileAnalyzer::new(&session).analyze_diagnostics_only(
+    FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         caller.clone(),
         caller_src,
         &parsed.program,
@@ -1039,7 +1040,7 @@ fn reanalyze_dependents_tracks_bare_fqn_static_call() {
 fn dependency_graph_includes_unused_param_type_hint() {
     use mir_analyzer::FileAnalyzer;
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let service: Arc<str> = Arc::from("service.php");
@@ -1060,7 +1061,7 @@ fn dependency_graph_includes_unused_param_type_hint() {
     // Analyze the consumer file to trigger Pass 2
     let consumer_src = "<?php\nnamespace Vendor\nfunction consume(Service $s) { }\n";
     let parsed = php_rs_parser::parse(consumer_src);
-    FileAnalyzer::new(&session).analyze_diagnostics_only(
+    FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         consumer.clone(),
         consumer_src,
         &parsed.program,
@@ -1089,7 +1090,7 @@ fn file_structural_deps_includes_enum_method_param_type_hint() {
     use mir_analyzer::db::{file_structural_deps, file_structural_symbols, MirDatabase};
     use mir_types::Name;
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.set_file_text(
         Arc::from("/proj/Service.php"),
         Arc::from("<?php\nnamespace Vendor;\nclass Service {}\n"),
@@ -1118,7 +1119,7 @@ fn file_structural_deps_includes_enum_method_param_type_hint() {
 fn file_structural_deps_includes_trait_property_and_method_type_hints() {
     use mir_analyzer::db::{file_structural_deps, MirDatabase};
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.set_file_text(
         Arc::from("/proj/Service.php"),
         Arc::from("<?php\nnamespace Vendor;\nclass Service {}\n"),
@@ -1149,7 +1150,7 @@ fn file_structural_deps_includes_trait_property_and_method_type_hints() {
 // ──────────────────────────────────────────────────────────────────────────────
 
 /// Helper: run Pass 2 on `src` under `file` path in `session`.
-fn analyze_file(session: &AnalysisSession, file: Arc<str>, src: &str) {
+fn analyze_file(session: &mut AnalysisSession, file: Arc<str>, src: &str) {
     use mir_analyzer::FileAnalyzer;
     let parsed = php_rs_parser::parse(src);
     FileAnalyzer::new(session).analyze_diagnostics_only(
@@ -1161,7 +1162,7 @@ fn analyze_file(session: &AnalysisSession, file: Arc<str>, src: &str) {
 }
 
 /// Return the set of file paths returned by reanalyze_dependents.
-fn dependent_files(session: &AnalysisSession, file: &str) -> std::collections::HashSet<String> {
+fn dependent_files(session: &mut AnalysisSession, file: &str) -> std::collections::HashSet<String> {
     session
         .reanalyze_dependents(file)
         .into_iter()
@@ -1171,7 +1172,7 @@ fn dependent_files(session: &AnalysisSession, file: &str) -> std::collections::H
 
 #[test]
 fn reanalyze_dependents_after_definition_deleted() {
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let foo: Arc<str> = Arc::from("Foo.php");
@@ -1184,10 +1185,10 @@ fn reanalyze_dependents_after_definition_deleted() {
         Arc::from("<?php\nfunction f(\\Foo $x): void {}\n"),
     );
     let bar_src = "<?php\nfunction f(\\Foo $x): void {}\n";
-    analyze_file(&session, bar.clone(), bar_src);
+    analyze_file(&mut session, bar.clone(), bar_src);
 
     // Precondition: Bar.php is a dependent before the mutation.
-    let before = dependent_files(&session, foo.as_ref());
+    let before = dependent_files(&mut session, foo.as_ref());
     assert!(
         before.contains(bar.as_ref()),
         "precondition: Bar.php must be a dependent before deletion; got {:?}",
@@ -1198,7 +1199,7 @@ fn reanalyze_dependents_after_definition_deleted() {
     session.ingest_file(foo.clone(), Arc::from("<?php\n// class Foo removed\n"));
 
     // Assert: Bar.php still appears — it has a broken reference that needs re-analysis.
-    let after = dependent_files(&session, foo.as_ref());
+    let after = dependent_files(&mut session, foo.as_ref());
     assert!(
         after.contains(bar.as_ref()),
         "Bar.php references \\Foo which was deleted from Foo.php — \
@@ -1210,7 +1211,7 @@ fn reanalyze_dependents_after_definition_deleted() {
 
 #[test]
 fn reanalyze_dependents_after_definition_renamed() {
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let foo: Arc<str> = Arc::from("Foo.php");
@@ -1222,7 +1223,7 @@ fn reanalyze_dependents_after_definition_renamed() {
         Arc::from("<?php\nfunction f(\\Foo $x): void {}\n"),
     );
     analyze_file(
-        &session,
+        &mut session,
         bar.clone(),
         "<?php\nfunction f(\\Foo $x): void {}\n",
     );
@@ -1230,7 +1231,7 @@ fn reanalyze_dependents_after_definition_renamed() {
     // Rename: class Foo → class Renamed in the same file.
     session.ingest_file(foo.clone(), Arc::from("<?php\nclass Renamed {}\n"));
 
-    let after = dependent_files(&session, foo.as_ref());
+    let after = dependent_files(&mut session, foo.as_ref());
     assert!(
         after.contains(bar.as_ref()),
         "Bar.php references \\Foo which was renamed to \\Renamed in Foo.php — \
@@ -1241,7 +1242,7 @@ fn reanalyze_dependents_after_definition_renamed() {
 
 #[test]
 fn reanalyze_dependents_after_definition_moved() {
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let a: Arc<str> = Arc::from("A.php");
@@ -1256,7 +1257,7 @@ fn reanalyze_dependents_after_definition_moved() {
         Arc::from("<?php\nfunction f(\\Foo $x): void {}\n"),
     );
     analyze_file(
-        &session,
+        &mut session,
         consumer.clone(),
         "<?php\nfunction f(\\Foo $x): void {}\n",
     );
@@ -1267,13 +1268,13 @@ fn reanalyze_dependents_after_definition_moved() {
 
     // Consumer.php references \Foo — it must appear as a dependent of A.php
     // (broken reference) AND of B.php (resolved reference).
-    let a_deps = dependent_files(&session, a.as_ref());
+    let a_deps = dependent_files(&mut session, a.as_ref());
     assert!(
         a_deps.contains(consumer.as_ref()),
         "Consumer.php must appear as dependent of A.php after Foo is moved out; got {:?}",
         a_deps
     );
-    let b_deps = dependent_files(&session, b.as_ref());
+    let b_deps = dependent_files(&mut session, b.as_ref());
     assert!(
         b_deps.contains(consumer.as_ref()),
         "Consumer.php must appear as dependent of B.php after Foo is moved in; got {:?}",
@@ -1283,7 +1284,7 @@ fn reanalyze_dependents_after_definition_moved() {
 
 #[test]
 fn reanalyze_dependents_after_definition_readded() {
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let foo: Arc<str> = Arc::from("Foo.php");
@@ -1295,7 +1296,7 @@ fn reanalyze_dependents_after_definition_readded() {
         Arc::from("<?php\nfunction f(\\Foo $x): void {}\n"),
     );
     analyze_file(
-        &session,
+        &mut session,
         bar.clone(),
         "<?php\nfunction f(\\Foo $x): void {}\n",
     );
@@ -1307,7 +1308,7 @@ fn reanalyze_dependents_after_definition_readded() {
     // edge restored — Bar.php is still a dependent via the current edge.
     session.ingest_file(foo.clone(), Arc::from("<?php\nclass Foo {}\n"));
 
-    let after = dependent_files(&session, foo.as_ref());
+    let after = dependent_files(&mut session, foo.as_ref());
     assert!(
         after.contains(bar.as_ref()),
         "Bar.php must be a dependent of Foo.php after Foo is re-added; got {:?}",
@@ -1322,7 +1323,7 @@ fn reanalyze_dependents_transitive_after_delete() {
     // After Foo is deleted from A.php:
     //   - B.php must appear (direct stale dependent)
     //   - C.php must appear (transitive via structural dep on B)
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let a: Arc<str> = Arc::from("A.php");
@@ -1338,16 +1339,20 @@ fn reanalyze_dependents_transitive_after_delete() {
 
     // Pass 2 on both B and C so their reference edges land in file_referenced_symbols.
     analyze_file(
-        &session,
+        &mut session,
         b.clone(),
         "<?php\nclass Bar { public function f(\\Foo $x): void {} }\n",
     );
-    analyze_file(&session, c.clone(), "<?php\nclass Baz extends \\Bar {}\n");
+    analyze_file(
+        &mut session,
+        c.clone(),
+        "<?php\nclass Baz extends \\Bar {}\n",
+    );
 
     // Delete Foo from A.php.
     session.ingest_file(a.clone(), Arc::from("<?php\n// Foo deleted\n"));
 
-    let after = dependent_files(&session, a.as_ref());
+    let after = dependent_files(&mut session, a.as_ref());
     assert!(
         after.contains(b.as_ref()),
         "B.php (direct referencer of deleted Foo) must appear; got {:?}",
@@ -1420,7 +1425,7 @@ fn reanalyze_dependents_lazy_load_warmup_does_not_deadlock() {
         );
     }
 
-    let session = AnalysisSession::new(PhpVersion::LATEST)
+    let mut session = AnalysisSession::new(PhpVersion::LATEST)
         .with_class_resolver(Arc::new(MapResolver(resolver_map)))
         .with_source_provider(Arc::new(MapProvider(provider_map)));
     session.ensure_all_stubs();
@@ -1442,14 +1447,11 @@ fn reanalyze_dependents_lazy_load_warmup_does_not_deadlock() {
         session.ingest_file(path, Arc::from(src.as_str()));
     }
 
-    // Run on a worker thread guarded by a timeout: a regression deadlocks here
-    // rather than returning, so recv_timeout is what turns the hang into a
-    // failed assertion instead of a hung test binary.
-    let session = Arc::new(session);
+    // Worker thread + recv_timeout turns a deadlock regression into a failure.
     let (tx, rx) = mpsc::channel();
-    let worker_session = Arc::clone(&session);
     let handle = std::thread::spawn(move || {
-        let result = worker_session.reanalyze_dependents("base.php");
+        let mut session = session;
+        let result = session.reanalyze_dependents("base.php");
         let _ = tx.send(result.len());
     });
 
@@ -1479,7 +1481,7 @@ fn catch_clause_records_class_reference_symbol() {
     // skipped (it only ever recorded the dead-code `cls:` reference).
     use mir_analyzer::symbol::ReferenceKind;
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let file: Arc<str> = Arc::from("catch.php");
@@ -1514,7 +1516,7 @@ fn static_property_access_records_symbols() {
     // ResolvedSymbol, so hover/go-to-definition silently did nothing on a
     // static property access (unlike instance `$obj->prop`, which does).
     use mir_analyzer::symbol::ReferenceKind;
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let file: Arc<str> = Arc::from("static_prop.php");
@@ -1563,7 +1565,7 @@ fn references_to_finds_extends_implements_and_trait_use() {
     // sites too, not just constructor/static-call/type-hint usages.
     use mir_analyzer::FileAnalyzer;
 
-    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let file: Arc<str> = Arc::from("hierarchy.php");
@@ -1579,7 +1581,7 @@ fn references_to_finds_extends_implements_and_trait_use() {
 
     session.ingest_file(file.clone(), source.clone());
     let parsed = php_rs_parser::parse(&source);
-    let _ = FileAnalyzer::new(&session).analyze_diagnostics_only(
+    let _ = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
         file.clone(),
         &source,
         &parsed.program,

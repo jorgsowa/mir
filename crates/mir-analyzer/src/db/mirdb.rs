@@ -119,8 +119,7 @@ pub struct MirDbStorage {
     /// can skip re-parsing files that were already parsed in the same session.
     /// Keyed by blake3 hash of the source text so stale entries from prior
     /// file versions are naturally evicted (different hash → different key).
-    /// DashMap (64 shards) replaces a single RwLock so parallel workers contend
-    /// on independent shards instead of serialising at a single write lock.
+    /// Sharded so parallel workers don't serialise on one lock.
     parse_cache: Arc<crate::parse_cache::ParseCache>,
     /// Pre-built FQCN symbol index singleton. Written imperatively by
     /// `rebuild_workspace_symbol_index` and read by `find_class_like` /
@@ -729,10 +728,9 @@ impl MirDbStorage {
 
     /// Build the workspace symbol index from **precomputed** per-file
     /// declarations — no `collect_file_declarations` (no parse) runs here, so
-    /// the write window is just map construction. The caller computes `decls`
-    /// off-lock (on a snapshot). Used by [`crate::AnalysisSession::index_batch`]
-    /// for the first chunk that seeds the singleton, keeping the write-lock hold
-    /// short even on a large initial set.
+    /// the write is just map construction; the caller computes `decls` on a
+    /// snapshot. Used by [`crate::AnalysisSession::index_batch`] to seed the
+    /// singleton.
     pub fn build_workspace_index_from_decls(
         &mut self,
         decls: Vec<(SourceFile, crate::db::FileDeclarations)>,

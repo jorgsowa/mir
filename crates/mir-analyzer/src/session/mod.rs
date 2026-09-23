@@ -1,11 +1,8 @@
 //! Session-based analysis API for incremental, per-file analysis.
 //!
-//! [`AnalysisSession`] owns the salsa database and per-session caches for a
-//! long-running analysis context shared across many per-file analyses. Reads
-//! clone the database under a brief lock, then run lock-free; writes hold the
-//! lock briefly to mutate canonical state. `MirDbStorage::clone()` is cheap
-//! (Arc-wrapped registries), so this pattern gives parallel readers without
-//! blocking on concurrent writes for longer than the clone itself.
+//! [`AnalysisSession`] owns the salsa database and per-session caches. It is
+//! the single writer (mutations take `&mut self`); readers use cheap
+//! [`AnalysisSession::snapshot_db`] clones.
 //!
 //! See [`crate::file_analyzer::FileAnalyzer`] for the per-file analysis
 //! entry point that operates against a session.
@@ -24,14 +21,9 @@ use crate::php_version::PhpVersion;
 
 /// Long-lived analysis context. Owns the salsa database and tracks which
 /// stubs have been loaded.
-///
-/// Cheap to clone the inner db for parallel reads; writes funnel through
-/// [`Self::ingest_file`], [`Self::invalidate_file`], and the crate-internal
-/// [`Self::with_db_mut`].
-#[derive(Clone)]
 pub struct AnalysisSession {
-    /// Shared database management (salsa, file registry, stub tracking).
-    pub(crate) db: Arc<AnalyzerDb>,
+    /// Database management (salsa, file registry, stub tracking).
+    pub(crate) db: AnalyzerDb,
     pub(crate) cache: Option<Arc<AnalysisCache>>,
     /// PSR-4 / Composer autoload map. Retained alongside `resolver` so the
     /// `psr4()` accessor can still return a typed `Psr4Map` for callers that
@@ -165,9 +157,6 @@ pub struct AnalysisSession {
     /// on this session sees the same file set with identical bytes. Any
     /// mutation outside `analyze_paths` clears it.
     transient_batch_replay: BatchReplayCache,
-    /// Test-only hook fired between releasing the sweep's snapshot and taking the commit lock, for the writer-deadlock regression test.
-    #[cfg(test)]
-    precommit_gate: Arc<RwLock<Option<Arc<dyn Fn() + Send + Sync>>>>,
 }
 
 /// Which reference postings [`AnalysisSession::indexed_references_to`]
@@ -398,14 +387,26 @@ pub(crate) struct BatchReplayState {
 /// resolver calls until it re-fills.
 const UNRESOLVABLE_CACHE_CAP: usize = 10_000;
 
-/// RAII scope from [`AnalysisSession::defer_revision_bumps`]. The last scope
-/// to close performs the one owed `bump_workspace_revision` (taking the db
-/// write lock), so generation-stamped freshness marks made after the scope
-/// see the post-load generation.
-pub(crate) struct DeferredRevisionBumps<'s> {
-    session: &'s AnalysisSession,
+/// RAII scope from [`AnalysisSession::defer_revision_bumps`]; the last scope
+/// to close performs the one owed `bump_workspace_revision`. Derefs to the
+/// session, so the scope body mutates it through the guard.
+pub(crate) struct DeferredRevisionBumps<'a> {
+    session: &'a mut AnalysisSession,
     depth: Arc<std::sync::atomic::AtomicUsize>,
     pending: Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl std::ops::Deref for DeferredRevisionBumps<'_> {
+    type Target = AnalysisSession;
+    fn deref(&self) -> &AnalysisSession {
+        self.session
+    }
+}
+
+impl std::ops::DerefMut for DeferredRevisionBumps<'_> {
+    fn deref_mut(&mut self) -> &mut AnalysisSession {
+        self.session
+    }
 }
 
 impl Drop for DeferredRevisionBumps<'_> {
@@ -414,7 +415,7 @@ impl Drop for DeferredRevisionBumps<'_> {
         if self.depth.fetch_sub(1, Ordering::SeqCst) == 1
             && self.pending.swap(false, Ordering::SeqCst)
         {
-            self.session.db.salsa.write().bump_workspace_revision();
+            self.session.db.salsa.bump_workspace_revision();
         }
     }
 }
@@ -422,10 +423,8 @@ impl Drop for DeferredRevisionBumps<'_> {
 impl AnalysisSession {
     /// Create a session targeting the given PHP language version.
     pub fn new(php_version: PhpVersion) -> Self {
-        let db = Arc::new(AnalyzerDb::new());
-        db.salsa
-            .write()
-            .set_php_version(Arc::from(php_version.to_string()));
+        let mut db = AnalyzerDb::new();
+        db.salsa.set_php_version(Arc::from(php_version.to_string()));
         Self {
             db,
             cache: None,
@@ -453,8 +452,6 @@ impl AnalysisSession {
             subtype_query_cache_hits: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             dependency_graph_cache: Arc::new(RwLock::new(None)),
             transient_batch_replay: Arc::new(RwLock::new(None)),
-            #[cfg(test)]
-            precommit_gate: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -489,30 +486,12 @@ impl AnalysisSession {
 
     /// Times the reference index has been locked on this session's db.
     pub fn ref_index_lock_count(&self) -> u64 {
-        self.db.salsa.read().ref_index_lock_count()
+        self.db.salsa.ref_index_lock_count()
     }
 
     pub(crate) fn clear_dependency_graph_cache(&self) {
         *self.dependency_graph_cache.write() = None;
     }
-
-    /// Install the sweep's pre-commit hold point (see `precommit_gate`).
-    #[cfg(test)]
-    pub(crate) fn set_precommit_gate(&self, gate: Arc<dyn Fn() + Send + Sync>) {
-        *self.precommit_gate.write() = Some(gate);
-    }
-
-    #[cfg(test)]
-    pub(crate) fn fire_precommit_gate(&self) {
-        let gate = self.precommit_gate.read().clone();
-        if let Some(gate) = gate {
-            gate();
-        }
-    }
-
-    #[cfg(not(test))]
-    #[inline(always)]
-    pub(crate) fn fire_precommit_gate(&self) {}
 
     pub(crate) fn clear_transient_batch_replay(&self) {
         *self.transient_batch_replay.write() = None;
@@ -549,15 +528,11 @@ impl AnalysisSession {
         }));
     }
 
-    /// Open a scope during which `bump_workspace_revision` calls coalesce:
-    /// a pass that lazy-loads N classes (Phase-1 warm-up, bulk registration)
-    /// performs one salsa input write when the last scope closes instead of
-    /// one per class — each such write cancels every in-flight salsa reader,
-    /// so this is what keeps a warm-up loop from restarting concurrent
-    /// queries N times. Scopes nest; the flush must not run while a db
-    /// guard is held (it takes the write lock).
-    pub(crate) fn defer_revision_bumps(&self) -> DeferredRevisionBumps<'_> {
-        let (depth, pending) = self.db.salsa.read().revision_bump_deferral_handles();
+    /// Coalesce `bump_workspace_revision` calls until the returned scope
+    /// closes: each bump cancels in-flight salsa readers, so a pass that
+    /// lazy-loads N classes pays one instead of N. Scopes nest.
+    pub(crate) fn defer_revision_bumps(&mut self) -> DeferredRevisionBumps<'_> {
+        let (depth, pending) = self.db.salsa.revision_bump_deferral_handles();
         depth.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         DeferredRevisionBumps {
             session: self,
@@ -569,7 +544,7 @@ impl AnalysisSession {
     /// Coverage/size counters for the class-mention gate index (host
     /// metrics and memory-bound checks).
     pub fn class_mention_stats(&self) -> crate::db::ClassMentionStats {
-        self.db.salsa.read().class_mention_stats()
+        self.db.salsa.class_mention_stats()
     }
 
     /// Which of `files` currently mention `class_name` as a whole
@@ -804,17 +779,13 @@ impl AnalysisSession {
     /// [`Self::warm_start_files`] or built by `index_batch`) — symbol lookups
     /// answer from the O(1) map instead of the tracked O(all-files) walk.
     pub fn workspace_symbol_index_ready(&self) -> bool {
-        self.db
-            .salsa
-            .read()
-            .workspace_symbol_index_singleton()
-            .is_some()
+        self.db.salsa.workspace_symbol_index_singleton().is_some()
     }
 
     /// Executions of the tracked O(all-files) `workspace_symbol_index` walk
     /// (diagnostic; a warm-started session should keep this at zero).
     pub fn workspace_index_walks(&self) -> u64 {
-        self.db.salsa.read().workspace_index_walks()
+        self.db.salsa.workspace_index_walks()
     }
 
     /// Whether `file`'s subtype-index class edges were committed from exactly
@@ -870,10 +841,9 @@ impl AnalysisSession {
             "AnalysisSession::with_cache must be called before any file is ingested"
         );
         let dir = cache.cache_dir().to_path_buf();
-        self.db = Arc::new(AnalyzerDb::new().with_cache_dir(&dir));
+        self.db = AnalyzerDb::new().with_cache_dir(&dir);
         self.db
             .salsa
-            .write()
             .set_php_version(Arc::from(self.php_version.to_string()));
         self.cache = Some(cache);
         self
@@ -893,10 +863,9 @@ impl AnalysisSession {
             0,
             "AnalysisSession::with_cache_dir must be called before any file is ingested"
         );
-        self.db = Arc::new(AnalyzerDb::new().with_cache_dir(cache_dir));
+        self.db = AnalyzerDb::new().with_cache_dir(cache_dir);
         self.db
             .salsa
-            .write()
             .set_php_version(Arc::from(self.php_version.to_string()));
         // Fold the user-stub fingerprint into the cache epoch. `with_user_stubs`
         // must run before this for it to be picked up (it does in `build_session`);
@@ -928,7 +897,7 @@ impl AnalysisSession {
         // Mirror into MirDbStorage so salsa-tracked resolver queries
         // (`db::resolve_fqcn_to_path`) see the same resolver and are
         // invalidated on swap.
-        self.db.salsa.write().set_resolver(Some(resolver));
+        self.db.salsa.set_resolver(Some(resolver));
         // Register vendor autoload.files for lazy loading. They define global
         // functions and constants that the class resolver cannot discover.
         // `ensure_vendor_eager_functions` will index them on first analysis call.
@@ -945,7 +914,7 @@ impl AnalysisSession {
             resolver,
             Arc::new(crate::StubClassResolver),
         ));
-        self.db.salsa.write().set_resolver(Some(wrapped.clone()));
+        self.db.salsa.set_resolver(Some(wrapped.clone()));
         self.resolver = Some(wrapped);
         self
     }
