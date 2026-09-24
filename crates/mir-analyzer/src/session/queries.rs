@@ -409,7 +409,7 @@ impl AnalysisSession {
     /// perspective; may trigger an on-demand commit of stale/uncommitted
     /// candidates' class edges (same self-heal `indexed_subtype_classes` uses).
     pub fn subtype_files(&mut self, class_fqn: &str) -> Vec<Arc<str>> {
-        self.settle_workspace_index();
+        self.prepare_for_query(None);
         let files = self.snapshot_db().source_file_paths();
         let mut out: Vec<Arc<str>> = self
             .indexed_subtype_classes(class_fqn, &files, false)
@@ -1201,7 +1201,7 @@ impl AnalysisSession {
         files: &[Arc<str>],
         include_trait_users: bool,
     ) -> Vec<SubtypeClassSite> {
-        self.settle_workspace_index();
+        self.prepare_for_query(None);
         let mut scanned: rustc_hash::FxHashSet<String> = rustc_hash::FxHashSet::default();
         let mut pending: Vec<String> = vec![class_fqn.trim_start_matches('\\').to_string()];
         let mut sites: Vec<crate::db::SubtypeSite> = Vec::new();
@@ -1492,7 +1492,7 @@ impl AnalysisSession {
     /// Circular-inheritance checks always run against the full workspace graph
     /// regardless of the `files` filter — a cycle is a workspace-wide problem.
     pub fn class_issues(&mut self, files: &[Arc<str>]) -> Vec<crate::Issue> {
-        self.settle_workspace_index();
+        self.prepare_for_query(None);
         let db = self.snapshot_db();
         let file_set: HashSet<Arc<str>> = files.iter().cloned().collect();
         // Read source texts through the snapshot already in hand.

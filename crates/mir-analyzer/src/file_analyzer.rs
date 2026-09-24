@@ -482,8 +482,7 @@ impl<'a> FileAnalyzer<'a> {
         file: Arc<str>,
         byte_offset: u32,
     ) -> Option<crate::Name> {
-        self.session.settle_workspace_index();
-        self.session.prepare_file_for_analysis(&file);
+        self.session.prepare_for_query(Some(&file));
 
         let db = self.session.snapshot_db();
         let sf = db.lookup_source_file(file.as_ref())?;
@@ -524,8 +523,7 @@ impl<'a> FileAnalyzer<'a> {
         byte_offset: u32,
         capture_symbol_types: bool,
     ) -> Option<ResolvedSymbol> {
-        self.session.settle_workspace_index();
-        self.session.prepare_file_for_analysis(&file);
+        self.session.prepare_for_query(Some(&file));
 
         let db = self.session.snapshot_db();
         let sf = db.lookup_source_file(file.as_ref())?;

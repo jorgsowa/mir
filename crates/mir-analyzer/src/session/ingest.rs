@@ -1038,6 +1038,21 @@ impl AnalysisSession {
         let _ = self.settle_workspace_index_cancellable(&|| false);
     }
 
+    /// The single write prelude every interactive query needs before it can
+    /// read a consistent snapshot: reconcile the workspace index, then (if a
+    /// specific file is the target of the query) warm up that file's direct
+    /// dependencies via [`Self::prepare_file_for_analysis`].
+    ///
+    /// Named and composed on its own so the read half of a query never needs
+    /// to know these two steps exist — it only ever runs after this has
+    /// already prepared the snapshot it reads.
+    pub(crate) fn prepare_for_query(&mut self, file: Option<&Arc<str>>) {
+        self.settle_workspace_index();
+        if let Some(file) = file {
+            self.prepare_file_for_analysis(file);
+        }
+    }
+
     /// Cancellable form of [`Self::settle_workspace_index`]. Returns `false`
     /// when the caller's request was cancelled before the pending index work
     /// could be reconciled.
