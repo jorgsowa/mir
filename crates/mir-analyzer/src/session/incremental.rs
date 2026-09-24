@@ -161,17 +161,9 @@ impl AnalysisSession {
         // The loop short-circuits when cancellation has been requested.
         // Generation before the snapshot: a file add racing the sweep leaves
         // the commits stale (self-healing), never wrongly fresh.
-        type Analyzed = (
-            Arc<str>,
-            Arc<str>,
-            std::sync::Arc<crate::db::AnalyzeOutput>,
-            Vec<crate::db::SubtypeEntry>,
-            Option<super::RefCachePut>,
-            Option<Box<[mir_types::Name]>>,
-        );
         type Pass = (
             Option<Arc<crate::db::class_mention_index::MentionScanner>>,
-            Vec<Analyzed>,
+            Vec<super::index_state::AnalyzedFile>,
         );
         let mut attempts_left = PASS_ATTEMPTS;
         let (commit_gen, mention_scanner, mut results) = loop {
@@ -198,48 +190,19 @@ impl AnalysisSession {
                     // alongside its postings, so later reference-gate checks are
                     // set lookups.
                     let mention_scanner = db_main.class_mention_scanner();
-                    let analyzed: Vec<Analyzed> = dependents
+                    let cache = self.cache.as_deref();
+                    let analyzed: Vec<_> = dependents
                         .iter()
                         .filter_map(|file| {
                             if cancel.is_cancelled() {
                                 return None;
                             }
-                            let sf = db_main.lookup_source_file(file.as_ref())?;
-                            // Capture the text the analysis ran against: the
-                            // freshness marks below must record exactly this Arc,
-                            // so a text write racing the sweep leaves the file
-                            // dirty rather than wrongly marked fresh.
-                            let text = sf.text(&db_main as &dyn crate::db::MirDatabase).clone();
-                            let out = crate::db::analyze_file(
-                                &db_main as &dyn crate::db::MirDatabase,
-                                sf,
+                            self.index.stage_analyzed(
+                                &db_main,
+                                cache,
+                                mention_scanner.as_deref(),
+                                file,
                             )
-                            .clone();
-                            let defs = crate::db::collect_file_definitions(
-                                &db_main as &dyn crate::db::MirDatabase,
-                                sf,
-                            );
-                            let entries = crate::db::subtype_index::entries_from_slice(&defs.slice);
-                            // Stage the disk-cache write only when the postings
-                            // commit below will actually rewrite — a no-op
-                            // re-sweep (current commit) adds no hashing or
-                            // parse-walk cost per file.
-                            let put = if self.ref_commit_is_current(file.as_ref(), &text, &out) {
-                                None
-                            } else {
-                                self.stage_ref_cache_put(
-                                    &db_main as &dyn crate::db::MirDatabase,
-                                    sf,
-                                    file.as_ref(),
-                                    &text,
-                                    &out,
-                                )
-                            };
-                            let mentions = mention_scanner.as_ref().and_then(|s| {
-                                (!db_main.class_mentions_current(file.as_ref(), &text, s.epoch()))
-                                    .then(|| s.scan(&text))
-                            });
-                            Some((file.clone(), text, out, entries, put, mentions))
                         })
                         .collect();
                     Some((mention_scanner, analyzed))
@@ -261,49 +224,25 @@ impl AnalysisSession {
         //
         // Runs with no live snapshot: see the pass closure above.
         {
-            let guard = &self.db.salsa;
-            let mut dependency_graph_changed = false;
-            for (file, text, out, entries, put, mentions) in results.iter_mut() {
-                // Pointer-identical memo ⇒ identical postings: skip the
-                // index rewrite. The mark is re-stamped unconditionally so a
-                // no-op sweep still advances the commit's generation.
-                if !self.ref_commit_is_current(file.as_ref(), text, out) {
-                    let file_no = guard.locked_ref_index().intern_path(file);
-                    guard.set_file_reference_locations(file_no, out.ref_locs.to_vec());
-                    dependency_graph_changed = true;
-                }
-                if let (Some(s), Some(m)) = (&mention_scanner, mentions.take()) {
-                    guard.set_file_class_mentions(file, text, s.epoch(), m);
-                }
-                if let Some(put) = put.take() {
-                    self.apply_ref_cache_put(file.as_ref(), out, put);
-                }
-                self.mark_ref_committed(
-                    file,
-                    text,
-                    Some(out),
-                    commit_gen,
-                    !out.has_unresolved_names(),
-                );
-                if !self.is_defs_committed(file.as_ref(), text) {
-                    let file_no = guard.locked_ref_index().intern_path(file);
-                    guard.set_file_class_edges(file_no, entries.clone());
-                    self.mark_defs_committed(file, text);
-                    dependency_graph_changed = true;
-                }
-            }
+            let dependency_graph_changed = self.index.commit_analyzed(
+                &self.db.salsa,
+                self.cache.as_deref(),
+                mention_scanner.as_deref(),
+                &mut results,
+                commit_gen,
+            );
             if dependency_graph_changed {
-                self.clear_dependency_graph_cache();
+                self.index.clear_dependency_graph_cache();
             }
         }
 
         results
             .into_iter()
-            .map(|(file, _, out, _, _, _)| {
+            .map(|a| {
                 (
-                    file,
+                    a.file,
                     crate::FileAnalysis {
-                        issues: out.issues.to_vec(),
+                        issues: a.out.issues.to_vec(),
                         symbols: Vec::new(),
                     },
                 )
@@ -472,8 +411,8 @@ impl AnalysisSession {
     /// file via O(1) lookup. Total cost is O(E) where E is the number of
     /// (file, symbol) edges.
     pub fn dependency_graph(&self) -> crate::DependencyGraph {
-        if let Some(graph) = self.dependency_graph_cache.read().as_ref() {
-            return graph.clone();
+        if let Some(graph) = self.index.cached_dependency_graph() {
+            return graph;
         }
         let db = self.snapshot_db();
 
@@ -593,7 +532,7 @@ impl AnalysisSession {
             dependencies,
             dependents,
         );
-        *self.dependency_graph_cache.write() = Some(graph.clone());
+        self.index.store_dependency_graph(graph.clone());
         graph
     }
 }

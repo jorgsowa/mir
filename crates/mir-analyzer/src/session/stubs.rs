@@ -287,7 +287,7 @@ impl AnalysisSession {
     /// file might then need its warm-up re-run to lazy-load a replacement
     /// (a vendor class shadowed by a since-deleted project class).
     pub fn bump_prepare_generation(&self) {
-        self.clear_transient_batch_replay();
+        self.index.clear_transient_batch_replay();
         self.prepare_generation
             .fetch_add(1, std::sync::atomic::Ordering::Release);
     }

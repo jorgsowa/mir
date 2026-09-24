@@ -1,8 +1,8 @@
 //! Session-based analysis API for incremental, per-file analysis.
 //!
 //! [`AnalysisSession`] owns the salsa database and per-session caches. It is
-//! the single writer (mutations take `&mut self`); readers use cheap
-//! [`AnalysisSession::snapshot_db`] clones.
+//! the single writer (mutations take `&mut self`); readers on other threads
+//! use [`AnalysisSnapshot`]s from [`AnalysisSession::snapshot`].
 //!
 //! See [`crate::file_analyzer::FileAnalyzer`] for the per-file analysis
 //! entry point that operates against a session.
@@ -47,20 +47,20 @@ pub struct AnalysisSession {
     /// from the set when re-added to the same file on a subsequent ingest.
     /// The set may contain symbols with no current referencers; those are
     /// harmless — the `symbol_referencers_of` lookup returns empty.
-    stale_defined_symbols: Arc<RwLock<HashMap<String, HashSet<Arc<str>>>>>,
+    stale_defined_symbols: RwLock<HashMap<String, HashSet<Arc<str>>>>,
     /// Symbols defined by each file as of its last `ingest_file`. The
     /// authoritative "old" set for the rename/deletion diff, independent of
     /// whether the salsa `SourceFile` input was already updated to the new text
     /// by a host driving the db directly (the LSP convergence path). Without
     /// this, re-deriving "old" symbols from the (possibly pre-updated) input
     /// would miss deletions and break cross-file dependency invalidation.
-    last_ingested_symbols: Arc<RwLock<HashMap<String, HashSet<Arc<str>>>>>,
+    last_ingested_symbols: RwLock<HashMap<String, HashSet<Arc<str>>>>,
     /// Structural outgoing dependency targets by file, as of the last
     /// ingestion that updated this session's declaration state. Lets
     /// `ingest_file` tell whether the dependency graph's declaration-shaped
     /// edges actually changed, so body-only edits need not invalidate the
     /// cached graph.
-    last_structural_targets: Arc<RwLock<HashMap<String, HashSet<String>>>>,
+    last_structural_targets: RwLock<HashMap<String, HashSet<String>>>,
     /// Negative cache: FQCNs that `load_class` already failed on.
     /// The value is the resolver-mapped path (when known) so eviction on
     /// `set_file_text` / `ingest_file` is a path equality check rather than
@@ -68,7 +68,7 @@ pub struct AnalysisSession {
     /// couldn't map the FQCN; those entries survive file edits (no source
     /// change makes a never-resolvable name resolvable).
     /// Bounded to `UNRESOLVABLE_CACHE_CAP`; clears on overflow.
-    unresolvable_fqcns: UnresolvableCache,
+    unresolvable_fqcns: RwLock<HashMap<Arc<str>, Option<Arc<str>>>>,
     /// Pluggable source-text provider for lazy-load. Defaults to filesystem
     /// reads ([`crate::FsSourceProvider`]); LSPs swap in a VFS-backed
     /// implementation so unsaved buffers override on-disk content.
@@ -77,11 +77,7 @@ pub struct AnalysisSession {
     /// pending; `None` means the load has already run (idempotent). Populated
     /// by [`Self::with_psr4`]; drained by [`Self::ensure_vendor_eager_functions`],
     /// which is called automatically from [`Self::prepare_ast_for_analysis`].
-    ///
-    /// The mutex is held for the full duration of the load so concurrent callers
-    /// block until indexing is complete rather than proceeding with a stale
-    /// workspace snapshot.
-    pub(crate) pending_eager_function_files: Arc<parking_lot::Mutex<Option<Vec<PathBuf>>>>,
+    pub(crate) pending_eager_function_files: parking_lot::Mutex<Option<Vec<PathBuf>>>,
     /// Warm-up skip set: files whose [`Self::prepare_ast_for_analysis`] has
     /// already run against their current text. Value is `(text, generation)` —
     /// the entry is live while the file's input text is pointer-equal to `text`
@@ -99,64 +95,10 @@ pub struct AnalysisSession {
     /// [`Self::bump_prepare_generation`]) — a prepared file might then need its
     /// warm-up re-run to lazy-load a replacement (e.g. a vendor class shadowed
     /// by a since-deleted project class).
-    prepare_generation: Arc<std::sync::atomic::AtomicU64>,
-    /// file → [`RefCommit`] its reference locations were last committed
-    /// from. Exact while the text is pointer-equal and the commit either
-    /// fully resolved every name it referenced or was stamped at the current
-    /// [`Self::index_generation`] — a later symbol add elsewhere can resolve
-    /// a reference this file's analysis left unresolved, even though this
-    /// file's own text never changed. Files absent here have never been
-    /// committed.
-    ref_committed: CommittedRefs,
-    /// file → source text its subtype-index class edges were last committed
-    /// from. Same freshness contract as `ref_committed`, but definitions
-    /// depend only on the file's own text, so a pointer-equal entry is
-    /// always exact (no cross-file drift).
-    defs_committed: CommittedTexts,
-    /// Memoized [`Self::indexed_references_to`] results. See
-    /// [`RefQueryCacheKey`] for the invalidation contract. Without this, a
-    /// repeat query against an unchanged candidate set still re-pays the
-    /// O(candidates) freshness scan on every call — cheap per file, but
-    /// measured at tens of MB / seconds of churn for a widely-referenced
-    /// symbol queried repeatedly (e.g. a host recomputing code-lens
-    /// reference counts on every request). Bounded by total cached
-    /// LOCATIONS (`ref_query_cache_locations`, capped at
-    /// `REF_QUERY_CACHE_LOCATION_CAP`), not entry count — a per-entry cap
-    /// would not bound memory here, since one entry's `Vec` scales with how
-    /// many times its symbol is referenced (a handful for a typical method,
-    /// thousands for a hot one like `Str::class`'s), so a fixed entry count
-    /// gives no fixed byte ceiling. Cleared wholesale on overflow, same
-    /// trade-off as the other simple caches in this module.
-    ref_query_cache: RefQueryCache,
-    /// Sum of `.len()` across every `ref_query_cache` entry, kept in
-    /// lockstep with it. See the field doc above.
-    ref_query_cache_locations: Arc<std::sync::atomic::AtomicUsize>,
-    /// Hits served from `ref_query_cache`. Diagnostic only — lets tests
-    /// assert a warm repeat skipped the freshness scan entirely, the same
-    /// way `ref_index_lock_count` proves a bounded posting lookup.
-    ref_query_cache_hits: Arc<std::sync::atomic::AtomicU64>,
-    /// Memoized [`Self::indexed_subtype_classes`] results. Same rationale
-    /// and invalidation contract as `ref_query_cache`:
-    /// `commit_defs_for_matching`'s freshness pass costs O(candidates) on
-    /// every call regardless of outcome, so a repeat query (e.g. resolving
-    /// a protected/static method's reference scope on every code-lens
-    /// refresh) would otherwise re-pay it every time. Bounded by total
-    /// cached sites (`subtype_query_cache_sites`, capped at
-    /// `SUBTYPE_QUERY_CACHE_SITE_CAP`), not entry count, for the same
-    /// reason `ref_query_cache` isn't entry-count-capped.
-    subtype_query_cache: SubtypeQueryCache,
-    /// Sum of `.len()` across every `subtype_query_cache` entry.
-    subtype_query_cache_sites: Arc<std::sync::atomic::AtomicUsize>,
-    /// Hits served from `subtype_query_cache`. Diagnostic only.
-    subtype_query_cache_hits: Arc<std::sync::atomic::AtomicU64>,
-    /// Session-local memo of the derived dependency graph. Rebuilt lazily on
-    /// demand and invalidated whenever committed references, structural
-    /// edges, source-file membership, or stale-symbol tracking changes.
-    dependency_graph_cache: DependencyGraphCache,
-    /// One-run replay cache for `analyze_paths` when the next batch invocation
-    /// on this session sees the same file set with identical bytes. Any
-    /// mutation outside `analyze_paths` clears it.
-    transient_batch_replay: BatchReplayCache,
+    prepare_generation: std::sync::atomic::AtomicU64,
+    /// Index freshness marks and query memos, shared with every
+    /// [`AnalysisSnapshot`].
+    pub(crate) index: Arc<IndexState>,
 }
 
 /// Which reference postings [`AnalysisSession::indexed_references_to`]
@@ -173,188 +115,12 @@ pub enum ReferenceIncludes {
     PlainAndUseImports,
 }
 
-/// Cache key for [`AnalysisSession::indexed_references_to`]'s memoization.
-///
-/// `generation`'s revision half is salsa's text revision, not
-/// [`AnalysisSession::index_generation`]: a body-only edit never bumps the
-/// workspace generation (by design — see `bump_workspace_revision`'s doc
-/// comment) but can still move, add, or remove a reference location, so
-/// keying on the coarser generation would serve stale locations after such
-/// an edit.
-/// `files_hash` guards against a caller narrowing/widening the candidate
-/// scope between calls for the same symbol at the same revision (e.g. a
-/// different reference-scope plan) — a coincidental hash collision would
-/// only cause a wrong cache HIT, so this hashes full content, not just
-/// length/pointers.
-///
-/// `generation` also carries the subtype-edge epoch (see
-/// [`AnalysisSession::query_cache_generation`]): a member query's hierarchy
-/// fan-out reads the subtype index, which another query's defs commit can
-/// grow without moving the text revision — the epoch keeps such an entry
-/// from being served after its fan-out went stale.
-#[derive(PartialEq, Eq, Hash)]
-struct RefQueryCacheKey {
-    symbol: String,
-    include_declaration: bool,
-    includes: ReferenceIncludes,
-    generation: (salsa::Revision, u64),
-    files_hash: u64,
-}
-
-/// Cap on `ref_query_cache`'s total cached reference-location count (summed
-/// across every entry), not entry count — see the field doc on
-/// `ref_query_cache`. Each location is `(Arc<str>, Range)`, ~24 bytes plus a
-/// refcount bump on an already-allocated path string (no new string data),
-/// so 200k locations is on the order of a few MB — a small, fixed ceiling
-/// regardless of how skewed the query distribution is (many small entries or
-/// a few huge ones for hot symbols cost the same worst case).
-const REF_QUERY_CACHE_LOCATION_CAP: usize = 200_000;
-
-/// Memoized [`AnalysisSession::indexed_references_to`] results. See
-/// [`RefQueryCacheKey`] for the invalidation contract.
-type RefQueryCache =
-    Arc<RwLock<RevisionedMap<RefQueryCacheKey, Arc<Vec<(Arc<str>, crate::Range)>>>>>;
-
-/// A memo map whose keys embed the generation — `(text revision,
-/// subtype-edge epoch)`, see [`AnalysisSession::query_cache_generation`] —
-/// they were computed at. Once the generation moves, old keys can never be
-/// looked up again, so the first insert at a newer generation drops them
-/// wholesale — without this, dead keys (heap `String`s) accumulate until
-/// the value-cap overflow clear.
-struct RevisionedMap<K, V> {
-    generation: Option<(salsa::Revision, u64)>,
-    map: HashMap<K, V>,
-}
-
-impl<K, V> Default for RevisionedMap<K, V> {
-    fn default() -> Self {
-        Self {
-            generation: None,
-            map: HashMap::default(),
-        }
-    }
-}
-
-impl<K: std::hash::Hash + Eq, V> RevisionedMap<K, V> {
-    fn get(&self, key: &K) -> Option<&V> {
-        self.map.get(key)
-    }
-
-    /// Prepare for an insert keyed at `generation`. Rolls the map forward
-    /// (dropping the dead generation) when `generation` is newer than the
-    /// resident one, running `on_clear` so the caller can zero its
-    /// lockstep size counter. Returns `false` when `generation` is older —
-    /// such a key can never hit again, so the caller should skip caching.
-    /// Both components are monotonic, so lexicographic order is sound.
-    fn advance_to(&mut self, generation: (salsa::Revision, u64), on_clear: impl FnOnce()) -> bool {
-        match self.generation {
-            Some(g) if g == generation => true,
-            Some(g) if g > generation => false,
-            _ => {
-                self.map.clear();
-                self.generation = Some(generation);
-                on_clear();
-                true
-            }
-        }
-    }
-}
-
-/// Cache key for [`AnalysisSession::indexed_subtype_classes`]'s memoization.
-/// Same invalidation contract as [`RefQueryCacheKey`]. `class_fqn` is
-/// lowercased and leading-`\`-stripped on entry (PHP class names are
-/// case-insensitive) so two callers spelling the same class differently
-/// still share a cache entry.
-#[derive(PartialEq, Eq, Hash)]
-struct SubtypeQueryCacheKey {
-    class_fqn: String,
-    include_trait_users: bool,
-    generation: (salsa::Revision, u64),
-    files_hash: u64,
-}
-
-/// Cap on `subtype_query_cache`'s total cached site count, not entry count
-/// — same rationale as [`REF_QUERY_CACHE_LOCATION_CAP`]. A `SubtypeClassSite`
-/// is ~80 bytes (two `Arc<str>`, an enum, a bool, a `Range`), so 50k sites
-/// is on the order of a few MB.
-const SUBTYPE_QUERY_CACHE_SITE_CAP: usize = 50_000;
-
-/// Memoized [`AnalysisSession::indexed_subtype_classes`] results. See
-/// [`SubtypeQueryCacheKey`] for the invalidation contract.
-type SubtypeQueryCache =
-    Arc<RwLock<RevisionedMap<SubtypeQueryCacheKey, Arc<Vec<SubtypeClassSite>>>>>;
-
-type DependencyGraphCache = Arc<RwLock<Option<crate::DependencyGraph>>>;
-type BatchReplayCache = Arc<RwLock<Option<Arc<BatchReplayState>>>>;
-
-/// Stable content hash of a candidate-file list, order-sensitive. Callers
-/// that rebuild the list identically each time (the common case — the same
-/// scope-narrowing query re-run against unchanged state) still hash equal;
-/// a genuinely different list (different content OR order) safely misses
-/// rather than risking a wrong hit.
-fn hash_files(files: &[Arc<str>]) -> u64 {
-    use std::hash::{Hash, Hasher};
-    let mut hasher = rustc_hash::FxHasher::default();
-    files.len().hash(&mut hasher);
-    for f in files {
-        f.hash(&mut hasher);
-    }
-    hasher.finish()
-}
-
-/// FQCN → optional resolver-mapped path. See the field doc on
-/// `AnalysisSession::unresolvable_fqcns`.
-type UnresolvableCache = Arc<RwLock<HashMap<Arc<str>, Option<Arc<str>>>>>;
-
-/// Warm-up skip set keyed by file path. See the field doc on
-/// `AnalysisSession::prepared_files`.
-type PreparedFilesCache = Arc<RwLock<HashMap<Arc<str>, (Arc<str>, u64)>>>;
+/// file → `(text, prepare generation)`. See `AnalysisSession::prepared_files`.
+type PreparedFilesCache = RwLock<HashMap<Arc<str>, (Arc<str>, u64)>>;
 
 /// Parsed inline suppressions keyed by file path and source text.
 type SuppressionMapCache =
-    Arc<RwLock<HashMap<Arc<str>, (Arc<str>, Arc<crate::suppression::SuppressionMap>)>>>;
-
-/// file → text a per-file index commit was computed from. See the field docs
-/// on `AnalysisSession::ref_committed` / `defs_committed`.
-type CommittedTexts = Arc<RwLock<HashMap<Arc<str>, Arc<str>>>>;
-
-/// A staged [`AnalysisCache`] write for one file's postings, prepared in the
-/// parallel analysis phase and applied during the serial index commit. See
-/// `AnalysisSession::stage_ref_cache_put`.
-pub(crate) struct RefCachePut {
-    content_hash: String,
-    surface_hash: String,
-    ref_locs: Arc<[crate::cache::CachedRefLoc]>,
-}
-
-/// One file's reference-posting commit. See `AnalysisSession::ref_committed`.
-pub(crate) struct RefCommit {
-    /// Source text the postings were computed from (pointer identity; a
-    /// text write self-invalidates).
-    text: Arc<str>,
-    /// Weak handle on the analyze memo — pointer-identical output means
-    /// identical postings, so sweeps can skip the index rewrite. The upgrade
-    /// guards against ABA on evicted memos.
-    out: std::sync::Weak<crate::db::AnalyzeOutput>,
-    /// Workspace generation whose resolution environment the postings
-    /// reflect, captured *before* the analysis snapshot.
-    generation: u64,
-    /// The analysis resolved every workspace-level name it referenced, so no
-    /// later symbol add can change the postings and the commit survives
-    /// generation bumps. FQCN shadowing and unqualified-call fallback
-    /// switches remain the reanalyze_dependents flow's job, as before.
-    resolved: bool,
-    /// Whether this commit came from this session's own `analyze_file` pass
-    /// (`out: Some(..)`) rather than a disk-cache replay (`out: None`, from
-    /// `warm_start_files`). A live analysis's postings are guaranteed
-    /// consistent with a fresh textual scan of the same text — a replayed
-    /// commit's are only as trustworthy as the cache entry, so it always
-    /// re-verifies via full re-analysis instead of the cheaper gate.
-    live_analyzed: bool,
-}
-
-/// file → [`RefCommit`] map shared across session clones.
-type CommittedRefs = Arc<RwLock<HashMap<Arc<str>, RefCommit>>>;
+    RwLock<HashMap<Arc<str>, (Arc<str>, Arc<crate::suppression::SuppressionMap>)>>;
 
 /// One file's replayable body-analysis output from the previous batch run.
 pub(crate) struct BatchReplayFile {
@@ -433,68 +199,73 @@ impl AnalysisSession {
             php_version,
             user_stub_files: Vec::new(),
             user_stub_dirs: Vec::new(),
-            stale_defined_symbols: Arc::new(RwLock::new(HashMap::default())),
-            last_ingested_symbols: Arc::new(RwLock::new(HashMap::default())),
-            last_structural_targets: Arc::new(RwLock::new(HashMap::default())),
-            unresolvable_fqcns: Arc::new(RwLock::new(HashMap::default())),
+            stale_defined_symbols: RwLock::default(),
+            last_ingested_symbols: RwLock::default(),
+            last_structural_targets: RwLock::default(),
+            unresolvable_fqcns: RwLock::default(),
             source_provider: Arc::new(crate::FsSourceProvider),
-            pending_eager_function_files: Arc::new(parking_lot::Mutex::new(Some(Vec::new()))),
-            prepared_files: Arc::new(RwLock::new(HashMap::default())),
-            suppression_maps: Arc::new(RwLock::new(HashMap::default())),
-            prepare_generation: Arc::new(std::sync::atomic::AtomicU64::new(0)),
-            ref_committed: Arc::new(RwLock::new(HashMap::default())),
-            defs_committed: Arc::new(RwLock::new(HashMap::default())),
-            ref_query_cache: Arc::new(RwLock::new(RevisionedMap::default())),
-            ref_query_cache_locations: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
-            ref_query_cache_hits: Arc::new(std::sync::atomic::AtomicU64::new(0)),
-            subtype_query_cache: Arc::new(RwLock::new(RevisionedMap::default())),
-            subtype_query_cache_sites: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
-            subtype_query_cache_hits: Arc::new(std::sync::atomic::AtomicU64::new(0)),
-            dependency_graph_cache: Arc::new(RwLock::new(None)),
-            transient_batch_replay: Arc::new(RwLock::new(None)),
+            pending_eager_function_files: parking_lot::Mutex::new(Some(Vec::new())),
+            prepared_files: RwLock::default(),
+            suppression_maps: RwLock::default(),
+            prepare_generation: std::sync::atomic::AtomicU64::new(0),
+            index: Arc::default(),
+        }
+    }
+
+    /// A `Send + Clone` read handle on the current revision. See
+    /// [`AnalysisSnapshot`] for the lifetime rules.
+    pub fn snapshot(&self) -> AnalysisSnapshot {
+        AnalysisSnapshot {
+            db: self.db.snapshot_db(),
+            index: Arc::clone(&self.index),
+            cache: self.cache.clone(),
+            php_version: self.php_version,
+            index_generation: self.index_generation(),
+        }
+    }
+
+    /// Run `query` on fresh snapshots until one completes. The owner can't
+    /// write while it's inside this call, so only a host writing through a
+    /// raw [`Self::snapshot_db`] clone can cancel it.
+    pub(crate) fn retry_snapshot<T>(
+        &self,
+        query: impl Fn(&AnalysisSnapshot) -> Result<T, salsa::Cancelled>,
+    ) -> T {
+        loop {
+            if let Ok(out) = query(&self.snapshot()) {
+                return out;
+            }
         }
     }
 
     /// Hits served from [`Self::indexed_references_to`]'s memoization cache.
-    /// Diagnostic only — see the field doc on `ref_query_cache_hits`.
+    /// Diagnostic only — lets tests assert a warm repeat skipped the
+    /// freshness scan entirely.
     pub fn ref_query_cache_hits(&self) -> u64 {
-        self.ref_query_cache_hits
-            .load(std::sync::atomic::Ordering::Relaxed)
+        self.index.ref_queries.hits()
     }
 
-    /// Total cached reference-location count across `ref_query_cache`.
+    /// Total cached reference-location count across the references memo.
     /// Diagnostic only — lets tests/hosts assert the cache stays under its
     /// byte-proportional cap rather than trusting entry count alone.
     pub fn ref_query_cache_locations(&self) -> usize {
-        self.ref_query_cache_locations
-            .load(std::sync::atomic::Ordering::Relaxed)
+        self.index.ref_queries.items()
     }
 
     /// Hits served from [`Self::indexed_subtype_classes`]'s memoization
     /// cache. Diagnostic only.
     pub fn subtype_query_cache_hits(&self) -> u64 {
-        self.subtype_query_cache_hits
-            .load(std::sync::atomic::Ordering::Relaxed)
+        self.index.subtype_queries.hits()
     }
 
-    /// Total cached site count across `subtype_query_cache`. Diagnostic
-    /// only — same purpose as `ref_query_cache_locations`.
+    /// Total cached site count across the subtype memo. Diagnostic only.
     pub fn subtype_query_cache_sites(&self) -> usize {
-        self.subtype_query_cache_sites
-            .load(std::sync::atomic::Ordering::Relaxed)
+        self.index.subtype_queries.items()
     }
 
     /// Times the reference index has been locked on this session's db.
     pub fn ref_index_lock_count(&self) -> u64 {
         self.db.salsa.ref_index_lock_count()
-    }
-
-    pub(crate) fn clear_dependency_graph_cache(&self) {
-        *self.dependency_graph_cache.write() = None;
-    }
-
-    pub(crate) fn clear_transient_batch_replay(&self) {
-        *self.transient_batch_replay.write() = None;
     }
 
     pub(crate) fn transient_batch_replay(
@@ -503,12 +274,11 @@ impl AnalysisSession {
         skip_symbols: bool,
         content_hashes: &HashMap<Arc<str>, String>,
     ) -> Option<Arc<BatchReplayState>> {
-        let replay = self.transient_batch_replay.read();
-        let state = replay.as_ref()?;
+        let state = self.index.transient_batch_replay()?;
         (state.key.php_version == php_version
             && state.key.skip_symbols == skip_symbols
             && state.key.content_hashes == *content_hashes)
-            .then(|| Arc::clone(state))
+            .then_some(state)
     }
 
     pub(crate) fn store_transient_batch_replay(
@@ -518,14 +288,14 @@ impl AnalysisSession {
         content_hashes: &HashMap<Arc<str>, String>,
         files: HashMap<Arc<str>, BatchReplayFile>,
     ) {
-        *self.transient_batch_replay.write() = Some(Arc::new(BatchReplayState {
+        self.index.store_transient_batch_replay(BatchReplayState {
             key: BatchReplayKey {
                 php_version,
                 skip_symbols,
                 content_hashes: content_hashes.clone(),
             },
             files,
-        }));
+        });
     }
 
     /// Coalesce `bump_workspace_revision` calls until the returned scope
@@ -547,220 +317,14 @@ impl AnalysisSession {
         self.db.salsa.class_mention_stats()
     }
 
-    /// Which of `files` currently mention `class_name` as a whole
-    /// identifier (case-insensitive) — the same persistent, incrementally-
-    /// maintained mechanism [`Self::indexed_references_to`]'s own gate uses
-    /// internally (see `db::class_mention_index`'s doc comment), exposed so
-    /// a host doesn't need to re-implement an equivalent from-scratch text
-    /// scan for its own narrowing (e.g. a reachability pre-filter ahead of
-    /// a references/code-lens query). A file already scanned against a
-    /// universe that included `class_name` answers via an O(log n) lookup
-    /// with no text pass at all; only a never-scanned or since-edited file
-    /// pays a scan, and that scan is recorded for every other name already
-    /// in the universe too, not just this one.
-    ///
-    /// **Scope**: the universe is seeded from *declared class-like names*
-    /// (classes/interfaces/traits/enums) — the same population mir's own
-    /// indexing already does as a side effect — but a `class_name` outside
-    /// that set is not a reason to skip narrowing: it's admitted verbatim
-    /// on the spot (see [`Self::files_mentioning_any`]) and answered by a
-    /// real scan, same as any other needle.
+    /// See [`AnalysisSnapshot::files_mentioning_class`].
     pub fn files_mentioning_class(&self, files: &[Arc<str>], class_name: &str) -> Vec<Arc<str>> {
         self.files_mentioning_any(files, &[class_name])
     }
 
-    /// Which of `files` currently mention ANY of `needles` as a whole
-    /// identifier (case-insensitive) — the multi-needle form of
-    /// [`Self::files_mentioning_class`], for a caller resolving several
-    /// candidate names at once (e.g. an owner FQN plus its subtype
-    /// closure). Every needle is admitted into the shared universe
-    /// verbatim (no short-name stripping) before querying, so this call's
-    /// answer is never conservative on account of an unknown needle — a
-    /// file only falls back to a raw scan when it was scanned before all
-    /// of `needles` existed in the universe and hasn't been touched since;
-    /// that one scan then answers every needle in the universe at once,
-    /// not just this call's.
+    /// See [`AnalysisSnapshot::files_mentioning_any`].
     pub fn files_mentioning_any(&self, files: &[Arc<str>], needles: &[&str]) -> Vec<Arc<str>> {
-        use rayon::prelude::*;
-
-        if needles.is_empty() {
-            return files.to_vec();
-        }
-        let db = self.snapshot_db();
-        db.add_literal_mention_names(needles.iter().copied());
-        // Just admitted every needle above, so `prepare_class_mention_query`
-        // only fails here while the universe itself is somehow still empty
-        // (unreachable: admission just grew it) — kept as a defensive
-        // fallback, not a reachable branch.
-        let queries: Vec<_> = needles
-            .iter()
-            .filter_map(|n| db.prepare_class_mention_query(n))
-            .collect();
-        if queries.is_empty() {
-            return files.to_vec();
-        }
-        let Some(scanner) = db.class_mention_scanner() else {
-            return files.to_vec();
-        };
-
-        files
-            .par_iter()
-            .map_with(db, |db, f| -> Option<Arc<str>> {
-                let sf = db.lookup_source_file(f.as_ref())?;
-                let text = sf.text(&*db as &dyn MirDatabase).clone();
-                for q in &queries {
-                    match db.class_mention_answer(f.as_ref(), q, &text) {
-                        Some(true) => return Some(f.clone()),
-                        Some(false) => continue,
-                        None => {
-                            let names = scanner.scan(text.as_ref());
-                            let hit = queries
-                                .iter()
-                                .any(|q2| names.binary_search(&q2.name).is_ok());
-                            db.set_file_class_mentions(f, &text, scanner.epoch(), names);
-                            return hit.then(|| f.clone());
-                        }
-                    }
-                }
-                None
-            })
-            .flatten()
-            .collect()
-    }
-
-    /// Whether `file`'s reference postings are exact for `current_text` at
-    /// `current_gen`: text pointer-equal, and the commit either resolved
-    /// every name (immune to workspace growth) or was stamped at that
-    /// generation — catches a file analyzed before a class it references
-    /// was registered elsewhere, which would otherwise look fresh forever.
-    pub(crate) fn is_ref_committed(
-        &self,
-        file: &str,
-        current_text: &Arc<str>,
-        current_gen: u64,
-    ) -> bool {
-        self.ref_committed.read().get(file).is_some_and(|c| {
-            Arc::ptr_eq(&c.text, current_text) && (c.resolved || c.generation == current_gen)
-        })
-    }
-
-    /// Whether `file` has a *live-analyzed* reference commit recorded against
-    /// exactly `current_text` — i.e. it's only stale by generation (an
-    /// unresolved-name commit racing a workspace-growth bump), not because
-    /// its text changed or because it was seeded by an unverified disk-cache
-    /// replay. Such a commit is still eligible for the mention/needle gate:
-    /// the current text is exactly what this session's own analysis already
-    /// scanned, so a needle miss is just as conclusive as for a
-    /// never-committed file. A replayed commit (`live_analyzed: false`)
-    /// never qualifies here, regardless of text match — its postings are
-    /// only as trustworthy as the cache entry, so it always falls through to
-    /// unconditional re-analysis. Same for a genuinely edited file (text
-    /// differs): the old commit's postings are for different text and must
-    /// be replaced regardless of what the new text mentions.
-    pub(crate) fn ref_commit_stale_by_generation_only(
-        &self,
-        file: &str,
-        current_text: &Arc<str>,
-    ) -> bool {
-        self.ref_committed
-            .read()
-            .get(file)
-            .is_some_and(|c| c.live_analyzed && Arc::ptr_eq(&c.text, current_text))
-    }
-
-    /// Whether `file`'s stored postings came from exactly this
-    /// (text, output) pair — generation aside. Pointer-identical output
-    /// means identical postings (salsa backdates equal results to the same
-    /// Arc), so callers skip the index rewrite and only re-stamp the mark.
-    pub(crate) fn ref_commit_is_current(
-        &self,
-        file: &str,
-        current_text: &Arc<str>,
-        out: &Arc<crate::db::AnalyzeOutput>,
-    ) -> bool {
-        self.ref_committed.read().get(file).is_some_and(|c| {
-            Arc::ptr_eq(&c.text, current_text)
-                && c.out.upgrade().is_some_and(|prev| Arc::ptr_eq(&prev, out))
-        })
-    }
-
-    /// Record a commit computed against the workspace state at `generation`
-    /// — captured by the caller *before* its analysis snapshot, so a file
-    /// add racing the analysis leaves the commit stale (re-verified on the
-    /// next query) rather than wrongly fresh. `resolved` must come from the
-    /// producing analysis' own issue set
-    /// ([`crate::db::issues_have_unresolved_names`]); pass `false` when
-    /// unknown — the gen-guarded safe direction.
-    pub(crate) fn mark_ref_committed(
-        &self,
-        file: &Arc<str>,
-        text: &Arc<str>,
-        out: Option<&Arc<crate::db::AnalyzeOutput>>,
-        generation: u64,
-        resolved: bool,
-    ) {
-        let commit = RefCommit {
-            text: text.clone(),
-            out: out.map(Arc::downgrade).unwrap_or_default(),
-            generation,
-            resolved,
-            live_analyzed: out.is_some(),
-        };
-        self.ref_committed.write().insert(file.clone(), commit);
-    }
-
-    pub(crate) fn forget_ref_committed(&self, file: &str) {
-        self.ref_committed.write().remove(file);
-    }
-
-    /// Stage a disk-cache write for `file`'s postings, computed in the
-    /// parallel analysis phase (needs a live db snapshot for the memoized
-    /// parse). `None` when no cache is attached or the stored entry already
-    /// matches this content — batch-written entries are never clobbered.
-    /// The caller applies the result via [`Self::apply_ref_cache_put`] in
-    /// its serial commit, alongside the in-memory index commit.
-    pub(crate) fn stage_ref_cache_put(
-        &self,
-        db: &dyn crate::db::MirDatabase,
-        sf: crate::db::SourceFile,
-        file: &str,
-        text: &Arc<str>,
-        out: &Arc<crate::db::AnalyzeOutput>,
-    ) -> Option<RefCachePut> {
-        let cache = self.cache.as_deref()?;
-        let content_hash = crate::cache::hash_content(text);
-        if cache.is_valid(file, &content_hash) {
-            return None;
-        }
-        let parsed = crate::db::parse_file(db, sf);
-        let surface_hash = crate::cache::surface_fingerprint(text, &parsed.0.program);
-        let ref_locs: Arc<[crate::cache::CachedRefLoc]> = out
-            .ref_locs
-            .iter()
-            .map(|r| (Arc::clone(&r.symbol_key), r.line, r.col_start, r.col_end))
-            .collect();
-        Some(RefCachePut {
-            content_hash,
-            surface_hash,
-            ref_locs,
-        })
-    }
-
-    pub(crate) fn apply_ref_cache_put(
-        &self,
-        file: &str,
-        out: &Arc<crate::db::AnalyzeOutput>,
-        put: RefCachePut,
-    ) {
-        if let Some(cache) = self.cache.as_deref() {
-            cache.put(
-                file,
-                put.content_hash,
-                put.surface_hash,
-                out.issues.clone(),
-                put.ref_locs,
-            );
-        }
+        self.retry_snapshot(|snap| snap.files_mentioning_any(files, needles))
     }
 
     /// Persist the attached [`AnalysisCache`] to disk. No-op without an
@@ -786,36 +350,6 @@ impl AnalysisSession {
     /// (diagnostic; a warm-started session should keep this at zero).
     pub fn workspace_index_walks(&self) -> u64 {
         self.db.salsa.workspace_index_walks()
-    }
-
-    /// Whether `file`'s subtype-index class edges were committed from exactly
-    /// `current_text`.
-    pub(crate) fn is_defs_committed(&self, file: &str, current_text: &Arc<str>) -> bool {
-        self.defs_committed
-            .read()
-            .get(file)
-            .is_some_and(|t| Arc::ptr_eq(t, current_text))
-    }
-
-    pub(crate) fn mark_defs_committed(&self, file: &Arc<str>, text: &Arc<str>) {
-        self.defs_committed
-            .write()
-            .insert(file.clone(), text.clone());
-    }
-
-    pub(crate) fn forget_defs_committed(&self, file: &str) {
-        self.defs_committed.write().remove(file);
-    }
-
-    /// Every file with a defs commit on record, regardless of staleness.
-    pub(crate) fn defs_committed_keys(&self) -> Vec<Arc<str>> {
-        self.defs_committed.read().keys().cloned().collect()
-    }
-
-    /// Every file with a reference commit on record, regardless of
-    /// staleness. Files absent here have no reference postings at all.
-    pub(crate) fn ref_committed_keys(&self) -> Vec<Arc<str>> {
-        self.ref_committed.read().keys().cloned().collect()
     }
 
     /// Swap in a custom [`crate::SourceProvider`]. LSPs install a VFS-backed
@@ -939,12 +473,16 @@ impl AnalysisSession {
 }
 
 mod incremental;
+mod index_state;
 mod ingest;
 mod loading;
 mod queries;
+mod snapshot;
 mod stubs;
 
+use index_state::IndexState;
 pub use queries::SubtypeClassSite;
+pub use snapshot::AnalysisSnapshot;
 
 /// Compute the full set of files `file` depends on by projecting structural
 /// and body-reference symbols through the workspace symbol index. Self-edges

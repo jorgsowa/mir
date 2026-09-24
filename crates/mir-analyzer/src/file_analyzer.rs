@@ -23,7 +23,7 @@ use rustc_hash::FxHashSet;
 
 use crate::body_analysis::BodyAnalyzer;
 use crate::db::MirDatabase;
-use crate::session::AnalysisSession;
+use crate::session::{AnalysisSession, AnalysisSnapshot};
 use crate::symbol::{NavigationFact, ResolvedNavigationFact, ResolvedSymbol};
 
 /// Result of a single-file analysis.
@@ -357,8 +357,9 @@ fn resolve_scope_symbols(
     symbols
 }
 
-/// Per-file body analysis analyzer bound to an [`AnalysisSession`]. Cheap to
-/// construct — typically held transiently per analysis call.
+/// Per-file body analysis bound to an [`AnalysisSession`]: runs the
+/// owner-side warm-up, then the read half on a fresh [`AnalysisSnapshot`].
+/// Cheap to construct — typically held transiently per analysis call.
 pub struct FileAnalyzer<'a> {
     session: &'a mut AnalysisSession,
 }
@@ -371,9 +372,8 @@ impl<'a> FileAnalyzer<'a> {
     /// Run a single body-analysis pass against a frozen db snapshot.
     ///
     /// `priority_index_for_ast` runs first to fault in any of this file's
-    /// direct class references not yet reached by the background indexer; then
-    /// one snapshot is analyzed and its reference locations committed. The lock
-    /// is not held during analysis, so concurrent edits and reads proceed.
+    /// direct class references not yet reached by the background indexer;
+    /// then one snapshot is analyzed and its reference locations committed.
     pub fn analyze(
         &mut self,
         file: Arc<str>,
@@ -409,18 +409,16 @@ impl<'a> FileAnalyzer<'a> {
         source_map: &SourceMap,
         collect_symbols: bool,
     ) -> FileAnalysis {
-        crate::metrics::record_file_analysis();
         // Reconcile mirror-only writes with the symbol-index singleton before
         // resolution runs against it (no-op when nothing is pending).
         self.session.settle_workspace_index();
 
         // Priority-index the buffer's direct class references so any not yet
         // reached by the background indexer resolve in this single pass (no
-        // transient false UndefinedClass during warm-up). Once indexing
-        // completes this is a no-op.
-        // Capture (text, generation) BEFORE the warm-up: if a concurrent edit
-        // swaps the input text mid-flight, the stored Arc no longer matches
-        // and the mark is dead on arrival — the safe direction.
+        // transient false UndefinedClass during warm-up). Capture (text,
+        // generation) BEFORE the warm-up: if the input text is swapped
+        // mid-flight, the stored Arc no longer matches and the mark is dead
+        // on arrival — the safe direction.
         let prepare_generation = self.session.prepare_generation_snapshot();
         let ingested_text = {
             let db = self.session.snapshot_db();
@@ -432,38 +430,14 @@ impl<'a> FileAnalyzer<'a> {
         // Record the warm-up so later Phase-1 sweeps (references, dependent
         // re-analysis) skip this file's parse + AST walk while its salsa
         // input text is unchanged.
-        if let Some(text) = ingested_text.clone() {
+        if let Some(text) = ingested_text {
             self.session
                 .mark_prepared_for_analysis(&file, text, prepare_generation);
         }
 
-        let _scope = crate::metrics::BodyAnalysisScope::new();
-
-        // Generation before the analysis snapshot — after the warm-up, so
-        // its lazy loads don't immediately stale the commit; a file add
-        // racing the analysis still leaves the mark stale, never fresh.
-        let commit_gen = self.session.index_generation();
-        // Single pass against a frozen snapshot. With the eager-static-input
-        // model the workspace index is complete (or priority-indexed for this
-        // file's direct refs), so there are no body-analysis "misses" to fault
-        // in — no retry loop, no whole-file re-analysis.
-        let db = self.session.snapshot_db();
-        let mut driver = BodyAnalyzer::new(&db, self.session.php_version());
-        driver.collect_symbols = collect_symbols;
-        let (issues, symbols) = driver.analyze_bodies(program, file.clone(), source, source_map);
-        // Replace (not append): this pass produced the file's complete
-        // reference set, and marking freshness against the pre-analysis text
-        // keeps the mark dead-on-arrival if a concurrent edit swapped the
-        // input mid-flight (Arc identity no longer matches).
-        let resolved = !crate::db::issues_have_unresolved_names(&issues);
-        self.session.commit_file_refs(
-            &file,
-            ingested_text,
-            db.take_pending_ref_locs(),
-            commit_gen,
-            resolved,
-        );
-        FileAnalysis { issues, symbols }
+        self.session.retry_snapshot(|snap| {
+            snap.analyze_with_symbols(file.clone(), source, program, source_map, collect_symbols)
+        })
     }
 
     /// Resolve the symbol at `byte_offset` in the session's current text for
@@ -474,7 +448,9 @@ impl<'a> FileAnalyzer<'a> {
     /// smallest containing file-scope declaration (or `use` item / top-level
     /// exec region), and runs symbol recording only for that scope.
     pub fn resolve_at(&mut self, file: Arc<str>, byte_offset: u32) -> Option<ResolvedSymbol> {
-        self.resolve_at_with_symbol_types(file, byte_offset, true)
+        self.session.prepare_for_query(Some(&file));
+        self.session
+            .retry_snapshot(|snap| snap.resolve_at(&file, byte_offset))
     }
 
     pub(crate) fn resolve_name_at(
@@ -483,265 +459,353 @@ impl<'a> FileAnalyzer<'a> {
         byte_offset: u32,
     ) -> Option<crate::Name> {
         self.session.prepare_for_query(Some(&file));
-
-        let db = self.session.snapshot_db();
-        let sf = db.lookup_source_file(file.as_ref())?;
-        let prepared = crate::db::prepare_analysis_file(&db, sf);
-        if prepared.has_hard_parse_errors {
-            return None;
-        }
-        let parsed = prepared.parse_result();
-        if let Some(name) = self.resolve_name_at_via_compact_facts(
-            &db,
-            &file,
-            prepared.text.as_ref(),
-            &parsed.program,
-            &parsed.source_map,
-            byte_offset,
-        ) {
-            crate::metrics::record_name_at_compact_hit();
-            return Some(name);
-        }
-        crate::metrics::record_name_at_fallback_walk();
-        let symbols = resolve_scope_symbols(
-            &db,
-            self.session.php_version(),
-            file,
-            prepared.text.as_ref(),
-            &parsed.program,
-            &parsed.source_map,
-            byte_offset,
-            false,
-            true,
-        );
-        symbol_at(&symbols, byte_offset).and_then(ResolvedSymbol::to_symbol)
+        self.session
+            .retry_snapshot(|snap| snap.name_at(&file, byte_offset))
     }
+}
 
-    fn resolve_at_with_symbol_types(
-        &mut self,
+impl AnalysisSnapshot {
+    /// Body-analyze `file` and commit its reference locations — the read half
+    /// of [`FileAnalyzer::analyze`]. The owner must have run
+    /// [`AnalysisSession::prepare_for_query`] for `file` (or ingested it via
+    /// [`AnalysisSession::ingest_file_prepared`]) so its direct references
+    /// are loaded; otherwise they report as undefined.
+    pub fn analyze(
+        &self,
         file: Arc<str>,
-        byte_offset: u32,
-        capture_symbol_types: bool,
-    ) -> Option<ResolvedSymbol> {
-        self.session.prepare_for_query(Some(&file));
-
-        let db = self.session.snapshot_db();
-        let sf = db.lookup_source_file(file.as_ref())?;
-        let prepared = crate::db::prepare_analysis_file(&db, sf);
-        if prepared.has_hard_parse_errors {
-            return None;
-        }
-        let parsed = prepared.parse_result();
-        if let Some(symbol) = self.resolve_at_via_compact_facts(
-            &db,
-            &file,
-            prepared.text.as_ref(),
-            &parsed.program,
-            &parsed.source_map,
-            byte_offset,
-            capture_symbol_types,
-        ) {
-            crate::metrics::record_resolve_at_compact_hit();
-            return Some(symbol);
-        }
-        crate::metrics::record_resolve_at_fallback_walk();
-        let symbols = resolve_scope_symbols(
-            &db,
-            self.session.php_version(),
-            file,
-            prepared.text.as_ref(),
-            &parsed.program,
-            &parsed.source_map,
-            byte_offset,
-            capture_symbol_types,
-            false,
-        );
-        symbol_at(&symbols, byte_offset).cloned()
-    }
-
-    fn resolve_name_at_via_compact_facts(
-        &self,
-        db: &dyn MirDatabase,
-        file: &Arc<str>,
         source: &str,
         program: &Program,
         source_map: &SourceMap,
-        byte_offset: u32,
-    ) -> Option<crate::Name> {
-        let best_stmt = best_navigation_scope_stmt(program, byte_offset);
-        let mut issues = Vec::new();
-        let guards: FxHashSet<Arc<str>> = FxHashSet::default();
-        let mut driver = match best_stmt.map(|stmt| &stmt.kind) {
-            Some(
-                StmtKind::Function(_)
-                | StmtKind::Class(_)
-                | StmtKind::Enum(_)
-                | StmtKind::Interface(_)
-                | StmtKind::Trait(_),
-            ) => BodyAnalyzer::new_inference_only(db, self.session.php_version()),
-            _ => BodyAnalyzer::new_inference_only(db, self.session.php_version()),
-        };
-        driver.collect_symbols = false;
-        driver.capture_symbol_types = false;
-        driver.codebase_symbols_only = true;
-        driver.record_reference_locations = false;
-        driver.collect_navigation_facts = true;
-
-        match best_stmt.map(|stmt| &stmt.kind) {
-            Some(StmtKind::Function(decl)) => {
-                driver.analyze_fn_decl(decl, file, source, source_map, &mut issues, None);
-            }
-            Some(StmtKind::Class(decl)) => {
-                driver.analyze_class_decl(
-                    decl,
-                    file,
-                    source,
-                    source_map,
-                    &mut issues,
-                    None,
-                    &guards,
-                );
-            }
-            Some(StmtKind::Enum(decl)) => {
-                driver.analyze_enum_decl(decl, file, source, source_map, &mut issues, None);
-            }
-            Some(StmtKind::Interface(decl)) => {
-                driver.analyze_interface_decl(
-                    decl,
-                    file,
-                    source,
-                    source_map,
-                    &mut issues,
-                    &guards,
-                    None,
-                );
-            }
-            Some(StmtKind::Trait(decl)) => {
-                driver.analyze_trait_decl(decl, file, source, source_map, &mut issues, None);
-            }
-            Some(StmtKind::Use(use_decl)) => {
-                let mut navigation_facts = Vec::new();
-                crate::body_analysis::check_use_decl_casing(
-                    use_decl,
-                    db,
-                    file,
-                    source,
-                    source_map,
-                    &mut issues,
-                    None,
-                    Some(&mut navigation_facts),
-                    None,
-                    false,
-                    true,
-                    false,
-                );
-                return navigation_fact_at(&navigation_facts, byte_offset)
-                    .map(|fact| fact.name.clone());
-            }
-            _ => {
-                driver.analyze_global_exec(program, file, source, source_map, &mut issues, None);
-            }
-        }
-
-        let facts = driver.take_navigation_facts();
-        navigation_fact_at(&facts, byte_offset).map(|fact| fact.name.clone())
+    ) -> Result<FileAnalysis, salsa::Cancelled> {
+        self.analyze_with_symbols(file, source, program, source_map, true)
     }
 
-    #[allow(clippy::too_many_arguments)]
-    fn resolve_at_via_compact_facts(
+    /// [`Self::analyze`] without the whole-file `ResolvedSymbol` list; see
+    /// [`FileAnalyzer::analyze_diagnostics_only`].
+    pub fn analyze_diagnostics_only(
         &self,
-        db: &dyn MirDatabase,
-        file: &Arc<str>,
+        file: Arc<str>,
         source: &str,
         program: &Program,
         source_map: &SourceMap,
-        byte_offset: u32,
-        capture_symbol_types: bool,
-    ) -> Option<ResolvedSymbol> {
-        let mut issues = Vec::new();
-        let guards: FxHashSet<Arc<str>> = FxHashSet::default();
-        let best_stmt = best_navigation_scope_stmt(program, byte_offset);
-        let mut driver = match best_stmt.map(|stmt| &stmt.kind) {
-            Some(
-                StmtKind::Function(_)
-                | StmtKind::Class(_)
-                | StmtKind::Enum(_)
-                | StmtKind::Interface(_)
-                | StmtKind::Trait(_),
-            ) => BodyAnalyzer::new_inference_only(db, self.session.php_version()),
-            _ => BodyAnalyzer::new_inference_only(db, self.session.php_version()),
-        };
-        driver.collect_symbols = false;
-        driver.capture_symbol_types = capture_symbol_types;
-        driver.codebase_symbols_only = false;
-        driver.record_reference_locations = false;
-        driver.collect_navigation_facts = false;
-        driver.collect_resolved_navigation_facts = true;
+    ) -> Result<FileAnalysis, salsa::Cancelled> {
+        self.analyze_with_symbols(file, source, program, source_map, false)
+    }
 
-        match best_stmt.map(|stmt| &stmt.kind) {
-            Some(StmtKind::Function(decl)) => {
-                driver.analyze_fn_decl(decl, file, source, source_map, &mut issues, None);
-            }
-            Some(StmtKind::Class(decl)) => {
-                driver.analyze_class_decl(
-                    decl,
-                    file,
-                    source,
-                    source_map,
-                    &mut issues,
-                    None,
-                    &guards,
-                );
-            }
-            Some(StmtKind::Enum(decl)) => {
-                driver.analyze_enum_decl(decl, file, source, source_map, &mut issues, None);
-            }
-            Some(StmtKind::Interface(decl)) => {
-                driver.analyze_interface_decl(
-                    decl,
-                    file,
-                    source,
-                    source_map,
-                    &mut issues,
-                    &guards,
-                    None,
-                );
-            }
-            Some(StmtKind::Trait(decl)) => {
-                driver.analyze_trait_decl(decl, file, source, source_map, &mut issues, None);
-            }
-            Some(StmtKind::Use(use_decl)) => {
-                let mut resolved_navigation_facts = Vec::new();
-                crate::body_analysis::check_use_decl_casing(
-                    use_decl,
-                    db,
-                    file,
-                    source,
-                    source_map,
-                    &mut issues,
-                    None,
-                    None,
-                    Some(&mut resolved_navigation_facts),
-                    false,
-                    true,
-                    false,
-                );
-                if let Some(fact) =
-                    resolved_navigation_fact_at(&resolved_navigation_facts, byte_offset)
-                {
-                    return Some(fact.clone().into_resolved_symbol(file.clone()));
-                }
-            }
-            _ => {
-                driver.analyze_global_exec(program, file, source, source_map, &mut issues, None);
+    fn analyze_with_symbols(
+        &self,
+        file: Arc<str>,
+        source: &str,
+        program: &Program,
+        source_map: &SourceMap,
+        collect_symbols: bool,
+    ) -> Result<FileAnalysis, salsa::Cancelled> {
+        salsa::Cancelled::catch(std::panic::AssertUnwindSafe(|| {
+            crate::metrics::record_file_analysis();
+            let _scope = crate::metrics::BodyAnalysisScope::new();
+            // A pass-local clone: its pending reference locations start empty
+            // even if an earlier query on this snapshot was cancelled midway.
+            let db = self.db().clone();
+            // Marking freshness against the snapshot's text keeps the mark
+            // dead on arrival if the owner has since swapped the input.
+            let text = db
+                .lookup_source_file(file.as_ref())
+                .map(|sf| sf.text(&db as &dyn MirDatabase).clone());
+            let mut driver = BodyAnalyzer::new(&db, self.php_version());
+            driver.collect_symbols = collect_symbols;
+            let (issues, symbols) =
+                driver.analyze_bodies(program, file.clone(), source, source_map);
+            // Replace (not append): this pass produced the file's complete
+            // reference set.
+            let resolved = !crate::db::issues_have_unresolved_names(&issues);
+            self.index().commit_file_refs(
+                &db,
+                &file,
+                text,
+                db.take_pending_ref_locs(),
+                self.index_generation(),
+                resolved,
+            );
+            FileAnalysis { issues, symbols }
+        }))
+    }
+
+    /// The symbol at `byte_offset` in `file`, found by analyzing only the
+    /// containing scope — the read half of [`AnalysisSession::resolve_at`].
+    /// Expects the owner to have prepared `file`
+    /// ([`AnalysisSession::prepare_for_query`]).
+    pub fn resolve_at(
+        &self,
+        file: &Arc<str>,
+        byte_offset: u32,
+    ) -> Result<Option<ResolvedSymbol>, salsa::Cancelled> {
+        let started = std::time::Instant::now();
+        let sym =
+            self.read(|db| resolve_symbol_at(db, self.php_version(), file, byte_offset, true));
+        crate::metrics::record_resolve_at(started.elapsed().as_micros() as u64);
+        sym
+    }
+
+    /// The codebase-level symbol name at `byte_offset` in `file` — the read
+    /// half of [`AnalysisSession::name_at`]. Same preparation contract as
+    /// [`Self::resolve_at`].
+    pub fn name_at(
+        &self,
+        file: &Arc<str>,
+        byte_offset: u32,
+    ) -> Result<Option<crate::Name>, salsa::Cancelled> {
+        let started = std::time::Instant::now();
+        let name = self.read(|db| resolve_name_at(db, self.php_version(), file, byte_offset));
+        crate::metrics::record_name_at(started.elapsed().as_micros() as u64);
+        name
+    }
+}
+
+fn resolve_name_at(
+    db: &dyn MirDatabase,
+    php_version: crate::PhpVersion,
+    file: &Arc<str>,
+    byte_offset: u32,
+) -> Option<crate::Name> {
+    let sf = db.lookup_source_file(file.as_ref())?;
+    let prepared = crate::db::prepare_analysis_file(db, sf);
+    if prepared.has_hard_parse_errors {
+        return None;
+    }
+    let parsed = prepared.parse_result();
+    if let Some(name) = resolve_name_at_via_compact_facts(
+        db,
+        php_version,
+        file,
+        prepared.text.as_ref(),
+        &parsed.program,
+        &parsed.source_map,
+        byte_offset,
+    ) {
+        crate::metrics::record_name_at_compact_hit();
+        return Some(name);
+    }
+    crate::metrics::record_name_at_fallback_walk();
+    let symbols = resolve_scope_symbols(
+        db,
+        php_version,
+        file.clone(),
+        prepared.text.as_ref(),
+        &parsed.program,
+        &parsed.source_map,
+        byte_offset,
+        false,
+        true,
+    );
+    symbol_at(&symbols, byte_offset).and_then(ResolvedSymbol::to_symbol)
+}
+
+fn resolve_symbol_at(
+    db: &dyn MirDatabase,
+    php_version: crate::PhpVersion,
+    file: &Arc<str>,
+    byte_offset: u32,
+    capture_symbol_types: bool,
+) -> Option<ResolvedSymbol> {
+    let sf = db.lookup_source_file(file.as_ref())?;
+    let prepared = crate::db::prepare_analysis_file(db, sf);
+    if prepared.has_hard_parse_errors {
+        return None;
+    }
+    let parsed = prepared.parse_result();
+    if let Some(symbol) = resolve_at_via_compact_facts(
+        db,
+        php_version,
+        file,
+        prepared.text.as_ref(),
+        &parsed.program,
+        &parsed.source_map,
+        byte_offset,
+        capture_symbol_types,
+    ) {
+        crate::metrics::record_resolve_at_compact_hit();
+        return Some(symbol);
+    }
+    crate::metrics::record_resolve_at_fallback_walk();
+    let symbols = resolve_scope_symbols(
+        db,
+        php_version,
+        file.clone(),
+        prepared.text.as_ref(),
+        &parsed.program,
+        &parsed.source_map,
+        byte_offset,
+        capture_symbol_types,
+        false,
+    );
+    symbol_at(&symbols, byte_offset).cloned()
+}
+
+fn resolve_name_at_via_compact_facts(
+    db: &dyn MirDatabase,
+    php_version: crate::PhpVersion,
+    file: &Arc<str>,
+    source: &str,
+    program: &Program,
+    source_map: &SourceMap,
+    byte_offset: u32,
+) -> Option<crate::Name> {
+    let best_stmt = best_navigation_scope_stmt(program, byte_offset);
+    let mut issues = Vec::new();
+    let guards: FxHashSet<Arc<str>> = FxHashSet::default();
+    let mut driver = match best_stmt.map(|stmt| &stmt.kind) {
+        Some(
+            StmtKind::Function(_)
+            | StmtKind::Class(_)
+            | StmtKind::Enum(_)
+            | StmtKind::Interface(_)
+            | StmtKind::Trait(_),
+        ) => BodyAnalyzer::new_inference_only(db, php_version),
+        _ => BodyAnalyzer::new_inference_only(db, php_version),
+    };
+    driver.collect_symbols = false;
+    driver.capture_symbol_types = false;
+    driver.codebase_symbols_only = true;
+    driver.record_reference_locations = false;
+    driver.collect_navigation_facts = true;
+
+    match best_stmt.map(|stmt| &stmt.kind) {
+        Some(StmtKind::Function(decl)) => {
+            driver.analyze_fn_decl(decl, file, source, source_map, &mut issues, None);
+        }
+        Some(StmtKind::Class(decl)) => {
+            driver.analyze_class_decl(decl, file, source, source_map, &mut issues, None, &guards);
+        }
+        Some(StmtKind::Enum(decl)) => {
+            driver.analyze_enum_decl(decl, file, source, source_map, &mut issues, None);
+        }
+        Some(StmtKind::Interface(decl)) => {
+            driver.analyze_interface_decl(
+                decl,
+                file,
+                source,
+                source_map,
+                &mut issues,
+                &guards,
+                None,
+            );
+        }
+        Some(StmtKind::Trait(decl)) => {
+            driver.analyze_trait_decl(decl, file, source, source_map, &mut issues, None);
+        }
+        Some(StmtKind::Use(use_decl)) => {
+            let mut navigation_facts = Vec::new();
+            crate::body_analysis::check_use_decl_casing(
+                use_decl,
+                db,
+                file,
+                source,
+                source_map,
+                &mut issues,
+                None,
+                Some(&mut navigation_facts),
+                None,
+                false,
+                true,
+                false,
+            );
+            return navigation_fact_at(&navigation_facts, byte_offset)
+                .map(|fact| fact.name.clone());
+        }
+        _ => {
+            driver.analyze_global_exec(program, file, source, source_map, &mut issues, None);
+        }
+    }
+
+    let facts = driver.take_navigation_facts();
+    navigation_fact_at(&facts, byte_offset).map(|fact| fact.name.clone())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn resolve_at_via_compact_facts(
+    db: &dyn MirDatabase,
+    php_version: crate::PhpVersion,
+    file: &Arc<str>,
+    source: &str,
+    program: &Program,
+    source_map: &SourceMap,
+    byte_offset: u32,
+    capture_symbol_types: bool,
+) -> Option<ResolvedSymbol> {
+    let mut issues = Vec::new();
+    let guards: FxHashSet<Arc<str>> = FxHashSet::default();
+    let best_stmt = best_navigation_scope_stmt(program, byte_offset);
+    let mut driver = match best_stmt.map(|stmt| &stmt.kind) {
+        Some(
+            StmtKind::Function(_)
+            | StmtKind::Class(_)
+            | StmtKind::Enum(_)
+            | StmtKind::Interface(_)
+            | StmtKind::Trait(_),
+        ) => BodyAnalyzer::new_inference_only(db, php_version),
+        _ => BodyAnalyzer::new_inference_only(db, php_version),
+    };
+    driver.collect_symbols = false;
+    driver.capture_symbol_types = capture_symbol_types;
+    driver.codebase_symbols_only = false;
+    driver.record_reference_locations = false;
+    driver.collect_navigation_facts = false;
+    driver.collect_resolved_navigation_facts = true;
+
+    match best_stmt.map(|stmt| &stmt.kind) {
+        Some(StmtKind::Function(decl)) => {
+            driver.analyze_fn_decl(decl, file, source, source_map, &mut issues, None);
+        }
+        Some(StmtKind::Class(decl)) => {
+            driver.analyze_class_decl(decl, file, source, source_map, &mut issues, None, &guards);
+        }
+        Some(StmtKind::Enum(decl)) => {
+            driver.analyze_enum_decl(decl, file, source, source_map, &mut issues, None);
+        }
+        Some(StmtKind::Interface(decl)) => {
+            driver.analyze_interface_decl(
+                decl,
+                file,
+                source,
+                source_map,
+                &mut issues,
+                &guards,
+                None,
+            );
+        }
+        Some(StmtKind::Trait(decl)) => {
+            driver.analyze_trait_decl(decl, file, source, source_map, &mut issues, None);
+        }
+        Some(StmtKind::Use(use_decl)) => {
+            let mut resolved_navigation_facts = Vec::new();
+            crate::body_analysis::check_use_decl_casing(
+                use_decl,
+                db,
+                file,
+                source,
+                source_map,
+                &mut issues,
+                None,
+                None,
+                Some(&mut resolved_navigation_facts),
+                false,
+                true,
+                false,
+            );
+            if let Some(fact) = resolved_navigation_fact_at(&resolved_navigation_facts, byte_offset)
+            {
+                return Some(fact.clone().into_resolved_symbol(file.clone()));
             }
         }
-
-        let facts = driver.take_resolved_navigation_facts();
-        resolved_navigation_fact_at(&facts, byte_offset)
-            .cloned()
-            .map(|fact| fact.into_resolved_symbol(file.clone()))
+        _ => {
+            driver.analyze_global_exec(program, file, source, source_map, &mut issues, None);
+        }
     }
+
+    let facts = driver.take_resolved_navigation_facts();
+    resolved_navigation_fact_at(&facts, byte_offset)
+        .cloned()
+        .map(|fact| fact.into_resolved_symbol(file.clone()))
 }
 
 #[cfg(test)]

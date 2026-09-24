@@ -571,7 +571,7 @@ impl AnalysisSession {
         new_content: &str,
         opts: &BatchOptions,
     ) -> AnalysisResult {
-        self.clear_transient_batch_replay();
+        self.index.clear_transient_batch_replay();
         let php_version = self.batch_php_version(opts);
 
         // Mirror-only workspace files may be waiting in the pending index
@@ -722,7 +722,7 @@ impl AnalysisSession {
     /// the parse + definition-collection step. Cache misses run the normal
     /// pipeline and write back so subsequent runs hit.
     pub fn collect_definitions(&mut self, paths: &[PathBuf]) {
-        self.clear_transient_batch_replay();
+        self.index.clear_transient_batch_replay();
         let _timing = std::env::var("MIR_TIMING").is_ok();
         let _t0 = std::time::Instant::now();
 

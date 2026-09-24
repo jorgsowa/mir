@@ -77,7 +77,7 @@ impl AnalyzeOutput {
 
 /// Whether a body-analysis issue set references a workspace-level name it
 /// could not resolve. While false, no later file/symbol add can change the
-/// file's reference postings (see `AnalysisSession::ref_committed`). An
+/// file's reference postings (see `IndexState::ref_committed`). An
 /// unresolved hierarchy edge (extends/implements/trait use/docblock type)
 /// always surfaces as one of these kinds even when member-level diagnostics
 /// are suppressed for the incomplete hierarchy. Variable kinds are excluded —
