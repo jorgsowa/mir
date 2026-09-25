@@ -621,3 +621,68 @@ fn mirror_only_class_rename_updates_index_after_settle() {
     );
     assert_eq!(refs[0].0.as_ref(), "user.php");
 }
+
+/// A settle cancelled at any poll re-queues the mirror writes it claimed, so
+/// the next settle still reconciles them.
+#[test]
+fn cancelled_settle_keeps_mirror_writes_pending() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let dir = create_temp_dir("warm_start_cancelled_settle");
+    let files = [
+        (
+            "shape.php",
+            "<?php\nnamespace App;\nclass OldShape { public static function draw(): void {} }\n",
+        ),
+        (
+            "user.php",
+            "<?php\nnamespace App;\nclass User { public function go(): void { NewShape::draw(); } }\n",
+        ),
+    ];
+    seed_disk_caches(dir.path(), &files);
+    let warm: Vec<(Arc<str>, Arc<str>)> = files
+        .iter()
+        .map(|(p, t)| (Arc::from(*p), Arc::from(*t)))
+        .collect();
+    let candidates: Vec<Arc<str>> = files.iter().map(|(p, _)| Arc::from(*p)).collect();
+
+    let mut cancelled_runs = 0;
+    for cancel_at in 0..32 {
+        let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+        session.warm_start_files(&warm);
+        assert!(session.workspace_symbol_index_ready());
+        session.set_file_text(
+            Arc::from("shape.php"),
+            Arc::from(
+                "<?php\nnamespace App;\nclass NewShape { public static function draw(): void {} }\n",
+            ),
+        );
+
+        let polls = AtomicUsize::new(0);
+        let refs = session.indexed_references_to(
+            &Name::method("App\\NewShape", "draw"),
+            &candidates,
+            false,
+            mir_analyzer::ReferenceIncludes::Plain,
+            &|| polls.fetch_add(1, Ordering::Relaxed) >= cancel_at,
+        );
+        if refs.is_none() {
+            cancelled_runs += 1;
+        }
+
+        session.settle_workspace_index();
+        let mut classes: Vec<Arc<str>> = session
+            .all_classes()
+            .into_iter()
+            .map(|(c, _)| c)
+            .filter(|c| c.starts_with("App\\"))
+            .collect();
+        classes.sort();
+        assert_eq!(
+            classes,
+            [Arc::from("App\\NewShape"), Arc::from("App\\User")],
+            "cancelled at poll {cancel_at}: stale symbol index"
+        );
+    }
+    assert!(cancelled_runs > 1, "sweep never cancelled mid-query");
+}

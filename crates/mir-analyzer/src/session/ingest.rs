@@ -1029,7 +1029,9 @@ impl AnalysisSession {
                 return true;
             }
             rounds_left -= 1;
-            let pending = {
+            // Every early return below drops the claim, which re-queues its
+            // paths for the next settle.
+            let claim = {
                 if should_cancel() {
                     return false;
                 }
@@ -1041,9 +1043,9 @@ impl AnalysisSession {
                 if should_cancel() {
                     return false;
                 }
-                db.take_index_pending()
+                db.claim_index_pending()
             };
-            if pending.is_empty() {
+            if claim.paths().is_empty() {
                 return true;
             }
 
@@ -1056,7 +1058,8 @@ impl AnalysisSession {
                 let attempt = salsa::Cancelled::catch(std::panic::AssertUnwindSafe(|| {
                     use rayon::prelude::*;
 
-                    let sfs: Vec<crate::db::SourceFile> = pending
+                    let sfs: Vec<crate::db::SourceFile> = claim
+                        .paths()
                         .iter()
                         .filter_map(|p| snap.lookup_source_file(p.as_ref()))
                         .collect();
@@ -1115,6 +1118,7 @@ impl AnalysisSession {
                     cache.evict_unresolved();
                 }
             }
+            claim.commit();
         }
     }
 

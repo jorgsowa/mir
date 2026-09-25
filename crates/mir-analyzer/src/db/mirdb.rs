@@ -48,6 +48,33 @@ impl Clone for PendingRefLocs {
     }
 }
 
+/// Pending-index paths taken for reconciliation. Dropping the claim without
+/// [`Self::commit`] (cancellation, panic) returns them to the pending set.
+#[must_use]
+pub(crate) struct IndexPendingClaim {
+    paths: HashSet<Arc<str>>,
+    pending: Arc<parking_lot::RwLock<HashSet<Arc<str>>>>,
+}
+
+impl IndexPendingClaim {
+    pub(crate) fn paths(&self) -> &HashSet<Arc<str>> {
+        &self.paths
+    }
+
+    /// The claimed paths are reconciled with the symbol index.
+    pub(crate) fn commit(mut self) {
+        self.paths.clear();
+    }
+}
+
+impl Drop for IndexPendingClaim {
+    fn drop(&mut self) {
+        if !self.paths.is_empty() {
+            self.pending.write().extend(self.paths.drain());
+        }
+    }
+}
+
 #[salsa::db]
 #[derive(Clone)]
 pub struct MirDbStorage {
@@ -1441,9 +1468,13 @@ impl MirDbStorage {
         pending.remove(path);
     }
 
-    /// Take the current pending-index set, leaving it empty.
-    pub(crate) fn take_index_pending(&self) -> rustc_hash::FxHashSet<Arc<str>> {
-        std::mem::take(&mut *self.pending_index_files.write())
+    /// Take the current pending-index set, leaving it empty until the claim
+    /// is committed or dropped.
+    pub(crate) fn claim_index_pending(&self) -> IndexPendingClaim {
+        IndexPendingClaim {
+            paths: std::mem::take(&mut *self.pending_index_files.write()),
+            pending: Arc::clone(&self.pending_index_files),
+        }
     }
 
     /// Whether any mirror-written file awaits symbol-index reconciliation.
