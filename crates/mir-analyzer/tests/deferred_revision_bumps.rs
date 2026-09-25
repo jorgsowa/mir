@@ -168,10 +168,13 @@ fn prefetch_imports_batches_generation_bumps() {
     let psr4 =
         Arc::new(mir_analyzer::composer::Psr4Map::from_composer(root.path()).expect("psr4 map"));
 
-    let mut session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(psr4);
+    // The map is attached after ingest, which would otherwise load the
+    // imports on demand as the file's structural dependencies.
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     let opened: Arc<str> = Arc::from("opened.php");
     session.ingest_file(opened.clone(), Arc::from(opened_src.as_str()));
     session.rebuild_workspace_symbol_index();
+    let mut session = session.with_psr4(psr4);
 
     let gen_before = session.index_generation();
     let loaded = session.prefetch_imports(opened.as_ref());

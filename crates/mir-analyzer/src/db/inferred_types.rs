@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use mir_types::Type;
 
-use crate::db::{MirDatabase, SymbolLoc};
+use crate::db::{Fqcn, MirDatabase};
 
 thread_local! {
     // Guards against re-entrant demand for a file currently being inferred on
@@ -41,17 +41,12 @@ pub(crate) fn try_mark_infer_in_progress(path: Arc<str>) -> Option<InferGuard> {
 
 /// Demand-driven inferred return type lookup for a function.
 ///
-/// Locates the file that declares `fqn` via the workspace symbol index, then
-/// calls [`crate::db::infer_file_return_types`] on that file. Salsa
+/// Locates the file that declares `fqn` (the symbol index, else on demand),
+/// then calls [`crate::db::infer_file_return_types`] on that file. Salsa
 /// memoizes both queries, so repeated lookups for the same function are free.
-/// Returns `None` when the function is unknown or not in the workspace index.
+/// Returns `None` when the function is unknown.
 pub fn inferred_function_return_type_demand(db: &dyn MirDatabase, fqn: &str) -> Option<Arc<Type>> {
-    let idx = crate::db::workspace_index(db);
-    let key = mir_types::Name::new(fqn).ascii_lowercase();
-    let sf = match idx.function_loc(key)? {
-        SymbolLoc::Function { file, .. } => file,
-        _ => return None,
-    };
+    let sf = crate::db::function_loc(db, Fqcn::from_str(db, fqn))?.file();
     let path = sf.path(db).clone();
     let _guard = try_mark_infer_in_progress(path)?;
     let inferred = crate::db::infer_file_return_types(db, sf);
@@ -60,8 +55,8 @@ pub fn inferred_function_return_type_demand(db: &dyn MirDatabase, fqn: &str) -> 
 
 /// Demand-driven inferred return type lookup for a method.
 ///
-/// Locates the file that declares the class via the workspace symbol index,
-/// then calls [`crate::db::infer_file_return_types`] on that file.
+/// Locates the file that declares the class (the symbol index, else on
+/// demand), then calls [`crate::db::infer_file_return_types`] on that file.
 /// `method_name_lower` must already be ASCII-lowercased (PHP semantics).
 /// Returns `None` when the class or method is unknown.
 pub fn inferred_method_return_type_demand(
@@ -69,15 +64,7 @@ pub fn inferred_method_return_type_demand(
     fqcn: &str,
     method_name_lower: &str,
 ) -> Option<Arc<Type>> {
-    let idx = crate::db::workspace_index(db);
-    let key = mir_types::Name::new(fqcn).ascii_lowercase();
-    let sf = match idx.class_like_loc(key)? {
-        SymbolLoc::Class { file, .. }
-        | SymbolLoc::Interface { file, .. }
-        | SymbolLoc::Trait { file, .. }
-        | SymbolLoc::Enum { file, .. } => file,
-        _ => return None,
-    };
+    let sf = crate::db::class_like_loc(db, Fqcn::from_str(db, fqcn))?.file();
     let path = sf.path(db).clone();
     let _guard = try_mark_infer_in_progress(path)?;
     let inferred = crate::db::infer_file_return_types(db, sf);
@@ -90,7 +77,7 @@ pub fn inferred_method_return_type_demand(
 /// Demand-driven inferred property type lookup, for a property with no
 /// native type hint and no `@var` docblock (see `PropertyDef::ty`).
 ///
-/// Locates the file that declares `fqcn` via the workspace symbol index,
+/// Locates the file that declares `fqcn` (the symbol index, else on demand),
 /// then calls [`crate::db::infer_file_return_types`] on that file — the same
 /// inference-only body-analysis pass also collects the union of types
 /// directly assigned to the property in `fqcn`'s own constructor. `fqcn`
@@ -102,15 +89,7 @@ pub fn inferred_property_type_demand(
     fqcn: &str,
     name: &str,
 ) -> Option<Arc<Type>> {
-    let idx = crate::db::workspace_index(db);
-    let key = mir_types::Name::new(fqcn).ascii_lowercase();
-    let sf = match idx.class_like_loc(key)? {
-        SymbolLoc::Class { file, .. }
-        | SymbolLoc::Interface { file, .. }
-        | SymbolLoc::Trait { file, .. }
-        | SymbolLoc::Enum { file, .. } => file,
-        _ => return None,
-    };
+    let sf = crate::db::class_like_loc(db, Fqcn::from_str(db, fqcn))?.file();
     let path = sf.path(db).clone();
     let _guard = try_mark_infer_in_progress(path)?;
     let inferred = crate::db::infer_file_return_types(db, sf);

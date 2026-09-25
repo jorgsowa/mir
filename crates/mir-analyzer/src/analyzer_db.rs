@@ -216,16 +216,7 @@ impl AnalyzerDb {
         let content_hash = crate::stub_cache::hash_source(source);
         let source_arc: Arc<str> = Arc::from(source);
 
-        // Vendor and user-stub files won't change within a session; project
-        // files may be edited repeatedly. HIGH durability tells salsa it can
-        // skip re-verifying vendor SourceFiles when only project files change,
-        // reducing O(N_total_files) verification to O(N_project_files) on
-        // every incremental edit.
-        let durability = if file.contains("/vendor/") || file.contains("\\vendor\\") {
-            salsa::Durability::HIGH
-        } else {
-            salsa::Durability::LOW
-        };
+        let durability = crate::db::durability_for_path(&file);
 
         // Check in-process parse cache first (fastest path, avoids even disk I/O).
         let cached = db_snapshot.parse_cache().get(&content_hash, php_v);

@@ -110,16 +110,15 @@ pub struct MirDbStorage {
     /// Shared by every clone and append-only, so concurrent readers loading
     /// one path agree on its handle. The owner adopts them into
     /// `source_files` at its next write ([`Self::adopt_on_demand_files`]).
-    on_demand_files: Arc<parking_lot::RwLock<FxHashMap<Arc<str>, SourceFile>>>,
+    on_demand_files: Arc<parking_lot::RwLock<FxHashMap<Arc<str>, OnDemandFile>>>,
     /// `on_demand_files.len()` at this handle's last adoption; entries are
     /// never removed, so equal means nothing new to adopt.
     on_demand_adopted: usize,
     /// Side-channel resolver state. The `ResolverConfig` salsa input is
-    /// lazily created on first `set_resolver` call; its `revision` is
-    /// bumped on every subsequent change so dependent tracked queries
-    /// (e.g. `resolve_fqcn_to_path`) are invalidated. The `Arc<dyn
-    /// ClassResolver>` lives off-salsa because trait objects don't
-    /// participate in `salsa::Update`.
+    /// created with the db; its `revision` is bumped on every resolver or
+    /// source-provider change so dependent tracked queries (e.g.
+    /// `resolve_fqcn_to_path`) are invalidated. The trait objects live
+    /// off-salsa because they don't participate in `salsa::Update`.
     resolver_state: Arc<parking_lot::RwLock<ResolverState>>,
     /// [`WorkspaceRevision`] singleton input, created with the db; bumped on
     /// file add/remove so workspace-enumeration tracked queries
@@ -280,6 +279,15 @@ impl Clone for NameResolutionCache {
     }
 }
 
+/// A [`MirDbStorage::on_demand_files`] entry.
+#[derive(Clone, Copy)]
+struct OnDemandFile {
+    file: SourceFile,
+    /// Durability the text was last set at; an owner write asking for more
+    /// raises it (see [`MirDbStorage::upsert_source_file_with_durability`]).
+    durability: salsa::Durability,
+}
+
 /// Open [`MirDbStorage::defer_revision_bumps`] scopes, and whether a bump
 /// requested inside them is still owed.
 #[derive(Clone, Copy, Default)]
@@ -293,8 +301,8 @@ struct RevisionBumpDeferral {
 /// shares one slot rather than copying.
 #[derive(Default)]
 struct ResolverState {
-    /// Lazily created on first `set_resolver`. Once created, the handle
-    /// is stable across clones and subsequent resolver swaps.
+    /// Created in [`MirDbStorage::default`], so a lookup run before any
+    /// resolver is attached still depends on it.
     config: Option<ResolverConfig>,
     /// Currently active resolver. `None` for sessions configured without
     /// PSR-4 / classmap support.
@@ -339,6 +347,8 @@ impl Default for MirDbStorage {
         // query run before any file is added would otherwise memoize an empty
         // result with no dependency to invalidate it.
         db.workspace_revision_input = Some(WorkspaceRevision::new(&db, 0));
+        let resolver_config = ResolverConfig::new(&db, 0);
+        db.resolver_state.write().config = Some(resolver_config);
         db
     }
 }
@@ -357,7 +367,7 @@ impl MirDatabase for MirDbStorage {
     }
 
     fn file_namespace(&self, file: &str) -> Option<Arc<str>> {
-        let sf = self.source_files.get(file).copied()?;
+        let sf = self.lookup_source_file(file)?;
         crate::db::collect_file_definitions(self, sf)
             .slice
             .namespace
@@ -365,7 +375,7 @@ impl MirDatabase for MirDbStorage {
     }
 
     fn file_imports(&self, file: &str) -> Arc<HashMap<Name, Name>> {
-        let Some(sf) = self.source_files.get(file).copied() else {
+        let Some(sf) = self.lookup_source_file(file) else {
             return Arc::new(HashMap::default());
         };
         // O(1) Arc refcount inc — `slice.imports` is itself `Arc<FxHashMap<...>>`.
@@ -380,7 +390,7 @@ impl MirDatabase for MirDbStorage {
                 return imports.clone();
             }
         }
-        let Some(sf) = self.source_files.get(file).copied() else {
+        let Some(sf) = self.lookup_source_file(file) else {
             return Arc::new(HashMap::default());
         };
         let imports = Arc::clone(
@@ -420,33 +430,8 @@ impl MirDatabase for MirDbStorage {
     }
 
     fn symbol_defining_file(&self, symbol: &str) -> Option<Arc<str>> {
-        // Route through `workspace_index` so this reads the incrementally
-        // maintained singleton (same source of truth as `find_class_like`)
-        // rather than the O(N) tracked `workspace_symbol_index` query, which
-        // re-runs on every revision bump during indexing.
-        let idx = crate::db::workspace_index(self);
-        let lower = Name::new(symbol).ascii_lowercase();
-        let case_sensitive = Name::new(symbol);
-        // Class-like and function keys are case-folded (PHP semantics).
-        // Constants are case-sensitive, so tried last without lowercasing.
-        // Global variables are not indexed here — they are not FQCNs and
-        // are not looked up via this method in any current caller.
-        let loc = idx
-            .class_like_loc(lower)
-            .or_else(|| idx.function_loc(lower))
-            .or_else(|| idx.constant_loc(case_sensitive));
-        loc.map(|l| {
-            let sf = match l {
-                SymbolLoc::Class { file, .. }
-                | SymbolLoc::Interface { file, .. }
-                | SymbolLoc::Trait { file, .. }
-                | SymbolLoc::Enum { file, .. }
-                | SymbolLoc::Function { file, .. }
-                | SymbolLoc::Constant { file, .. } => file,
-            };
-            sf.path(self)
-        })
-        .cloned()
+        let loc = crate::db::symbol_loc(self, symbol)?;
+        Some(loc.file().path(self).clone())
     }
 
     fn symbol_referencers_of(&self, symbol_key: &str) -> Vec<Arc<str>> {
@@ -543,17 +528,17 @@ impl MirDatabase for MirDbStorage {
         }
         // Held across the read so racing loaders of one path share a handle.
         let mut on_demand = self.on_demand_files.write();
-        if let Some(&sf) = on_demand.get(path) {
-            return Some(sf);
+        if let Some(entry) = on_demand.get(path) {
+            return Some(entry.file);
         }
         let path: Arc<str> = Arc::from(path);
-        let sf = SourceFile::builder(path.clone(), text()?)
+        let file = SourceFile::builder(path.clone(), text()?)
             .durability(durability)
             .new(self);
-        on_demand.insert(path.clone(), sf);
+        on_demand.insert(path.clone(), OnDemandFile { file, durability });
         drop(on_demand);
         self.mark_index_pending(&path);
-        Some(sf)
+        Some(file)
     }
 
     fn source_provider(&self) -> Option<Arc<dyn crate::SourceProvider>> {
@@ -574,8 +559,11 @@ impl MirDatabase for MirDbStorage {
         cfg
     }
 
-    fn resolver_config(&self) -> Option<ResolverConfig> {
-        self.resolver_state.read().config
+    fn resolver_config(&self) -> ResolverConfig {
+        self.resolver_state
+            .read()
+            .config
+            .expect("created in MirDbStorage::default")
     }
 
     fn current_resolver(&self) -> Option<Arc<dyn crate::ClassResolver>> {
@@ -712,6 +700,7 @@ impl MirDbStorage {
     /// `ingest_file` that detects a declaration change.
     pub fn rebuild_workspace_symbol_index(&mut self) {
         use crate::db::{build_workspace_symbol_index, collect_file_declarations, SymbolLoc};
+        self.adopt_on_demand_files();
         let files = self.all_source_files();
         let user_stubs: std::collections::HashSet<_> =
             self.user_stub_source_files().into_iter().collect();
@@ -871,6 +860,9 @@ impl MirDbStorage {
             constant_collisions,
         );
         self.set_workspace_index(new_index);
+        // Files loaded on demand after `decls` were collected are queued now
+        // that the singleton exists.
+        self.adopt_on_demand_files();
     }
 
     /// Incrementally merge **precomputed** per-file declarations into the
@@ -1343,39 +1335,27 @@ impl MirDbStorage {
         }
     }
 
-    /// Install or replace the active class resolver.
-    ///
-    /// First call lazily creates the singleton [`ResolverConfig`] salsa
-    /// input (revision = 0); subsequent calls bump the revision so
-    /// downstream tracked queries (notably
-    /// [`crate::db::resolve_fqcn_to_path`]) are invalidated.
-    ///
-    /// `None` clears the resolver. The `ResolverConfig` input is *not*
-    /// removed — it remains as a versioned anchor, with revision bumped to
-    /// signal the change.
+    /// Install or replace the active class resolver. `None` clears it.
+    /// Bumps the [`ResolverConfig`] revision so downstream tracked queries
+    /// (notably [`crate::db::resolve_fqcn_to_path`]) are invalidated.
     pub fn set_resolver(&mut self, resolver: Option<Arc<dyn crate::ClassResolver>>) {
-        use salsa::Setter as _;
-        // The lock and salsa storage are independent; we briefly read /
-        // briefly write the lock, but never hold it across a salsa setter
-        // call (which needs `&mut self`).
-        let existing = self.resolver_state.read().config;
-        match existing {
-            Some(c) => {
-                let current = *c.revision(self);
-                c.set_revision(self).to(current.wrapping_add(1));
-            }
-            None => {
-                let c = ResolverConfig::new(self, 0);
-                self.resolver_state.write().config = Some(c);
-            }
-        }
         self.resolver_state.write().resolver = resolver;
+        self.bump_resolver_revision();
     }
 
     /// Set the reader for files the resolver maps to; see
-    /// [`MirDatabase::load_on_demand`].
+    /// [`MirDatabase::load_on_demand`]. Bumps the [`ResolverConfig`]
+    /// revision, since what a resolver-mapped file loads as depends on it.
     pub fn set_source_provider(&mut self, provider: Arc<dyn crate::SourceProvider>) {
         self.resolver_state.write().source_provider = Some(provider);
+        self.bump_resolver_revision();
+    }
+
+    fn bump_resolver_revision(&mut self) {
+        use salsa::Setter as _;
+        let config = self.resolver_config();
+        let next = config.revision(self).wrapping_add(1);
+        config.set_revision(self).to(next);
     }
 
     /// Create a new or update an existing Salsa SourceFile input for `path`.
@@ -1408,6 +1388,10 @@ impl MirDbStorage {
                 }
                 sf.set_text(self).with_durability(durability).to(text);
                 self.mark_index_pending(&path);
+            } else if self.raise_on_demand_durability(&path, sf, durability) {
+                // The stored Arc keeps text-identity freshness marks valid.
+                let text = sf.text(self).clone();
+                sf.set_text(self).with_durability(durability).to(text);
             }
             return sf;
         }
@@ -1425,12 +1409,37 @@ impl MirDbStorage {
         if self.deleted_files.contains(path) {
             return None;
         }
-        self.on_demand_files.read().get(path).copied()
+        self.on_demand_files
+            .read()
+            .get(path)
+            .map(|entry| entry.file)
+    }
+
+    /// Whether `sf`, registered on demand at a lower durability than
+    /// `durability`, needs its text re-set to raise it. Records the new
+    /// durability when it does.
+    fn raise_on_demand_durability(
+        &self,
+        path: &str,
+        sf: SourceFile,
+        durability: salsa::Durability,
+    ) -> bool {
+        if durability == salsa::Durability::LOW {
+            return false;
+        }
+        let mut on_demand = self.on_demand_files.write();
+        match on_demand.get_mut(path) {
+            Some(entry) if entry.file == sf && entry.durability < durability => {
+                entry.durability = durability;
+                true
+            }
+            _ => false,
+        }
     }
 
     /// Move files reads registered on demand into this handle's own registry,
-    /// so workspace enumeration sees them. Bumps the workspace revision when
-    /// any are new here.
+    /// so workspace enumeration sees them, and queue the ones the symbol
+    /// index lacks. Bumps the workspace revision when any are new here.
     pub(crate) fn adopt_on_demand_files(&mut self) {
         let on_demand = self.on_demand_files.read();
         if on_demand.len() == self.on_demand_adopted {
@@ -1442,15 +1451,48 @@ impl MirDbStorage {
             .filter(|(path, _)| {
                 !self.source_files.contains_key(*path) && !self.deleted_files.contains(*path)
             })
-            .map(|(path, &sf)| (path.clone(), sf))
+            .map(|(path, entry)| (path.clone(), entry.file))
             .collect();
         drop(on_demand);
         self.on_demand_adopted = seen;
         if adopted.is_empty() {
             return;
         }
+        let unindexed: Vec<Arc<str>> = {
+            let indexed = self.file_decl_snapshots.read();
+            adopted
+                .iter()
+                .filter(|(_, sf)| !indexed.contains_key(sf))
+                .map(|(path, _)| path.clone())
+                .collect()
+        };
+        for path in &unindexed {
+            self.mark_index_pending(path);
+        }
         Arc::make_mut(&mut self.source_files).extend(adopted);
         self.bump_workspace_revision();
+    }
+
+    /// Registered paths plus files loaded on demand and not yet adopted:
+    /// every path [`MirDatabase::lookup_source_file`] resolves.
+    pub(crate) fn known_file_paths(&self) -> Vec<Arc<str>> {
+        let mut paths = self.source_file_paths();
+        paths.extend(
+            self.on_demand_files
+                .read()
+                .keys()
+                .filter(|path| {
+                    !self.source_files.contains_key(*path) && !self.deleted_files.contains(*path)
+                })
+                .cloned(),
+        );
+        paths
+    }
+
+    /// Files ever loaded on demand. Grows whenever a lookup registers one,
+    /// so it versions state derived from on-demand lookups.
+    pub(crate) fn on_demand_file_count(&self) -> usize {
+        self.on_demand_files.read().len()
     }
 
     /// Record that `path`'s declarations may be out of step with the symbol
@@ -1482,6 +1524,13 @@ impl MirDbStorage {
     /// Whether any mirror-written file awaits symbol-index reconciliation.
     pub fn index_pending_is_empty(&self) -> bool {
         self.pending_index_files.read().is_empty()
+    }
+
+    /// Whether a settle has work: files awaiting reconciliation, or files
+    /// loaded on demand this handle hasn't adopted.
+    pub(crate) fn needs_index_settle(&self) -> bool {
+        self.on_demand_files.read().len() != self.on_demand_adopted
+            || !self.index_pending_is_empty()
     }
 
     /// Executions of the tracked O(all-files) `workspace_symbol_index` walk.

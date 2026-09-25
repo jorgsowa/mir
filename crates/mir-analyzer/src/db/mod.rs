@@ -130,7 +130,9 @@ pub trait MirDatabase: salsa::Database {
         text: &dyn Fn() -> Option<Arc<str>>,
     ) -> Option<SourceFile>;
 
-    /// Reader for resolver-mapped files. **Side channel** — not tracked.
+    /// Reader for resolver-mapped files. **Side channel** — this read is not
+    /// salsa-tracked; tracked queries that consult it must also read
+    /// `resolver_config().revision(db)`.
     fn source_provider(&self) -> Option<Arc<dyn crate::SourceProvider>>;
 
     /// Return the singleton [`AnalyzeFileInput`] input handle, lazily
@@ -140,11 +142,10 @@ pub trait MirDatabase: salsa::Database {
     /// queries like `analyze_file` a repeatable memo key.
     fn analyze_config(&self) -> AnalyzeFileInput;
 
-    /// Return the singleton [`ResolverConfig`] input handle, if a resolver
-    /// has ever been attached via `MirDbStorage::set_resolver`. Tracked queries
+    /// Return the singleton [`ResolverConfig`] input handle. Tracked queries
     /// read `cfg.revision(db)` to anchor on the resolver's version so
-    /// they're invalidated when the resolver changes.
-    fn resolver_config(&self) -> Option<ResolverConfig>;
+    /// they're invalidated when the resolver or source provider changes.
+    fn resolver_config(&self) -> ResolverConfig;
 
     /// Return the current class resolver, if any. **Side channel** — this
     /// read is not salsa-tracked. Tracked queries that consult this must
@@ -210,6 +211,21 @@ pub trait MirDatabase: salsa::Database {
     fn parse_cache(&self) -> Arc<crate::parse_cache::ParseCache>;
 }
 
+/// Whether `path` lies under a `vendor` directory (Composer dependencies).
+pub(crate) fn is_vendor_path(path: &str) -> bool {
+    path.split(['/', '\\']).any(|segment| segment == "vendor")
+}
+
+/// Durability for a source file at `path`: dependencies don't change within a
+/// session, so salsa skips re-verifying them after project edits.
+pub(crate) fn durability_for_path(path: &str) -> salsa::Durability {
+    if is_vendor_path(path) {
+        salsa::Durability::HIGH
+    } else {
+        salsa::Durability::LOW
+    }
+}
+
 // Re-export all public items from sub-modules to preserve the flat db::* namespace.
 pub use self::class_mention_index::{
     ClassMentionIndex, ClassMentionStats, MentionQuery, MentionScanner,
@@ -225,6 +241,7 @@ pub use self::find_queries::{
     has_method_in_chain, interface_in_file, is_method_concretely_implemented,
     method_is_pure_in_chain, property_in_own_composition, trait_in_file, ClassLike,
 };
+pub(crate) use self::find_queries::{class_like_loc, function_loc, symbol_loc};
 pub use self::inferred_types::{
     inferred_function_return_type_demand, inferred_method_return_type_demand,
     inferred_property_type_demand,

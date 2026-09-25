@@ -45,7 +45,7 @@ pub(crate) struct IndexState {
     /// Derived dependency graph, rebuilt lazily and dropped whenever
     /// committed references, structural edges, source-file membership, or
     /// stale-symbol tracking changes.
-    dependency_graph: RwLock<Option<crate::DependencyGraph>>,
+    dependency_graph: RwLock<DependencyGraphCache>,
     /// One-run replay cache for `analyze_paths` when the next batch run sees
     /// the same file set with identical bytes. Any mutation outside
     /// `analyze_paths` clears it.
@@ -54,6 +54,23 @@ pub(crate) struct IndexState {
     /// [`Self::retire_references`] / [`Self::retire_file`], so a commit's
     /// check → postings → mark sequence never interleaves with a retire.
     retirements: Mutex<Retirements>,
+}
+
+#[derive(Default)]
+struct DependencyGraphCache {
+    /// Bumped by every invalidation, so a build that raced one is not stored.
+    epoch: u64,
+    graph: Option<(DependencyGraphStamp, crate::DependencyGraph)>,
+}
+
+/// The state a dependency graph was built from, captured before the build.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) struct DependencyGraphStamp {
+    epoch: u64,
+    /// Workspace generation: moves on every file add, remove or adoption.
+    generation: u64,
+    /// Files loaded on demand, which can newly resolve a referenced symbol.
+    on_demand_files: usize,
 }
 
 /// Owner-side retirements of per-file index state, ordered by a sequence
@@ -284,16 +301,42 @@ impl IndexState {
         self.defs_committed.read().keys().cloned().collect()
     }
 
-    pub(crate) fn cached_dependency_graph(&self) -> Option<crate::DependencyGraph> {
-        self.dependency_graph.read().clone()
+    /// Capture before reading anything a dependency graph is built from.
+    pub(crate) fn dependency_graph_stamp(&self, db: &MirDbStorage) -> DependencyGraphStamp {
+        DependencyGraphStamp {
+            epoch: self.dependency_graph.read().epoch,
+            generation: db.workspace_revision_value(),
+            on_demand_files: db.on_demand_file_count(),
+        }
     }
 
-    pub(crate) fn store_dependency_graph(&self, graph: crate::DependencyGraph) {
-        *self.dependency_graph.write() = Some(graph);
+    pub(crate) fn cached_dependency_graph(
+        &self,
+        stamp: DependencyGraphStamp,
+    ) -> Option<crate::DependencyGraph> {
+        match &self.dependency_graph.read().graph {
+            Some((built_at, graph)) if *built_at == stamp => Some(graph.clone()),
+            _ => None,
+        }
+    }
+
+    /// Cache `graph`, built from the state at `stamp`, unless an
+    /// invalidation landed since.
+    pub(crate) fn store_dependency_graph(
+        &self,
+        stamp: DependencyGraphStamp,
+        graph: crate::DependencyGraph,
+    ) {
+        let mut cache = self.dependency_graph.write();
+        if cache.epoch == stamp.epoch {
+            cache.graph = Some((stamp, graph));
+        }
     }
 
     pub(crate) fn clear_dependency_graph_cache(&self) {
-        *self.dependency_graph.write() = None;
+        let mut cache = self.dependency_graph.write();
+        cache.epoch += 1;
+        cache.graph = None;
     }
 
     pub(crate) fn transient_batch_replay(&self) -> Option<Arc<BatchReplayState>> {
@@ -649,4 +692,34 @@ pub(crate) fn hash_files(files: &[Arc<str>]) -> u64 {
         f.hash(&mut hasher);
     }
     hasher.finish()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn empty_graph() -> crate::DependencyGraph {
+        crate::DependencyGraph::from_compact_parts(
+            Vec::new(),
+            HashMap::default(),
+            Vec::new(),
+            Vec::new(),
+        )
+    }
+
+    #[test]
+    fn a_dependency_graph_built_across_an_invalidation_is_not_cached() {
+        let state = IndexState::default();
+        let db = MirDbStorage::default();
+
+        let stamp = state.dependency_graph_stamp(&db);
+        state.store_dependency_graph(stamp, empty_graph());
+        assert!(state.cached_dependency_graph(stamp).is_some());
+
+        let stamp = state.dependency_graph_stamp(&db);
+        state.clear_dependency_graph_cache();
+        state.store_dependency_graph(stamp, empty_graph());
+        let current = state.dependency_graph_stamp(&db);
+        assert!(state.cached_dependency_graph(current).is_none());
+    }
 }

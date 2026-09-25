@@ -77,7 +77,7 @@ impl AnalysisSession {
                         return None;
                     };
                     let file: Arc<str> = Arc::from(path.to_string_lossy().as_ref());
-                    let is_vendor = file.contains("/vendor/") || file.contains("\\vendor\\");
+                    let is_vendor = crate::db::is_vendor_path(&file);
                     let prepared = crate::analyzer_db::AnalyzerDb::prepare_ingest(
                         db,
                         stub_cache.as_ref(),

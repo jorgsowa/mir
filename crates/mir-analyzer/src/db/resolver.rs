@@ -75,12 +75,12 @@ impl<'db> Fqcn<'db> {
 /// `MirDbStorage::set_resolver`).
 ///
 /// Returns `None` when no resolver is configured or the resolver couldn't
-/// map `fqcn`.
+/// map `fqcn`. The anchor is read even then, so attaching a resolver later
+/// invalidates the miss.
 #[salsa::tracked]
 pub fn resolve_fqcn_to_path<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option<Arc<str>> {
-    let cfg = db.resolver_config()?;
     // Anchor on the revision so this query is part of salsa's graph.
-    let _rev = cfg.revision(db);
+    let _rev = db.resolver_config().revision(db);
     let resolver = db.current_resolver()?;
     let name = fqcn.name(db);
     let path = resolver.resolve(name.as_str())?;

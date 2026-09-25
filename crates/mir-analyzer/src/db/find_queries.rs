@@ -100,9 +100,10 @@ fn read_workspace_revision(db: &dyn MirDatabase) {
 }
 
 /// Where class-like `fqcn` is declared when the symbol index doesn't know
-/// it: its embedded stub, else the file the resolver maps it to, both
-/// registered on demand. Loading this way is a pure read, so it runs on any
-/// snapshot without the owner.
+/// it: the file the resolver maps it to, else its embedded stub, both
+/// registered on demand. The order matches the index, which ranks user files
+/// above native stubs (a vendor polyfill of `Stringable` wins). Loading this
+/// way is a pure read, so it runs on any snapshot without the owner.
 #[salsa::tracked]
 fn class_like_loc_on_demand<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option<SymbolLoc> {
     read_workspace_revision(db);
@@ -114,14 +115,62 @@ fn class_like_loc_on_demand<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> O
             .find(|d| d.lookup_key() == key)
             .map(|d| d.loc)
     };
-    let stub = crate::stubs::stub_path_for_class(name.as_str()).and_then(|p| stub_on_demand(db, p));
-    if let Some(loc) = stub.and_then(declared_in) {
-        return Some(loc);
-    }
+    resolver_file_on_demand(db, fqcn)
+        .and_then(declared_in)
+        .or_else(|| {
+            let stub = stub_on_demand(db, crate::stubs::stub_path_for_class(name.as_str())?)?;
+            declared_in(stub)
+        })
+}
+
+/// Register the file the resolver maps `fqcn` to on demand.
+fn resolver_file_on_demand(db: &dyn MirDatabase, fqcn: Fqcn<'_>) -> Option<SourceFile> {
     let path = crate::db::resolve_fqcn_to_path(db, fqcn).clone()?;
+    // The path query backdates across a provider swap; anchor the read itself.
+    let _ = db.resolver_config().revision(db);
     let provider = db.source_provider()?;
-    let sf = db.load_on_demand(&path, salsa::Durability::LOW, &|| provider.read(&path))?;
-    declared_in(sf)
+    db.load_on_demand(&path, crate::db::durability_for_path(&path), &|| {
+        provider.read(&path)
+    })
+}
+
+/// Where class-like `fqcn` is declared: the symbol index, else on demand.
+pub(crate) fn class_like_loc(db: &dyn MirDatabase, fqcn: Fqcn<'_>) -> Option<SymbolLoc> {
+    let key = fqcn.name(db).ascii_lowercase();
+    workspace_symbol_loc(db, |index| index.class_like_loc(key))
+        .or_else(|| *class_like_loc_on_demand(db, fqcn))
+}
+
+/// Where function `fqn` is declared: the symbol index, else on demand.
+pub(crate) fn function_loc(db: &dyn MirDatabase, fqn: Fqcn<'_>) -> Option<SymbolLoc> {
+    let key = fqn.name(db).ascii_lowercase();
+    workspace_symbol_loc(db, |index| index.function_loc(key))
+        .or_else(|| *function_loc_on_demand(db, fqn))
+}
+
+/// Where global constant `fqn` is declared: the symbol index, else on demand.
+/// Constants are keyed case-sensitively, unlike class-likes and functions.
+fn constant_loc(db: &dyn MirDatabase, fqn: Fqcn<'_>) -> Option<SymbolLoc> {
+    let key = *fqn.name(db);
+    workspace_symbol_loc(db, |index| index.constant_loc(key))
+        .or_else(|| *constant_loc_on_demand(db, fqn))
+}
+
+/// Where a class-like, function or global constant named `symbol` is
+/// declared, trying every kind in the index before loading any on demand.
+pub(crate) fn symbol_loc(db: &dyn MirDatabase, symbol: &str) -> Option<SymbolLoc> {
+    let fqn = Fqcn::from_str(db, symbol);
+    let lower = fqn.name(db).ascii_lowercase();
+    let exact = *fqn.name(db);
+    workspace_symbol_loc(db, |index| {
+        index
+            .class_like_loc(lower)
+            .or_else(|| index.function_loc(lower))
+            .or_else(|| index.constant_loc(exact))
+    })
+    .or_else(|| *class_like_loc_on_demand(db, fqn))
+    .or_else(|| *function_loc_on_demand(db, fqn))
+    .or_else(|| *constant_loc_on_demand(db, fqn))
 }
 
 /// [`class_like_loc_on_demand`] for a built-in function's stub.
@@ -677,21 +726,9 @@ pub fn function_def_at(
 /// `set_file_text` or `set_workspace_files`), but definition collection
 /// happens on demand inside salsa.
 pub fn find_class_like<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option<ClassLike> {
-    // O(1) HashMap lookup in the workspace symbol index, then a per-(file, idx)
-    // salsa-memoized fetch of the Arc<Storage>.
-    //
-    // `Name::ascii_lowercase` is memoized — first call per unique FQCN
-    // allocates the lowercase string and interns it; subsequent calls hit a
-    // process-global DashMap. The hot body-analysis path becomes alloc-free after
-    // warmup.
-    let key = fqcn.name(db).ascii_lowercase();
-    // Prefer the frozen, borrow-only index (set on the batch body/class pass)
-    // to avoid cloning the singleton's three Arcs on every call; fall back to
-    // the live index on the canonical/open-file db. `.copied()` ends the borrow
-    // before the `*_def_at` salsa calls below.
-    workspace_symbol_loc(db, |index| index.class_like_loc(key))
-        .or_else(|| *class_like_loc_on_demand(db, fqcn))
-        .and_then(|loc| class_like_from_loc(db, loc))
+    // O(1) index lookup (borrowing the frozen index on batch passes), then a
+    // per-(file, idx) salsa-memoized fetch of the Arc<Storage>.
+    class_like_loc(db, fqcn).and_then(|loc| class_like_from_loc(db, loc))
 }
 
 /// Whether the workspace symbol index already holds `fqcn`, as opposed to
@@ -703,19 +740,13 @@ pub fn class_like_indexed(db: &dyn MirDatabase, fqcn: Fqcn<'_>) -> bool {
 
 /// The file a class-like symbol is declared in, if known.
 pub fn class_like_decl_file(db: &dyn MirDatabase, fqcn: Fqcn<'_>) -> Option<Arc<str>> {
-    let key = fqcn.name(db).ascii_lowercase();
-    let loc = workspace_symbol_loc(db, |index| index.class_like_loc(key))
-        .or_else(|| *class_like_loc_on_demand(db, fqcn))?;
-    Some(loc.file().path(db).clone())
+    Some(class_like_loc(db, fqcn)?.file().path(db).clone())
 }
 
 /// Composite: resolve `fqn` to its defining file, then locate the
 /// function within it.
 pub fn find_function<'db>(db: &'db dyn MirDatabase, fqn: Fqcn<'db>) -> Option<Arc<FunctionDef>> {
-    let key = fqn.name(db).ascii_lowercase();
-    let loc = workspace_symbol_loc(db, |index| index.function_loc(key))
-        .or_else(|| *function_loc_on_demand(db, fqn));
-    let SymbolLoc::Function { file, idx } = loc? else {
+    let SymbolLoc::Function { file, idx } = function_loc(db, fqn)? else {
         return None;
     };
     function_def_at(db, file, idx as u32).clone()
@@ -727,11 +758,7 @@ pub fn find_global_constant<'db>(
     db: &'db dyn MirDatabase,
     fqn: Fqcn<'db>,
 ) -> Option<Arc<mir_types::Type>> {
-    // Constants are keyed case-sensitively (raw name), unlike class_like/functions.
-    let key = fqn.name(db);
-    let const_loc = workspace_symbol_loc(db, |index| index.constant_loc(*key))
-        .or_else(|| *constant_loc_on_demand(db, fqn));
-    if let Some(SymbolLoc::Constant { file, idx }) = const_loc {
+    if let Some(SymbolLoc::Constant { file, idx }) = constant_loc(db, fqn) {
         if let Some(ty) = global_constant_type_at(db, file, idx) {
             return Some(ty);
         }

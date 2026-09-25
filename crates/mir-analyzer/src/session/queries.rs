@@ -342,6 +342,14 @@ impl AnalysisSession {
         includes: crate::ReferenceIncludes,
         should_cancel: &(dyn Fn() -> bool + Sync),
     ) -> Option<Vec<(Arc<str>, crate::Range)>> {
+        // Settling can move the generation, which turns commits with
+        // unresolved names stale, so it runs before both the memo probe and
+        // the stale set.
+        if self.db.salsa.needs_index_settle()
+            && !self.settle_workspace_index_cancellable(should_cancel)
+        {
+            return None;
+        }
         // No `should_cancel()` check before the memo probe: a hit does no
         // analysis work, and some callers count probe invocations to prove
         // a warm query needed no re-analysis.
@@ -359,12 +367,6 @@ impl AnalysisSession {
         let stale = self.db_view().stale_reference_candidates(symbol, files);
 
         if !stale.is_empty() {
-            // Cached postings for fresh candidates don't need the pending
-            // symbol-index work; stale ones are about to analyze against the
-            // workspace, so reconcile first.
-            if !self.settle_workspace_index_cancellable(should_cancel) {
-                return None;
-            }
             // The bump scope closes before the commit view captures its
             // generation.
             {

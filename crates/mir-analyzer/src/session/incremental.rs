@@ -309,15 +309,13 @@ impl AnalysisSession {
     /// File dependency graph: which files depend on which other files.
     /// Used for incremental invalidation in LSP servers and build systems.
     ///
-    /// File dependency graph: which files depend on which other files.
-    /// Used for incremental invalidation in LSP servers and build systems.
-    ///
     /// O(edges) — iterates symbol edges from the reference index and from
     /// `file_structural_symbols`, then resolves each symbol to its defining
     /// file via O(1) lookup. Total cost is O(E) where E is the number of
     /// (file, symbol) edges.
     pub fn dependency_graph(&self) -> crate::DependencyGraph {
-        if let Some(graph) = self.index.cached_dependency_graph() {
+        let stamp = self.index.dependency_graph_stamp(&self.db.salsa);
+        if let Some(graph) = self.index.cached_dependency_graph(stamp) {
             return graph;
         }
         let db = self.snapshot_db();
@@ -342,17 +340,40 @@ impl AnalysisSession {
             }
         }
 
-        fn symbol_defining_file_id(
-            db: &dyn crate::db::MirDatabase,
-            file_ids: &HashMap<Arc<str>, u32>,
-            symbol_key: &str,
-        ) -> Option<u32> {
-            let lookup = crate::defining_file_lookup_key(symbol_key);
-            db.symbol_defining_file(lookup)
-                .and_then(|file| file_ids.get(file.as_ref()).copied())
+        // Every file a symbol resolves to joins the graph, including ones
+        // loaded on demand while resolving, so their own edges are walked too.
+        let mut known: HashSet<Arc<str>> = db.known_file_paths().into_iter().collect();
+        let mut pending: Vec<Arc<str>> = known.iter().cloned().collect();
+        let mut outgoing: Vec<(Arc<str>, HashSet<Arc<str>>)> = Vec::with_capacity(pending.len());
+        while let Some(file) = pending.pop() {
+            let mut targets: HashSet<Arc<str>> = HashSet::default();
+            let mut resolve = |symbol_key: &str| {
+                let lookup = crate::defining_file_lookup_key(symbol_key);
+                if let Some(defining_file) = db.symbol_defining_file(lookup) {
+                    targets.insert(defining_file);
+                }
+            };
+            // O(degree(file)) — forward reference-index lookup, no full-table scan.
+            for symbol_key in db.file_referenced_symbols(file.as_ref()) {
+                resolve(&symbol_key);
+            }
+            // Declaration-level symbol edges from Salsa. These cover imports,
+            // class hierarchy edges, and type-hint-only references that never
+            // appear in file_referenced_symbols.
+            if let Some(sf) = db.lookup_source_file(file.as_ref()) {
+                for symbol in crate::db::file_structural_symbols(&db, sf).iter() {
+                    resolve(symbol);
+                }
+            }
+            for target in &targets {
+                if known.insert(target.clone()) {
+                    pending.push(target.clone());
+                }
+            }
+            outgoing.push((file, targets));
         }
 
-        let mut all_files: Vec<Arc<str>> = db.source_file_paths().to_vec();
+        let mut all_files: Vec<Arc<str>> = known.into_iter().collect();
         all_files.sort();
         assert!(
             u32::try_from(all_files.len()).is_ok(),
@@ -366,30 +387,15 @@ impl AnalysisSession {
 
         let mut dependencies = vec![Vec::new(); all_files.len()];
         let mut dependents = vec![Vec::new(); all_files.len()];
-        for (file_id, file) in all_files.iter().enumerate() {
-            let file_id = file_id as u32;
-            let mut file_deps: HashSet<u32> = HashSet::default();
-
-            // O(degree(file)) — forward reference-index lookup, no full-table scan.
-            for symbol_key in db.file_referenced_symbols(file.as_ref()) {
-                if let Some(def_id) = symbol_defining_file_id(&db, &file_ids, &symbol_key) {
-                    file_deps.insert(def_id);
-                }
-            }
-
-            // Declaration-level symbol edges from Salsa. These cover imports,
-            // class hierarchy edges, and type-hint-only references that never
-            // appear in file_referenced_symbols.
-            if let Some(sf) = db.lookup_source_file(file.as_ref()) {
-                for symbol in crate::db::file_structural_symbols(&db, sf).iter() {
-                    if let Some(def_id) = symbol_defining_file_id(&db, &file_ids, symbol) {
-                        file_deps.insert(def_id);
-                    }
-                }
-            }
-
-            for dep_id in file_deps {
-                push_edge(&mut dependencies, &mut dependents, file_id, dep_id);
+        for (file, targets) in outgoing {
+            let file_id = file_ids[&file];
+            for target in targets {
+                push_edge(
+                    &mut dependencies,
+                    &mut dependents,
+                    file_id,
+                    file_ids[&target],
+                );
             }
         }
 
@@ -438,7 +444,7 @@ impl AnalysisSession {
             dependencies,
             dependents,
         );
-        self.index.store_dependency_graph(graph.clone());
+        self.index.store_dependency_graph(stamp, graph.clone());
         graph
     }
 }

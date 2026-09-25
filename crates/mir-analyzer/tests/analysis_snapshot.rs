@@ -199,10 +199,11 @@ impl mir_analyzer::SourceProvider for VendorSources {
     }
 }
 
+/// The resolver is attached after ingest: ingesting resolves a file's
+/// structural dependencies, which would load the vendor file before any
+/// snapshot could.
 fn vendor_workspace() -> (AnalysisSession, Vec<Arc<str>>) {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST)
-        .with_class_resolver(Arc::new(VendorSources))
-        .with_source_provider(Arc::new(VendorSources));
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     let files: Vec<Arc<str>> = ["child.php", "caller.php"]
         .into_iter()
         .map(Arc::from)
@@ -210,6 +211,9 @@ fn vendor_workspace() -> (AnalysisSession, Vec<Arc<str>>) {
     for (path, text) in files.iter().zip([VENDOR_CHILD, VENDOR_CALLER]) {
         session.ingest_file(path.clone(), Arc::from(text));
     }
+    let session = session
+        .with_class_resolver(Arc::new(VendorSources))
+        .with_source_provider(Arc::new(VendorSources));
     (session, files)
 }
 
