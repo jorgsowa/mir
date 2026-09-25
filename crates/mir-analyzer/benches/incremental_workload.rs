@@ -17,12 +17,10 @@ use std::time::Duration;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use mir_analyzer::cache::AnalysisCache;
 use mir_analyzer::{
-    discover_files, perf_fixture::PerfFixture, AnalysisSession, BatchOptions, FileAnalyzer, Name,
-    PhpVersion,
+    discover_files, perf_fixture::PerfFixture, AnalysisSession, AnalysisSnapshot, BatchOptions,
+    FileAnalyzer, Name, PhpVersion,
 };
 use mir_types::Name as MirSymbol;
-#[cfg(any())]
-use salsa::Cancelled;
 use tempfile::TempDir;
 
 // Counting allocator — global atomics updated on every alloc/dealloc.
@@ -441,17 +439,12 @@ fn bench_stub_loading(c: &mut Criterion) {
     group.finish();
 }
 
-/// Concurrent-read workload: N reader threads do `definition_of` lookups in
-/// a tight loop while one writer thread re-ingests Login.php at editor-typing
-/// cadence. Lower is better; flat scaling with reader count means snapshot
-/// readers don't block on the writer.
-// Disabled: shares a mutating `AnalysisSession` across threads, which the
-// single-owner model forbids; needs a rewrite against a write actor.
-#[cfg(any())]
+/// Concurrent-read workload: N reader threads run `definition_of_cached` on
+/// snapshots in a tight loop while the owner re-ingests Login.php as fast as
+/// it can. A write cancels in-flight reads; the reader then asks the owner for
+/// a fresh snapshot. Lower is better; flat scaling with reader count means
+/// readers don't serialize on each other or on the owner beyond its writes.
 fn bench_concurrent_read_under_edits(c: &mut Criterion) {
-    use std::sync::atomic::{AtomicBool, Ordering};
-    use std::thread;
-
     let Some(fixture) = PerfFixture::discover() else {
         eprintln!("\nSkipping concurrent-read benchmark: no supported perf fixture found\n");
         return;
@@ -463,90 +456,95 @@ fn bench_concurrent_read_under_edits(c: &mut Criterion) {
     let root = fixture.root();
     let (vendor_files, project_files) = split_vendor_project(root);
     let cache: TempDir = tempfile::tempdir().unwrap();
-    let session = Arc::new(warm_session(&cache, &vendor_files, &project_files));
+    let mut session = warm_session(&cache, &vendor_files, &project_files);
 
-    // Pick a class that exists in the warmed session so reads are cache-hot.
-    let target_class = fixture.concurrent_target_class();
+    // A class that exists in the warmed session, so reads are cache-hot.
+    let target = Name::class(fixture.concurrent_target_class());
 
-    // Pre-load the editing target's source so the writer doesn't pay disk I/O.
     let edit_path = fixture.leaf_file();
-    let edit_path_str: Arc<str> = Arc::from(edit_path.to_string_lossy().as_ref());
-    let original = std::fs::read_to_string(&edit_path).unwrap();
+    let edit_path: Arc<str> = Arc::from(edit_path.to_string_lossy().as_ref());
+    let original = std::fs::read_to_string(edit_path.as_ref()).unwrap();
 
     let mut group = c.benchmark_group("concurrent_read_under_edits");
     group.sample_size(10);
     group.measurement_time(Duration::from_secs(20));
 
-    // Constants kept modest so the bench finishes in reasonable time per
-    // iteration. The reader work dwarfs the writer work, so adjusting reads
-    // per iteration is what controls measurement granularity.
-    const READS_PER_THREAD: u32 = 5_000;
-    let thread_counts = [1usize, 4, 8];
-
-    for &n_readers in &thread_counts {
-        let id = format!("{n_readers}_readers");
-        let session_outer = Arc::clone(&session);
-        let edit_path_outer = edit_path_str.clone();
-        let original_outer = original.clone();
-
-        group.bench_function(&id, |b| {
+    for n_readers in [1usize, 4, 8] {
+        group.bench_function(format!("{n_readers}_readers"), |b| {
             b.iter_custom(|iters| {
-                let mut total = Duration::ZERO;
-                for _ in 0..iters {
-                    let stop = Arc::new(AtomicBool::new(false));
-
-                    // Background writer: re-ingest the target file repeatedly.
-                    let writer_session = Arc::clone(&session_outer);
-                    let writer_path = edit_path_outer.clone();
-                    let writer_orig = original_outer.clone();
-                    let writer_stop = Arc::clone(&stop);
-                    let writer = thread::spawn(move || {
-                        let mut counter: u32 = 0;
-                        while !writer_stop.load(Ordering::Relaxed) {
-                            counter = counter.wrapping_add(1);
-                            let new_src: Arc<str> =
-                                Arc::from(format!("{writer_orig}\n// edit {counter}\n"));
-                            writer_session.ingest_file(writer_path.clone(), new_src);
-                        }
-                    });
-
-                    // Spawn readers and time their combined wall-clock work.
-                    let start = std::time::Instant::now();
-                    let mut handles = Vec::with_capacity(n_readers);
-                    for _ in 0..n_readers {
-                        let s = Arc::clone(&session_outer);
-                        handles.push(thread::spawn(move || {
-                            for _ in 0..READS_PER_THREAD {
-                                // Wrap each query in Cancelled::catch — salsa fires
-                                // Cancelled::PendingWrite when the writer bumps the
-                                // revision mid-query. Treat as a no-op read (the bench
-                                // measures contention, not correctness).
-                                let s_ref = &s;
-                                let _ = Cancelled::catch(std::panic::AssertUnwindSafe(|| {
-                                    std::hint::black_box(
-                                        s_ref.definition_of(&Name::class(target_class)),
-                                    )
-                                }));
-                            }
-                        }));
-                    }
-                    for h in handles {
-                        h.join().unwrap();
-                    }
-                    total += start.elapsed();
-
-                    stop.store(true, Ordering::Relaxed);
-                    writer.join().unwrap();
-                }
-                total
+                (0..iters)
+                    .map(|_| {
+                        read_under_edits(&mut session, &edit_path, &original, &target, n_readers)
+                    })
+                    .sum()
             });
         });
     }
 
     group.finish();
+}
 
-    // Restore source content.
-    std::fs::write(&edit_path, &original).unwrap();
+/// Wall-clock time for `n_readers` threads to finish their lookups while the
+/// owner keeps editing `edit_path`.
+fn read_under_edits(
+    session: &mut AnalysisSession,
+    edit_path: &Arc<str>,
+    original: &str,
+    target: &Name,
+    n_readers: usize,
+) -> Duration {
+    use std::sync::mpsc;
+
+    // The reader work dwarfs the owner's, so reads per thread set the
+    // measurement granularity.
+    const READS_PER_THREAD: u32 = 5_000;
+
+    let (request_tx, requests) = mpsc::channel::<mpsc::Sender<AnalysisSnapshot>>();
+    std::thread::scope(|scope| {
+        let start = std::time::Instant::now();
+        let readers: Vec<_> = (0..n_readers)
+            .map(|_| {
+                let owner = request_tx.clone();
+                scope.spawn(move || {
+                    let fresh_snapshot = || {
+                        let (reply, snapshot) = mpsc::channel();
+                        owner.send(reply).unwrap();
+                        snapshot.recv().unwrap()
+                    };
+                    let mut snap = fresh_snapshot();
+                    for _ in 0..READS_PER_THREAD {
+                        if std::hint::black_box(snap.definition_of_cached(target)).is_err() {
+                            // The pending write waits for this handle, so drop it
+                            // before asking for the next.
+                            drop(snap);
+                            snap = fresh_snapshot();
+                        }
+                    }
+                })
+            })
+            .collect();
+        drop(request_tx);
+
+        let mut counter: u32 = 0;
+        'owner: loop {
+            loop {
+                match requests.try_recv() {
+                    Ok(reply) => {
+                        let _ = reply.send(session.snapshot());
+                    }
+                    Err(mpsc::TryRecvError::Empty) => break,
+                    Err(mpsc::TryRecvError::Disconnected) => break 'owner,
+                }
+            }
+            counter = counter.wrapping_add(1);
+            let edited: Arc<str> = Arc::from(format!("{original}\n// edit {counter}\n"));
+            session.ingest_file(edit_path.clone(), edited);
+        }
+        for reader in readers {
+            reader.join().unwrap();
+        }
+        start.elapsed()
+    })
 }
 
 /// LSP-shaped cold-start: how long does a fresh `AnalysisSession::with_cache_dir`
@@ -1355,6 +1353,7 @@ criterion_group!(
     bench_file_analyzer_memory_probe,
     bench_read_query_latency,
     bench_stub_loading,
+    bench_concurrent_read_under_edits,
     bench_lsp_cold_start_warm_cache,
 );
 criterion_main!(benches);

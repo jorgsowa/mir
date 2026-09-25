@@ -1,30 +1,24 @@
-#![allow(dead_code, unused_imports)]
-//! Regression guards for the session's salsa locking hazards: the
-//! `index_generation()` query-stack reentrancy abort (fixed by reading the
-//! epoch from an off-salsa atomic mirror), plus stress coverage for a writer
-//! toggling a base class and an opener mirroring buffer text on the shared
-//! rayon pool. The two deadlock shapes those hazards can hide are pinned
-//! deterministically instead, since this stress run is too narrow a race to
-//! rely on: see `settle_workspace_index_does_not_deadlock_on_its_own_snapshot`
-//! below and `session::incremental`'s
-//! `sweep_commit_does_not_deadlock_a_concurrent_file_write` unit test.
+//! Concurrency guards for the single-owner session: one thread owns the
+//! [`AnalysisSession`] and writes, readers query [`AnalysisSnapshot`]s it hands
+//! out. An owner write cancels in-flight snapshot queries; they must unwind
+//! as `Err(Cancelled)` rather than abort (salsa's `ZalsaLocal` reentrancy
+//! check) or deadlock the owner waiting for their handles.
 
-use std::panic::AssertUnwindSafe;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use mir_analyzer::{AnalysisSession, IndexCancel, IndexParallelism, Name, PhpVersion};
+use mir_analyzer::{
+    AnalysisSession, AnalysisSnapshot, IndexCancel, IndexParallelism, Name, PhpVersion,
+    ReferenceIncludes,
+};
 
 const CALLERS: usize = 250;
 const READERS: usize = 10;
-const WRITERS: usize = 4;
 const READ_ITERS: usize = 60;
-const CALL_BUDGET: Duration = Duration::from_millis(80);
-/// Distinct paths the opener thread cycles through — kept small since past 32 files reconciliation switches to a full rebuild.
+/// Distinct paths the owner's mirror writes cycle through — kept small since past 32 files reconciliation switches to a full rebuild.
 const OPENED_FILES: usize = 8;
-/// Gap between the opener's mirror writes, far above an editor's real rate.
-const OPEN_INTERVAL: Duration = Duration::from_millis(2);
 /// Budget for the single-threaded settle guard, which is sub-second when it is not deadlocked.
 const SETTLE_BUDGET: Duration = Duration::from_secs(30);
 /// Generous upper bound for the stress test — turns a deadlock into a reported failure, not a performance gate.
@@ -58,61 +52,6 @@ impl Drop for Watchdog {
     fn drop(&mut self) {
         self.finished.store(true, Ordering::Relaxed);
     }
-}
-
-// Disabled: shares a mutating `AnalysisSession` across threads, which the
-// single-owner model forbids; needs a rewrite against a write actor.
-#[cfg(any())]
-#[test]
-fn cancelled_reanalysis_does_not_wait_behind_stub_writer_blocked_by_snapshot() {
-    let _watchdog = Watchdog::new(
-        "cancelled_reanalysis_does_not_wait_behind_stub_writer_blocked_by_snapshot",
-        STRESS_BUDGET,
-    );
-    // Keep a Salsa snapshot alive, then start stub ingestion. The writer takes
-    // the session write lock before Salsa waits for this snapshot to unwind.
-    // A reanalysis started afterwards is therefore queued at the RwLock. Its
-    // cancellation must release it even though the writer cannot proceed yet.
-    let session = Arc::new(AnalysisSession::new(PhpVersion::LATEST));
-    let file: Arc<str> = Arc::from("queued.php");
-    session.upsert_source_file(
-        file.clone(),
-        Arc::from("<?php class Queued {}\n"),
-        salsa::Durability::LOW,
-    );
-    let held_snapshot = session.snapshot_db();
-
-    let writer_session = Arc::clone(&session);
-    let writer = std::thread::spawn(move || writer_session.ensure_all_stubs());
-    // Give the writer time to acquire the outer lock and block in Salsa on
-    // `held_snapshot`. The snapshot is deliberately retained until after the
-    // reanalysis has proved it can observe cancellation.
-    std::thread::sleep(Duration::from_millis(30));
-
-    let cancel = IndexCancel::new();
-    let (done_tx, done_rx) = std::sync::mpsc::channel();
-    let reader_session = Arc::clone(&session);
-    let reader_file = file.clone();
-    let reader_cancel = cancel.clone();
-    let reader = std::thread::spawn(move || {
-        let result = reader_session.reanalyze_files_cancellable(&[reader_file], &reader_cancel);
-        done_tx.send(result).unwrap();
-    });
-
-    std::thread::sleep(Duration::from_millis(30));
-    assert!(
-        done_rx.try_recv().is_err(),
-        "reanalysis did not block behind the stub writer"
-    );
-    cancel.cancel();
-    let result = done_rx
-        .recv_timeout(Duration::from_secs(1))
-        .expect("cancelled reanalysis remained queued behind the stub writer");
-    assert!(result.is_empty());
-
-    drop(held_snapshot);
-    reader.join().unwrap();
-    writer.join().unwrap();
 }
 
 /// Reconciling the symbol index must not hold a database handle across its own merge write, or it deadlocks itself once the symbol-index singleton exists.
@@ -150,10 +89,10 @@ fn base_source(marker: usize) -> Arc<str> {
 
 fn caller_source(i: usize, marker: usize) -> Arc<str> {
     // Wide body: every method takes `Base` and calls `run()`, so each caller's
-    // `analyze_file` depends on the shared `Base` class query and re-runs when a
-    // writer invalidates `Base` — keeping the rayon pool saturated with salsa
-    // reads so the indexer's shared-handle read reliably overlaps one. `marker`
-    // varies the body so a re-index actually bumps the revision.
+    // `analyze_file` depends on the shared `Base` class query and re-runs when
+    // the owner invalidates `Base` — keeping reader queries long enough for
+    // owner writes to land mid-query. `marker` varies the body so a re-index
+    // actually bumps the revision.
     let mut body = format!("<?php\nnamespace Lib;\nclass C{i} {{\n    const M = {marker};\n");
     for m in 0..24 {
         body.push_str(&format!(
@@ -164,30 +103,59 @@ fn caller_source(i: usize, marker: usize) -> Arc<str> {
     Arc::from(body.as_str())
 }
 
-// Disabled: shares a mutating `AnalysisSession` across threads, which the
-// single-owner model forbids; needs a rewrite against a write actor.
-#[cfg(any())]
+/// A reader asking the owner for a fresh snapshot, reporting whether its
+/// previous query completed.
+struct SnapshotRequest {
+    completed_last: bool,
+    reply: mpsc::Sender<AnalysisSnapshot>,
+}
+
+fn request_snapshot(
+    owner: &mpsc::Sender<SnapshotRequest>,
+    completed_last: bool,
+) -> AnalysisSnapshot {
+    let (reply, snapshot) = mpsc::channel();
+    owner
+        .send(SnapshotRequest {
+            completed_last,
+            reply,
+        })
+        .expect("owner alive while readers run");
+    snapshot.recv().expect("owner answers every request")
+}
+
+/// Answers `request` with a snapshot of the current revision; returns
+/// whether the reader's previous query completed.
+fn serve(session: &AnalysisSession, request: SnapshotRequest) -> bool {
+    let _ = request.reply.send(session.snapshot());
+    request.completed_last
+}
+
 #[test]
-fn concurrent_writes_do_not_abort_parallel_reference_reads() {
+fn owner_writes_cancel_snapshot_readers_without_aborting() {
     let _watchdog = Watchdog::new(
-        "concurrent_writes_do_not_abort_parallel_reference_reads",
+        "owner_writes_cancel_snapshot_readers_without_aborting",
         STRESS_BUDGET,
     );
-    let session = Arc::new(AnalysisSession::new(PhpVersion::LATEST));
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
     session.ensure_all_stubs();
 
     let base_path: Arc<str> = Arc::from("Base.php");
     session.ingest_file(base_path.clone(), base_source(0));
 
-    let mut callers: Vec<Arc<str>> = Vec::with_capacity(CALLERS);
-    for i in 0..CALLERS {
-        let path = caller_path(i);
-        session.ingest_file(path.clone(), caller_source(i, 0));
-        callers.push(path);
-    }
+    let callers: Arc<[Arc<str>]> = (0..CALLERS)
+        .map(|i| {
+            let path = caller_path(i);
+            session.ingest_file(path.clone(), caller_source(i, 0));
+            path
+        })
+        .collect();
+    // Only a live singleton makes mirror writes pending, so the owner's
+    // per-round settle has reconciliation work to do.
+    session.rebuild_workspace_symbol_index();
 
-    // Two full caller batches with differing bodies; the background indexer
-    // toggles between them so each re-index bumps the revision.
+    // Two full caller batches with differing bodies; the owner toggles
+    // between them so each re-index bumps the revision.
     let batch_a: Vec<(Arc<str>, Arc<str>)> = (0..CALLERS)
         .map(|i| (caller_path(i), caller_source(i, 1)))
         .collect();
@@ -195,138 +163,122 @@ fn concurrent_writes_do_not_abort_parallel_reference_reads() {
         .map(|i| (caller_path(i), caller_source(i, 2)))
         .collect();
 
-    let symbol = Name::class("Lib\\Base");
-    let writer_stop = Arc::new(AtomicBool::new(false));
-
-    // Writers: concurrent `ingest_file` calls, each toggling its own file.
-    // `ingest_file` derives the file's defined-symbol set right after writing,
-    // and if that derivation runs the `collect_file_definitions` tracked query
-    // on the shared (non-snapshot) db handle, two writers doing it at once race
-    // the shared `ZalsaLocal` query stack — the same abort as the indexer path.
-    // Writer 0 bumps the shared `Base` (also driving revision churn for the
-    // readers); the rest each own a distinct file.
-    let writers: Vec<_> = (0..WRITERS)
-        .map(|w| {
-            let session = Arc::clone(&session);
-            let writer_stop = Arc::clone(&writer_stop);
-            let base_path = base_path.clone();
-            std::thread::spawn(move || {
-                let mut n: usize = 0;
-                while !writer_stop.load(Ordering::Relaxed) {
-                    n += 1;
-                    if w == 0 {
-                        session.ingest_file(base_path.clone(), base_source(n));
-                    } else {
-                        let path: Arc<str> = Arc::from(format!("writers/W{w}.php").as_str());
-                        // Every 50th write mints a brand-new class name so the
-                        // mention-universe epoch churns while readers fetch /
-                        // rebuild the gate scanner and commit mention sets —
-                        // the class-mention index's own concurrency hazard.
-                        let fresh = if n.is_multiple_of(50) {
-                            format!("\nclass W{w}Gen{n} {{}}\n")
-                        } else {
-                            String::new()
-                        };
-                        let src: Arc<str> = Arc::from(
-                            format!("<?php\nnamespace Lib;\nclass W{w} {{\n    public function f(): int {{ return {n}; }}\n}}\n{fresh}")
-                                .as_str(),
-                        );
-                        session.ingest_file(path, src);
-                    }
-                    std::thread::sleep(Duration::from_micros(80));
-                }
-            })
-        })
-        .collect();
-
-    // Opener: the host's `did_open` write path, kept running as background pressure for the sweep/settle deadlocks pinned by the deterministic guards.
-    let opener = {
-        let session = Arc::clone(&session);
-        let writer_stop = Arc::clone(&writer_stop);
-        std::thread::spawn(move || {
-            let mut n: usize = 0;
-            while !writer_stop.load(Ordering::Relaxed) {
-                n += 1;
-                let slot = n % OPENED_FILES;
-                let path: Arc<str> = Arc::from(format!("opened/O{slot}.php").as_str());
-                let src: Arc<str> = Arc::from(
-                    format!("<?php\nnamespace Lib;\nclass O{slot} {{ const M = {n}; }}\n").as_str(),
-                );
-                session.upsert_source_file(path, src, salsa::Durability::LOW);
-                std::thread::sleep(OPEN_INTERVAL);
-            }
-        })
-    };
-
-    // Background indexer: re-runs the parallel `index_batch` (rayon-side
-    // `collect_file_declarations`) against the readers' parallel `analyze_file`
-    // on the shared rayon pool — the frameworks-suite interleaving.
-    let indexer = {
-        let session = Arc::clone(&session);
-        let writer_stop = Arc::clone(&writer_stop);
-        std::thread::spawn(move || {
-            let mut toggle = false;
-            while !writer_stop.load(Ordering::Relaxed) {
-                let batch = if toggle { &batch_a } else { &batch_b };
-                toggle = !toggle;
-                let _ = std::panic::catch_unwind(AssertUnwindSafe(|| {
-                    session.index_batch(batch, IndexParallelism::Rayon, &IndexCancel::new());
-                }));
-            }
-        })
-    };
-
+    let (request_tx, requests) = mpsc::channel::<SnapshotRequest>();
     let readers: Vec<_> = (0..READERS)
         .map(|r| {
-            let session = Arc::clone(&session);
-            let callers = callers.clone();
-            let symbol = symbol.clone();
-            let base_path = base_path.clone();
+            let owner = request_tx.clone();
+            let callers = Arc::clone(&callers);
             std::thread::spawn(move || {
-                for _ in 0..READ_ITERS {
-                    // Each call is wrapped in `catch_unwind`: a `salsa::Cancelled`
-                    // raised by the serial warm-up phase unwinds normally and is
-                    // caught here (in production the host's panic guard does this).
-                    // The reentrancy abort we guard against is a NON-unwinding
-                    // `unreachable_unchecked` — `catch_unwind` cannot absorb it, so
-                    // if it regresses the whole test binary aborts and CI fails.
-                    // A bounded deadline keeps a sustained cancellation stream from
-                    // livelocking the Phase-2 retry loop, and drives the exact
-                    // cancellable path the LSP server uses.
-                    let deadline = Instant::now() + CALL_BUDGET;
-                    let _ = std::panic::catch_unwind(AssertUnwindSafe(|| {
-                        session.indexed_references_to(
+                let symbol = Name::method("Lib\\Base", "run");
+                let (mut completed, mut cancelled) = (0usize, 0usize);
+                let mut completed_last = false;
+                for i in 0..READ_ITERS {
+                    let snap = request_snapshot(&owner, completed_last);
+                    // Half the readers alternate with the sweep a host runs
+                    // for open files, which commits analyses from the reader
+                    // thread.
+                    let result = if r % 2 == 0 && i % 2 == 1 {
+                        snap.warm_files(&callers, &IndexCancel::new()).map(drop)
+                    } else {
+                        snap.indexed_references_to(
                             &symbol,
                             &callers,
                             false,
-                            mir_analyzer::ReferenceIncludes::Plain,
-                            &|| Instant::now() > deadline,
+                            ReferenceIncludes::Plain,
                         )
-                    }));
-                    // Every other reader also drives the incremental sweep, which
-                    // shares the same rayon-join hazard.
-                    if r % 2 == 0 {
-                        let _ = std::panic::catch_unwind(AssertUnwindSafe(|| {
-                            session.reanalyze_dependents(&base_path)
-                        }));
+                        .map(drop)
+                    };
+                    completed_last = result.is_ok();
+                    if completed_last {
+                        completed += 1;
+                    } else {
+                        cancelled += 1;
                     }
                 }
+                (completed, cancelled)
             })
         })
         .collect();
+    drop(request_tx);
 
-    for reader in readers {
-        reader.join().expect("reader thread panicked");
+    // Owner: one host write path per round. Odd rounds answer the queued
+    // requests and write again at once, cancelling readers mid-query; even
+    // rounds stay quiet until readers report `READERS` completed queries.
+    // Ends once every reader has hung up.
+    let mut round: usize = 0;
+    'owner: loop {
+        round += 1;
+        match round % 4 {
+            0 => session.ingest_file(base_path.clone(), base_source(round)),
+            1 => {
+                // Every 50th write mints a brand-new class name so the
+                // mention-universe epoch churns while readers fetch the gate
+                // scanner and commit mention sets.
+                let fresh = if round.is_multiple_of(50) {
+                    format!("\nclass WGen{round} {{}}\n")
+                } else {
+                    String::new()
+                };
+                let src = format!(
+                    "<?php\nnamespace Lib;\nclass W {{\n    public function f(): int {{ return {round}; }}\n}}\n{fresh}"
+                );
+                session.ingest_file(Arc::from("writers/W.php"), Arc::from(src.as_str()));
+            }
+            2 => {
+                let slot = round % OPENED_FILES;
+                let src =
+                    format!("<?php\nnamespace Lib;\nclass O{slot} {{ const M = {round}; }}\n");
+                session.upsert_source_file(
+                    Arc::from(format!("opened/O{slot}.php").as_str()),
+                    Arc::from(src.as_str()),
+                    salsa::Durability::LOW,
+                );
+            }
+            _ => {
+                let batch = if round % 8 == 3 { &batch_a } else { &batch_b };
+                session.index_batch(batch, IndexParallelism::Rayon, &IndexCancel::new());
+            }
+        }
+        session.prepare_for_query(None);
+        loop {
+            match requests.try_recv() {
+                Ok(request) => {
+                    serve(&session, request);
+                }
+                Err(mpsc::TryRecvError::Empty) => break,
+                Err(mpsc::TryRecvError::Disconnected) => break 'owner,
+            }
+        }
+        if round.is_multiple_of(2) {
+            let mut completions = 0;
+            while completions < READERS {
+                match requests.recv() {
+                    Ok(request) => completions += usize::from(serve(&session, request)),
+                    Err(mpsc::RecvError) => break 'owner,
+                }
+            }
+        }
     }
-    writer_stop.store(true, Ordering::Relaxed);
-    for writer in writers {
-        writer.join().expect("writer thread panicked");
-    }
-    indexer.join().expect("indexer thread panicked");
-    opener.join().expect("opener thread panicked");
 
-    // Surviving to here without a process abort is the assertion. Confirm the
-    // session is still usable after the concurrent churn.
+    let (completed, cancelled) = readers
+        .into_iter()
+        .map(|reader| reader.join().expect("reader thread panicked"))
+        .fold((0, 0), |(c, x), (rc, rx)| (c + rc, x + rx));
+    assert!(cancelled > 0, "owner writes never cancelled a reader");
+    assert!(completed > 0, "no reader query completed between writes");
     assert!(session.contains_class("Lib\\Base"));
     assert!(session.contains_class("Lib\\C0"));
+    let refs = session
+        .indexed_references_to(
+            &Name::method("Lib\\Base", "run"),
+            &callers,
+            false,
+            ReferenceIncludes::Plain,
+            &|| false,
+        )
+        .expect("not cancelled");
+    assert!(
+        !refs.is_empty(),
+        "callers' run() sites must survive the churn"
+    );
 }
