@@ -290,4 +290,6 @@ pub(crate) mod subtype_index;
 mod workspace;
 
 #[cfg(test)]
+mod query_tests;
+#[cfg(test)]
 pub mod tests;

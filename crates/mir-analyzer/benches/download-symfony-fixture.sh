@@ -21,6 +21,4 @@ git -C "$DEST" checkout --detach "$SYMFONY_COMMIT"
 
 echo ""
 echo "Done. Run the heavy Symfony integration tests with:"
-echo "  for t in crates/mir-analyzer/tests/symfony_query_*.rs; do"
-echo "    cargo test -p mir-analyzer --test \"\$(basename \"\${t%.rs}\")\" -- --ignored --nocapture"
-echo "  done"
+echo "  cargo test -p mir-analyzer --lib db::query_tests::symfony -- --ignored --nocapture --test-threads=1"

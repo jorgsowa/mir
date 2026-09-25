@@ -161,8 +161,9 @@ behavior.
 - `metrics.rs`, `tmp_suffix.rs`, `util.rs`, `symbol.rs`, `reference_key.rs`
   — shared plumbing.
 - **Tests**: parser tests in `parser/docblock/tests.rs` (including the
-  keyword-table integrity tests), `db/tests.rs`, and `test_utils.rs`
-  fixtures under `tests/` (organized `by-kind/`, e.g.
+  keyword-table integrity tests), `db/tests.rs`, `db/query_tests/`
+  (salsa queries driven directly, incl. the ignored Symfony-fixture
+  suite), and `test_utils.rs` fixtures under `tests/` (organized `by-kind/`, e.g.
   `invalid_return_type/`); regression fixtures are kept per kind so a
   failing kind maps to one directory.
 - **Guardrail**: the keyword table (§3) is the one place where docblock

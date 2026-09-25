@@ -114,12 +114,7 @@ jobs:
         shell: bash
         env:
           MIR_SYMFONY_FIXTURE: ${{ github.workspace }}/crates/mir-analyzer/benches/fixtures/symfony
-        run: |
-          set -euo pipefail
-          for t in crates/mir-analyzer/tests/symfony_query_*.rs; do
-            name="$(basename "${t%.rs}")"
-            cargo test -p mir-analyzer --test "$name" -- --ignored --nocapture
-          done
+        run: cargo test -p mir-analyzer --lib db::query_tests::symfony -- --ignored --nocapture --test-threads=1
 
       - name: Build mir
         run: cargo build --release -p mir-php

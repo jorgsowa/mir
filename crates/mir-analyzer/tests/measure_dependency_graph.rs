@@ -44,14 +44,12 @@ fn measure_dependency_graph() {
     let _ = session.analyze_paths(&project_files, &BatchOptions::new().without_symbols());
     session.rebuild_workspace_symbol_index();
 
-    let db = session.snapshot_db();
-    let mut files: Vec<String> = db
-        .source_file_paths()
+    let mut files: Vec<String> = vendor_files
         .iter()
-        .map(|file| file.as_ref().to_string())
+        .chain(&project_files)
+        .map(|path| path.to_string_lossy().into_owned())
         .collect();
     files.sort();
-    drop(db);
 
     eprintln!(
         "[measure_dependency_graph] files={} (vendor={} project={})",
