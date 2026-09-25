@@ -1714,11 +1714,4 @@ impl MirDbStorage {
     pub fn source_file_paths(&self) -> Vec<Arc<str>> {
         self.source_files.keys().cloned().collect()
     }
-
-    /// Reset `file`'s reference-location index before re-analysis. Name
-    /// data itself is derived lazily from `collect_file_definitions` and
-    /// doesn't need explicit clearing.
-    pub fn remove_file_definitions(&mut self, file: &str) {
-        self.clear_file_references(file);
-    }
 }

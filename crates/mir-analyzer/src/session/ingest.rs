@@ -231,18 +231,20 @@ impl AnalysisSession {
             .cloned()
             .unwrap_or_default();
 
-        {
-            let guard = &mut self.db.salsa;
-            guard.remove_file_definitions(file.as_ref());
-        }
+        // Postings for the new text are recomputed lazily; retiring also
+        // refuses commits from snapshots still analyzing the old text.
+        self.index.retire_references(&self.db.salsa, file.as_ref());
         let file_defs =
             self.db
                 .collect_and_ingest_file(file.clone(), source.as_ref(), self.php_version);
-        let new_decls = {
+        let (new_decls, stored_text) = {
             let sf = self
                 .lookup_source_file(file.as_ref())
                 .expect("collect_and_ingest_file must register SourceFile");
-            crate::db::decls_from_slice(&file_defs.slice, sf)
+            (
+                crate::db::decls_from_slice(&file_defs.slice, sf),
+                sf.text(&self.db.salsa).clone(),
+            )
         };
 
         // Derive this file's defined symbols from the `FileDefinitions` just
@@ -335,10 +337,7 @@ impl AnalysisSession {
             }
         }
 
-        // Keep the inverted indexes in step with the edit. Class edges come
-        // straight from the definitions just collected; reference postings
-        // for the new text are recomputed lazily (analysis has not run yet),
-        // so the file's freshness mark is dropped rather than updated.
+        // Class edges come straight from the definitions just collected.
         {
             let entries = crate::db::subtype_index::entries_from_slice(&file_defs.slice);
             let guard = &self.db.salsa;
@@ -347,11 +346,7 @@ impl AnalysisSession {
         }
         // Freshness is keyed on the Arc actually stored on the input (the
         // upsert keeps the prior Arc when content is equal), so read it back.
-        self.index.mark_defs_committed(&file, &source);
-        // `remove_file_definitions` above cleared the file's postings, so the
-        // freshness mark must drop unconditionally — even for unchanged text —
-        // or a query would trust the now-empty posting lists.
-        self.index.forget_ref_committed(file.as_ref());
+        self.index.mark_defs_committed(&file, &stored_text);
     }
 
     /// [`Self::ingest_file`] followed by the file's Phase-1 warm-up
@@ -1134,14 +1129,8 @@ impl AnalysisSession {
     pub fn invalidate_file(&mut self, file: &str) {
         self.index.clear_transient_batch_replay();
         self.index.clear_dependency_graph_cache();
-        {
-            let guard = &mut self.db.salsa;
-            guard.remove_file_definitions(file);
-            guard.remove_source_file(file);
-            guard.clear_file_class_edges(file);
-        }
-        self.index.forget_ref_committed(file);
-        self.index.forget_defs_committed(file);
+        self.index.retire_file(&self.db.salsa, file);
+        self.db.salsa.remove_source_file(file);
         // Outgoing structural edges disappear from the derived graph
         // automatically: the file is no longer in `source_file_paths()`, so
         // `dependency_graph()` stops iterating it.

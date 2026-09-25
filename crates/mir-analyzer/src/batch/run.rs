@@ -610,10 +610,7 @@ impl AnalysisSession {
 
         let file: Arc<str> = Arc::from(file_path);
 
-        {
-            let guard = &mut self.db.salsa;
-            guard.remove_file_definitions(file_path);
-        }
+        self.index.retire_references(&self.db.salsa, file_path);
 
         let collected =
             self.db

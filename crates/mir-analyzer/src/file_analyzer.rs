@@ -501,7 +501,7 @@ impl AnalysisSnapshot {
         source_map: &SourceMap,
         collect_symbols: bool,
     ) -> Result<FileAnalysis, salsa::Cancelled> {
-        salsa::Cancelled::catch(std::panic::AssertUnwindSafe(|| {
+        let (analysis, db, text) = salsa::Cancelled::catch(std::panic::AssertUnwindSafe(|| {
             crate::metrics::record_file_analysis();
             let _scope = crate::metrics::BodyAnalysisScope::new();
             // A pass-local clone: its pending reference locations start empty
@@ -516,19 +516,20 @@ impl AnalysisSnapshot {
             driver.collect_symbols = collect_symbols;
             let (issues, symbols) =
                 driver.analyze_bodies(program, file.clone(), source, source_map);
-            // Replace (not append): this pass produced the file's complete
-            // reference set.
-            let resolved = !crate::db::issues_have_unresolved_names(&issues);
-            self.index().commit_file_refs(
-                &db,
-                &file,
-                text,
-                db.take_pending_ref_locs(),
-                self.index_generation(),
-                resolved,
-            );
-            FileAnalysis { issues, symbols }
-        }))
+            (FileAnalysis { issues, symbols }, db, text)
+        }))?;
+        // Replace (not append): this pass produced the file's complete
+        // reference set.
+        let resolved = !crate::db::issues_have_unresolved_names(&analysis.issues);
+        self.index().commit_file_refs(
+            &db,
+            &file,
+            text,
+            db.take_pending_ref_locs(),
+            resolved,
+            self.stamp(),
+        )?;
+        Ok(analysis)
     }
 
     /// The symbol at `byte_offset` in `file`, found by analyzing only the

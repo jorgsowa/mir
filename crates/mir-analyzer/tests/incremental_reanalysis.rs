@@ -246,8 +246,7 @@ fn re_analyze_file_without_symbols_skips_symbol_retention() {
 /// After re_analyze_file, file_imports and file_namespaces must be restored so
 /// that use-alias resolution still works on the re-analyzed file.
 ///
-/// Mechanism: re_analyze_file calls remove_file_definitions, which clears both
-/// maps for the re-analyzed file, then calls DefinitionCollector::collect →
+/// Mechanism: re_analyze_file calls DefinitionCollector::collect →
 /// inject_stub_slice. inject_stub_slice is now the sole write path that
 /// repopulates file_namespaces and file_imports (via StubSlice::namespace and
 /// StubSlice::imports). If either field is missing from the slice, the maps stay

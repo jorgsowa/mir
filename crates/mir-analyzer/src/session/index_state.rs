@@ -11,7 +11,9 @@ use rustc_hash::FxHashMap as HashMap;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use parking_lot::RwLock;
+use parking_lot::{Mutex, MutexGuard, RwLock};
+
+use salsa::Cancelled;
 
 use crate::cache::AnalysisCache;
 use crate::db::{MirDatabase, MirDbStorage};
@@ -48,6 +50,49 @@ pub(crate) struct IndexState {
     /// the same file set with identical bytes. Any mutation outside
     /// `analyze_paths` clears it.
     transient_batch_replay: RwLock<Option<Arc<BatchReplayState>>>,
+    /// Serializes every snapshot-side index commit against
+    /// [`Self::retire_references`] / [`Self::retire_file`], so a commit's
+    /// check → postings → mark sequence never interleaves with a retire.
+    retirements: Mutex<Retirements>,
+}
+
+/// Owner-side retirements of per-file index state, ordered by a sequence
+/// number a snapshot captures as its [`RetireEpoch`].
+#[derive(Default)]
+struct Retirements {
+    seq: u64,
+    /// file → `seq` of its latest retirement; one entry per path ever
+    /// retired, so bounded by the workspace.
+    retired_at: HashMap<Arc<str>, u64>,
+}
+
+/// The retirement sequence a snapshot's view reflects. Commits for a file
+/// retired after it are refused: the snapshot analyzed text the owner has
+/// since replaced or removed.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct RetireEpoch(u64);
+
+/// The owner state a snapshot's analyses reflect, stamped on its commits.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct ViewStamp {
+    /// Workspace generation, captured before the analysis snapshot.
+    pub(crate) generation: u64,
+    pub(crate) retire_epoch: RetireEpoch,
+}
+
+/// Held while committing one file; see [`IndexState::begin_commit`].
+pub(crate) struct CommitGuard<'a>(MutexGuard<'a, Retirements>);
+
+impl CommitGuard<'_> {
+    /// `Err` when `file` was retired after `epoch`: the view analyzed text
+    /// the owner has since replaced or removed, and an owner write is under
+    /// way, so the caller retries like any other cancellation.
+    pub(crate) fn admit(&self, file: &str, epoch: RetireEpoch) -> Result<(), Cancelled> {
+        match self.0.retired_at.get(file) {
+            Some(&at) if at > epoch.0 => Err(Cancelled::PendingWrite),
+            _ => Ok(()),
+        }
+    }
 }
 
 impl Default for IndexState {
@@ -59,6 +104,7 @@ impl Default for IndexState {
             subtype_queries: QueryMemo::new(SUBTYPE_QUERY_CACHE_SITE_CAP),
             dependency_graph: RwLock::default(),
             transient_batch_replay: RwLock::default(),
+            retirements: Mutex::default(),
         }
     }
 }
@@ -90,6 +136,45 @@ struct RefCommit {
 }
 
 impl IndexState {
+    /// The current [`RetireEpoch`]. Captured by the owner when it hands out a
+    /// snapshot, while no retire can race it.
+    pub(crate) fn retire_epoch(&self) -> RetireEpoch {
+        RetireEpoch(self.retirements.lock().seq)
+    }
+
+    /// Lock out retirements for the duration of one commit. Callers check
+    /// [`CommitGuard::admit`] first, then write postings before marks.
+    pub(crate) fn begin_commit(&self) -> CommitGuard<'_> {
+        CommitGuard(self.retirements.lock())
+    }
+
+    /// Drop `file`'s reference postings and their freshness mark as one step
+    /// and refuse later commits from snapshots that predate it. The mark goes
+    /// first: a concurrent reader may see postings without a mark (re-verified
+    /// through the gate) but never a mark over cleared postings.
+    pub(crate) fn retire_references(&self, db: &MirDbStorage, file: &str) {
+        let mut retirements = self.retirements.lock();
+        Self::record_retirement(&mut retirements, file);
+        self.forget_ref_committed(file);
+        db.clear_file_references(file);
+    }
+
+    /// [`Self::retire_references`] plus the file's subtype-index class edges.
+    pub(crate) fn retire_file(&self, db: &MirDbStorage, file: &str) {
+        let mut retirements = self.retirements.lock();
+        Self::record_retirement(&mut retirements, file);
+        self.forget_ref_committed(file);
+        db.clear_file_references(file);
+        self.forget_defs_committed(file);
+        db.clear_file_class_edges(file);
+    }
+
+    fn record_retirement(retirements: &mut Retirements, file: &str) {
+        retirements.seq += 1;
+        let seq = retirements.seq;
+        retirements.retired_at.insert(Arc::from(file), seq);
+    }
+
     /// Whether `file`'s reference postings are exact for `current_text` at
     /// `current_gen`: text pointer-equal, and the commit either resolved
     /// every name (immune to workspace growth) or was stamped at that
@@ -225,24 +310,27 @@ impl IndexState {
 
     /// Replace `file`'s postings with a complete reference set produced
     /// outside the memoized `analyze_file` query (the open-file analysis
-    /// path). No memo to record, so the empty weak handle makes the next
-    /// sweep recommit once — the safe direction.
+    /// path) by the view at `stamp`. No memo to record, so the empty weak
+    /// handle makes the next sweep recommit once — the safe direction.
     pub(crate) fn commit_file_refs(
         &self,
         db: &MirDbStorage,
         file: &Arc<str>,
         text: Option<Arc<str>>,
         locs: Vec<crate::db::RefLoc>,
-        generation: u64,
         resolved: bool,
-    ) {
+        stamp: ViewStamp,
+    ) -> Result<(), Cancelled> {
+        let commit = self.begin_commit();
+        commit.admit(file, stamp.retire_epoch)?;
         self.clear_transient_batch_replay();
         let file_no = db.locked_ref_index().intern_path(file);
         db.set_file_reference_locations(file_no, locs);
         self.clear_dependency_graph_cache();
         if let Some(text) = text {
-            self.mark_ref_committed(file, &text, None, generation, resolved);
+            self.mark_ref_committed(file, &text, None, stamp.generation, resolved);
         }
+        Ok(())
     }
 
     /// Analyze `path` via the memoized `analyze_file` query and stage
@@ -285,18 +373,26 @@ impl IndexState {
     /// Serial commit of staged analyses into both inverted indexes and their
     /// freshness marks. Each output is the file's complete reference set, so
     /// postings are replaced, not appended; unchanged files (same text, same
-    /// memo) skip the rewrite and only re-stamp the mark. Returns whether
-    /// any dependency-graph-shaped state changed.
+    /// memo) skip the rewrite and only re-stamp the mark.
+    ///
+    /// `Err` when a file was retired after `stamp`; every other file is still
+    /// committed.
     pub(crate) fn commit_analyzed(
         &self,
         db: &MirDbStorage,
         cache: Option<&AnalysisCache>,
         mention_scanner: Option<&crate::db::class_mention_index::MentionScanner>,
         analyzed: &mut [AnalyzedFile],
-        commit_gen: u64,
-    ) -> bool {
+        stamp: ViewStamp,
+    ) -> Result<(), Cancelled> {
         let mut dependency_graph_changed = false;
+        let mut refused = Ok(());
         for a in analyzed.iter_mut() {
+            let commit = self.begin_commit();
+            if let Err(cancelled) = commit.admit(&a.file, stamp.retire_epoch) {
+                refused = Err(cancelled);
+                continue;
+            }
             if !self.ref_commit_is_current(a.file.as_ref(), &a.text, &a.out) {
                 let file_no = db.locked_ref_index().intern_path(&a.file);
                 db.set_file_reference_locations(file_no, a.out.ref_locs.to_vec());
@@ -318,7 +414,7 @@ impl IndexState {
                 &a.file,
                 &a.text,
                 Some(&a.out),
-                commit_gen,
+                stamp.generation,
                 !a.out.has_unresolved_names(),
             );
             if !self.is_defs_committed(a.file.as_ref(), &a.text) {
@@ -327,8 +423,30 @@ impl IndexState {
                 self.mark_defs_committed(&a.file, &a.text);
                 dependency_graph_changed = true;
             }
+            drop(commit);
         }
-        dependency_graph_changed
+        if dependency_graph_changed {
+            self.clear_dependency_graph_cache();
+        }
+        refused
+    }
+
+    /// Commit class edges a view at `epoch` computed from `text`; `Err`
+    /// when the file was retired since.
+    pub(crate) fn commit_class_edges(
+        &self,
+        db: &MirDbStorage,
+        file: &Arc<str>,
+        text: &Arc<str>,
+        entries: Vec<crate::db::SubtypeEntry>,
+        epoch: RetireEpoch,
+    ) -> Result<(), Cancelled> {
+        let commit = self.begin_commit();
+        commit.admit(file, epoch)?;
+        let file_no = db.locked_ref_index().intern_path(file);
+        db.set_file_class_edges(file_no, entries);
+        self.mark_defs_committed(file, text);
+        Ok(())
     }
 }
 

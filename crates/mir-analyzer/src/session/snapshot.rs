@@ -5,7 +5,8 @@ use rustc_hash::FxHashSet as HashSet;
 use salsa::Cancelled;
 
 use super::index_state::{
-    hash_files, AnalyzedFile, IndexState, RefQueryCacheKey, SubtypeQueryCacheKey,
+    hash_files, AnalyzedFile, IndexState, RefQueryCacheKey, RetireEpoch, SubtypeQueryCacheKey,
+    ViewStamp,
 };
 use super::queries::{identifier_char_col, span_range, ReferenceGate};
 use super::SubtypeClassSite;
@@ -37,6 +38,9 @@ pub struct AnalysisSnapshot {
     /// [`Self::index_generation`] captured when the owner created the
     /// snapshot, while no write could race it.
     pub(super) index_generation: u64,
+    /// Retirements this snapshot's view already reflects; commits for files
+    /// retired later are refused.
+    pub(super) retire_epoch: RetireEpoch,
 }
 
 const _: () = {
@@ -94,6 +98,11 @@ pub(super) fn catch<T>(f: impl FnOnce() -> T) -> Result<T, Cancelled> {
     Cancelled::catch(AssertUnwindSafe(f))
 }
 
+/// Raise `cancelled` the way salsa does, for code already inside [`catch`].
+fn unwind(cancelled: Cancelled) -> ! {
+    std::panic::resume_unwind(Box::new(cancelled))
+}
+
 impl AnalysisSnapshot {
     /// The salsa database this snapshot reads.
     ///
@@ -116,6 +125,13 @@ impl AnalysisSnapshot {
 
     pub(crate) fn index(&self) -> &IndexState {
         &self.index
+    }
+
+    pub(crate) fn stamp(&self) -> ViewStamp {
+        ViewStamp {
+            generation: self.index_generation,
+            retire_epoch: self.retire_epoch,
+        }
     }
 
     pub fn php_version(&self) -> PhpVersion {
@@ -606,7 +622,7 @@ impl AnalysisSnapshot {
         let Some(mut pass) = self.stage_warm(files, cancel)? else {
             return Ok(None);
         };
-        self.commit_warm(&mut pass);
+        self.commit_warm(&mut pass)?;
         Ok(Some(pass.analyzed))
     }
 
@@ -645,16 +661,14 @@ impl AnalysisSnapshot {
 
     /// Marks record the exact text Arc each file was analyzed against, so an
     /// owner text write racing the pass leaves the file stale, never fresh.
-    fn commit_warm(&self, pass: &mut WarmPass) {
-        if self.index.commit_analyzed(
+    fn commit_warm(&self, pass: &mut WarmPass) -> Result<(), Cancelled> {
+        self.index.commit_analyzed(
             &self.db,
             self.cache.as_deref(),
             pass.mention_scanner.as_deref(),
             &mut pass.analyzed,
-            self.index_generation,
-        ) {
-            self.index.clear_dependency_graph_cache();
-        }
+            self.stamp(),
+        )
     }
 
     /// Posting lookup for `symbol`, filtered to the candidate scope.
@@ -1121,6 +1135,9 @@ impl AnalysisSnapshot {
     /// scanned by either consumer answers the other with a set lookup. A file
     /// the cache can't answer for is scanned once against the whole name
     /// universe and recorded.
+    ///
+    /// Unwinds with [`Cancelled`] when a file was retired after this
+    /// snapshot, once every other file is committed.
     fn commit_defs_for_matching(&self, files: &[Arc<str>], shorts: &[String]) {
         use rayon::prelude::*;
 
@@ -1192,16 +1209,26 @@ impl AnalysisSnapshot {
         // Record the fallback scans regardless of hit/miss: each is a
         // complete, current mention set for its file, so the next round's
         // (and the references gate's) checks become set lookups.
+        let mut refused = Ok(());
         for (work, scan_rec) in results {
             if let (Some(scanner), Some((file, text, names))) = (&mention_scanner, scan_rec) {
                 self.db
                     .set_file_class_mentions(&file, &text, scanner.epoch(), names);
             }
             if let Some((file, text, entries)) = work {
-                let file_no = self.db.locked_ref_index().intern_path(&file);
-                self.db.set_file_class_edges(file_no, entries);
-                self.index.mark_defs_committed(&file, &text);
+                if let Err(cancelled) = self.index.commit_class_edges(
+                    &self.db,
+                    &file,
+                    &text,
+                    entries,
+                    self.retire_epoch,
+                ) {
+                    refused = Err(cancelled);
+                }
             }
+        }
+        if let Err(cancelled) = refused {
+            unwind(cancelled);
         }
     }
 
@@ -1281,12 +1308,7 @@ mod tests {
     /// fresh for the incoming text.
     #[test]
     fn warm_commit_racing_a_text_write_leaves_the_file_stale() {
-        let mut session = AnalysisSession::new(PhpVersion::LATEST);
-        let files: Vec<Arc<str>> = vec![Arc::from("base.php"), Arc::from("caller.php")];
-        session.ingest_file(files[0].clone(), Arc::from(BASE));
-        session.ingest_file(files[1].clone(), Arc::from(CALLS_RUN));
-        session.prepare_for_query(Some(&files[1]));
-
+        let (mut session, files) = prepared_workspace(CALLS_RUN);
         let snap = session.snapshot();
         let mut pass = snap
             .stage_warm(&files[1..], &IndexCancel::new())
@@ -1299,35 +1321,78 @@ mod tests {
             session
         });
         await_pending_write(&snap);
-        snap.commit_warm(&mut pass);
+        snap.commit_warm(&mut pass).unwrap();
         drop(snap);
         let mut session = writer.join().unwrap();
 
-        let callers_of = |session: &mut AnalysisSession, method: &str| -> Vec<Arc<str>> {
+        assert_eq!(callers_of(&mut session, &files, "stop"), [files[1].clone()]);
+        assert!(callers_of(&mut session, &files, "run").is_empty());
+    }
+
+    #[test]
+    fn warm_commit_after_an_ingest_retired_the_file_is_refused() {
+        let (session, files) = prepared_workspace(CALLS_RUN);
+        let snap = session.snapshot();
+        let mut pass = snap
+            .stage_warm(&files[1..], &IndexCancel::new())
+            .unwrap()
+            .unwrap();
+
+        let caller = files[1].clone();
+        let writer = std::thread::spawn(move || {
+            let mut session = session;
+            session.ingest_file(caller, Arc::from(CALLS_STOP));
             session
-                .indexed_references_to(
-                    &Name::method("Base", method),
-                    &files,
-                    false,
-                    ReferenceIncludes::Plain,
-                    &|| false,
-                )
-                .unwrap()
-                .into_iter()
-                .map(|(file, _)| file)
-                .collect()
-        };
-        assert_eq!(callers_of(&mut session, "stop"), [files[1].clone()]);
-        assert!(callers_of(&mut session, "run").is_empty());
+        });
+        await_pending_write(&snap);
+        assert!(snap.commit_warm(&mut pass).is_err());
+        drop(snap);
+        let mut session = writer.join().unwrap();
+
+        assert!(callers_of(&mut session, &files, "run").is_empty());
+        assert_eq!(callers_of(&mut session, &files, "stop"), [files[1].clone()]);
+    }
+
+    #[test]
+    fn commits_after_invalidate_file_retired_the_file_are_refused() {
+        const CHILD_CALLS_RUN: &str =
+            "<?php\nclass Child extends Base {}\nfunction go(Base $b): void { $b->run(); }\n";
+        let (session, files) = prepared_workspace(CHILD_CALLS_RUN);
+        let snap = session.snapshot();
+        let mut pass = snap
+            .stage_warm(&files[1..], &IndexCancel::new())
+            .unwrap()
+            .unwrap();
+        let parsed = php_rs_parser::parse(CHILD_CALLS_RUN);
+
+        let caller = files[1].clone();
+        let writer = std::thread::spawn(move || {
+            let mut session = session;
+            session.invalidate_file(&caller);
+            session
+        });
+        await_pending_write(&snap);
+        assert!(snap.commit_warm(&mut pass).is_err());
+        assert!(snap
+            .analyze(
+                files[1].clone(),
+                CHILD_CALLS_RUN,
+                &parsed.program,
+                &parsed.source_map
+            )
+            .is_err());
+        drop(snap);
+        let mut session = writer.join().unwrap();
+
+        assert!(callers_of(&mut session, &files, "run").is_empty());
+        assert!(session
+            .indexed_subtype_classes("Base", &files, false)
+            .is_empty());
     }
 
     #[test]
     fn cancelled_reference_commit_reports_cancellation() {
-        let mut session = AnalysisSession::new(PhpVersion::LATEST);
-        let files: Vec<Arc<str>> = vec![Arc::from("base.php"), Arc::from("caller.php")];
-        session.ingest_file(files[0].clone(), Arc::from(BASE));
-        session.ingest_file(files[1].clone(), Arc::from(CALLS_RUN));
-        session.prepare_for_query(Some(&files[1]));
+        let (mut session, files) = prepared_workspace(CALLS_RUN);
         let snap = session.snapshot();
         let stale = snap.stale_reference_candidates(&Name::method("Base", "run"), &files);
         assert!(stale.contains(&files[1]));
@@ -1343,11 +1408,39 @@ mod tests {
         writer.join().unwrap();
     }
 
+    fn prepared_workspace(caller_text: &str) -> (AnalysisSession, Vec<Arc<str>>) {
+        let mut session = AnalysisSession::new(PhpVersion::LATEST);
+        let files: Vec<Arc<str>> = vec![Arc::from("base.php"), Arc::from("caller.php")];
+        session.ingest_file(files[0].clone(), Arc::from(BASE));
+        session.ingest_file(files[1].clone(), Arc::from(caller_text));
+        session.prepare_for_query(Some(&files[1]));
+        (session, files)
+    }
+
     /// Spins until an owner write has tripped cancellation; the writer then
     /// waits for `snap` to drop before applying.
     fn await_pending_write(snap: &AnalysisSnapshot) {
         while catch(|| snap.db.unwind_if_revision_cancelled()).is_ok() {
             std::thread::yield_now();
         }
+    }
+
+    fn callers_of(
+        session: &mut AnalysisSession,
+        files: &[Arc<str>],
+        method: &str,
+    ) -> Vec<Arc<str>> {
+        session
+            .indexed_references_to(
+                &Name::method("Base", method),
+                files,
+                false,
+                ReferenceIncludes::Plain,
+                &|| false,
+            )
+            .unwrap()
+            .into_iter()
+            .map(|(file, _)| file)
+            .collect()
     }
 }

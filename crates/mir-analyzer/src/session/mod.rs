@@ -218,6 +218,7 @@ impl AnalysisSession {
             cache: self.cache.clone(),
             php_version: self.php_version,
             index_generation: self.index_generation(),
+            retire_epoch: self.index.retire_epoch(),
         }
     }
 
