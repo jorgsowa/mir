@@ -354,8 +354,7 @@ mod run;
 /// and single-file LSP mode. Allocates a throwaway db; doesn't touch any
 /// existing session.
 ///
-/// This preserves the historical default of collecting per-expression
-/// symbols. Issue-only or type-env-only callers should prefer
+/// Collects per-expression symbols. Issue-only or type-env-only callers should prefer
 /// [`analyze_source_with_options`] with [`BatchOptions::without_symbols`].
 pub fn analyze_source(source: &str) -> AnalysisResult {
     analyze_source_with_options(source, &BatchOptions::new())
@@ -696,7 +695,7 @@ pub struct AnalysisResult {
     #[doc(hidden)]
     pub type_envs: rustc_hash::FxHashMap<crate::type_env::ScopeId, crate::type_env::TypeEnv>,
     /// Per-expression resolved symbols from body analysis in analyzer emission
-    /// order. File indexing is built lazily for the legacy [`Self::symbol_at`]
+    /// order. File indexing is built lazily for the [`Self::symbol_at`]
     /// helper so issue-only consumers do not pay the setup cost.
     pub symbols: Vec<crate::symbol::ResolvedSymbol>,
     /// Maps each file path to the symbol indices belonging to it. Built on

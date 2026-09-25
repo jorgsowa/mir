@@ -752,7 +752,7 @@ fn run_analyzer(files: &[(&str, &str)], config: &FixtureConfig) -> Vec<Issue> {
     // such fixtures. Reuse a pooled base session (stub index already
     // materialized) and reset it afterwards by invalidating the fixture's files,
     // amortizing the one-time stub-index build. Fixtures with custom stubs or a
-    // composer map get a fresh, isolated session as before.
+    // composer map get a fresh, isolated session.
     let reusable =
         stub_files.is_empty() && stub_dirs.is_empty() && !has_composer && session_pool_enabled();
 

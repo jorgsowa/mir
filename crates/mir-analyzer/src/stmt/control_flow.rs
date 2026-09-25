@@ -36,10 +36,7 @@ impl<'a> StatementsAnalyzer<'a> {
         // `if` AND every earlier elseif's condition already ran and were
         // falsy, so an assignment made in any of those conditions (`if ($a =
         // tryA()) {} elseif ($b = tryB()) {} elseif ($a || $b) {}`) must stay
-        // visible. Previously each iteration re-branched from the original
-        // `ctx` and only ever re-narrowed the PRIMARY if's condition,
-        // discarding every earlier elseif's condition (both its assignments
-        // and its narrowing) outright.
+        // visible, along with each earlier condition's narrowing.
         let mut running_ctx = ctx.branch();
         // For `if ($x = expr())`, on the false edge the assignment was evaluated
         // and found falsy — the write is consumed by the truthiness check. Remove
@@ -357,7 +354,7 @@ impl<'a> StatementsAnalyzer<'a> {
                 entry.set_var(&var_name, key_ty.clone());
                 // `foreach ($_GET as $k => $v)`: the key is attacker-controlled
                 // exactly as much as the value (a reflected-XSS vector via GET
-                // param NAMES) — only the value binding below was ever tainted.
+                // param NAMES).
                 if iterable_tainted {
                     entry.taint_var(&var_name);
                 }

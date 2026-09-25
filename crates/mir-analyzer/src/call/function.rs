@@ -682,8 +682,7 @@ impl CallAnalyzer {
             // Taint sink check: emit the matching Tainted* issue when a
             // tainted value reaches a @taint-sink annotated parameter.
             // Mirrors call/method.rs's identical check for method/
-            // static-method calls — a plain function previously had no
-            // equivalent at all, so `@taint-sink` on one was a silent no-op.
+            // static-method calls.
             if !taint_sink_params.is_empty() {
                 for (param_name, sink_kind) in &taint_sink_params {
                     let param_idx = params
@@ -945,11 +944,9 @@ impl CallAnalyzer {
                             if let ExprKind::Variable(name) = &value.kind {
                                 let var_name = name.as_ref().trim_start_matches('$');
                                 // A plain-variable by-ref argument (`sort($items)`)
-                                // mutates it exactly as much as an explicit write
-                                // would — this branch used to go straight to
-                                // `ctx.set_var` without ever routing through the
-                                // purity check the `else` (non-variable) branch
-                                // below already gets.
+                                // mutates it exactly as an explicit write would,
+                                // so it gets the same purity check as the
+                                // non-variable branch below.
                                 ea.check_var_write_purity(var_name, ctx, value.span);
                                 ctx.set_var(var_name, output_ty.clone());
                                 if any_arg_tainted {

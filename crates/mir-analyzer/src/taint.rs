@@ -1,4 +1,4 @@
-/// Taint analysis helpers (M19).
+/// Taint analysis helpers.
 ///
 /// A value is "tainted" when it originates from user-controlled superglobals
 /// (`$_GET`, `$_POST`, `$_REQUEST`, `$_COOKIE`, `$_FILES`, `$_SERVER`, `$_ENV`).
@@ -209,9 +209,7 @@ pub fn is_expr_tainted(
         }
 
         // `$$name` where `$name` holds a known literal string resolves to
-        // that variable's own taint state — previously always untainted
-        // (no arm at all), even when the accessed variable name was fully
-        // known and itself tainted.
+        // that variable's own taint state.
         ExprKind::VariableVariable(inner) => {
             if let Some(var_name) = crate::expr::helpers::extract_simple_var(inner) {
                 let inner_ty = ctx.get_var(&var_name);

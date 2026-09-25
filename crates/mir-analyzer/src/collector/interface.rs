@@ -37,8 +37,7 @@ impl<'a> DefinitionCollector<'a> {
         // Hoisted above the `@template` bound/default resolution below so a
         // same-file `@psalm-type` alias used in a bound/default (`@template T
         // of Numeric`) is expanded before resolution — `class.rs`'s own
-        // template-param construction already does this, this collector
-        // previously built its aliases too late to ever use them here.
+        // template-param construction does the same.
         let type_aliases = self.build_type_aliases(&iface_doc);
 
         let iface_template_names: rustc_hash::FxHashSet<String> = iface_doc

@@ -900,8 +900,7 @@ pub(super) fn resolve_int_mask_of(inner: &str) -> Option<Type> {
 /// boundary: `prefix` must be pure ASCII, and the comparison runs byte-for-
 /// byte, so a multi-byte character in `s` can never spuriously "match" it the
 /// way `s.to_lowercase().starts_with(prefix)` could if lowercasing changed a
-/// character's byte length (the historical bug behind
-/// `docblock_unicode_type_no_panic.phpt`).
+/// character's byte length (see `docblock_unicode_type_no_panic.phpt`).
 pub(super) fn strip_ascii_ci_prefix<'a>(s: &'a str, prefix: &str) -> Option<&'a str> {
     let bytes = s.as_bytes();
     (bytes.len() >= prefix.len() && bytes[..prefix.len()].eq_ignore_ascii_case(prefix.as_bytes()))

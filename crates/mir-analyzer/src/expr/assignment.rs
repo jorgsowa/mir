@@ -35,12 +35,9 @@ pub(crate) fn taint_destructured_targets(target: &Expr, ctx: &mut FlowState) {
 
 /// Resolve a `self::$prop`/`static::$prop`/`parent::$prop`/`Foo::$prop`
 /// static-property target to its owning FQCN + bare property name — shared
-/// resolution logic reused by every write/taint call site below instead of
-/// each reimplementing it inline. A variable class-string receiver
-/// (`$cls::$prop`, where `$cls` holds a `class-string<Foo>`-typed value)
-/// used to fall straight to `None` here (only a literal class-name
-/// `Identifier` was matched), silently bypassing purity/readonly/taint
-/// tracking for every one of this function's callers at once.
+/// resolution logic reused by every write/taint call site below. Resolves a
+/// variable class-string receiver (`$cls::$prop`, where `$cls` holds a
+/// `class-string<Foo>`-typed value) as well as a literal class name.
 pub(crate) fn resolve_static_prop_target(
     spa: &php_ast::owned::StaticAccessExpr,
     ctx: &FlowState,
@@ -842,8 +839,8 @@ impl<'a> ExpressionAnalyzer<'a> {
     /// `++`/`--`, `unset()`, and an array-index write through a property
     /// base (`$this->items[] = x`) never go through `assign_to_target`'s own
     /// `PropertyAccess` arm, which is the ONLY place a plain `=`/compound-op
-    /// write's readonly violation is caught — so all three silently bypassed
-    /// `@readonly` enforcement entirely. Walks a chained receiver
+    /// write's readonly violation is caught, so they enforce `@readonly`
+    /// here. Walks a chained receiver
     /// (`$this->cache->v`) via `resolve_chained_receiver_type`, mirroring
     /// `check_property_write_purity`'s own chain-walk — a fresh
     /// `self.analyze(&pa.object, ...)` here would re-run (and double-report)
@@ -946,8 +943,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             // this function for a plain by-ref PARAMETER or superglobal
             // (`++`/`--` and `foreach (&$v)`, both routed here by their own
             // call sites, plus a direct by-ref call argument like
-            // `sort($items)`) — previously unchecked entirely, unlike the
-            // property/static-property arms above.
+            // `sort($items)`), like the property/static-property arms above.
             ExprKind::Variable(name) => {
                 self.check_var_write_purity(name.trim_start_matches('$'), ctx, span);
             }
@@ -1182,10 +1178,9 @@ impl<'a> ExpressionAnalyzer<'a> {
                         span,
                     );
                 }
-                // Without this, hover/go-to-definition on the variable name worked on
-                // the read side (analyze_variable) but not on a plain-assignment write
-                // target ($x = ... / list()/array-destructuring targets), unlike the
-                // already-fixed property write case just below.
+                // Lets hover/go-to-definition work on a plain-assignment write
+                // target ($x = ... / list()/array-destructuring targets), as on
+                // the read side (analyze_variable) and the property write below.
                 self.record_symbol(
                     target.span,
                     crate::symbol::ReferenceKind::Variable(std::sync::Arc::from(name_str.as_str())),
@@ -1338,24 +1333,20 @@ impl<'a> ExpressionAnalyzer<'a> {
                         })
                         .unwrap_or_else(Type::mixed);
                     // Each destructured target gets its OWN span, not the
-                    // outer destructuring statement's span — `[$this->x,
-                    // $this->y] = $vals;` previously passed the same `span`
-                    // for every element, so a purity/readonly/immutability
-                    // diagnostic on the second+ target collided with the
+                    // outer destructuring statement's span: with a shared
+                    // span, a diagnostic on the second+ target of
+                    // `[$this->x, $this->y] = $vals;` would collide with the
                     // first's under the issue buffer's (kind, file, line,
-                    // col_start) dedup key and was silently discarded, even
-                    // though it names a different property.
+                    // col_start) dedup key and be discarded.
                     self.assign_to_target(&elem.value, elem_ty, ctx, elem.value.span);
                 }
             }
             ExprKind::PropertyAccess(pa) => {
                 self.check_property_write_purity(pa, ctx, span);
                 let obj_ty = self.analyze(&pa.object, ctx);
-                // A self/static/parent-typed receiver (e.g. a `self $x` param)
-                // previously matched no arm at all below (only TNamedObject),
-                // so a write through it got zero property-type/readonly
-                // checking. Rebind to a plain TNamedObject using the atom's
-                // own already-resolved fqcn so the existing checks apply.
+                // The checks below match only TNamedObject, so rebind a
+                // self/static/parent-typed receiver (e.g. a `self $x` param)
+                // to one using the atom's own already-resolved fqcn.
                 let obj_ty = crate::expr::objects::rebind_self_static_parent_atom_only(obj_ty);
                 let prop_name_opt = extract_string_from_expr(&pa.property);
                 if prop_name_opt.is_none() {
@@ -1394,10 +1385,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                                 }
                                 continue;
                             }
-                            // Cross-class immutable write is now checked once,
-                            // for every write shape, by `check_property_write_purity`
-                            // (called at the top of this arm) — no longer
-                            // duplicated here.
+                            // Cross-class immutable writes are checked by
+                            // `check_property_write_purity` at the top of this arm.
                             let db = self.db;
                             let prop_found = crate::db::find_property_in_chain(
                                 db,
@@ -1980,10 +1969,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                             // nested chain) has a directly-known literal key —
                             // used to update just that one shape property
                             // in place instead of widening the whole shape.
-                            // Reuses the same `literal_array_key_of_kind` resolution
-                            // already computed for `literal_key_chain` above, rather
-                            // than re-deriving it here (a prior duplicate match only
-                            // handled string/int keys, missing bool/float/null).
+                            // Reuses the `literal_array_key_of_kind` resolution
+                            // already computed for `literal_key_chain` above.
                             let literal_key: Option<mir_types::ArrayKey> = if key_chain.len() == 1 {
                                 literal_key_chain.last().cloned().flatten()
                             } else {
@@ -2198,9 +2185,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             // still a mutation of that property (it changes
                             // the array's contents in place), so it must go
                             // through the same purity/immutability checks as
-                            // a plain `$obj->items = …` assignment — not just
-                            // be read for reference-recording, which is all
-                            // this arm previously did.
+                            // a plain `$obj->items = …` assignment.
                             self.check_property_write_purity(pa, ctx, span);
                             self.check_property_readonly_write(pa, ctx, span, true);
                             let _ = self.analyze(base, ctx);

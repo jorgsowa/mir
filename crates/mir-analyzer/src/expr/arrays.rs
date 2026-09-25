@@ -554,11 +554,9 @@ impl<'a> ExpressionAnalyzer<'a> {
         ctx: &mut FlowState,
     ) -> Type {
         // Purity check: `$GLOBALS['x']` reaches the same external mutable
-        // state as `global $x;`, but only the `global` statement was ever
-        // checked — accessing the superglobal array directly inside a
-        // @pure function bypassed the check entirely. Any OTHER superglobal
-        // ($_SESSION/$_ENV/$_SERVER/etc.) is exactly the same shape of
-        // external mutable state, previously unrecognized here at all.
+        // state as `global $x;`, as does any other superglobal
+        // ($_SESSION/$_ENV/$_SERVER/etc.), so reading one inside a @pure
+        // function is impure.
         if ctx.is_in_pure_fn {
             if let ExprKind::Variable(name) = &aa.array.kind {
                 let bare = name.trim_start_matches('$');

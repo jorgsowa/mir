@@ -845,10 +845,9 @@ impl<'a> BodyAnalyzer<'a> {
     /// analysis, unused-param/-var emission, optional return checks, and
     /// inference recording.
     ///
-    /// One shared core replaces the six previously copy-pasted blocks
-    /// (class / trait / enum × plain / typed). [`MethodScopeCx`] captures the
-    /// container-kind divergences so each call site's behavior — including
-    /// issue emission *order* — is reproduced exactly.
+    /// Shared by class / trait / enum × plain / typed methods;
+    /// [`MethodScopeCx`] captures the container-kind divergences, including
+    /// issue emission *order*.
     #[allow(clippy::too_many_arguments)]
     #[allow(clippy::needless_option_as_deref)]
     pub(super) fn analyze_method_scope(
@@ -1100,10 +1099,8 @@ impl<'a> BodyAnalyzer<'a> {
                 &method_name.to_ascii_lowercase(),
             );
             // @pure implies no side effects at all, including no `$this`
-            // mutation — not just @mutation-free/@psalm-immutable, which
-            // previously were the only tags that set this flag, silently
-            // letting a @pure-only method (a very natural annotation on its
-            // own, with no redundant @mutation-free) mutate `$this` freely.
+            // mutation, so it sets this flag alongside
+            // @mutation-free/@psalm-immutable.
             if !is_ctor && (method_storage.is_mutation_free || ctx.is_in_pure_fn) {
                 ctx.is_in_immutable_method = true;
             }

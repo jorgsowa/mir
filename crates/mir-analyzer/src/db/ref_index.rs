@@ -396,8 +396,8 @@ mod tests {
     }
     #[test]
     fn set_file_refs_hot_symbol_across_many_files() {
-        // One symbol referenced by many files — the case that used to be
-        // quadratic. Views must stay exact and replace-on-recommit must work.
+        // One symbol referenced by many files — must not go quadratic.
+        // Views must stay exact and replace-on-recommit must work.
         let mut idx = RefIndex::default();
         for f in 0..50 {
             let file: Arc<str> = Arc::from(format!("f{f}.php"));

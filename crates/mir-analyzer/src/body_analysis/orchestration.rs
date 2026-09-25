@@ -100,7 +100,7 @@ impl<'a> BodyAnalyzer<'a> {
         // resolution is file-scoped (`resolve_name` reads the file's first
         // namespace), so exec code inside a second, *different* namespace
         // block would resolve against the wrong prefix and emit bogus
-        // diagnostics. Multi-namespace files keep the old skip.
+        // diagnostics, so multi-namespace files skip braced namespace bodies.
         let mut ns_names: Vec<Option<String>> = Vec::new();
         for stmt in program.stmts.iter() {
             if let StmtKind::Namespace(ns) = &stmt.kind {

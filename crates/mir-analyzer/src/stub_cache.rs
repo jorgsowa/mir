@@ -156,7 +156,7 @@ impl StubSliceCache {
         // from garbage bytes and try to allocate it before returning an
         // error. Bounding every read to the entry's own size makes that
         // impossible: the real data can never need more bytes than the file
-        // contains, so a desync now fails fast as a miss instead of paging
+        // contains, so a desync fails fast as a miss instead of paging
         // the machine to death. `config()` (not the newer `options()`) is
         // required here: it's the fixint encoding `put()` writes with, while
         // `options()`'s `DefaultOptions` defaults to varint and silently

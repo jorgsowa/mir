@@ -154,12 +154,8 @@ fn apply_assertions(
 /// the per-assertion body shared between `apply_assertions`'s conditional
 /// if-true/if-false narrowing (pre-filtered by kind + branch) and a bare,
 /// unconditional `@psalm-assert` statement call (which always applies,
-/// regardless of any condition, and must never fall through to the generic
-/// per-call-site `AssertionKind::Assert` handling that used to be
-/// hand-duplicated in `call/function.rs`, `call/method.rs`, and
-/// `call/static_call.rs` — none of which ever read `assertion.param_key`,
-/// handled a variadic param, or resolved a named argument, unlike this
-/// shared body).
+/// regardless of any condition). Handles `assertion.param_key`, variadic
+/// params and named arguments for every call kind.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn apply_one_assertion(
     assertion: &mir_codebase::definitions::Assertion,
@@ -429,8 +425,8 @@ pub(crate) fn compute_assertion_template_bindings(
 /// (`$this->validator->isInt($p)`, a very common real-world shape), a
 /// static-property receiver, and — via `resolve_chained_receiver_type` — a
 /// deeper property chain, an array-index hop, or a method-call hop
-/// (`$h->getValidator()->isInt($p)`), all of which previously fell through
-/// unresolved, silently no-oping the whole assertion.
+/// (`$h->getValidator()->isInt($p)`). An unresolved receiver no-ops the
+/// whole assertion.
 pub(super) fn method_call_receiver_fqcn(
     object: &php_ast::owned::Expr,
     ctx: &FlowState,
@@ -442,9 +438,8 @@ pub(super) fn method_call_receiver_fqcn(
         ctx.get_var(&obj_var)
     } else if let Some((obj_var, prop)) = extract_any_prop_access(object) {
         // `extract_any_prop_access` also matches a nullsafe (`?->`) receiver,
-        // unlike the plain-`->`-only `extract_prop_access` this used to
-        // call — mirrors the same fix already applied to the self-out
-        // write-back's receiver resolution in `call/method.rs`. Deliberately
+        // unlike the plain-`->`-only `extract_prop_access` — as the self-out
+        // write-back's receiver resolution in `call/method.rs` does. Deliberately
         // 1-hop-only here (not `extract_chained_prop_access`): a 2+-hop
         // receiver must fall through to the `resolve_chained_receiver_type`
         // arm below instead, which resolves its DECLARED type rather than

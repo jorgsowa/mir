@@ -744,11 +744,10 @@ impl CallAnalyzer {
             } else {
                 class_bindings.extend(inherited_class_bindings);
             }
-            // A class-level `@template T of Bound` was previously only ever
-            // checked at `new Box(...)` construction sites — a receiver typed
-            // `Box<NotAnimal>` via a docblock/param annotation instead sailed
-            // through every static/self/parent call unchecked, regardless of
-            // whether the called method itself declares its own template params.
+            // Check class-level `@template T of Bound` here too, not only at
+            // `new Box(...)`: a receiver typed `Box<NotAnimal>` by annotation
+            // never passes through a constructor, whether or not the called
+            // method declares its own template params.
             for (name, inferred, bound) in check_template_bounds_with_inheritance(
                 ea.db,
                 &class_bindings,
@@ -888,9 +887,9 @@ impl CallAnalyzer {
                     &arg_types,
                     &arg_names,
                 );
-                // Static calls (`Foo::bar()`, `self::bar()`, `parent::bar()`)
-                // previously never checked the method's own `@template ... of
-                // Bound` at all — only instance-method and function calls did.
+                // The method's own `@template ... of Bound`, checked for static
+                // calls (`Foo::bar()`, `self::bar()`, `parent::bar()`) as for
+                // instance-method and function calls.
                 for (name, inferred, bound) in check_template_bounds_with_inheritance(
                     ea.db,
                     &bindings,
@@ -910,9 +909,7 @@ impl CallAnalyzer {
                 }
                 // Only warn about template shadowing when the declaring class lives
                 // in the file under analysis — mirrors method.rs's instance-call
-                // check, which a static call (Foo::bar()) previously never got at
-                // all despite computing an equivalent class_bindings/method
-                // bindings pair right here.
+                // check, using the class/method bindings computed above.
                 let declared_here = crate::db::class_like_decl_file(
                     ea.db,
                     crate::db::Fqcn::from_str(ea.db, resolved.owner_fqcn.as_ref()),
@@ -1139,15 +1136,11 @@ impl CallAnalyzer {
             }
 
             // `@if-this-is X<Y>` on a method reached through self::/static::/
-            // parent:: — mirrors the instance-call-syntax handling in
-            // `resolve_method_return`, which `analyze_static_method_call` never
-            // invoked at all, so this idiom silently never fired for the
-            // (more common) self::/static:: call syntax, only `$this->method()`.
+            // parent:: — the static-call twin of the instance-call handling in
+            // `resolve_method_return`, which this path doesn't go through.
             // Also applies to `$var::staticMethod()` through an object-typed
-            // variable (the `_` catch-all match arm above, which already
-            // extracted `fqcn`/`receiver_type_params` from the receiver's own
-            // concrete type for return-type substitution) — previously only
-            // self/static/parent/`$this` calls were checked at all.
+            // variable (the `_` catch-all match arm above, which extracted
+            // `fqcn`/`receiver_type_params` from the receiver's concrete type).
             let is_object_var_call = !matches!(&call.class.kind, ExprKind::Identifier(_));
             if is_self_parent_call || is_object_var_call {
                 if let Some(original_constraint) = resolved.if_this_is.clone() {

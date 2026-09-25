@@ -94,9 +94,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     pub(super) fn analyze_variable_variable(&mut self, inner: &Expr, ctx: &mut FlowState) -> Type {
         let inner_ty = self.analyze(inner, ctx);
         // `$$name` where `$name` holds a known literal string (or union of
-        // them) resolves to that variable's OWN real type — this used to
-        // always return bare `mixed`, even when the accessed variable name
-        // was fully known at analysis time. A non-literal-string `$name`
+        // them) resolves to that variable's OWN real type. A non-literal-string `$name`
         // (or no `$name` at all) stays `mixed`: the accessed variable is
         // genuinely unknown.
         let mut result = Type::empty();

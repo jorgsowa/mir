@@ -179,9 +179,7 @@ impl<'a> DefinitionCollector<'a> {
                             .map(|h| type_from_hint_owned(h, Some(&fqcn))),
                     );
                     // phpstorm-stubs `#[LanguageLevelTypeAware]` wins, then an `@var`
-                    // docblock (mirroring class.rs's precedence — a trait property's
-                    // @var was previously ignored entirely, only the native hint was
-                    // ever used), then the native hint.
+                    // docblock (mirroring class.rs's precedence), then the native hint.
                     let ty = self
                         .version_attr_type_string(&p.attributes)
                         .map(|s| crate::parser::docblock::parse_type_string(&s))

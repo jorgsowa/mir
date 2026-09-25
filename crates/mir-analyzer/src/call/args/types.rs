@@ -1667,7 +1667,7 @@ fn validate_callable_type(
                                 // runtime — the direct-call twin of the suppression
                                 // in `call/method.rs` (which consults the same
                                 // `method_exists_guards` set for `$obj->method()`),
-                                // now extended to array callables passed by value.
+                                // applied to array callables passed by value.
                                 let guarded = array_callable_guard_key(ea, ctx, arg_expr)
                                     .is_some_and(|key| {
                                         method_exists_guarded(ctx, &key, method_name)

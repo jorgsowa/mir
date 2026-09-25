@@ -297,19 +297,17 @@ impl<'a> DefinitionCollector<'a> {
                             })
                         })
                         .or_else(|| hint_ty.clone());
-                    // M7: a bare `array` declaration with a literal initializer
+                    // A bare `array` declaration with a literal initializer
                     // reads back the literal's far narrower shape. Rebuild the
-                    // initializer type (which the collector used to discard)
-                    // and refine the declared type into it when the property
+                    // initializer type and refine the declared type into it when the property
                     // is private static, the initializer is a typed literal,
                     // and no static write in this file touches the property
                     // (a `private static` is file-scoped, so that scan is
                     // complete). Non-private-static properties and written
                     // properties keep their declared type.
                     let default_ty = p.default.as_ref().map(|d| {
-                        // Preserve the collector's historical `Some(mixed)`
-                        // for initializers we don't type as literals: `None`
-                        // means "no initializer" to readers such as the
+                        // `Some(mixed)` for initializers we don't type as
+                        // literals: `None` means "no initializer" to readers such as the
                         // missing-constructor check.
                         literal_types::literal_type(d).unwrap_or_else(mir_types::Type::mixed)
                     });

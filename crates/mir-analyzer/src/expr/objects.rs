@@ -209,11 +209,9 @@ impl<'a> ExpressionAnalyzer<'a> {
             }
         }
 
-        // A class-level `@template T of Bound` was previously enforced only at
-        // method-call sites (against a method's OWN template params), never
-        // here — the dominant real-world path (constructor-arg inference on
-        // `new`) bypassed bound checking entirely. Check it the same way
-        // method/function calls do.
+        // Check class-level `@template T of Bound` against constructor-arg
+        // inference on `new`, the same way method/function calls check their
+        // own template params.
         //
         // Restricted to classes declared outside the bundled stubs: a stub
         // constructor with multiple declared PHP overloads (e.g. DatePeriod's
@@ -254,8 +252,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         // A template bound from an argument → its (widened) inferred type;
         // otherwise → `mixed`. Only consider the receiver "concrete" when at
         // least one template was bound from an argument — otherwise keep the
-        // bare (un-parameterised) type, preserving prior behaviour for ordinary
-        // / non-generic / uninferable instantiations.
+        // bare (un-parameterised) type for ordinary / non-generic /
+        // uninferable instantiations.
         let mut params: Vec<Type> = Vec::with_capacity(class_tps.len());
         let mut any_concrete = false;
         for tp in class_tps.iter() {
@@ -2228,7 +2226,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     // TNamedObject) — resolve the property the same way, minus
                     // template substitution (these atoms carry no type params
                     // of their own). Falls through to the loop's final
-                    // `Type::mixed()` on a miss, matching prior silent behavior.
+                    // `Type::mixed()` on a miss.
                     let prop_result = crate::db::find_property_in_chain(
                         self.db,
                         crate::db::Fqcn::interned(self.db, *fqcn),

@@ -201,8 +201,8 @@ pub(crate) fn preserve_native_nullability(native: &Type, mut doc: Type) -> Type 
 
 /// True for type keywords/pseudo-types that must never be namespace-
 /// qualified (even as TNamedObject, e.g. inside generic params). Delegates to
-/// the docblock parser's keyword table — single source of truth, a strict
-/// superset of the old hand-maintained list. Case-insensitive, tolerates
+/// the docblock parser's keyword table, the single source of truth.
+/// Case-insensitive, tolerates
 /// one leading `\`.
 fn is_php_builtin_type(name: &str) -> bool {
     crate::parser::docblock::is_docblock_type_keyword(name)
@@ -234,13 +234,11 @@ where
 
 /// Expand a single atomic, returning the (possibly multi-atom) `Type` it
 /// contributes. A bare (non-parameterized) `TNamedObject` matching an alias
-/// name substitutes the alias's own definition directly, same as before.
-/// Anything else is rebuilt with alias references in its OWN nested types
-/// (a generic type argument, an array's key/value type, a shape property's
-/// type, an intersection member) recursively expanded — previously a plain
-/// alias used only inside one of these nested positions (e.g. `Box<IntList>`,
-/// or `IntListList = array<IntList>`'s own definition) silently never
-/// expanded at all, since only the single top-level atom was ever checked.
+/// name substitutes the alias's own definition directly. Anything else is
+/// rebuilt with alias references in its OWN nested types (a generic type
+/// argument, an array's key/value type, a shape property's type, an
+/// intersection member) recursively expanded, so `Box<IntList>` and
+/// `IntListList = array<IntList>` expand too.
 fn expand_aliases_in_atomic<K>(atomic: mir_types::Atomic, aliases: &FxHashMap<K, Type>) -> Type
 where
     K: std::borrow::Borrow<str> + std::hash::Hash + Eq,
@@ -315,8 +313,7 @@ where
         }),
         // `callable(T): R` / `Closure(T): R` — an alias used as a param or
         // return type inside one of these signatures (`@param
-        // Closure(): IntList $factory`) previously never expanded at all,
-        // since no arm here recursed into either variant.
+        // Closure(): IntList $factory`) expands too.
         Atomic::TCallable {
             params,
             return_type,
@@ -692,7 +689,7 @@ pub struct DefinitionCollector<'a> {
     accumulated_class_imports: FxHashMap<String, String>,
     /// Static-property write targets found in this file, from
     /// `literal_types::scan_static_property_writes(program)` — the soundness
-    /// gate for initializer-based property type refinement (ROADMAP M7): a
+    /// gate for initializer-based property type refinement: a
     /// property written to anywhere in its own file must not be refined from
     /// its literal default.
     static_writes: literal_types::StaticWrites,
@@ -817,7 +814,7 @@ impl<'a> DefinitionCollector<'a> {
     }
 
     pub fn collect_slice(mut self, program: &Program) -> (StubSlice, Vec<Issue>) {
-        // M7: scan before the main pass — property refinement in
+        // Scan before the main pass — property refinement in
         // `collect_class` consults the result.
         self.static_writes = literal_types::scan_static_property_writes(program);
         let _ = self.visit_program(program);
@@ -891,13 +888,9 @@ impl<'a> DefinitionCollector<'a> {
     /// name matching a same-file `@psalm-type`/`@phpstan-type` alias before
     /// falling back to template/namespace resolution. Used for magic
     /// `@property`/`@method` docblock member types (`add_docblock_members`),
-    /// which — unlike a real member's `@var`/`@param`/`@return` — previously
-    /// went through `resolve_union_doc_with_aliases` alone: that resolver
-    /// deliberately leaves a bare, non-aliased class name namespace-unqualified
-    /// (see the comment on `substitute_template_params`), so `@property Foo $x`
-    /// inside a namespaced file stored the literal, unqualified name `Foo`
-    /// instead of `App\Foo` — silently failing every existence check and
-    /// reference recording done against it.
+    /// so `@property Foo $x` in a namespaced file stores `App\Foo`, not the
+    /// unqualified `Foo` that would fail every existence check and reference
+    /// recording.
     fn resolve_docblock_member_type(
         &self,
         union: Type,
@@ -1227,9 +1220,7 @@ impl<'a> DefinitionCollector<'a> {
         type_aliases: Option<&FxHashMap<String, Type>>,
     ) -> Vec<Assertion> {
         // Expand local type aliases before resolving, matching every other
-        // type position (@param/@return/template bounds) — an assertion type
-        // named after a `@psalm-type` alias previously stayed an unresolved,
-        // unexpandable bare atom.
+        // type position (@param/@return/template bounds).
         annotation::build_assertions(doc, |u| {
             let expanded = match type_aliases {
                 Some(a) => expand_aliases_only(u, a),
@@ -1385,10 +1376,10 @@ impl<'a> DefinitionCollector<'a> {
         // N passes. Any bare alias-name atom still present after that many
         // passes is, by construction, part of a real cycle — there's no other
         // way it could have survived — so it can never resolve to a real class.
-        // Previously left as-is, it silently became a phantom reference to a
-        // nonexistent class two-plus levels into the expansion. Substitute
-        // `mixed` for every alias name at this point instead: any part of a
-        // body that was NOT part of a cycle no longer contains an atom
+        // Left as-is, it would become a phantom reference to a nonexistent
+        // class two-plus levels into the expansion. Substitute `mixed` for
+        // every alias name at this point instead: any part of a body that
+        // was NOT part of a cycle contains no atom
         // matching an alias name at all (it was already fully expanded away
         // above), so this only ever touches genuinely-cyclic residue.
         let neutralize_cycles: FxHashMap<String, Type> = aliases
@@ -1985,11 +1976,8 @@ impl<'a> DefinitionCollector<'a> {
                         // template param (e.g. `TRelatedModel`) becomes a
                         // TTemplateParam, and any other bare class name (e.g.
                         // a same-namespace sibling class) is FQN-qualified
-                        // instead of left relative. A separate `full_qualify
-                        // =false` + post-hoc `substitute_template_params` pass
-                        // used to run here instead, which qualified nothing —
-                        // real global builtins like `Closure` are now
-                        // exempted directly in `resolve_type_name`.
+                        // instead of left relative. Real global builtins like
+                        // `Closure` are exempted in `resolve_type_name`.
                         let expanded = effective_aliases
                             .map_or(u.clone(), |a| expand_aliases_only(u.clone(), a));
                         let doc_ty = self.resolve_union_doc_with_templates(

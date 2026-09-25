@@ -1,4 +1,4 @@
-/// Dead-code detector (M18).
+/// Dead-code detector.
 ///
 /// After body analysis has recorded all method/property/function references into the
 /// codebase, this analyzer walks every class and reports:

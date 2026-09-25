@@ -119,7 +119,7 @@ pub struct FlowState {
     pub strict_types: bool,
 
     /// Variables that carry tainted (user-controlled) values at this point.
-    /// Used by taint analysis (M19).
+    /// Used by taint analysis.
     pub tainted_vars: FxHashSet<Name>,
 
     /// Instance properties that carry tainted (user-controlled) values at
@@ -162,7 +162,7 @@ pub struct FlowState {
     pub cloned_local_vars: FxHashSet<Name>,
 
     /// Variables that have been read at least once in this scope.
-    /// Used by UnusedParam detection (M18).
+    /// Used by UnusedParam detection.
     pub read_vars: FxHashSet<Name>,
 
     /// Names of function/method parameters in this scope (stripped of `$`).
@@ -371,7 +371,7 @@ pub struct FlowState {
     /// be seeded as callable) from the equally common by-ref out-param idiom
     /// (`set_error_handler(function () use (&$error) { $error = ...; })`,
     /// no enclosing assignment at all) — the two require different seed
-    /// types and were previously conflated.
+    /// types.
     pub self_ref_closure_hint: Option<Name>,
 }
 

@@ -201,10 +201,8 @@ impl<'a> BodyAnalyzer<'a> {
     /// Analyze each enum case's value expression against a minimal FlowState
     /// scoped to the enum itself. Case values are constant expressions that
     /// may reference class constants (`case Active = Config::VALUE;`) or
-    /// other classes — the enum-analysis loop previously matched only
-    /// `EnumMemberKind::Method`, so `Case` values were never walked and an
-    /// undefined reference there (a genuine PHP fatal on first touch of the
-    /// enum) went completely unflagged.
+    /// other classes; an undefined reference there is a PHP fatal on first
+    /// touch of the enum.
     #[allow(clippy::too_many_arguments)]
     fn analyze_enum_case_values(
         &self,

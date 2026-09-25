@@ -96,10 +96,9 @@ fn parse_list_of_int() {
 
 #[test]
 fn parse_bare_array_keys_on_array_key_not_mixed() {
-    // Regression guard: a bare `array` used to build its key as a literal
-    // `mixed`, which both misrepresented the true PHP array-key domain
-    // (`int|string`) and defeated the `array<mixed, mixed>` -> `array`
-    // display collapse for the common no-generics case.
+    // A bare `array` keys on `array-key`: a `mixed` key would misrepresent
+    // the PHP array-key domain (`int|string`) and defeat the
+    // `array<mixed, mixed>` -> `array` display collapse.
     let u = parse_type_string("array");
     assert!(u.contains(|t| matches!(t, Atomic::TArray { key, .. } if key.is_array_key())));
 }
@@ -192,8 +191,8 @@ fn parse_template_contravariant() {
 
 #[test]
 fn parse_template_single_line_does_not_over_read() {
-    // E1: single-line docblock — the @template body runs to the closing `*/`,
-    // so the parser used to take `T @param T $x @return T` as the template name.
+    // Single-line docblock: the @template body runs to the closing `*/`, so
+    // the parser must not take `T @param T $x @return T` as the template name.
     let doc = "/** @template T @param T $x @return T */";
     let parsed = DocblockParser::parse(doc);
     assert_eq!(parsed.templates.len(), 1);
@@ -217,7 +216,7 @@ fn parse_template_multiline_with_bound_still_works() {
 
 #[test]
 fn parse_template_extends_alias() {
-    // E2: `@template-extends` / `@phpstan-extends` route into `extends`.
+    // `@template-extends` / `@phpstan-extends` route into `extends`.
     for tag in ["template-extends", "phpstan-extends"] {
         let doc = format!("/** @{tag} Base<User> */");
         let parsed = DocblockParser::parse(&doc);
@@ -239,7 +238,7 @@ fn parse_template_extends_alias() {
 
 #[test]
 fn parse_template_implements_alias() {
-    // E2: `@template-implements` / `@phpstan-implements` route into `implements`.
+    // `@template-implements` / `@phpstan-implements` route into `implements`.
     for tag in ["template-implements", "phpstan-implements"] {
         let doc = format!("/** @{tag} Iter<User> */");
         let parsed = DocblockParser::parse(&doc);

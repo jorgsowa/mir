@@ -140,7 +140,7 @@ fn parse_autoload_section(
     // class basename become directories — see `psr0_logical_path`), so these
     // go into their own prefix list rather than `entries`. We ALSO keep
     // pushing the raw dirs into `extras` so bulk file discovery (project/vendor
-    // file listing) still walks them, same as before.
+    // file listing) still walks them.
     if let Some(map) = autoload.get("psr-0").and_then(|v| v.as_object()) {
         for (prefix, dir) in map {
             collect_prefix_dirs_raw(dir, prefix, base, psr0_entries);
@@ -1372,8 +1372,7 @@ mod tests {
         assert!(files[0].ends_with("bootstrap.php"));
     }
 
-    /// Sector H4 of the real-world compatibility audit (ROADMAP.md): a
-    /// files-autoload bootstrap that only dispatches to a version-gated
+    /// A files-autoload bootstrap that only dispatches to a version-gated
     /// sibling implementation (the common polyfill idiom) must have that
     /// sibling followed into `vendor_eager_files()` too, or the functions it
     /// declares are invisible to the lazy-mode analyzer.

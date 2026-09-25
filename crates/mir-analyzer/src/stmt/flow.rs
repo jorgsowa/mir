@@ -650,8 +650,7 @@ impl<'a> StatementsAnalyzer<'a> {
             } else {
                 // `unset($obj->prop)` mutates the property just as much as a
                 // plain `$obj->prop = x` assignment does — run the same
-                // pure/immutable/external-mutation-free checks, which
-                // previously only ever ran on the assignment path.
+                // pure/immutable/external-mutation-free checks.
                 if let php_ast::owned::ExprKind::PropertyAccess(pa) = &var.kind {
                     self.expr_analyzer(ctx)
                         .check_property_write_purity(pa, ctx, var.span);
@@ -718,11 +717,9 @@ impl<'a> StatementsAnalyzer<'a> {
                             }
                             // `unset($items['k'])` on a by-ref PARAMETER or
                             // a superglobal mutates it exactly as much as a
-                            // plain `$items['k'] = …` write does — this
-                            // unwrap loop previously fell straight to the
-                            // `_ => break` no-op arm for a bare variable
-                            // base, unlike the property/static-property arms
-                            // above which already run their own checks.
+                            // plain `$items['k'] = …` write does, so a bare
+                            // variable base gets the same checks as the
+                            // property/static-property arms above.
                             php_ast::owned::ExprKind::Variable(name) => {
                                 self.expr_analyzer(ctx).check_var_write_purity(
                                     name.trim_start_matches('$'),

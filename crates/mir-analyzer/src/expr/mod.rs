@@ -473,7 +473,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     self.emit(IssueKind::TaintedHtml, Severity::Error, expr.span);
                 }
                 // @pure implies no side effects at all — same purity
-                // violation `echo` now checks (stmt/expressions.rs), for the
+                // violation `echo` checks (stmt/expressions.rs), for the
                 // `print` expression form.
                 if ctx.is_in_pure_fn {
                     self.emit(
@@ -823,9 +823,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                     // `fqcn` is already a canonical, resolved receiver type (from
                     // `named_object_fqcn()`) — re-running `resolve_name`'s
                     // raw-source-text rules on it, rather than trusting it as-is,
-                    // mis-resolves a `\GlobalClass` receiver in a namespaced file
-                    // the same way L20's other fixed call sites did (`db::resolve_receiver_fqcn`
-                    // covers exactly this).
+                    // mis-resolves a `\GlobalClass` receiver in a namespaced file;
+                    // `db::resolve_receiver_fqcn` handles exactly this.
                     let fqcn_resolved =
                         crate::db::resolve_receiver_fqcn(self.db, self.file.as_ref(), fqcn);
                     let fqcn_arc: Arc<str> = Arc::from(fqcn_resolved.as_str());
@@ -1067,7 +1066,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     /// UndefinedMethod check for a first-class-callable (`$obj->method(...)`)
     /// whose method didn't resolve — mirrors call/method.rs's ordinary-call
     /// suppression rules (interface/abstract/trait receivers, `__call`, and an
-    /// active `method_exists()` guard), which the FCC path previously never ran.
+    /// active `method_exists()` guard).
     fn emit_undefined_method_for_callable(
         &mut self,
         fqcn: &Arc<str>,
@@ -1853,9 +1852,8 @@ mod tests {
     fn col_end_not_clamped_across_lines() {
         // A multi-line span (e.g. a `new Foo(\n ...\n)` call) legitimately has
         // col_end smaller than col_start, since they're columns on different
-        // lines. Regression for a bug where `.max(col_start + 1)` was applied
-        // unconditionally, producing a nonsensical column past the end of the
-        // end line's actual content (see `TooManyArguments` on 0-arg `new` calls).
+        // lines. Clamping it to `col_start + 1` would point past the end
+        // line's actual content (e.g. `TooManyArguments` on 0-arg `new` calls).
         let col_start = 11u16; // e.g. "    return new Foo(" — "new" starts at col 11
         let col_end = 5u16; // e.g. "    );" — ")" ends at col 5
         let effective_col_end = crate::diagnostics::clamp_col_end(1, 8, col_start, col_end);

@@ -28,9 +28,8 @@ pub(super) fn narrow_from_type_fn(
 /// Property-access counterpart of `narrow_from_type_fn`, for
 /// `is_string($this->prop)`, `is_array($this->prop)`, `array_is_list($this->prop)`,
 /// `ctype_digit($this->prop)`, `method_exists($this->prop, ...)`, etc. — the
-/// whole `is_*`/`ctype_*`/type-check family previously only ever narrowed a
-/// plain-variable receiver, unlike the analogous `instanceof`/null/literal-match
-/// arms elsewhere in this file, which all have a property-access fallback.
+/// property-access fallback for the `is_*`/`ctype_*`/type-check family, as the
+/// `instanceof`/null/literal-match arms elsewhere in this file have.
 pub(super) fn narrow_prop_from_type_fn(
     ctx: &mut FlowState,
     fn_name: &str,
@@ -213,8 +212,7 @@ pub(super) fn type_fn_narrowed(
                 // `implements Traversable` later) AND its own hierarchy provably
                 // doesn't already extend/implement Traversable — same
                 // final-class soundness gate `narrow_var_to_specific_class` uses
-                // for its false branch. A non-final or unresolvable class stays,
-                // same conservatism as before this class-hierarchy check existed.
+                // for its false branch. A non-final or unresolvable class stays.
                 current
                     .filter(|t| !atom_excluded_from_is_iterable_or_countable(t, "Traversable", db))
             }
@@ -353,10 +351,8 @@ pub(super) fn type_fn_narrowed(
 /// into the false branch. A `final` class that provably does NOT
 /// extend/implement `$interface` is the opposite case (guaranteed to make
 /// the check false) and must be kept, not excluded. A non-final or
-/// unresolvable class is left alone (kept), matching this function's
-/// conservative behavior before this class-hierarchy check existed
-/// (stripping a non-final class here risks falsely excluding a legitimately
-/// Countable/Traversable subclass).
+/// unresolvable class is kept too: stripping it risks falsely excluding a
+/// legitimately Countable/Traversable subclass.
 pub(super) fn atom_excluded_from_is_iterable_or_countable(
     t: &Atomic,
     interface: &str,

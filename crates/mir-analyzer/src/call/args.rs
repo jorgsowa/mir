@@ -622,9 +622,8 @@ fn param_contains_template_or_unknown(
                 })
             }
             // A templated/unknown array KEY (e.g. `@template TKey of array-key`
-            // in `array<TKey, TValue>`) must also be forgiven — previously only
-            // the value type was checked, so a key-only template left this arm
-            // returning false and a legitimate arg risked a false InvalidArgument.
+            // in `array<TKey, TValue>`) is forgiven like the value type, or a
+            // key-only template would raise a false InvalidArgument.
             contains_template_or_unknown(key, ea, &template_names)
                 || contains_template_or_unknown(value, ea, &template_names)
         }

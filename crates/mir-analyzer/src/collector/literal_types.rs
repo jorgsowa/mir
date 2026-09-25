@@ -1,15 +1,11 @@
-//! Literal initializer typing and static-property write scanning — the
-//! soundness machinery behind ROADMAP item M7 ("array_keys() TKey `of
-//! int|string` falls back to full bound when source array key type unknown").
+//! Literal initializer typing and static-property write scanning.
 //!
-//! M7's trigger is a class property declared with a bare `array` type (native
-//! `: array` hint or `@var array` docblock) but initialized with a literal
-//! (`private static $defaults = ['Name' => null, ...]`). The collector used to
-//! discard the initializer expression and record `PropertyDef::default` as
-//! `mixed`, and `PropertyDef::inferred_ty` stayed `None`; consumers (e.g.
-//! `array_keys()`) then read the bare `array` bound and typed the keys
-//! `int|string`, producing spurious `PossiblyInvalidArgument` (MIR0105) reports
-//! on call sites like `array_keys(self::$defaults)`.
+//! A class property declared with a bare `array` type (native `: array` hint
+//! or `@var array` docblock) but initialized with a literal
+//! (`private static $defaults = ['Name' => null, ...]`) would otherwise read
+//! back as bare `array`: consumers such as `array_keys()` would type the keys
+//! `int|string` and report spurious `PossiblyInvalidArgument` (MIR0105) on
+//! call sites like `array_keys(self::$defaults)`.
 //!
 //! This module contributes two refinements, both applied at collection time so
 //! every downstream consumer (docblock `@var` resolution, `effective_property_ty`,

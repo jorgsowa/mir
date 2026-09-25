@@ -1191,10 +1191,10 @@ impl<'a> StatementsAnalyzer<'a> {
             }
 
             // A guaranteed loop has no zero-iteration exit path.  Merging its
-            // first body pass with `pre` nevertheless used to resurrect every
-            // pre-loop type/refinement and pending write: `do { $x = new X; }
-            // while (...)` could leave `$x` nullable, and a write consumed in
-            // the body could be reported unused after the loop.  Start from the
+            // first body pass with `pre` would resurrect every pre-loop
+            // type/refinement and pending write: `do { $x = new X; }
+            // while (...)` would leave `$x` nullable, and a write consumed in
+            // the body would be reported unused after the loop.  Start from the
             // first completed iteration instead.  Subsequent passes merge the
             // already-valid post-body state with one more iteration, accounting
             // for any number of executions without inventing a zeroth one.
@@ -1244,8 +1244,8 @@ impl<'a> StatementsAnalyzer<'a> {
         }
 
         // Widen only if the bounded fixed-point search did not converge.  Doing
-        // this after a converged guaranteed loop used to merge stable body state
-        // back with `pre` anyway, recreating the impossible zero-iteration path.
+        // this after a converged guaranteed loop would merge stable body state
+        // back with `pre`, recreating the impossible zero-iteration path.
         if !stabilized {
             widen_unstable(
                 &pre.vars,

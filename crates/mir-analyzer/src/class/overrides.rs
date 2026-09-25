@@ -37,9 +37,8 @@ impl<'a> ClassAnalyzer<'a> {
         // Members composed via `use Trait;` behave like "own" methods for override
         // purposes: this class inherits the trait's *implementation*, so a conflict
         // against the real parent/interfaces must be checked even when the class
-        // body never redeclares the method — previously only literally-declared
-        // `own_methods()` were checked, making trait-composed overrides invisible to
-        // every check below (final/static/visibility/return/param).
+        // body never redeclares the method, by every check below
+        // (final/static/visibility/return/param).
         //
         // `class_ancestors_by_fqcn` DFS-visits the FULL transitive trait subtree
         // before ever reaching the real parent/interfaces (traits are always
@@ -463,10 +462,9 @@ impl<'a> ClassAnalyzer<'a> {
                     let parent_has_object = Self::type_has_named_objects(parent_ret)
                         || self.type_has_self_or_static(parent_ret);
                     let compatible = if child_has_object && parent_has_object {
-                        // Both sides involve objects: named_object_return_compatible now
-                        // splits mixed object+scalar unions per atom (G5), so it covers
-                        // `string|Cat` vs `string|Animal` directly — not just purely-object
-                        // unions as before. An array-of-named-object return
+                        // Both sides involve objects: named_object_return_compatible
+                        // splits mixed object+scalar unions per atom, so it covers
+                        // `string|Cat` vs `string|Animal` directly. An array-of-named-object return
                         // (`array<int, T>`) falls through named_object_return_compatible's
                         // structural catch-all (no class-hierarchy awareness for arrays),
                         // so also try the codebase-aware array check the ordinary
@@ -716,7 +714,7 @@ impl<'a> ClassAnalyzer<'a> {
                     // accepts strictly fewer values than the parent contract). We only
                     // decide this when every named class involved is known to the
                     // codebase — an unknown class would make `is_subtype` falsely report
-                    // narrowing. Pure-scalar params keep the structural check. (G4)
+                    // narrowing. Pure-scalar params keep the structural check.
                     let involves_objects = Self::type_has_named_objects(parent_ty)
                         || Self::type_has_named_objects(child_ty);
                     let narrowed = if involves_objects {
@@ -1099,7 +1097,7 @@ impl<'a> ClassAnalyzer<'a> {
 
     /// Returns true if every named-object class referenced anywhere in `ty`
     /// (including inside generic type arguments and array key/value types) is known
-    /// to the codebase. Used to gate object-aware param contravariance (G4): when an
+    /// to the codebase. Used to gate object-aware param contravariance: when an
     /// involved class is unknown, `is_subtype` cannot resolve its hierarchy and would
     /// falsely report narrowing, so the check is skipped instead.
     fn all_object_classes_known(&self, ty: &mir_types::Type) -> bool {

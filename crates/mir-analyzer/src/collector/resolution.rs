@@ -257,9 +257,8 @@ pub(super) fn resolve_atomic_inner(
         },
         // `callable(T): R` / `Closure(T): R` — a class name embedded in one
         // of these signatures (including inside a `@psalm-type` alias body)
-        // previously never went through `use`-import/namespace resolution at
-        // all, since no arm here recursed into either variant. Mirrors the
-        // identical fix already applied to the sibling `expand_aliases_in_atomic`.
+        // goes through `use`-import/namespace resolution too, as in
+        // `expand_aliases_in_atomic`.
         Atomic::TCallable {
             params,
             return_type,
@@ -366,12 +365,9 @@ pub(super) fn resolve_union_doc(
 ) -> Type {
     // A bare same-namespace class name in a docblock (`@param Foo $x` inside
     // `namespace App;`, referring to `App\Foo`) must resolve exactly like a
-    // native type hint does — `full_qualify=false` used to leave it bare
-    // specifically to avoid mis-qualifying real global classes like `Closure`
-    // against the current namespace, but that also silently left every
-    // genuine sibling-class reference unqualified. `resolve_type_name` exempts
-    // real global builtins on its own (`allow_builtin_shortcut=true` here) for
-    // docblocks specifically, since they're commonly written without imports.
+    // native type hint does. `resolve_type_name` exempts real global builtins
+    // on its own (`allow_builtin_shortcut=true` here) for docblocks, since
+    // they're commonly written without imports.
     resolve_union_inner(union, true, true, namespace, use_aliases)
 }
 
@@ -389,8 +385,7 @@ pub(super) fn resolve_union_doc_with_aliases(
     // the return-type call site already uses. `expand_aliases_only` recurses
     // into nested positions (a generic type argument, an array's key/value
     // type, …), so an alias used as `Box<IntList>` (not just a bare `IntList`)
-    // now expands too; a single top-level-only check here previously missed
-    // that case even though `expand_aliases_only` itself was fixed for it.
+    // expands too.
     let expanded = super::expand_aliases_only(union, aliases);
     resolve_union_doc(expanded, namespace, use_aliases)
 }

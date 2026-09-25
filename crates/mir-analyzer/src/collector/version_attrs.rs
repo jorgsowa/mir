@@ -14,8 +14,6 @@
 //! [`PhpVersion`], so they are unit-testable in isolation with no collector
 //! state. They are gated by the caller on `php_version == Some(_)`; user code
 //! never reaches them.
-//!
-//! See `ROADMAP.md` §5 for the confirmed upstream semantics.
 
 use rustc_hash::FxHashMap;
 

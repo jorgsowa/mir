@@ -669,9 +669,8 @@ pub(crate) fn narrow_static_prop_type_fn_disjuncts(
 /// fully narrows both functions for every receiver shape (var/prop/
 /// static-prop) — this only lets the `single_leaf_disjunct_*` family
 /// recognize them as a single-receiver leaf instead of bailing out of the
-/// whole OR-disjunct union machinery, which previously fell back to a
-/// sequential AND-compose that collapses the result to the last disjunct
-/// (the same bug class `collect_instanceof`'s doc comment describes).
+/// OR-disjunct union machinery to a sequential AND-compose, which collapses
+/// the result to the last disjunct (see `collect_instanceof`'s doc).
 fn is_a_or_subclass_of_call_receiver(expr: &php_ast::owned::Expr) -> Option<&php_ast::owned::Expr> {
     let ExprKind::FunctionCall(call) = &expr.kind else {
         return None;

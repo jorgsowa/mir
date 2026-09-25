@@ -27,8 +27,7 @@ use super::core::{
 /// the same template arity as the ancestor, which real-world code (and this
 /// analyzer's own `class_template_params`) treats as an implicit,
 /// unchanged passthrough. Anything else (arity mismatch, no relationship
-/// found) falls back to no type params, same as before this projection
-/// existed.
+/// found) falls back to no type params.
 pub(super) fn project_type_params_onto_subclass(
     db: &dyn MirDatabase,
     atom_fqcn: &str,

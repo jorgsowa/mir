@@ -728,8 +728,8 @@ impl CallAnalyzer {
                 ctx.set_var(recv_name.trim_start_matches('$'), self_out_union);
             } else if let Some((obj_var, prop)) = extract_any_prop_access(&call.object) {
                 // `extract_any_prop_access` also matches a nullsafe (`?->`)
-                // receiver chain (`$h?->factory->prepare()`), which the
-                // plain-`->`-only `extract_prop_access` used to miss here.
+                // receiver chain (`$h?->factory->prepare()`), unlike the
+                // plain-`->`-only `extract_prop_access`.
                 ctx.set_prop_refined(&obj_var, &prop, self_out_union);
             } else if let Some((obj_key, prop)) =
                 crate::narrowing::extract_chained_prop_access(&call.object)
@@ -1138,11 +1138,10 @@ fn resolve_method_return<'a>(
             bindings.extend(inherited_bindings);
         }
 
-        // A class-level `@template T of Bound` was previously only ever checked
-        // at `new Box(...)` construction sites — a receiver typed `Box<NotAnimal>`
-        // via a docblock/param annotation instead (no constructor call in sight)
-        // sailed through every method call unchecked, regardless of whether the
-        // called method itself declares any template params of its own.
+        // Check class-level `@template T of Bound` here too, not only at
+        // `new Box(...)`: a receiver typed `Box<NotAnimal>` by annotation never
+        // passes through a constructor, whether or not the called method
+        // declares its own template params.
         for (name, inferred, bound) in check_template_bounds_with_inheritance(
             ea.db,
             &bindings,

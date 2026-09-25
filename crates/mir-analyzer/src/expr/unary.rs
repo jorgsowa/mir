@@ -98,15 +98,14 @@ impl<'a> ExpressionAnalyzer<'a> {
                 // `++`/`--` on a property/array-index-into-property/static
                 // property is a write, same as `+=` — route it through the
                 // shared purity/immutability/readonly gate. Reuses
-                // `check_byref_arg_purity` (originally for by-ref call
-                // arguments) since it already covers exactly this same set
-                // of mutation-target shapes; this arm previously only
-                // special-cased a direct `PropertyAccess` operand, missing
-                // an array-index-into-property (`$t->counts['x']++`) or a
-                // static property (`Frozen::$hits++`) entirely.
+                // `check_byref_arg_purity` (shared with by-ref call
+                // arguments) since it covers exactly this set of
+                // mutation-target shapes, including an array index into
+                // a property (`$t->counts['x']++`) and a static property
+                // (`Frozen::$hits++`).
                 self.check_byref_arg_purity(&u.operand, ctx, u.operand.span);
                 // Same operand check as postfix ++/-- — the same PHP warning/
-                // deprecation fires for both forms, only postfix was flagged.
+                // deprecation fires for both forms.
                 if operand_is_definitely_bool(&operand_ty)
                     || operand_is_non_empty_literal_string(&operand_ty)
                 {

@@ -432,9 +432,8 @@ impl<'a> ExpressionAnalyzer<'a> {
         // (which key off that set) also catch such captures. A capture of a
         // locally-created object stays out of this set, matching the "local
         // objects are exempt" rule the same checks already apply to real
-        // params. Previously only a by-value capture was covered here — a
-        // by-ref capture (`use (&$c)`) is the SAME external variable, not a
-        // copy, so it's just as reachable, yet was silently excluded.
+        // params. A by-ref capture (`use (&$c)`) counts too: it is the SAME
+        // external variable, not a copy.
         if closure_ctx.is_in_pure_fn
             || closure_ctx.is_in_immutable_method
             || closure_ctx.is_in_external_mutation_free_method

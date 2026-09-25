@@ -439,16 +439,12 @@ impl DocblockParser {
                                 .flatten()
                         });
                         if let Some((name, type_expr)) = split {
-                            // A generic alias name (`ListOf<T> = array<int, T>`)
-                            // kept the `<T>` suffix verbatim, so even a BARE
-                            // (non-parameterized) use site's lookup by the
-                            // plain name (`ListOf`) never matched — the alias
-                            // was silently 100% dead. Strip the suffix so at
-                            // least bare usage resolves; substituting T at a
-                            // parameterized use site (`ListOf<int>`) stays a
-                            // separate, not-yet-modeled problem (the template
-                            // parameter list itself is discarded here, same
-                            // as before).
+                            // Strip a generic alias name's `<T>` suffix
+                            // (`ListOf<T> = array<int, T>`) so bare use sites
+                            // (`ListOf`) resolve. Substituting T at a
+                            // parameterized use site (`ListOf<int>`) isn't
+                            // modeled: the template parameter list is
+                            // discarded here.
                             let raw_name = name.trim();
                             let name = raw_name
                                 .split('<')

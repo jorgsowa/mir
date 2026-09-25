@@ -1,9 +1,8 @@
 //! Per-expression resolved symbol data, retained from body analysis.
 //!
-//! The static analyzer already resolves types for every expression during
-//! analysis but historically discarded the intermediate state.  This module
-//! exposes that data so that downstream tools can build position indexes for
-//! hover, go-to-definition, and completions.
+//! Body analysis resolves a type for every expression; this module keeps
+//! that state so downstream tools can build position indexes for hover,
+//! go-to-definition, and completions.
 
 use std::sync::Arc;
 

@@ -19,14 +19,10 @@ pub struct CallAnalyzer;
 
 /// Resolve a declared parameter's own textual argument position at a call
 /// site — the index into `arg_types` (built in call-site TEXTUAL order),
-/// not the parameter's own DECLARED index. The two only differ when a
-/// named argument reorders the call, but `resolve_conditional_returns`'s
-/// three call sites (`@return ($x is T ? A : B)`, in function.rs/
-/// method.rs/static_call.rs) each indexed `arg_types` directly by the
-/// declared position — silently reading the wrong argument's type for a
-/// reordered named call. Mirrors `narrowing/assertions.rs`'s
-/// `arg_for_param_index`, which already fixed the same bug class for the
-/// positional File/Unserialize sink check.
+/// not the parameter's own DECLARED index. The two differ when a named
+/// argument reorders the call, so `resolve_conditional_returns`'s call sites
+/// (`@return ($x is T ? A : B)`) must not index `arg_types` by declared
+/// position. Mirrors `narrowing/assertions.rs`'s `arg_for_param_index`.
 pub(crate) fn resolve_named_arg_type_index(
     params: &[mir_codebase::definitions::DeclaredParam],
     call_args: &[php_ast::owned::Arg],

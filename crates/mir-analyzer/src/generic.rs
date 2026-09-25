@@ -124,9 +124,8 @@ pub fn infer_arg_template_bindings(
     // Use a risky contribution only where NO real parameter ever bound this
     // template name for real — `unchecked` is computed from exactly those
     // fallback uses, so a name a different parameter legitimately bound
-    // stays fully checked (this is what previously leaked: a risky
-    // contribution merged directly into `bindings`, unconditionally
-    // poisoning `unchecked` for the name regardless of what else bound it).
+    // stays fully checked. Merging a risky contribution straight into
+    // `bindings` would mark the name unchecked whatever else bound it.
     let mut unchecked: FxHashSet<Name> = FxHashSet::default();
     for (name, val) in risky_fallback {
         if let std::collections::hash_map::Entry::Vacant(e) = bindings.entry(name) {
@@ -414,9 +413,8 @@ pub fn build_class_bindings(
     // A bare class ref supplies fewer type args than the class declares (most
     // commonly zero, e.g. `new TypedList()` for `class TypedList<T = int>`) —
     // fall back to each unbound template's declared default, when it has
-    // one. Leaving it unbound here is what previously made every downstream
-    // consumer treat a bare ref as an unconstrained wildcard even when the
-    // class declared a concrete `@template T = Default`.
+    // one. Left unbound, every downstream consumer would treat a bare ref
+    // as an unconstrained wildcard despite a concrete `@template T = Default`.
     //
     // Deliberately only handles a template that HAS a declared default —
     // does NOT insert any entry (let alone fall back to `tp.bound` or

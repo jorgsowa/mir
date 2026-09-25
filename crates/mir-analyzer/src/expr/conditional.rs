@@ -552,8 +552,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         // Case 2: Subject is a single named object (or self/static, possibly
         // nullable) that is an enum. A backed enum's case *set* is just as
         // finite and enumerable as a pure enum's — the backing scalar (its
-        // value range) is irrelevant to exhaustiveness over case names, so
-        // this no longer excludes backed enums.
+        // value range) is irrelevant to exhaustiveness over case names.
         let non_null_atoms: Vec<&Atomic> = subject_ty
             .types
             .iter()

@@ -526,13 +526,10 @@ fn next_code_line(
         }
         // A declaration whose own signature spans multiple physical lines
         // (one parameter per line is a common style) still has exactly one
-        // target line for suppression purposes — but a per-line issue
-        // reported later in the SAME signature (e.g. `UnusedParam` on a
-        // parameter several lines down) previously escaped the directive
-        // entirely, since only the signature's first line was ever recorded
-        // as covered. Track open/close paren depth from the target line
-        // onward and keep covering every continuation line until the
-        // signature's parens close.
+        // target line for suppression purposes, yet per-line issues land
+        // later in the SAME signature (e.g. `UnusedParam` on a parameter
+        // several lines down). Track paren depth from the target line and
+        // cover every continuation line until the signature's parens close.
         let target = offset as u32 + 1;
         let mut paren_depth = paren_delta(trimmed);
         let mut cont_idx = offset + 1;
@@ -657,9 +654,8 @@ fn is_comment_only(trimmed: &str) -> bool {
 
 /// A single-line PHP 8 attribute (`#[Foo]`, `#[Foo(bar: 1)]`) with no other
 /// code on the same line — a trailing same-line comment (`#[Foo] // note`,
-/// `#[Foo] /* note */`) is stripped first so it doesn't re-defeat this
-/// check (it previously required `]` to be the line's last character,
-/// which a trailing comment always violates). Doesn't attempt multi-line
+/// `#[Foo] /* note */`) is stripped first, so `]` needn't end the line.
+/// Doesn't attempt multi-line
 /// bracket-depth tracking for a `#[` that spans several lines — only the
 /// common single-line case, mirroring the scope this suppression logic
 /// already accepts elsewhere (e.g. no nested-comment tracking either).
@@ -832,13 +828,10 @@ fn extract_comment(raw: &str) -> Option<Comment<'_>> {
     }
 
     // Earliest single-line / block introducer on the line, skipping any
-    // that fall inside a quoted string literal — `$x = "// not a
-    // comment";` previously matched `raw.find("//")` regardless, wrongly
-    // treating a plain string-literal statement as carrying a trailing
-    // suppression comment. Only a same-line string is handled here (a
-    // bounded, quote-toggle scan); a heredoc/multi-line string body stays
-    // unrecognized, same as before — that needs cross-line state this
-    // line-at-a-time scanner doesn't have.
+    // that fall inside a quoted string literal (`$x = "// not a
+    // comment";` carries no comment). Only a same-line string is handled
+    // (a bounded, quote-toggle scan); a heredoc/multi-line string body
+    // needs cross-line state this line-at-a-time scanner doesn't have.
     let pos = find_comment_introducer(raw)?;
     let has_code_before = !raw[..pos].trim().is_empty();
     Some(Comment {
