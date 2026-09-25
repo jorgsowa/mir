@@ -550,3 +550,46 @@ fn open_file_resolves_psr0_namespaced_vendor_class() {
         analysis.issues
     );
 }
+
+/// `analyze_file_diagnostics` lazily loads an unindexed PSR-4 class mid-call;
+/// that input write must not wait on a db handle the call itself holds.
+#[test]
+fn session_diagnostics_lazy_loads_psr4_class_without_deadlock() {
+    let root = common::create_temp_dir("session_diagnostics_psr4");
+    fs::create_dir_all(root.path().join("src")).unwrap();
+    fs::write(
+        root.path().join("src/Greeter.php"),
+        "<?php\nnamespace App;\nclass Greeter { public function greet(): string { return 'hi'; } }\n",
+    )
+    .unwrap();
+    fs::write(
+        root.path().join("composer.json"),
+        r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+    )
+    .unwrap();
+    let psr4 = mir_analyzer::composer::Psr4Map::from_composer(root.path()).expect("psr4 map");
+    let open_path = root
+        .path()
+        .join("src/main.php")
+        .to_string_lossy()
+        .into_owned();
+
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let mut session = AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4));
+        let analysis = session.analyze_file_diagnostics(
+            &open_path,
+            "<?php\nnamespace App;\nfunction run(): void { (new Greeter())->greet(); }\n",
+        );
+        let _ = tx.send(analysis);
+    });
+    let analysis = rx
+        .recv_timeout(std::time::Duration::from_secs(60))
+        .expect("analyze_file_diagnostics deadlocked loading a PSR-4 class");
+
+    let kinds: Vec<_> = analysis.issues.iter().map(|i| i.kind.name()).collect();
+    assert!(
+        !kinds.contains(&"UndefinedClass") && !kinds.contains(&"UndefinedMethod"),
+        "lazily loaded class should resolve, got {kinds:?}"
+    );
+}

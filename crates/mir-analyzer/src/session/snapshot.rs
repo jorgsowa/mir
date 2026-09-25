@@ -61,6 +61,12 @@ impl<'a> DbView<'a> {
     }
 }
 
+// Without a `Drop` impl, NLL ends the owner borrow at the view's last use
+// while its db clone lives on to the end of scope.
+impl Drop for DbView<'_> {
+    fn drop(&mut self) {}
+}
+
 impl std::ops::Deref for DbView<'_> {
     type Target = AnalysisSnapshot;
     fn deref(&self) -> &AnalysisSnapshot {

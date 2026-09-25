@@ -638,7 +638,8 @@ impl AnalysisSession {
         // for the whole currently-registered set (stubs + this chunk); otherwise
         // just this chunk.
         let seed = self.db.salsa.workspace_symbol_index_singleton().is_none();
-        let snap = self.db.snapshot_db();
+        let view = self.db_view();
+        let snap = view.db();
         let to_collect: Vec<crate::db::SourceFile> = if seed {
             snap.all_source_files()
         } else {
@@ -658,12 +659,9 @@ impl AnalysisSession {
                     .map_with(snap.clone(), |db, &sf| collect_one(db, sf))
                     .collect()
             } else {
-                to_collect
-                    .iter()
-                    .map(|&sf| collect_one(&snap, sf))
-                    .collect()
+                to_collect.iter().map(|&sf| collect_one(snap, sf)).collect()
             };
-        drop(snap);
+        drop(view);
 
         if cancel.is_cancelled() {
             return crate::IndexBatchOutcome {
@@ -806,12 +804,12 @@ impl AnalysisSession {
         // 3.9s warm boot at 15.4K files serially; this is the `index_batch`
         // pattern already used elsewhere in this file). Only cheap map
         // construction/merge runs in phase 2, under a lock.
-        let snap = self.snapshot_db();
+        let view = self.db_view();
         let hits: Vec<WarmStartHit> = {
             use rayon::prelude::*;
             files
                 .par_iter()
-                .map_with(snap.clone(), |db, (file, _)| {
+                .map_with(view.db().clone(), |db, (file, _)| {
                     // Freshness is keyed on the Arc actually stored on the
                     // input — an upsert against already-registered,
                     // content-equal text keeps the prior Arc (see
@@ -860,7 +858,7 @@ impl AnalysisSession {
                 .filter_map(|hit| hit)
                 .collect()
         };
-        drop(snap);
+        drop(view);
 
         // Phase 2: apply — only cheap salsa input writes and map merges run
         // here, under the lock each one already required individually.
@@ -900,12 +898,12 @@ impl AnalysisSession {
             }
         }
         if !structural_target_files.is_empty() {
-            let db = self.snapshot_db();
+            let view = self.db_view();
             let mut structural_targets = self.last_structural_targets.write();
             for file in &structural_target_files {
                 structural_targets.insert(
                     file.as_ref().to_string(),
-                    file_outgoing_dependencies(&db, file.as_ref(), false),
+                    file_outgoing_dependencies(view.db(), file.as_ref(), false),
                 );
             }
         }
@@ -937,7 +935,8 @@ impl AnalysisSession {
             return;
         }
 
-        let snap = self.snapshot_db();
+        let view = self.db_view();
+        let snap = view.db();
         let all = snap.all_source_files();
         let covered_set: FxHashSet<crate::db::SourceFile> =
             covered.iter().map(|(sf, _)| *sf).collect();
@@ -969,7 +968,7 @@ impl AnalysisSession {
                 })
                 .collect()
         };
-        drop(snap);
+        drop(view);
 
         let mut decls = covered;
         decls.extend(gap_decls);

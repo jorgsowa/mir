@@ -421,9 +421,10 @@ impl<'a> FileAnalyzer<'a> {
         // on arrival — the safe direction.
         let prepare_generation = self.session.prepare_generation_snapshot();
         let ingested_text = {
-            let db = self.session.snapshot_db();
+            let view = self.session.db_view();
+            let db = view.db();
             db.lookup_source_file(file.as_ref())
-                .map(|sf| sf.text(&db as &dyn crate::db::MirDatabase).clone())
+                .map(|sf| sf.text(db as &dyn crate::db::MirDatabase).clone())
         };
         self.session
             .prepare_ast_for_analysis(program, file.as_ref());

@@ -324,11 +324,11 @@ impl AnalysisSession {
             return;
         }
         // Resolve names against the file's namespace/imports up front, then
-        // drop the snapshot before loading (which mutates inputs).
+        // drop the view before loading (which mutates inputs).
         let resolved: Vec<String> = {
-            let db = self.snapshot_db();
+            let view = self.db_view();
             refs.into_iter()
-                .map(|raw| crate::db::resolve_name(&db, file, &raw))
+                .map(|raw| crate::db::resolve_name(view.db(), file, &raw))
                 .collect()
         };
         for fqcn in resolved {

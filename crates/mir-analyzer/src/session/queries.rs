@@ -15,22 +15,28 @@ impl AnalysisSession {
         let file: Arc<str> = Arc::from(file);
         self.ingest_file(file.clone(), Arc::from(source));
 
-        let db = self.snapshot_db();
-        let Some(sf) = db.lookup_source_file(file.as_ref()) else {
-            return crate::FileAnalysis {
-                issues: Vec::new(),
-                symbols: Vec::new(),
+        // Body analysis can load classes, a write that would wait forever on
+        // a db handle still alive here.
+        let (mut issues, parsed) = {
+            let view = self.db_view();
+            let db = view.db();
+            let Some(sf) = db.lookup_source_file(file.as_ref()) else {
+                return crate::FileAnalysis {
+                    issues: Vec::new(),
+                    symbols: Vec::new(),
+                };
             };
+            let defs = crate::db::collect_file_definitions(db, sf);
+            let prepared = crate::db::prepare_analysis_file(db, sf);
+            let parsed = (!prepared.has_hard_parse_errors)
+                .then(|| (prepared.text.clone(), prepared.parsed.0.clone()));
+            (Arc::unwrap_or_clone(defs.issues.clone()), parsed)
         };
-        let defs = crate::db::collect_file_definitions(&db, sf);
-        let prepared = crate::db::prepare_analysis_file(&db, sf);
-        let mut issues = Arc::unwrap_or_clone(defs.issues.clone());
 
-        if !prepared.has_hard_parse_errors {
-            let parsed = prepared.parse_result();
+        if let Some((text, parsed)) = parsed {
             let analysis = crate::FileAnalyzer::new(self).analyze_diagnostics_only(
                 file.clone(),
-                prepared.text.as_ref(),
+                text.as_ref(),
                 &parsed.program,
                 &parsed.source_map,
             );
