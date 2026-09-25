@@ -1005,8 +1005,9 @@ impl AnalysisSession {
     /// dependencies via [`Self::prepare_file_for_analysis`].
     ///
     /// Run it before handing out an [`super::AnalysisSnapshot`]: snapshot
-    /// queries never load, so they only see what this has prepared. Pass the
-    /// file a query is about, or `None` for workspace-wide queries.
+    /// queries load missing classes on demand, but workspace-wide ones only
+    /// enumerate what this has settled. Pass the file a query is about, or
+    /// `None` for workspace-wide queries.
     pub fn prepare_for_query(&mut self, file: Option<&Arc<str>>) {
         self.settle_workspace_index();
         if let Some(file) = file {
@@ -1021,6 +1022,7 @@ impl AnalysisSession {
         &mut self,
         should_cancel: &(dyn Fn() -> bool + Sync),
     ) -> bool {
+        self.db.salsa.adopt_on_demand_files();
         // Bounded rounds: without a cap, a caller with no cancellation token would never return while a host keeps mirroring buffers.
         let mut rounds_left = SETTLE_ROUNDS;
         loop {

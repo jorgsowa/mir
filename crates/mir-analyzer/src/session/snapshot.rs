@@ -16,9 +16,10 @@ use crate::php_version::PhpVersion;
 /// A read handle on one revision of an [`super::AnalysisSession`]:
 /// `Send + Clone`, for running queries on threads other than the owner's.
 ///
-/// Every query assumes the owner already ran the matching write prelude
-/// ([`super::AnalysisSession::prepare_for_query`]) before handing the
-/// snapshot out; none of them load classes or write salsa inputs.
+/// No query writes salsa inputs. Class-likes and built-in stubs the symbol
+/// index lacks load on demand as pure reads; the owner adopts them at its
+/// next [`super::AnalysisSession::prepare_for_query`], which also settles
+/// the index before a snapshot is handed out.
 ///
 /// A snapshot blocks the owner's next input write until it is dropped (salsa
 /// waits for outstanding handles), so hand snapshots out per request and
@@ -583,10 +584,8 @@ impl AnalysisSnapshot {
     /// mention scans to the index shared with the owner, so later queries
     /// find them fresh. `Ok(false)` when `cancel` stopped the pass first.
     ///
-    /// Files the owner hasn't prepared (see
-    /// [`super::AnalysisSession::prepare_for_query`]) analyze against the
-    /// classes already loaded; a commit with unresolved names stays tied to
-    /// this snapshot's [`Self::index_generation`], so the next load re-opens it.
+    /// A commit with unresolved names stays tied to this snapshot's
+    /// [`Self::index_generation`], so the next workspace change re-opens it.
     pub fn warm_files(
         &self,
         files: &[Arc<str>],

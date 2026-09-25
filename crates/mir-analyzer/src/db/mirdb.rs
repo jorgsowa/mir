@@ -79,6 +79,14 @@ pub struct MirDbStorage {
     /// the deleted state explicit and auditable, and provides the foundation
     /// for the Phase M2 tracked-struct migration.
     deleted_files: Arc<HashSet<Arc<str>>>,
+    /// Files a read registered on demand ([`MirDatabase::load_on_demand`]).
+    /// Shared by every clone and append-only, so concurrent readers loading
+    /// one path agree on its handle. The owner adopts them into
+    /// `source_files` at its next write ([`Self::adopt_on_demand_files`]).
+    on_demand_files: Arc<parking_lot::RwLock<FxHashMap<Arc<str>, SourceFile>>>,
+    /// `on_demand_files.len()` at this handle's last adoption; entries are
+    /// never removed, so equal means nothing new to adopt.
+    on_demand_adopted: usize,
     /// Side-channel resolver state. The `ResolverConfig` salsa input is
     /// lazily created on first `set_resolver` call; its `revision` is
     /// bumped on every subsequent change so dependent tracked queries
@@ -260,6 +268,9 @@ struct ResolverState {
     /// Currently active resolver. `None` for sessions configured without
     /// PSR-4 / classmap support.
     resolver: Option<Arc<dyn crate::ClassResolver>>,
+    /// Reads the text of files a resolver maps to. `None` disables on-demand
+    /// loading of resolver-mapped files.
+    source_provider: Option<Arc<dyn crate::SourceProvider>>,
 }
 
 impl Default for MirDbStorage {
@@ -273,6 +284,8 @@ impl Default for MirDbStorage {
             pending_ref_locs: PendingRefLocs::default(),
             source_files: Arc::default(),
             deleted_files: Arc::default(),
+            on_demand_files: Arc::default(),
+            on_demand_adopted: 0,
             resolver_state: Arc::default(),
             workspace_revision_input: Arc::default(),
             workspace_revision_counter: Arc::default(),
@@ -477,7 +490,41 @@ impl MirDatabase for MirDbStorage {
     }
 
     fn lookup_source_file(&self, path: &str) -> Option<SourceFile> {
-        self.source_files.get(path).copied()
+        self.source_files
+            .get(path)
+            .copied()
+            .or_else(|| self.on_demand_file(path))
+    }
+
+    fn load_on_demand(
+        &self,
+        path: &str,
+        durability: salsa::Durability,
+        text: &dyn Fn() -> Option<Arc<str>>,
+    ) -> Option<SourceFile> {
+        if let Some(sf) = self.lookup_source_file(path) {
+            return Some(sf);
+        }
+        if self.deleted_files.contains(path) {
+            return None;
+        }
+        // Held across the read so racing loaders of one path share a handle.
+        let mut on_demand = self.on_demand_files.write();
+        if let Some(&sf) = on_demand.get(path) {
+            return Some(sf);
+        }
+        let path: Arc<str> = Arc::from(path);
+        let sf = SourceFile::builder(path.clone(), text()?)
+            .durability(durability)
+            .new(self);
+        on_demand.insert(path.clone(), sf);
+        drop(on_demand);
+        self.mark_index_pending(&path);
+        Some(sf)
+    }
+
+    fn source_provider(&self) -> Option<Arc<dyn crate::SourceProvider>> {
+        self.resolver_state.read().source_provider.clone()
     }
 
     fn analyze_config(&self) -> crate::db::AnalyzeFileInput {
@@ -1296,6 +1343,12 @@ impl MirDbStorage {
         self.resolver_state.write().resolver = resolver;
     }
 
+    /// Set the reader for files the resolver maps to; see
+    /// [`MirDatabase::load_on_demand`].
+    pub fn set_source_provider(&mut self, provider: Arc<dyn crate::SourceProvider>) {
+        self.resolver_state.write().source_provider = Some(provider);
+    }
+
     /// Create a new or update an existing Salsa SourceFile input for `path`.
     /// Returns the stable handle that callers should retain for tracked queries.
     pub fn upsert_source_file(&mut self, path: Arc<str>, text: Arc<str>) -> SourceFile {
@@ -1315,6 +1368,7 @@ impl MirDbStorage {
         durability: salsa::Durability,
     ) -> SourceFile {
         use salsa::Setter as _;
+        self.adopt_on_demand_files();
         if let Some(&sf) = self.source_files.get(&path) {
             Arc::make_mut(&mut self.deleted_files).remove(path.as_ref());
             if *sf.text(self) != text {
@@ -1335,6 +1389,39 @@ impl MirDbStorage {
         self.bump_workspace_revision();
         self.mark_index_pending(&path);
         sf
+    }
+
+    /// A file a read registered on demand and the owner hasn't adopted.
+    fn on_demand_file(&self, path: &str) -> Option<SourceFile> {
+        if self.deleted_files.contains(path) {
+            return None;
+        }
+        self.on_demand_files.read().get(path).copied()
+    }
+
+    /// Move files reads registered on demand into this handle's own registry,
+    /// so workspace enumeration sees them. Bumps the workspace revision when
+    /// any are new here.
+    pub(crate) fn adopt_on_demand_files(&mut self) {
+        let on_demand = self.on_demand_files.read();
+        if on_demand.len() == self.on_demand_adopted {
+            return;
+        }
+        let seen = on_demand.len();
+        let adopted: Vec<(Arc<str>, SourceFile)> = on_demand
+            .iter()
+            .filter(|(path, _)| {
+                !self.source_files.contains_key(*path) && !self.deleted_files.contains(*path)
+            })
+            .map(|(path, &sf)| (path.clone(), sf))
+            .collect();
+        drop(on_demand);
+        self.on_demand_adopted = seen;
+        if adopted.is_empty() {
+            return;
+        }
+        Arc::make_mut(&mut self.source_files).extend(adopted);
+        self.bump_workspace_revision();
     }
 
     /// Record that `path`'s declarations may be out of step with the symbol
@@ -1385,6 +1472,7 @@ impl MirDbStorage {
     /// incremental subtract is ambiguous, the singleton is nulled so the next
     /// lookup falls back to the tracked query / a finalize rebuilds it.
     pub fn remove_source_file(&mut self, path: &str) {
+        self.adopt_on_demand_files();
         self.clear_index_pending(path);
         let sf = self.source_files.get(path).copied();
         if Arc::make_mut(&mut self.source_files).remove(path).is_some() {

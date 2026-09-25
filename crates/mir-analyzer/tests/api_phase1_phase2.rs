@@ -715,10 +715,10 @@ fn load_class_with_custom_resolver() {
 
     let mut session = AnalysisSession::new(PhpVersion::LATEST).with_class_resolver(resolver);
 
-    // Class is not yet known
-    assert!(!session.contains_class("ResolvedByCustom"));
+    // Lookups find it on demand before any explicit load.
+    assert!(session.contains_class("ResolvedByCustom"));
 
-    // First call: should load via resolver
+    // First call: ingests it into the symbol index via the resolver
     let outcome = session.load_class("ResolvedByCustom");
     assert_eq!(outcome, LoadOutcome::Loaded);
     assert!(session.contains_class("ResolvedByCustom"));
@@ -771,8 +771,8 @@ fn prefetch_imports_loads_unresolved_use_statements() {
         Arc::from("<?php\nuse App\\Dep;\nclass Caller { public function go(Dep $d): void {} }\n");
     session.ingest_file(opened.clone(), opened_src);
 
-    // Before prefetch: Dep is not in the codebase.
-    assert!(!session.contains_class("App\\Dep"));
+    // Before prefetch: lookups find Dep on demand, but the index lacks it.
+    assert!(session.contains_class("App\\Dep"));
 
     // pending_lazy_loads should surface the unresolved import.
     let pending = session.pending_lazy_loads(opened.as_ref());

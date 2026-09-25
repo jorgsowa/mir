@@ -174,7 +174,7 @@ impl AnalysisSession {
     }
 
     /// FQCNs that `file` imports via `use` statements but that aren't yet
-    /// loaded in the session.
+    /// in the session's symbol index.
     ///
     /// Designed as the input to background prefetching: after the LSP server
     /// Return the `use`-import alias map for a file: a list of `(alias, fqcn)`
@@ -215,7 +215,7 @@ impl AnalysisSession {
         let mut seen: FxHashSet<Arc<str>> = FxHashSet::default();
         for fqcn in imports.values() {
             let here = crate::db::Fqcn::interned(&db, *fqcn);
-            if crate::db::find_class_like(&db, here).is_some() {
+            if crate::db::class_like_indexed(&db, here) {
                 continue;
             }
             if let Some(resolver) = &self.resolver {
@@ -232,7 +232,7 @@ impl AnalysisSession {
     }
 
     /// Convenience: synchronously lazy-load every import of `file` that
-    /// isn't already in the codebase. Returns the number successfully loaded.
+    /// isn't already in the symbol index. Returns the number successfully loaded.
     ///
     /// Uses a single shared-visited two-tier BFS across all pending imports
     /// (see [`Self::load_classes_transitive_bounded`]) with a shallow depth so

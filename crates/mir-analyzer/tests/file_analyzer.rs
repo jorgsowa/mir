@@ -218,17 +218,18 @@ fn ensure_all_stubs_is_idempotent() {
 }
 
 /// `ensure_stub_for_function` lazily loads exactly the stub containing the
-/// requested function — no more, no less. On a fresh session nothing is loaded
-/// yet; requesting `imagecreate` brings in the gd stub on demand.
+/// requested function — no more, no less. A lookup finds `imagecreate` on
+/// demand without ingesting it; requesting it ingests the gd stub.
 #[test]
 fn ensure_stub_for_function_lazy_loads_extension() {
     let mut session = AnalysisSession::new(PhpVersion::LATEST);
     let baseline = session.loaded_stub_count();
 
-    // Nothing loaded yet on a fresh session.
-    assert!(
-        !session.contains_function("imagecreate"),
-        "imagecreate() must not be loaded on a fresh session"
+    assert!(session.contains_function("imagecreate"));
+    assert_eq!(
+        session.loaded_stub_count(),
+        baseline,
+        "an on-demand lookup must not ingest the stub"
     );
 
     let was_known = session.ensure_stub_for_function("imagecreate");

@@ -175,3 +175,125 @@ fn owner_write_cancels_an_in_flight_snapshot_query() {
         .unwrap();
     assert_eq!(decl.file.as_ref(), "base.php");
 }
+
+const VENDOR_BASE_PATH: &str = "vendor/Base.php";
+const VENDOR_BASE: &str =
+    "<?php\nnamespace Vendor;\nclass Base { public function fromVendor(): int { return 1; } }\n";
+const VENDOR_CHILD: &str = "<?php\nnamespace App;\nclass VendorChild extends \\Vendor\\Base {}\n";
+const VENDOR_CALLER: &str =
+    "<?php\nnamespace App;\nfunction use_vendor(\\Vendor\\Base $b): int { return $b->fromVendor(); }\n";
+
+/// Maps every `Vendor\` class to [`VENDOR_BASE_PATH`], served from memory.
+struct VendorSources;
+
+impl mir_analyzer::ClassResolver for VendorSources {
+    fn resolve(&self, fqcn: &str) -> Option<std::path::PathBuf> {
+        fqcn.starts_with("Vendor\\")
+            .then(|| std::path::PathBuf::from(VENDOR_BASE_PATH))
+    }
+}
+
+impl mir_analyzer::SourceProvider for VendorSources {
+    fn read(&self, path: &str) -> Option<Arc<str>> {
+        (path == VENDOR_BASE_PATH).then(|| Arc::from(VENDOR_BASE))
+    }
+}
+
+fn vendor_workspace() -> (AnalysisSession, Vec<Arc<str>>) {
+    let mut session = AnalysisSession::new(PhpVersion::LATEST)
+        .with_class_resolver(Arc::new(VendorSources))
+        .with_source_provider(Arc::new(VendorSources));
+    let files: Vec<Arc<str>> = ["child.php", "caller.php"]
+        .into_iter()
+        .map(Arc::from)
+        .collect();
+    for (path, text) in files.iter().zip([VENDOR_CHILD, VENDOR_CALLER]) {
+        session.ingest_file(path.clone(), Arc::from(text));
+    }
+    (session, files)
+}
+
+#[test]
+fn snapshot_loads_an_unindexed_vendor_class_without_an_owner_write() {
+    let (mut session, files) = vendor_workspace();
+    let tracked_before = session.tracked_file_count();
+    let revision_before = session.text_revision();
+    let generation_before = session.index_generation();
+
+    let snap = session.snapshot();
+    let caller = files[1].clone();
+    let (declaring, issues) = thread::spawn(move || {
+        let (declaring, _) = snap
+            .find_method_in_chain("App\\VendorChild", "fromVendor")
+            .unwrap()
+            .expect("inherited vendor method resolves on demand");
+        let parsed = php_rs_parser::parse(VENDOR_CALLER);
+        let analysis = snap
+            .analyze(caller, VENDOR_CALLER, &parsed.program, &parsed.source_map)
+            .unwrap();
+        (declaring, analysis.issues)
+    })
+    .join()
+    .unwrap();
+
+    assert_eq!(declaring.as_ref(), "Vendor\\Base");
+    assert!(
+        !issues.iter().any(|i| matches!(
+            i.kind,
+            IssueKind::UndefinedClass { .. } | IssueKind::UndefinedMethod { .. }
+        )),
+        "{issues:?}"
+    );
+    assert_eq!(session.text_revision(), revision_before);
+    assert_eq!(session.index_generation(), generation_before);
+    assert_eq!(session.tracked_file_count(), tracked_before);
+
+    // The owner's next settle adopts the file into its own registry.
+    session.prepare_for_query(None);
+    assert_eq!(session.tracked_file_count(), tracked_before + 1);
+    assert!(session
+        .all_classes()
+        .iter()
+        .any(|(fqcn, _)| fqcn.as_ref() == "Vendor\\Base"));
+}
+
+#[test]
+fn concurrent_snapshots_loading_one_vendor_file_share_its_input() {
+    let (mut session, _files) = vendor_workspace();
+    let tracked_before = session.tracked_file_count();
+    let readers: Vec<_> = (0..4)
+        .map(|_| {
+            let snap = session.snapshot();
+            thread::spawn(move || {
+                snap.find_class_like("Vendor\\Base")
+                    .unwrap()
+                    .expect("vendor class resolves on demand")
+                    .location()
+                    .cloned()
+                    .expect("vendor class has a location")
+            })
+        })
+        .collect();
+    let locations: Vec<_> = readers.into_iter().map(|r| r.join().unwrap()).collect();
+    assert!(locations.windows(2).all(|w| w[0] == w[1]), "{locations:?}");
+
+    session.prepare_for_query(None);
+    assert_eq!(session.tracked_file_count(), tracked_before + 1);
+}
+
+#[test]
+fn snapshot_loads_a_builtin_stub_on_demand() {
+    let session = AnalysisSession::new(PhpVersion::LATEST);
+    let stubs_before = session.loaded_stub_count();
+    let snap = session.snapshot();
+    let found = thread::spawn(move || {
+        (
+            snap.find_class_like("ArrayObject").unwrap().is_some(),
+            snap.find_function("str_contains").unwrap().is_some(),
+        )
+    })
+    .join()
+    .unwrap();
+    assert_eq!(found, (true, true));
+    assert_eq!(session.loaded_stub_count(), stubs_before);
+}

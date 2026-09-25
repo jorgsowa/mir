@@ -157,10 +157,13 @@ impl AnalysisSession {
             Some(f) if f.is_empty() => return,
             Some(f) => f,
         };
+        let Some(provider) = self.db.salsa.source_provider() else {
+            return;
+        };
         let sources: Vec<(std::sync::Arc<str>, std::sync::Arc<str>)> = files
             .iter()
             .filter_map(|p| {
-                let text = self.source_provider.read(p.to_string_lossy().as_ref())?;
+                let text = provider.read(p.to_string_lossy().as_ref())?;
                 Some((std::sync::Arc::from(p.to_string_lossy().as_ref()), text))
             })
             .collect();

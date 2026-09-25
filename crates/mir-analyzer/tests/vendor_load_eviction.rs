@@ -253,8 +253,8 @@ fn priority_index_is_bounded_to_direct_refs() {
     );
     assert!(session.contains_class("Vendor\\Root"));
     assert!(
-        !session.contains_class("Vendor\\Leaf0"),
-        "transitively-reachable Leaf0 must NOT be priority-loaded"
+        session.contains_class("Vendor\\Leaf0"),
+        "a lookup still finds the unindexed Leaf0 on demand"
     );
 }
 

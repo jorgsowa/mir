@@ -15,6 +15,11 @@ impl AnalysisSession {
         crate::db::class_exists(&db, fqcn)
     }
 
+    fn class_indexed(&self, fqcn: &str) -> bool {
+        let db = self.snapshot_db();
+        crate::db::class_like_indexed(&db, crate::db::Fqcn::from_str(&db, fqcn))
+    }
+
     /// Returns `true` if `class` has a method named `name` registered. Method
     /// names are matched case-insensitively (PHP method dispatch semantics).
     pub fn contains_method(&self, class: &str, name: &str) -> bool {
@@ -23,9 +28,11 @@ impl AnalysisSession {
     }
 
     /// Resolve `fqcn` via the configured [`crate::ClassResolver`] and ingest
-    /// the mapped file. The session keeps a negative cache so repeated calls
-    /// for an unresolvable name don't re-hit the resolver; the cache is
-    /// invalidated on any [`Self::ingest_file`] / [`Self::invalidate_file`].
+    /// the mapped file into the symbol index. Lookups already find such a
+    /// class on demand; ingesting also makes workspace enumeration see it.
+    /// The session keeps a negative cache so repeated calls for an
+    /// unresolvable name don't re-hit the resolver; the cache is invalidated
+    /// on any [`Self::ingest_file`] / [`Self::invalidate_file`].
     ///
     /// This is the LSP-friendly entry point: the analyzer never touches
     /// `vendor/` on its own, but consumers can ask it to resolve individual
@@ -36,7 +43,7 @@ impl AnalysisSession {
     /// already-loaded / freshly-loaded / not-resolvable. Use
     /// [`crate::LoadOutcome::is_loaded`] when only success matters.
     pub fn load_class(&mut self, fqcn: &str) -> crate::LoadOutcome {
-        if self.contains_class(fqcn) {
+        if self.class_indexed(fqcn) {
             return crate::LoadOutcome::AlreadyLoaded;
         }
         if self.unresolvable_fqcns.read().contains_key(fqcn) {
@@ -82,7 +89,12 @@ impl AnalysisSession {
         // same path.
         let src: Arc<str> = match self.source_of(&file) {
             Some(text) => text,
-            None => match self.source_provider.read(&path.to_string_lossy()) {
+            None => match self
+                .db
+                .salsa
+                .source_provider()
+                .and_then(|p| p.read(&path.to_string_lossy()))
+            {
                 Some(text) => text,
                 None => {
                     record_lazy_load_failure(LazyLoadFailure::SourceUnreadable, fqcn);
@@ -91,7 +103,7 @@ impl AnalysisSession {
             },
         };
         self.ingest_file(file, src);
-        if self.contains_class(fqcn) {
+        if self.class_indexed(fqcn) {
             true
         } else {
             record_lazy_load_failure(LazyLoadFailure::IngestThenMissing, fqcn);

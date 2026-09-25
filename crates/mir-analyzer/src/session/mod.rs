@@ -69,10 +69,6 @@ pub struct AnalysisSession {
     /// change makes a never-resolvable name resolvable).
     /// Bounded to `UNRESOLVABLE_CACHE_CAP`; clears on overflow.
     unresolvable_fqcns: RwLock<HashMap<Arc<str>, Option<Arc<str>>>>,
-    /// Pluggable source-text provider for lazy-load. Defaults to filesystem
-    /// reads ([`crate::FsSourceProvider`]); LSPs swap in a VFS-backed
-    /// implementation so unsaved buffers override on-disk content.
-    source_provider: Arc<dyn crate::SourceProvider>,
     /// Vendor `autoload.files` entries not yet indexed. `Some(paths)` means
     /// pending; `None` means the load has already run (idempotent). Populated
     /// by [`Self::with_psr4`]; drained by [`Self::ensure_vendor_eager_functions`],
@@ -191,6 +187,8 @@ impl AnalysisSession {
     pub fn new(php_version: PhpVersion) -> Self {
         let mut db = AnalyzerDb::new();
         db.salsa.set_php_version(Arc::from(php_version.to_string()));
+        db.salsa
+            .set_source_provider(Arc::new(crate::FsSourceProvider));
         Self {
             db,
             cache: None,
@@ -203,7 +201,6 @@ impl AnalysisSession {
             last_ingested_symbols: RwLock::default(),
             last_structural_targets: RwLock::default(),
             unresolvable_fqcns: RwLock::default(),
-            source_provider: Arc::new(crate::FsSourceProvider),
             pending_eager_function_files: parking_lot::Mutex::new(Some(Vec::new())),
             prepared_files: RwLock::default(),
             suppression_maps: RwLock::default(),
@@ -362,7 +359,7 @@ impl AnalysisSession {
     /// provider here so the analyzer reads from unsaved editor buffers
     /// instead of disk.
     pub fn with_source_provider(mut self, provider: Arc<dyn crate::SourceProvider>) -> Self {
-        self.source_provider = provider;
+        self.db.salsa.set_source_provider(provider);
         self
     }
 

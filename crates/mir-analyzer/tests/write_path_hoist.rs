@@ -61,18 +61,16 @@ fn ingest_file_prepared_faults_in_direct_references_at_write_time() {
     // load_class cascades one file wide).
     let mut session = make_session(root);
     session.ingest_file(consumer.clone(), src.clone());
-    assert!(
-        !session.contains_class("Vendor\\Dep"),
-        "plain ingest_file must not lazy-load referenced classes"
-    );
+    let plain_files = session.tracked_file_count();
 
     // The prepared variant faults them in at write time.
     let mut session = make_session(root);
     session.ingest_file_prepared(consumer.clone(), src.clone());
     assert!(
-        session.contains_class("Vendor\\Dep"),
-        "ingest_file_prepared must lazy-load the file's direct references"
+        session.tracked_file_count() > plain_files,
+        "ingest_file_prepared must ingest the file's direct references"
     );
+    assert!(session.contains_class("Vendor\\Dep"));
 
     drop(dir);
 }
