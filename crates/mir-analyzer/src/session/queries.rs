@@ -341,7 +341,7 @@ impl AnalysisSession {
         // analysis work, and some callers count probe invocations to prove
         // a warm query needed no re-analysis.
         let key = {
-            let snap = self.snapshot();
+            let snap = self.db_view();
             let key = snap.reference_query_key(symbol, files, include_declaration, includes);
             if let Some(hit) = self.index.ref_queries.get(&key) {
                 return Some(hit);
@@ -352,7 +352,7 @@ impl AnalysisSession {
             if should_cancel() {
                 return None;
             }
-            let snap = self.snapshot();
+            let snap = self.db_view();
             match catch(|| snap.stale_reference_candidates(symbol, files)) {
                 Ok(stale) => break stale,
                 Err(_) if should_cancel() => return None,
@@ -367,10 +367,9 @@ impl AnalysisSession {
             if !self.settle_workspace_index_cancellable(should_cancel) {
                 return None;
             }
-            // Serial, no live snapshot held; a cancelled file retries in
-            // place. Parallel variants deadlocked under
-            // `concurrent_reference_cancel`. The bump scope closes before the
-            // commit snapshot captures its generation.
+            // Serial; a cancelled file retries in place. Parallel variants
+            // deadlocked under `concurrent_reference_cancel`. The bump scope
+            // closes before the commit snapshot captures its generation.
             {
                 let mut session = self.defer_revision_bumps();
                 for path in &stale {
@@ -390,7 +389,7 @@ impl AnalysisSession {
                 if should_cancel() {
                     return None;
                 }
-                let snap = self.snapshot();
+                let snap = self.db_view();
                 match catch(|| snap.commit_reference_candidates(&stale)) {
                     Ok(()) => break,
                     Err(_) if should_cancel() => return None,
@@ -402,16 +401,17 @@ impl AnalysisSession {
         if include_declaration {
             self.load_symbol_owner(symbol);
         }
-        let snap = self.snapshot();
-        let out = loop {
+        loop {
+            let snap = self.db_view();
             match catch(|| snap.read_references(symbol, files, include_declaration, includes)) {
-                Ok(out) => break out,
+                Ok(out) => {
+                    snap.memoize_references(key, &out);
+                    return Some(out);
+                }
                 Err(_) if should_cancel() => return None,
                 Err(_) => {}
             }
-        };
-        snap.memoize_references(key, &out);
-        Some(out)
+        }
     }
 
     /// The symbol's declaration site, narrowed from the collector's

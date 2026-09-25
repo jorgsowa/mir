@@ -224,6 +224,12 @@ impl AnalysisSession {
         }
     }
 
+    /// A [`Self::snapshot`] scoped to this borrow of the session; see
+    /// [`DbView`].
+    pub(crate) fn db_view(&self) -> DbView<'_> {
+        DbView::new(self, self.snapshot())
+    }
+
     /// Run `query` on fresh snapshots until one completes. The owner can't
     /// write while it's inside this call, so only a host writing through a
     /// raw [`Self::snapshot_db`] clone can cancel it.
@@ -483,6 +489,7 @@ mod stubs;
 use index_state::IndexState;
 pub use queries::SubtypeClassSite;
 pub use snapshot::AnalysisSnapshot;
+use snapshot::DbView;
 
 /// Compute the full set of files `file` depends on by projecting structural
 /// and body-reference symbols through the workspace symbol index. Self-edges

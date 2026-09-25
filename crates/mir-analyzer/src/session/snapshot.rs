@@ -41,6 +41,36 @@ const _: () = {
     assert_send_clone::<AnalysisSnapshot>();
 };
 
+/// An [`AnalysisSnapshot`] that borrows its owner, so the owner's next
+/// `&mut self` write can't start while it's alive. A live handle across that
+/// write would deadlock the owner in salsa's `cancel_others`.
+pub(crate) struct DbView<'a> {
+    snapshot: AnalysisSnapshot,
+    _owner: std::marker::PhantomData<&'a super::AnalysisSession>,
+}
+
+impl<'a> DbView<'a> {
+    pub(super) fn new(_owner: &'a super::AnalysisSession, snapshot: AnalysisSnapshot) -> Self {
+        Self {
+            snapshot,
+            _owner: std::marker::PhantomData,
+        }
+    }
+}
+
+impl std::ops::Deref for DbView<'_> {
+    type Target = AnalysisSnapshot;
+    fn deref(&self) -> &AnalysisSnapshot {
+        &self.snapshot
+    }
+}
+
+impl std::ops::DerefMut for DbView<'_> {
+    fn deref_mut(&mut self) -> &mut AnalysisSnapshot {
+        &mut self.snapshot
+    }
+}
+
 /// A fallback mention scan `(file, text scanned, names found)`, recorded
 /// after the pass so later gate checks become set lookups.
 type MentionScanRecord = (Arc<str>, Arc<str>, Box<[mir_types::Name]>);

@@ -190,9 +190,7 @@ impl AnalysisSession {
     /// This is the write-path home of the warm-up: hosts call it (via
     /// [`Self::ingest_file_prepared`]) when text lands, so read paths
     /// (`indexed_references_to`, `reanalyze_files_cancellable`) find every
-    /// candidate prepared and stay pure. Loading mutates salsa inputs, so the
-    /// parse snapshot is scoped and dropped before the warm-up runs — callers
-    /// must not hold a live snapshot across this call.
+    /// candidate prepared and stay pure.
     pub fn prepare_file_for_analysis(&mut self, path: &std::sync::Arc<str>) {
         let _ = self.prepare_file_for_analysis_cancellable(path, &|| false);
     }
@@ -215,16 +213,17 @@ impl AnalysisSession {
             if should_cancel() {
                 return false;
             }
-            let db = self.snapshot_db();
+            let view = self.db_view();
+            let db = view.db();
             let Some(sf) = db.lookup_source_file(path.as_ref()) else {
                 return true;
             };
-            let text = sf.text(&db as &dyn crate::db::MirDatabase).clone();
+            let text = sf.text(db as &dyn crate::db::MirDatabase).clone();
             if self.is_prepared_for_analysis(path.as_ref(), &text, generation) {
                 return true;
             }
             (
-                crate::db::parse_file(&db as &dyn crate::db::MirDatabase, sf)
+                crate::db::parse_file(db as &dyn crate::db::MirDatabase, sf)
                     .0
                     .clone(),
                 text,

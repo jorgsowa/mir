@@ -86,7 +86,7 @@ impl AnalysisSession {
     /// only for the duration of the clone, so concurrent readers never
     /// serialize on each other or on writes for longer than the clone itself.
     ///
-    /// Drop the handle before this session takes the db lock again — see [`crate::analyzer_db::AnalyzerDb::snapshot_db`].
+    /// The handle blocks this session's next input write until dropped.
     ///
     /// **Internal API — exposes Salsa types.** Subject to change without
     /// notice. Public consumers should use the typed query methods
@@ -1032,7 +1032,8 @@ impl AnalysisSession {
                 if should_cancel() {
                     return false;
                 }
-                let db = self.snapshot_db();
+                let view = self.db_view();
+                let db = view.db();
                 if db.index_pending_is_empty() {
                     return true;
                 }
@@ -1049,7 +1050,8 @@ impl AnalysisSession {
                 if should_cancel() {
                     return false;
                 }
-                let snap = self.snapshot_db();
+                let view = self.db_view();
+                let snap = view.db();
                 let attempt = salsa::Cancelled::catch(std::panic::AssertUnwindSafe(|| {
                     use rayon::prelude::*;
 

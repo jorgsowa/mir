@@ -99,26 +99,16 @@ impl AnalysisSession {
         // warm-up behavior, avoiding transient false `UndefinedClass` during
         // index warm-up).
         //
-        // This runs SERIALLY and *before* the parallel analyze loop below:
+        // This runs SERIALLY and *before* the analyze loop below:
         // `prepare_ast_for_analysis` resolves and loads classes, and loading
-        // mutates the shared session salsa storage (`load_class` →
-        // `ingest_file` sets salsa inputs). Salsa input mutation cancels and
-        // blocks until every other database handle is released, so it must run
-        // with NO live snapshot in scope:
+        // writes salsa inputs, which waits for every other database handle
+        // to drop. In parallel (the v0.37.0 regression), sibling rayon
+        // workers held live snapshot clones mid-`analyze_file`, so the first
+        // warm-up write blocked on them forever.
         //
-        //  - in parallel (the v0.37.0 regression), sibling rayon workers held
-        //    live snapshot clones mid-`analyze_file`, so the first warm-up
-        //    write blocked on them forever — under high dependent fan-out this
-        //    deadlocked the whole runtime; and
-        //  - even serially, a snapshot held across the loop (e.g. one taken to
-        //    parse the dependents) blocks the very first write.
-        //
-        // `prepare_file_for_analysis` takes a *scoped* snapshot to fetch the
-        // parsed AST, drops it (the `Arc<ParseResult>` is owned), and only
-        // then warms up. Files already prepared against their current text
-        // skip the parse + AST walk entirely — hosts on the
-        // `ingest_file_prepared` write path pre-pay this per edit, making the
-        // whole loop a map-lookup sweep.
+        // Files already prepared against their current text skip the parse +
+        // AST walk entirely — hosts on the `ingest_file_prepared` write path
+        // pre-pay this per edit, making the whole loop a map-lookup sweep.
         {
             // Closed before `commit_gen` is read, so commits carry the
             // post-load generation.
@@ -172,7 +162,6 @@ impl AnalysisSession {
             }
             attempts_left -= 1;
             let gen = self.index_generation();
-            // The pass snapshot is created and dropped INSIDE this closure so no handle survives into the commit below — holding one there deadlocks a concurrent input writer waiting in `cancel_others`.
             // A write landing mid-pass raises `salsa::Cancelled`; catch it and retry rather than discarding the whole sweep.
             let attempt =
                 salsa::Cancelled::catch(std::panic::AssertUnwindSafe(|| -> Option<Pass> {
@@ -183,8 +172,9 @@ impl AnalysisSession {
                     if cancel.is_cancelled() {
                         return None;
                     }
-                    let mut db_main = self.snapshot_db();
-                    db_main.freeze_workspace_index();
+                    let mut view = self.db_view();
+                    view.db.freeze_workspace_index();
+                    let db_main = view.db();
                     // Sweeps are the steady-state population path for the mention
                     // index: every analyzed file gets a current mention scan
                     // alongside its postings, so later reference-gate checks are
@@ -198,7 +188,7 @@ impl AnalysisSession {
                                 return None;
                             }
                             self.index.stage_analyzed(
-                                &db_main,
+                                db_main,
                                 cache,
                                 mention_scanner.as_deref(),
                                 file,
@@ -221,8 +211,6 @@ impl AnalysisSession {
         // lookup-shaped instead of re-validating every candidate memo.
         // Unchanged files (same text, same memoized output) skip the rebuild
         // entirely, so a no-op re-sweep is a pointer compare per file.
-        //
-        // Runs with no live snapshot: see the pass closure above.
         {
             let dependency_graph_changed = self.index.commit_analyzed(
                 &self.db.salsa,
