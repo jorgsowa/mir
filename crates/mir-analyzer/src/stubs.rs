@@ -903,7 +903,6 @@ mod tests {
     #[test]
     fn symbol_to_file_paths_are_resolvable_via_stub_vfs() {
         let mut db = MirDbStorage::default();
-        db.init_workspace_revision();
         load_stubs(&mut db);
         let vfs = StubVfs::new();
 

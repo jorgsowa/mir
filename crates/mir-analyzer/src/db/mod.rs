@@ -156,7 +156,7 @@ pub trait MirDatabase: salsa::Database {
     /// workspace-enumeration queries (`workspace_classes`,
     /// `workspace_functions`) read its `revision` to anchor on
     /// add/remove invalidations.
-    fn workspace_revision(&self) -> Option<WorkspaceRevision>;
+    fn workspace_revision(&self) -> WorkspaceRevision;
 
     /// Return the pre-built workspace symbol index singleton, if populated.
     /// **Side channel** — not salsa-tracked. Call `singleton.index(db)` on

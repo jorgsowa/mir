@@ -121,10 +121,11 @@ pub struct MirDbStorage {
     /// ClassResolver>` lives off-salsa because trait objects don't
     /// participate in `salsa::Update`.
     resolver_state: Arc<parking_lot::RwLock<ResolverState>>,
-    /// Lazily-created [`WorkspaceRevision`] singleton input; bumped on
+    /// [`WorkspaceRevision`] singleton input, created with the db; bumped on
     /// file add/remove so workspace-enumeration tracked queries
-    /// (`workspace_classes`, `workspace_functions`) invalidate.
-    workspace_revision_input: Arc<parking_lot::RwLock<Option<WorkspaceRevision>>>,
+    /// (`workspace_classes`, `workspace_functions`) invalidate. `None` only
+    /// inside [`Default::default`].
+    workspace_revision_input: Option<WorkspaceRevision>,
     /// Off-salsa mirror of the workspace revision, kept in lockstep with
     /// `workspace_revision_input`. Read by [`Self::workspace_revision_value`]
     /// (the background-indexing epoch) so that fetching the generation never
@@ -218,13 +219,8 @@ pub struct MirDbStorage {
     /// (e.g. a member-references hierarchy fan-out) must not outlive it
     /// within one salsa revision. Unchanged recommits don't bump.
     subtype_edges_epoch: Arc<std::sync::atomic::AtomicU64>,
-    /// Open deferred-bump scopes (see `AnalysisSession::defer_revision_bumps`).
-    /// While > 0, `bump_workspace_revision` coalesces into one pending bump
-    /// flushed by the last scope to close — a pass that lazy-loads N classes
-    /// costs one salsa input write (one reader cancellation) instead of N.
-    deferred_bump_depth: Arc<std::sync::atomic::AtomicUsize>,
-    /// A bump was requested while a scope was open and is still owed.
-    deferred_bump_pending: Arc<std::sync::atomic::AtomicBool>,
+    /// See [`Self::defer_revision_bumps`].
+    revision_bump_deferral: RevisionBumpDeferral,
     /// Per-clone memo for `Fqcn` interning and per-file `use`-import maps —
     /// see [`NameResolutionCache`].
     name_resolution_cache: NameResolutionCache,
@@ -284,6 +280,14 @@ impl Clone for NameResolutionCache {
     }
 }
 
+/// Open [`MirDbStorage::defer_revision_bumps`] scopes, and whether a bump
+/// requested inside them is still owed.
+#[derive(Clone, Copy, Default)]
+struct RevisionBumpDeferral {
+    depth: usize,
+    owed: bool,
+}
+
 /// Resolver-related state held outside salsa storage. Wrapped in a
 /// `parking_lot::RwLock` so `MirDbStorage::clone()` (cheap for parallel readers)
 /// shares one slot rather than copying.
@@ -314,7 +318,7 @@ impl Default for MirDbStorage {
             on_demand_files: Arc::default(),
             on_demand_adopted: 0,
             resolver_state: Arc::default(),
-            workspace_revision_input: Arc::default(),
+            workspace_revision_input: None,
             workspace_revision_counter: Arc::default(),
             user_stub_paths: Arc::default(),
             php_version: Arc::new(parking_lot::RwLock::new(Arc::from("8.2"))),
@@ -328,11 +332,13 @@ impl Default for MirDbStorage {
             pending_index_files: Arc::default(),
             workspace_index_walks: Arc::default(),
             subtype_edges_epoch: Arc::default(),
-            deferred_bump_depth: Arc::default(),
-            deferred_bump_pending: Arc::default(),
+            revision_bump_deferral: RevisionBumpDeferral::default(),
             name_resolution_cache: NameResolutionCache::default(),
         };
-        db.init_workspace_revision();
+        // Created up front so `workspace_symbol_index` always reads it: a
+        // query run before any file is added would otherwise memoize an empty
+        // result with no dependency to invalidate it.
+        db.workspace_revision_input = Some(WorkspaceRevision::new(&db, 0));
         db
     }
 }
@@ -576,8 +582,9 @@ impl MirDatabase for MirDbStorage {
         self.resolver_state.read().resolver.clone()
     }
 
-    fn workspace_revision(&self) -> Option<WorkspaceRevision> {
-        *self.workspace_revision_input.read()
+    fn workspace_revision(&self) -> WorkspaceRevision {
+        self.workspace_revision_input
+            .expect("created in MirDbStorage::default")
     }
 
     fn workspace_symbol_index_singleton(&self) -> Option<crate::db::WorkspaceSymbolIndexSingleton> {
@@ -1533,19 +1540,8 @@ impl MirDbStorage {
         }
     }
 
-    /// Create the WorkspaceRevision salsa input at revision 0 if it doesn't
-    /// exist yet. Called once at database construction so workspace_symbol_index
-    /// always reads the revision and salsa can invalidate it on first file add.
-    pub fn init_workspace_revision(&mut self) {
-        if self.workspace_revision_input.read().is_none() {
-            let rev = crate::db::WorkspaceRevision::new(self, 0);
-            *self.workspace_revision_input.write() = Some(rev);
-        }
-    }
-
     /// Bump the workspace revision so tracked `workspace_*` queries
-    /// reading it invalidate. Lazily creates the singleton input on
-    /// first call.
+    /// reading it invalidate.
     ///
     /// **Does NOT null the workspace symbol index singleton.** In the
     /// eager-static-input model the singleton is maintained incrementally
@@ -1559,52 +1555,37 @@ impl MirDbStorage {
     /// add no files, never bump, and never touch the singleton.
     pub(crate) fn bump_workspace_revision(&mut self) {
         use salsa::Setter as _;
-        use std::sync::atomic::Ordering;
         // Deferral is only sound while the singleton exists: without one,
         // `find_class_like` falls back to the tracked walk keyed on this
         // revision, and a deferred bump would leave `contains_class` blind
         // to a class loaded moments ago in the same scope.
-        if self.deferred_bump_depth.load(Ordering::SeqCst) > 0
+        if self.revision_bump_deferral.depth > 0
             && self.workspace_symbol_index_input.read().is_some()
         {
-            self.deferred_bump_pending.store(true, Ordering::SeqCst);
-            // Re-check: if every scope closed between the two loads, the
-            // closer may have missed our pending flag — claim it and bump
-            // here instead of leaving the generation permanently behind.
-            if self.deferred_bump_depth.load(Ordering::SeqCst) > 0
-                || !self.deferred_bump_pending.swap(false, Ordering::SeqCst)
-            {
-                return;
-            }
+            self.revision_bump_deferral.owed = true;
+            return;
         }
-        let existing = *self.workspace_revision_input.read();
-        match existing {
-            Some(rev) => {
-                let cur = *rev.revision(self);
-                rev.set_revision(self).to(cur.wrapping_add(1));
-            }
-            None => {
-                let rev = crate::db::WorkspaceRevision::new(self, 0);
-                *self.workspace_revision_input.write() = Some(rev);
-            }
-        }
+        let rev = self.workspace_revision();
+        let cur = *rev.revision(self);
+        rev.set_revision(self).to(cur.wrapping_add(1));
         self.workspace_revision_counter
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
 
-    /// The (depth, pending) pair backing deferred-bump scopes; shared across
-    /// db clones so a scope opened on the session handle governs bumps from
-    /// any clone.
-    pub(crate) fn revision_bump_deferral_handles(
-        &self,
-    ) -> (
-        Arc<std::sync::atomic::AtomicUsize>,
-        Arc<std::sync::atomic::AtomicBool>,
-    ) {
-        (
-            self.deferred_bump_depth.clone(),
-            self.deferred_bump_pending.clone(),
-        )
+    /// Coalesce [`Self::bump_workspace_revision`] calls until the matching
+    /// [`Self::resume_revision_bumps`]: each bump cancels in-flight snapshot
+    /// readers, so a pass that lazy-loads N classes pays one instead of N.
+    /// Scopes nest; the outermost resume performs the owed bump.
+    pub(crate) fn defer_revision_bumps(&mut self) {
+        self.revision_bump_deferral.depth += 1;
+    }
+
+    pub(crate) fn resume_revision_bumps(&mut self) {
+        let deferral = &mut self.revision_bump_deferral;
+        deferral.depth -= 1;
+        if deferral.depth == 0 && std::mem::take(&mut deferral.owed) {
+            self.bump_workspace_revision();
+        }
     }
 
     /// Subtract one file's declarations from the singleton without re-adding

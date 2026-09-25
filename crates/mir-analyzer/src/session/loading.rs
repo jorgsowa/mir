@@ -46,7 +46,7 @@ impl AnalysisSession {
         if self.class_indexed(fqcn) {
             return crate::LoadOutcome::AlreadyLoaded;
         }
-        if self.unresolvable_fqcns.read().contains_key(fqcn) {
+        if self.unresolvable_fqcns.contains_key(fqcn) {
             return crate::LoadOutcome::NotResolvable;
         }
         if self.try_resolve_and_ingest(fqcn) {
@@ -60,11 +60,10 @@ impl AnalysisSession {
                 .and_then(|r| r.resolve(fqcn))
                 .map(|p| Arc::from(p.to_string_lossy().as_ref()));
             let key: Arc<str> = Arc::from(fqcn);
-            let mut cache = self.unresolvable_fqcns.write();
-            if cache.len() >= UNRESOLVABLE_CACHE_CAP {
-                cache.clear();
+            if self.unresolvable_fqcns.len() >= UNRESOLVABLE_CACHE_CAP {
+                self.unresolvable_fqcns.clear();
             }
-            cache.insert(key, resolved_path);
+            self.unresolvable_fqcns.insert(key, resolved_path);
             crate::LoadOutcome::NotResolvable
         }
     }
@@ -114,23 +113,19 @@ impl AnalysisSession {
     /// Evict every negative-cache entry whose stored resolver-mapped path
     /// equals `file`. FQCNs cached as never-resolvable (path `None`) are left
     /// alone — no source-text change can make them resolvable.
-    pub(super) fn evict_unresolvable_for_file(&self, file: &str) {
-        let mut cache = self.unresolvable_fqcns.write();
-        if cache.is_empty() {
-            return;
-        }
-        cache.retain(|_fqcn, path| path.as_deref() != Some(file));
+    pub(super) fn evict_unresolvable_for_file(&mut self, file: &str) {
+        self.unresolvable_fqcns
+            .retain(|_fqcn, path| path.as_deref() != Some(file));
     }
 
     /// Bulk variant of [`Self::evict_unresolvable_for_file`]. One `HashSet`
     /// build + one pass over the cache; no resolver calls.
-    pub(super) fn evict_unresolvable_for_files(&self, files: &[Arc<str>]) {
-        let mut cache = self.unresolvable_fqcns.write();
-        if cache.is_empty() {
+    pub(super) fn evict_unresolvable_for_files(&mut self, files: &[Arc<str>]) {
+        if self.unresolvable_fqcns.is_empty() {
             return;
         }
         let registered: HashSet<&str> = files.iter().map(|f| f.as_ref()).collect();
-        cache.retain(|_fqcn, path| match path {
+        self.unresolvable_fqcns.retain(|_fqcn, path| match path {
             Some(p) => !registered.contains(p.as_ref()),
             None => true,
         });

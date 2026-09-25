@@ -26,10 +26,7 @@ pub struct WorkspaceRevision {
 
 #[salsa::tracked]
 pub fn workspace_classes(db: &dyn MirDatabase) -> Arc<[Name]> {
-    let rev = db
-        .workspace_revision()
-        .expect("WorkspaceRevision not initialized");
-    let _ = rev.revision(db);
+    let _ = db.workspace_revision().revision(db);
 
     let files = db.all_source_files();
     let mut out: Vec<Name> = Vec::new();
@@ -42,10 +39,7 @@ pub fn workspace_classes(db: &dyn MirDatabase) -> Arc<[Name]> {
 
 #[salsa::tracked]
 pub fn workspace_functions(db: &dyn MirDatabase) -> Arc<[Name]> {
-    let rev = db
-        .workspace_revision()
-        .expect("WorkspaceRevision not initialized");
-    let _ = rev.revision(db);
+    let _ = db.workspace_revision().revision(db);
 
     let files = db.all_source_files();
     let mut out: Vec<Name> = Vec::new();
@@ -453,10 +447,7 @@ pub fn workspace_index(db: &dyn MirDatabase) -> &WorkspaceSymbolIndex {
 
 #[salsa::tracked]
 pub fn workspace_symbol_index(db: &dyn MirDatabase) -> WorkspaceSymbolIndex {
-    let rev = db
-        .workspace_revision()
-        .expect("WorkspaceRevision not initialized");
-    let _ = rev.revision(db);
+    let _ = db.workspace_revision().revision(db);
     db.note_workspace_index_walk();
 
     let files = db.all_source_files();
@@ -704,10 +695,7 @@ impl PartialEq for GlobalVarMap {
 
 #[salsa::tracked]
 pub fn workspace_global_vars(db: &dyn MirDatabase) -> GlobalVarMap {
-    let rev = db
-        .workspace_revision()
-        .expect("WorkspaceRevision not initialized");
-    let _ = rev.revision(db);
+    let _ = db.workspace_revision().revision(db);
 
     let files = db.all_source_files();
     let mut out: FxHashMap<Arc<str>, mir_types::Type> = FxHashMap::default();

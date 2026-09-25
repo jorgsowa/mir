@@ -157,7 +157,7 @@ impl ParsedProjectFile {
 
 impl AnalysisSession {
     fn suppression_map_for_file(
-        &self,
+        &mut self,
         db: &dyn MirDatabase,
         file: &Arc<str>,
     ) -> Option<Arc<crate::suppression::SuppressionMap>> {
@@ -165,7 +165,6 @@ impl AnalysisSession {
         let text = sf.text(db).clone();
         if let Some((_, map)) = self
             .suppression_maps
-            .read()
             .get(file)
             .filter(|(cached_text, _)| cached_text.as_ref() == text.as_ref())
         {
@@ -176,7 +175,6 @@ impl AnalysisSession {
             text.as_ref(),
         ));
         self.suppression_maps
-            .write()
             .insert(file.clone(), (text, map.clone()));
         Some(map)
     }
@@ -213,7 +211,7 @@ impl AnalysisSession {
     /// that files with *zero* existing issues still have their suppression maps
     /// inspected for unused annotations.
     pub(crate) fn apply_suppressions_and_emit_unused(
-        &self,
+        &mut self,
         issues: &mut Vec<Issue>,
         analyzed_files: &[Arc<str>],
     ) {
@@ -318,8 +316,7 @@ impl AnalysisSession {
     /// `class_exists` miss every project and lazy-loaded class, yielding false
     /// `UndefinedClass`. Cheap after the definition caches are warm (no parsing).
     fn refresh_workspace_index(&mut self) {
-        let guard = &mut self.db.salsa;
-        guard.rebuild_workspace_symbol_index();
+        self.db.salsa.rebuild_workspace_symbol_index();
     }
 
     /// Load the configured PHP version + built-in stubs + user stubs into
@@ -343,10 +340,10 @@ impl AnalysisSession {
 
         // Ensure a resolver is configured so pull-path lookups can map
         // built-in FQCNs to the stub VFS paths registered above.
-        let guard = &mut self.db.salsa;
-        if guard.current_resolver().is_none() {
+        let db = &mut self.db.salsa;
+        if db.current_resolver().is_none() {
             let resolver: Arc<dyn crate::ClassResolver> = Arc::new(crate::StubClassResolver);
-            guard.set_resolver(Some(resolver));
+            db.set_resolver(Some(resolver));
         }
     }
 }

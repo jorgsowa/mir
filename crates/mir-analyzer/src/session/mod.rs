@@ -11,8 +11,6 @@ use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use parking_lot::RwLock;
-
 use crate::analyzer_db::AnalyzerDb;
 use crate::cache::AnalysisCache;
 use crate::composer::Psr4Map;
@@ -47,20 +45,20 @@ pub struct AnalysisSession {
     /// from the set when re-added to the same file on a subsequent ingest.
     /// The set may contain symbols with no current referencers; those are
     /// harmless — the `symbol_referencers_of` lookup returns empty.
-    stale_defined_symbols: RwLock<HashMap<String, HashSet<Arc<str>>>>,
+    stale_defined_symbols: HashMap<String, HashSet<Arc<str>>>,
     /// Symbols defined by each file as of its last `ingest_file`. The
     /// authoritative "old" set for the rename/deletion diff, independent of
     /// whether the salsa `SourceFile` input was already updated to the new text
     /// by a host driving the db directly (the LSP convergence path). Without
     /// this, re-deriving "old" symbols from the (possibly pre-updated) input
     /// would miss deletions and break cross-file dependency invalidation.
-    last_ingested_symbols: RwLock<HashMap<String, HashSet<Arc<str>>>>,
+    last_ingested_symbols: HashMap<String, HashSet<Arc<str>>>,
     /// Structural outgoing dependency targets by file, as of the last
     /// ingestion that updated this session's declaration state. Lets
     /// `ingest_file` tell whether the dependency graph's declaration-shaped
     /// edges actually changed, so body-only edits need not invalidate the
     /// cached graph.
-    last_structural_targets: RwLock<HashMap<String, HashSet<String>>>,
+    last_structural_targets: HashMap<String, HashSet<String>>,
     /// Negative cache: FQCNs that `load_class` already failed on.
     /// The value is the resolver-mapped path (when known) so eviction on
     /// `set_file_text` / `ingest_file` is a path equality check rather than
@@ -68,12 +66,12 @@ pub struct AnalysisSession {
     /// couldn't map the FQCN; those entries survive file edits (no source
     /// change makes a never-resolvable name resolvable).
     /// Bounded to `UNRESOLVABLE_CACHE_CAP`; clears on overflow.
-    unresolvable_fqcns: RwLock<HashMap<Arc<str>, Option<Arc<str>>>>,
+    unresolvable_fqcns: HashMap<Arc<str>, Option<Arc<str>>>,
     /// Vendor `autoload.files` entries not yet indexed. `Some(paths)` means
     /// pending; `None` means the load has already run (idempotent). Populated
     /// by [`Self::with_psr4`]; drained by [`Self::ensure_vendor_eager_functions`],
     /// which is called automatically from [`Self::prepare_ast_for_analysis`].
-    pub(crate) pending_eager_function_files: parking_lot::Mutex<Option<Vec<PathBuf>>>,
+    pub(crate) pending_eager_function_files: Option<Vec<PathBuf>>,
     /// Warm-up skip set: files whose [`Self::prepare_ast_for_analysis`] has
     /// already run against their current text. Value is `(text, generation)` —
     /// the entry is live while the file's input text is pointer-equal to `text`
@@ -91,7 +89,7 @@ pub struct AnalysisSession {
     /// [`Self::bump_prepare_generation`]) — a prepared file might then need its
     /// warm-up re-run to lazy-load a replacement (e.g. a vendor class shadowed
     /// by a since-deleted project class).
-    prepare_generation: std::sync::atomic::AtomicU64,
+    prepare_generation: u64,
     /// Index freshness marks and query memos, shared with every
     /// [`AnalysisSnapshot`].
     pub(crate) index: Arc<IndexState>,
@@ -112,11 +110,10 @@ pub enum ReferenceIncludes {
 }
 
 /// file → `(text, prepare generation)`. See `AnalysisSession::prepared_files`.
-type PreparedFilesCache = RwLock<HashMap<Arc<str>, (Arc<str>, u64)>>;
+type PreparedFilesCache = HashMap<Arc<str>, (Arc<str>, u64)>;
 
 /// Parsed inline suppressions keyed by file path and source text.
-type SuppressionMapCache =
-    RwLock<HashMap<Arc<str>, (Arc<str>, Arc<crate::suppression::SuppressionMap>)>>;
+type SuppressionMapCache = HashMap<Arc<str>, (Arc<str>, Arc<crate::suppression::SuppressionMap>)>;
 
 /// One file's replayable body-analysis output from the previous batch run.
 pub(crate) struct BatchReplayFile {
@@ -149,13 +146,10 @@ pub(crate) struct BatchReplayState {
 /// resolver calls until it re-fills.
 const UNRESOLVABLE_CACHE_CAP: usize = 10_000;
 
-/// RAII scope from [`AnalysisSession::defer_revision_bumps`]; the last scope
-/// to close performs the one owed `bump_workspace_revision`. Derefs to the
+/// RAII scope from [`AnalysisSession::defer_revision_bumps`]. Derefs to the
 /// session, so the scope body mutates it through the guard.
 pub(crate) struct DeferredRevisionBumps<'a> {
     session: &'a mut AnalysisSession,
-    depth: Arc<std::sync::atomic::AtomicUsize>,
-    pending: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl std::ops::Deref for DeferredRevisionBumps<'_> {
@@ -173,12 +167,7 @@ impl std::ops::DerefMut for DeferredRevisionBumps<'_> {
 
 impl Drop for DeferredRevisionBumps<'_> {
     fn drop(&mut self) {
-        use std::sync::atomic::Ordering;
-        if self.depth.fetch_sub(1, Ordering::SeqCst) == 1
-            && self.pending.swap(false, Ordering::SeqCst)
-        {
-            self.session.db.salsa.bump_workspace_revision();
-        }
+        self.session.db.salsa.resume_revision_bumps();
     }
 }
 
@@ -197,14 +186,14 @@ impl AnalysisSession {
             php_version,
             user_stub_files: Vec::new(),
             user_stub_dirs: Vec::new(),
-            stale_defined_symbols: RwLock::default(),
-            last_ingested_symbols: RwLock::default(),
-            last_structural_targets: RwLock::default(),
-            unresolvable_fqcns: RwLock::default(),
-            pending_eager_function_files: parking_lot::Mutex::new(Some(Vec::new())),
-            prepared_files: RwLock::default(),
-            suppression_maps: RwLock::default(),
-            prepare_generation: std::sync::atomic::AtomicU64::new(0),
+            stale_defined_symbols: HashMap::default(),
+            last_ingested_symbols: HashMap::default(),
+            last_structural_targets: HashMap::default(),
+            unresolvable_fqcns: HashMap::default(),
+            pending_eager_function_files: Some(Vec::new()),
+            prepared_files: HashMap::default(),
+            suppression_maps: HashMap::default(),
+            prepare_generation: 0,
             index: Arc::default(),
         }
     }
@@ -301,17 +290,11 @@ impl AnalysisSession {
         });
     }
 
-    /// Coalesce `bump_workspace_revision` calls until the returned scope
-    /// closes: each bump cancels in-flight salsa readers, so a pass that
-    /// lazy-loads N classes pays one instead of N. Scopes nest.
+    /// Defer workspace revision bumps until the returned scope closes; see
+    /// [`MirDbStorage::defer_revision_bumps`].
     pub(crate) fn defer_revision_bumps(&mut self) -> DeferredRevisionBumps<'_> {
-        let (depth, pending) = self.db.salsa.revision_bump_deferral_handles();
-        depth.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        DeferredRevisionBumps {
-            session: self,
-            depth,
-            pending,
-        }
+        self.db.salsa.defer_revision_bumps();
+        DeferredRevisionBumps { session: self }
     }
 
     /// Coverage/size counters for the class-mention gate index (host
@@ -429,7 +412,7 @@ impl AnalysisSession {
         // Register vendor autoload.files for lazy loading. They define global
         // functions and constants that the class resolver cannot discover.
         // `ensure_vendor_eager_functions` will index them on first analysis call.
-        *self.pending_eager_function_files.lock() = Some(map.vendor_eager_files());
+        self.pending_eager_function_files = Some(map.vendor_eager_files());
         self
     }
 

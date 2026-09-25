@@ -96,9 +96,7 @@ fn stub_on_demand(db: &dyn MirDatabase, path: &'static str) -> Option<SourceFile
 /// Anchors an on-demand lookup on the workspace revision, so a miss is
 /// retried once the workspace changes.
 fn read_workspace_revision(db: &dyn MirDatabase) {
-    if let Some(rev) = db.workspace_revision() {
-        let _ = rev.revision(db);
-    }
+    let _ = db.workspace_revision().revision(db);
 }
 
 /// Where class-like `fqcn` is declared when the symbol index doesn't know

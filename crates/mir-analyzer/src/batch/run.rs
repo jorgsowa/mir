@@ -66,9 +66,9 @@ impl AnalysisSession {
 
         // ---- Register Salsa source inputs for incremental follow-up calls ----
         {
-            let guard = &mut self.db.salsa;
+            let db = &mut self.db.salsa;
             for parsed in &parsed_files {
-                guard.upsert_source_file(parsed.file.clone(), parsed.source.clone());
+                db.upsert_source_file(parsed.file.clone(), parsed.source.clone());
             }
         }
         let _t_salsa_reg = _t0.elapsed();
@@ -193,11 +193,11 @@ impl AnalysisSession {
         // Prime the in-process parse cache so the pre-warm loop below avoids
         // re-parsing every project file through collect_file_definitions.
         {
-            let guard = &self.db.salsa;
+            let db = &self.db.salsa;
             let php_v = php_version.cache_byte();
             for (defs, hash, has_hard_parse_errors, _surface) in &file_defs {
                 if !*has_hard_parse_errors {
-                    guard.prime_parse_cache(
+                    db.prime_parse_cache(
                         *hash,
                         php_v,
                         Arc::clone(&defs.slice),
@@ -213,7 +213,7 @@ impl AnalysisSession {
             // parity with `ingest_file`'s single-file path, so goto-implementation
             // sees implementors from a batch/vendor run without waiting for
             // each file to be individually touched by an on-demand commit path.
-            let guard = &self.db.salsa;
+            let db = &self.db.salsa;
             for (parsed, (defs, _hash, _hard_err, _surface)) in parsed_files.iter().zip(file_defs) {
                 for issue in defs.issues.iter() {
                     if matches!(issue.kind, mir_issues::IssueKind::ParseError { .. })
@@ -223,8 +223,8 @@ impl AnalysisSession {
                     }
                 }
                 let entries = crate::db::subtype_index::entries_from_slice(&defs.slice);
-                let file_no = guard.locked_ref_index().intern_path(&parsed.file);
-                guard.set_file_class_edges(file_no, entries);
+                let file_no = db.locked_ref_index().intern_path(&parsed.file);
+                db.set_file_class_edges(file_no, entries);
                 all_issues.extend(Arc::unwrap_or_clone(defs.issues));
             }
         }
@@ -232,17 +232,11 @@ impl AnalysisSession {
 
         // ---- Pre-warm collect_file_definitions for project files -------------
         {
-            let db_prewarm = {
-                let guard = &self.db.salsa;
-                (*guard).clone()
-            };
-            let project_source_files: Vec<SourceFile> = {
-                let guard = &self.db.salsa;
-                parsed_files
-                    .iter()
-                    .filter_map(|p| (*guard).lookup_source_file(&p.file))
-                    .collect()
-            };
+            let db_prewarm = self.db.snapshot_db();
+            let project_source_files: Vec<SourceFile> = parsed_files
+                .iter()
+                .filter_map(|p| self.db.lookup_source_file(&p.file))
+                .collect();
             project_source_files
                 .into_par_iter()
                 .for_each_with(db_prewarm, |db, sf| {
@@ -281,10 +275,7 @@ impl AnalysisSession {
         }
         let _t_class_analyzer = std::time::Instant::now();
         {
-            let class_db = {
-                let guard = &self.db.salsa;
-                (*guard).clone()
-            };
+            let class_db = self.db.snapshot_db();
             let class_issues = crate::class::ClassAnalyzer::with_files(
                 &class_db,
                 analyzed_file_set.clone(),
@@ -297,10 +288,7 @@ impl AnalysisSession {
 
         let _t_class_checks = _t0.elapsed();
 
-        let mut db_main = {
-            let guard = &self.db.salsa;
-            (*guard).clone()
-        };
+        let mut db_main = self.db.snapshot_db();
         // All index mutation for the body pass is done (lazy_load_missing_classes
         // + refresh ran above; lazy_load_from_body_issues runs *after* this pass
         // on a separate db). Freeze the index on this ephemeral clone so each
@@ -458,12 +446,12 @@ impl AnalysisSession {
         // prior run cannot survive an append.
         let mut all_symbols = Vec::new();
         {
-            let guard = &self.db.salsa;
+            let db = &self.db.salsa;
             for (file, issues, symbols, ref_locs) in body_results {
                 all_issues.extend(issues);
                 all_symbols.extend(symbols);
-                let file_no = guard.locked_ref_index().intern_path(&file);
-                guard.set_file_reference_locations(file_no, ref_locs);
+                let file_no = db.locked_ref_index().intern_path(&file);
+                db.set_file_reference_locations(file_no, ref_locs);
             }
         }
 
@@ -489,10 +477,7 @@ impl AnalysisSession {
         // reachable only through a call site or inferred type goes stale.
         if topology_changed {
             if let Some(cache) = &self.cache {
-                let db_snapshot = {
-                    let guard = &self.db.salsa;
-                    (*guard).clone()
-                };
+                let db_snapshot = self.db.snapshot_db();
                 let rev = build_reverse_deps(&db_snapshot);
                 cache.set_reverse_deps(rev);
             }
@@ -553,10 +538,7 @@ impl AnalysisSession {
         }
 
         // ---- Build workspace symbol index singleton -------------------------
-        {
-            let guard = &mut self.db.salsa;
-            guard.rebuild_workspace_symbol_index();
-        }
+        self.db.salsa.rebuild_workspace_symbol_index();
 
         AnalysisResult::build(all_issues, rustc_hash::FxHashMap::default(), all_symbols)
     }
@@ -599,9 +581,9 @@ impl AnalysisSession {
                         col_end: *col_end,
                     })
                     .collect();
-                let guard = &self.db.salsa;
-                let file_no = guard.locked_ref_index().intern_path(&file);
-                guard.set_file_reference_locations(file_no, locs);
+                let db = &self.db.salsa;
+                let file_no = db.locked_ref_index().intern_path(&file);
+                db.set_file_reference_locations(file_no, locs);
                 opts.apply(&mut issues);
                 self.apply_suppressions_and_emit_unused(&mut issues, std::slice::from_ref(&file));
                 return AnalysisResult::build(issues, HashMap::default(), Vec::new());
@@ -620,18 +602,18 @@ impl AnalysisSession {
         let mut all_issues: Vec<Issue> = Arc::unwrap_or_clone(file_defs.issues.clone());
 
         {
-            let guard = &mut self.db.salsa;
-            if guard.workspace_symbol_index_singleton().is_some() {
-                if let Some(sf) = guard.lookup_source_file(file.as_ref()) {
-                    if guard.file_declarations_changed(sf) {
-                        guard.rebuild_workspace_symbol_index();
+            let db = &mut self.db.salsa;
+            if db.workspace_symbol_index_singleton().is_some() {
+                if let Some(sf) = db.lookup_source_file(file.as_ref()) {
+                    if db.file_declarations_changed(sf) {
+                        db.rebuild_workspace_symbol_index();
                     }
                 }
             }
         }
 
         let (symbols, surface_hash) = {
-            let guard = &mut self.db.salsa;
+            let db = &mut self.db.salsa;
             let parsed = collected
                 .parsed
                 .unwrap_or_else(|| php_rs_parser::parse(new_content));
@@ -639,7 +621,7 @@ impl AnalysisSession {
 
             let has_hard_errors = parsed.errors.iter().any(crate::parser::is_hard_parse_error);
             let symbols = if !has_hard_errors {
-                let db_ref: &dyn MirDatabase = &*guard;
+                let db_ref: &dyn MirDatabase = &*db;
                 let mut driver = BodyAnalyzer::new(db_ref, php_version);
                 driver.collect_symbols = !opts.skip_symbols;
                 let (body_issues, symbols) = driver.analyze_bodies(
@@ -649,9 +631,9 @@ impl AnalysisSession {
                     &parsed.source_map,
                 );
                 all_issues.extend(body_issues);
-                let pending = guard.take_pending_ref_locs();
-                let file_no = guard.locked_ref_index().intern_path(&file);
-                guard.set_file_reference_locations(file_no, pending);
+                let pending = db.take_pending_ref_locs();
+                let file_no = db.locked_ref_index().intern_path(&file);
+                db.set_file_reference_locations(file_no, pending);
                 if opts.skip_symbols {
                     Vec::new()
                 } else {
@@ -755,11 +737,11 @@ impl AnalysisSession {
         let _t_read = _t0.elapsed();
 
         let source_files: Vec<SourceFile> = {
-            let guard = &mut self.db.salsa;
+            let db = &mut self.db.salsa;
             entries
                 .iter()
                 .map(|e| {
-                    guard.upsert_source_file_with_durability(
+                    db.upsert_source_file_with_durability(
                         e.file.clone(),
                         e.src.clone(),
                         salsa::Durability::HIGH,
@@ -769,10 +751,7 @@ impl AnalysisSession {
         };
         let _t_reg = _t0.elapsed();
 
-        let db_pass1 = {
-            let guard = &self.db.salsa;
-            (*guard).clone()
-        };
+        let db_pass1 = self.db.snapshot_db();
         let stub_cache = self.db.stub_cache.clone();
         let prepared: Vec<(Arc<str>, mir_codebase::definitions::StubSlice)> = entries
             .into_par_iter()
@@ -802,11 +781,11 @@ impl AnalysisSession {
         // project files, but no StubSlice is cheaply available there — see
         // the persistence work tracked separately).
         {
-            let guard = &self.db.salsa;
+            let db = &self.db.salsa;
             for (file, slice) in &prepared {
                 let entries = crate::db::subtype_index::entries_from_slice(slice);
-                let file_no = guard.locked_ref_index().intern_path(file);
-                guard.set_file_class_edges(file_no, entries);
+                let file_no = db.locked_ref_index().intern_path(file);
+                db.set_file_class_edges(file_no, entries);
             }
         }
         drop(prepared);
@@ -824,10 +803,7 @@ impl AnalysisSession {
             );
         }
 
-        {
-            let guard = &mut self.db.salsa;
-            guard.rebuild_workspace_symbol_index();
-        }
+        self.db.salsa.rebuild_workspace_symbol_index();
 
         crate::collector::print_collector_stats();
     }

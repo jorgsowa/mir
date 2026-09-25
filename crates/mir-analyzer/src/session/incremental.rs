@@ -15,9 +15,8 @@ impl AnalysisSession {
     ///
     /// When the user saves a file that other files depend on (e.g. editing
     /// a base class, an interface, or a trait), those dependents may have
-    /// new diagnostics. Concurrent callers may run sweeps simultaneously;
-    /// each returns its per-file analysis results so the LSP server can
-    /// publish updated diagnostics in one batch.
+    /// new diagnostics. Returns the per-file analysis results so the LSP
+    /// server can publish updated diagnostics in one batch.
     ///
     /// Source text for dependents is retrieved from the session's salsa
     /// inputs (set by previous `ingest_file` calls) — the caller doesn't
@@ -127,13 +126,12 @@ impl AnalysisSession {
         // without re-running body analysis — re-analysis cost scales with
         // what actually changed, not with dependent count.
         //
-        // Keep this pass on the caller thread. A request may already be one
-        // of several concurrent host threads, while background indexing uses
-        // the shared Rayon pool. Sending each sweep back through that pool
-        // creates a pool-fan-in deadlock: every worker can block on a writer
-        // while the thread that would release it waits for a worker. It also
-        // prevents a cancelled request from making progress. The caller-level
-        // concurrency preserves throughput without that dependency.
+        // Keep this pass on the caller thread. Snapshot queries on host
+        // threads share the Rayon pool with background indexing; sending each
+        // sweep back through that pool creates a pool-fan-in deadlock: every
+        // worker can block on a writer while the thread that would release it
+        // waits for a worker. It also prevents a cancelled request from making
+        // progress.
         //
         // Dependents' `FileAnalysis::symbols` are empty on this path:
         // per-expression symbols are intentionally not memoized (a typical
@@ -403,7 +401,7 @@ impl AnalysisSession {
         // symbol_defining_file lookup but the referencing file still needs
         // re-analysis to surface the now-broken reference.
         {
-            let stale = self.stale_defined_symbols.read();
+            let stale = &self.stale_defined_symbols;
             if !stale.is_empty() {
                 for (file, deleted_syms) in stale.iter() {
                     let Some(&file_id) = file_ids.get(file.as_str()) else {

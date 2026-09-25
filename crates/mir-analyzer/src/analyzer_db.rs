@@ -13,7 +13,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::db::MirDatabase;
-use parking_lot::Mutex;
 
 use crate::db::MirDbStorage;
 use crate::php_version::PhpVersion;
@@ -24,9 +23,9 @@ pub struct AnalyzerDb {
     /// Salsa database, owned by the single writer; readers use `snapshot_db()`.
     pub(crate) salsa: MirDbStorage,
     /// Stubs that have been ingested (for idempotency).
-    pub(crate) loaded_stubs: Mutex<HashSet<&'static str>>,
+    pub(crate) loaded_stubs: HashSet<&'static str>,
     /// Whether user stubs have been ingested.
-    pub(crate) user_stubs_loaded: std::sync::atomic::AtomicBool,
+    user_stubs_loaded: bool,
     /// Optional definition-collection disk cache. When `Some`, `collect_and_ingest_file`
     /// (the per-file LSP path) consults the cache before parsing and writes
     /// back on misses. Wired in by [`Self::attach_cache_dir`].
@@ -48,17 +47,10 @@ pub(crate) struct PreparedIngest {
 
 impl AnalyzerDb {
     pub fn new() -> Self {
-        let mut db = MirDbStorage::default();
-        // Pre-create the WorkspaceRevision salsa input so workspace_symbol_index
-        // always reads it and salsa properly invalidates it on first file add.
-        // Without this, querying workspace_symbol_index before any file is
-        // ingested memoizes an empty result that salsa can never invalidate
-        // (because the query never read the revision during that execution).
-        db.init_workspace_revision();
         Self {
-            salsa: db,
-            loaded_stubs: Mutex::new(HashSet::new()),
-            user_stubs_loaded: std::sync::atomic::AtomicBool::new(false),
+            salsa: MirDbStorage::default(),
+            loaded_stubs: HashSet::new(),
+            user_stubs_loaded: false,
             stub_cache: None,
         }
     }
@@ -100,49 +92,28 @@ impl AnalyzerDb {
 
     /// Ingest multiple stub paths. Idempotent — already-loaded stubs are skipped.
     pub fn ingest_stub_paths(&mut self, paths: &[&'static str], _php_version: PhpVersion) {
-        // Identify needed paths (filter to those not yet loaded).
-        let needed: Vec<&'static str> = {
-            let loaded = self.loaded_stubs.lock();
-            paths
-                .iter()
-                .copied()
-                .filter(|p| !loaded.contains(p))
-                .collect()
-        };
-
-        if needed.is_empty() {
-            return;
-        }
-
-        let mut loaded = self.loaded_stubs.lock();
-        for path in &needed {
-            if loaded.insert(*path) {
-                // Register as a SourceFile so the pull path (workspace_symbol_index
-                // → collect_file_definitions) can index built-in PHP symbols.
-                // Version filtering happens in collect_file_definitions_uncached via
-                // db.php_version_str() / .with_php_version().
-                // HIGH durability: built-in stubs never change within a session.
-                if let Some(content) = crate::stubs::stub_content_for_path(path) {
-                    self.salsa.upsert_source_file_with_durability(
-                        Arc::from(*path),
-                        Arc::from(content),
-                        salsa::Durability::HIGH,
-                    );
-                }
+        for &path in paths {
+            if !self.loaded_stubs.insert(path) {
+                continue;
+            }
+            // Register as a SourceFile so the pull path (workspace_symbol_index
+            // → collect_file_definitions) can index built-in PHP symbols.
+            // Version filtering happens in collect_file_definitions_uncached via
+            // db.php_version_str() / .with_php_version().
+            // HIGH durability: built-in stubs never change within a session.
+            if let Some(content) = crate::stubs::stub_content_for_path(path) {
+                self.salsa.upsert_source_file_with_durability(
+                    Arc::from(path),
+                    Arc::from(content),
+                    salsa::Durability::HIGH,
+                );
             }
         }
     }
 
     /// Ingest user stub slices from configured files and directories.
     pub fn ingest_user_stubs(&mut self, files: &[PathBuf], dirs: &[PathBuf]) {
-        if files.is_empty() && dirs.is_empty() {
-            return;
-        }
-
-        let was_loaded = self
-            .user_stubs_loaded
-            .load(std::sync::atomic::Ordering::Relaxed);
-        if was_loaded {
+        if self.user_stubs_loaded || (files.is_empty() && dirs.is_empty()) {
             return;
         }
 
@@ -181,8 +152,7 @@ impl AnalyzerDb {
             );
             self.salsa.register_user_stub_path(path_arc);
         }
-        self.user_stubs_loaded
-            .store(true, std::sync::atomic::Ordering::Relaxed);
+        self.user_stubs_loaded = true;
     }
 
     /// Collect definitions from a file and ingest its stub slice.

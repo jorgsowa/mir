@@ -171,10 +171,7 @@ impl AnalysisSession {
             all_issues.retain(|i| !files_to_reanalyze.contains(&i.location.file));
             all_symbols.retain(|s| !files_to_reanalyze.contains(&s.file));
 
-            let mut db_full = {
-                let guard = &self.db.salsa;
-                (*guard).clone()
-            };
+            let mut db_full = self.db.snapshot_db();
             // This round's index mutation is done (ingest + refresh +
             // lazy_load_missing_classes ran above). Freeze on the ephemeral
             // per-round clone, same as the main body pass in run.rs.
@@ -208,10 +205,9 @@ impl AnalysisSession {
                 }
                 reanalysis_ref_locs.extend(ref_locs);
             }
-            {
-                let guard = &self.db.salsa;
-                guard.commit_reference_locations_batch(reanalysis_ref_locs);
-            }
+            self.db
+                .salsa
+                .commit_reference_locations_batch(reanalysis_ref_locs);
         }
     }
 }
