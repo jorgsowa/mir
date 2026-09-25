@@ -276,3 +276,65 @@ fn vendor_autoload_files_function_exists_guard_is_transparent() {
         result.issues
     );
 }
+
+// ---------------------------------------------------------------------------
+// Disk cache attached alongside the autoload map
+// ---------------------------------------------------------------------------
+
+fn assert_vendor_helper_resolves(mut session: AnalysisSession) {
+    let src = "<?php\nvendor_helper('test');\n";
+    let path: Arc<str> = Arc::from("consumer.php");
+    session.ingest_file(path.clone(), Arc::from(src));
+    let parsed = php_rs_parser::parse(src);
+    let result = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
+        path,
+        src,
+        &parsed.program,
+        &parsed.source_map,
+    );
+    assert_eq!(
+        undefined_function_count(&result.issues),
+        0,
+        "got issues: {:?}",
+        result.issues
+    );
+}
+
+/// The CLI builder order: cache first, then the autoload map.
+#[test]
+fn vendor_autoload_files_load_when_cache_dir_is_attached_before_psr4() {
+    let root = create_temp_dir("autoload_lazy_cache_first");
+    let cache_dir = create_temp_dir("autoload_lazy_cache_first_cache");
+    write_vendor_autoload_files(
+        root.path(),
+        "<?php\nfunction vendor_helper(string $s): string { return $s; }\n",
+    );
+    write_composer_json(root.path());
+    let psr4 =
+        mir_analyzer::composer::Psr4Map::from_composer(root.path()).expect("psr4 from composer");
+
+    assert_vendor_helper_resolves(
+        AnalysisSession::new(PhpVersion::LATEST)
+            .with_cache_dir(cache_dir.path())
+            .with_psr4(Arc::new(psr4)),
+    );
+}
+
+#[test]
+fn vendor_autoload_files_load_when_cache_dir_is_attached_after_psr4() {
+    let root = create_temp_dir("autoload_lazy_cache_last");
+    let cache_dir = create_temp_dir("autoload_lazy_cache_last_cache");
+    write_vendor_autoload_files(
+        root.path(),
+        "<?php\nfunction vendor_helper(string $s): string { return $s; }\n",
+    );
+    write_composer_json(root.path());
+    let psr4 =
+        mir_analyzer::composer::Psr4Map::from_composer(root.path()).expect("psr4 from composer");
+
+    assert_vendor_helper_resolves(
+        AnalysisSession::new(PhpVersion::LATEST)
+            .with_psr4(Arc::new(psr4))
+            .with_cache_dir(cache_dir.path()),
+    );
+}

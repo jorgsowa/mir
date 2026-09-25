@@ -367,8 +367,7 @@ impl AnalysisSession {
     /// open a sibling definition [`StubSlice`] cache under the same root, so
     /// callers using this builder get the same speedup as `with_cache_dir`.
     ///
-    /// Rebuilds the shared database to attach the definition cache — call
-    /// **before** any file is ingested. A debug assertion catches misuse.
+    /// Call **before** any file is ingested. A debug assertion catches misuse.
     ///
     /// [`StubSlice`]: mir_codebase::definitions::StubSlice
     pub fn with_cache(mut self, cache: Arc<AnalysisCache>) -> Self {
@@ -377,11 +376,7 @@ impl AnalysisSession {
             0,
             "AnalysisSession::with_cache must be called before any file is ingested"
         );
-        let dir = cache.cache_dir().to_path_buf();
-        self.db = AnalyzerDb::new().with_cache_dir(&dir);
-        self.db
-            .salsa
-            .set_php_version(Arc::from(self.php_version.to_string()));
+        self.db.attach_cache_dir(cache.cache_dir());
         self.cache = Some(cache);
         self
     }
@@ -389,9 +384,8 @@ impl AnalysisSession {
     /// Convenience: open a disk-backed cache at `cache_dir` and attach it.
     ///
     /// Attaches both the body-analysis issue cache ([`AnalysisCache`]) and the
-    /// definition [`StubSlice`] cache to the shared database. Builds a fresh
-    /// [`AnalyzerDb`] internally — call **before** any file is ingested. A
-    /// debug assertion catches misuse.
+    /// definition [`StubSlice`] cache to the shared database. Call **before**
+    /// any file is ingested. A debug assertion catches misuse.
     ///
     /// [`StubSlice`]: mir_codebase::definitions::StubSlice
     pub fn with_cache_dir(mut self, cache_dir: &std::path::Path) -> Self {
@@ -400,10 +394,7 @@ impl AnalysisSession {
             0,
             "AnalysisSession::with_cache_dir must be called before any file is ingested"
         );
-        self.db = AnalyzerDb::new().with_cache_dir(cache_dir);
-        self.db
-            .salsa
-            .set_php_version(Arc::from(self.php_version.to_string()));
+        self.db.attach_cache_dir(cache_dir);
         // Fold the user-stub fingerprint into the cache epoch. `with_user_stubs`
         // must run before this for it to be picked up (it does in `build_session`);
         // sessions without user stubs get 0, which is correct.

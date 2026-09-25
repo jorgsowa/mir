@@ -29,7 +29,7 @@ pub struct AnalyzerDb {
     pub(crate) user_stubs_loaded: std::sync::atomic::AtomicBool,
     /// Optional definition-collection disk cache. When `Some`, `collect_and_ingest_file`
     /// (the per-file LSP path) consults the cache before parsing and writes
-    /// back on misses. Wired in by [`Self::with_cache_dir`].
+    /// back on misses. Wired in by [`Self::attach_cache_dir`].
     pub(crate) stub_cache: Option<Arc<crate::stub_cache::StubSliceCache>>,
 }
 
@@ -68,12 +68,11 @@ impl AnalyzerDb {
     /// before parsing and write back on misses. The target PHP version is
     /// passed per call so the same cache directory remains usable across
     /// version changes (entries from other versions become misses).
-    pub fn with_cache_dir(mut self, cache_dir: &std::path::Path) -> Self {
+    pub(crate) fn attach_cache_dir(&mut self, cache_dir: &std::path::Path) {
         let cache = Arc::new(crate::stub_cache::StubSliceCache::open(cache_dir));
         // Wire cache into the salsa db so collect_file_definitions can use it.
         self.salsa.set_stub_cache(cache.clone());
         self.stub_cache = Some(cache);
-        self
     }
 
     /// Number of [`crate::db::SourceFile`] inputs registered in salsa.

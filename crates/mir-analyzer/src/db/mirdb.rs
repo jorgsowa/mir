@@ -611,7 +611,7 @@ impl MirDbStorage {
     }
 
     /// Wire a disk-backed stub cache into this db so `collect_file_definitions`
-    /// can skip reparsing on cache hits. Called by `AnalyzerDb::with_cache_dir`.
+    /// can skip reparsing on cache hits. Called by `AnalyzerDb::attach_cache_dir`.
     pub fn set_stub_cache(&self, cache: Arc<crate::stub_cache::StubSliceCache>) {
         *self.stub_cache.write() = Some(cache);
     }

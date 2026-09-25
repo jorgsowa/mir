@@ -152,13 +152,14 @@ impl AnalysisSession {
     /// read via the session's [`crate::SourceProvider`], so LSP VFS overrides
     /// are respected.
     pub(crate) fn ensure_vendor_eager_functions(&mut self) {
+        // Checked before `take()` so a missing provider leaves the queue intact.
+        let Some(provider) = self.db.salsa.source_provider() else {
+            return;
+        };
         let files = match self.pending_eager_function_files.lock().take() {
             None => return,
             Some(f) if f.is_empty() => return,
             Some(f) => f,
-        };
-        let Some(provider) = self.db.salsa.source_provider() else {
-            return;
         };
         let sources: Vec<(std::sync::Arc<str>, std::sync::Arc<str>)> = files
             .iter()
