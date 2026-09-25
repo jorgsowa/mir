@@ -201,6 +201,8 @@ pub struct MirDbStorage {
     /// O(all-files) walk the singleton exists to avoid). Diagnostic only —
     /// hosts assert warm-started sessions keep this at zero.
     workspace_index_walks: Arc<std::sync::atomic::AtomicU64>,
+    /// Analysis-path counters shared across clones; see [`crate::db::WorkCounts`].
+    work_counts: Arc<crate::db::WorkCounts>,
     /// Monotonic counter of subtype-edge mutations — class-like edge
     /// commits/clears ([`Self::set_file_class_edges`]) and anonymous-class
     /// `impl:` posting commits. These mutate query-visible
@@ -330,6 +332,7 @@ impl Default for MirDbStorage {
             subtype_cache: None,
             pending_index_files: Arc::default(),
             workspace_index_walks: Arc::default(),
+            work_counts: Arc::default(),
             subtype_edges_epoch: Arc::default(),
             revision_bump_deferral: RevisionBumpDeferral::default(),
             name_resolution_cache: NameResolutionCache::default(),
@@ -355,6 +358,10 @@ impl MirDatabase for MirDbStorage {
 
     fn note_workspace_index_walk(&self) {
         self.count_workspace_index_walk();
+    }
+
+    fn note_work(&self, work: crate::db::Work, n: u64) {
+        self.work_counts.add(work, n);
     }
 
     fn file_namespace(&self, file: &str) -> Option<Arc<str>> {
@@ -1517,6 +1524,11 @@ impl MirDbStorage {
     pub fn workspace_index_walks(&self) -> u64 {
         self.workspace_index_walks
             .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Units of `work` done by this db and its clones.
+    pub fn work_count(&self, work: crate::db::Work) -> u64 {
+        self.work_counts.get(work)
     }
 
     /// Count one tracked `workspace_symbol_index` execution (diagnostic).

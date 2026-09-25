@@ -338,6 +338,11 @@ impl AnalysisSession {
         self.db.salsa.workspace_index_walks()
     }
 
+    /// Units of `work` this session's analysis has done (diagnostic).
+    pub fn work_count(&self, work: crate::db::Work) -> u64 {
+        self.db.salsa.work_count(work)
+    }
+
     /// Swap in a custom [`crate::SourceProvider`]. LSPs install a VFS-backed
     /// provider here so the analyzer reads from unsaved editor buffers
     /// instead of disk.

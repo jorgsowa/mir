@@ -284,6 +284,7 @@ pub fn infer_scope(
     let ref_locs = db.pop_ref_loc_frame();
     let inferred_types = Arc::new(driver.take_inferred_types());
     crate::metrics::record_scope_analysis(path.as_ref(), 0);
+    db.note_work(crate::db::Work::ScopeAnalysis, 1);
     crate::metrics::record_infer_scope_retained(
         issues.len(),
         ref_locs.len(),

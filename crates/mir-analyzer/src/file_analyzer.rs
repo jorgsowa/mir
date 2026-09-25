@@ -581,9 +581,11 @@ fn resolve_name_at(
         byte_offset,
     ) {
         crate::metrics::record_name_at_compact_hit();
+        db.note_work(crate::db::Work::NameAtCompact, 1);
         return Some(name);
     }
     crate::metrics::record_name_at_fallback_walk();
+    db.note_work(crate::db::Work::NameAtFallback, 1);
     let symbols = resolve_scope_symbols(
         db,
         php_version,
@@ -622,9 +624,11 @@ fn resolve_symbol_at(
         capture_symbol_types,
     ) {
         crate::metrics::record_resolve_at_compact_hit();
+        db.note_work(crate::db::Work::ResolveAtCompact, 1);
         return Some(symbol);
     }
     crate::metrics::record_resolve_at_fallback_walk();
+    db.note_work(crate::db::Work::ResolveAtFallback, 1);
     let symbols = resolve_scope_symbols(
         db,
         php_version,
@@ -812,6 +816,7 @@ mod tests {
     use std::time::{Duration, Instant};
 
     use super::FileAnalyzer;
+    use crate::db::Work;
     use crate::{symbol::ReferenceKind, AnalysisSession, PhpVersion, ResolvedSymbol};
 
     fn session_for_source(path: &str, source: &str) -> (AnalysisSession, Arc<str>) {
@@ -862,27 +867,28 @@ mod tests {
         offset: u32,
         expected: impl FnOnce(&ResolvedSymbol),
     ) {
-        crate::metrics::test_reset();
+        let before = |work| session.work_count(work);
+        let (compact, fallback, symbols) = (
+            before(Work::ResolveAtCompact),
+            before(Work::ResolveAtFallback),
+            before(Work::SymbolAllocated),
+        );
         let symbol = session
             .resolve_at(file.as_ref(), offset)
             .expect("resolve_at should find a symbol at the chosen offset");
         expected(&symbol);
 
-        let dump = crate::metrics::dump().expect("metrics enabled in tests");
-        assert!(
-            dump.contains("resolve_at path      : compact 1  fallback 0"),
-            "expected compact resolve_at path without fallback, got:\n{dump}"
-        );
-        assert!(
-            dump.contains("symbols allocated    : 0"),
-            "compact resolve_at should not allocate legacy symbols, got:\n{dump}"
+        assert_eq!(session.work_count(Work::ResolveAtCompact) - compact, 1);
+        assert_eq!(session.work_count(Work::ResolveAtFallback) - fallback, 0);
+        assert_eq!(
+            session.work_count(Work::SymbolAllocated) - symbols,
+            0,
+            "compact resolve_at should not allocate legacy symbols"
         );
     }
 
     #[test]
     fn name_at_records_compact_path_without_fallback() {
-        crate::metrics::test_reset();
-
         let src = "<?php\nfunction helper(): void {}\nfunction caller(): void { helper(); }\n";
         let (mut session, file) = session_for_source("/proj/name_at_metrics.php", src);
         analyze_diagnostics_only(&mut session, file.clone(), src);
@@ -894,21 +900,17 @@ mod tests {
 
         assert_eq!(name, crate::Name::function("helper"));
 
-        let dump = crate::metrics::dump().expect("metrics enabled in tests");
-        assert!(
-            dump.contains("name_at path         : compact 1  fallback 0"),
-            "expected compact name_at path without fallback, got:\n{dump}"
-        );
-        assert!(
-            dump.contains("symbols allocated    : 0"),
-            "compact name_at should not allocate legacy symbols, got:\n{dump}"
+        assert_eq!(session.work_count(Work::NameAtCompact), 1);
+        assert_eq!(session.work_count(Work::NameAtFallback), 0);
+        assert_eq!(
+            session.work_count(Work::SymbolAllocated),
+            0,
+            "compact name_at should not allocate legacy symbols"
         );
     }
 
     #[test]
     fn name_at_top_level_exec_uses_compact_path_without_fallback() {
-        crate::metrics::test_reset();
-
         let src = "<?php\nfunction helper(): void {}\nhelper();\n";
         let (mut session, file) = session_for_source("/proj/name_at_top_level_metrics.php", src);
         analyze_diagnostics_only(&mut session, file.clone(), src);
@@ -920,14 +922,12 @@ mod tests {
 
         assert_eq!(name, crate::Name::function("helper"));
 
-        let dump = crate::metrics::dump().expect("metrics enabled in tests");
-        assert!(
-            dump.contains("name_at path         : compact 1  fallback 0"),
-            "expected compact top-level name_at path without fallback, got:\n{dump}"
-        );
-        assert!(
-            dump.contains("symbols allocated    : 0"),
-            "compact top-level name_at should not allocate legacy symbols, got:\n{dump}"
+        assert_eq!(session.work_count(Work::NameAtCompact), 1);
+        assert_eq!(session.work_count(Work::NameAtFallback), 0);
+        assert_eq!(
+            session.work_count(Work::SymbolAllocated),
+            0,
+            "compact top-level name_at should not allocate legacy symbols"
         );
     }
 
@@ -1045,8 +1045,6 @@ mod tests {
 
     #[test]
     fn hover_at_uses_resolve_at_targeted_path() {
-        crate::metrics::test_reset();
-
         let src = "<?php\nclass Dep {}\nfunction run(Dep $dep): Dep { return $dep; }\n";
         let (mut session, file) = session_for_source("/proj/hover_metrics.php", src);
         analyze_diagnostics_only(&mut session, file.clone(), src);
@@ -1058,21 +1056,17 @@ mod tests {
 
         assert_eq!(hover.ty.to_string(), "Dep");
 
-        let dump = crate::metrics::dump().expect("metrics enabled in tests");
-        assert!(
-            dump.contains("resolve_at path      : compact 1  fallback 0"),
-            "hover_at should resolve through the compact resolve_at path, got:\n{dump}"
-        );
-        assert!(
-            dump.contains("name_at path         : compact 0  fallback 0"),
-            "hover_at should not rely on name_at anymore, got:\n{dump}"
+        assert_eq!(session.work_count(Work::ResolveAtCompact), 1);
+        assert_eq!(session.work_count(Work::ResolveAtFallback), 0);
+        assert_eq!(
+            session.work_count(Work::NameAtCompact) + session.work_count(Work::NameAtFallback),
+            0,
+            "hover_at should not rely on name_at"
         );
     }
 
     #[test]
     fn definition_at_uses_resolve_at_targeted_path() {
-        crate::metrics::test_reset();
-
         let src = "<?php\nclass Dep {}\nfunction run(Dep $dep): Dep { return $dep; }\n";
         let (mut session, file) = session_for_source("/proj/definition_metrics.php", src);
         analyze_diagnostics_only(&mut session, file.clone(), src);
@@ -1084,21 +1078,17 @@ mod tests {
 
         assert_eq!(loc.file.as_ref(), file.as_ref());
 
-        let dump = crate::metrics::dump().expect("metrics enabled in tests");
-        assert!(
-            dump.contains("resolve_at path      : compact 1  fallback 0"),
-            "definition_at should resolve through the compact resolve_at path, got:\n{dump}"
-        );
-        assert!(
-            dump.contains("name_at path         : compact 0  fallback 0"),
-            "definition_at should not rely on name_at anymore, got:\n{dump}"
+        assert_eq!(session.work_count(Work::ResolveAtCompact), 1);
+        assert_eq!(session.work_count(Work::ResolveAtFallback), 0);
+        assert_eq!(
+            session.work_count(Work::NameAtCompact) + session.work_count(Work::NameAtFallback),
+            0,
+            "definition_at should not rely on name_at"
         );
     }
 
     #[test]
     fn references_at_uses_name_at_compact_path_without_fallback() {
-        crate::metrics::test_reset();
-
         let src = "<?php\nfunction helper(): void {}\nfunction caller(): void { helper(); }\n";
         let (mut session, file) = session_for_source("/proj/references_metrics.php", src);
         analyze_diagnostics_only(&mut session, file.clone(), src);
@@ -1119,14 +1109,13 @@ mod tests {
             "references_at should include the helper() call site; got {refs:?}"
         );
 
-        let dump = crate::metrics::dump().expect("metrics enabled in tests");
-        assert!(
-            dump.contains("name_at path         : compact 1  fallback 0"),
-            "references_at should resolve through the compact name_at path, got:\n{dump}"
-        );
-        assert!(
-            dump.contains("resolve_at path      : compact 0  fallback 0"),
-            "references_at should not rely on resolve_at, got:\n{dump}"
+        assert_eq!(session.work_count(Work::NameAtCompact), 1);
+        assert_eq!(session.work_count(Work::NameAtFallback), 0);
+        assert_eq!(
+            session.work_count(Work::ResolveAtCompact)
+                + session.work_count(Work::ResolveAtFallback),
+            0,
+            "references_at should not rely on resolve_at"
         );
     }
 

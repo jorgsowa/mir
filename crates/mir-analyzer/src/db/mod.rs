@@ -187,6 +187,9 @@ pub trait MirDatabase: salsa::Database {
     /// `workspace_symbol_index` walk (the fallback the singleton avoids).
     fn note_workspace_index_walk(&self) {}
 
+    /// Diagnostic hook: `n` units of `work` done (see [`WorkCounts`]).
+    fn note_work(&self, _work: Work, _n: u64) {}
+
     /// Snapshot every registered SourceFile. Side channel — not
     /// salsa-tracked; tracked queries that consult this must also
     /// read `workspace_revision().revision(db)` so file add/remove
@@ -266,6 +269,7 @@ pub use self::scopes::{
     analyze_file_per_scope, file_scopes, infer_scope, ScopeInferenceResult, ScopeKey,
 };
 pub use self::subtype_index::{ClassLikeKind, SubtypeEntry, SubtypeIndex, SubtypeSite};
+pub use self::work_counts::{Work, WorkCounts};
 pub use self::workspace::{
     build_workspace_symbol_index, collect_file_declarations, decls_from_slice, workspace_classes,
     workspace_functions, workspace_global_vars, workspace_index, workspace_symbol_index, FileDecl,
@@ -287,6 +291,7 @@ mod reference_locations;
 mod resolver;
 mod scopes;
 pub(crate) mod subtype_index;
+mod work_counts;
 mod workspace;
 
 #[cfg(test)]

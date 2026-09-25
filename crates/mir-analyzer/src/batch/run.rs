@@ -811,14 +811,10 @@ impl AnalysisSession {
 mod tests {
     use rustc_hash::FxHashMap as HashMap;
     use std::fs;
-    use std::sync::{Arc, Mutex, OnceLock};
+    use std::sync::Arc;
 
+    use crate::db::Work;
     use crate::{AnalysisSession, BatchOptions, PhpVersion};
-
-    fn metrics_test_lock() -> &'static Mutex<()> {
-        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-        LOCK.get_or_init(|| Mutex::new(()))
-    }
 
     fn write_php(dir: &tempfile::TempDir, name: &str, contents: &str) -> std::path::PathBuf {
         let path = dir.path().join(name);
@@ -828,7 +824,6 @@ mod tests {
 
     #[test]
     fn identical_batch_rerun_replays_without_symbols() {
-        let _guard = metrics_test_lock().lock().expect("metrics test lock");
         let dir = tempfile::tempdir().expect("tempdir");
         let file = write_php(
             &dir,
@@ -851,25 +846,26 @@ mod tests {
             "expected first run to populate transient replay"
         );
 
-        crate::metrics::test_reset();
+        let walks = session.work_count(Work::WholeFileWalk);
+        let symbols = session.work_count(Work::SymbolAllocated);
         let second = session.analyze_paths(std::slice::from_ref(&file), &opts);
         assert!(second.issues.is_empty());
         assert!(second.symbols.is_empty());
 
-        let dump = crate::metrics::dump().expect("metrics enabled in tests");
-        assert!(
-            dump.contains("whole-file walks     : 0"),
-            "expected replay to skip body walks, got:\n{dump}"
+        assert_eq!(
+            session.work_count(Work::WholeFileWalk) - walks,
+            0,
+            "expected replay to skip body walks"
         );
-        assert!(
-            dump.contains("symbols allocated    : 0"),
-            "expected diagnostics-only replay to avoid symbol allocation, got:\n{dump}"
+        assert_eq!(
+            session.work_count(Work::SymbolAllocated) - symbols,
+            0,
+            "expected diagnostics-only replay to avoid symbol allocation"
         );
     }
 
     #[test]
     fn identical_batch_rerun_replays_with_symbols() {
-        let _guard = metrics_test_lock().lock().expect("metrics test lock");
         let dir = tempfile::tempdir().expect("tempdir");
         let file = write_php(
             &dir,
@@ -895,20 +891,19 @@ mod tests {
             "expected first run to populate transient replay"
         );
 
-        crate::metrics::test_reset();
+        let walks = session.work_count(Work::WholeFileWalk);
         let second = session.analyze_paths(std::slice::from_ref(&file), &opts);
         assert_eq!(second.symbols.len(), first.symbols.len());
 
-        let dump = crate::metrics::dump().expect("metrics enabled in tests");
-        assert!(
-            dump.contains("whole-file walks     : 0"),
-            "expected replay to skip body walks, got:\n{dump}"
+        assert_eq!(
+            session.work_count(Work::WholeFileWalk) - walks,
+            0,
+            "expected replay to skip body walks"
         );
     }
 
     #[test]
     fn session_mutation_clears_batch_replay() {
-        let _guard = metrics_test_lock().lock().expect("metrics test lock");
         let dir = tempfile::tempdir().expect("tempdir");
         let file = write_php(
             &dir,
@@ -927,14 +922,14 @@ mod tests {
             ),
         );
 
-        crate::metrics::test_reset();
+        let walks = session.work_count(Work::WholeFileWalk);
         let result = session.analyze_paths(std::slice::from_ref(&file), &opts);
         assert!(result.issues.is_empty());
 
-        let dump = crate::metrics::dump().expect("metrics enabled in tests");
-        assert!(
-            dump.contains("whole-file walks     : 1"),
-            "expected session mutation to invalidate replay, got:\n{dump}"
+        assert_eq!(
+            session.work_count(Work::WholeFileWalk) - walks,
+            1,
+            "expected session mutation to invalidate replay"
         );
     }
 }

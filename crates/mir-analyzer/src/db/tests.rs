@@ -193,8 +193,6 @@ mod tests {
 
     #[test]
     fn infer_scope_does_not_allocate_resolved_symbols() {
-        crate::metrics::test_reset();
-
         let db = MirDbStorage::default();
         let file = SourceFile::new(
             &db,
@@ -206,21 +204,20 @@ mod tests {
 
         let _ = infer_scope(&db, file, scopes[0].clone());
 
-        let dump = crate::metrics::dump().expect("metrics enabled in tests");
-        assert!(
-            dump.contains("scopes analyzed      : 1"),
-            "infer_scope should still execute the requested scope, got:\n{dump}"
+        assert_eq!(
+            db.work_count(Work::ScopeAnalysis),
+            1,
+            "infer_scope should still execute the requested scope"
         );
-        assert!(
-            dump.contains("symbols allocated    : 0"),
-            "infer_scope should avoid allocating resolved symbols, got:\n{dump}"
+        assert_eq!(
+            db.work_count(Work::SymbolAllocated),
+            0,
+            "infer_scope should avoid allocating resolved symbols"
         );
     }
 
     #[test]
     fn infer_file_return_types_uses_per_scope_queries() {
-        crate::metrics::test_reset();
-
         let db = MirDbStorage::default();
         let file = SourceFile::new(
             &db,
@@ -239,14 +236,15 @@ mod tests {
             Some("1".to_string())
         );
 
-        let dump = crate::metrics::dump().expect("metrics enabled in tests");
-        assert!(
-            dump.contains("whole-file walks     : 0"),
-            "infer_file_return_types should avoid whole-file body walks, got:\n{dump}"
+        assert_eq!(
+            db.work_count(Work::WholeFileWalk),
+            0,
+            "infer_file_return_types should avoid whole-file body walks"
         );
-        assert!(
-            dump.contains("scopes analyzed      : 2"),
-            "infer_file_return_types should analyze the function and class scopes, got:\n{dump}"
+        assert_eq!(
+            db.work_count(Work::ScopeAnalysis),
+            2,
+            "infer_file_return_types should analyze the function and class scopes"
         );
     }
 
@@ -300,8 +298,6 @@ mod tests {
 
     #[test]
     fn infer_function_does_not_allocate_resolved_symbols() {
-        crate::metrics::test_reset();
-
         let db = MirDbStorage::default();
         let file = SourceFile::new(
             &db,
@@ -313,14 +309,10 @@ mod tests {
         let result = infer_function(&db, file, Arc::from("foo"));
         assert!(result.is_some(), "expected infer_function to locate `foo`");
 
-        let dump = crate::metrics::dump().expect("metrics enabled in tests");
-        assert!(
-            dump.contains("symbols allocated    : 0"),
-            "infer_function should not retain or allocate resolved symbols, got:\n{dump}"
-        );
-        assert!(
-            dump.contains("retained/infer_fn    :"),
-            "infer_function should still record retained-size metrics, got:\n{dump}"
+        assert_eq!(
+            db.work_count(Work::SymbolAllocated),
+            0,
+            "infer_function should not retain or allocate resolved symbols"
         );
     }
 

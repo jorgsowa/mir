@@ -45,6 +45,9 @@ impl<'a> BodyAnalyzer<'a> {
         );
 
         crate::metrics::record_whole_file_body_walk(file.as_ref(), all_symbols.len());
+        self.db.note_work(crate::db::Work::WholeFileWalk, 1);
+        self.db
+            .note_work(crate::db::Work::SymbolAllocated, all_symbols.len() as u64);
         (all_issues, all_symbols)
     }
 
