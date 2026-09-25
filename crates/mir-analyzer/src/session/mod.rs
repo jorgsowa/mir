@@ -228,17 +228,16 @@ impl AnalysisSession {
         DbView::new(self, self.snapshot())
     }
 
-    /// Run `query` on fresh snapshots until one completes. The owner can't
-    /// write while it's inside this call, so only a host writing through a
-    /// raw [`Self::snapshot_db`] clone can cancel it.
-    pub(crate) fn retry_snapshot<T>(
+    /// Run a snapshot query on the owner's thread. The owner can't write
+    /// while borrowed, so nothing can cancel the query: a `Cancelled` is
+    /// re-raised, never retried.
+    pub(crate) fn query_snapshot<T>(
         &self,
-        query: impl Fn(&AnalysisSnapshot) -> Result<T, salsa::Cancelled>,
+        query: impl FnOnce(&AnalysisSnapshot) -> Result<T, salsa::Cancelled>,
     ) -> T {
-        loop {
-            if let Ok(out) = query(&self.snapshot()) {
-                return out;
-            }
+        match query(&self.db_view()) {
+            Ok(out) => out,
+            Err(cancelled) => snapshot::unwind(cancelled),
         }
     }
 
@@ -328,7 +327,7 @@ impl AnalysisSession {
 
     /// See [`AnalysisSnapshot::files_mentioning_any`].
     pub fn files_mentioning_any(&self, files: &[Arc<str>], needles: &[&str]) -> Vec<Arc<str>> {
-        self.retry_snapshot(|snap| snap.files_mentioning_any(files, needles))
+        self.query_snapshot(|snap| snap.files_mentioning_any(files, needles))
     }
 
     /// Persist the attached [`AnalysisCache`] to disk. No-op without an

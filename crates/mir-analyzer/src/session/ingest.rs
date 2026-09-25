@@ -1,5 +1,4 @@
 use super::*;
-use std::panic::AssertUnwindSafe;
 
 /// One file's disk-cache lookup result from `AnalysisSession::warm_start_files`'s
 /// parallel read phase — everything the sequential apply phase needs, so it
@@ -72,16 +71,6 @@ fn displaced_cache_owners(
 }
 
 impl AnalysisSession {
-    fn snapshot_retry<R>(&self, mut f: impl FnMut(&MirDbStorage) -> R) -> R {
-        loop {
-            let db = self.snapshot_db();
-            if let Ok(value) = salsa::Cancelled::catch(AssertUnwindSafe(|| f(&db))) {
-                return value;
-            }
-            std::thread::yield_now();
-        }
-    }
-
     /// Cheap clone of the salsa db for a read-only query. The lock is held
     /// only for the duration of the clone, so concurrent readers never
     /// serialize on each other or on writes for longer than the clone itself.
@@ -196,10 +185,9 @@ impl AnalysisSession {
     /// accumulate dead reference-location entries indefinitely.)
     pub fn ingest_file(&mut self, file: Arc<str>, source: Arc<str>) {
         self.ensure_all_stubs();
-        let existing_text = self.snapshot_retry(|db| {
-            db.lookup_source_file(file.as_ref())
-                .map(|sf| sf.text(db as &dyn MirDatabase).clone())
-        });
+        let existing_text = self
+            .lookup_source_file(file.as_ref())
+            .map(|sf| sf.text(&self.db.salsa).clone());
         if existing_text
             .as_ref()
             .is_some_and(|text| text.as_ref() == source.as_ref())
@@ -290,7 +278,7 @@ impl AnalysisSession {
         // committed above, so compute them now and only invalidate the cached
         // dependency graph when those edges actually changed.
         let new_structural_targets =
-            self.snapshot_retry(|db| file_outgoing_dependencies(db, file.as_ref(), false));
+            file_outgoing_dependencies(&self.db.salsa, file.as_ref(), false);
         self.last_structural_targets
             .write()
             .insert(file.as_ref().to_string(), new_structural_targets.clone());
@@ -1017,7 +1005,7 @@ impl AnalysisSession {
         should_cancel: &(dyn Fn() -> bool + Sync),
     ) -> bool {
         self.db.salsa.adopt_on_demand_files();
-        // Bounded rounds: without a cap, a caller with no cancellation token would never return while a host keeps mirroring buffers.
+        // Bounded: snapshot readers keep queueing on-demand loads meanwhile.
         let mut rounds_left = SETTLE_ROUNDS;
         loop {
             if rounds_left == 0 {
@@ -1044,32 +1032,23 @@ impl AnalysisSession {
                 return true;
             }
 
-            let decls: Vec<(crate::db::SourceFile, crate::db::FileDeclarations)> = loop {
-                if should_cancel() {
-                    return false;
-                }
+            if should_cancel() {
+                return false;
+            }
+            let decls: Vec<(crate::db::SourceFile, crate::db::FileDeclarations)> = {
+                use rayon::prelude::*;
                 let view = self.db_view();
                 let snap = view.db();
-                let attempt = salsa::Cancelled::catch(std::panic::AssertUnwindSafe(|| {
-                    use rayon::prelude::*;
-
-                    let sfs: Vec<crate::db::SourceFile> = claim
-                        .paths()
-                        .iter()
-                        .filter_map(|p| snap.lookup_source_file(p.as_ref()))
-                        .collect();
-
-                    sfs.par_iter()
-                        .map_with(snap.clone(), |db, &sf| {
-                            (sf, crate::db::collect_file_declarations(db, sf).clone())
-                        })
-                        .collect()
-                }));
-                match attempt {
-                    Ok(decls) => break decls,
-                    Err(_) if should_cancel() => return false,
-                    Err(_) => std::thread::yield_now(),
-                }
+                let sfs: Vec<crate::db::SourceFile> = claim
+                    .paths()
+                    .iter()
+                    .filter_map(|p| snap.lookup_source_file(p.as_ref()))
+                    .collect();
+                sfs.par_iter()
+                    .map_with(snap.clone(), |db, &sf| {
+                        (sf, crate::db::collect_file_declarations(db, sf).clone())
+                    })
+                    .collect()
             };
 
             if should_cancel() {

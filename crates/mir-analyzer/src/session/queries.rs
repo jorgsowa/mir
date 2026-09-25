@@ -1,7 +1,6 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use super::snapshot::catch;
 use super::*;
 
 impl AnalysisSession {
@@ -235,7 +234,7 @@ impl AnalysisSession {
         &self,
         symbol: &crate::Name,
     ) -> Result<mir_types::Location, crate::SymbolLookupError> {
-        self.retry_snapshot(|snap| snap.definition_of_cached(symbol))
+        self.query_snapshot(|snap| snap.definition_of_cached(symbol))
     }
 
     /// Hover information for a symbol: type, docstring, and definition location.
@@ -282,7 +281,7 @@ impl AnalysisSession {
         &self,
         symbol: &crate::Name,
     ) -> Result<crate::HoverInfo, crate::SymbolLookupError> {
-        self.retry_snapshot(|snap| snap.hover_cached(symbol))
+        self.query_snapshot(|snap| snap.hover_cached(symbol))
     }
 
     /// Raw reference locations indexed by string symbol key, kept for tests
@@ -307,7 +306,7 @@ impl AnalysisSession {
     /// candidates' class edges (same self-heal `indexed_subtype_classes` uses).
     pub fn subtype_files(&mut self, class_fqn: &str) -> Vec<Arc<str>> {
         self.prepare_for_query(None);
-        self.retry_snapshot(|snap| snap.subtype_files(class_fqn))
+        self.query_snapshot(|snap| snap.subtype_files(class_fqn))
     }
 
     /// Compatibility wrapper for callers that only want `use` import items.
@@ -333,8 +332,8 @@ impl AnalysisSession {
     /// form, this runs the owner-side warm-up for stale candidates first, so
     /// every one of them is analyzed with its referenced classes loaded.
     ///
-    /// `should_cancel` is polled at phase boundaries and between
-    /// cancellation retries; `true` aborts with `None`.
+    /// `should_cancel` is polled at phase boundaries and between stale
+    /// candidates; `true` aborts with `None`.
     pub fn indexed_references_to(
         &mut self,
         symbol: &crate::Name,
@@ -354,17 +353,10 @@ impl AnalysisSession {
             }
             key
         };
-        let stale = loop {
-            if should_cancel() {
-                return None;
-            }
-            let snap = self.db_view();
-            match catch(|| snap.stale_reference_candidates(symbol, files)) {
-                Ok(stale) => break stale,
-                Err(_) if should_cancel() => return None,
-                Err(_) => {}
-            }
-        };
+        if should_cancel() {
+            return None;
+        }
+        let stale = self.db_view().stale_reference_candidates(symbol, files);
 
         if !stale.is_empty() {
             // Cached postings for fresh candidates don't need the pending
@@ -373,51 +365,29 @@ impl AnalysisSession {
             if !self.settle_workspace_index_cancellable(should_cancel) {
                 return None;
             }
-            // Serial; a cancelled file retries in place. Parallel variants
-            // deadlocked under `concurrent_reference_cancel`. The bump scope
-            // closes before the commit snapshot captures its generation.
+            // The bump scope closes before the commit view captures its
+            // generation.
             {
                 let mut session = self.defer_revision_bumps();
                 for path in &stale {
-                    loop {
-                        if should_cancel() {
-                            return None;
-                        }
-                        match catch(|| session.prepare_file_for_analysis(path)) {
-                            Ok(()) => break,
-                            Err(_) if should_cancel() => return None,
-                            Err(_) => {}
-                        }
+                    if !session.prepare_file_for_analysis_cancellable(path, should_cancel) {
+                        return None;
                     }
                 }
             }
-            loop {
-                if should_cancel() {
-                    return None;
-                }
-                let snap = self.db_view();
-                match snap.commit_reference_candidates(&stale) {
-                    Ok(()) => break,
-                    Err(_) if should_cancel() => return None,
-                    Err(_) => {}
-                }
+            if should_cancel() {
+                return None;
             }
+            self.query_snapshot(|snap| snap.commit_reference_candidates(&stale));
         }
 
         if include_declaration {
             self.load_symbol_owner(symbol);
         }
-        loop {
-            let snap = self.db_view();
-            match catch(|| snap.read_references(symbol, files, include_declaration, includes)) {
-                Ok(out) => {
-                    snap.memoize_references(key, &out);
-                    return Some(out);
-                }
-                Err(_) if should_cancel() => return None,
-                Err(_) => {}
-            }
-        }
+        let snap = self.db_view();
+        let out = snap.read_references(symbol, files, include_declaration, includes);
+        snap.memoize_references(key, &out);
+        Some(out)
     }
 
     /// The symbol's declaration site, narrowed from the collector's
@@ -428,7 +398,7 @@ impl AnalysisSession {
         symbol: &crate::Name,
     ) -> Option<(Arc<str>, crate::Range)> {
         self.load_symbol_owner(symbol);
-        self.retry_snapshot(|snap| catch(|| snap.declaration_name_range(symbol)))
+        self.db_view().declaration_name_range(symbol)
     }
 
     /// See [`AnalysisSnapshot::indexed_subtype_classes`].
@@ -439,7 +409,7 @@ impl AnalysisSession {
         include_trait_users: bool,
     ) -> Vec<SubtypeClassSite> {
         self.prepare_for_query(None);
-        self.retry_snapshot(|snap| {
+        self.query_snapshot(|snap| {
             snap.indexed_subtype_classes(class_fqn, files, include_trait_users)
         })
     }
@@ -452,7 +422,7 @@ impl AnalysisSession {
         files: &[Arc<str>],
     ) -> Vec<(Arc<str>, Arc<str>, crate::Range)> {
         self.prepare_for_query(None);
-        self.retry_snapshot(|snap| snap.indexed_method_implementations(class_fqn, method, files))
+        self.query_snapshot(|snap| snap.indexed_method_implementations(class_fqn, method, files))
     }
 
     /// See [`AnalysisSnapshot::class_issues`]. Call this after ingesting or
@@ -460,14 +430,14 @@ impl AnalysisSession {
     /// picture.
     pub fn class_issues(&mut self, files: &[Arc<str>]) -> Vec<crate::Issue> {
         self.prepare_for_query(None);
-        self.retry_snapshot(|snap| snap.class_issues(files))
+        self.query_snapshot(|snap| snap.class_issues(files))
     }
 
     /// See [`AnalysisSnapshot::collector_issues`]. Correct regardless of
     /// which path put the file's text into the db (`ingest_file`,
     /// `set_file_text`, lazy vendor load) or how many times.
     pub fn collector_issues(&self, files: &[Arc<str>]) -> Vec<crate::Issue> {
-        self.retry_snapshot(|snap| snap.collector_issues(files))
+        self.query_snapshot(|snap| snap.collector_issues(files))
     }
 
     /// All declarations defined in `file` as a **hierarchical tree**.

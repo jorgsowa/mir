@@ -1,8 +1,5 @@
 use super::*;
 
-/// How many times the re-analysis pass re-runs after a concurrent write cancels it, then the sweep yields like an explicit cancellation.
-const PASS_ATTEMPTS: usize = 4;
-
 impl AnalysisSession {
     /// Retrieve the source text the session has registered for `file`, if
     /// any. Returns `None` when the file has never been ingested. Used by
@@ -143,20 +140,8 @@ impl AnalysisSession {
         // file resolves thousands; caching them balloons memory), and
         // diagnostics consumers don't read them. Hover / go-to-definition
         // flows analyze the open file directly via [`crate::FileAnalyzer`].
-        let mut attempts_left = PASS_ATTEMPTS;
-        let results = loop {
-            if cancel.is_cancelled() || attempts_left == 0 {
-                return Vec::new();
-            }
-            attempts_left -= 1;
-            // A host write landing mid-pass raises `salsa::Cancelled`; retry
-            // rather than discarding the whole sweep.
-            match self.db_view().warm_pass(&dependents, cancel) {
-                Ok(Some(analyzed)) => break analyzed,
-                Ok(None) => return Vec::new(),
-                Err(_) if cancel.is_cancelled() => return Vec::new(),
-                Err(_) => std::thread::yield_now(),
-            }
+        let Some(results) = self.query_snapshot(|snap| snap.warm_pass(&dependents, cancel)) else {
+            return Vec::new();
         };
 
         results

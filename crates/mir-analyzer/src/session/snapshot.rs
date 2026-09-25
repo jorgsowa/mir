@@ -99,7 +99,7 @@ pub(super) fn catch<T>(f: impl FnOnce() -> T) -> Result<T, Cancelled> {
 }
 
 /// Raise `cancelled` the way salsa does, for code already inside [`catch`].
-fn unwind(cancelled: Cancelled) -> ! {
+pub(super) fn unwind(cancelled: Cancelled) -> ! {
     std::panic::resume_unwind(Box::new(cancelled))
 }
 

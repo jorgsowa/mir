@@ -436,7 +436,7 @@ impl<'a> FileAnalyzer<'a> {
                 .mark_prepared_for_analysis(&file, text, prepare_generation);
         }
 
-        self.session.retry_snapshot(|snap| {
+        self.session.query_snapshot(|snap| {
             snap.analyze_with_symbols(file.clone(), source, program, source_map, collect_symbols)
         })
     }
@@ -451,7 +451,7 @@ impl<'a> FileAnalyzer<'a> {
     pub fn resolve_at(&mut self, file: Arc<str>, byte_offset: u32) -> Option<ResolvedSymbol> {
         self.session.prepare_for_query(Some(&file));
         self.session
-            .retry_snapshot(|snap| snap.resolve_at(&file, byte_offset))
+            .query_snapshot(|snap| snap.resolve_at(&file, byte_offset))
     }
 
     pub(crate) fn resolve_name_at(
@@ -461,7 +461,7 @@ impl<'a> FileAnalyzer<'a> {
     ) -> Option<crate::Name> {
         self.session.prepare_for_query(Some(&file));
         self.session
-            .retry_snapshot(|snap| snap.name_at(&file, byte_offset))
+            .query_snapshot(|snap| snap.name_at(&file, byte_offset))
     }
 }
 
