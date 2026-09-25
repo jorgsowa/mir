@@ -1328,11 +1328,6 @@ impl MirDbStorage {
         self.user_stub_paths.write().insert(path);
     }
 
-    /// Returns `true` if `file` was registered as a user stub.
-    pub fn is_user_stub_file(&self, file: SourceFile, db: &dyn crate::db::MirDatabase) -> bool {
-        self.user_stub_paths.read().contains(file.path(db).as_ref())
-    }
-
     /// Update the target PHP version for `@since`/`@removed` filtering in
     /// `collect_file_definitions`. Must be called before any stub files are
     /// registered so the salsa cache sees consistent results.

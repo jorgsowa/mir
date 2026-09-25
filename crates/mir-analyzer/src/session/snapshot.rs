@@ -78,12 +78,6 @@ impl std::ops::Deref for DbView<'_> {
     }
 }
 
-impl std::ops::DerefMut for DbView<'_> {
-    fn deref_mut(&mut self) -> &mut AnalysisSnapshot {
-        &mut self.snapshot
-    }
-}
-
 /// Analyses staged by [`AnalysisSnapshot::stage_warm`], awaiting commit.
 struct WarmPass {
     mention_scanner: Option<Arc<crate::db::class_mention_index::MentionScanner>>,

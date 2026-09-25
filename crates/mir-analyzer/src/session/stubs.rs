@@ -1,22 +1,12 @@
 use super::*;
 
 impl AnalysisSession {
-    /// Deprecated — stub loading is now fully lazy per-AST.
-    ///
-    /// This is an alias for [`Self::ensure_all_stubs`] kept for API
-    /// compatibility. Internal analysis paths use [`Self::prepare_ast_for_analysis`]
-    /// which loads only the stubs referenced by the file under analysis.
-    #[deprecated(note = "use ensure_all_stubs() or ensure_stubs_for_ast() instead")]
-    pub fn ensure_essential_stubs(&mut self) {
-        self.ensure_all_stubs();
-    }
-
     /// Load every embedded PHP stub plus any configured user stubs.
     /// Use for batch tools (CLI, full project analysis) where comprehensive
     /// symbol coverage matters more than cold-start latency.
     pub fn ensure_all_stubs(&mut self) {
         let paths: Vec<&'static str> = crate::stubs::stub_files().iter().map(|&(p, _)| p).collect();
-        self.db.ingest_stub_paths(&paths, self.php_version);
+        self.db.ingest_stub_paths(&paths);
         self.ensure_user_stubs_loaded();
     }
 
@@ -30,7 +20,7 @@ impl AnalysisSession {
     pub fn ensure_stub_for_function(&mut self, name: &str) -> bool {
         match crate::stubs::stub_path_for_function(name) {
             Some(path) => {
-                self.db.ingest_stub_paths(&[path], self.php_version);
+                self.db.ingest_stub_paths(&[path]);
                 true
             }
             None => false,
@@ -46,7 +36,7 @@ impl AnalysisSession {
     pub fn ensure_stub_for_class(&mut self, fqcn: &str) -> bool {
         match crate::stubs::stub_path_for_class(fqcn) {
             Some(path) => {
-                self.db.ingest_stub_paths(&[path], self.php_version);
+                self.db.ingest_stub_paths(&[path]);
                 true
             }
             None => false,
@@ -60,7 +50,7 @@ impl AnalysisSession {
     pub fn ensure_stub_for_constant(&mut self, name: &str) -> bool {
         match crate::stubs::stub_path_for_constant(name) {
             Some(path) => {
-                self.db.ingest_stub_paths(&[path], self.php_version);
+                self.db.ingest_stub_paths(&[path]);
                 true
             }
             None => false,
@@ -102,7 +92,7 @@ impl AnalysisSession {
         if paths.is_empty() {
             return;
         }
-        self.db.ingest_stub_paths(&paths, self.php_version);
+        self.db.ingest_stub_paths(&paths);
     }
 
     /// Discover and ingest stubs by walking the parsed AST of a PHP file.
@@ -122,7 +112,7 @@ impl AnalysisSession {
         if paths.is_empty() {
             return;
         }
-        self.db.ingest_stub_paths(&paths, self.php_version);
+        self.db.ingest_stub_paths(&paths);
     }
 
     /// Returns true if this session has a configured class resolver

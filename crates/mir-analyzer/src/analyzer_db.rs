@@ -85,13 +85,8 @@ impl AnalyzerDb {
         self.salsa.lookup_source_file(path)
     }
 
-    /// Mark a [`crate::db::SourceFile`] as removed from the workspace.
-    pub fn remove_source_file(&mut self, path: &str) {
-        self.salsa.remove_source_file(path);
-    }
-
     /// Ingest multiple stub paths. Idempotent — already-loaded stubs are skipped.
-    pub fn ingest_stub_paths(&mut self, paths: &[&'static str], _php_version: PhpVersion) {
+    pub fn ingest_stub_paths(&mut self, paths: &[&'static str]) {
         for &path in paths {
             if !self.loaded_stubs.insert(path) {
                 continue;

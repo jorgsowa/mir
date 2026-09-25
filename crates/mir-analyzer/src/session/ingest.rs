@@ -131,15 +131,6 @@ impl AnalysisSession {
         self.db.lookup_source_file(path)
     }
 
-    /// Mark a [`crate::db::SourceFile`] as removed from the workspace.
-    ///
-    /// **Internal API — exposes Salsa types.** Subject to change without notice.
-    #[doc(hidden)]
-    pub fn remove_source_file_input(&mut self, path: &str) {
-        self.index.clear_transient_batch_replay();
-        self.db.remove_source_file(path);
-    }
-
     /// Run `f` with exclusive `&mut` access to the shared salsa db, for a host
     /// that owns additional salsa ingredients (inputs/tracked fns) on this db
     /// and needs to create or mutate them.
@@ -151,15 +142,6 @@ impl AnalysisSession {
         f(&mut self.db.salsa)
     }
 
-    /// Run `f` with shared access to the canonical (non-snapshot) salsa db.
-    /// For host-owned reads of off-salsa state that must observe the live db
-    /// rather than a clone.
-    ///
-    /// **Internal API — exposes Salsa types.** Subject to change without notice.
-    #[doc(hidden)]
-    pub fn with_db_ref<R>(&self, f: impl FnOnce(&MirDbStorage) -> R) -> R {
-        f(&self.db.salsa)
-    }
     /// Run a closure with read access to a database snapshot.
     ///
     /// **Internal API — exposes Salsa types.** Subject to change without

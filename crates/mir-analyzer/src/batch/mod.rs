@@ -332,7 +332,7 @@ impl AnalysisSession {
 
         // Built-in stubs for the configured PHP version.
         let paths: Vec<&'static str> = crate::stubs::stub_files().iter().map(|&(p, _)| p).collect();
-        self.db.ingest_stub_paths(&paths, php_version);
+        self.db.ingest_stub_paths(&paths);
 
         // User-configured stubs.
         self.db
