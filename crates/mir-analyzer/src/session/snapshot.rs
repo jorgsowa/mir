@@ -410,19 +410,17 @@ impl AnalysisSnapshot {
         include_declaration: bool,
         includes: crate::ReferenceIncludes,
     ) -> Result<Vec<(Arc<str>, crate::Range)>, Cancelled> {
-        catch(|| {
-            let key = self.reference_query_key(symbol, files, include_declaration, includes);
-            if let Some(hit) = self.index.ref_queries.get(&key) {
-                return hit;
-            }
-            let stale = self.stale_reference_candidates(symbol, files);
-            if !stale.is_empty() {
-                self.commit_reference_candidates(&stale);
-            }
-            let out = self.read_references(symbol, files, include_declaration, includes);
-            self.memoize_references(key, &out);
-            out
-        })
+        let key = self.reference_query_key(symbol, files, include_declaration, includes);
+        if let Some(hit) = self.index.ref_queries.get(&key) {
+            return Ok(hit);
+        }
+        let stale = catch(|| self.stale_reference_candidates(symbol, files))?;
+        if !stale.is_empty() {
+            self.commit_reference_candidates(&stale)?;
+        }
+        let out = catch(|| self.read_references(symbol, files, include_declaration, includes))?;
+        self.memoize_references(key, &out);
+        Ok(out)
     }
 
     /// `use` import items (`use Foo\Bar;`, `use function ...;`,
@@ -582,8 +580,8 @@ impl AnalysisSnapshot {
     }
 
     /// Analyze `stale` and commit their postings and class edges.
-    pub(super) fn commit_reference_candidates(&self, stale: &[Arc<str>]) {
-        let _ = self.warm_pass(stale, &crate::IndexCancel::new());
+    pub(super) fn commit_reference_candidates(&self, stale: &[Arc<str>]) -> Result<(), Cancelled> {
+        self.warm_pass(stale, &crate::IndexCancel::new()).map(drop)
     }
 
     /// Analyze `files` and commit their reference postings, class edges and
@@ -1300,10 +1298,7 @@ mod tests {
             session.upsert_source_file(caller, Arc::from(CALLS_STOP), salsa::Durability::LOW);
             session
         });
-        // The write trips cancellation before it waits for `snap` to drop.
-        while catch(|| snap.db.unwind_if_revision_cancelled()).is_ok() {
-            std::thread::yield_now();
-        }
+        await_pending_write(&snap);
         snap.commit_warm(&mut pass);
         drop(snap);
         let mut session = writer.join().unwrap();
@@ -1324,5 +1319,35 @@ mod tests {
         };
         assert_eq!(callers_of(&mut session, "stop"), [files[1].clone()]);
         assert!(callers_of(&mut session, "run").is_empty());
+    }
+
+    #[test]
+    fn cancelled_reference_commit_reports_cancellation() {
+        let mut session = AnalysisSession::new(PhpVersion::LATEST);
+        let files: Vec<Arc<str>> = vec![Arc::from("base.php"), Arc::from("caller.php")];
+        session.ingest_file(files[0].clone(), Arc::from(BASE));
+        session.ingest_file(files[1].clone(), Arc::from(CALLS_RUN));
+        session.prepare_for_query(Some(&files[1]));
+        let snap = session.snapshot();
+        let stale = snap.stale_reference_candidates(&Name::method("Base", "run"), &files);
+        assert!(stale.contains(&files[1]));
+
+        let caller = files[1].clone();
+        let writer = std::thread::spawn(move || {
+            session.upsert_source_file(caller, Arc::from(CALLS_STOP), salsa::Durability::LOW);
+            session
+        });
+        await_pending_write(&snap);
+        assert!(snap.commit_reference_candidates(&stale).is_err());
+        drop(snap);
+        writer.join().unwrap();
+    }
+
+    /// Spins until an owner write has tripped cancellation; the writer then
+    /// waits for `snap` to drop before applying.
+    fn await_pending_write(snap: &AnalysisSnapshot) {
+        while catch(|| snap.db.unwind_if_revision_cancelled()).is_ok() {
+            std::thread::yield_now();
+        }
     }
 }

@@ -396,7 +396,7 @@ impl AnalysisSession {
                     return None;
                 }
                 let snap = self.db_view();
-                match catch(|| snap.commit_reference_candidates(&stale)) {
+                match snap.commit_reference_candidates(&stale) {
                     Ok(()) => break,
                     Err(_) if should_cancel() => return None,
                     Err(_) => {}
