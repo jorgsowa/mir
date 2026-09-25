@@ -4,7 +4,9 @@ use std::sync::Arc;
 use rustc_hash::FxHashSet as HashSet;
 use salsa::Cancelled;
 
-use super::index_state::{hash_files, IndexState, RefQueryCacheKey, SubtypeQueryCacheKey};
+use super::index_state::{
+    hash_files, AnalyzedFile, IndexState, RefQueryCacheKey, SubtypeQueryCacheKey,
+};
 use super::queries::{identifier_char_col, span_range, ReferenceGate};
 use super::SubtypeClassSite;
 use crate::cache::AnalysisCache;
@@ -69,6 +71,12 @@ impl std::ops::DerefMut for DbView<'_> {
     fn deref_mut(&mut self) -> &mut AnalysisSnapshot {
         &mut self.snapshot
     }
+}
+
+/// Analyses staged by [`AnalysisSnapshot::stage_warm`], awaiting commit.
+struct WarmPass {
+    mention_scanner: Option<Arc<crate::db::class_mention_index::MentionScanner>>,
+    analyzed: Vec<AnalyzedFile>,
 }
 
 /// A fallback mention scan `(file, text scanned, names found)`, recorded
@@ -567,30 +575,83 @@ impl AnalysisSnapshot {
     }
 
     /// Analyze `stale` and commit their postings and class edges.
+    pub(super) fn commit_reference_candidates(&self, stale: &[Arc<str>]) {
+        let _ = self.warm_pass(stale, &crate::IndexCancel::new());
+    }
+
+    /// Analyze `files` and commit their reference postings, class edges and
+    /// mention scans to the index shared with the owner, so later queries
+    /// find them fresh. `Ok(false)` when `cancel` stopped the pass first.
     ///
+    /// Files the owner hasn't prepared (see
+    /// [`super::AnalysisSession::prepare_for_query`]) analyze against the
+    /// classes already loaded; a commit with unresolved names stays tied to
+    /// this snapshot's [`Self::index_generation`], so the next load re-opens it.
+    pub fn warm_files(
+        &self,
+        files: &[Arc<str>],
+        cancel: &crate::IndexCancel,
+    ) -> Result<bool, Cancelled> {
+        Ok(self.warm_pass(files, cancel)?.is_some())
+    }
+
+    pub(super) fn warm_pass(
+        &self,
+        files: &[Arc<str>],
+        cancel: &crate::IndexCancel,
+    ) -> Result<Option<Vec<AnalyzedFile>>, Cancelled> {
+        let Some(mut pass) = self.stage_warm(files, cancel)? else {
+            return Ok(None);
+        };
+        self.commit_warm(&mut pass);
+        Ok(Some(pass.analyzed))
+    }
+
     /// Freezes the workspace index on a pass-scoped clone (borrow-only
     /// symbol lookups + pass-shared subtype cache): a snapshot never
     /// lazy-loads, and a concurrent write cancels the pass, so the frozen
     /// view is never stale. Same discipline as the batch body pass.
-    pub(super) fn commit_reference_candidates(&self, stale: &[Arc<str>]) {
-        let mut db = self.db.clone();
-        db.freeze_workspace_index();
-        let mention_scanner = db.class_mention_scanner();
-        let cache = self.cache.as_deref();
-        let mut analyzed: Vec<_> = stale
-            .iter()
-            .filter_map(|path| {
-                self.index
-                    .stage_analyzed(&db, cache, mention_scanner.as_deref(), path)
+    fn stage_warm(
+        &self,
+        files: &[Arc<str>],
+        cancel: &crate::IndexCancel,
+    ) -> Result<Option<WarmPass>, Cancelled> {
+        catch(|| {
+            let mut db = self.db.clone();
+            db.freeze_workspace_index();
+            let mention_scanner = db.class_mention_scanner();
+            let cache = self.cache.as_deref();
+            let mut analyzed = Vec::with_capacity(files.len());
+            for path in files {
+                if cancel.is_cancelled() {
+                    return None;
+                }
+                analyzed.extend(self.index.stage_analyzed(
+                    &db,
+                    cache,
+                    mention_scanner.as_deref(),
+                    path,
+                ));
+            }
+            Some(WarmPass {
+                mention_scanner,
+                analyzed,
             })
-            .collect();
-        self.index.commit_analyzed(
-            &db,
-            cache,
-            mention_scanner.as_deref(),
-            &mut analyzed,
+        })
+    }
+
+    /// Marks record the exact text Arc each file was analyzed against, so an
+    /// owner text write racing the pass leaves the file stale, never fresh.
+    fn commit_warm(&self, pass: &mut WarmPass) {
+        if self.index.commit_analyzed(
+            &self.db,
+            self.cache.as_deref(),
+            pass.mention_scanner.as_deref(),
+            &mut pass.analyzed,
             self.index_generation,
-        );
+        ) {
+            self.index.clear_dependency_graph_cache();
+        }
     }
 
     /// Posting lookup for `symbol`, filtered to the candidate scope.
@@ -1198,5 +1259,65 @@ impl AnalysisSnapshot {
     /// owner/name gate because `$obj()` call sites do not spell `__invoke`.
     pub(super) fn reference_gate(&self, symbol: &crate::Name) -> ReferenceGate {
         ReferenceGate::for_symbol(&self.db, symbol)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{AnalysisSession, IndexCancel, Name, ReferenceIncludes};
+    use salsa::Database as _;
+
+    const BASE: &str =
+        "<?php\nclass Base { public function run(): void {} public function stop(): void {} }\n";
+    const CALLS_RUN: &str = "<?php\nfunction go(Base $b): void { $b->run(); }\n";
+    const CALLS_STOP: &str = "<?php\nfunction go(Base $b): void { $b->stop(); }\n";
+
+    /// Pins the warm pass's commit landing after an owner text write has
+    /// started but before it applies: the commit must not leave the file
+    /// fresh for the incoming text.
+    #[test]
+    fn warm_commit_racing_a_text_write_leaves_the_file_stale() {
+        let mut session = AnalysisSession::new(PhpVersion::LATEST);
+        let files: Vec<Arc<str>> = vec![Arc::from("base.php"), Arc::from("caller.php")];
+        session.ingest_file(files[0].clone(), Arc::from(BASE));
+        session.ingest_file(files[1].clone(), Arc::from(CALLS_RUN));
+        session.prepare_for_query(Some(&files[1]));
+
+        let snap = session.snapshot();
+        let mut pass = snap
+            .stage_warm(&files[1..], &IndexCancel::new())
+            .unwrap()
+            .unwrap();
+
+        let caller = files[1].clone();
+        let writer = std::thread::spawn(move || {
+            session.upsert_source_file(caller, Arc::from(CALLS_STOP), salsa::Durability::LOW);
+            session
+        });
+        // The write trips cancellation before it waits for `snap` to drop.
+        while catch(|| snap.db.unwind_if_revision_cancelled()).is_ok() {
+            std::thread::yield_now();
+        }
+        snap.commit_warm(&mut pass);
+        drop(snap);
+        let mut session = writer.join().unwrap();
+
+        let callers_of = |session: &mut AnalysisSession, method: &str| -> Vec<Arc<str>> {
+            session
+                .indexed_references_to(
+                    &Name::method("Base", method),
+                    &files,
+                    false,
+                    ReferenceIncludes::Plain,
+                    &|| false,
+                )
+                .unwrap()
+                .into_iter()
+                .map(|(file, _)| file)
+                .collect()
+        };
+        assert_eq!(callers_of(&mut session, "stop"), [files[1].clone()]);
+        assert!(callers_of(&mut session, "run").is_empty());
     }
 }

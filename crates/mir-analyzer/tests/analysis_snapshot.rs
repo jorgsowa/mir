@@ -98,6 +98,33 @@ fn snapshot_analyze_commits_references_for_the_owner() {
 }
 
 #[test]
+fn snapshot_warm_files_commits_references_for_the_owner() {
+    let (mut session, files) = workspace();
+    let run_key = "meth:App\\Base::run";
+    session.prepare_for_query(Some(&files[2]));
+    let snap = session.snapshot();
+
+    let cancelled = mir_analyzer::IndexCancel::new();
+    cancelled.cancel();
+    assert!(!snap.warm_files(&files, &cancelled).unwrap());
+    assert!(session.reference_locations(run_key).is_empty());
+
+    let thread_files = files.clone();
+    let warmed = thread::spawn(move || {
+        snap.warm_files(&thread_files, &mir_analyzer::IndexCancel::new())
+            .unwrap()
+    })
+    .join()
+    .unwrap();
+    assert!(warmed);
+    let locs = session.reference_locations(run_key);
+    assert!(
+        locs.iter().any(|(f, ..)| f.as_ref() == "caller.php"),
+        "warm commit should land in the owner's reference index: {locs:?}"
+    );
+}
+
+#[test]
 fn snapshot_class_and_collector_issues_match_the_session() {
     let (mut session, files) = workspace();
     session.prepare_for_query(None);

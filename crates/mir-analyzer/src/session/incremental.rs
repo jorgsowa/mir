@@ -110,7 +110,7 @@ impl AnalysisSession {
         // AST walk entirely — hosts on the `ingest_file_prepared` write path
         // pre-pay this per edit, making the whole loop a map-lookup sweep.
         {
-            // Closed before `commit_gen` is read, so commits carry the
+            // Closed before the pass view is taken, so commits carry the
             // post-load generation.
             let mut session = self.defer_revision_bumps();
             for file in &dependents {
@@ -130,11 +130,7 @@ impl AnalysisSession {
         // without re-running body analysis — re-analysis cost scales with
         // what actually changed, not with dependent count.
         //
-        // The snapshot is taken AFTER the warm-up above so the loop observes
-        // the freshly-loaded classes. This loop is read-only on salsa: it does
-        // not mutate inputs, so its snapshot never contends on a write.
-        //
-        // Keep this loop on the caller thread. A request may already be one
+        // Keep this pass on the caller thread. A request may already be one
         // of several concurrent host threads, while background indexing uses
         // the shared Rayon pool. Sending each sweep back through that pool
         // creates a pool-fan-in deadlock: every worker can block on a writer
@@ -147,82 +143,21 @@ impl AnalysisSession {
         // file resolves thousands; caching them balloons memory), and
         // diagnostics consumers don't read them. Hover / go-to-definition
         // flows analyze the open file directly via [`crate::FileAnalyzer`].
-        //
-        // The loop short-circuits when cancellation has been requested.
-        // Generation before the snapshot: a file add racing the sweep leaves
-        // the commits stale (self-healing), never wrongly fresh.
-        type Pass = (
-            Option<Arc<crate::db::class_mention_index::MentionScanner>>,
-            Vec<super::index_state::AnalyzedFile>,
-        );
         let mut attempts_left = PASS_ATTEMPTS;
-        let (commit_gen, mention_scanner, mut results) = loop {
+        let results = loop {
             if cancel.is_cancelled() || attempts_left == 0 {
                 return Vec::new();
             }
             attempts_left -= 1;
-            let gen = self.index_generation();
-            // A write landing mid-pass raises `salsa::Cancelled`; catch it and retry rather than discarding the whole sweep.
-            let attempt =
-                salsa::Cancelled::catch(std::panic::AssertUnwindSafe(|| -> Option<Pass> {
-                    // Freeze on the pass-scoped snapshot: warm-up (2a) completed
-                    // every lazy load, and a concurrent index write cancels the
-                    // pass, so the frozen view is never stale. Same discipline as
-                    // the batch body pass.
-                    if cancel.is_cancelled() {
-                        return None;
-                    }
-                    let mut view = self.db_view();
-                    view.db.freeze_workspace_index();
-                    let db_main = view.db();
-                    // Sweeps are the steady-state population path for the mention
-                    // index: every analyzed file gets a current mention scan
-                    // alongside its postings, so later reference-gate checks are
-                    // set lookups.
-                    let mention_scanner = db_main.class_mention_scanner();
-                    let cache = self.cache.as_deref();
-                    let analyzed: Vec<_> = dependents
-                        .iter()
-                        .filter_map(|file| {
-                            if cancel.is_cancelled() {
-                                return None;
-                            }
-                            self.index.stage_analyzed(
-                                db_main,
-                                cache,
-                                mention_scanner.as_deref(),
-                                file,
-                            )
-                        })
-                        .collect();
-                    Some((mention_scanner, analyzed))
-                }));
-            match attempt {
-                Ok(Some((scanner, analyzed))) => break (gen, scanner, analyzed),
+            // A host write landing mid-pass raises `salsa::Cancelled`; retry
+            // rather than discarding the whole sweep.
+            match self.db_view().warm_pass(&dependents, cancel) {
+                Ok(Some(analyzed)) => break analyzed,
                 Ok(None) => return Vec::new(),
                 Err(_) if cancel.is_cancelled() => return Vec::new(),
                 Err(_) => std::thread::yield_now(),
             }
         };
-
-        // Serial commit: each dependent's output is its complete reference
-        // set, so replace rather than append. Both inverted indexes and their
-        // freshness marks update here — this is what keeps read queries
-        // lookup-shaped instead of re-validating every candidate memo.
-        // Unchanged files (same text, same memoized output) skip the rebuild
-        // entirely, so a no-op re-sweep is a pointer compare per file.
-        {
-            let dependency_graph_changed = self.index.commit_analyzed(
-                &self.db.salsa,
-                self.cache.as_deref(),
-                mention_scanner.as_deref(),
-                &mut results,
-                commit_gen,
-            );
-            if dependency_graph_changed {
-                self.index.clear_dependency_graph_cache();
-            }
-        }
 
         results
             .into_iter()
