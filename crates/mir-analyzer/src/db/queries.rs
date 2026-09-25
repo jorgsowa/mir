@@ -174,9 +174,8 @@ pub fn class_template_params(db: &dyn MirDatabase, fqcn: &str) -> Option<Arc<[Te
     // (`interface DogContainer extends AnimalContainer {}`) may extend
     // several bases at once, and PHP/Psalm don't require it to redeclare an
     // un-narrowed inherited `@template` — same reasoning `declared_template_params`'s
-    // doc comment already gives for the class case, which this used to be the
-    // only branch for (see `inherited_template_bindings` for the analogous
-    // worklist over interfaces' multi-base `extends`).
+    // doc comment gives for the class case (see `inherited_template_bindings`
+    // for the analogous worklist over interfaces' multi-base `extends`).
     let mut worklist: Vec<Arc<str>> = vec![Arc::from(fqcn)];
     while let Some(current) = worklist.pop() {
         if !visited.insert(current.clone()) {
@@ -306,8 +305,8 @@ pub fn inherited_template_bindings(
     // A worklist, not a linear `current = parent` chain: an interface's
     // native `extends A, B` clause may name several bases at once, and each
     // of THOSE may further extend other generic interfaces — walking only
-    // the class/parent spine (as this used to) silently drops any template
-    // parameterization declared past the first interface hop.
+    // the class/parent spine would drop any template parameterization
+    // declared past the first interface hop.
     let mut worklist: Vec<Arc<str>> = vec![Arc::from(fqcn)];
 
     let apply_type_args = |iface: &Arc<str>,
@@ -711,9 +710,9 @@ pub fn collect_file_definitions_uncached(
 /// simultaneous active-file count: the first subtype/defs index build and
 /// the ancestor resolution behind it walk EVERY registered file through
 /// this query, and a cap below the workspace size makes each walk
-/// re-execute the evicted majority — measured as every file re-collected
-/// (and re-parsed past `parse_file`'s own LRU) ~3× within a single cold
-/// reference query on a 15K-file workspace under the old `lru = 4096`.
+/// re-execute the evicted majority — at `lru = 4096`, a cold reference
+/// query on a 15K-file workspace re-collected (and re-parsed past
+/// `parse_file`'s own LRU) every file ~3×.
 /// 65536 covers the LSP consumer's 50K-file scan ceiling with headroom
 /// while still bounding transiently-loaded vendor slices in pathological
 /// sessions.

@@ -90,17 +90,10 @@ impl AnalysisSession {
     ) -> Vec<(Arc<str>, crate::FileAnalysis)> {
         let dependents = files;
 
-        // Phase 2a: fault in each dependent's direct class references if the
-        // background indexer hasn't reached them yet (mirrors the FileAnalyzer
-        // warm-up behavior, avoiding transient false `UndefinedClass` during
-        // index warm-up).
-        //
-        // This runs SERIALLY and *before* the analyze loop below:
-        // `prepare_ast_for_analysis` resolves and loads classes, and loading
-        // writes salsa inputs, which waits for every other database handle
-        // to drop. In parallel (the v0.37.0 regression), sibling rayon
-        // workers held live snapshot clones mid-`analyze_file`, so the first
-        // warm-up write blocked on them forever.
+        // Phase 2a: index each dependent's direct class references the
+        // background indexer hasn't reached yet, as `FileAnalyzer` does.
+        // Loading writes salsa inputs, and a write waits for every live db
+        // handle, so this runs serially before the pass takes its snapshot.
         //
         // Files already prepared against their current text skip the parse +
         // AST walk entirely — hosts on the `ingest_file_prepared` write path
@@ -126,12 +119,8 @@ impl AnalysisSession {
         // without re-running body analysis — re-analysis cost scales with
         // what actually changed, not with dependent count.
         //
-        // Keep this pass on the caller thread. Snapshot queries on host
-        // threads share the Rayon pool with background indexing; sending each
-        // sweep back through that pool creates a pool-fan-in deadlock: every
-        // worker can block on a writer while the thread that would release it
-        // waits for a worker. It also prevents a cancelled request from making
-        // progress.
+        // The pass runs serially on the owner's thread, checking `cancel`
+        // between files.
         //
         // Dependents' `FileAnalysis::symbols` are empty on this path:
         // per-expression symbols are intentionally not memoized (a typical
@@ -156,10 +145,6 @@ impl AnalysisSession {
             .collect()
     }
 
-    /// FQCNs that `file` imports via `use` statements but that aren't yet
-    /// in the session's symbol index.
-    ///
-    /// Designed as the input to background prefetching: after the LSP server
     /// Return the `use`-import alias map for a file: a list of `(alias, fqcn)`
     /// pairs where `alias` is the local name (e.g. `"Str"`) and `fqcn` is the
     /// fully-qualified name (e.g. `"Illuminate\\Support\\Str"`).
@@ -180,6 +165,10 @@ impl AnalysisSession {
             .collect()
     }
 
+    /// FQCNs that `file` imports via `use` statements but that aren't yet
+    /// in the session's symbol index.
+    ///
+    /// Designed as the input to background prefetching: after the LSP server
     /// ingests an open buffer, it can call this and lazy-load the returned
     /// FQCNs on a worker thread so the user's first Cmd+Click into vendor
     /// code doesn't pay the file-read+parse cost.
@@ -217,18 +206,13 @@ impl AnalysisSession {
     /// Convenience: synchronously lazy-load every import of `file` that
     /// isn't already in the symbol index. Returns the number successfully loaded.
     ///
-    /// Uses a single shared-visited two-tier BFS across all pending imports
-    /// (see [`Self::load_classes_transitive_bounded`]) with a shallow depth so
-    /// member access on imported types type-checks without pulling in the
-    /// entire vendor tree.
+    /// Loads only the imported files themselves; their ancestors and
+    /// signature types resolve through the symbol index or on demand.
     pub fn prefetch_imports(&mut self, file: &str) -> usize {
         let pending = self.pending_lazy_loads(file);
         if pending.is_empty() {
             return 0;
         }
-        // Fault in each imported FQCN directly (single-file load + tier-merge).
-        // Inheritance ancestors / signature types resolve through the eagerly
-        // built workspace symbol index — no transitive walk needed here.
         let mut session = self.defer_revision_bumps();
         let mut loaded = 0;
         for fqcn in &pending {
@@ -292,12 +276,8 @@ impl AnalysisSession {
         crate::db::find_function(&db, here)
     }
 
-    /// Compute `file`'s outgoing dependency edges and persist them to the
-    /// disk cache's reverse-dep graph (if configured). The in-memory graph
-    /// is no longer maintained imperatively: `dependency_graph()` derives
-    /// structural symbols from the memoized [`crate::db::file_structural_symbols`]
-    /// tracked query, then projects them through the workspace symbol index
-    /// alongside body-reference symbols.
+    /// Persist `file`'s outgoing dependency edges to the disk cache's
+    /// reverse-dep graph, if one is attached.
     pub(super) fn update_reverse_deps_for(&self, file: &str) {
         if let Some(cache) = self.cache.as_deref() {
             let db = self.snapshot_db();
@@ -309,10 +289,9 @@ impl AnalysisSession {
     /// File dependency graph: which files depend on which other files.
     /// Used for incremental invalidation in LSP servers and build systems.
     ///
-    /// O(edges) — iterates symbol edges from the reference index and from
-    /// `file_structural_symbols`, then resolves each symbol to its defining
-    /// file via O(1) lookup. Total cost is O(E) where E is the number of
-    /// (file, symbol) edges.
+    /// O(E) in the (file, symbol) edges from the reference index and
+    /// `file_structural_symbols`, each resolved to its defining
+    /// file by index lookup. Cached until the file set or an edge changes.
     pub fn dependency_graph(&self) -> crate::DependencyGraph {
         let stamp = self.index.dependency_graph_stamp(&self.db.salsa);
         if let Some(graph) = self.index.cached_dependency_graph(stamp) {

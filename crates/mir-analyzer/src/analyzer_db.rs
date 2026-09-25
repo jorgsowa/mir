@@ -1,12 +1,4 @@
-//! Shared database and analysis operations for both ProjectAnalyzer and AnalysisSession.
-//!
-//! This module consolidates the common patterns both APIs need:
-//! - Database management (Salsa cloning, snapshots)
-//! - Stub loading and ingestion
-//! - File definition collection
-//!
-//! By extracting these into a single place, both APIs benefit from the same code
-//! paths and behavior, eliminating duplication and reducing maintenance burden.
+//! The session's salsa database plus stub-ingestion bookkeeping.
 
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -17,8 +9,7 @@ use crate::db::MirDatabase;
 use crate::db::MirDbStorage;
 use crate::php_version::PhpVersion;
 
-/// Shared database holder with stub tracking. Owned by both ProjectAnalyzer and
-/// AnalysisSession, providing a common point for their database operations.
+/// The [`crate::AnalysisSession`]'s salsa database with stub tracking.
 pub struct AnalyzerDb {
     /// Salsa database, owned by the single writer; readers use `snapshot_db()`.
     pub(crate) salsa: MirDbStorage,
@@ -151,7 +142,6 @@ impl AnalyzerDb {
     }
 
     /// Collect definitions from a file and ingest its stub slice.
-    /// Used by both ProjectAnalyzer and AnalysisSession during file ingestion.
     pub fn collect_and_ingest_file(
         &mut self,
         file: Arc<str>,

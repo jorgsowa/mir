@@ -1,13 +1,11 @@
 //! Per-file analysis entry point for incremental analysis.
 //!
 //! [`FileAnalyzer`] runs a **single** body-analysis pass against an
-//! [`AnalysisSession`] snapshot. In the eager-static-input model the workspace
-//! symbol index is built up front by the background indexer
-//! ([`AnalysisSession::index_batch`]), so `find_class_like` resolves vendor
-//! classes directly — there is no lazy-load / retry loop. The only on-demand
-//! work is [`AnalysisSession::priority_index_for_ast`], which faults in the
-//! open file's *direct* references if the background walk hasn't reached them
-//! yet, keeping warm-up free of transient false positives.
+//! [`AnalysisSession`] snapshot. Lookups go through the workspace symbol
+//! index the background indexer ([`AnalysisSession::index_batch`]) builds;
+//! classes and built-in stubs it lacks load on demand as pure reads. Before
+//! the pass, [`AnalysisSession::priority_index_for_ast`] indexes the file's
+//! *direct* references the background walk hasn't reached.
 //!
 //! For bulk multi-file work, use the session sweeps
 //! ([`AnalysisSession::reanalyze_files_cancellable`]) — memoized and
@@ -371,9 +369,9 @@ impl<'a> FileAnalyzer<'a> {
 
     /// Run a single body-analysis pass against a frozen db snapshot.
     ///
-    /// `priority_index_for_ast` runs first to fault in any of this file's
-    /// direct class references not yet reached by the background indexer;
-    /// then one snapshot is analyzed and its reference locations committed.
+    /// `priority_index_for_ast` first indexes this file's direct class
+    /// references the background indexer hasn't reached; then one snapshot
+    /// is analyzed and its reference locations committed.
     pub fn analyze(
         &mut self,
         file: Arc<str>,
@@ -413,12 +411,9 @@ impl<'a> FileAnalyzer<'a> {
         // resolution runs against it (no-op when nothing is pending).
         self.session.settle_workspace_index();
 
-        // Priority-index the buffer's direct class references so any not yet
-        // reached by the background indexer resolve in this single pass (no
-        // transient false UndefinedClass during warm-up). Capture (text,
-        // generation) BEFORE the warm-up: if the input text is swapped
-        // mid-flight, the stored Arc no longer matches and the mark is dead
-        // on arrival — the safe direction.
+        // Capture (text, generation) before the warm-up: if the input text
+        // is swapped meanwhile, the stored Arc mismatches and the mark is
+        // dead on arrival — the safe direction.
         let prepare_generation = self.session.prepare_generation_snapshot();
         let ingested_text = {
             let view = self.session.db_view();
@@ -467,10 +462,11 @@ impl<'a> FileAnalyzer<'a> {
 
 impl AnalysisSnapshot {
     /// Body-analyze `file` and commit its reference locations — the read half
-    /// of [`FileAnalyzer::analyze`]. The owner must have run
+    /// of [`FileAnalyzer::analyze`]. The owner should have run
     /// [`AnalysisSession::prepare_for_query`] for `file` (or ingested it via
-    /// [`AnalysisSession::ingest_file_prepared`]) so its direct references
-    /// are loaded; otherwise they report as undefined.
+    /// [`AnalysisSession::ingest_file_prepared`]): classes load on demand
+    /// regardless, but Composer `autoload.files` functions are indexed only
+    /// by that warm-up.
     pub fn analyze(
         &self,
         file: Arc<str>,

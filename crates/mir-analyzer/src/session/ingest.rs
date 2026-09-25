@@ -507,11 +507,11 @@ impl AnalysisSession {
     ///
     /// For each chunk this: (1) registers the files as `Durability::HIGH` salsa
     /// inputs in one short write window, (2) parses them to prime the in-process
-    /// and on-disk declaration caches (in parallel when `parallelism ==
-    /// `[`IndexParallelism::Rayon`]; sequentially for wasm / single-thread
-    /// consumers), and (3) merges their declarations into the workspace symbol
-    /// index singleton **incrementally** (no full rebuild) so partially-indexed
-    /// symbols resolve immediately.
+    /// and on-disk declaration caches (in parallel for
+    /// [`crate::IndexParallelism::Rayon`]; sequentially for wasm /
+    /// single-thread consumers), and (3) merges their declarations into the
+    /// workspace symbol index singleton **incrementally** (no full rebuild) so
+    /// partially-indexed symbols resolve immediately.
     ///
     /// The library spawns no thread: the consumer pumps chunks from its own
     /// driver (LSP worker thread, or one chunk per wasm event-loop tick),

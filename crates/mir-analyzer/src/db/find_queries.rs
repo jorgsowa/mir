@@ -722,9 +722,8 @@ pub fn function_def_at(
 /// on the resolved file as a salsa tracked dependency — callers reading
 /// this from a tracked context are correctly invalidated when either the
 /// resolver or the defining file's text changes. No prior `ingest_file`
-/// call is required: the file's text must be registered (via
-/// `set_file_text` or `set_workspace_files`), but definition collection
-/// happens on demand inside salsa.
+/// call is required: a class the symbol index lacks is found in the file
+/// the resolver maps it to, else its embedded stub, both loaded on demand.
 pub fn find_class_like<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option<ClassLike> {
     // O(1) index lookup (borrowing the frozen index on batch passes), then a
     // per-(file, idx) salsa-memoized fetch of the Arc<Storage>.

@@ -9,15 +9,6 @@ use mir_types::{Name, Type};
 
 use super::*;
 
-// MirDbStorage concrete database
-
-/// Concrete in-process Salsa database.
-///
-/// `Clone` is required for parallel batch analysis: salsa's supported
-/// pattern for sharing a db across threads is to give each worker its
-/// own clone (each clone gets a fresh `ZalsaLocal`, sharing the
-/// underlying memoization storage).  Sharing `&MirDbStorage` across threads is
-/// **not** supported because `salsa::Database: Send` (not `Sync`).
 /// Per-clone staging buffer for reference locations recorded during a parallel
 /// body analysis worker.  `record_reference_location` pushes here instead of directly
 /// into the shared reference index, eliminating cross-thread contention.
@@ -75,6 +66,11 @@ impl Drop for IndexPendingClaim {
     }
 }
 
+/// Concrete in-process Salsa database.
+///
+/// Threads share it by cloning: each clone gets its own `ZalsaLocal` over
+/// the shared memo storage. `&MirDbStorage` can't cross threads, since
+/// `salsa::Database` is `Send` but not `Sync`.
 #[salsa::db]
 #[derive(Clone)]
 pub struct MirDbStorage {
@@ -93,18 +89,16 @@ pub struct MirDbStorage {
     /// file → declared class-like short names its text mentions, so the
     /// reference-query gate answers repeat single-needle checks with a set
     /// lookup instead of rescanning raw text. Internally synchronized (not
-    /// a salsa input): safe to use from parallel workers and under the
-    /// session read lock. See [`crate::db::class_mention_index`].
+    /// a salsa input), so snapshots and parallel workers record into it.
+    /// See [`crate::db::class_mention_index`].
     class_mentions: Arc<crate::db::class_mention_index::ClassMentionIndex>,
     /// Per-clone staging area for reference locations.  Workers push here
     /// during parallel analysis; the orchestrator drains and commits serially.
     pending_ref_locs: PendingRefLocs,
     /// File path → Salsa SourceFile input handle.
     source_files: Arc<FxHashMap<Arc<str>, SourceFile>>,
-    /// Paths removed via `remove_source_file`. The `SourceFile` handle remains
-    /// in `source_files` (salsa inputs are immortal in 0.27); this set makes
-    /// the deleted state explicit and auditable, and provides the foundation
-    /// for the Phase M2 tracked-struct migration.
+    /// Paths removed via `remove_source_file` and not registered since. Their
+    /// salsa inputs live on, so this stops on-demand lookups resolving them.
     deleted_files: Arc<HashSet<Arc<str>>>,
     /// Files a read registered on demand ([`MirDatabase::load_on_demand`]).
     /// Shared by every clone and append-only, so concurrent readers loading
@@ -126,11 +120,8 @@ pub struct MirDbStorage {
     /// inside [`Default::default`].
     workspace_revision_input: Option<WorkspaceRevision>,
     /// Off-salsa mirror of the workspace revision, kept in lockstep with
-    /// `workspace_revision_input`. Read by [`Self::workspace_revision_value`]
-    /// (the background-indexing epoch) so that fetching the generation never
-    /// executes a salsa input read on the shared handle — doing so borrows the
-    /// handle's single `ZalsaLocal` query stack, which races (and aborts under
-    /// debug assertions) when other threads run salsa reads on it concurrently.
+    /// `workspace_revision_input`. [`Self::workspace_revision_value`] reads
+    /// it so fetching the index generation records no salsa dependency.
     workspace_revision_counter: Arc<std::sync::atomic::AtomicU64>,
     /// Paths of user-provided stub files (registered via `ingest_user_stubs`).
     /// Used by `workspace_symbol_index` to give user stubs priority over
@@ -181,9 +172,9 @@ pub struct MirDbStorage {
     /// borrow moves the Arc refcount only once per worker (at `map_with`
     /// clone), so the hot path is atomic-free.
     ///
-    /// Correct by construction: the index is immutable for the duration of a
-    /// frozen pass (all lazy-loading completes before the freeze), so a frozen
-    /// read is byte-identical to the live `workspace_index(db)` it replaces.
+    /// Correct by construction: only the owner writes the index, and a write
+    /// cancels in-flight passes, so a frozen read always equals the live
+    /// `workspace_index(db)` it replaces. On-demand loads never touch it.
     ///
     /// Holds the singleton **handle** alongside the snapshot so the borrow path
     /// can register a salsa dependency by reading `handle.revision(db)` (a
@@ -225,24 +216,6 @@ pub struct MirDbStorage {
     name_resolution_cache: NameResolutionCache,
 }
 
-/// Per-clone memo for two salsa reads that dominate name resolution's
-/// dispatch cost: `Fqcn` interning (`#[salsa::interned]`, hit once per
-/// distinct class name touched in a pass) and a file's `use`-import map
-/// (`#[salsa::tracked] collect_file_definitions`, re-fetched by
-/// `resolve_name` on **every** class-name reference even though it cannot
-/// change mid-pass). Both are idempotent, memoized-by-salsa reads —
-/// caching them here changes no query's output, only how many times its
-/// full dispatch (hash the key, probe the memo table, record a
-/// `QueryEdge`) gets paid for an answer already known.
-///
-/// Keyed defensively by [`salsa::plumbing::current_revision`] — salsa's own
-/// global "some input changed" counter, a plain field read — rather than
-/// relying on every caller re-cloning `MirDbStorage` per pass. This makes
-/// the cache correct even if a caller reuses one clone across edits, not
-/// just the batch pipeline's per-pass fresh `snapshot_db()` clone.
-///
-/// `Clone` resets to empty, mirroring [`PendingRefLocs`]: a worker clone
-/// starts cold rather than inheriting another clone's cached entries.
 type ClassImportsCacheEntry = (Arc<str>, Arc<FxHashMap<Name, Name>>);
 
 #[derive(Default)]
@@ -265,6 +238,24 @@ impl NameResolutionCacheInner {
     }
 }
 
+/// Per-clone memo for two salsa reads that dominate name resolution's
+/// dispatch cost: `Fqcn` interning (`#[salsa::interned]`, hit once per
+/// distinct class name touched in a pass) and a file's `use`-import map
+/// (`#[salsa::tracked] collect_file_definitions`, re-fetched by
+/// `resolve_name` on **every** class-name reference even though it cannot
+/// change mid-pass). Both are idempotent, memoized-by-salsa reads —
+/// caching them here changes no query's output, only how many times its
+/// full dispatch (hash the key, probe the memo table, record a
+/// `QueryEdge`) gets paid for an answer already known.
+///
+/// Keyed defensively by [`salsa::plumbing::current_revision`] — salsa's own
+/// global "some input changed" counter, a plain field read — rather than
+/// relying on every caller re-cloning `MirDbStorage` per pass. This makes
+/// the cache correct even if a caller reuses one clone across edits, not
+/// just the batch pipeline's per-pass fresh `snapshot_db()` clone.
+///
+/// `Clone` resets to empty, mirroring [`PendingRefLocs`]: a worker clone
+/// starts cold rather than inheriting another clone's cached entries.
 struct NameResolutionCache(Mutex<NameResolutionCacheInner>);
 
 impl Default for NameResolutionCache {
@@ -657,15 +648,9 @@ impl MirDbStorage {
     /// **borrow** the index per `find_class_like` call instead of cloning the
     /// singleton's three `Arc<FxHashMap>`s on every lookup.
     ///
-    /// Call this ONLY on an ephemeral, per-pass `MirDbStorage` clone (e.g. the
-    /// `db_main` used by the batch body pass) **after all index mutation for
-    /// that pass has completed** (all lazy-loading done). The frozen view is
-    /// then immutable for the pass, so each borrowed read is byte-identical to
-    /// the `workspace_index(self)` clone it replaces — no staleness window.
-    ///
-    /// Never call this on the canonical `self.db` clone: leaving `frozen_index`
-    /// `None` there is what keeps the open-file / LSP path (which mutates the
-    /// index mid-analysis via lazy-load) reading the live singleton.
+    /// Call this only on an ephemeral per-pass clone, after the pass's last
+    /// index write. The long-lived owner db must stay unfrozen: it outlives
+    /// its own index writes.
     pub fn freeze_workspace_index(&mut self) {
         // Only freeze the index when the singleton is populated: the borrow path
         // anchors its salsa dep on the singleton's `revision` field. With no
@@ -675,10 +660,8 @@ impl MirDbStorage {
             let index = handle.index(self).clone();
             self.frozen_index = Some((handle, Arc::new(index)));
         }
-        // Begin the pass-scoped subtype cache. Sound regardless of the singleton:
-        // its validity rests only on the class graph being immutable for the
-        // pass (the caller freezes after all lazy-loading), the same invariant
-        // as the frozen index. Dropped when this ephemeral db clone is dropped.
+        // Sound with or without the singleton: it relies only on the class
+        // graph staying fixed for the pass, as the frozen index does.
         self.subtype_cache = Some(Arc::new(crate::db::SubtypeCache::default()));
     }
 
@@ -865,12 +848,9 @@ impl MirDbStorage {
         self.adopt_on_demand_files();
     }
 
-    /// Incrementally merge **precomputed** per-file declarations into the
-    /// existing singleton — no parse runs under the lock. Mirror of
-    /// [`Self::merge_precomputed_into_workspace_index`] but with the (off-lock)
-    /// declaration collection already done by the caller. Files already present
-    /// in `file_decl_snapshots` are skipped (avoids double-counting). No-op if
-    /// the singleton hasn't been created yet.
+    /// Merge per-file declarations the caller already collected into the
+    /// singleton, skipping files already in `file_decl_snapshots`. Before the
+    /// singleton exists, only records their snapshots.
     pub fn merge_precomputed_into_workspace_index(
         &mut self,
         decls: &[(SourceFile, crate::db::FileDeclarations)],
@@ -1548,11 +1528,10 @@ impl MirDbStorage {
     /// Remove the Salsa SourceFile handle for `path` from the registry and
     /// drop its contribution to the workspace symbol index singleton.
     ///
-    /// The index must be updated here: with `bump_workspace_revision` no longer
-    /// nulling the singleton, a stale entry could otherwise keep resolving a
-    /// removed file's symbols (the salsa input itself is never deleted). If the
-    /// incremental subtract is ambiguous, the singleton is nulled so the next
-    /// lookup falls back to the tracked query / a finalize rebuilds it.
+    /// The salsa input is never deleted, so a stale index entry would keep
+    /// resolving the removed file's symbols. If the incremental subtract is
+    /// ambiguous, the singleton is nulled so lookups fall back to the tracked
+    /// query until a finalize rebuilds it.
     pub fn remove_source_file(&mut self, path: &str) {
         self.adopt_on_demand_files();
         self.clear_index_pending(path);
@@ -1569,10 +1548,8 @@ impl MirDbStorage {
                     self.clear_file_class_mentions(file_no);
                 }
                 self.file_decl_snapshots.write().remove(&sf);
-                // Free the file text. The salsa input slot is immortal in 0.27
-                // (no delete API), but the Arc<str> content — potentially hundreds
-                // of KB per file — can be dropped now. This also invalidates any
-                // still-cached memo for this file, accelerating LRU eviction.
+                // The input slot is immortal, but its text can be freed; this
+                // also invalidates the file's cached memos.
                 {
                     use salsa::Setter as _;
                     sf.set_text(self)
@@ -1587,16 +1564,11 @@ impl MirDbStorage {
     /// Bump the workspace revision so tracked `workspace_*` queries
     /// reading it invalidate.
     ///
-    /// **Does NOT null the workspace symbol index singleton.** In the
-    /// eager-static-input model the singleton is maintained incrementally
-    /// (`merge_precomputed_into_workspace_index` on add, `update_/remove_..._index`
-    /// on edit/remove). Nulling here was the source of the warm-cache churn:
-    /// every lazily-added file destroyed the singleton and forced an O(N)
-    /// fallback rebuild that cascade-invalidated body-analysis memos. The
-    /// invariant is now: **whoever mutates the input set is responsible for
-    /// refreshing the singleton** (bulk-register paths call merge/finalize;
-    /// edits call update; removes call remove). Steady-state body-only edits
-    /// add no files, never bump, and never touch the singleton.
+    /// Leaves the workspace symbol index singleton alone: whoever mutates the
+    /// input set refreshes it (bulk registration merges or finalizes, edits
+    /// update, removals subtract). Nulling it would force an O(N) rebuild that
+    /// invalidates every body-analysis memo. Body-only edits add no files and
+    /// never bump.
     pub(crate) fn bump_workspace_revision(&mut self) {
         use salsa::Setter as _;
         // Deferral is only sound while the singleton exists: without one,

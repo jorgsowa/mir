@@ -68,7 +68,7 @@ impl ResolvedSymbol {
     }
 
     /// Convert to a typed [`crate::Name`] for use with
-    /// [`crate::AnalysisSession::definition_of`], [`crate::AnalysisSession::references_to`],
+    /// [`crate::AnalysisSession::definition_of`], [`crate::AnalysisSession::indexed_references_to`],
     /// or [`crate::AnalysisSession::hover`]. Delegates to [`ReferenceKind::to_name`].
     pub fn to_symbol(&self) -> Option<crate::Name> {
         self.kind.to_name()

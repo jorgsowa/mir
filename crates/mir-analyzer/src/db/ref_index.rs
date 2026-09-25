@@ -50,10 +50,8 @@ pub struct RefIndex {
     file_symbols: FxHashMap<FileNo, FxHashSet<SymbolNo>>,
     /// Reverse view: symbol → compact list of files referencing it.
     ///
-    /// The relation is still intentionally indexed both ways for O(1)-ish
-    /// forward and reverse reads, but the symbol payload is no longer
-    /// duplicated across those views: all edge-bearing structures point at
-    /// one interned `SymbolNo`.
+    /// Indexed both ways for O(1)-ish forward and reverse reads; every view
+    /// points at one interned `SymbolNo` rather than copying the symbol.
     referencers: FxHashMap<SymbolNo, SmallVec<[FileNo; 4]>>,
 }
 
@@ -91,8 +89,7 @@ impl RefIndex {
     }
 
     /// Append a batch of reference locations. Per-entry deduplicated against
-    /// the existing locations of the same symbol, preserving insertion order
-    /// (mirrors the legacy `commit_reference_locations_batch` semantics).
+    /// the existing locations of the same symbol, preserving insertion order.
     /// Returns whether the batch touched any anonymous-class subtype posting
     /// (`impl:`) — those participate in subtype queries, so the
     /// caller bumps the subtype-edge epoch for them.

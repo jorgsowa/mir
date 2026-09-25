@@ -1,10 +1,9 @@
 //! Batch-oriented project analysis on [`AnalysisSession`].
 //!
-//! This module hosts the multi-file orchestration that used to live on the
-//! retired `ProjectAnalyzer`: parallel definition collection, lazy class loading, dead-code
-//! sweep, reverse-dependency index, and the [`AnalysisResult`] return type.
-//! Per-file (LSP) entry points stay on `AnalysisSession` itself in
-//! `session.rs`.
+//! Multi-file orchestration: parallel definition collection, lazy class
+//! loading, dead-code sweep, reverse-dependency index, and the
+//! [`AnalysisResult`] return type. Per-file (LSP) entry points live in
+//! `session/`.
 //!
 //! All methods are `impl AnalysisSession`; configuration that's only
 //! meaningful for batch runs (issue suppressions, progress callback, optional
@@ -701,8 +700,7 @@ pub struct AnalysisResult {
     /// helper so issue-only consumers do not pay the setup cost.
     pub symbols: Vec<crate::symbol::ResolvedSymbol>,
     /// Maps each file path to the symbol indices belonging to it. Built on
-    /// first use of [`Self::symbol_at`] because the batch result's navigation
-    /// helper is now primarily exercised by tests.
+    /// first use of [`Self::symbol_at`], which mostly tests call.
     symbols_by_file: OnceLock<HashMap<Arc<str>, Vec<usize>>>,
 }
 

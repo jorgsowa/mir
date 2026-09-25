@@ -508,8 +508,8 @@ impl Drop for BodyAnalysisScope {
 }
 
 /// Render counters as a human-readable block. Returns `None` if metrics are
-/// disabled. Intended to be printed at end of batch (`ProjectAnalyzer`) or
-/// session shutdown.
+/// disabled. Intended to be printed at the end of a batch run or at session
+/// shutdown.
 pub fn dump() -> Option<String> {
     if !enabled() {
         return None;

@@ -173,7 +173,8 @@ impl AnalysisSnapshot {
         })
     }
 
-    /// Declaration location of `symbol` among already-loaded state.
+    /// Declaration location of `symbol`. Symbols the index lacks load on
+    /// demand; no input is written.
     pub fn definition_of_cached(
         &self,
         symbol: &crate::Name,
@@ -214,7 +215,8 @@ impl AnalysisSnapshot {
         }
     }
 
-    /// Hover payload for `symbol` among already-loaded state.
+    /// Hover payload for `symbol`. Symbols the index lacks load on demand; no
+    /// input is written.
     pub fn hover_cached(
         &self,
         symbol: &crate::Name,
@@ -621,9 +623,9 @@ impl AnalysisSnapshot {
     }
 
     /// Freezes the workspace index on a pass-scoped clone (borrow-only
-    /// symbol lookups + pass-shared subtype cache): a snapshot never
-    /// lazy-loads, and a concurrent write cancels the pass, so the frozen
-    /// view is never stale. Same discipline as the batch body pass.
+    /// symbol lookups + pass-shared subtype cache). On-demand loads leave the
+    /// index untouched and an owner write cancels the pass, so the frozen
+    /// view can't go stale. Same discipline as the batch body pass.
     fn stage_warm(
         &self,
         files: &[Arc<str>],

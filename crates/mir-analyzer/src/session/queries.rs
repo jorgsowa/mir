@@ -191,10 +191,9 @@ impl AnalysisSession {
     /// Resolve a top-level symbol (class or function) to its declaration
     /// location. Powers go-to-definition.
     ///
-    /// **Side effects:** if the symbol isn't yet known, this may invoke the
-    /// configured [`crate::SourceProvider`] to fault in additional files and
-    /// mutate the salsa input set. Use [`Self::definition_of_cached`] for a
-    /// pure variant that only consults already-loaded state.
+    /// **Side effects:** ingests the file defining the symbol's class if the
+    /// symbol index lacks it. [`Self::definition_of_cached`] answers the same
+    /// without writing inputs.
     ///
     /// Returns:
     /// - `Ok(Location)` — symbol found with a source location
@@ -209,8 +208,8 @@ impl AnalysisSession {
         self.definition_of_cached(symbol)
     }
 
-    /// Lazy-load the class (or function) `symbol` is rooted in, so a pure
-    /// lookup against a following snapshot finds it. No-op when loaded.
+    /// Ingest the file defining the class (or function) `symbol` is rooted
+    /// in, so the symbol index holds it. No-op when indexed.
     fn load_symbol_owner(&mut self, symbol: &crate::Name) {
         match symbol {
             crate::Name::Class(fqn) | crate::Name::Function(fqn) => {
@@ -225,11 +224,9 @@ impl AnalysisSession {
         }
     }
 
-    /// Pure variant of [`Self::definition_of`]. Never invokes the
-    /// [`crate::SourceProvider`] and never mutates salsa inputs; resolves
-    /// only against state already loaded by `set_file_text` / `ingest_file`.
-    /// Returns `Err(NotFound)` when the symbol isn't in the loaded set, even
-    /// if a resolver could in principle map it.
+    /// Pure variant of [`Self::definition_of`]: never writes salsa inputs.
+    /// Symbols the index lacks load on demand through the resolver and
+    /// [`crate::SourceProvider`] as pure reads.
     pub fn definition_of_cached(
         &self,
         symbol: &crate::Name,
@@ -244,9 +241,9 @@ impl AnalysisSession {
     /// retained whole-file symbol list. This method assembles hover data once
     /// the caller already has a typed [`crate::Name`].
     ///
-    /// **Side effects:** when `symbol`'s owning class isn't yet loaded, this
-    /// may invoke the configured [`crate::SourceProvider`] to fault in
-    /// dependencies. Use [`Self::hover_cached`] for a pure variant.
+    /// **Side effects:** ingests the file defining `symbol`'s owning class if
+    /// the symbol index lacks it. Use [`Self::hover_cached`] for a pure
+    /// variant.
     ///
     /// Returns `Err(NotFound)` if the symbol doesn't exist. May still return
     /// `Ok` with `docstring: None` or `definition: None` if those specific
@@ -255,9 +252,6 @@ impl AnalysisSession {
         &mut self,
         symbol: &crate::Name,
     ) -> Result<crate::HoverInfo, crate::SymbolLookupError> {
-        // Trigger lazy loading for class-rooted symbols before snapshotting.
-        // No-op when the class is already known; ensures inherited member
-        // lookups have the chain present.
         match symbol {
             crate::Name::Class(fqcn) => {
                 self.load_class(fqcn.as_ref());
@@ -265,9 +259,6 @@ impl AnalysisSession {
             crate::Name::Method { class, .. }
             | crate::Name::Property { class, .. }
             | crate::Name::ClassConstant { class, .. } => {
-                // Fault in the owning class for navigation if the background
-                // indexer hasn't reached it yet. Its inheritance ancestors
-                // resolve through the (eagerly-built) workspace symbol index.
                 self.load_class(class.as_ref());
             }
             _ => {}
@@ -275,8 +266,8 @@ impl AnalysisSession {
         self.hover_cached(symbol)
     }
 
-    /// Pure variant of [`Self::hover`]. Never invokes the
-    /// [`crate::SourceProvider`]; consults only the already-loaded db.
+    /// Pure variant of [`Self::hover`]: never writes salsa inputs. Symbols
+    /// the index lacks load on demand as pure reads.
     pub fn hover_cached(
         &self,
         symbol: &crate::Name,
@@ -285,7 +276,7 @@ impl AnalysisSession {
     }
 
     /// Raw reference locations indexed by string symbol key, kept for tests
-    /// that use the legacy stringly-typed API. Prefer [`Self::indexed_references_to`]
+    /// that use the string-keyed API. Prefer [`Self::indexed_references_to`]
     /// with a typed [`crate::Name`].
     #[doc(hidden)]
     pub fn reference_locations(&self, symbol: &str) -> Vec<(Arc<str>, u32, u16, u16)> {

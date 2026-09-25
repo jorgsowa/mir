@@ -5,11 +5,10 @@
 //! textual gates.
 //!
 //! The reference-query and subtype-BFS gates admit a never-committed file
-//! only when its text mentions a queried needle — previously a fresh
-//! Aho-Corasick pass over every candidate's raw text on *every* query. This
-//! index memoizes that purely textual predicate: a file scanned once
-//! (against the whole universe) answers all later gates with an O(log n)
-//! set lookup instead of an O(text) scan.
+//! only when its text mentions a queried needle. This index memoizes that
+//! purely textual predicate: a file scanned once (against the whole
+//! universe) answers all later gates with an O(log n) set lookup instead of
+//! an O(text) scan.
 //!
 //! Correctness model — the index can only ever say what a raw scan would:
 //! - An entry is keyed to its source text by `Arc` identity; an edit

@@ -1,7 +1,7 @@
 //! End-to-end verification of Phase 1 and Phase 2 API improvements.
 //!
 //! Phase 1 (analyzer's job):
-//! - hover() returns real HoverInfo (no longer a stub)
+//! - hover() returns real HoverInfo
 //! - Name enum for type-safe identity
 //! - Result types for lookups (NotFound vs NoSourceLocation)
 //! - Hierarchical DocumentSymbol (classes contain method/property children)
@@ -1366,21 +1366,13 @@ fn reanalyze_dependents_transitive_after_delete() {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Regression: reanalyze_dependents must not deadlock when many dependents each
-// trigger a lazy class-load during warm-up.
+// reanalyze_dependents must not deadlock when many dependents each lazy-load a
+// class during warm-up.
 //
-// `reanalyze_dependents` warms up each dependent via `prepare_ast_for_analysis`,
-// which resolves the dependent's direct class references and loads any that
-// aren't indexed yet. Loading mutates the shared session salsa storage
-// (`load_class` → `ingest_file` takes the salsa write lock and sets inputs).
-//
-// v0.37.0 moved that warm-up *inside* the parallel rayon worker. With many
-// dependents each referencing a not-yet-loaded class, multiple workers entered
-// `ingest_file` concurrently while sibling workers held live snapshot clones
-// mid-`analyze_file` — quiescing the salsa runtime and deadlocking. On a
-// high-fan-out workspace (the symfony LSP feature tests) the call hung
-// indefinitely. The fix hoists the input-mutating warm-up out of the parallel
-// loop. This test reproduces the condition and asserts the call completes.
+// The warm-up (`prepare_ast_for_analysis`) loads each dependent's unindexed
+// direct class references via `load_class` → `ingest_file`, which writes salsa
+// inputs. A write waits for every live db handle, so a warm-up load issued
+// while the analysis pass holds snapshots never completes.
 // ──────────────────────────────────────────────────────────────────────────────
 
 /// In-memory `ClassResolver`: maps an FQCN to a virtual path. Leading
@@ -1407,8 +1399,7 @@ fn reanalyze_dependents_lazy_load_warmup_does_not_deadlock() {
     use std::sync::mpsc;
     use std::time::Duration;
 
-    // Enough dependents to guarantee concurrent rayon workers contend on the
-    // shared salsa write lock during warm-up.
+    // Enough dependents that a warm-up overlapping the pass would stall.
     const N: usize = 64;
 
     // Build resolver + provider for the lazily-loaded classes (Lazy0..LazyN).
@@ -1465,8 +1456,8 @@ fn reanalyze_dependents_lazy_load_warmup_does_not_deadlock() {
         }
         Err(mpsc::RecvTimeoutError::Timeout) => {
             panic!(
-                "reanalyze_dependents did not complete within 60s — likely the \
-                 in-parallel-worker lazy-load deadlock regressed (v0.37.0 bug)"
+                "reanalyze_dependents did not complete within 60s — likely a \
+                 warm-up load ran while the analysis pass held a snapshot"
             );
         }
         Err(e) => panic!("worker channel error: {e:?}"),

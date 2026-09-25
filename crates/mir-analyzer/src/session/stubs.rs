@@ -71,7 +71,7 @@ impl AnalysisSession {
     /// [`crate::FileAnalyzer::analyze_diagnostics_only`]) to keep
     /// essentials-only mode correct without forcing callers to enumerate which
     /// stubs they need.
-    /// Idempotent — already-loaded stubs are skipped via [`Self::loaded_stubs`].
+    /// Idempotent — already-loaded stubs are skipped.
     ///
     /// The discovery scan is a coarse identifier sweep (see
     /// [`crate::stubs::collect_referenced_builtin_paths`]) — it may pull in
@@ -183,11 +183,8 @@ impl AnalysisSession {
         let _ = self.prepare_file_for_analysis_cancellable(path, &|| false);
     }
 
-    /// Cancellable variant of [`Self::prepare_file_for_analysis`].
-    ///
-    /// The scoped parse snapshot is acquired cooperatively so an obsolete
-    /// background reanalysis cannot remain queued behind a writer which is
-    /// itself waiting for another Salsa snapshot to end.
+    /// Cancellable variant of [`Self::prepare_file_for_analysis`]; `false`
+    /// when `should_cancel` stopped it before the warm-up.
     pub(crate) fn prepare_file_for_analysis_cancellable(
         &mut self,
         path: &std::sync::Arc<str>,
@@ -277,24 +274,13 @@ impl AnalysisSession {
 
     /// Priority-index the classes directly referenced by `file`'s AST.
     ///
-    /// In the eager-static-input model the background indexer
-    /// ([`Self::index_batch`]) walks the whole vendor tree, but it may not have
-    /// reached every file the open buffer references yet. To avoid a transient
-    /// false `UndefinedClass` during the warm-up window, this **reorders** that
-    /// static work: it resolves the buffer's *direct* class references and
-    /// loads any not-yet-indexed ones immediately, jumping them to the front of
-    /// the queue.
-    ///
-    /// This is bounded by the number of distinct direct references in **one**
-    /// file — no transitive BFS, no depth/total budget, no pinning. Inheritance
-    /// ancestors and signature types of those classes are picked up by the
-    /// background walk (or, for navigation, by [`Self::hover`] /
-    /// [`Self::definition_of`]). Because `bump_workspace_revision` no longer
-    /// nulls the workspace index singleton, each [`Self::load_class`] here costs
-    /// only a resolver lookup + parse (or cache hit) + one tier-aware merge,
-    /// invalidating just the actively-analyzed file's memo once — not the whole
-    /// cache. Once background indexing completes this is a no-op (every
-    /// reference already resolves).
+    /// Lookups already find unindexed classes on demand; this moves the
+    /// buffer's *direct* references to the front of the background indexer's
+    /// ([`Self::index_batch`]) queue so workspace enumeration and reverse
+    /// lookups see them too. Bounded by one file's direct references: their
+    /// ancestors and signature types are left to the background walk. Each
+    /// [`Self::load_class`] is a resolver lookup, a parse (or cache hit) and
+    /// one index merge; a no-op once indexing has passed the file.
     pub fn priority_index_for_ast(&mut self, program: &php_ast::owned::Program, file: &str) {
         if self.resolver.is_none() {
             return;

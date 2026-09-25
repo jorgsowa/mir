@@ -1,15 +1,13 @@
 //! Tests for the eager + background vendor-indexing model.
 //!
-//! Replaces the old lazy-load/retry/evict tests. The model is now:
-//!
 //! 1. **Eager background index** — the consumer enumerates vendor files
 //!    (`Psr4Map::all_vendor_files`) and registers them via
 //!    `AnalysisSession::index_batch`; the workspace symbol index is built
 //!    incrementally and stays static, so `find_class_like` resolves any vendor
 //!    class — including types reached only through inheritance/return types.
 //! 2. **Priority indexing** — before the background walk finishes, the open
-//!    file's *direct* references are faulted in so there is no transient false
-//!    `UndefinedClass`, bounded to that file's direct refs (no transitive BFS).
+//!    file's *direct* references are indexed first (no transitive BFS);
+//!    lookups find any other unindexed class on demand.
 //! 3. **Static inputs** — closing a buffer does NOT evict vendor (no per-file
 //!    eviction); memory is bounded by the LRU memo + parse cache instead.
 
@@ -98,9 +96,8 @@ fn eager_index_vendor(session: &mut AnalysisSession, root: &std::path::Path) {
 // ─── eager index completeness ─────────────────────────────────────────────────
 
 /// With the vendor tree eagerly indexed, a method call on the return value of an
-/// **inherited** vendor method resolves and emits `UndefinedMethod` — the case
-/// the old lazy retry loop existed to approximate, now covered for free because
-/// the full symbol index is static.
+/// **inherited** vendor method resolves and emits `UndefinedMethod`, since the
+/// symbol index covers the whole vendor tree.
 #[test]
 fn eager_index_resolves_inherited_return_type_member() {
     let root = create_temp_dir("eager_inherited");

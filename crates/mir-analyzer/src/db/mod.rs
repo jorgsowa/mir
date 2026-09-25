@@ -179,8 +179,8 @@ pub trait MirDatabase: salsa::Database {
 
     /// Pass-scoped memoization cache for `extends_or_implements`, present only
     /// on a frozen read-only pass (set alongside `frozen_workspace_index`).
-    /// `None` on the canonical / open-file db, where the class graph can mutate
-    /// mid-analysis and a cache would go stale. See [`SubtypeCache`].
+    /// `None` on the long-lived owner db, which outlives class-graph changes.
+    /// See [`SubtypeCache`].
     fn subtype_cache(&self) -> Option<&SubtypeCache>;
 
     /// Diagnostic hook: one execution of the tracked O(all-files)

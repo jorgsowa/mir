@@ -38,9 +38,8 @@ pub struct SubtypeEntry {
     pub fqcn: Arc<str>,
     pub kind: ClassLikeKind,
     pub is_abstract: bool,
-    /// Direct parent edges, lowercased resolved FQCNs. Kept in one tagged
-    /// slice so the same logical relation is no longer retained in two field
-    /// layouts (`supers` and `trait_supers`) per declaration.
+    /// Direct parent edges, lowercased resolved FQCNs, extends/implements
+    /// and trait uses alike.
     pub parents: Box<[ParentEdge]>,
     /// Declaration site (line 1-based, cols 0-based code points), when known.
     pub location: Option<Location>,

@@ -46,7 +46,6 @@ pub struct RefLoc {
 #[salsa::input]
 pub struct AnalyzeFileInput {
     /// Resolved PHP version (`"8.1"`, `"8.2"`, …) used by the analyzer.
-    /// Mirrors `ProjectAnalyzer::resolved_php_version`.
     pub php_version: Arc<str>,
 }
 

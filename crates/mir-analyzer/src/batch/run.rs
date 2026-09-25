@@ -246,10 +246,8 @@ impl AnalysisSession {
         let _t_prewarm_ms = (_t0.elapsed() - _t_ingest).as_secs_f64() * 1000.0;
 
         // Fold the freshly-registered project files into the workspace symbol
-        // index singleton. The singleton may have been built from vendor before
-        // this run (CLI indexes vendor before analyze_paths); since adding files
-        // no longer nulls it, project classes would otherwise be invisible to
-        // find_class_like and reported as false UndefinedClass.
+        // index singleton. It may predate this run (the CLI indexes vendor
+        // before analyze_paths), and adding files doesn't rebuild it.
         self.refresh_workspace_index();
 
         // ---- Lazy-load unknown classes via PSR-4 ----------------------------
@@ -542,9 +540,9 @@ impl AnalysisSession {
 
         AnalysisResult::build(all_issues, rustc_hash::FxHashMap::default(), all_symbols)
     }
-    /// Re-analyze a single file (definition collection + body analysis) within the batch context.
+    /// Re-analyze a single file (definition collection + body analysis) within
+    /// the batch context, consulting the disk cache.
     ///
-    /// Mirrors the old `ProjectAnalyzer::re_analyze_file` cache-aware path.
     /// Use [`Self::reanalyze_dependents`] for LSP-style per-file flows that
     /// don't need batch options.
     pub fn re_analyze_file(
