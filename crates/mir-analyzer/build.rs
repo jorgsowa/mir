@@ -407,7 +407,7 @@ fn generate_stub_files(manifest_dir: &Path, out_dir: &Path) {
     // exact failure mode that shipped in 0.17.1: the workspace `stubs/` directory was
     // not packaged into the crate, the build script took the "no stubs" path, and every
     // built-in function/class was reported `UndefinedFunction` / `UndefinedClass` for
-    // every downstream consumer. `tests/packaging.rs` guards the packaging side; this
+    // every downstream consumer. `tests/it/packaging.rs` guards the packaging side; this
     // guard catches the local-build side.
     assert!(
         stubs_dir.is_dir(),
