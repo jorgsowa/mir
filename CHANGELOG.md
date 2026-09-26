@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.79.0] - 2026-09-26
+
 ### Changed
 
 - **`mir-analyzer` navigation API narrowed to resolution primitives:** cursor
