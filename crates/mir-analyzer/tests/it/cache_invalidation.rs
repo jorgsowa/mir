@@ -242,15 +242,16 @@ fn warm_run_without_changes_does_not_rewrite_cache() {
         &BatchOptions::new().without_symbols(),
     );
 
+    // Pin cache.bin's mtime far in the past: any rewrite during the second run
+    // stamps the current time, whatever the filesystem's mtime granularity.
     let cache_bin = cache_dir.path().join("cache.bin");
-    let mtime1 = std::fs::metadata(&cache_bin)
+    let sentinel = std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000_000);
+    std::fs::File::options()
+        .write(true)
+        .open(&cache_bin)
         .expect("cache.bin should exist after first run")
-        .modified()
+        .set_modified(sentinel)
         .unwrap();
-
-    // Advance the clock past filesystem mtime granularity so a real rewrite
-    // during the second run would be observable.
-    std::thread::sleep(std::time::Duration::from_millis(20));
 
     let mut session2 = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(cache_dir.path());
     let result2 = session2.analyze_paths(
@@ -258,10 +259,10 @@ fn warm_run_without_changes_does_not_rewrite_cache() {
         &BatchOptions::new().without_symbols(),
     );
 
-    let mtime2 = std::fs::metadata(&cache_bin).unwrap().modified().unwrap();
+    let mtime = std::fs::metadata(&cache_bin).unwrap().modified().unwrap();
 
     assert_eq!(
-        mtime1, mtime2,
+        mtime, sentinel,
         "an unchanged warm run must not rewrite cache.bin"
     );
     assert_eq!(
