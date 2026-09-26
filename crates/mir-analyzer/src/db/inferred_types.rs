@@ -42,7 +42,7 @@ pub(crate) fn try_mark_infer_in_progress(path: Arc<str>) -> Option<InferGuard> {
 /// Demand-driven inferred return type lookup for a function.
 ///
 /// Locates the file that declares `fqn` (the symbol index, else on demand),
-/// then calls [`crate::db::infer_file_return_types`] on that file. Salsa
+/// then calls `infer_file_return_types` on that file. Salsa
 /// memoizes both queries, so repeated lookups for the same function are free.
 /// Returns `None` when the function is unknown.
 pub fn inferred_function_return_type_demand(db: &dyn MirDatabase, fqn: &str) -> Option<Arc<Type>> {
@@ -56,7 +56,7 @@ pub fn inferred_function_return_type_demand(db: &dyn MirDatabase, fqn: &str) -> 
 /// Demand-driven inferred return type lookup for a method.
 ///
 /// Locates the file that declares the class (the symbol index, else on
-/// demand), then calls [`crate::db::infer_file_return_types`] on that file.
+/// demand), then calls `infer_file_return_types` on that file.
 /// `method_name_lower` must already be ASCII-lowercased (PHP semantics).
 /// Returns `None` when the class or method is unknown.
 pub fn inferred_method_return_type_demand(
@@ -78,7 +78,7 @@ pub fn inferred_method_return_type_demand(
 /// native type hint and no `@var` docblock (see `PropertyDef::ty`).
 ///
 /// Locates the file that declares `fqcn` (the symbol index, else on demand),
-/// then calls [`crate::db::infer_file_return_types`] on that file — the same
+/// then calls `infer_file_return_types` on that file — the same
 /// inference-only body-analysis pass also collects the union of types
 /// directly assigned to the property in `fqcn`'s own constructor. `fqcn`
 /// must be the property's DECLARING class (e.g. `find_property_in_chain`'s

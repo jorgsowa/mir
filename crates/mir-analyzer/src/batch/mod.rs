@@ -29,7 +29,7 @@ use crate::php_version::PhpVersion;
 use crate::session::AnalysisSession;
 use crate::stub_cache::{hash_source, prepare_for_ingest};
 
-/// Issue kinds emitted by [`crate::dead_code::DeadCodeAnalyzer`].
+/// Issue kinds emitted by `DeadCodeAnalyzer`.
 ///
 /// The dead-code pass is just an error group — these names participate in
 /// [`BatchOptions::suppressed_issue_kinds`] like any other `IssueKind`. If

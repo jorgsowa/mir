@@ -357,12 +357,12 @@ where
     value.as_ref().serialize(serializer)
 }
 
-/// Helper to wrap Option<Type> in interned Arc<Type>.
+/// Helper to wrap `Option<Type>` in interned `Arc<Type>`.
 pub fn wrap_param_type(ty: Option<Type>) -> Option<Arc<Type>> {
     ty.map(interned_types::intern_or_wrap)
 }
 
-/// Helper to wrap return type Option<Type> in interned Arc<Type>.
+/// Helper to wrap return type `Option<Type>` in interned `Arc<Type>`.
 pub fn wrap_return_type(ty: Option<Type>) -> Option<Arc<Type>> {
     ty.map(interned_types::intern_or_wrap)
 }

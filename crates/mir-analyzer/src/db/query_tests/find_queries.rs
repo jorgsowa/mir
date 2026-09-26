@@ -157,3 +157,28 @@ fn find_class_constant_in_chain_finds_inherited_constant() {
         .expect("find_class_constant_in_chain must walk to App\\Base");
     assert_eq!(declared_in.as_ref(), "App\\Base");
 }
+
+#[test]
+fn on_demand_miss_is_read_once_per_revision() {
+    use crate::db::MirDatabase as _;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let reads = AtomicUsize::new(0);
+    let missing = || {
+        reads.fetch_add(1, Ordering::Relaxed);
+        None
+    };
+    let load = |session: &AnalysisSession| {
+        let db = session.snapshot_db();
+        db.load_on_demand("/proj/Missing.php", salsa::Durability::LOW, &missing)
+    };
+
+    assert!(load(&session).is_none());
+    assert!(load(&session).is_none());
+    assert_eq!(reads.load(Ordering::Relaxed), 1);
+
+    session.set_file_text(Arc::from("/proj/Other.php"), Arc::from("<?php\n"));
+    assert!(load(&session).is_none());
+    assert_eq!(reads.load(Ordering::Relaxed), 2, "an input write retries");
+}

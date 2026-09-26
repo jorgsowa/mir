@@ -19,6 +19,9 @@ use crate::php_version::PhpVersion;
 
 /// Long-lived analysis context. Owns the salsa database and tracks which
 /// stubs have been loaded.
+///
+/// `Send` but not `Sync`: share it across threads through
+/// [`AnalysisSession::snapshot`], never by reference.
 pub struct AnalysisSession {
     /// Database management (salsa, file registry, stub tracking).
     pub(crate) db: AnalyzerDb,
@@ -94,6 +97,23 @@ pub struct AnalysisSession {
     /// [`AnalysisSnapshot`].
     pub(crate) index: Arc<IndexState>,
 }
+
+const _: () = {
+    const fn assert_send<T: Send>() {}
+    assert_send::<AnalysisSession>();
+};
+
+// Fails to compile once `AnalysisSession: Sync`: the second impl then makes
+// `<_>` ambiguous.
+const _: fn() = || {
+    trait AmbiguousIfSync<A> {
+        fn some_item() {}
+    }
+    impl<T: ?Sized> AmbiguousIfSync<()> for T {}
+    struct IsSync;
+    impl<T: ?Sized + Sync> AmbiguousIfSync<IsSync> for T {}
+    let _ = <AnalysisSession as AmbiguousIfSync<_>>::some_item;
+};
 
 /// Which reference postings [`AnalysisSession::indexed_references_to`]
 /// should read back from the maintained reference index.

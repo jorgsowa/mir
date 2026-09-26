@@ -164,7 +164,8 @@ impl AnalysisSession {
     /// every one of them is analyzed with its referenced classes loaded.
     ///
     /// `should_cancel` is polled at phase boundaries and between stale
-    /// candidates; `true` aborts with `None`.
+    /// candidates; `true` aborts with `None`, as does an index settle that
+    /// snapshot readers keep feeding past its round cap.
     pub fn indexed_references_to(
         &mut self,
         symbol: &crate::Name,

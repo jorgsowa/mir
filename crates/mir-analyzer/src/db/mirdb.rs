@@ -108,6 +108,8 @@ pub struct MirDbStorage {
     /// `on_demand_files.len()` at this handle's last adoption; entries are
     /// never removed, so equal means nothing new to adopt.
     on_demand_adopted: usize,
+    /// Paths whose on-demand read found nothing, shared by every clone.
+    on_demand_misses: Arc<Mutex<OnDemandMisses>>,
     /// Side-channel resolver state. The `ResolverConfig` salsa input is
     /// created with the db; its `revision` is bumped on every resolver or
     /// source-provider change so dependent tracked queries (e.g.
@@ -281,6 +283,28 @@ struct OnDemandFile {
     durability: salsa::Durability,
 }
 
+/// On-demand reads that found nothing at `revision`. Any input write can
+/// make a path loadable, so a newer revision drops the set.
+#[derive(Default)]
+struct OnDemandMisses {
+    revision: Option<salsa::Revision>,
+    paths: HashSet<Arc<str>>,
+}
+
+impl OnDemandMisses {
+    fn contains(&self, revision: salsa::Revision, path: &str) -> bool {
+        self.revision == Some(revision) && self.paths.contains(path)
+    }
+
+    fn insert(&mut self, revision: salsa::Revision, path: &str) {
+        if self.revision != Some(revision) {
+            self.revision = Some(revision);
+            self.paths.clear();
+        }
+        self.paths.insert(Arc::from(path));
+    }
+}
+
 /// Open [`MirDbStorage::defer_revision_bumps`] scopes, and whether a bump
 /// requested inside them is still owed.
 #[derive(Clone, Copy, Default)]
@@ -318,6 +342,7 @@ impl Default for MirDbStorage {
             deleted_files: Arc::default(),
             on_demand_files: Arc::default(),
             on_demand_adopted: 0,
+            on_demand_misses: Arc::default(),
             resolver_state: Arc::default(),
             workspace_revision_input: None,
             workspace_revision_counter: Arc::default(),
@@ -524,13 +549,23 @@ impl MirDatabase for MirDbStorage {
         if self.deleted_files.contains(path) {
             return None;
         }
-        // Held across the read so racing loaders of one path share a handle.
+        let revision = self.current_revision();
+        if self.on_demand_misses.lock().contains(revision, path) {
+            return None;
+        }
+        // Read before locking, so a slow host read stalls no other loader.
+        let Some(text) = text() else {
+            self.on_demand_misses.lock().insert(revision, path);
+            return None;
+        };
         let mut on_demand = self.on_demand_files.write();
+        // A racing loader may have registered `path` during the read; every
+        // reader must share its handle.
         if let Some(entry) = on_demand.get(path) {
             return Some(entry.file);
         }
         let path: Arc<str> = Arc::from(path);
-        let file = SourceFile::builder(path.clone(), text()?)
+        let file = SourceFile::builder(path.clone(), text)
             .durability(durability)
             .new(self);
         on_demand.insert(path.clone(), OnDemandFile { file, durability });

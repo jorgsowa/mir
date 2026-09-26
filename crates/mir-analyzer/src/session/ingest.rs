@@ -964,8 +964,8 @@ impl AnalysisSession {
     }
 
     /// Cancellable form of [`Self::settle_workspace_index`]. Returns `false`
-    /// when the caller's request was cancelled before the pending index work
-    /// could be reconciled.
+    /// when the caller's request was cancelled, or the round cap ran out,
+    /// before the pending index work could be reconciled.
     pub(crate) fn settle_workspace_index_cancellable(
         &mut self,
         should_cancel: &(dyn Fn() -> bool + Sync),
@@ -975,7 +975,7 @@ impl AnalysisSession {
         let mut rounds_left = SETTLE_ROUNDS;
         loop {
             if rounds_left == 0 {
-                return true;
+                return self.db.salsa.index_pending_is_empty();
             }
             rounds_left -= 1;
             // Every early return below drops the claim, which re-queues its

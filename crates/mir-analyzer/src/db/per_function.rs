@@ -21,7 +21,7 @@ use mir_types::Type;
 
 use super::*;
 
-/// Output of [`infer_function`]: everything body-analysis produces for one free function
+/// Output of `infer_function`: everything body-analysis produces for one free function
 /// that we want salsa to memoize.
 ///
 /// Notably excludes [`crate::symbol::ResolvedSymbol`]s — those are intentionally

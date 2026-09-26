@@ -35,6 +35,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `indexed_references_to` could return, and keep serving from its memo, a
   result missing a file that was opened via `ingest_file` with unchanged text
   while a snapshot query was in flight.
+- Snapshot `indexed_references_to` and `indexed_subtype_classes` return
+  `Cancelled` instead of a possibly incomplete result when the owner retires
+  a file mid-query.
+- `re_analyze_file`'s disk-cache fast path retires the file's postings before
+  replaying them, so in-flight snapshot commits for the old text are refused.
+- `settle_workspace_index` no longer reports success when its round cap runs
+  out with index work still pending; `indexed_references_to` and
+  `reanalyze_files_cancellable` then return as if cancelled.
+- On-demand file loads read the host outside the shared registry lock, and a
+  read that finds nothing is not repeated within the same revision.
+- `cargo doc` with `-D warnings` no longer fails on links to private items.
+- `AnalysisSession` is documented and compile-time asserted as `Send` but not
+  `Sync`.
 
 ## [0.78.0] - 2026-09-23
 

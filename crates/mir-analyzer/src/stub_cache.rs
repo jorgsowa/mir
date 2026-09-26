@@ -18,7 +18,7 @@
 //! two hex chars of the path hash. Sharding keeps any single directory below
 //! ~40 entries even for large monorepos.
 //!
-//! Format: a fixed-size [`Header`] (magic + version fields + content hash)
+//! Format: a fixed-size `Header` (magic + version fields + content hash)
 //! followed by a bincode 1.x-encoded [`StubSlice`], followed by a bincode
 //! 1.x-encoded `Vec<Issue>` (the collector-phase issues found alongside the
 //! slice — parse errors, `BackedEnumCaseTypeMismatch`, docblock warnings,

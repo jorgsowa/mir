@@ -120,7 +120,7 @@
 //! - `===config===` must appear **at most once** per fixture.
 //! - Every key in `===config===` must be a recognised key (`php_version`,
 //!   `suppress`, `stub_file`, `stub_dir`); unknown keys fail the test.
-//! - `php_version` is parsed via [`PhpVersion::from_str`] (same parser as the
+//! - `php_version` is parsed via [`std::str::FromStr`] on [`PhpVersion`] (same parser as the
 //!   real CLI config); invalid values fail the test.
 //! - `suppress` accepts a comma-separated list of [`IssueKind`] names to drop
 //!   from the analyzer's output. Every other kind is asserted strictly: a

@@ -23,8 +23,8 @@ use smallvec::SmallVec;
 use super::reference_locations::RefLoc;
 
 /// Interned file id, valid within one `RefIndex` instance.
-/// Re-exported for use by [`crate::db::subtype_index`] and
-/// [`crate::db::class_mention_index`] to unify file identity across indexes.
+/// Re-exported for use by `subtype_index` and
+/// `class_mention_index` to unify file identity across indexes.
 pub type FileNo = u32;
 /// Interned symbol id, valid within one `RefIndex` instance.
 type SymbolNo = u32;

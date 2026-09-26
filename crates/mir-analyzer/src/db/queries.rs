@@ -71,7 +71,7 @@ pub fn resolve_receiver_fqcn(db: &dyn MirDatabase, file: &str, fqcn: &str) -> St
 /// real global builtin (`Closure`, `Throwable`, …) is left unqualified
 /// instead of being prepended with the current namespace, matching how
 /// Psalm/PHPStan lenently resolve these in docblocks even with no explicit
-/// `use` import — see [`crate::util::is_global_builtin_docblock_class`].
+/// `use` import — see `is_global_builtin_docblock_class`.
 /// An explicit `use` import for the same bare name still wins, same
 /// priority order `resolve_name` itself uses internally.
 pub fn resolve_docblock_type_name(db: &dyn MirDatabase, file: &str, name: &str) -> String {
@@ -586,7 +586,7 @@ pub fn parse_file(db: &dyn MirDatabase, file: SourceFile) -> TrackedParseResult 
 
 /// Uncached version of collect_file_definitions for bulk operations like vendor
 /// collection, where we don't need Salsa to cache the intermediate StubSlice
-/// results. This avoids holding Arc<StubSlice> in Salsa's query cache after
+/// results. This avoids holding `Arc<StubSlice>` in Salsa's query cache after
 /// ingestion.
 pub fn collect_file_definitions_uncached(
     db: &dyn MirDatabase,

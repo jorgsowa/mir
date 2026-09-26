@@ -74,7 +74,7 @@ impl AnalysisSession {
     /// Idempotent — already-loaded stubs are skipped.
     ///
     /// The discovery scan is a coarse identifier sweep (see
-    /// [`crate::stubs::collect_referenced_builtin_paths`]) — it may pull in
+    /// `collect_referenced_builtin_paths`) — it may pull in
     /// a slightly larger set than the file strictly needs, but never misses
     /// a referenced built-in. Cost is sub-millisecond per file.
     ///

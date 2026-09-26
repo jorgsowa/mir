@@ -90,7 +90,7 @@ pub fn resolve_fqcn_to_path<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> O
 /// Composite: resolve an FQCN to a registered [`crate::db::SourceFile`] if
 /// the workspace has the defining file's text loaded.
 ///
-/// Not currently tracked: it composes [`resolve_fqcn_to_path`] (tracked)
+/// Not currently tracked: it composes `resolve_fqcn_to_path` (tracked)
 /// with `MirDatabase::lookup_source_file` (untracked map read). Phase 3
 /// will likely promote the path-keyed lookup to a tracked query to fully
 /// participate in salsa's invalidation graph.

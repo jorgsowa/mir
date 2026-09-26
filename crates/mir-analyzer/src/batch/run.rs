@@ -579,9 +579,13 @@ impl AnalysisSession {
                         col_end: *col_end,
                     })
                     .collect();
+                // Retire first so in-flight snapshot commits for the old
+                // text are refused, as on the analysis path below.
+                self.index.retire_references(&self.db.salsa, file_path);
                 let db = &self.db.salsa;
                 let file_no = db.locked_ref_index().intern_path(&file);
                 db.set_file_reference_locations(file_no, locs);
+                self.index.clear_dependency_graph_cache();
                 opts.apply(&mut issues);
                 self.apply_suppressions_and_emit_unused(&mut issues, std::slice::from_ref(&file));
                 return AnalysisResult::build(issues, HashMap::default(), Vec::new());

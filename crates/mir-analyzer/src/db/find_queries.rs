@@ -628,7 +628,7 @@ pub fn class_def_at(db: &dyn MirDatabase, file: SourceFile, idx: u32) -> Option<
 /// each materialized exactly once and the whole list sorted by FQCN for
 /// deterministic issue order across runs.
 ///
-/// Decomposes per file via the memoized [`collect_file_definitions`] query
+/// Decomposes per file via the memoized `collect_file_definitions` query
 /// rather than walking the global symbol index: in batch mode `analyzed_files`
 /// is the project file set, so vendor / stub classes are never enumerated at
 /// all (they aren't in the set). An empty `analyzed_files` means "all files"

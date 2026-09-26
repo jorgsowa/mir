@@ -341,8 +341,22 @@ impl AnalysisSnapshot {
             self.commit_reference_candidates(&stale)?;
         }
         let out = catch(|| self.read_references(symbol, files, include_declaration, includes))?;
+        self.ensure_no_retire_since(key.generation)?;
         self.memoize_references(key, &out);
         Ok(out)
+    }
+
+    /// `Err` when the owner retired a file since `generation`: postings read
+    /// in between may lack that file, and its replacing write is under way.
+    pub(super) fn ensure_no_retire_since(
+        &self,
+        generation: QueryGeneration,
+    ) -> Result<(), Cancelled> {
+        if self.index.retire_seq() == generation.2 {
+            Ok(())
+        } else {
+            Err(Cancelled::PendingWrite)
+        }
     }
 
     /// `use` import items (`use Foo\Bar;`, `use function ...;`,
@@ -920,6 +934,9 @@ impl AnalysisSnapshot {
                 return hit;
             }
             let out = self.subtype_classes_uncached(class_fqn, files, include_trait_users);
+            if let Err(cancelled) = self.ensure_no_retire_since(key.generation) {
+                unwind(cancelled);
+            }
             // See `memoize_references` for why a moved generation skips.
             let generation = self.query_cache_generation();
             if generation == key.generation {
@@ -1349,6 +1366,7 @@ mod tests {
         assert!(snap.stale_reference_candidates(&symbol, &files).is_empty());
         session.ingest_file(files[1].clone(), Arc::from(ROUTES_CALLS_RUN));
         let out = snap.read_references(&symbol, &files, false, ReferenceIncludes::Plain);
+        assert!(snap.ensure_no_retire_since(key.generation).is_ok());
         snap.memoize_references(key, &out);
         drop(snap);
 
@@ -1361,10 +1379,10 @@ mod tests {
     }
 
     /// Any retire without a salsa write (e.g. `re_analyze_file` on unchanged
-    /// text, between its clear and re-record) must keep a query that read
-    /// the cleared postings out of the memo.
+    /// text, between its clear and re-record) must cancel a query that read
+    /// the cleared postings and keep its result out of the memo.
     #[test]
-    fn query_spanning_a_retirement_is_not_memoized() {
+    fn query_spanning_a_retirement_is_cancelled_and_not_memoized() {
         let (mut session, files) = registered_routes_workspace();
         let symbol = Name::method("Base", "run");
 
@@ -1376,12 +1394,38 @@ mod tests {
             .retire_references(&session.db.salsa, files[1].as_ref());
         let out = snap.read_references(&symbol, &files, false, ReferenceIncludes::Plain);
         assert!(out.is_empty());
+        assert!(snap.ensure_no_retire_since(key.generation).is_err());
         snap.memoize_references(key, &out);
         drop(snap);
 
         let hits = session.ref_query_cache_hits();
         assert_eq!(callers_of(&mut session, &files, "run"), [files[1].clone()]);
         assert_eq!(session.ref_query_cache_hits(), hits);
+    }
+
+    /// The cache-hit fast path replaces postings without a salsa write, so
+    /// it must retire like the analysis path: a query spanning it cancels.
+    #[test]
+    fn re_analyze_file_cache_hit_cancels_spanning_queries() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut session = AnalysisSession::new(PhpVersion::LATEST).with_cache_dir(dir.path());
+        let files: Vec<Arc<str>> = vec![Arc::from("base.php"), Arc::from("caller.php")];
+        let opts = crate::BatchOptions::new();
+        session.ingest_file(files[0].clone(), Arc::from(BASE));
+        session.re_analyze_file(&files[1], CALLS_RUN, &opts);
+        session.prepare_for_query(None);
+        assert_eq!(callers_of(&mut session, &files, "run"), [files[1].clone()]);
+
+        let symbol = Name::method("Base", "run");
+        let snap = session.snapshot();
+        let key = snap.reference_query_key(&symbol, &files, false, ReferenceIncludes::Plain);
+        let revision = session.text_revision();
+        session.re_analyze_file(&files[1], CALLS_RUN, &opts);
+        assert_eq!(session.text_revision(), revision, "took the analysis path");
+        assert!(snap.ensure_no_retire_since(key.generation).is_err());
+        drop(snap);
+
+        assert_eq!(callers_of(&mut session, &files, "run"), [files[1].clone()]);
     }
 
     fn prepared_workspace(caller_text: &str) -> (AnalysisSession, Vec<Arc<str>>) {

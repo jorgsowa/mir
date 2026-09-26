@@ -924,7 +924,7 @@ impl ParsedDocblock {
     }
 
     /// Returns the raw `@param` type spelling for a given parameter name.
-    /// Uses the **last** match, mirroring [`get_param_type`].
+    /// Uses the **last** match, mirroring [`Self::get_param_type`].
     pub fn get_param_type_string(&self, name: &str) -> Option<&str> {
         let name = name.trim_start_matches('$');
         self.param_type_strings
