@@ -286,6 +286,58 @@ fn freshness_edit_updates_postings() {
     assert!(refs.is_empty(), "stale postings must not survive: {refs:?}");
 }
 
+/// An editor opening files the scan registered but never ingested, with
+/// unchanged text and no declarations, keeps their postings and the memo.
+#[test]
+fn opening_scanned_files_with_unchanged_text_keeps_their_postings() {
+    let files = [
+        (
+            "base.php",
+            "<?php\nclass B { public function m(): void {} }\n",
+        ),
+        ("routes.php", "<?php\n(new B())->m();\n"),
+        ("config.php", "<?php\nreturn ['k' => (new B())->m()];\n"),
+    ];
+    let mut session = session_with(&files);
+    let all = paths(&files);
+    let callers = |session: &mut AnalysisSession| -> Vec<Arc<str>> {
+        let mut files: Vec<Arc<str>> = session
+            .indexed_references_to(
+                &Name::method("B", "m"),
+                &all,
+                false,
+                mir_analyzer::ReferenceIncludes::Plain,
+                &|| false,
+            )
+            .expect("not cancelled")
+            .into_iter()
+            .map(|(file, _)| file)
+            .collect();
+        files.sort();
+        files
+    };
+    let expected: Vec<Arc<str>> = vec![Arc::from("config.php"), Arc::from("routes.php")];
+    assert_eq!(callers(&mut session), expected);
+    // The cold query's own commits move the generation; this one memoizes.
+    assert_eq!(callers(&mut session), expected);
+
+    let hits = session.ref_query_cache_hits();
+    for _ in 0..2 {
+        for (path, text) in &files[1..] {
+            session.ingest_file(Arc::from(*path), Arc::from(*text));
+        }
+    }
+    assert_eq!(callers(&mut session), expected);
+    assert_eq!(
+        session.ref_query_cache_hits(),
+        hits + 1,
+        "unchanged opens must not invalidate the memo"
+    );
+
+    session.re_analyze_file("routes.php", files[1].1, &mir_analyzer::BatchOptions::new());
+    assert_eq!(callers(&mut session), expected);
+}
+
 #[test]
 fn subtype_classes_transitive_with_alias_and_fqn_forms() {
     let files = [

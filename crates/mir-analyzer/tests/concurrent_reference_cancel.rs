@@ -2,7 +2,8 @@
 //! [`AnalysisSession`] and writes, readers query [`AnalysisSnapshot`]s it hands
 //! out. An owner write cancels in-flight snapshot queries; they must unwind
 //! as `Err(Cancelled)` rather than abort (salsa's `ZalsaLocal` reentrancy
-//! check) or deadlock the owner waiting for their handles.
+//! check) or deadlock the owner waiting for their handles. A query that
+//! completes must return the exact known result.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
@@ -19,6 +20,13 @@ const READERS: usize = 10;
 const READ_ITERS: usize = 60;
 /// Distinct paths the owner's mirror writes cycle through — kept small since past 32 files reconciliation switches to a full rebuild.
 const OPENED_FILES: usize = 8;
+/// Declaration-free files the owner re-registers and then opens with unchanged text.
+const ROUTES: usize = 4;
+/// Pause before opening a route, so it lands mid-commit rather than before readers' freshness pass.
+const OPEN_DELAY: Duration = Duration::from_millis(20);
+const CALLER_METHODS: usize = 24;
+/// Every completed query must return exactly this many `Base::run` sites.
+const EXPECTED_SITES: usize = CALLERS * CALLER_METHODS * 2 + ROUTES;
 /// Budget for the single-threaded settle guard, which is sub-second when it is not deadlocked.
 const SETTLE_BUDGET: Duration = Duration::from_secs(30);
 /// Generous upper bound for the stress test — turns a deadlock into a reported failure, not a performance gate.
@@ -94,13 +102,22 @@ fn caller_source(i: usize, marker: usize) -> Arc<str> {
     // owner writes to land mid-query. `marker` varies the body so a re-index
     // actually bumps the revision.
     let mut body = format!("<?php\nnamespace Lib;\nclass C{i} {{\n    const M = {marker};\n");
-    for m in 0..24 {
+    for m in 0..CALLER_METHODS {
         body.push_str(&format!(
             "    public function go{m}(Base $b): int {{ return $b->run() + $b->run() + {m}; }}\n"
         ));
     }
     body.push_str("}\n");
     Arc::from(body.as_str())
+}
+
+fn route_path(i: usize) -> Arc<str> {
+    Arc::from(format!("routes/R{i}.php").as_str())
+}
+
+/// Top-level code only, so opening it writes nothing to salsa.
+fn route_source() -> Arc<str> {
+    Arc::from("<?php\nnamespace Lib;\n(new Base())->run();\n")
 }
 
 /// A reader asking the owner for a fresh snapshot, reporting whether its
@@ -150,6 +167,14 @@ fn owner_writes_cancel_snapshot_readers_without_aborting() {
             path
         })
         .collect();
+    for i in 0..ROUTES {
+        session.upsert_source_file(route_path(i), route_source(), salsa::Durability::LOW);
+    }
+    let scope: Arc<[Arc<str>]> = callers
+        .iter()
+        .cloned()
+        .chain((0..ROUTES).map(route_path))
+        .collect();
     // Only a live singleton makes mirror writes pending, so the owner's
     // per-round settle has reconciliation work to do.
     session.rebuild_workspace_symbol_index();
@@ -167,7 +192,7 @@ fn owner_writes_cancel_snapshot_readers_without_aborting() {
     let readers: Vec<_> = (0..READERS)
         .map(|r| {
             let owner = request_tx.clone();
-            let callers = Arc::clone(&callers);
+            let scope = Arc::clone(&scope);
             std::thread::spawn(move || {
                 let symbol = Name::method("Lib\\Base", "run");
                 let (mut completed, mut cancelled) = (0usize, 0usize);
@@ -178,15 +203,12 @@ fn owner_writes_cancel_snapshot_readers_without_aborting() {
                     // for open files, which commits analyses from the reader
                     // thread.
                     let result = if r % 2 == 0 && i % 2 == 1 {
-                        snap.warm_files(&callers, &IndexCancel::new()).map(drop)
+                        snap.warm_files(&scope, &IndexCancel::new()).map(drop)
                     } else {
-                        snap.indexed_references_to(
-                            &symbol,
-                            &callers,
-                            false,
-                            ReferenceIncludes::Plain,
-                        )
-                        .map(drop)
+                        snap.indexed_references_to(&symbol, &scope, false, ReferenceIncludes::Plain)
+                            .map(|refs| {
+                                assert_eq!(refs.len(), EXPECTED_SITES, "reader {r} query {i}");
+                            })
                     };
                     completed_last = result.is_ok();
                     if completed_last {
@@ -208,7 +230,7 @@ fn owner_writes_cancel_snapshot_readers_without_aborting() {
     let mut round: usize = 0;
     'owner: loop {
         round += 1;
-        match round % 4 {
+        match round % 6 {
             0 => session.ingest_file(base_path.clone(), base_source(round)),
             1 => {
                 // Every 50th write mints a brand-new class name so the
@@ -225,6 +247,28 @@ fn owner_writes_cancel_snapshot_readers_without_aborting() {
                 session.ingest_file(Arc::from("writers/W.php"), Arc::from(src.as_str()));
             }
             2 => {
+                // Back to registered-but-never-ingested; readers commit its
+                // postings during the quiet phase that follows.
+                let route = route_path((round / 6) % ROUTES);
+                session.invalidate_file(&route);
+                session.upsert_source_file(route, route_source(), salsa::Durability::LOW);
+            }
+            3 => {
+                let batch = if (round / 6).is_multiple_of(2) {
+                    &batch_a
+                } else {
+                    &batch_b
+                };
+                session.index_batch(batch, IndexParallelism::Rayon, &IndexCancel::new());
+            }
+            4 => {
+                // The editor opens it: same text, no declarations, no salsa
+                // write. The pause lets readers get past their freshness pass
+                // so it lands while they re-commit the rewritten callers.
+                std::thread::sleep(OPEN_DELAY);
+                session.ingest_file(route_path((round / 6) % ROUTES), route_source());
+            }
+            _ => {
                 let slot = round % OPENED_FILES;
                 let src =
                     format!("<?php\nnamespace Lib;\nclass O{slot} {{ const M = {round}; }}\n");
@@ -233,10 +277,6 @@ fn owner_writes_cancel_snapshot_readers_without_aborting() {
                     Arc::from(src.as_str()),
                     salsa::Durability::LOW,
                 );
-            }
-            _ => {
-                let batch = if round % 8 == 3 { &batch_a } else { &batch_b };
-                session.index_batch(batch, IndexParallelism::Rayon, &IndexCancel::new());
             }
         }
         session.prepare_for_query(None);
@@ -271,14 +311,15 @@ fn owner_writes_cancel_snapshot_readers_without_aborting() {
     let refs = session
         .indexed_references_to(
             &Name::method("Lib\\Base", "run"),
-            &callers,
+            &scope,
             false,
             ReferenceIncludes::Plain,
             &|| false,
         )
         .expect("not cancelled");
-    assert!(
-        !refs.is_empty(),
-        "callers' run() sites must survive the churn"
+    assert_eq!(
+        refs.len(),
+        EXPECTED_SITES,
+        "every run() site must survive the churn"
     );
 }

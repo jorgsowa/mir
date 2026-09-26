@@ -5,8 +5,8 @@ use rustc_hash::FxHashSet as HashSet;
 use salsa::Cancelled;
 
 use super::index_state::{
-    hash_files, AnalyzedFile, IndexState, RefQueryCacheKey, RetireEpoch, SubtypeQueryCacheKey,
-    ViewStamp,
+    hash_files, AnalyzedFile, IndexState, QueryGeneration, RefQueryCacheKey, RetireEpoch,
+    SubtypeQueryCacheKey, ViewStamp,
 };
 use super::queries::{identifier_char_col, span_range, ReferenceGate};
 use super::SubtypeClassSite;
@@ -143,13 +143,19 @@ impl AnalysisSnapshot {
     }
 
     /// The combined generation the query memos key on: salsa's text revision
-    /// plus the off-salsa subtype-edge epoch. The epoch covers what the
-    /// revision can't — subtype edges and anonymous-class `impl:` postings
-    /// committed *within* one revision (e.g. a subtype BFS admitting a file
-    /// the reference gate skipped), which change a member query's hierarchy
-    /// fan-out without any text write.
-    pub(crate) fn query_cache_generation(&self) -> (salsa::Revision, u64) {
-        (self.db.current_revision(), self.db.subtype_edges_epoch())
+    /// plus the off-salsa subtype-edge epoch and retirement seq. The epoch
+    /// covers what the revision can't — subtype edges and anonymous-class
+    /// `impl:` postings committed *within* one revision (e.g. a subtype BFS
+    /// admitting a file the reference gate skipped), which change a member
+    /// query's hierarchy fan-out without any text write. The seq covers a
+    /// retire whose ingest writes nothing, so a query that read the cleared
+    /// postings is never memoized.
+    pub(crate) fn query_cache_generation(&self) -> QueryGeneration {
+        (
+            self.db.current_revision(),
+            self.db.subtype_edges_epoch(),
+            self.index.retire_seq(),
+        )
     }
 
     pub fn find_class_like(&self, fqcn: &str) -> Result<Option<crate::db::ClassLike>, Cancelled> {
@@ -1306,6 +1312,76 @@ mod tests {
         assert!(snap.commit_reference_candidates(&stale).is_err());
         drop(snap);
         writer.join().unwrap();
+    }
+
+    /// Top-level code only: ingesting it defines no symbols, so the ingest
+    /// itself writes nothing to salsa.
+    const ROUTES_CALLS_RUN: &str = "<?php\n(new Base())->run();\n";
+
+    /// A workspace whose `routes.php` is registered and committed by a
+    /// references query but was never passed through `ingest_file` — the
+    /// state of a file an editor opens after the initial scan.
+    fn registered_routes_workspace() -> (AnalysisSession, Vec<Arc<str>>) {
+        let mut session = AnalysisSession::new(PhpVersion::LATEST);
+        let files: Vec<Arc<str>> = vec![Arc::from("base.php"), Arc::from("routes.php")];
+        session.ingest_file(files[0].clone(), Arc::from(BASE));
+        session.upsert_source_file(
+            files[1].clone(),
+            Arc::from(ROUTES_CALLS_RUN),
+            salsa::Durability::LOW,
+        );
+        session.prepare_for_query(None);
+        assert_eq!(callers_of(&mut session, &files, "run"), [files[1].clone()]);
+        (session, files)
+    }
+
+    /// Opening the file lands between a query's freshness pass and its
+    /// posting read. Nothing cancels the query, so it must still see the
+    /// file's postings — and must not memoize a result without them.
+    #[test]
+    fn ingest_of_unchanged_text_mid_query_keeps_references() {
+        let (mut session, files) = registered_routes_workspace();
+        let symbol = Name::method("Base", "run");
+        let revision = session.text_revision();
+
+        let snap = session.snapshot();
+        let key = snap.reference_query_key(&symbol, &files, false, ReferenceIncludes::Plain);
+        assert!(snap.stale_reference_candidates(&symbol, &files).is_empty());
+        session.ingest_file(files[1].clone(), Arc::from(ROUTES_CALLS_RUN));
+        let out = snap.read_references(&symbol, &files, false, ReferenceIncludes::Plain);
+        snap.memoize_references(key, &out);
+        drop(snap);
+
+        assert_eq!(session.text_revision(), revision, "ingest wrote salsa");
+        assert_eq!(
+            out.into_iter().map(|(file, _)| file).collect::<Vec<_>>(),
+            [files[1].clone()]
+        );
+        assert_eq!(callers_of(&mut session, &files, "run"), [files[1].clone()]);
+    }
+
+    /// Any retire without a salsa write (e.g. `re_analyze_file` on unchanged
+    /// text, between its clear and re-record) must keep a query that read
+    /// the cleared postings out of the memo.
+    #[test]
+    fn query_spanning_a_retirement_is_not_memoized() {
+        let (mut session, files) = registered_routes_workspace();
+        let symbol = Name::method("Base", "run");
+
+        let snap = session.snapshot();
+        let key = snap.reference_query_key(&symbol, &files, false, ReferenceIncludes::Plain);
+        assert!(snap.stale_reference_candidates(&symbol, &files).is_empty());
+        session
+            .index
+            .retire_references(&session.db.salsa, files[1].as_ref());
+        let out = snap.read_references(&symbol, &files, false, ReferenceIncludes::Plain);
+        assert!(out.is_empty());
+        snap.memoize_references(key, &out);
+        drop(snap);
+
+        let hits = session.ref_query_cache_hits();
+        assert_eq!(callers_of(&mut session, &files, "run"), [files[1].clone()]);
+        assert_eq!(session.ref_query_cache_hits(), hits);
     }
 
     fn prepared_workspace(caller_text: &str) -> (AnalysisSession, Vec<Arc<str>>) {

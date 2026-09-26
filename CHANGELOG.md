@@ -30,6 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `indexed_references_to` instead.
 - `metrics::record_hover_at` / `record_definition_at` and their counters.
 
+### Fixed
+
+- `indexed_references_to` could return, and keep serving from its memo, a
+  result missing a file that was opened via `ingest_file` with unchanged text
+  while a snapshot query was in flight.
+
 ## [0.78.0] - 2026-09-23
 
 ### Changed

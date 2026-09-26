@@ -164,14 +164,10 @@ impl AnalysisSession {
     /// accumulate dead reference-location entries indefinitely.)
     pub fn ingest_file(&mut self, file: Arc<str>, source: Arc<str>) {
         self.ensure_all_stubs();
-        let existing_text = self
+        let text_unchanged = self
             .lookup_source_file(file.as_ref())
-            .map(|sf| sf.text(&self.db.salsa).clone());
-        if existing_text
-            .as_ref()
-            .is_some_and(|text| text.as_ref() == source.as_ref())
-            && self.last_ingested_symbols.contains_key(file.as_ref())
-        {
+            .is_some_and(|sf| sf.text(&self.db.salsa).as_ref() == source.as_ref());
+        if text_unchanged && self.last_ingested_symbols.contains_key(file.as_ref()) {
             return;
         }
         self.index.clear_transient_batch_replay();
@@ -195,7 +191,12 @@ impl AnalysisSession {
 
         // Postings for the new text are recomputed lazily; retiring also
         // refuses commits from snapshots still analyzing the old text.
-        self.index.retire_references(&self.db.salsa, file.as_ref());
+        // Unchanged text keeps its stored Arc, so its postings stay exact —
+        // and with no salsa write to cancel in-flight readers, a clear here
+        // would let them read the file's postings as missing.
+        if !text_unchanged {
+            self.index.retire_references(&self.db.salsa, file.as_ref());
+        }
         let file_defs =
             self.db
                 .collect_and_ingest_file(file.clone(), source.as_ref(), self.php_version);

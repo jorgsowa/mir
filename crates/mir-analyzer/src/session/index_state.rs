@@ -54,6 +54,9 @@ pub(crate) struct IndexState {
     /// [`Self::retire_references`] / [`Self::retire_file`], so a commit's
     /// check → postings → mark sequence never interleaves with a retire.
     retirements: Mutex<Retirements>,
+    /// Mirror of `Retirements::seq` readable without the lock. Part of the
+    /// query-memo generation: a retire clears postings without a salsa write.
+    retire_seq: AtomicU64,
 }
 
 #[derive(Default)]
@@ -122,6 +125,7 @@ impl Default for IndexState {
             dependency_graph: RwLock::default(),
             transient_batch_replay: RwLock::default(),
             retirements: Mutex::default(),
+            retire_seq: AtomicU64::new(0),
         }
     }
 }
@@ -171,7 +175,7 @@ impl IndexState {
     /// through the gate) but never a mark over cleared postings.
     pub(crate) fn retire_references(&self, db: &MirDbStorage, file: &str) {
         let mut retirements = self.retirements.lock();
-        Self::record_retirement(&mut retirements, file);
+        self.record_retirement(&mut retirements, file);
         self.forget_ref_committed(file);
         db.clear_file_references(file);
     }
@@ -179,17 +183,24 @@ impl IndexState {
     /// [`Self::retire_references`] plus the file's subtype-index class edges.
     pub(crate) fn retire_file(&self, db: &MirDbStorage, file: &str) {
         let mut retirements = self.retirements.lock();
-        Self::record_retirement(&mut retirements, file);
+        self.record_retirement(&mut retirements, file);
         self.forget_ref_committed(file);
         db.clear_file_references(file);
         self.forget_defs_committed(file);
         db.clear_file_class_edges(file);
     }
 
-    fn record_retirement(retirements: &mut Retirements, file: &str) {
+    /// Bumps the seq before the caller clears anything, so a query that
+    /// reads the cleared postings sees its generation move.
+    fn record_retirement(&self, retirements: &mut Retirements, file: &str) {
         retirements.seq += 1;
         let seq = retirements.seq;
         retirements.retired_at.insert(Arc::from(file), seq);
+        self.retire_seq.store(seq, Ordering::SeqCst);
+    }
+
+    pub(crate) fn retire_seq(&self) -> u64 {
+        self.retire_seq.load(Ordering::SeqCst)
     }
 
     /// Whether `file`'s reference postings are exact for `current_text` at
@@ -542,8 +553,11 @@ fn stage_ref_cache_put(
     })
 }
 
-/// A memo of per-query result lists keyed at a query generation — `(text
-/// revision, subtype-edge epoch)`, see
+/// `(text revision, subtype-edge epoch, retirement seq)`; every component is
+/// monotonic.
+pub(crate) type QueryGeneration = (salsa::Revision, u64, u64);
+
+/// A memo of per-query result lists keyed at a query generation — see
 /// [`super::AnalysisSnapshot::query_cache_generation`]. Bounded by the total
 /// number of cached *items* across entries, not entry count: one entry's
 /// `Vec` scales with how often its symbol occurs (a handful for a typical
@@ -587,7 +601,7 @@ impl<K: std::hash::Hash + Eq, T: Clone> QueryMemo<K, T> {
     /// Cache `result` under `key`, computed at `generation`. The caller must
     /// only insert when the generation didn't move while computing — such a
     /// key can never be looked up again.
-    pub(crate) fn insert(&self, generation: (salsa::Revision, u64), key: K, result: &[T]) {
+    pub(crate) fn insert(&self, generation: QueryGeneration, key: K, result: &[T]) {
         let mut map = self.map.write();
         if !map.advance_to(generation, || self.items.store(0, Ordering::Relaxed)) {
             return;
@@ -607,7 +621,7 @@ impl<K: std::hash::Hash + Eq, T: Clone> QueryMemo<K, T> {
 /// insert at a newer generation drops them wholesale — without this, dead
 /// keys (heap `String`s) accumulate until the overflow clear.
 struct RevisionedMap<K, V> {
-    generation: Option<(salsa::Revision, u64)>,
+    generation: Option<QueryGeneration>,
     map: HashMap<K, V>,
 }
 
@@ -629,8 +643,8 @@ impl<K: std::hash::Hash + Eq, V> RevisionedMap<K, V> {
     /// (dropping the dead generation) when `generation` is newer, running
     /// `on_clear` so the caller can zero its lockstep size counter. Returns
     /// `false` when `generation` is older — the caller should skip caching.
-    /// Both components are monotonic, so lexicographic order is sound.
-    fn advance_to(&mut self, generation: (salsa::Revision, u64), on_clear: impl FnOnce()) -> bool {
+    /// Every component is monotonic, so lexicographic order is sound.
+    fn advance_to(&mut self, generation: QueryGeneration, on_clear: impl FnOnce()) -> bool {
         match self.generation {
             Some(g) if g == generation => true,
             Some(g) if g > generation => false,
@@ -658,7 +672,7 @@ pub(crate) struct RefQueryCacheKey {
     pub(crate) symbol: String,
     pub(crate) include_declaration: bool,
     pub(crate) includes: super::ReferenceIncludes,
-    pub(crate) generation: (salsa::Revision, u64),
+    pub(crate) generation: QueryGeneration,
     pub(crate) files_hash: u64,
 }
 
@@ -674,7 +688,7 @@ const REF_QUERY_CACHE_LOCATION_CAP: usize = 200_000;
 pub(crate) struct SubtypeQueryCacheKey {
     pub(crate) class_fqn: String,
     pub(crate) include_trait_users: bool,
-    pub(crate) generation: (salsa::Revision, u64),
+    pub(crate) generation: QueryGeneration,
     pub(crate) files_hash: u64,
 }
 
