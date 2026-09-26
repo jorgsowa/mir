@@ -95,15 +95,18 @@
 //! test.php@3:0-3:5
 //! ```
 //!
-//! The files are analyzed as a project, then the query runs through the
-//! session's cursor API at the `<CURSOR>` marker, which is removed from the
-//! source first and must appear exactly once across all files. Queries:
+//! The files are analyzed as a project, then the query runs at the `<CURSOR>`
+//! marker, which is removed from the source first and must appear exactly once
+//! across all files. Queries exercise the resolution primitives editor
+//! front-ends build on; presentation (hover text, docblock rendering) is theirs.
 //!
-//! - `hover` — `type: T`, then one `docstring: …` line per docstring line
-//!   and `definition: LOCATION` when present.
-//! - `definition` — the declaration's `LOCATION`.
-//! - `references [include_declaration] [use_imports]` — one `LOCATION` per
-//!   reference, sorted, searched across every non-stub PHP file.
+//! - `symbol` — the `ResolvedSymbol` at the cursor from `FileAnalysis::symbol_at`
+//!   as `kind: K` and `type: T`; must agree with `AnalysisSession::symbol_at`.
+//! - `definition` — `name_at`, then the declaration's `LOCATION` from
+//!   `definition_of_cached`.
+//! - `references [include_declaration] [use_imports]` — `name_at`, then one
+//!   `LOCATION` per `indexed_references_to` hit, sorted, searched across every
+//!   non-stub PHP file.
 //!
 //! A `LOCATION` is `path@line:col-line_end:col_end`, with `path` relative to
 //! the fixture root (stub declarations keep their `stubs/…` path). A failed
@@ -226,7 +229,7 @@ pub(crate) struct ParsedFixture {
 /// Editor query a `===cursor===` fixture runs at its `<CURSOR>` marker.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CursorQuery {
-    Hover,
+    Symbol,
     Definition,
     References {
         include_declaration: bool,
@@ -404,17 +407,17 @@ fn take_cursor_marker(files: &mut [(String, String)], path: &str) -> Option<(usi
 fn parse_cursor_query(text: &str, path: &str) -> CursorQuery {
     let mut words = text.split_whitespace();
     let query = words.next().unwrap_or_else(|| {
-        panic!("fixture {path}: ===cursor=== needs a query — valid queries: hover, definition, references")
+        panic!("fixture {path}: ===cursor=== needs a query — valid queries: symbol, definition, references")
     });
     let options: Vec<&str> = words.collect();
     match query {
-        "hover" | "definition" => {
+        "symbol" | "definition" => {
             assert!(
                 options.is_empty(),
                 "fixture {path}: {query} takes no options, found {options:?}"
             );
-            if query == "hover" {
-                CursorQuery::Hover
+            if query == "symbol" {
+                CursorQuery::Symbol
             } else {
                 CursorQuery::Definition
             }
@@ -437,7 +440,7 @@ fn parse_cursor_query(text: &str, path: &str) -> CursorQuery {
             }
         }
         other => panic!(
-            "fixture {path}: unknown ===cursor=== query {other:?} — valid queries: hover, definition, references"
+            "fixture {path}: unknown ===cursor=== query {other:?} — valid queries: symbol, definition, references"
         ),
     }
 }
@@ -766,48 +769,92 @@ fn run_cursor_query(
     file: &str,
     cursor: &Cursor,
 ) -> Vec<String> {
-    let lookup_error = |e: crate::SymbolLookupError| vec![format!("error: {e:?}")];
+    let not_found = || vec![format!("error: {:?}", crate::SymbolLookupError::NotFound)];
     match cursor.query {
-        CursorQuery::Hover => match session.hover_at(file, cursor.offset) {
-            Ok(hover) => {
-                let mut lines = vec![format!("type: {}", hover.ty)];
-                if let Some(doc) = &hover.docstring {
-                    lines.extend(
-                        doc.lines()
-                            .map(|l| format!("docstring: {}", l.trim()).trim_end().to_string()),
-                    );
-                }
-                if let Some(def) = &hover.definition {
-                    lines.push(format!("definition: {}", ws.fmt_location(def)));
-                }
-                lines
-            }
-            Err(e) => lookup_error(e),
-        },
-        CursorQuery::Definition => match session.definition_at(file, cursor.offset) {
-            Ok(def) => vec![ws.fmt_location(&def)],
-            Err(e) => lookup_error(e),
+        CursorQuery::Symbol => {
+            let whole_file = whole_file_symbol_at(session, file, cursor.offset);
+            let targeted = session.symbol_at(file, cursor.offset);
+            let (whole_file, targeted) = (
+                whole_file.as_ref().map(fmt_symbol),
+                targeted.as_ref().map(fmt_symbol),
+            );
+            assert_eq!(
+                whole_file, targeted,
+                "FileAnalysis::symbol_at and AnalysisSession::symbol_at disagree"
+            );
+            whole_file.unwrap_or_else(not_found)
+        }
+        CursorQuery::Definition => match session.name_at(file, cursor.offset) {
+            Some(name) => match session.definition_of_cached(&name) {
+                Ok(def) => vec![ws.fmt_location(&def)],
+                Err(e) => vec![format!("error: {e:?}")],
+            },
+            None => not_found(),
         },
         CursorQuery::References {
             include_declaration,
             includes,
         } => {
+            let Some(name) = session.name_at(file, cursor.offset) else {
+                return not_found();
+            };
             let files: Vec<Arc<str>> = ws
                 .project_files
                 .iter()
                 .map(|p| Arc::from(p.to_string_lossy().as_ref()))
                 .collect();
-            match session.references_at(file, cursor.offset, &files, include_declaration, includes)
-            {
-                Ok(mut refs) => {
-                    refs.sort_by_key(|(file, range)| (file.clone(), range.start, range.end));
-                    refs.iter()
-                        .map(|(file, range)| ws.fmt_range(file, range))
-                        .collect()
-                }
-                Err(e) => lookup_error(e),
-            }
+            let mut refs = session
+                .indexed_references_to(&name, &files, include_declaration, includes, &|| false)
+                .expect("uncancelled references query");
+            refs.sort_by_key(|(file, range)| (file.clone(), range.start, range.end));
+            refs.iter()
+                .map(|(file, range)| ws.fmt_range(file, range))
+                .collect()
         }
+    }
+}
+
+/// `symbol_at` on a whole-file analysis with retained symbols, the path an
+/// editor takes when it keeps the file's `FileAnalysis` around.
+fn whole_file_symbol_at(
+    session: &mut AnalysisSession,
+    file: &str,
+    offset: u32,
+) -> Option<crate::ResolvedSymbol> {
+    use crate::db::MirDatabase;
+    let (text, parsed) = {
+        let view = session.db_view();
+        let db = view.db();
+        let sf = db.lookup_source_file(file)?;
+        let prepared = crate::db::prepare_analysis_file(db, sf);
+        (prepared.text.clone(), prepared.parsed.0.clone())
+    };
+    crate::FileAnalyzer::new(session)
+        .analyze(Arc::from(file), &text, &parsed.program, &parsed.source_map)
+        .symbol_at(offset)
+        .cloned()
+}
+
+fn fmt_symbol(symbol: &crate::ResolvedSymbol) -> Vec<String> {
+    vec![
+        format!("kind: {}", fmt_reference_kind(&symbol.kind)),
+        format!("type: {}", symbol.resolved_type),
+    ]
+}
+
+fn fmt_reference_kind(kind: &crate::ReferenceKind) -> String {
+    use crate::ReferenceKind as K;
+    match kind {
+        K::Variable(name) => format!("variable ${}", name.trim_start_matches('$')),
+        K::MethodCall { class, method } => format!("method call {class}::{method}"),
+        K::StaticCall { class, method } => format!("static call {class}::{method}"),
+        K::PropertyAccess { class, property } => format!("property {class}::${property}"),
+        K::FunctionCall(name) => format!("function call {name}"),
+        K::ClassReference(name) => format!("class {name}"),
+        K::ConstantAccess { class, constant } => format!("class constant {class}::{constant}"),
+        K::GlobalConstant(name) => format!("global constant {name}"),
+        K::UseImport(inner) => format!("use import of {}", fmt_reference_kind(inner)),
+        K::Receiver => "receiver".to_string(),
     }
 }
 
@@ -1394,15 +1441,15 @@ mod parser_validation {
 
     #[test]
     fn config_before_cursor_section_is_accepted() {
-        let f = p("===config===\nphp_version=8.1\n===cursor===\nhover\n\
+        let f = p("===config===\nphp_version=8.1\n===cursor===\nsymbol\n\
                    ===file===\n<?php f<CURSOR>();\n===expect===\n");
-        assert_eq!(f.cursor.map(|c| c.query), Some(CursorQuery::Hover));
+        assert_eq!(f.cursor.map(|c| c.query), Some(CursorQuery::Symbol));
     }
 
     #[test]
     #[should_panic(expected = "===cursor=== needs a <CURSOR> marker")]
     fn cursor_section_without_marker() {
-        p("===cursor===\nhover\n===file===\n<?php\n===expect===\n");
+        p("===cursor===\nsymbol\n===file===\n<?php\n===expect===\n");
     }
 
     #[test]
@@ -1414,7 +1461,7 @@ mod parser_validation {
     #[test]
     #[should_panic(expected = "<CURSOR> must appear exactly once across all files")]
     fn marker_in_two_files() {
-        p("===cursor===\nhover\n===file:a.php===\n<?php <CURSOR>\n\
+        p("===cursor===\nsymbol\n===file:a.php===\n<?php <CURSOR>\n\
            ===file:b.php===\n<?php <CURSOR>\n===expect===\n");
     }
 
@@ -1431,21 +1478,21 @@ mod parser_validation {
     }
 
     #[test]
-    #[should_panic(expected = "hover takes no options")]
-    fn hover_with_options() {
-        p("===cursor===\nhover include_declaration\n===file===\n<?php <CURSOR>\n===expect===\n");
+    #[should_panic(expected = "symbol takes no options")]
+    fn symbol_with_options() {
+        p("===cursor===\nsymbol include_declaration\n===file===\n<?php <CURSOR>\n===expect===\n");
     }
 
     #[test]
     #[should_panic(expected = "suppress has no effect in a ===cursor=== fixture")]
     fn suppress_in_cursor_fixture() {
-        p("===config===\nsuppress=Foo\n===cursor===\nhover\n\
+        p("===config===\nsuppress=Foo\n===cursor===\nsymbol\n\
            ===file===\n<?php <CURSOR>\n===expect===\n");
     }
 
     #[test]
     #[should_panic(expected = "===cursor=== must appear before the first ===file===")]
     fn cursor_after_file_marker() {
-        p("===file===\n<?php <CURSOR>\n===cursor===\nhover\n===expect===\n");
+        p("===file===\n<?php <CURSOR>\n===cursor===\nsymbol\n===expect===\n");
     }
 }

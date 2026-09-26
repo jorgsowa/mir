@@ -1,5 +1,5 @@
 ===cursor===
-hover
+symbol
 ===file===
 <?php
 function f(): void {<CURSOR>}

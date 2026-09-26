@@ -63,10 +63,12 @@ The `===expect===` section lists expected issues, one per line, formatted as
 analyzer emits exactly those issues. An empty `===expect===` section asserts
 the snippet is clean.
 
-Editor features (hover, go-to-definition, find-references) are tested the same
-way under `tests/fixtures/by-query/`: a `===cursor===` section names the query,
-a `<CURSOR>` marker in the source sets the position, and `===expect===` holds
-the result:
+The resolution queries editors build on (symbol at a position, definition
+location, find-references) are tested the same way under
+`tests/fixtures/by-query/`: a `===cursor===` section names the query, a
+`<CURSOR>` marker in the source sets the position, and `===expect===` holds the
+result. Editor presentation (hover text, docblock rendering, LSP ranges) is
+tested in php-lsp.
 
 ```
 ===cursor===

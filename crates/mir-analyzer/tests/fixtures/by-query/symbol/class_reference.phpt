@@ -1,9 +1,9 @@
 ===cursor===
-hover
+symbol
 ===file===
 <?php
 final class Greeter {}
 $g = new Gre<CURSOR>eter();
 ===expect===
+kind: class Greeter
 type: Greeter
-definition: test.php@2:6-2:22

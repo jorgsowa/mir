@@ -1,5 +1,7 @@
+===description===
+A property fetch resolves to the declaring class's property with its docblock type.
 ===cursor===
-hover
+symbol
 ===file===
 <?php
 final class User {
@@ -9,5 +11,5 @@ final class User {
 $u = new User();
 $r = $u->ro<CURSOR>les;
 ===expect===
+kind: property User::$roles
 type: list<string>
-definition: test.php@4:4-4:28

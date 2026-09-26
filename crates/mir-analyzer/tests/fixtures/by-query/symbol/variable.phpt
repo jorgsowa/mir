@@ -1,7 +1,7 @@
 ===description===
-Hover on a variable shows its inferred type at that point.
+A variable resolves to its narrowed type at that point.
 ===cursor===
-hover
+symbol
 ===file===
 <?php
 function f(?int $n): void {
@@ -10,4 +10,5 @@ function f(?int $n): void {
     }
 }
 ===expect===
+kind: variable $n
 type: int
