@@ -1,8 +1,7 @@
 name: Benchmarks
 
-# Run on every push to main that touches Rust source (saves a new baseline),
-# and on every PR that touches Rust source (compares against the latest main
-# baseline and posts a comment).
+# main: full real-world suite, results kept as a per-commit artifact.
+# PRs: the crucial benchmarks, base and head measured on the same runner.
 on:
   push:
     branches: [main]
@@ -10,43 +9,163 @@ on:
       - 'crates/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
+      - '.github/workflows/bench.yml'
+      - '.github/actions/laravel-fixture/**'
   pull_request:
     paths:
       - 'crates/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
+      - '.github/workflows/bench.yml'
+      - '.github/actions/laravel-fixture/**'
+  workflow_dispatch:
 
-# Keep the fixture version in sync with download-fixtures.sh.
+concurrency:
+  group: bench-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
+  # Keep in sync with download-fixtures.sh.
   LARAVEL_FIXTURE_VERSION: v11.44.7
+  # Deep PHP AST traversal on Laravel overflows the default rayon stack.
+  RUST_MIN_STACK: "16777216"
 
 jobs:
-  bench:
-    name: Benchmark
+  full:
+    name: Benchmark (full suite)
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    permissions:
-      pull-requests: write   # needed to post the comparison comment
-
     steps:
       - uses: actions/checkout@v7.0.1
 
       - uses: dtolnay/rust-toolchain@stable
 
-      # Caches registry index, downloaded crates, and compiled artifacts.
-      # The bench profile inherits [profile.release] (lto=thin, codegen-units=1)
-      # so the first compile is slow; this makes subsequent runs fast.
       - uses: Swatinem/rust-cache@v2.9.2
+        with:
+          key: bench
 
-      # Criterion stores benchmark results (JSON baselines) in target/criterion.
-      # The rust-cache above may restore stale criterion data from a previous run.
-      # Always wipe it so the only baseline present is the one we explicitly restore
-      # below (on PRs) or the one we're about to create (on pushes to main).
-      - name: Clear stale criterion cache
-        run: rm -rf target/criterion
+      - uses: ./.github/actions/laravel-fixture
+        with:
+          version: ${{ env.LARAVEL_FIXTURE_VERSION }}
 
-      # critcmp reads Criterion's raw JSON and produces a before/after table.
-      # Cache the compiled binary so we don't rebuild it on every run.
+      # Best-effort: governor and turbo knobs are usually absent on cloud VMs.
+      - name: Tune system for stable measurements
+        run: |
+          echo 0 | sudo tee /proc/sys/kernel/randomize_va_space
+          echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 2>/dev/null || true
+          echo 1 | sudo tee /sys/devices/system/cpu/intel_pstate/no_turbo 2>/dev/null || true
+
+      - name: Run benchmarks
+        run: |
+          set -eo pipefail
+          rm -rf target/criterion
+          cargo bench -p mir-analyzer --bench analyze_real_world -- --noplot 2>&1 | tee bench-output.txt
+          {
+            echo '## Benchmark output'
+            echo '```'
+            cat bench-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bench-main-${{ github.sha }}
+          path: |
+            target/criterion
+            bench-output.txt
+          retention-days: 90
+
+  # Build base and head at the same checkout path: the fixture path is baked in
+  # at compile time and changes lazy-load resolution, which skews comparisons.
+  build:
+    name: Benchmark (build)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          # The PR merge commit and its first parent (the base branch tip).
+          fetch-depth: 2
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2.9.2
+        with:
+          key: bench
+          save-if: false
+
+      - name: Build head and base benchmarks
+        run: |
+          set -eo pipefail
+          build() {
+            mkdir -p "bench-bin/$1"
+            cargo bench -p mir-analyzer --bench analyze_real_world --bench incremental_workload \
+              --no-run --message-format=json-render-diagnostics \
+              | jq -r 'select(.reason == "compiler-artifact" and .executable != null and (.target.kind | index("bench"))) | "\(.target.name) \(.executable)"' \
+              | while read -r name exe; do cp "$exe" "bench-bin/$1/$name"; done
+          }
+          git rev-parse HEAD > bench-bin-head-sha
+          build head
+          git checkout --detach HEAD^1
+          build base
+          mv bench-bin-head-sha bench-bin/head-sha
+          git rev-parse HEAD > bench-bin/base-sha
+          ls -l bench-bin/*
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bench-bin
+          path: bench-bin
+          compression-level: 1
+          if-no-files-found: error
+          retention-days: 1
+
+  run:
+    name: Benchmark (${{ matrix.name }})
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: cli-cold
+            title: CLI cold analysis
+            bench: analyze_real_world
+            only: bench_full_analysis
+          - name: cli-warm
+            title: CLI re-analysis with warm cache
+            bench: analyze_real_world
+            only: bench_reanalysis
+          - name: lsp-edit
+            title: LSP file edits
+            bench: incremental_workload
+            only: bench_single_file_edit,bench_high_fanout_edit
+          - name: lsp-queries
+            title: LSP queries after an edit
+            bench: incremental_workload
+            only: bench_diagnostics_only_latency,bench_definition_at_after_diagnostics,bench_references_at_after_diagnostics
+    env:
+      MIR_LARAVEL_FIXTURE: ${{ github.workspace }}/crates/mir-analyzer/benches/fixtures/laravel
+      CRITERION_HOME: ${{ github.workspace }}/target/criterion
+      MIR_BENCH_ONLY: ${{ matrix.only }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: bench-bin
+          path: bench-bin
+
+      - name: Restore binary permissions
+        run: chmod +x bench-bin/base/* bench-bin/head/*
+
+      - uses: ./.github/actions/laravel-fixture
+        with:
+          version: ${{ env.LARAVEL_FIXTURE_VERSION }}
+
       - name: Cache critcmp
         id: critcmp-cache
         uses: actions/cache@v6.1.0
@@ -56,188 +175,131 @@ jobs:
 
       - name: Install critcmp
         if: steps.critcmp-cache.outputs.cache-hit != 'true'
-        run: cargo install critcmp
+        run: cargo install critcmp --locked
 
-      # Cache the cloned + composer-installed fixture. Key includes the pinned
-      # version so a version bump in download-fixtures.sh automatically
-      # invalidates the cache.
-      - name: Cache Laravel fixture
-        id: fixture-cache
-        uses: actions/cache@v6.1.0
-        with:
-          path: crates/mir-analyzer/benches/fixtures
-          key: laravel-fixture-${{ env.LARAVEL_FIXTURE_VERSION }}
-
-      # PHP + Composer are only needed when the fixture cache is cold.
-      - name: Set up PHP
-        if: steps.fixture-cache.outputs.cache-hit != 'true'
-        uses: shivammathur/setup-php@2.37.2
-        with:
-          php-version: '8.3'
-          tools: composer
-
-      - name: Download and install benchmark fixture
-        if: steps.fixture-cache.outputs.cache-hit != 'true'
-        run: bash crates/mir-analyzer/benches/download-fixtures.sh
-
-      # Reduce measurement noise on the shared runner:
-      #   - ASLR off → stable memory-layout addresses across samples
-      #   - Performance governor → no frequency scaling mid-measurement
-      #   - No turbo boost → eliminates burst-clock outliers
-      # These are best-effort; governors and turbo knobs are silently
-      # unavailable in most cloud VMs.
       - name: Tune system for stable measurements
         run: |
           echo 0 | sudo tee /proc/sys/kernel/randomize_va_space
           echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 2>/dev/null || true
           echo 1 | sudo tee /sys/devices/system/cpu/intel_pstate/no_turbo 2>/dev/null || true
 
-      # PRs: restore the most recent main baseline so critcmp can compare.
-      - name: Restore main baseline
-        if: github.event_name == 'pull_request'
-        id: restore-baseline
-        uses: actions/cache/restore@v6.1.0
-        with:
-          path: target/criterion
-          # Exact key won't match (PR SHA ≠ any main SHA); falls through to
-          # restore-keys prefix match which picks the most recent main run.
-          key: criterion-baseline-main-${{ github.sha }}
-          restore-keys: criterion-baseline-main-
-
-      - name: Run benchmarks
-        env:
-          # 'main' on push, 'pr' on pull_request — used by --save-baseline.
-          BASELINE_NAME: ${{ github.event_name == 'pull_request' && 'pr' || 'main' }}
-          # Rayon worker threads default to 2 MiB stack; deep PHP AST traversal
-          # and recursive type resolution on large corpora (e.g. Laravel) can
-          # exceed 8 MiB due to large match-arm locals in analyze_stmt. 16 MiB
-          # gives enough headroom without unbounded growth.
-          RUST_MIN_STACK: "16777216"
+      - name: Run base and head
         run: |
           set -eo pipefail
-          cargo bench -p mir-analyzer --bench analyze_real_world \
-            -- --save-baseline "$BASELINE_NAME" --noplot 2>&1 | tee bench-output.txt
-          # Save memory stats alongside the Criterion baseline so PRs can diff them.
-          grep '\[memory\]' bench-output.txt | sed 's/^[[:space:]]*//' \
-            > "target/criterion/memory-${BASELINE_NAME}.txt" || true
-          echo '## Benchmark output' >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          cat bench-output.txt >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          mkdir -p result
+          for rev in base head; do
+            "bench-bin/$rev/${{ matrix.bench }}" --bench --save-baseline "$rev" --noplot 2>&1 \
+              | tee "result/output-$rev.txt"
+            grep '\[memory\]' "result/output-$rev.txt" | sed 's/^[[:space:]]*//' \
+              > "result/memory-$rev.txt" || true
+          done
+          critcmp base head | tee result/critcmp.txt
+          echo '${{ matrix.title }}' > result/title.txt
+          {
+            echo '## ${{ matrix.title }} (head vs base)'
+            echo '```'
+            cat result/critcmp.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
-      # Push to main: persist the new baseline for future PR comparisons.
-      - name: Save main baseline
-        if: github.event_name == 'push'
-        uses: actions/cache/save@v6.1.0
+      - uses: actions/upload-artifact@v7
         with:
-          path: target/criterion
-          key: criterion-baseline-main-${{ github.sha }}
+          name: bench-result-${{ matrix.name }}
+          path: result
+          retention-days: 14
 
-      # PRs: compare and post. Skip gracefully if no baseline was restored
-      # (first benchmark run ever, or cache was evicted).
-      - name: Compare baselines
-        if: >-
-          github.event_name == 'pull_request' &&
-          steps.restore-baseline.outputs.cache-matched-key != ''
-        run: |
-          critcmp main pr | tee critcmp-output.txt
-          echo '## Benchmark results (PR vs `main`)' >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          cat critcmp-output.txt >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          echo '' >> "$GITHUB_STEP_SUMMARY"
-          echo '## Memory (PR vs `main`)' >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          echo 'main:' >> "$GITHUB_STEP_SUMMARY"
-          cat target/criterion/memory-main.txt >> "$GITHUB_STEP_SUMMARY" 2>/dev/null \
-            || echo '(unavailable)' >> "$GITHUB_STEP_SUMMARY"
-          echo '' >> "$GITHUB_STEP_SUMMARY"
-          echo 'PR:' >> "$GITHUB_STEP_SUMMARY"
-          cat target/criterion/memory-pr.txt >> "$GITHUB_STEP_SUMMARY" 2>/dev/null \
-            || echo '(unavailable)' >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Post no-baseline notice
-        if: >-
-          github.event_name == 'pull_request' &&
-          steps.restore-baseline.outputs.cache-matched-key == ''
-        uses: actions/github-script@v9.0.0
+  report:
+    name: Benchmark (report)
+    needs: [build, run]
+    if: always() && github.event_name == 'pull_request' && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/download-artifact@v8
         with:
-          script: |
-            await github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: '## Benchmark results\n\nNo `main` baseline found — comparison skipped. A baseline will be saved when this PR merges.',
-            });
+          pattern: bench-result-*
+          path: results
 
-      - name: Post comparison comment
-        if: >-
-          github.event_name == 'pull_request' &&
-          steps.restore-baseline.outputs.cache-matched-key != ''
+      - uses: actions/download-artifact@v8
+        with:
+          name: bench-bin
+          path: bench-bin
+
+      - name: Build report
         uses: actions/github-script@v9.0.0
         with:
           script: |
             const fs = require('fs');
-            const table = fs.readFileSync('critcmp-output.txt', 'utf8');
+            const path = require('path');
+            const read = p => fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : '';
+            const sha = rev => read(`bench-bin/${rev}-sha`).trim().slice(0, 10);
 
-            function parseMemory(path) {
-              if (!fs.existsSync(path)) return {};
+            function parseMemory(text) {
               const re = /\[memory\]\s+(.+?):\s+peak live ([\d.]+) MiB,\s+total allocated ([\d.]+) MiB/g;
               const out = {};
               let m;
-              const text = fs.readFileSync(path, 'utf8');
               while ((m = re.exec(text)) !== null)
                 out[m[1].trim()] = { peak: parseFloat(m[2]), total: parseFloat(m[3]) };
               return out;
             }
 
-            function buildMemoryTable(mainS, prS) {
-              const keys = [...new Set([...Object.keys(mainS), ...Object.keys(prS)])].sort();
+            function memoryTable(base, head) {
+              const keys = [...new Set([...Object.keys(base), ...Object.keys(head)])].sort();
               if (!keys.length) return null;
+              const mib = v => v ? `${v.toFixed(1)} MiB` : 'N/A';
               const rows = keys.map(k => {
-                const m = mainS[k], p = prS[k];
-                const mp = m ? `${m.peak.toFixed(1)} MiB` : 'N/A';
-                const pp = p ? `${p.peak.toFixed(1)} MiB` : 'N/A';
-                const mt = m ? `${m.total.toFixed(1)} MiB` : 'N/A';
-                const pt = p ? `${p.total.toFixed(1)} MiB` : 'N/A';
+                const b = base[k], h = head[k];
                 let delta = 'N/A';
-                if (m && p) {
-                  const d = p.peak - m.peak;
-                  const pct = m.peak ? d / m.peak * 100 : 0;
+                if (b && h) {
+                  const d = h.peak - b.peak;
                   const s = d >= 0 ? '+' : '';
-                  delta = `${s}${d.toFixed(1)} MiB (${s}${pct.toFixed(1)}%)`;
+                  delta = `${s}${d.toFixed(1)} MiB (${s}${(b.peak ? d / b.peak * 100 : 0).toFixed(1)}%)`;
                 }
-                return { k, mp, pp, delta, mt, pt };
+                return `| ${k} | ${mib(b?.peak)} | ${mib(h?.peak)} | ${delta} | ${mib(b?.total)} | ${mib(h?.total)} |`;
               });
-              const pad = (s, n, r = false) => r ? String(s).padStart(n) : String(s).padEnd(n);
-              const cols = {
-                k:  Math.max(...rows.map(r => r.k.length),  'benchmark'.length),
-                mp: Math.max(...rows.map(r => r.mp.length), 'peak(main)'.length),
-                pp: Math.max(...rows.map(r => r.pp.length), 'peak(pr)'.length),
-                d:  Math.max(...rows.map(r => r.delta.length), 'Δ peak'.length),
-                mt: Math.max(...rows.map(r => r.mt.length), 'total(main)'.length),
-                pt: Math.max(...rows.map(r => r.pt.length), 'total(pr)'.length),
-              };
-              const fmt = r =>
-                `${pad(r.k,cols.k)}  ${pad(r.mp,cols.mp,true)}  ${pad(r.pp,cols.pp,true)}  ${pad(r.delta,cols.d,true)}  ${pad(r.mt,cols.mt,true)}  ${pad(r.pt,cols.pt,true)}`;
-              const hdr = fmt({k:'benchmark', mp:'peak(main)', pp:'peak(pr)', delta:'Δ peak', mt:'total(main)', pt:'total(pr)'});
-              return [hdr, '-'.repeat(hdr.length), ...rows.map(fmt)].join('\n');
+              return ['| benchmark | peak (base) | peak (head) | Δ peak | total (base) | total (head) |',
+                      '|---|--:|--:|--:|--:|--:|', ...rows].join('\n');
             }
 
-            const memTable = buildMemoryTable(
-              parseMemory('target/criterion/memory-main.txt'),
-              parseMemory('target/criterion/memory-pr.txt'),
-            );
-
-            let body = `## Benchmark results (PR vs \`main\`)\n\`\`\`\n${table}\`\`\`\n`;
-            if (memTable) {
-              body += `\n## Memory (PR vs \`main\`)\n\`\`\`\n${memTable}\n\`\`\`\n`;
+            const legs = ['cli-cold', 'cli-warm', 'lsp-edit', 'lsp-queries'];
+            let body = '<!-- mir-bench -->\n## Benchmark results\n\n'
+              + `Base \`${sha('base')}\` vs head \`${sha('head')}\`, both measured on the same runner. `
+              + 'Shared runners are noisy: treat changes under ~5% as noise.\n';
+            for (const leg of legs) {
+              const dir = path.join('results', `bench-result-${leg}`);
+              const table = read(path.join(dir, 'critcmp.txt'));
+              const title = read(path.join(dir, 'title.txt')).trim() || leg;
+              body += `\n### ${title}\n`;
+              if (!table) {
+                body += '\n_No results: the run failed or was cancelled._\n';
+                continue;
+              }
+              body += `\n\`\`\`\n${table}\`\`\`\n`;
+              const mem = memoryTable(
+                parseMemory(read(path.join(dir, 'memory-base.txt'))),
+                parseMemory(read(path.join(dir, 'memory-head.txt'))),
+              );
+              if (mem) body += `\n${mem}\n`;
             }
 
-            await github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body,
-            });
+            await core.summary.addRaw(body).write();
+            fs.writeFileSync('report.md', body);
+
+      # Fork PRs get a read-only token; the step summary still has the report.
+      - name: Post or update comment
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@v9.0.0
+        with:
+          script: |
+            const body = require('fs').readFileSync('report.md', 'utf8');
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+            const existing = comments.find(c => c.body?.startsWith('<!-- mir-bench -->'));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }

@@ -1,0 +1,29 @@
+name: Laravel benchmark fixture
+description: Restore or download the pinned laravel/framework fixture used by the benchmarks.
+
+inputs:
+  version:
+    description: Laravel version; keep in sync with download-fixtures.sh.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Cache Laravel fixture
+      id: fixture-cache
+      uses: actions/cache@v6.1.0
+      with:
+        path: crates/mir-analyzer/benches/fixtures
+        key: laravel-fixture-${{ inputs.version }}
+
+    - name: Set up PHP
+      if: steps.fixture-cache.outputs.cache-hit != 'true'
+      uses: shivammathur/setup-php@2.37.2
+      with:
+        php-version: '8.3'
+        tools: composer
+
+    - name: Download and install benchmark fixture
+      if: steps.fixture-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: bash crates/mir-analyzer/benches/download-fixtures.sh

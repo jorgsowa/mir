@@ -1,6 +1,7 @@
-use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
+use criterion::{criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
 use mir_analyzer::{
-    discover_files, perf_fixture::PerfFixture, AnalysisSession, BatchOptions, PhpVersion,
+    discover_files, perf_fixture, perf_fixture::PerfFixture, AnalysisSession, BatchOptions,
+    PhpVersion,
 };
 use std::alloc::{GlobalAlloc, Layout};
 use std::path::{Path, PathBuf};
@@ -748,7 +749,21 @@ fn bench_file_removal_memory_probe(_c: &mut Criterion) {
     eprintln!("  retained (slots): {:>7.1} MiB\n", retained);
 }
 
-criterion_group!(
+/// `criterion_group!` that skips functions not listed in `MIR_BENCH_ONLY`.
+macro_rules! selected_group {
+    ($name:ident, $($target:ident),+ $(,)?) => {
+        fn $name() {
+            let mut criterion = Criterion::default().configure_from_args();
+            $(
+                if perf_fixture::bench_selected(stringify!($target)) {
+                    $target(&mut criterion);
+                }
+            )+
+        }
+    };
+}
+
+selected_group!(
     benches,
     bench_full_analysis,
     bench_reanalysis,

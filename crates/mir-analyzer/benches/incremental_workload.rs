@@ -14,11 +14,11 @@ use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering::Relaxed};
 use std::sync::Arc;
 use std::time::Duration;
 
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{criterion_main, BatchSize, Criterion};
 use mir_analyzer::cache::AnalysisCache;
 use mir_analyzer::{
-    discover_files, perf_fixture::PerfFixture, AnalysisSession, AnalysisSnapshot, BatchOptions,
-    FileAnalyzer, Name, PhpVersion,
+    discover_files, perf_fixture, perf_fixture::PerfFixture, AnalysisSession, AnalysisSnapshot,
+    BatchOptions, FileAnalyzer, Name, PhpVersion,
 };
 use mir_types::Name as MirSymbol;
 use tempfile::TempDir;
@@ -1285,7 +1285,21 @@ fn bench_file_analyzer_memory_probe(_c: &mut Criterion) {
     );
 }
 
-criterion_group!(
+/// `criterion_group!` that skips functions not listed in `MIR_BENCH_ONLY`.
+macro_rules! selected_group {
+    ($name:ident, $($target:ident),+ $(,)?) => {
+        fn $name() {
+            let mut criterion = Criterion::default().configure_from_args();
+            $(
+                if perf_fixture::bench_selected(stringify!($target)) {
+                    $target(&mut criterion);
+                }
+            )+
+        }
+    };
+}
+
+selected_group!(
     benches,
     bench_single_file_edit,
     bench_high_fanout_edit,

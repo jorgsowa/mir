@@ -160,6 +160,20 @@ impl PerfFixture {
     }
 }
 
+/// Whether the bench function `name` runs, per the comma-separated `MIR_BENCH_ONLY`
+/// list (unset runs all). Skips a whole function, including setup a Criterion
+/// filter would still execute.
+pub fn bench_selected(name: &str) -> bool {
+    is_selected(std::env::var("MIR_BENCH_ONLY").ok().as_deref(), name)
+}
+
+fn is_selected(only: Option<&str>, name: &str) -> bool {
+    match only.map(str::trim) {
+        None | Some("") => true,
+        Some(list) => list.split(',').any(|entry| entry.trim() == name),
+    }
+}
+
 fn detect_fixture_kind(root: &Path) -> Option<PerfFixtureKind> {
     if is_laravel_fixture(root) {
         return Some(PerfFixtureKind::Laravel);
@@ -228,6 +242,20 @@ mod tests {
             detect_fixture_kind(dir.path()),
             Some(PerfFixtureKind::Symfony)
         );
+    }
+
+    #[test]
+    fn bench_selection_matches_exact_names() {
+        assert!(is_selected(None, "bench_full_analysis"));
+        assert!(is_selected(Some(""), "bench_full_analysis"));
+        assert!(is_selected(
+            Some("bench_reanalysis, bench_full_analysis"),
+            "bench_full_analysis"
+        ));
+        assert!(!is_selected(
+            Some("bench_full_analysis"),
+            "bench_full_analysis_detailed"
+        ));
     }
 
     #[test]
