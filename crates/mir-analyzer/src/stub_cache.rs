@@ -52,8 +52,9 @@ const FORMAT_VERSION: u8 = 13;
 #[derive(Serialize, Deserialize)]
 struct Header {
     magic: u32,
-    /// Stable hash of `CARGO_PKG_VERSION`. Bumps with every mir release so
-    /// cached `StubSlice` data produced by an older version is rejected.
+    /// Hash of `CARGO_PKG_VERSION` and the build-time hash of the
+    /// stub-collection sources, so entries from a release or a local build
+    /// with different collection logic are rejected.
     mir_version: u64,
     format_version: u8,
     php_version: u8,
@@ -62,13 +63,15 @@ struct Header {
     content_hash: [u8; 32],
 }
 
-/// Precomputed at process start: hash of `CARGO_PKG_VERSION` so two mir
-/// builds with different versions never share cache entries.
 fn mir_version_hash() -> u64 {
     use std::sync::OnceLock;
     static HASH: OnceLock<u64> = OnceLock::new();
     *HASH.get_or_init(|| {
-        let digest = blake3::hash(env!("CARGO_PKG_VERSION").as_bytes());
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(env!("CARGO_PKG_VERSION").as_bytes());
+        hasher.update(&[0]);
+        hasher.update(env!("MIR_STUB_LOGIC_HASH").as_bytes());
+        let digest = hasher.finalize();
         let bytes = digest.as_bytes();
         u64::from_le_bytes([
             bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],

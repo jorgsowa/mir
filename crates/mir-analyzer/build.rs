@@ -92,6 +92,7 @@ fn main() {
 
     generate_builtin_fn_names(Path::new(&manifest_dir), Path::new(&out_dir));
     generate_stub_files(Path::new(&manifest_dir), Path::new(&out_dir));
+    emit_stub_logic_hash(Path::new(&manifest_dir));
 
     let fixtures_dir = Path::new(&manifest_dir).join("tests").join("fixtures");
     let out_path = Path::new(&out_dir).join("fixture_tests.rs");
@@ -442,6 +443,58 @@ fn generate_stub_files(manifest_dir: &Path, out_dir: &Path) {
 
     code.push_str("];\n");
     fs::write(&out_path, code).unwrap();
+}
+
+/// Sources whose logic shapes a cached `StubSlice`. Paths missing from a packaged
+/// crate (sibling crates, the workspace lockfile) are skipped.
+const STUB_LOGIC_SOURCES: &[&str] = &[
+    "src/collector",
+    "src/parser",
+    "src/attributes.rs",
+    "src/diagnostics.rs",
+    "src/php_version.rs",
+    "src/stub_cache.rs",
+    "src/util.rs",
+    "../mir-codebase/src",
+    "../mir-types/src",
+    "../../Cargo.lock",
+];
+
+/// Exposes `MIR_STUB_LOGIC_HASH` so the stub cache rejects entries written by
+/// a build whose collection logic differed, even at the same crate version.
+fn emit_stub_logic_hash(manifest_dir: &Path) {
+    let mut files = Vec::new();
+    for rel in STUB_LOGIC_SOURCES {
+        let path = manifest_dir.join(rel);
+        if path.exists() {
+            println!("cargo:rerun-if-changed={}", path.display());
+            collect_files(&path, &mut files);
+        }
+    }
+    files.sort();
+
+    let mut hasher = blake3::Hasher::new();
+    for file in &files {
+        let rel = file.strip_prefix(manifest_dir).unwrap_or(file);
+        hasher.update(rel.to_string_lossy().as_bytes());
+        hasher.update(&[0]);
+        hasher.update(&fs::read(file).unwrap());
+        hasher.update(&[0]);
+    }
+    println!(
+        "cargo:rustc-env=MIR_STUB_LOGIC_HASH={}",
+        &hasher.finalize().to_hex()[..16]
+    );
+}
+
+fn collect_files(path: &Path, out: &mut Vec<PathBuf>) {
+    if path.is_file() {
+        out.push(path.to_path_buf());
+        return;
+    }
+    for entry in fs::read_dir(path).unwrap().filter_map(|e| e.ok()) {
+        collect_files(&entry.path(), out);
+    }
 }
 
 /// Extract the body of `===description===` from a `.phpt` file, if present.

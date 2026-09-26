@@ -35,7 +35,8 @@ quick-xml     = "0.42"
 salsa         = { workspace = true }
 
 [build-dependencies]
-rayon = { workspace = true }
+rayon  = { workspace = true }
+blake3 = { workspace = true }
 
 [dev-dependencies]
 mir-issues     = { workspace = true }

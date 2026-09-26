@@ -824,8 +824,9 @@ fn file_refs(fixture: &ParsedFixture) -> Vec<(&str, &str)> {
 // ---------------------------------------------------------------------------
 
 /// Shared on-disk stub-slice cache dir, reused across fixtures, binaries, and
-/// runs. Keyed by (path, content_hash, php_version, mir_version), so it
-/// self-invalidates and stale entries are never read.
+/// runs. Keyed by (path, content_hash, php_version, mir_version) where
+/// mir_version covers the stub-collection sources, so it self-invalidates and
+/// stale entries are never read.
 fn fixture_stub_cache_dir() -> std::path::PathBuf {
     std::env::temp_dir().join("mir-fixture-stub-cache")
 }
