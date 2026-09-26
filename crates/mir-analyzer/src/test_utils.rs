@@ -82,6 +82,33 @@
 //! `#[ignore]` at compile time (via `build.rs`), so it shows up as `ignored`
 //! rather than `ok` or `FAILED` in test output.
 //!
+//! **Editor query** (`===cursor===`, must appear before file sections):
+//! ```text
+//! ===cursor===
+//! references include_declaration
+//! ===file===
+//! <?php
+//! function greet(): void {}
+//! gr<CURSOR>eet();
+//! ===expect===
+//! test.php@2:9-2:14
+//! test.php@3:0-3:5
+//! ```
+//!
+//! The files are analyzed as a project, then the query runs through the
+//! session's cursor API at the `<CURSOR>` marker, which is removed from the
+//! source first and must appear exactly once across all files. Queries:
+//!
+//! - `hover` — `type: T`, then one `docstring: …` line per docstring line
+//!   and `definition: LOCATION` when present.
+//! - `definition` — the declaration's `LOCATION`.
+//! - `references [include_declaration] [use_imports]` — one `LOCATION` per
+//!   reference, sorted, searched across every non-stub PHP file.
+//!
+//! A `LOCATION` is `path@line:col-line_end:col_end`, with `path` relative to
+//! the fixture root (stub declarations keep their `stubs/…` path). A failed
+//! lookup renders as `error: NotFound` or `error: NoSourceLocation`.
+//!
 //! # Validation rules
 //!
 //! - `===file===` (bare, no name) must appear **at most once** per fixture.
@@ -104,11 +131,14 @@
 //! - `stub_file` and `stub_dir` accept a relative path (matching a `===file:===` name).
 //! - `===description===` must appear **at most once** and before any file section.
 //! - `===ignore===` must appear **at most once** and before any file section.
+//! - `===cursor===` must appear **at most once** and before any file section,
+//!   and only together with a `<CURSOR>` marker; `suppress` is rejected there.
 //!
 //! # Expect format
 //!
 //! Single-file fixtures use `KindName@line:col: message`.
 //! Multi-file fixtures use `FileName.php: KindName@line:col: message`.
+//! `===cursor===` fixtures use the query output described above.
 //!
 //! Location assertions (`@line:col`) are **required**. Both line and column must be specified
 //! and must match for the issue to be considered a match.
@@ -120,7 +150,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use crate::{batch::BatchOptions, session::AnalysisSession, PhpVersion};
+use crate::{batch::BatchOptions, session::AnalysisSession, PhpVersion, ReferenceIncludes};
 use mir_issues::{Issue, IssueKind};
 use parking_lot::Mutex;
 
@@ -188,7 +218,29 @@ pub(crate) struct ParsedFixture {
     pub is_multi: bool,
     /// Optional human-readable description from `===description===`.
     pub description: Option<String>,
+    /// Set for `===cursor===` fixtures, whose `expected` issue list stays empty.
+    cursor: Option<Cursor>,
     config: FixtureConfig,
+}
+
+/// Editor query a `===cursor===` fixture runs at its `<CURSOR>` marker.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CursorQuery {
+    Hover,
+    Definition,
+    References {
+        include_declaration: bool,
+        includes: ReferenceIncludes,
+    },
+}
+
+struct Cursor {
+    query: CursorQuery,
+    /// Index into [`ParsedFixture::files`] of the file holding the marker.
+    file: usize,
+    /// Byte offset of the marker in that file, after the marker is removed.
+    offset: u32,
+    expected: Vec<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -201,6 +253,8 @@ const CONFIG_MARKER: &str = "===config===";
 const EXPECT_MARKER: &str = "===expect===";
 const DESCRIPTION_MARKER: &str = "===description===";
 const IGNORE_MARKER: &str = "===ignore===";
+const CURSOR_MARKER: &str = "===cursor===";
+const CURSOR: &str = "<CURSOR>";
 
 /// Parse a `.phpt` fixture file.
 pub(crate) fn parse_phpt(content: &str, path: &str) -> ParsedFixture {
@@ -214,65 +268,31 @@ pub(crate) fn parse_phpt(content: &str, path: &str) -> ParsedFixture {
     let header_region = &content[..expect_pos];
     let expect_content = content[expect_pos + EXPECT_MARKER.len()..].trim();
 
-    // --- Validate config section ---
-    let config_count = count_occurrences(header_region, CONFIG_MARKER);
-    assert!(
-        config_count <= 1,
-        "fixture {path}: ===config=== must appear at most once, found {config_count} times"
-    );
-
-    // --- Validate description section ---
-    let description_count = count_occurrences(header_region, DESCRIPTION_MARKER);
-    assert!(
-        description_count <= 1,
-        "fixture {path}: ===description=== must appear at most once, found {description_count} times"
-    );
-
-    // --- Validate ignore marker ---
-    let ignore_count = count_occurrences(header_region, IGNORE_MARKER);
-    assert!(
-        ignore_count <= 1,
-        "fixture {path}: ===ignore=== must appear at most once, found {ignore_count} times"
-    );
+    // --- Validate header sections ---
+    // They must appear before any file marker so their text is never silently
+    // included in the PHP source of the first file.
+    for marker in [
+        CONFIG_MARKER,
+        DESCRIPTION_MARKER,
+        IGNORE_MARKER,
+        CURSOR_MARKER,
+    ] {
+        let count = count_occurrences(header_region, marker);
+        assert!(
+            count <= 1,
+            "fixture {path}: {marker} must appear at most once, found {count} times"
+        );
+        if let (Some(pos), Some(first_file_pos)) =
+            (header_region.find(marker), header_region.find("===file"))
+        {
+            assert!(
+                pos < first_file_pos,
+                "fixture {path}: {marker} must appear before the first ===file=== / ===file:name=== marker"
+            );
+        }
+    }
 
     // --- Count and validate file markers ---
-    // Config, description, and ignore must appear before any file marker so their
-    // text is never silently included in the PHP source of the first file.
-    if config_count == 1 {
-        if let (Some(cfg_pos), Some(first_file_pos)) = (
-            header_region.find(CONFIG_MARKER),
-            header_region.find("===file"),
-        ) {
-            assert!(
-                cfg_pos < first_file_pos,
-                "fixture {path}: ===config=== must appear before the first ===file=== / ===file:name=== marker"
-            );
-        }
-    }
-    if description_count == 1 {
-        if let (Some(desc_pos), Some(first_file_pos)) = (
-            header_region.find(DESCRIPTION_MARKER),
-            header_region.find("===file"),
-        ) {
-            assert!(
-                desc_pos < first_file_pos,
-                "fixture {path}: ===description=== must appear before the first ===file=== / ===file:name=== marker"
-            );
-        }
-    }
-    if ignore_count == 1 {
-        if let (Some(ignore_pos), Some(first_file_pos)) = (
-            header_region.find(IGNORE_MARKER),
-            header_region.find("===file"),
-        ) {
-            assert!(
-                ignore_pos < first_file_pos,
-                "fixture {path}: ===ignore=== must appear before the first ===file=== / ===file:name=== marker"
-            );
-        }
-    }
-
-    // ---
     let bare_count = count_occurrences(header_region, BARE_FILE);
     // FILE_PREFIX ("===file:") won't match BARE_FILE ("===file===") since after
     // "file" one has ':' and the other '='.
@@ -294,7 +314,7 @@ pub(crate) fn parse_phpt(content: &str, path: &str) -> ParsedFixture {
     let is_multi = named_count > 0;
 
     // --- Extract file content(s) ---
-    let files = if is_multi {
+    let mut files = if is_multi {
         extract_named_files(header_region, path)
     } else {
         let bare_pos = header_region.find(BARE_FILE).unwrap();
@@ -304,55 +324,121 @@ pub(crate) fn parse_phpt(content: &str, path: &str) -> ParsedFixture {
         vec![("test.php".to_string(), src)]
     };
 
-    // --- Parse config section ---
-    let config = if config_count == 1 {
-        let cfg_pos = header_region.find(CONFIG_MARKER).unwrap();
-        let after_cfg = cfg_pos + CONFIG_MARKER.len();
-        // Config body ends at the first ===file marker (bare or named).
-        let cfg_end = header_region[after_cfg..]
-            .find("===file")
-            .map(|r| after_cfg + r)
-            .unwrap_or(header_region.len());
-        let cfg_text = header_region[after_cfg..cfg_end].trim();
-        parse_config_section(cfg_text, path)
-    } else {
-        FixtureConfig::default()
-    };
+    let config = section_body(header_region, CONFIG_MARKER)
+        .map(|text| parse_config_section(text, path))
+        .unwrap_or_default();
+    let description = section_body(header_region, DESCRIPTION_MARKER).map(str::to_string);
 
-    // --- Parse description section ---
-    let description = if description_count == 1 {
-        let desc_pos = header_region.find(DESCRIPTION_MARKER).unwrap();
-        let after_desc = desc_pos + DESCRIPTION_MARKER.len();
-        // Description body ends at the next section marker.
-        let desc_end = header_region[after_desc..]
-            .find("===")
-            .map(|r| after_desc + r)
-            .unwrap_or(header_region.len());
-        Some(header_region[after_desc..desc_end].trim().to_string())
-    } else {
-        None
-    };
-
-    // --- Parse expect lines ---
-    let expected = expect_content
+    let expect_lines = expect_content
         .lines()
         .map(str::trim)
-        .filter(|l| !l.is_empty() && !l.starts_with('#'))
-        .map(|l| {
-            if is_multi {
-                parse_multi_expect_line(l, path)
-            } else {
-                parse_single_expect_line(l, path)
-            }
-        })
-        .collect();
+        .filter(|l| !l.is_empty() && !l.starts_with('#'));
+
+    let marker = take_cursor_marker(&mut files, path);
+    let (expected, cursor) = match (section_body(header_region, CURSOR_MARKER), marker) {
+        (Some(query), Some((file, offset))) => {
+            assert!(
+                config.suppressed_issue_kinds.is_none(),
+                "fixture {path}: suppress has no effect in a ===cursor=== fixture"
+            );
+            let cursor = Cursor {
+                query: parse_cursor_query(query, path),
+                file,
+                offset,
+                expected: expect_lines.map(str::to_string).collect(),
+            };
+            (Vec::new(), Some(cursor))
+        }
+        (Some(_), None) => panic!("fixture {path}: ===cursor=== needs a {CURSOR} marker"),
+        (None, Some(_)) => panic!("fixture {path}: {CURSOR} marker needs a ===cursor=== section"),
+        (None, None) => {
+            let expected = expect_lines
+                .map(|l| {
+                    if is_multi {
+                        parse_multi_expect_line(l, path)
+                    } else {
+                        parse_single_expect_line(l, path)
+                    }
+                })
+                .collect();
+            (expected, None)
+        }
+    };
 
     ParsedFixture {
         files,
         expected,
         is_multi,
         description,
+        cursor,
         config,
+    }
+}
+
+/// Trimmed text between `marker` and the next section marker.
+fn section_body<'a>(region: &'a str, marker: &str) -> Option<&'a str> {
+    let start = region.find(marker)? + marker.len();
+    let end = region[start..]
+        .find("\n===")
+        .map_or(region.len(), |r| start + r);
+    Some(region[start..end].trim())
+}
+
+/// Remove the `<CURSOR>` marker, returning its file index and byte offset.
+fn take_cursor_marker(files: &mut [(String, String)], path: &str) -> Option<(usize, u32)> {
+    let mut found = None;
+    for (index, (_, src)) in files.iter_mut().enumerate() {
+        let Some(offset) = src.find(CURSOR) else {
+            continue;
+        };
+        assert!(
+            found.is_none() && count_occurrences(src, CURSOR) == 1,
+            "fixture {path}: {CURSOR} must appear exactly once across all files"
+        );
+        src.replace_range(offset..offset + CURSOR.len(), "");
+        found = Some((index, offset as u32));
+    }
+    found
+}
+
+fn parse_cursor_query(text: &str, path: &str) -> CursorQuery {
+    let mut words = text.split_whitespace();
+    let query = words.next().unwrap_or_else(|| {
+        panic!("fixture {path}: ===cursor=== needs a query — valid queries: hover, definition, references")
+    });
+    let options: Vec<&str> = words.collect();
+    match query {
+        "hover" | "definition" => {
+            assert!(
+                options.is_empty(),
+                "fixture {path}: {query} takes no options, found {options:?}"
+            );
+            if query == "hover" {
+                CursorQuery::Hover
+            } else {
+                CursorQuery::Definition
+            }
+        }
+        "references" => {
+            let mut include_declaration = false;
+            let mut includes = ReferenceIncludes::Plain;
+            for option in options {
+                match option {
+                    "include_declaration" => include_declaration = true,
+                    "use_imports" => includes = ReferenceIncludes::PlainAndUseImports,
+                    other => panic!(
+                        "fixture {path}: unknown references option {other:?} — valid options: include_declaration, use_imports"
+                    ),
+                }
+            }
+            CursorQuery::References {
+                include_declaration,
+                includes,
+            }
+        }
+        other => panic!(
+            "fixture {path}: unknown ===cursor=== query {other:?} — valid queries: hover, definition, references"
+        ),
     }
 }
 
@@ -574,7 +660,7 @@ fn count_occurrences(haystack: &str, needle: &str) -> usize {
 // Fixture runner
 // ---------------------------------------------------------------------------
 
-/// Run a `.phpt` fixture file and assert issues match the `===expect===` section.
+/// Run a `.phpt` fixture file and assert its output matches the `===expect===` section.
 ///
 /// Set `UPDATE_FIXTURES=1` to rewrite the expect section with actual output.
 pub fn run_fixture(path: &str) {
@@ -582,13 +668,27 @@ pub fn run_fixture(path: &str) {
         .unwrap_or_else(|e| panic!("failed to read fixture {path}: {e}"));
 
     let mut fixture = parse_phpt(&content, path);
+    match fixture.cursor.take() {
+        Some(cursor) => run_cursor_fixture(path, &content, &fixture, &cursor),
+        None => run_diagnostic_fixture(path, &content, fixture),
+    }
+}
+
+const UPDATE_HINT: &str =
+    "UPDATE_FIXTURES=1 cargo test -p mir-analyzer --test fixtures <fixture name>";
+
+fn update_requested() -> bool {
+    std::env::var("UPDATE_FIXTURES").as_deref() == Ok("1")
+}
+
+fn run_diagnostic_fixture(path: &str, content: &str, mut fixture: ParsedFixture) {
     // Auto-suppression: the dead-code group (UnusedMethod/Property/Function) is
     // suppressed by default so authors don't have to sprinkle boilerplate
     // `suppress=` lines on every fixture whose example code happens to declare
     // an uncalled global function. This default is applied *additively* — it
     // merges with any explicit `suppress=Foo,Bar` rather than being skipped when
     // one is present — and is held back in two cases, so the `dead_code_enabled`
-    // path filter below keeps its semantics:
+    // path filter in `run_analyzer` keeps its semantics:
     //   1. the fixture expects a dead-code diagnostic, or
     //   2. the fixture sets an explicit *empty* `suppress=`, which is the marker
     //      for "report everything, including dead code" (used by the negative
@@ -618,19 +718,105 @@ pub fn run_fixture(path: &str) {
             }
         }
     }
-    let file_refs: Vec<(&str, &str)> = fixture
-        .files
-        .iter()
-        .map(|(n, s)| (n.as_str(), s.as_str()))
-        .collect();
-    let actual = run_analyzer(&file_refs, &fixture.config);
+    let actual = run_analyzer(&file_refs(&fixture), &fixture.config);
 
-    if std::env::var("UPDATE_FIXTURES").as_deref() == Ok("1") {
-        rewrite_fixture(path, &content, &actual, fixture.is_multi);
+    if update_requested() {
+        rewrite_expect_section(path, content, &fmt_expect_lines(&actual, fixture.is_multi));
         return;
     }
 
     assert_fixture(path, &fixture, &actual);
+}
+
+fn run_cursor_fixture(path: &str, content: &str, fixture: &ParsedFixture, cursor: &Cursor) {
+    let actual = with_fixture_session(&file_refs(fixture), &fixture.config, |session, ws| {
+        let file = ws.dir.join(&fixture.files[cursor.file].0);
+        // An editor analyzes the file it has open even when PSR-4 discovery
+        // would otherwise leave it unloaded.
+        let mut analyzed = ws.analyzed.clone();
+        if !analyzed.contains(&file) {
+            analyzed.push(file.clone());
+        }
+        session.analyze_paths(&analyzed, &BatchOptions::new().without_symbols());
+        run_cursor_query(session, ws, &file.to_string_lossy(), cursor)
+    });
+
+    if update_requested() {
+        rewrite_expect_section(path, content, &actual);
+        return;
+    }
+
+    if actual != cursor.expected {
+        let desc = fixture
+            .description
+            .as_deref()
+            .map(|d| format!("\n\nDescription: {d}"))
+            .unwrap_or_default();
+        panic!(
+            "fixture {path} FAILED:{desc}\n\nExpected:\n{}\n\nActual:\n{}\n\nTo update: {UPDATE_HINT}",
+            fmt_lines(&cursor.expected),
+            fmt_lines(&actual),
+        );
+    }
+}
+
+fn run_cursor_query(
+    session: &mut AnalysisSession,
+    ws: &FixtureWorkspace,
+    file: &str,
+    cursor: &Cursor,
+) -> Vec<String> {
+    let lookup_error = |e: crate::SymbolLookupError| vec![format!("error: {e:?}")];
+    match cursor.query {
+        CursorQuery::Hover => match session.hover_at(file, cursor.offset) {
+            Ok(hover) => {
+                let mut lines = vec![format!("type: {}", hover.ty)];
+                if let Some(doc) = &hover.docstring {
+                    lines.extend(
+                        doc.lines()
+                            .map(|l| format!("docstring: {}", l.trim()).trim_end().to_string()),
+                    );
+                }
+                if let Some(def) = &hover.definition {
+                    lines.push(format!("definition: {}", ws.fmt_location(def)));
+                }
+                lines
+            }
+            Err(e) => lookup_error(e),
+        },
+        CursorQuery::Definition => match session.definition_at(file, cursor.offset) {
+            Ok(def) => vec![ws.fmt_location(&def)],
+            Err(e) => lookup_error(e),
+        },
+        CursorQuery::References {
+            include_declaration,
+            includes,
+        } => {
+            let files: Vec<Arc<str>> = ws
+                .project_files
+                .iter()
+                .map(|p| Arc::from(p.to_string_lossy().as_ref()))
+                .collect();
+            match session.references_at(file, cursor.offset, &files, include_declaration, includes)
+            {
+                Ok(mut refs) => {
+                    refs.sort_by_key(|(file, range)| (file.clone(), range.start, range.end));
+                    refs.iter()
+                        .map(|(file, range)| ws.fmt_range(file, range))
+                        .collect()
+                }
+                Err(e) => lookup_error(e),
+            }
+        }
+    }
+}
+
+fn file_refs(fixture: &ParsedFixture) -> Vec<(&str, &str)> {
+    fixture
+        .files
+        .iter()
+        .map(|(n, s)| (n.as_str(), s.as_str()))
+        .collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -672,7 +858,55 @@ fn return_base_session(version: PhpVersion, session: AnalysisSession) {
     SESSION_POOL.lock().push((version, session));
 }
 
-fn run_analyzer(files: &[(&str, &str)], config: &FixtureConfig) -> Vec<Issue> {
+/// A fixture's files written to a temp directory.
+struct FixtureWorkspace {
+    dir: PathBuf,
+    /// PHP files outside the configured stubs.
+    project_files: Vec<PathBuf>,
+    /// Project files to pass to `analyze_paths`; PSR-4-mapped ones are left
+    /// for lazy discovery.
+    analyzed: Vec<PathBuf>,
+}
+
+impl FixtureWorkspace {
+    /// `file` relative to the fixture root; paths outside it (stubs) as-is.
+    fn display_path(&self, file: &str) -> String {
+        let dir = self.dir.to_string_lossy();
+        file.strip_prefix(dir.as_ref())
+            .map_or(file, |rel| rel.trim_start_matches(['/', '\\']))
+            .replace('\\', "/")
+    }
+
+    fn fmt_location(&self, loc: &mir_types::Location) -> String {
+        format!(
+            "{}@{}:{}-{}:{}",
+            self.display_path(&loc.file),
+            loc.line,
+            loc.col_start,
+            loc.line_end,
+            loc.col_end
+        )
+    }
+
+    fn fmt_range(&self, file: &str, range: &crate::Range) -> String {
+        format!(
+            "{}@{}:{}-{}:{}",
+            self.display_path(file),
+            range.start.line,
+            range.start.column,
+            range.end.line,
+            range.end.column
+        )
+    }
+}
+
+/// Write `files` to a fresh temp directory, then call `run` with a session
+/// configured for them (PHP version, user stubs, PSR-4 map).
+fn with_fixture_session<R>(
+    files: &[(&str, &str)],
+    config: &FixtureConfig,
+    run: impl FnOnce(&mut AnalysisSession, &FixtureWorkspace) -> R,
+) -> R {
     // The pid disambiguates concurrent nextest processes: COUNTER is
     // process-local and resets to 0 in each, so without it they'd all share
     // `mir_fixture_0/` and clobber each other's `test.php`.
@@ -694,14 +928,6 @@ fn run_analyzer(files: &[(&str, &str)], config: &FixtureConfig) -> Vec<Issue> {
         })
         .collect();
 
-    let tmp_dir_str = tmp_dir.to_string_lossy().into_owned();
-
-    // Build BatchOptions from the fixture's suppression config.
-    let mut opts = BatchOptions::new().without_symbols();
-    if let Some(explicit) = &config.suppressed_issue_kinds {
-        opts.suppressed_issue_kinds = explicit.clone();
-    }
-
     // Resolve the requested PHP version (defaulting to LATEST), user stubs, and
     // PSR-4/composer mapping, plus the set of files to analyze. Session
     // construction is deferred until after we know whether this fixture can
@@ -711,41 +937,33 @@ fn run_analyzer(files: &[(&str, &str)], config: &FixtureConfig) -> Vec<Issue> {
     let stub_files: Vec<PathBuf> = config.stub_files.iter().map(|f| tmp_dir.join(f)).collect();
     let stub_dirs: Vec<PathBuf> = config.stub_dirs.iter().map(|d| tmp_dir.join(d)).collect();
     let stub_file_set: HashSet<PathBuf> = stub_files.iter().cloned().collect();
-    let is_stub = |p: &PathBuf| -> bool {
-        stub_file_set.contains(p) || stub_dirs.iter().any(|d| p.starts_with(d))
-    };
+    let project_files: Vec<PathBuf> = php_files_only(&paths)
+        .into_iter()
+        .filter(|p| !stub_file_set.contains(p) && !stub_dirs.iter().any(|d| p.starts_with(d)))
+        .collect();
 
     let has_composer = files.iter().any(|(name, _)| *name == "composer.json");
-    let mut psr4: Option<Arc<crate::composer::Psr4Map>> = None;
-    let explicit_paths: Vec<PathBuf> = if has_composer {
-        match crate::composer::Psr4Map::from_composer(&tmp_dir) {
-            Ok(map) => {
-                let map = Arc::new(map);
-                let psr4_files: HashSet<PathBuf> = map.project_files().into_iter().collect();
-                let explicit: Vec<PathBuf> = paths
-                    .iter()
-                    .filter(|p| p.extension().map(|e| e == "php").unwrap_or(false))
-                    .filter(|p| !psr4_files.contains(*p) && !is_stub(p))
-                    .cloned()
-                    .collect();
-                psr4 = Some(map);
-                explicit
-            }
-            Err(_) => php_files_only(&paths)
-                .into_iter()
-                .filter(|p| !is_stub(p))
-                .collect(),
+    let psr4 = has_composer
+        .then(|| crate::composer::Psr4Map::from_composer(&tmp_dir).ok())
+        .flatten()
+        .map(Arc::new);
+    let analyzed: Vec<PathBuf> = match &psr4 {
+        Some(map) => {
+            let psr4_files: HashSet<PathBuf> = map.project_files().into_iter().collect();
+            project_files
+                .iter()
+                .filter(|p| !psr4_files.contains(*p))
+                .cloned()
+                .collect()
         }
-    } else {
-        php_files_only(&paths)
-            .into_iter()
-            .filter(|p| !is_stub(p))
-            .collect()
+        None => project_files.clone(),
     };
 
-    let dead_code_enabled = crate::batch::dead_code_issue_kinds()
-        .iter()
-        .any(|k| !opts.suppressed_issue_kinds.contains(*k));
+    let ws = FixtureWorkspace {
+        dir: tmp_dir,
+        project_files,
+        analyzed,
+    };
 
     // The ~96% of fixtures with no user stubs and no PSR-4/composer need nothing
     // in their session beyond the stdlib stubs, which are identical across all
@@ -758,8 +976,8 @@ fn run_analyzer(files: &[(&str, &str)], config: &FixtureConfig) -> Vec<Issue> {
 
     let result = if reusable {
         let mut session = checkout_base_session(version);
-        let result = session.analyze_paths(&explicit_paths, &opts);
-        for p in &explicit_paths {
+        let result = run(&mut session, &ws);
+        for p in &ws.analyzed {
             session.invalidate_file(&p.to_string_lossy());
         }
         return_base_session(version, session);
@@ -770,26 +988,41 @@ fn run_analyzer(files: &[(&str, &str)], config: &FixtureConfig) -> Vec<Issue> {
             session = session.with_cache_dir(&fixture_stub_cache_dir());
         }
         if !stub_files.is_empty() || !stub_dirs.is_empty() {
-            session = session.with_user_stubs(stub_files.clone(), stub_dirs.clone());
+            session = session.with_user_stubs(stub_files, stub_dirs);
         }
         if let Some(map) = psr4 {
             session = session.with_psr4(map);
         }
-        session.analyze_paths(&explicit_paths, &opts)
+        run(&mut session, &ws)
     };
-    std::fs::remove_dir_all(&tmp_dir).ok();
-
+    std::fs::remove_dir_all(&ws.dir).ok();
     result
-        .issues
-        .into_iter()
-        .filter(|i| !i.suppressed)
-        // When dead-code analysis runs, the analyzer walks the entire
-        // codebase including stubs. Filter to issues from the temp directory
-        // only so stub-side false positives don't pollute fixture output.
-        .filter(|i| {
-            !dead_code_enabled || i.location.file.as_ref().starts_with(tmp_dir_str.as_str())
-        })
-        .collect()
+}
+
+fn run_analyzer(files: &[(&str, &str)], config: &FixtureConfig) -> Vec<Issue> {
+    let mut opts = BatchOptions::new().without_symbols();
+    if let Some(explicit) = &config.suppressed_issue_kinds {
+        opts.suppressed_issue_kinds = explicit.clone();
+    }
+    let dead_code_enabled = crate::batch::dead_code_issue_kinds()
+        .iter()
+        .any(|k| !opts.suppressed_issue_kinds.contains(*k));
+
+    with_fixture_session(files, config, |session, ws| {
+        let tmp_dir_str = ws.dir.to_string_lossy();
+        session
+            .analyze_paths(&ws.analyzed, &opts)
+            .issues
+            .into_iter()
+            .filter(|i| !i.suppressed)
+            // When dead-code analysis runs, the analyzer walks the entire
+            // codebase including stubs. Filter to issues from the temp directory
+            // only so stub-side false positives don't pollute fixture output.
+            .filter(|i| {
+                !dead_code_enabled || i.location.file.as_ref().starts_with(tmp_dir_str.as_ref())
+            })
+            .collect()
+    })
 }
 
 fn php_files_only(paths: &[PathBuf]) -> Vec<PathBuf> {
@@ -838,7 +1071,7 @@ fn assert_fixture(path: &str, fixture: &ParsedFixture, actual: &[Issue]) {
             .map(|d| format!("\n\nDescription: {d}"))
             .unwrap_or_default();
         panic!(
-            "fixture {path} FAILED:{desc}\n{}\n\nTo fix: ensure all expected issues have @line:col-line_end:col_end locations, then run: UPDATE_FIXTURES=1 cargo test --lib fixture\n\nAll actual issues:\n{}",
+            "fixture {path} FAILED:{desc}\n{}\n\nTo fix: ensure all expected issues have @line:col-line_end:col_end locations, then run: {UPDATE_HINT}\n\nAll actual issues:\n{}",
             failures.join("\n"),
             fmt_issues(actual, fixture.is_multi)
         );
@@ -888,16 +1121,8 @@ fn issue_matches(actual: &Issue, expected: &ExpectedIssue) -> bool {
 // UPDATE_FIXTURES rewrite
 // ---------------------------------------------------------------------------
 
-fn rewrite_fixture(path: &str, content: &str, actual: &[Issue], is_multi: bool) {
-    // Preserve everything before ===expect=== and rewrite only the expect section.
-    let exp_pos = content
-        .find(EXPECT_MARKER)
-        .expect("fixture missing ===expect===");
-
-    let mut out = content[..exp_pos].to_string();
-    out.push_str(EXPECT_MARKER);
-    out.push('\n');
-
+/// Sorted `===expect===` lines for `actual`.
+fn fmt_expect_lines(actual: &[Issue], is_multi: bool) -> Vec<String> {
     let mut sorted: Vec<&Issue> = actual.iter().collect();
     if is_multi {
         sorted.sort_by_key(|i| {
@@ -912,35 +1137,27 @@ fn rewrite_fixture(path: &str, content: &str, actual: &[Issue], is_multi: bool) 
                 i.kind.name(),
             )
         });
-        for issue in sorted {
-            let basename = Path::new(issue.location.file.as_ref())
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_default();
-            out.push_str(&format!(
-                "{}: {}@{}:{}-{}:{}: {}\n",
-                basename,
-                issue.kind.name(),
-                issue.location.line,
-                issue.location.col_start,
-                issue.location.line_end,
-                issue.location.col_end,
-                issue.kind.message()
-            ));
-        }
     } else {
         sorted.sort_by_key(|i| (i.location.line, i.location.col_start, i.kind.name()));
-        for issue in sorted {
-            out.push_str(&format!(
-                "{}@{}:{}-{}:{}: {}\n",
-                issue.kind.name(),
-                issue.location.line,
-                issue.location.col_start,
-                issue.location.line_end,
-                issue.location.col_end,
-                issue.kind.message()
-            ));
-        }
+    }
+    sorted
+        .into_iter()
+        .map(|i| fmt_actual(i, is_multi))
+        .collect()
+}
+
+/// Rewrite only the `===expect===` section, preserving everything before it.
+fn rewrite_expect_section(path: &str, content: &str, lines: &[String]) {
+    let exp_pos = content
+        .find(EXPECT_MARKER)
+        .expect("fixture missing ===expect===");
+
+    let mut out = content[..exp_pos].to_string();
+    out.push_str(EXPECT_MARKER);
+    out.push('\n');
+    for line in lines {
+        out.push_str(line);
+        out.push('\n');
     }
 
     std::fs::write(path, &out).unwrap_or_else(|e| panic!("failed to write fixture {path}: {e}"));
@@ -1055,13 +1272,24 @@ fn fmt_issues(issues: &[Issue], is_multi: bool) -> String {
         .join("\n")
 }
 
+fn fmt_lines(lines: &[String]) -> String {
+    if lines.is_empty() {
+        return "  (none)".to_string();
+    }
+    lines
+        .iter()
+        .map(|l| format!("  {l}"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 // ---------------------------------------------------------------------------
 // Fixture parser validation tests
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod parser_validation {
-    use super::{parse_phpt, ParsedFixture};
+    use super::{parse_phpt, CursorQuery, ParsedFixture, ReferenceIncludes};
 
     fn p(content: &str) -> ParsedFixture {
         parse_phpt(content, "<test>")
@@ -1142,5 +1370,81 @@ mod parser_validation {
     fn valid_ignore_is_accepted() {
         let f = p("===ignore===\n===file===\n<?php\n===expect===\n");
         assert!(f.description.is_none());
+    }
+
+    #[test]
+    fn cursor_marker_is_removed_and_located() {
+        let f = p("===cursor===\nreferences include_declaration use_imports\n\
+                   ===file:a.php===\n<?php\n===file:b.php===\n<?php f<CURSOR>oo();\n\
+                   ===expect===\nb.php@1:6-1:9\n");
+        let cursor = f.cursor.expect("cursor fixture");
+        assert_eq!(
+            cursor.query,
+            CursorQuery::References {
+                include_declaration: true,
+                includes: ReferenceIncludes::PlainAndUseImports,
+            }
+        );
+        assert_eq!((cursor.file, cursor.offset), (1, 7));
+        assert_eq!(f.files[1].1, "<?php foo();");
+        assert_eq!(cursor.expected, ["b.php@1:6-1:9"]);
+        assert!(f.expected.is_empty());
+    }
+
+    #[test]
+    fn config_before_cursor_section_is_accepted() {
+        let f = p("===config===\nphp_version=8.1\n===cursor===\nhover\n\
+                   ===file===\n<?php f<CURSOR>();\n===expect===\n");
+        assert_eq!(f.cursor.map(|c| c.query), Some(CursorQuery::Hover));
+    }
+
+    #[test]
+    #[should_panic(expected = "===cursor=== needs a <CURSOR> marker")]
+    fn cursor_section_without_marker() {
+        p("===cursor===\nhover\n===file===\n<?php\n===expect===\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "<CURSOR> marker needs a ===cursor=== section")]
+    fn marker_without_cursor_section() {
+        p("===file===\n<?php f<CURSOR>();\n===expect===\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "<CURSOR> must appear exactly once across all files")]
+    fn marker_in_two_files() {
+        p("===cursor===\nhover\n===file:a.php===\n<?php <CURSOR>\n\
+           ===file:b.php===\n<?php <CURSOR>\n===expect===\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "unknown ===cursor=== query")]
+    fn unknown_cursor_query() {
+        p("===cursor===\ncompletion\n===file===\n<?php <CURSOR>\n===expect===\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "unknown references option")]
+    fn unknown_references_option() {
+        p("===cursor===\nreferences all\n===file===\n<?php <CURSOR>\n===expect===\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "hover takes no options")]
+    fn hover_with_options() {
+        p("===cursor===\nhover include_declaration\n===file===\n<?php <CURSOR>\n===expect===\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "suppress has no effect in a ===cursor=== fixture")]
+    fn suppress_in_cursor_fixture() {
+        p("===config===\nsuppress=Foo\n===cursor===\nhover\n\
+           ===file===\n<?php <CURSOR>\n===expect===\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "===cursor=== must appear before the first ===file===")]
+    fn cursor_after_file_marker() {
+        p("===file===\n<?php <CURSOR>\n===cursor===\nhover\n===expect===\n");
     }
 }

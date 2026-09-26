@@ -48,24 +48,45 @@ Fixture files live under `crates/mir-analyzer/tests/fixtures/<category>/`.
 Each file is a `.phpt` that contains PHP source followed by expected issues:
 
 ```
-===source===
+===file===
 <?php
 
 function foo(): int {
     return "oops";
 }
 ===expect===
-InvalidReturnType: function foo expects return type int, string provided
+InvalidReturnType@4:4-4:18: Return type '"oops"' is not compatible with declared 'int'
 ```
 
-The `===expect===` section lists expected issues, one per line. Each line is
-formatted as `IssueKind: message`. The test passes when the analyzer emits
-exactly those issues. An empty `===expect===` section asserts the snippet is clean.
+The `===expect===` section lists expected issues, one per line, formatted as
+`IssueKind@line:col-line_end:col_end: message`. The test passes when the
+analyzer emits exactly those issues. An empty `===expect===` section asserts
+the snippet is clean.
 
-Run only the fixture tests:
+Editor features (hover, go-to-definition, find-references) are tested the same
+way under `tests/fixtures/by-query/`: a `===cursor===` section names the query,
+a `<CURSOR>` marker in the source sets the position, and `===expect===` holds
+the result:
+
+```
+===cursor===
+definition
+===file===
+<?php
+function greet(): string { return 'hi'; }
+echo gr<CURSOR>eet();
+===expect===
+test.php@2:0-2:41
+```
+
+The full format is documented in `crates/mir-analyzer/src/test_utils.rs`.
+
+Run only the fixture tests, or regenerate one fixture's `===expect===` section
+from the current output (review the diff before committing it):
 
 ```bash
-cargo test -p mir-analyzer
+cargo test -p mir-analyzer --test fixtures
+UPDATE_FIXTURES=1 cargo test -p mir-analyzer --test fixtures <fixture name>
 ```
 
 ## Built-in stubs
