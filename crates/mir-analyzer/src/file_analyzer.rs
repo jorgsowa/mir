@@ -34,7 +34,7 @@ impl FileAnalysis {
     /// Return the innermost resolved symbol whose span contains `byte_offset`,
     /// or `None` if no symbol was recorded at that position.
     ///
-    /// Entry point for hover / go-to-definition flows: callers map
+    /// Whole-file counterpart of [`crate::AnalysisSession::symbol_at`]: callers map
     /// (line, column) → byte offset → resolved symbol, then look up the
     /// symbol's definition via [`crate::AnalysisSession::definition_of`] or
     /// type info via [`ResolvedSymbol::resolved_type`].
@@ -387,8 +387,8 @@ impl<'a> FileAnalyzer<'a> {
     ///
     /// This is the preferred hot path for editor diagnostics: body analysis
     /// still walks the entire file and commits references, but per-expression
-    /// symbol payloads are skipped and navigation can use [`Self::resolve_at`]
-    /// on demand.
+    /// symbol payloads are skipped and navigation can use
+    /// [`AnalysisSession::symbol_at`] on demand.
     pub fn analyze_diagnostics_only(
         &mut self,
         file: Arc<str>,
@@ -443,17 +443,13 @@ impl<'a> FileAnalyzer<'a> {
     /// references, snapshots the current ingested text/AST, selects the
     /// smallest containing file-scope declaration (or `use` item / top-level
     /// exec region), and runs symbol recording only for that scope.
-    pub fn resolve_at(&mut self, file: Arc<str>, byte_offset: u32) -> Option<ResolvedSymbol> {
+    pub(crate) fn symbol_at(&mut self, file: Arc<str>, byte_offset: u32) -> Option<ResolvedSymbol> {
         self.session.prepare_for_query(Some(&file));
         self.session
-            .query_snapshot(|snap| snap.resolve_at(&file, byte_offset))
+            .query_snapshot(|snap| snap.symbol_at(&file, byte_offset))
     }
 
-    pub(crate) fn resolve_name_at(
-        &mut self,
-        file: Arc<str>,
-        byte_offset: u32,
-    ) -> Option<crate::Name> {
+    pub(crate) fn name_at(&mut self, file: Arc<str>, byte_offset: u32) -> Option<crate::Name> {
         self.session.prepare_for_query(Some(&file));
         self.session
             .query_snapshot(|snap| snap.name_at(&file, byte_offset))
@@ -529,10 +525,10 @@ impl AnalysisSnapshot {
     }
 
     /// The symbol at `byte_offset` in `file`, found by analyzing only the
-    /// containing scope — the read half of [`AnalysisSession::resolve_at`].
+    /// containing scope — the read half of [`AnalysisSession::symbol_at`].
     /// Expects the owner to have prepared `file`
     /// ([`AnalysisSession::prepare_for_query`]).
-    pub fn resolve_at(
+    pub fn symbol_at(
         &self,
         file: &Arc<str>,
         byte_offset: u32,
@@ -540,13 +536,13 @@ impl AnalysisSnapshot {
         let started = std::time::Instant::now();
         let sym =
             self.read(|db| resolve_symbol_at(db, self.php_version(), file, byte_offset, true));
-        crate::metrics::record_resolve_at(started.elapsed().as_micros() as u64);
+        crate::metrics::record_symbol_at(started.elapsed().as_micros() as u64);
         sym
     }
 
     /// The codebase-level symbol name at `byte_offset` in `file` — the read
     /// half of [`AnalysisSession::name_at`]. Same preparation contract as
-    /// [`Self::resolve_at`].
+    /// [`Self::symbol_at`].
     pub fn name_at(
         &self,
         file: &Arc<str>,
@@ -613,7 +609,7 @@ fn resolve_symbol_at(
         return None;
     }
     let parsed = prepared.parse_result();
-    if let Some(symbol) = resolve_at_via_compact_facts(
+    if let Some(symbol) = symbol_at_via_compact_facts(
         db,
         php_version,
         file,
@@ -623,12 +619,12 @@ fn resolve_symbol_at(
         byte_offset,
         capture_symbol_types,
     ) {
-        crate::metrics::record_resolve_at_compact_hit();
-        db.note_work(crate::db::Work::ResolveAtCompact, 1);
+        crate::metrics::record_symbol_at_compact_hit();
+        db.note_work(crate::db::Work::SymbolAtCompact, 1);
         return Some(symbol);
     }
-    crate::metrics::record_resolve_at_fallback_walk();
-    db.note_work(crate::db::Work::ResolveAtFallback, 1);
+    crate::metrics::record_symbol_at_fallback_walk();
+    db.note_work(crate::db::Work::SymbolAtFallback, 1);
     let symbols = resolve_scope_symbols(
         db,
         php_version,
@@ -724,7 +720,7 @@ fn resolve_name_at_via_compact_facts(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn resolve_at_via_compact_facts(
+fn symbol_at_via_compact_facts(
     db: &dyn MirDatabase,
     php_version: crate::PhpVersion,
     file: &Arc<str>,
@@ -861,7 +857,7 @@ mod tests {
             .collect()
     }
 
-    fn assert_resolve_at_compact_without_fallback(
+    fn assert_symbol_at_compact_without_fallback(
         session: &mut AnalysisSession,
         file: &Arc<str>,
         offset: u32,
@@ -869,21 +865,21 @@ mod tests {
     ) {
         let before = |work| session.work_count(work);
         let (compact, fallback, symbols) = (
-            before(Work::ResolveAtCompact),
-            before(Work::ResolveAtFallback),
+            before(Work::SymbolAtCompact),
+            before(Work::SymbolAtFallback),
             before(Work::SymbolAllocated),
         );
         let symbol = session
-            .resolve_at(file.as_ref(), offset)
-            .expect("resolve_at should find a symbol at the chosen offset");
+            .symbol_at(file.as_ref(), offset)
+            .expect("symbol_at should find a symbol at the chosen offset");
         expected(&symbol);
 
-        assert_eq!(session.work_count(Work::ResolveAtCompact) - compact, 1);
-        assert_eq!(session.work_count(Work::ResolveAtFallback) - fallback, 0);
+        assert_eq!(session.work_count(Work::SymbolAtCompact) - compact, 1);
+        assert_eq!(session.work_count(Work::SymbolAtFallback) - fallback, 0);
         assert_eq!(
             session.work_count(Work::SymbolAllocated) - symbols,
             0,
-            "compact resolve_at should not allocate legacy symbols"
+            "compact symbol_at should not allocate legacy symbols"
         );
     }
 
@@ -932,25 +928,25 @@ mod tests {
     }
 
     #[test]
-    fn resolve_at_records_compact_path_without_fallback() {
+    fn symbol_at_records_compact_path_without_fallback() {
         let src = "<?php\nclass Box { public int $value = 0; }\nfunction read(Box $box): void { $box->value; }\n";
-        let (mut session, file) = session_for_source("/proj/resolve_at_metrics.php", src);
+        let (mut session, file) = session_for_source("/proj/symbol_at_metrics.php", src);
         analyze_diagnostics_only(&mut session, file.clone(), src);
 
         let offset = src.find("$box->value").unwrap() as u32 + "$box".len() as u32;
-        assert_resolve_at_compact_without_fallback(&mut session, &file, offset, |symbol| {
+        assert_symbol_at_compact_without_fallback(&mut session, &file, offset, |symbol| {
             assert!(matches!(symbol.kind, ReferenceKind::Receiver));
         });
     }
 
     #[test]
-    fn resolve_at_top_level_exec_uses_compact_path_without_fallback() {
+    fn symbol_at_top_level_exec_uses_compact_path_without_fallback() {
         let src = "<?php\nfunction helper(): void {}\nhelper();\n";
         let (mut session, file) = session_for_source("/proj/resolve_top_level_metrics.php", src);
         analyze_diagnostics_only(&mut session, file.clone(), src);
 
         let offset = src.find("helper();").unwrap() as u32;
-        assert_resolve_at_compact_without_fallback(&mut session, &file, offset, |symbol| {
+        assert_symbol_at_compact_without_fallback(&mut session, &file, offset, |symbol| {
             assert!(matches!(
                 &symbol.kind,
                 ReferenceKind::FunctionCall(name) if name.as_ref() == "helper"
@@ -959,13 +955,13 @@ mod tests {
     }
 
     #[test]
-    fn resolve_at_method_call_uses_compact_path_without_fallback() {
+    fn symbol_at_method_call_uses_compact_path_without_fallback() {
         let src = "<?php\nclass Dep { public function next(): int { return 1; } }\nfunction run(Dep $dep): int { return $dep->next(); }\n";
         let (mut session, file) = session_for_source("/proj/resolve_method_metrics.php", src);
         analyze_diagnostics_only(&mut session, file.clone(), src);
 
         let offset = src.find("->next()").unwrap() as u32 + 2;
-        assert_resolve_at_compact_without_fallback(&mut session, &file, offset, |symbol| {
+        assert_symbol_at_compact_without_fallback(&mut session, &file, offset, |symbol| {
             assert!(matches!(
                 &symbol.kind,
                 ReferenceKind::MethodCall { class, method }
@@ -975,13 +971,13 @@ mod tests {
     }
 
     #[test]
-    fn resolve_at_type_hint_uses_compact_path_without_fallback() {
+    fn symbol_at_type_hint_uses_compact_path_without_fallback() {
         let src = "<?php\nclass Dep {}\nfunction run(Dep $dep): Dep { return $dep; }\n";
         let (mut session, file) = session_for_source("/proj/resolve_type_hint_metrics.php", src);
         analyze_diagnostics_only(&mut session, file.clone(), src);
 
         let offset = src.find("run(Dep").unwrap() as u32 + "run(".len() as u32;
-        assert_resolve_at_compact_without_fallback(&mut session, &file, offset, |symbol| {
+        assert_symbol_at_compact_without_fallback(&mut session, &file, offset, |symbol| {
             assert!(matches!(
                 &symbol.kind,
                 ReferenceKind::ClassReference(name) if name.as_ref() == "Dep"
@@ -990,7 +986,7 @@ mod tests {
     }
 
     #[test]
-    fn resolve_at_use_import_uses_compact_path_without_fallback() {
+    fn symbol_at_use_import_uses_compact_path_without_fallback() {
         let mut session = AnalysisSession::new(PhpVersion::LATEST);
         let dep_file: Arc<str> = Arc::from("/proj/Dep.php");
         let main_file: Arc<str> = Arc::from("/proj/Main.php");
@@ -1001,7 +997,7 @@ mod tests {
         analyze_diagnostics_only(&mut session, main_file.clone(), main_src);
 
         let offset = main_src.find("App\\Dep").unwrap() as u32 + "App\\".len() as u32;
-        assert_resolve_at_compact_without_fallback(&mut session, &main_file, offset, |symbol| {
+        assert_symbol_at_compact_without_fallback(&mut session, &main_file, offset, |symbol| {
             assert!(matches!(
                 &symbol.kind,
                 ReferenceKind::UseImport(inner)
@@ -1014,13 +1010,13 @@ mod tests {
     }
 
     #[test]
-    fn resolve_at_catch_clause_type_uses_compact_path_without_fallback() {
+    fn symbol_at_catch_clause_type_uses_compact_path_without_fallback() {
         let src = "<?php\nfinal class MyException extends \\Exception {}\nfunction run(): void {\n    try {\n        throw new MyException();\n    } catch (MyException $e) {\n    }\n}\n";
         let (mut session, file) = session_for_source("/proj/resolve_catch_metrics.php", src);
         analyze_diagnostics_only(&mut session, file.clone(), src);
 
         let offset = src.rfind("catch (MyException").unwrap() as u32 + "catch (".len() as u32;
-        assert_resolve_at_compact_without_fallback(&mut session, &file, offset, |symbol| {
+        assert_symbol_at_compact_without_fallback(&mut session, &file, offset, |symbol| {
             assert!(matches!(
                 &symbol.kind,
                 ReferenceKind::ClassReference(name) if name.as_ref() == "MyException"
@@ -1029,13 +1025,13 @@ mod tests {
     }
 
     #[test]
-    fn resolve_at_static_property_write_class_uses_compact_path_without_fallback() {
+    fn symbol_at_static_property_write_class_uses_compact_path_without_fallback() {
         let src = "<?php\nclass Counter {\n    public static int $count = 0;\n}\nfunction bump(): void {\n    Counter::$count = Counter::$count + 1;\n}\n";
         let (mut session, file) = session_for_source("/proj/resolve_static_prop_metrics.php", src);
         analyze_diagnostics_only(&mut session, file.clone(), src);
 
         let offset = src.find("Counter::$count =").unwrap() as u32;
-        assert_resolve_at_compact_without_fallback(&mut session, &file, offset, |symbol| {
+        assert_symbol_at_compact_without_fallback(&mut session, &file, offset, |symbol| {
             assert!(matches!(
                 &symbol.kind,
                 ReferenceKind::ClassReference(name) if name.as_ref() == "Counter"
@@ -1044,78 +1040,61 @@ mod tests {
     }
 
     #[test]
-    fn hover_at_uses_resolve_at_targeted_path() {
-        let src = "<?php\nclass Dep {}\nfunction run(Dep $dep): Dep { return $dep; }\n";
-        let (mut session, file) = session_for_source("/proj/hover_metrics.php", src);
-        analyze_diagnostics_only(&mut session, file.clone(), src);
-
-        let offset = src.find("run(Dep").unwrap() as u32 + "run(".len() as u32;
-        let hover = session
-            .hover_at(file.as_ref(), offset)
-            .expect("hover_at should resolve the Dep type hint");
-
-        assert_eq!(hover.ty.to_string(), "Dep");
-
-        assert_eq!(session.work_count(Work::ResolveAtCompact), 1);
-        assert_eq!(session.work_count(Work::ResolveAtFallback), 0);
-        assert_eq!(
-            session.work_count(Work::NameAtCompact) + session.work_count(Work::NameAtFallback),
-            0,
-            "hover_at should not rely on name_at"
-        );
-    }
-
-    #[test]
-    fn definition_at_uses_resolve_at_targeted_path() {
+    fn definition_uses_name_at_compact_path_without_fallback() {
         let src = "<?php\nclass Dep {}\nfunction run(Dep $dep): Dep { return $dep; }\n";
         let (mut session, file) = session_for_source("/proj/definition_metrics.php", src);
         analyze_diagnostics_only(&mut session, file.clone(), src);
 
         let offset = src.find("run(Dep").unwrap() as u32 + "run(".len() as u32;
+        let name = session
+            .name_at(file.as_ref(), offset)
+            .expect("name_at should resolve the Dep type hint");
         let loc = session
-            .definition_at(file.as_ref(), offset)
-            .expect("definition_at should resolve the Dep type hint");
+            .definition_of_cached(&name)
+            .expect("Dep should have a declaration");
 
         assert_eq!(loc.file.as_ref(), file.as_ref());
 
-        assert_eq!(session.work_count(Work::ResolveAtCompact), 1);
-        assert_eq!(session.work_count(Work::ResolveAtFallback), 0);
+        assert_eq!(session.work_count(Work::NameAtCompact), 1);
+        assert_eq!(session.work_count(Work::NameAtFallback), 0);
         assert_eq!(
-            session.work_count(Work::NameAtCompact) + session.work_count(Work::NameAtFallback),
+            session.work_count(Work::SymbolAtCompact) + session.work_count(Work::SymbolAtFallback),
             0,
-            "definition_at should not rely on name_at"
+            "definition lookup should not rely on symbol_at"
         );
     }
 
     #[test]
-    fn references_at_uses_name_at_compact_path_without_fallback() {
+    fn references_use_name_at_compact_path_without_fallback() {
         let src = "<?php\nfunction helper(): void {}\nfunction caller(): void { helper(); }\n";
         let (mut session, file) = session_for_source("/proj/references_metrics.php", src);
         analyze_diagnostics_only(&mut session, file.clone(), src);
 
         let offset = src.find("helper();").unwrap() as u32 + 1;
+        let name = session
+            .name_at(file.as_ref(), offset)
+            .expect("name_at should resolve helper()");
         let refs = session
-            .references_at(
-                file.as_ref(),
-                offset,
+            .indexed_references_to(
+                &name,
                 std::slice::from_ref(&file),
                 false,
                 crate::ReferenceIncludes::Plain,
+                &|| false,
             )
-            .expect("references_at should resolve helper()");
+            .expect("uncancelled references query");
 
         assert!(
             refs.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
-            "references_at should include the helper() call site; got {refs:?}"
+            "references should include the helper() call site; got {refs:?}"
         );
 
         assert_eq!(session.work_count(Work::NameAtCompact), 1);
         assert_eq!(session.work_count(Work::NameAtFallback), 0);
         assert_eq!(
-            session.work_count(Work::ResolveAtCompact)
-                + session.work_count(Work::ResolveAtFallback),
+            session.work_count(Work::SymbolAtCompact) + session.work_count(Work::SymbolAtFallback),
             0,
-            "references_at should not rely on resolve_at"
+            "references lookup should not rely on symbol_at"
         );
     }
 
@@ -1186,7 +1165,7 @@ function read_box(Box $box): int {
         let receiver_gap_offset = src.find("$box->value").unwrap() as u32 + "$box".len() as u32;
         let import_resolve_offset =
             main_src.find("App\\Dep").unwrap() as u32 + "App\\".len() as u32;
-        let hover_offset = src.find("Dep $dep").unwrap() as u32;
+        let definition_offset = src.find("Dep $dep").unwrap() as u32;
         let references_offset = method_name_offset;
 
         let t0 = Instant::now();
@@ -1195,7 +1174,7 @@ function read_box(Box $box): int {
         assert_eq!(first_name, Some(crate::Name::method("Dep", "next")));
 
         let t0 = Instant::now();
-        let first_method_resolve = session.resolve_at(file.as_ref(), method_resolve_offset);
+        let first_method_resolve = session.symbol_at(file.as_ref(), method_resolve_offset);
         let first_method_resolve_time = t0.elapsed();
         assert!(matches!(
             first_method_resolve.as_ref().map(|s| &s.kind),
@@ -1204,7 +1183,7 @@ function read_box(Box $box): int {
         ));
 
         let t0 = Instant::now();
-        let first_variable_resolve = session.resolve_at(file.as_ref(), variable_resolve_offset);
+        let first_variable_resolve = session.symbol_at(file.as_ref(), variable_resolve_offset);
         let first_variable_resolve_time = t0.elapsed();
         assert!(matches!(
             first_variable_resolve.as_ref().map(|s| &s.kind),
@@ -1212,7 +1191,7 @@ function read_box(Box $box): int {
         ));
 
         let t0 = Instant::now();
-        let first_type_hint_resolve = session.resolve_at(file.as_ref(), type_hint_offset);
+        let first_type_hint_resolve = session.symbol_at(file.as_ref(), type_hint_offset);
         let first_type_hint_resolve_time = t0.elapsed();
         assert!(matches!(
             first_type_hint_resolve.as_ref().map(|s| &s.kind),
@@ -1220,7 +1199,7 @@ function read_box(Box $box): int {
         ));
 
         let t0 = Instant::now();
-        let first_receiver_gap_resolve = session.resolve_at(file.as_ref(), receiver_gap_offset);
+        let first_receiver_gap_resolve = session.symbol_at(file.as_ref(), receiver_gap_offset);
         let first_receiver_gap_resolve_time = t0.elapsed();
         assert!(matches!(
             first_receiver_gap_resolve.as_ref().map(|s| &s.kind),
@@ -1229,7 +1208,7 @@ function read_box(Box $box): int {
 
         let t0 = Instant::now();
         let first_import_resolve =
-            import_session.resolve_at(main_file.as_ref(), import_resolve_offset);
+            import_session.symbol_at(main_file.as_ref(), import_resolve_offset);
         let first_import_resolve_time = t0.elapsed();
         assert!(matches!(
             first_import_resolve.as_ref().map(|s| &s.kind),
@@ -1241,35 +1220,33 @@ function read_box(Box $box): int {
         ));
 
         let t0 = Instant::now();
-        let first_hover = session.hover_at(file.as_ref(), hover_offset);
-        let first_hover_time = t0.elapsed();
-        assert!(
-            first_hover.is_ok(),
-            "hover_at should succeed on Dep type hint"
-        );
-
-        let t0 = Instant::now();
-        let first_definition = session.definition_at(file.as_ref(), hover_offset);
+        let first_definition = session
+            .name_at(file.as_ref(), definition_offset)
+            .map(|name| session.definition_of_cached(&name));
         let first_definition_time = t0.elapsed();
         assert!(
-            first_definition.is_ok(),
-            "definition_at should succeed on Dep type hint"
+            matches!(first_definition, Some(Ok(_))),
+            "definition lookup should succeed on Dep type hint"
         );
 
         let t0 = Instant::now();
-        let first_references = session.references_at(
-            file.as_ref(),
-            references_offset,
-            std::slice::from_ref(&file),
-            false,
-            crate::ReferenceIncludes::Plain,
-        );
+        let first_references = session
+            .name_at(file.as_ref(), references_offset)
+            .and_then(|name| {
+                session.indexed_references_to(
+                    &name,
+                    std::slice::from_ref(&file),
+                    false,
+                    crate::ReferenceIncludes::Plain,
+                    &|| false,
+                )
+            });
         let first_references_time = t0.elapsed();
         assert!(
             first_references
                 .as_ref()
-                .is_ok_and(|refs| refs.iter().any(|(f, _)| f.as_ref() == file.as_ref())),
-            "references_at should succeed on helper-like method call"
+                .is_some_and(|refs| refs.iter().any(|(f, _)| f.as_ref() == file.as_ref())),
+            "references lookup should succeed on helper-like method call"
         );
 
         const ITERS: usize = 100;
@@ -1279,7 +1256,6 @@ function read_box(Box $box): int {
         let mut type_hint_resolve_samples = Vec::with_capacity(ITERS);
         let mut receiver_gap_resolve_samples = Vec::with_capacity(ITERS);
         let mut import_resolve_samples = Vec::with_capacity(ITERS);
-        let mut hover_samples = Vec::with_capacity(ITERS);
         let mut definition_samples = Vec::with_capacity(ITERS);
         let mut references_samples = Vec::with_capacity(ITERS);
 
@@ -1290,7 +1266,7 @@ function read_box(Box $box): int {
             assert_eq!(name, Some(crate::Name::method("Dep", "next")));
 
             let t0 = Instant::now();
-            let resolve = session.resolve_at(file.as_ref(), method_resolve_offset);
+            let resolve = session.symbol_at(file.as_ref(), method_resolve_offset);
             method_resolve_samples.push(t0.elapsed());
             assert!(matches!(
                 resolve.as_ref().map(|s| &s.kind),
@@ -1299,7 +1275,7 @@ function read_box(Box $box): int {
             ));
 
             let t0 = Instant::now();
-            let resolve = session.resolve_at(file.as_ref(), variable_resolve_offset);
+            let resolve = session.symbol_at(file.as_ref(), variable_resolve_offset);
             variable_resolve_samples.push(t0.elapsed());
             assert!(matches!(
                 resolve.as_ref().map(|s| &s.kind),
@@ -1307,7 +1283,7 @@ function read_box(Box $box): int {
             ));
 
             let t0 = Instant::now();
-            let resolve = session.resolve_at(file.as_ref(), type_hint_offset);
+            let resolve = session.symbol_at(file.as_ref(), type_hint_offset);
             type_hint_resolve_samples.push(t0.elapsed());
             assert!(matches!(
                 resolve.as_ref().map(|s| &s.kind),
@@ -1315,7 +1291,7 @@ function read_box(Box $box): int {
             ));
 
             let t0 = Instant::now();
-            let resolve = session.resolve_at(file.as_ref(), receiver_gap_offset);
+            let resolve = session.symbol_at(file.as_ref(), receiver_gap_offset);
             receiver_gap_resolve_samples.push(t0.elapsed());
             assert!(matches!(
                 resolve.as_ref().map(|s| &s.kind),
@@ -1323,7 +1299,7 @@ function read_box(Box $box): int {
             ));
 
             let t0 = Instant::now();
-            let resolve = import_session.resolve_at(main_file.as_ref(), import_resolve_offset);
+            let resolve = import_session.symbol_at(main_file.as_ref(), import_resolve_offset);
             import_resolve_samples.push(t0.elapsed());
             assert!(matches!(
                 resolve.as_ref().map(|s| &s.kind),
@@ -1335,27 +1311,28 @@ function read_box(Box $box): int {
             ));
 
             let t0 = Instant::now();
-            let hover = session.hover_at(file.as_ref(), hover_offset);
-            hover_samples.push(t0.elapsed());
-            assert!(hover.is_ok());
-
-            let t0 = Instant::now();
-            let definition = session.definition_at(file.as_ref(), hover_offset);
+            let definition = session
+                .name_at(file.as_ref(), definition_offset)
+                .map(|name| session.definition_of_cached(&name));
             definition_samples.push(t0.elapsed());
-            assert!(definition.is_ok());
+            assert!(matches!(definition, Some(Ok(_))));
 
             let t0 = Instant::now();
-            let references = session.references_at(
-                file.as_ref(),
-                references_offset,
-                std::slice::from_ref(&file),
-                false,
-                crate::ReferenceIncludes::Plain,
-            );
+            let references = session
+                .name_at(file.as_ref(), references_offset)
+                .and_then(|name| {
+                    session.indexed_references_to(
+                        &name,
+                        std::slice::from_ref(&file),
+                        false,
+                        crate::ReferenceIncludes::Plain,
+                        &|| false,
+                    )
+                });
             references_samples.push(t0.elapsed());
             assert!(references
                 .as_ref()
-                .is_ok_and(|refs| refs.iter().any(|(f, _)| f.as_ref() == file.as_ref())));
+                .is_some_and(|refs| refs.iter().any(|(f, _)| f.as_ref() == file.as_ref())));
         }
 
         let repeat_name_p50 = median(&mut name_samples);
@@ -1364,18 +1341,17 @@ function read_box(Box $box): int {
         let repeat_type_hint_resolve_p50 = median(&mut type_hint_resolve_samples);
         let repeat_receiver_gap_resolve_p50 = median(&mut receiver_gap_resolve_samples);
         let repeat_import_resolve_p50 = median(&mut import_resolve_samples);
-        let repeat_hover_p50 = median(&mut hover_samples);
         let repeat_definition_p50 = median(&mut definition_samples);
         let repeat_references_p50 = median(&mut references_samples);
         let dump = crate::metrics::dump().expect("metrics enabled in tests");
-        let expected_resolve_calls = 7 * (ITERS + 1);
-        let expected_name_calls = 2 * (ITERS + 1);
+        let expected_resolve_calls = 5 * (ITERS + 1);
+        let expected_name_calls = 3 * (ITERS + 1);
 
         assert!(
             dump.contains(&format!(
-                "resolve_at path      : compact {expected_resolve_calls}  fallback 0"
+                "symbol_at path       : compact {expected_resolve_calls}  fallback 0"
             )),
-            "expanded probe should stay fully on the compact resolve_at path, got:\n{dump}"
+            "expanded probe should stay fully on the compact symbol_at path, got:\n{dump}"
         );
         assert!(
             dump.contains(&format!(
@@ -1399,35 +1375,31 @@ function read_box(Box $box): int {
             first_name_time.as_micros()
         );
         println!(
-            "  first resolve_at method    : {} us",
+            "  first symbol_at method    : {} us",
             first_method_resolve_time.as_micros()
         );
         println!(
-            "  first resolve_at variable  : {} us",
+            "  first symbol_at variable  : {} us",
             first_variable_resolve_time.as_micros()
         );
         println!(
-            "  first resolve_at type_hint : {} us",
+            "  first symbol_at type_hint : {} us",
             first_type_hint_resolve_time.as_micros()
         );
         println!(
-            "  first resolve_at receiver  : {} us",
+            "  first symbol_at receiver  : {} us",
             first_receiver_gap_resolve_time.as_micros()
         );
         println!(
-            "  first resolve_at import    : {} us",
+            "  first symbol_at import    : {} us",
             first_import_resolve_time.as_micros()
         );
         println!(
-            "  first hover_at             : {} us",
-            first_hover_time.as_micros()
-        );
-        println!(
-            "  first definition_at        : {} us",
+            "  first definition           : {} us",
             first_definition_time.as_micros()
         );
         println!(
-            "  first references_at        : {} us",
+            "  first references           : {} us",
             first_references_time.as_micros()
         );
         println!(
@@ -1453,10 +1425,6 @@ function read_box(Box $box): int {
         println!(
             "  repeat resolve import p50  : {} us",
             repeat_import_resolve_p50.as_micros()
-        );
-        println!(
-            "  repeat hover p50           : {} us",
-            repeat_hover_p50.as_micros()
         );
         println!(
             "  repeat definition p50      : {} us",

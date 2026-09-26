@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **`mir-analyzer` navigation API narrowed to resolution primitives:** cursor
+  navigation is `AnalysisSession::symbol_at` / `name_at`, then
+  `definition_of` / `definition_of_cached` or `indexed_references_to`.
+  Composing them into editor features, and presenting hover text, is left to
+  consumers such as php-lsp.
+- `AnalysisSession::resolve_at` merged into `AnalysisSession::symbol_at`, and
+  `AnalysisSnapshot::resolve_at` renamed to `AnalysisSnapshot::symbol_at`.
+  `FileAnalyzer::resolve_at` is no longer public; use `AnalysisSession::symbol_at`.
+- `Work::ResolveAtCompact` / `Work::ResolveAtFallback` renamed to
+  `Work::SymbolAtCompact` / `Work::SymbolAtFallback`, and the `resolve_at`
+  metrics to `symbol_at`.
+
+### Removed
+
+- `AnalysisSession::hover_at`, `hover`, `hover_cached`,
+  `AnalysisSnapshot::hover_cached` and `HoverInfo`.
+- `AnalysisSession::definition_at`, `references_at` and
+  `references_at_cancellable`; compose `name_at` with `definition_of` or
+  `indexed_references_to` instead.
+- `metrics::record_hover_at` / `record_definition_at` and their counters.
+
 ## [0.78.0] - 2026-09-23
 
 ### Changed

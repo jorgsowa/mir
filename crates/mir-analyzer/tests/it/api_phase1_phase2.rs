@@ -1,7 +1,6 @@
 //! End-to-end verification of Phase 1 and Phase 2 API improvements.
 //!
 //! Phase 1 (analyzer's job):
-//! - hover() returns real HoverInfo
 //! - Name enum for type-safe identity
 //! - Result types for lookups (NotFound vs NoSourceLocation)
 //! - Hierarchical DocumentSymbol (classes contain method/property children)
@@ -15,52 +14,6 @@
 use std::sync::Arc;
 
 use mir_analyzer::{AnalysisSession, Name, PhpVersion, SymbolLookupError};
-
-#[test]
-fn hover_returns_real_info_for_function() {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
-    session.ensure_all_stubs();
-
-    let file: Arc<str> = Arc::from("test.php");
-    let source: Arc<str> = Arc::from(
-        "<?php\n\
-         /**\n\
-          * Adds two integers and returns the sum.\n\
-          */\n\
-         function add(int $a, int $b): int { return $a + $b; }\n",
-    );
-
-    session.ingest_file(file.clone(), source.clone());
-
-    let hover = session
-        .hover(&Name::function("add"))
-        .expect("add() should be resolvable");
-
-    assert!(
-        hover.docstring.is_some(),
-        "Docstring should be populated from the docblock description"
-    );
-    assert!(
-        hover
-            .docstring
-            .as_ref()
-            .unwrap()
-            .contains("Adds two integers"),
-        "Docstring should include the description text, got: {:?}",
-        hover.docstring
-    );
-    assert!(
-        hover.definition.is_some(),
-        "Function should have a source location"
-    );
-}
-
-#[test]
-fn hover_returns_not_found_for_unknown_symbol() {
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
-    let result = session.hover(&Name::function("nonexistent_function_xyz"));
-    assert_eq!(result.unwrap_err(), SymbolLookupError::NotFound);
-}
 
 #[test]
 fn symbol_method_normalizes_case() {
@@ -355,7 +308,7 @@ fn method_references_scoped_by_declaring_class() {
 
 #[test]
 fn method_references_end_to_end_symbol_at_flow() {
-    // Verify the real findReferences flow: cursor offset → references_at.
+    // Verify the real findReferences flow: cursor offset → name_at → indexed_references_to.
     // The targeted navigation path must round-trip the call position back to
     // the same reference without a retained whole-file symbol list.
     use mir_analyzer::symbol::ReferenceKind;
@@ -384,15 +337,15 @@ fn method_references_end_to_end_symbol_at_flow() {
         sym.kind
     );
 
-    let refs = session
-        .references_at(
-            file.as_ref(),
-            call_offset,
-            std::slice::from_ref(&file),
-            false,
-            mir_analyzer::ReferenceIncludes::Plain,
-        )
-        .expect("references_at should resolve the call site");
+    let refs = crate::common::references_at(
+        &mut session,
+        file.as_ref(),
+        call_offset,
+        std::slice::from_ref(&file),
+        false,
+        mir_analyzer::ReferenceIncludes::Plain,
+    )
+    .expect("references_at should resolve the call site");
 
     assert!(
         !refs.is_empty(),
@@ -428,15 +381,15 @@ fn global_constant_references_end_to_end_symbol_at_flow() {
         sym.kind
     );
 
-    let refs = session
-        .references_at(
-            file.as_ref(),
-            use_offset,
-            std::slice::from_ref(&file),
-            false,
-            mir_analyzer::ReferenceIncludes::Plain,
-        )
-        .expect("references_at should resolve the constant usage");
+    let refs = crate::common::references_at(
+        &mut session,
+        file.as_ref(),
+        use_offset,
+        std::slice::from_ref(&file),
+        false,
+        mir_analyzer::ReferenceIncludes::Plain,
+    )
+    .expect("references_at should resolve the constant usage");
 
     assert!(
         !refs.is_empty(),
@@ -481,15 +434,15 @@ fn method_references_inherited_method_end_to_end() {
         "symbol_at must report the DECLARING class (Base), not the receiver (Foo)"
     );
 
-    let refs = session
-        .references_at(
-            file.as_ref(),
-            call_offset,
-            std::slice::from_ref(&file),
-            false,
-            mir_analyzer::ReferenceIncludes::Plain,
-        )
-        .expect("references_at should resolve the inherited method call");
+    let refs = crate::common::references_at(
+        &mut session,
+        file.as_ref(),
+        call_offset,
+        std::slice::from_ref(&file),
+        false,
+        mir_analyzer::ReferenceIncludes::Plain,
+    )
+    .expect("references_at should resolve the inherited method call");
 
     assert!(
         !refs.is_empty(),
@@ -532,15 +485,15 @@ fn property_references_inherited_property_end_to_end() {
         "symbol_at must report the DECLARING class (Base), not the receiver (Foo)"
     );
 
-    let refs = session
-        .references_at(
-            file.as_ref(),
-            prop_offset,
-            std::slice::from_ref(&file),
-            false,
-            mir_analyzer::ReferenceIncludes::Plain,
-        )
-        .expect("references_at should resolve the inherited property access");
+    let refs = crate::common::references_at(
+        &mut session,
+        file.as_ref(),
+        prop_offset,
+        std::slice::from_ref(&file),
+        false,
+        mir_analyzer::ReferenceIncludes::Plain,
+    )
+    .expect("references_at should resolve the inherited property access");
 
     assert!(
         !refs.is_empty(),

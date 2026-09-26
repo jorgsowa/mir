@@ -1,4 +1,4 @@
-//! Warm-cache guards for go-to-definition, find-references and hover: asserted on work done, not wall-clock time.
+//! Warm-cache guards for symbol_at, go-to-definition and find-references: asserted on work done, not wall-clock time.
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -16,7 +16,7 @@ const REWORK: [Work; 5] = [
     Work::ScopeAnalysis,
     Work::SymbolAllocated,
     Work::NameAtFallback,
-    Work::ResolveAtFallback,
+    Work::SymbolAtFallback,
 ];
 
 struct Project {
@@ -87,9 +87,8 @@ function caller(): void
 
 fn definition_of_greet_call(c: &Cursors) -> impl FnMut(&mut AnalysisSession) + '_ {
     |session| {
-        let def = session
-            .definition_at(c.file_b.as_ref(), c.method_call)
-            .expect("definition_at should resolve the greet() call");
+        let def = crate::common::definition_at(session, c.file_b.as_ref(), c.method_call)
+            .expect("definition lookup should resolve the greet() call");
         assert_eq!(def.file.as_ref(), c.file_a.as_ref());
     }
 }
@@ -97,15 +96,15 @@ fn definition_of_greet_call(c: &Cursors) -> impl FnMut(&mut AnalysisSession) + '
 fn references_of_helper_call(c: &Cursors) -> impl FnMut(&mut AnalysisSession) + '_ {
     let files = vec![c.file_a.clone(), c.file_b.clone()];
     move |session| {
-        let refs = session
-            .references_at(
-                c.file_b.as_ref(),
-                c.fn_call,
-                &files,
-                true,
-                ReferenceIncludes::Plain,
-            )
-            .expect("references_at should resolve helper() usages");
+        let refs = crate::common::references_at(
+            session,
+            c.file_b.as_ref(),
+            c.fn_call,
+            &files,
+            true,
+            ReferenceIncludes::Plain,
+        )
+        .expect("references lookup should resolve helper() usages");
         for file in &files {
             assert!(
                 refs.iter().any(|(f, _)| f == file),
@@ -115,12 +114,12 @@ fn references_of_helper_call(c: &Cursors) -> impl FnMut(&mut AnalysisSession) + 
     }
 }
 
-fn hover_of_helper_call(c: &Cursors) -> impl FnMut(&mut AnalysisSession) + '_ {
+fn symbol_of_helper_call(c: &Cursors) -> impl FnMut(&mut AnalysisSession) + '_ {
     |session| {
-        let hover = session
-            .hover_at(c.file_b.as_ref(), c.fn_call)
-            .expect("hover_at should resolve the helper() call");
-        assert_eq!(hover.ty.to_string(), "int");
+        let symbol = session
+            .symbol_at(c.file_b.as_ref(), c.fn_call)
+            .expect("symbol_at should resolve the helper() call");
+        assert_eq!(symbol.resolved_type.to_string(), "int");
     }
 }
 
@@ -154,7 +153,7 @@ fn assert_warm_calls_do_no_rework(
 }
 
 #[test]
-fn warm_definition_at_does_no_rework() {
+fn warm_definition_does_no_rework() {
     let Project {
         _dir,
         mut session,
@@ -162,13 +161,13 @@ fn warm_definition_at_does_no_rework() {
     } = warm_project();
     assert_warm_calls_do_no_rework(
         &mut session,
-        Work::ResolveAtCompact,
+        Work::NameAtCompact,
         definition_of_greet_call(&cursors),
     );
 }
 
 #[test]
-fn warm_references_at_does_no_rework() {
+fn warm_references_do_no_rework() {
     let Project {
         _dir,
         mut session,
@@ -182,7 +181,7 @@ fn warm_references_at_does_no_rework() {
 }
 
 #[test]
-fn warm_hover_at_does_no_rework() {
+fn warm_symbol_at_does_no_rework() {
     let Project {
         _dir,
         mut session,
@@ -190,8 +189,8 @@ fn warm_hover_at_does_no_rework() {
     } = warm_project();
     assert_warm_calls_do_no_rework(
         &mut session,
-        Work::ResolveAtCompact,
-        hover_of_helper_call(&cursors),
+        Work::SymbolAtCompact,
+        symbol_of_helper_call(&cursors),
     );
 }
 
@@ -238,7 +237,7 @@ mod timing {
             cursors,
         } = warm_project();
         assert_instant(
-            "definition_at(Greeter::greet call)",
+            "definition(Greeter::greet call)",
             &mut session,
             definition_of_greet_call(&cursors),
         );
@@ -253,7 +252,7 @@ mod timing {
             cursors,
         } = warm_project();
         assert_instant(
-            "references_at(helper usages)",
+            "references(helper usages)",
             &mut session,
             references_of_helper_call(&cursors),
         );
@@ -261,16 +260,16 @@ mod timing {
 
     #[test]
     #[ignore = "wall-clock benchmark; run explicitly with --release --ignored --nocapture"]
-    fn hover_is_instant_on_warm_cache() {
+    fn symbol_at_is_instant_on_warm_cache() {
         let Project {
             _dir,
             mut session,
             cursors,
         } = warm_project();
         assert_instant(
-            "hover_at(helper call)",
+            "symbol_at(helper call)",
             &mut session,
-            hover_of_helper_call(&cursors),
+            symbol_of_helper_call(&cursors),
         );
     }
 
@@ -350,8 +349,8 @@ mod timing {
         let Some((mut session, file, offset)) = warm_full_corpus_session() else {
             return;
         };
-        assert_instant("definition_at(full corpus)", &mut session, |session| {
-            let _ = session.definition_at(file.as_ref(), offset);
+        assert_instant("definition(full corpus)", &mut session, |session| {
+            let _ = crate::common::definition_at(session, file.as_ref(), offset);
         });
     }
 
@@ -362,8 +361,9 @@ mod timing {
             return;
         };
         let files = vec![file.clone()];
-        assert_instant("references_at(full corpus)", &mut session, |session| {
-            let _ = session.references_at(
+        assert_instant("references(full corpus)", &mut session, |session| {
+            let _ = crate::common::references_at(
+                session,
                 file.as_ref(),
                 offset,
                 &files,

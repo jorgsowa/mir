@@ -77,7 +77,7 @@ impl AnalysisSession {
     ///
     /// **Internal API — exposes Salsa types.** Subject to change without
     /// notice. Public consumers should use the typed query methods
-    /// ([`Self::definition_of`], [`Self::hover`], etc.) instead.
+    /// ([`Self::definition_of`], [`Self::symbol_at`], etc.) instead.
     #[doc(hidden)]
     pub fn snapshot_db(&self) -> MirDbStorage {
         self.db.snapshot_db()

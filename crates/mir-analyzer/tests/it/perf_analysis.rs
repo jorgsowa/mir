@@ -373,22 +373,22 @@ fn perf_analysis_full_report() {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Scenario 9: Hover after diagnostics
+    // Scenario 9: Symbol resolution after diagnostics
     // ─────────────────────────────────────────────────────────────────────────
-    print_header("Scenario 9 — Hover after diagnostics");
+    print_header("Scenario 9 — Symbol resolution after diagnostics");
     println!("  Reuse the same post-diagnostics cursor position to resolve");
-    println!("  hover info through the targeted navigation path.");
+    println!("  the full symbol through the targeted navigation path.");
     println!();
 
     if let Some(offset) = open_source.find(fixture.open_symbol_probe()) {
-        let hover_offset = offset as u32;
+        let symbol_offset = offset as u32;
         let t0 = Instant::now();
-        let first_hover = session.hover_at(open_arc.as_ref(), hover_offset);
-        let first_hover_time = t0.elapsed();
+        let first_symbol = session.symbol_at(open_arc.as_ref(), symbol_offset);
+        let first_symbol_time = t0.elapsed();
         print_row(
-            "first hover_at",
-            first_hover_time,
-            if first_hover.is_ok() {
+            "first symbol_at",
+            first_symbol_time,
+            if first_symbol.is_some() {
                 "after diagnostics"
             } else {
                 "no symbol at chosen offset"
@@ -396,12 +396,12 @@ fn perf_analysis_full_report() {
         );
 
         let t0 = Instant::now();
-        let second_hover = session.hover_at(open_arc.as_ref(), hover_offset);
-        let repeat_hover_time = t0.elapsed();
+        let second_symbol = session.symbol_at(open_arc.as_ref(), symbol_offset);
+        let repeat_symbol_time = t0.elapsed();
         print_row(
-            "repeat hover_at",
-            repeat_hover_time,
-            if second_hover.is_ok() {
+            "repeat symbol_at",
+            repeat_symbol_time,
+            if second_symbol.is_some() {
                 "warm repeat"
             } else {
                 "no symbol at chosen offset"

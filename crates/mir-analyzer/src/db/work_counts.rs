@@ -15,13 +15,13 @@ pub enum Work {
     NameAtCompact,
     /// `name_at` fell back to a symbol walk.
     NameAtFallback,
-    /// `resolve_at` answered from compact facts.
-    ResolveAtCompact,
-    /// `resolve_at` fell back to a symbol walk.
-    ResolveAtFallback,
+    /// `symbol_at` answered from compact facts.
+    SymbolAtCompact,
+    /// `symbol_at` fell back to a symbol walk.
+    SymbolAtFallback,
 }
 
-const WORK_KINDS: usize = Work::ResolveAtFallback as usize + 1;
+const WORK_KINDS: usize = Work::SymbolAtFallback as usize + 1;
 
 /// Always-on counters, shared by every clone of one database. Unlike the
 /// process-global [`crate::metrics`], concurrent sessions never see each

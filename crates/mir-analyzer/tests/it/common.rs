@@ -30,6 +30,37 @@ pub fn path_to_arc_str(path: &Path) -> Arc<str> {
     Arc::from(path_to_str(path))
 }
 
+/// Find-references at a cursor as an editor composes it: `name_at`, then
+/// `indexed_references_to`.
+pub fn references_at(
+    session: &mut mir_analyzer::AnalysisSession,
+    file: &str,
+    offset: u32,
+    files: &[Arc<str>],
+    include_declaration: bool,
+    includes: mir_analyzer::ReferenceIncludes,
+) -> Result<Vec<(Arc<str>, mir_analyzer::Range)>, mir_analyzer::SymbolLookupError> {
+    let name = session
+        .name_at(file, offset)
+        .ok_or(mir_analyzer::SymbolLookupError::NotFound)?;
+    Ok(session
+        .indexed_references_to(&name, files, include_declaration, includes, &|| false)
+        .expect("uncancelled references query"))
+}
+
+/// Go-to-definition at a cursor as an editor composes it: `name_at`, then
+/// `definition_of`.
+pub fn definition_at(
+    session: &mut mir_analyzer::AnalysisSession,
+    file: &str,
+    offset: u32,
+) -> Result<mir_types::Location, mir_analyzer::SymbolLookupError> {
+    let name = session
+        .name_at(file, offset)
+        .ok_or(mir_analyzer::SymbolLookupError::NotFound)?;
+    session.definition_of(&name)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

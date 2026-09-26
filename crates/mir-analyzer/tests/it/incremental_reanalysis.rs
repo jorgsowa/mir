@@ -382,7 +382,7 @@ fn file_analyzer_sees_fresh_return_type_after_ingest() {
 
     let x_offset = b_src.rfind("$x").unwrap() as u32;
     let x_ty = session
-        .resolve_at(file_b.as_ref(), x_offset)
+        .symbol_at(file_b.as_ref(), x_offset)
         .map(|symbol| format!("{}", symbol.resolved_type))
         .unwrap_or_else(|| "not found".to_string());
     assert_eq!(

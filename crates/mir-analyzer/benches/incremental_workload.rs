@@ -848,15 +848,15 @@ function caller(): int { return helper(41); }
 }
 
 /// Targeted navigation latency once diagnostics have already run.
-fn bench_resolve_at_after_diagnostics(c: &mut Criterion) {
+fn bench_symbol_at_after_diagnostics(c: &mut Criterion) {
     let src = "<?php
 function helper(int $x): int { return $x + 1; }
 function caller(): int { return helper(41); }
 ";
-    let file: Arc<str> = Arc::from("/bench/hover.php");
+    let file: Arc<str> = Arc::from("/bench/symbol_at.php");
     let offset = src.find("helper(41)").unwrap() as u32 + 1;
 
-    let mut cold_group = c.benchmark_group("resolve_at_after_diagnostics");
+    let mut cold_group = c.benchmark_group("symbol_at_after_diagnostics");
     cold_group.sample_size(50);
     cold_group.measurement_time(Duration::from_secs(10));
     cold_group.bench_function("first_resolve", |b| {
@@ -879,8 +879,8 @@ function caller(): int { return helper(41); }
             },
             |mut session| {
                 session
-                    .resolve_at(file.as_ref(), offset)
-                    .expect("resolve_at should find helper call")
+                    .symbol_at(file.as_ref(), offset)
+                    .expect("symbol_at should find helper call")
             },
             BatchSize::LargeInput,
         );
@@ -898,78 +898,14 @@ function caller(): int { return helper(41); }
     );
     assert!(analysis.symbols.is_empty());
 
-    let mut warm_group = c.benchmark_group("resolve_at_repeat");
+    let mut warm_group = c.benchmark_group("symbol_at_repeat");
     warm_group.sample_size(100);
     warm_group.measurement_time(Duration::from_secs(10));
     warm_group.bench_function("repeat_resolve", |b| {
         b.iter(|| {
             session
-                .resolve_at(file.as_ref(), offset)
-                .expect("resolve_at should keep resolving helper call")
-        });
-    });
-    warm_group.finish();
-}
-
-/// Targeted hover latency once diagnostics have already run.
-fn bench_hover_at_after_diagnostics(c: &mut Criterion) {
-    let src = "<?php
-function helper(int $x): int { return $x + 1; }
-function caller(): int { return helper(41); }
-";
-    let file: Arc<str> = Arc::from("/bench/hover_at.php");
-    let offset = src.find("helper(41)").unwrap() as u32 + 1;
-
-    let mut cold_group = c.benchmark_group("hover_at_after_diagnostics");
-    cold_group.sample_size(50);
-    cold_group.measurement_time(Duration::from_secs(10));
-    cold_group.bench_function("first_hover", |b| {
-        b.iter_batched(
-            || {
-                let mut session = AnalysisSession::new(PhpVersion::LATEST);
-                session.ingest_file(file.clone(), Arc::from(src));
-                let parsed = php_rs_parser::parse(src);
-                let analysis = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
-                    file.clone(),
-                    src,
-                    &parsed.program,
-                    &parsed.source_map,
-                );
-                assert!(
-                    analysis.symbols.is_empty(),
-                    "diagnostics path should not retain whole-file symbols"
-                );
-                session
-            },
-            |mut session| {
-                session
-                    .hover_at(file.as_ref(), offset)
-                    .expect("hover_at should find helper call")
-            },
-            BatchSize::LargeInput,
-        );
-    });
-    cold_group.finish();
-
-    let mut session = AnalysisSession::new(PhpVersion::LATEST);
-    session.ingest_file(file.clone(), Arc::from(src));
-    let parsed = php_rs_parser::parse(src);
-    let analysis = FileAnalyzer::new(&mut session).analyze_diagnostics_only(
-        file.clone(),
-        src,
-        &parsed.program,
-        &parsed.source_map,
-    );
-    assert!(analysis.symbols.is_empty());
-
-    let mut warm_group = c.benchmark_group("hover_at_repeat");
-    warm_group.sample_size(100);
-    warm_group.measurement_time(Duration::from_secs(10));
-    warm_group.bench_function("repeat_hover", |b| {
-        b.iter(|| {
-            session
-                .hover_at(file.as_ref(), offset)
-                .expect("hover_at should keep resolving helper call")
+                .symbol_at(file.as_ref(), offset)
+                .expect("symbol_at should keep resolving helper call")
         });
     });
     warm_group.finish();
@@ -1006,9 +942,12 @@ function caller(): int { return helper(41); }
                 session
             },
             |mut session| {
+                let name = session
+                    .name_at(file.as_ref(), offset)
+                    .expect("name_at should find helper call");
                 let definition = session
-                    .definition_at(file.as_ref(), offset)
-                    .expect("definition_at should find helper call");
+                    .definition_of(&name)
+                    .expect("helper should have a declaration");
                 assert_eq!(definition.file.as_ref(), file.as_ref());
             },
             BatchSize::LargeInput,
@@ -1032,24 +971,27 @@ function caller(): int { return helper(41); }
     warm_group.measurement_time(Duration::from_secs(10));
     warm_group.bench_function("repeat_definition", |b| {
         b.iter(|| {
+            let name = session
+                .name_at(file.as_ref(), offset)
+                .expect("name_at should keep resolving helper call");
             let definition = session
-                .definition_at(file.as_ref(), offset)
-                .expect("definition_at should keep resolving helper call");
+                .definition_of(&name)
+                .expect("helper should have a declaration");
             assert_eq!(definition.file.as_ref(), file.as_ref());
         });
     });
     warm_group.finish();
 }
 
-/// Targeted `resolve_at` latency for a variable read once diagnostics have run.
-fn bench_resolve_at_variable_after_diagnostics(c: &mut Criterion) {
+/// Targeted `symbol_at` latency for a variable read once diagnostics have run.
+fn bench_symbol_at_variable_after_diagnostics(c: &mut Criterion) {
     let src = "<?php
 function helper(int $value): int { return $value + 1; }
 ";
     let file: Arc<str> = Arc::from("/bench/resolve_var.php");
     let offset = src.rfind("$value").unwrap() as u32 + 1;
 
-    let mut cold_group = c.benchmark_group("resolve_at_variable_after_diagnostics");
+    let mut cold_group = c.benchmark_group("symbol_at_variable_after_diagnostics");
     cold_group.sample_size(50);
     cold_group.measurement_time(Duration::from_secs(10));
     cold_group.bench_function("first_variable", |b| {
@@ -1069,8 +1011,8 @@ function helper(int $value): int { return $value + 1; }
             },
             |mut session| {
                 let sym = session
-                    .resolve_at(file.as_ref(), offset)
-                    .expect("resolve_at should find $value");
+                    .symbol_at(file.as_ref(), offset)
+                    .expect("symbol_at should find $value");
                 assert!(matches!(
                     &sym.kind,
                     mir_analyzer::ReferenceKind::Variable(name) if name.as_ref() == "value"
@@ -1092,14 +1034,14 @@ function helper(int $value): int { return $value + 1; }
     );
     assert!(analysis.symbols.is_empty());
 
-    let mut warm_group = c.benchmark_group("resolve_at_variable_repeat");
+    let mut warm_group = c.benchmark_group("symbol_at_variable_repeat");
     warm_group.sample_size(100);
     warm_group.measurement_time(Duration::from_secs(10));
     warm_group.bench_function("repeat_variable", |b| {
         b.iter(|| {
             let sym = session
-                .resolve_at(file.as_ref(), offset)
-                .expect("resolve_at should keep resolving $value");
+                .symbol_at(file.as_ref(), offset)
+                .expect("symbol_at should keep resolving $value");
             assert!(matches!(
                 &sym.kind,
                 mir_analyzer::ReferenceKind::Variable(name) if name.as_ref() == "value"
@@ -1109,8 +1051,8 @@ function helper(int $value): int { return $value + 1; }
     warm_group.finish();
 }
 
-/// Targeted `resolve_at` latency for a receiver-gap cursor once diagnostics have run.
-fn bench_resolve_at_receiver_gap_after_diagnostics(c: &mut Criterion) {
+/// Targeted `symbol_at` latency for a receiver-gap cursor once diagnostics have run.
+fn bench_symbol_at_receiver_gap_after_diagnostics(c: &mut Criterion) {
     let src = "<?php
 class Box { public int $value = 0; }
 function read(Box $box): void { $box->value; }
@@ -1118,7 +1060,7 @@ function read(Box $box): void { $box->value; }
     let file: Arc<str> = Arc::from("/bench/resolve_receiver_gap.php");
     let offset = src.find("$box->value").unwrap() as u32 + "$box".len() as u32;
 
-    let mut cold_group = c.benchmark_group("resolve_at_receiver_gap_after_diagnostics");
+    let mut cold_group = c.benchmark_group("symbol_at_receiver_gap_after_diagnostics");
     cold_group.sample_size(50);
     cold_group.measurement_time(Duration::from_secs(10));
     cold_group.bench_function("first_receiver_gap", |b| {
@@ -1138,8 +1080,8 @@ function read(Box $box): void { $box->value; }
             },
             |mut session| {
                 let sym = session
-                    .resolve_at(file.as_ref(), offset)
-                    .expect("resolve_at should find the receiver gap");
+                    .symbol_at(file.as_ref(), offset)
+                    .expect("symbol_at should find the receiver gap");
                 assert!(matches!(&sym.kind, mir_analyzer::ReferenceKind::Receiver));
             },
             BatchSize::LargeInput,
@@ -1158,14 +1100,14 @@ function read(Box $box): void { $box->value; }
     );
     assert!(analysis.symbols.is_empty());
 
-    let mut warm_group = c.benchmark_group("resolve_at_receiver_gap_repeat");
+    let mut warm_group = c.benchmark_group("symbol_at_receiver_gap_repeat");
     warm_group.sample_size(100);
     warm_group.measurement_time(Duration::from_secs(10));
     warm_group.bench_function("repeat_receiver_gap", |b| {
         b.iter(|| {
             let sym = session
-                .resolve_at(file.as_ref(), offset)
-                .expect("resolve_at should keep resolving the receiver gap");
+                .symbol_at(file.as_ref(), offset)
+                .expect("symbol_at should keep resolving the receiver gap");
             assert!(matches!(&sym.kind, mir_analyzer::ReferenceKind::Receiver));
         });
     });
@@ -1204,18 +1146,21 @@ function caller(): int { return helper(41); }
                 session
             },
             |mut session| {
+                let name = session
+                    .name_at(file.as_ref(), offset)
+                    .expect("name_at should find helper call");
                 let refs = session
-                    .references_at(
-                        file.as_ref(),
-                        offset,
+                    .indexed_references_to(
+                        &name,
                         &files,
                         false,
                         mir_analyzer::ReferenceIncludes::Plain,
+                        &|| false,
                     )
-                    .expect("references_at should find helper call");
+                    .expect("uncancelled references query");
                 assert!(
                     !refs.is_empty(),
-                    "references_at should return the helper() call site"
+                    "references should include the helper() call site"
                 );
             },
             BatchSize::LargeInput,
@@ -1239,18 +1184,21 @@ function caller(): int { return helper(41); }
     warm_group.measurement_time(Duration::from_secs(10));
     warm_group.bench_function("repeat_references", |b| {
         b.iter(|| {
+            let name = session
+                .name_at(file.as_ref(), offset)
+                .expect("name_at should keep resolving helper call");
             let refs = session
-                .references_at(
-                    file.as_ref(),
-                    offset,
+                .indexed_references_to(
+                    &name,
                     &files,
                     false,
                     mir_analyzer::ReferenceIncludes::Plain,
+                    &|| false,
                 )
-                .expect("references_at should keep resolving helper call");
+                .expect("uncancelled references query");
             assert!(
                 !refs.is_empty(),
-                "references_at warm repeat should stay non-empty"
+                "references warm repeat should stay non-empty"
             );
         });
     });
@@ -1344,11 +1292,10 @@ criterion_group!(
     bench_file_analyzer_cache_hit,
     bench_diagnostics_only_latency,
     bench_name_at_after_diagnostics,
-    bench_resolve_at_after_diagnostics,
-    bench_hover_at_after_diagnostics,
+    bench_symbol_at_after_diagnostics,
     bench_definition_at_after_diagnostics,
-    bench_resolve_at_variable_after_diagnostics,
-    bench_resolve_at_receiver_gap_after_diagnostics,
+    bench_symbol_at_variable_after_diagnostics,
+    bench_symbol_at_receiver_gap_after_diagnostics,
     bench_references_at_after_diagnostics,
     bench_file_analyzer_memory_probe,
     bench_read_query_latency,

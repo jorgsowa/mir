@@ -209,7 +209,7 @@ fn definition_of_returns_not_found_for_unknown() {
 }
 
 // ---------------------------------------------------------------------------
-// laravel_definition_on_new_expression — full flow: definition_at
+// laravel_definition_on_new_expression — full flow: name_at → definition_of
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -236,14 +236,13 @@ fn laravel_definition_on_new_expression() {
     );
 
     let offset = auth_src.find("new RequestGuard").unwrap() as u32 + "new ".len() as u32;
-    let loc = analyzer
-        .definition_at(&auth_file_str, offset)
-        .expect("definition_at must find RequestGuard");
+    let loc = crate::common::definition_at(&mut analyzer, &auth_file_str, offset)
+        .expect("definition lookup must find RequestGuard");
 
     assert_eq!(
         loc.file.as_ref(),
         guard_file_str.as_str(),
-        "definition_at must navigate to RequestGuard.php, not AuthManager.php"
+        "definition lookup must navigate to RequestGuard.php, not AuthManager.php"
     );
 }
 

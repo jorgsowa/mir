@@ -88,7 +88,7 @@ pub struct Counters {
     pub scopes_analyzed: AtomicU64,
     /// Total `ResolvedSymbol` entries produced across all analysis paths.
     pub symbols_allocated: AtomicU64,
-    /// Number of targeted cursor-resolution calls (`resolve_at`).
+    /// Number of targeted cursor-resolution calls (`symbol_at`).
     pub name_at_calls: AtomicU64,
     /// Total wall time spent in `name_at`, in microseconds.
     pub name_at_micros: AtomicU64,
@@ -96,22 +96,14 @@ pub struct Counters {
     pub name_at_compact_hits: AtomicU64,
     /// `name_at` queries that still required a fallback symbol walk.
     pub name_at_fallback_walks: AtomicU64,
-    /// Number of targeted cursor-resolution calls (`resolve_at`).
-    pub resolve_at_calls: AtomicU64,
-    /// Total wall time spent in `resolve_at`, in microseconds.
-    pub resolve_at_micros: AtomicU64,
-    /// `resolve_at` queries answered by compact typed facts.
-    pub resolve_at_compact_hits: AtomicU64,
-    /// `resolve_at` queries that still required a fallback symbol walk.
-    pub resolve_at_fallback_walks: AtomicU64,
-    /// Number of cursor hover lookups (`hover_at`).
-    pub hover_at_calls: AtomicU64,
-    /// Total wall time spent in `hover_at`, in microseconds.
-    pub hover_at_micros: AtomicU64,
-    /// Number of cursor definition lookups (`definition_at`).
-    pub definition_at_calls: AtomicU64,
-    /// Total wall time spent in `definition_at`, in microseconds.
-    pub definition_at_micros: AtomicU64,
+    /// Number of targeted cursor-resolution calls (`symbol_at`).
+    pub symbol_at_calls: AtomicU64,
+    /// Total wall time spent in `symbol_at`, in microseconds.
+    pub symbol_at_micros: AtomicU64,
+    /// `symbol_at` queries answered by compact typed facts.
+    pub symbol_at_compact_hits: AtomicU64,
+    /// `symbol_at` queries that still required a fallback symbol walk.
+    pub symbol_at_fallback_walks: AtomicU64,
 
     /// Lower-bound retained bytes for `analyze_file` memos.
     pub analyze_file_retained_bytes: AtomicU64,
@@ -150,14 +142,10 @@ static COUNTERS: Counters = Counters {
     name_at_micros: AtomicU64::new(0),
     name_at_compact_hits: AtomicU64::new(0),
     name_at_fallback_walks: AtomicU64::new(0),
-    resolve_at_calls: AtomicU64::new(0),
-    resolve_at_micros: AtomicU64::new(0),
-    resolve_at_compact_hits: AtomicU64::new(0),
-    resolve_at_fallback_walks: AtomicU64::new(0),
-    hover_at_calls: AtomicU64::new(0),
-    hover_at_micros: AtomicU64::new(0),
-    definition_at_calls: AtomicU64::new(0),
-    definition_at_micros: AtomicU64::new(0),
+    symbol_at_calls: AtomicU64::new(0),
+    symbol_at_micros: AtomicU64::new(0),
+    symbol_at_compact_hits: AtomicU64::new(0),
+    symbol_at_fallback_walks: AtomicU64::new(0),
     analyze_file_retained_bytes: AtomicU64::new(0),
     analyze_file_retained_samples: AtomicU64::new(0),
     infer_scope_retained_bytes: AtomicU64::new(0),
@@ -288,31 +276,31 @@ pub fn record_scope_analysis(file: &str, symbols_allocated: usize) {
     *scopes.entry(file.to_string()).or_insert(0) += 1;
 }
 
-pub fn record_resolve_at(duration_micros: u64) {
+pub fn record_symbol_at(duration_micros: u64) {
     if !enabled() {
         return;
     }
-    COUNTERS.resolve_at_calls.fetch_add(1, Ordering::Relaxed);
+    COUNTERS.symbol_at_calls.fetch_add(1, Ordering::Relaxed);
     COUNTERS
-        .resolve_at_micros
+        .symbol_at_micros
         .fetch_add(duration_micros, Ordering::Relaxed);
 }
 
-pub fn record_resolve_at_compact_hit() {
+pub fn record_symbol_at_compact_hit() {
     if !enabled() {
         return;
     }
     COUNTERS
-        .resolve_at_compact_hits
+        .symbol_at_compact_hits
         .fetch_add(1, Ordering::Relaxed);
 }
 
-pub fn record_resolve_at_fallback_walk() {
+pub fn record_symbol_at_fallback_walk() {
     if !enabled() {
         return;
     }
     COUNTERS
-        .resolve_at_fallback_walks
+        .symbol_at_fallback_walks
         .fetch_add(1, Ordering::Relaxed);
 }
 
@@ -342,26 +330,6 @@ pub fn record_name_at_fallback_walk() {
     COUNTERS
         .name_at_fallback_walks
         .fetch_add(1, Ordering::Relaxed);
-}
-
-pub fn record_hover_at(duration_micros: u64) {
-    if !enabled() {
-        return;
-    }
-    COUNTERS.hover_at_calls.fetch_add(1, Ordering::Relaxed);
-    COUNTERS
-        .hover_at_micros
-        .fetch_add(duration_micros, Ordering::Relaxed);
-}
-
-pub fn record_definition_at(duration_micros: u64) {
-    if !enabled() {
-        return;
-    }
-    COUNTERS.definition_at_calls.fetch_add(1, Ordering::Relaxed);
-    COUNTERS
-        .definition_at_micros
-        .fetch_add(duration_micros, Ordering::Relaxed);
 }
 
 pub fn record_analyze_file_retained(issues: usize, ref_locs: usize) {
@@ -542,14 +510,10 @@ pub fn dump() -> Option<String> {
     let name_at_micros = COUNTERS.name_at_micros.load(Ordering::Relaxed);
     let name_at_compact_hits = COUNTERS.name_at_compact_hits.load(Ordering::Relaxed);
     let name_at_fallback_walks = COUNTERS.name_at_fallback_walks.load(Ordering::Relaxed);
-    let resolve_at_calls = COUNTERS.resolve_at_calls.load(Ordering::Relaxed);
-    let resolve_at_micros = COUNTERS.resolve_at_micros.load(Ordering::Relaxed);
-    let resolve_at_compact_hits = COUNTERS.resolve_at_compact_hits.load(Ordering::Relaxed);
-    let resolve_at_fallback_walks = COUNTERS.resolve_at_fallback_walks.load(Ordering::Relaxed);
-    let hover_at_calls = COUNTERS.hover_at_calls.load(Ordering::Relaxed);
-    let hover_at_micros = COUNTERS.hover_at_micros.load(Ordering::Relaxed);
-    let definition_at_calls = COUNTERS.definition_at_calls.load(Ordering::Relaxed);
-    let definition_at_micros = COUNTERS.definition_at_micros.load(Ordering::Relaxed);
+    let symbol_at_calls = COUNTERS.symbol_at_calls.load(Ordering::Relaxed);
+    let symbol_at_micros = COUNTERS.symbol_at_micros.load(Ordering::Relaxed);
+    let symbol_at_compact_hits = COUNTERS.symbol_at_compact_hits.load(Ordering::Relaxed);
+    let symbol_at_fallback_walks = COUNTERS.symbol_at_fallback_walks.load(Ordering::Relaxed);
     let analyze_file_retained_bytes = COUNTERS.analyze_file_retained_bytes.load(Ordering::Relaxed);
     let analyze_file_retained_samples = COUNTERS
         .analyze_file_retained_samples
@@ -569,11 +533,7 @@ pub fn dump() -> Option<String> {
         .checked_div(body_analysis_runs)
         .unwrap_or(0);
     let avg_name_at_us = name_at_micros.checked_div(name_at_calls).unwrap_or(0);
-    let avg_resolve_at_us = resolve_at_micros.checked_div(resolve_at_calls).unwrap_or(0);
-    let avg_hover_at_us = hover_at_micros.checked_div(hover_at_calls).unwrap_or(0);
-    let avg_definition_at_us = definition_at_micros
-        .checked_div(definition_at_calls)
-        .unwrap_or(0);
+    let avg_symbol_at_us = symbol_at_micros.checked_div(symbol_at_calls).unwrap_or(0);
     let avg_analyze_file_retained = analyze_file_retained_bytes
         .checked_div(analyze_file_retained_samples)
         .unwrap_or(0);
@@ -605,10 +565,8 @@ pub fn dump() -> Option<String> {
          symbols allocated    : {symbols_allocated}\n  \
          name_at              : {name_at_calls} calls  {name_at_micros} us total  (avg {avg_name_at_us} us)\n  \
          name_at path         : compact {name_at_compact_hits}  fallback {name_at_fallback_walks}\n  \
-         resolve_at           : {resolve_at_calls} calls  {resolve_at_micros} us total  (avg {avg_resolve_at_us} us)\n  \
-         resolve_at path      : compact {resolve_at_compact_hits}  fallback {resolve_at_fallback_walks}\n  \
-         hover_at             : {hover_at_calls} calls  {hover_at_micros} us total  (avg {avg_hover_at_us} us)\n  \
-         definition_at        : {definition_at_calls} calls  {definition_at_micros} us total  (avg {avg_definition_at_us} us)\n  \
+         symbol_at            : {symbol_at_calls} calls  {symbol_at_micros} us total  (avg {avg_symbol_at_us} us)\n  \
+         symbol_at path       : compact {symbol_at_compact_hits}  fallback {symbol_at_fallback_walks}\n  \
          lazy load attempts   : {attempts}  resolved: {resolved}\n  \
          lazy load failures   : no_resolver={ll_no_resolver}  resolver_none={ll_resolver_none}  \
          source_unreadable={ll_source_unreadable}  ingest_then_missing={ll_ingest_missing}\n  \
@@ -658,16 +616,12 @@ pub(crate) fn test_reset() {
     COUNTERS.name_at_micros.store(0, Ordering::Relaxed);
     COUNTERS.name_at_compact_hits.store(0, Ordering::Relaxed);
     COUNTERS.name_at_fallback_walks.store(0, Ordering::Relaxed);
-    COUNTERS.resolve_at_calls.store(0, Ordering::Relaxed);
-    COUNTERS.resolve_at_micros.store(0, Ordering::Relaxed);
-    COUNTERS.resolve_at_compact_hits.store(0, Ordering::Relaxed);
+    COUNTERS.symbol_at_calls.store(0, Ordering::Relaxed);
+    COUNTERS.symbol_at_micros.store(0, Ordering::Relaxed);
+    COUNTERS.symbol_at_compact_hits.store(0, Ordering::Relaxed);
     COUNTERS
-        .resolve_at_fallback_walks
+        .symbol_at_fallback_walks
         .store(0, Ordering::Relaxed);
-    COUNTERS.hover_at_calls.store(0, Ordering::Relaxed);
-    COUNTERS.hover_at_micros.store(0, Ordering::Relaxed);
-    COUNTERS.definition_at_calls.store(0, Ordering::Relaxed);
-    COUNTERS.definition_at_micros.store(0, Ordering::Relaxed);
     COUNTERS
         .analyze_file_retained_bytes
         .store(0, Ordering::Relaxed);

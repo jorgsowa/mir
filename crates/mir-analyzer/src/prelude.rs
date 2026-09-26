@@ -14,8 +14,8 @@
 //! - `mir-analyzer` itself: [`AnalysisSession`], [`FileAnalyzer`], …
 
 pub use crate::{
-    AnalysisSession, DocumentSymbol, FileAnalysis, FileAnalyzer, HoverInfo, LoadOutcome, Name,
-    Position, Range, ReferenceKind, ResolvedSymbol, SymbolLookupError,
+    AnalysisSession, DocumentSymbol, FileAnalysis, FileAnalyzer, LoadOutcome, Name, Position,
+    Range, ReferenceKind, ResolvedSymbol, SymbolLookupError,
 };
 pub use mir_codebase::definitions::{DeclaredParam, TemplateParam, Visibility};
 pub use mir_issues::{Issue, IssueKind, Severity};

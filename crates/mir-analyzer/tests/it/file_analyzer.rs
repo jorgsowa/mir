@@ -304,7 +304,7 @@ function encode(array $data): string {
 }
 
 #[test]
-fn resolve_at_finds_function_call_without_whole_file_symbol_list() {
+fn symbol_at_finds_function_call_without_whole_file_symbol_list() {
     let src = "<?php\nfunction greet(): void {}\nfunction caller(): void { greet(); }\n";
     let (mut session, file) = session_for_source("/proj/a.php", src);
     assert!(
@@ -314,8 +314,8 @@ fn resolve_at_finds_function_call_without_whole_file_symbol_list() {
 
     let offset = src.find("{ greet").unwrap() as u32 + 2;
     let sym = session
-        .resolve_at(file.as_ref(), offset)
-        .expect("resolve_at should find greet()");
+        .symbol_at(file.as_ref(), offset)
+        .expect("symbol_at should find greet()");
 
     assert!(
         matches!(&sym.kind, ReferenceKind::FunctionCall(name) if name.as_ref() == "greet"),
@@ -324,19 +324,19 @@ fn resolve_at_finds_function_call_without_whole_file_symbol_list() {
     );
     assert!(
         session.reference_locations("fn:greet").is_empty(),
-        "resolve_at should not commit reference postings as a side effect"
+        "symbol_at should not commit reference postings as a side effect"
     );
 }
 
 #[test]
-fn resolve_at_finds_method_call_inside_class_scope() {
+fn symbol_at_finds_method_call_inside_class_scope() {
     let src = "<?php\nclass Svc { public function helper(): void {}\npublic function run(): void { $this->helper(); } }\n";
     let (mut session, file) = session_for_source("/proj/this_call.php", src);
 
     let offset = src.find("->helper").unwrap() as u32 + 2;
     let sym = session
-        .resolve_at(file.as_ref(), offset)
-        .expect("resolve_at should resolve $this->helper()");
+        .symbol_at(file.as_ref(), offset)
+        .expect("symbol_at should resolve $this->helper()");
 
     assert!(
         matches!(&sym.kind, ReferenceKind::MethodCall { method, .. } if method.as_ref() == "helper"),
@@ -346,8 +346,8 @@ fn resolve_at_finds_method_call_inside_class_scope() {
 }
 
 #[test]
-fn resolve_at_finds_use_import_symbol() {
-    let dir = create_temp_dir("resolve_at_use_import");
+fn symbol_at_finds_use_import_symbol() {
+    let dir = create_temp_dir("symbol_at_use_import");
     let dep = crate::common::write_file(&dir, "Dep.php", "<?php\nnamespace App;\nclass Dep {}\n");
     let main_src = "<?php\nuse App\\Dep;\nfunction run(): Dep { return new Dep(); }\n";
     let main = crate::common::write_file(&dir, "Main.php", main_src);
@@ -362,8 +362,8 @@ fn resolve_at_finds_use_import_symbol() {
 
     let offset = main_src.find("App\\Dep").unwrap() as u32 + "App\\".len() as u32;
     let sym = session
-        .resolve_at(&main_str, offset)
-        .expect("resolve_at should find use-import symbol");
+        .symbol_at(&main_str, offset)
+        .expect("symbol_at should find use-import symbol");
 
     assert!(
         matches!(&sym.kind, ReferenceKind::UseImport(inner) if matches!(inner.as_ref(), ReferenceKind::ClassReference(name) if name.as_ref() == "App\\Dep")),
@@ -373,15 +373,15 @@ fn resolve_at_finds_use_import_symbol() {
 }
 
 #[test]
-fn resolve_at_finds_top_level_exec_symbol() {
+fn symbol_at_finds_top_level_exec_symbol() {
     let src =
         "<?php\nclass Svc { public function run(): void {} }\n$svc = new Svc();\n$svc->run();\n";
     let (mut session, file) = session_for_source("/proj/top_level_exec.php", src);
 
     let offset = src.rfind("->run").unwrap() as u32 + 2;
     let sym = session
-        .resolve_at(file.as_ref(), offset)
-        .expect("resolve_at should find top-level method call");
+        .symbol_at(file.as_ref(), offset)
+        .expect("symbol_at should find top-level method call");
 
     assert!(
         matches!(&sym.kind, ReferenceKind::MethodCall { class, method } if class.as_ref() == "Svc" && method.as_ref() == "run"),
@@ -391,14 +391,14 @@ fn resolve_at_finds_top_level_exec_symbol() {
 }
 
 #[test]
-fn resolve_at_finds_native_type_hint_symbol() {
+fn symbol_at_finds_native_type_hint_symbol() {
     let src = "<?php\nclass Dep {}\nfunction run(Dep $d): Dep { return $d; }\n";
     let (mut session, file) = session_for_source("/proj/resolve_type_hint.php", src);
 
     let offset = src.find("run(Dep").unwrap() as u32 + "run(".len() as u32;
     let sym = session
-        .resolve_at(file.as_ref(), offset)
-        .expect("resolve_at should resolve the parameter type-hint class name");
+        .symbol_at(file.as_ref(), offset)
+        .expect("symbol_at should resolve the parameter type-hint class name");
 
     assert!(
         matches!(&sym.kind, ReferenceKind::ClassReference(name) if name.as_ref() == "Dep"),
@@ -409,14 +409,14 @@ fn resolve_at_finds_native_type_hint_symbol() {
 }
 
 #[test]
-fn resolve_at_finds_variable_symbol() {
+fn symbol_at_finds_variable_symbol() {
     let src = "<?php\nfunction run(int $value): int { return $value; }\n";
     let (mut session, file) = session_for_source("/proj/resolve_var.php", src);
 
     let offset = src.rfind("$value").unwrap() as u32 + 1;
     let sym = session
-        .resolve_at(file.as_ref(), offset)
-        .expect("resolve_at should resolve the variable read");
+        .symbol_at(file.as_ref(), offset)
+        .expect("symbol_at should resolve the variable read");
 
     assert!(
         matches!(&sym.kind, ReferenceKind::Variable(name) if name.as_ref() == "value"),
@@ -427,15 +427,15 @@ fn resolve_at_finds_variable_symbol() {
 }
 
 #[test]
-fn resolve_at_finds_receiver_gap_symbol() {
+fn symbol_at_finds_receiver_gap_symbol() {
     let src =
         "<?php\nclass Foo { public string $name = ''; }\nfunction read(Foo $obj): void { $obj->name; }\n";
     let (mut session, file) = session_for_source("/proj/resolve_receiver_gap.php", src);
 
     let gap_off = src.find("$obj->name").unwrap() as u32 + "$obj".len() as u32;
     let sym = session
-        .resolve_at(file.as_ref(), gap_off)
-        .expect("resolve_at should resolve the receiver-gap symbol");
+        .symbol_at(file.as_ref(), gap_off)
+        .expect("symbol_at should resolve the receiver-gap symbol");
 
     assert!(
         matches!(&sym.kind, ReferenceKind::Receiver),
@@ -443,60 +443,6 @@ fn resolve_at_finds_receiver_gap_symbol() {
         sym.kind
     );
     assert_eq!(sym.resolved_type.to_string(), "Foo");
-}
-
-#[test]
-fn hover_at_uses_targeted_navigation_path() {
-    let src = "<?php\nfunction helper(): int { return 1; }\nfunction caller(): int { return helper(); }\n";
-    let (mut session, file) = session_for_source("/proj/hover.php", src);
-
-    let offset = src.rfind("helper()").unwrap() as u32;
-    let hover = session
-        .hover_at(file.as_ref(), offset)
-        .expect("hover_at should resolve helper()");
-
-    assert_eq!(hover.ty.to_string(), "int");
-    assert!(
-        hover.definition.is_some(),
-        "hover_at should surface the helper() definition location"
-    );
-}
-
-#[test]
-fn hover_at_returns_type_for_variable_without_definition_lookup() {
-    let src = "<?php\nfunction run(int $value): int { return $value; }\n";
-    let (mut session, file) = session_for_source("/proj/hover_var.php", src);
-
-    let offset = src.rfind("$value").unwrap() as u32 + 1;
-    let hover = session
-        .hover_at(file.as_ref(), offset)
-        .expect("hover_at should resolve variable reads");
-
-    assert_eq!(hover.ty.to_string(), "int");
-    assert!(
-        hover.definition.is_none(),
-        "variable hover should not require a codebase definition location"
-    );
-    assert!(hover.docstring.is_none());
-}
-
-#[test]
-fn hover_at_returns_type_for_receiver_gap_without_definition_lookup() {
-    let src =
-        "<?php\nclass Foo { public string $name = ''; }\nfunction read(Foo $obj): void { $obj->name; }\n";
-    let (mut session, file) = session_for_source("/proj/hover_receiver.php", src);
-
-    let gap_off = src.find("$obj->name").unwrap() as u32 + "$obj".len() as u32;
-    let hover = session
-        .hover_at(file.as_ref(), gap_off)
-        .expect("hover_at should resolve receiver-gap positions");
-
-    assert_eq!(hover.ty.to_string(), "Foo");
-    assert!(
-        hover.definition.is_none(),
-        "receiver-gap hover should surface the inferred receiver type without a definition lookup"
-    );
-    assert!(hover.docstring.is_none());
 }
 
 #[test]
@@ -565,7 +511,7 @@ fn name_at_resolves_native_type_hint_via_navigation_facts() {
 }
 
 #[test]
-fn references_at_uses_compact_navigation_fact_path() {
+fn references_resolve_through_compact_navigation_fact_path() {
     let src = "<?php
 function helper(): void {}
 function caller(): void { helper(); }
@@ -573,40 +519,31 @@ function caller(): void { helper(); }
     let (mut session, file) = session_for_source("/proj/references_at.php", src);
     let offset = src.find("helper();").unwrap() as u32 + 1;
 
-    let refs = session
-        .references_at(
-            file.as_ref(),
-            offset,
-            std::slice::from_ref(&file),
-            false,
-            mir_analyzer::ReferenceIncludes::Plain,
-        )
-        .expect("references_at should resolve helper()");
+    let refs = crate::common::references_at(
+        &mut session,
+        file.as_ref(),
+        offset,
+        std::slice::from_ref(&file),
+        false,
+        mir_analyzer::ReferenceIncludes::Plain,
+    )
+    .expect("helper() should resolve");
 
     assert!(
         refs.iter().any(|(f, _)| f.as_ref() == file.as_ref()),
-        "references_at should include the helper() call site; got {refs:?}"
+        "references should include the helper() call site; got {refs:?}"
     );
 }
 
 #[test]
-fn references_at_cancellable_reports_not_found_without_running_query() {
+fn name_at_returns_none_off_a_symbol() {
     let src = "<?php
 function helper(): void {}
 ";
     let (mut session, file) = session_for_source("/proj/references_at_missing.php", src);
     let offset = src.find("function").unwrap() as u32;
 
-    let result = session.references_at_cancellable(
-        file.as_ref(),
-        offset,
-        std::slice::from_ref(&file),
-        false,
-        mir_analyzer::ReferenceIncludes::Plain,
-        &|| true,
-    );
-
-    assert_eq!(result, Err(mir_analyzer::SymbolLookupError::NotFound));
+    assert_eq!(session.name_at(file.as_ref(), offset), None);
 }
 
 // ── Version-filtering helpers ────────────────────────────────────────────────

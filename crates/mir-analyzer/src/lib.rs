@@ -94,7 +94,7 @@ pub use stubs::{
 //
 // - Incremental (LSP, watch mode): ingest files as they change; per-file
 //   diagnostics come from `FileAnalyzer::analyze_diagnostics_only`, and
-//   cursor navigation comes from `AnalysisSession::{symbol_at,hover_at,definition_at}`.
+//   cursor navigation comes from `AnalysisSession::{symbol_at,name_at}`.
 //   Builder-style configuration (`with_cache`, `with_psr4`, …).
 //
 // The two phases of analysis are:
@@ -299,18 +299,6 @@ impl std::fmt::Display for SymbolLookupError {
 }
 
 impl std::error::Error for SymbolLookupError {}
-
-/// Hover information for a symbol at a source location.
-/// Includes the inferred type, optional docstring, and location of definition.
-#[derive(Debug, Clone)]
-pub struct HoverInfo {
-    /// Inferred type of the symbol.
-    pub ty: Type,
-    /// Docstring / documentation comment for the symbol (if available).
-    pub docstring: Option<String>,
-    /// Source location of the symbol's definition.
-    pub definition: Option<mir_types::Location>,
-}
 
 /// File dependency graph: tracks which files depend on which other files.
 /// Used for incremental invalidation in LSP servers and build systems.

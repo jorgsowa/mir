@@ -125,8 +125,8 @@ impl AnalysisSession {
         // Dependents' `FileAnalysis::symbols` are empty on this path:
         // per-expression symbols are intentionally not memoized (a typical
         // file resolves thousands; caching them balloons memory), and
-        // diagnostics consumers don't read them. Hover / go-to-definition
-        // flows analyze the open file directly via [`crate::FileAnalyzer`].
+        // diagnostics consumers don't read them. Cursor navigation resolves
+        // the open file on demand via `symbol_at`/`name_at`.
         let Some(results) = self.query_snapshot(|snap| snap.warm_pass(&dependents, cancel)) else {
             return Vec::new();
         };

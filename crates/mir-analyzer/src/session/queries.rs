@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::time::Instant;
 
 use super::*;
 
@@ -49,143 +48,25 @@ impl AnalysisSession {
         }
     }
 
-    fn codebase_name_at_via_resolve(
-        &mut self,
-        file: &str,
-        byte_offset: u32,
-    ) -> Result<crate::Name, crate::SymbolLookupError> {
-        self.resolve_at(file, byte_offset)
-            .ok_or(crate::SymbolLookupError::NotFound)?
-            .to_symbol()
-            .ok_or(crate::SymbolLookupError::NotFound)
-    }
-
     /// Resolve the codebase-level symbol name at `byte_offset` in `file`.
     ///
-    /// This is the compact cursor-navigation helper for consumers that only
-    /// need symbol identity (for example, references queries) and not the full
-    /// `ResolvedSymbol` payload.
+    /// The identity half of [`Self::symbol_at`], for consumers that only need
+    /// a [`crate::Name`] to feed [`Self::definition_of`] or
+    /// [`Self::indexed_references_to`].
     pub fn name_at(&mut self, file: &str, byte_offset: u32) -> Option<crate::Name> {
-        crate::FileAnalyzer::new(self).resolve_name_at(Arc::from(file), byte_offset)
+        crate::FileAnalyzer::new(self).name_at(Arc::from(file), byte_offset)
     }
 
     /// Resolve the symbol at `byte_offset` in `file`'s current ingested text.
     ///
-    /// Canonical open-file navigation entrypoint: unlike
-    /// [`crate::FileAnalysis::symbol_at`], this does not require the caller to
-    /// retain a whole-file symbol list from diagnostics.
-    pub fn symbol_at(&mut self, file: &str, byte_offset: u32) -> Option<crate::ResolvedSymbol> {
-        self.resolve_at(file, byte_offset)
-    }
-
-    /// Resolve the symbol at `byte_offset` in `file`'s current ingested text.
-    ///
-    /// This powers hover / go-to-definition without requiring the caller to
-    /// retain a whole-file `ResolvedSymbol` list: the containing scope is
+    /// Answers the same as [`crate::FileAnalysis::symbol_at`] without the
+    /// caller retaining a whole-file symbol list: the containing scope is
     /// re-analyzed on demand and only its symbol payload is searched.
     ///
-    /// **Side effects:** like [`Self::definition_of`] and [`Self::hover`], this
-    /// may fault in direct dependencies of `file` by running the open-file
-    /// warm-up path (`prepare_file_for_analysis`) before snapshotting.
-    pub fn resolve_at(&mut self, file: &str, byte_offset: u32) -> Option<crate::ResolvedSymbol> {
-        crate::FileAnalyzer::new(self).resolve_at(Arc::from(file), byte_offset)
-    }
-
-    /// Hover information for the symbol at `byte_offset` in `file`.
-    ///
-    /// Uses the targeted [`Self::resolve_at`] navigation path, then resolves
-    /// the resulting symbol's hover payload.
-    pub fn hover_at(
-        &mut self,
-        file: &str,
-        byte_offset: u32,
-    ) -> Result<crate::HoverInfo, crate::SymbolLookupError> {
-        let started = Instant::now();
-        let hover = (|| {
-            let resolved = self
-                .resolve_at(file, byte_offset)
-                .ok_or(crate::SymbolLookupError::NotFound)?;
-            let Some(name) = resolved.to_symbol() else {
-                return Ok(crate::HoverInfo {
-                    ty: resolved.resolved_type,
-                    docstring: None,
-                    definition: None,
-                });
-            };
-
-            let mut hover = self.hover(&name)?;
-            if !matches!(
-                resolved.kind,
-                crate::ReferenceKind::ClassReference(_) | crate::ReferenceKind::UseImport(_)
-            ) {
-                hover.ty = resolved.resolved_type;
-            }
-            Ok(hover)
-        })();
-        crate::metrics::record_hover_at(started.elapsed().as_micros() as u64);
-        hover
-    }
-
-    /// Definition location for the symbol at `byte_offset` in `file`.
-    ///
-    /// Uses the targeted [`Self::resolve_at`] navigation path, then resolves
-    /// the resulting symbol to its declaration site.
-    pub fn definition_at(
-        &mut self,
-        file: &str,
-        byte_offset: u32,
-    ) -> Result<mir_types::Location, crate::SymbolLookupError> {
-        let started = Instant::now();
-        let definition = (|| {
-            let name = self.codebase_name_at_via_resolve(file, byte_offset)?;
-            self.definition_of(&name)
-        })();
-        crate::metrics::record_definition_at(started.elapsed().as_micros() as u64);
-        definition
-    }
-
-    /// Reference locations for the symbol at `byte_offset` in `file`.
-    ///
-    /// This is the compact cursor-navigation entrypoint for find-references:
-    /// resolve a typed symbol identity with [`Self::name_at`], then answer the
-    /// query from the maintained reference index.
-    pub fn references_at(
-        &mut self,
-        file: &str,
-        byte_offset: u32,
-        files: &[Arc<str>],
-        include_declaration: bool,
-        includes: crate::ReferenceIncludes,
-    ) -> Result<Vec<(Arc<str>, crate::Range)>, crate::SymbolLookupError> {
-        self.references_at_cancellable(
-            file,
-            byte_offset,
-            files,
-            include_declaration,
-            includes,
-            &|| false,
-        )
-        .map(|refs| refs.expect("uncancelled references_at query should not return None"))
-    }
-
-    /// Cancellable variant of [`Self::references_at`].
-    ///
-    /// Returns `Err(NotFound)` when no symbol exists at the cursor. Returns
-    /// `Ok(None)` when `should_cancel` aborts the underlying indexed query.
-    #[allow(clippy::type_complexity)]
-    pub fn references_at_cancellable(
-        &mut self,
-        file: &str,
-        byte_offset: u32,
-        files: &[Arc<str>],
-        include_declaration: bool,
-        includes: crate::ReferenceIncludes,
-        should_cancel: &(dyn Fn() -> bool + Sync),
-    ) -> Result<Option<Vec<(Arc<str>, crate::Range)>>, crate::SymbolLookupError> {
-        let name = self
-            .name_at(file, byte_offset)
-            .ok_or(crate::SymbolLookupError::NotFound)?;
-        Ok(self.indexed_references_to(&name, files, include_declaration, includes, should_cancel))
+    /// **Side effects:** may fault in direct dependencies of `file` by running
+    /// the open-file warm-up path (`prepare_file_for_analysis`).
+    pub fn symbol_at(&mut self, file: &str, byte_offset: u32) -> Option<crate::ResolvedSymbol> {
+        crate::FileAnalyzer::new(self).symbol_at(Arc::from(file), byte_offset)
     }
 
     /// Resolve a top-level symbol (class or function) to its declaration
@@ -232,47 +113,6 @@ impl AnalysisSession {
         symbol: &crate::Name,
     ) -> Result<mir_types::Location, crate::SymbolLookupError> {
         self.query_snapshot(|snap| snap.definition_of_cached(symbol))
-    }
-
-    /// Hover information for a symbol: type, docstring, and definition location.
-    ///
-    /// For cursor-based editor navigation, prefer [`Self::hover_at`], which
-    /// uses the targeted [`Self::resolve_at`] path instead of requiring a
-    /// retained whole-file symbol list. This method assembles hover data once
-    /// the caller already has a typed [`crate::Name`].
-    ///
-    /// **Side effects:** ingests the file defining `symbol`'s owning class if
-    /// the symbol index lacks it. Use [`Self::hover_cached`] for a pure
-    /// variant.
-    ///
-    /// Returns `Err(NotFound)` if the symbol doesn't exist. May still return
-    /// `Ok` with `docstring: None` or `definition: None` if those specific
-    /// pieces aren't available.
-    pub fn hover(
-        &mut self,
-        symbol: &crate::Name,
-    ) -> Result<crate::HoverInfo, crate::SymbolLookupError> {
-        match symbol {
-            crate::Name::Class(fqcn) => {
-                self.load_class(fqcn.as_ref());
-            }
-            crate::Name::Method { class, .. }
-            | crate::Name::Property { class, .. }
-            | crate::Name::ClassConstant { class, .. } => {
-                self.load_class(class.as_ref());
-            }
-            _ => {}
-        }
-        self.hover_cached(symbol)
-    }
-
-    /// Pure variant of [`Self::hover`]: never writes salsa inputs. Symbols
-    /// the index lacks load on demand as pure reads.
-    pub fn hover_cached(
-        &self,
-        symbol: &crate::Name,
-    ) -> Result<crate::HoverInfo, crate::SymbolLookupError> {
-        self.query_snapshot(|snap| snap.hover_cached(symbol))
     }
 
     /// Raw reference locations indexed by string symbol key, kept for tests
