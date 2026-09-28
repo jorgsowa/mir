@@ -250,7 +250,8 @@ impl NameResolutionCacheInner {
 /// change mid-pass). A hit skips the full dispatch (hash the key, probe the
 /// memo table, record a `QueryEdge`), so the calling query records no
 /// dependency on the answer. That's sound for `Fqcn` ids because the struct
-/// is never collected.
+/// is never collected, and for imports while every caller resolves names in
+/// the file it analyzes, so it already depends on that file's text.
 ///
 /// Keyed defensively by [`salsa::plumbing::current_revision`] — salsa's own
 /// global "some input changed" counter, a plain field read — rather than
