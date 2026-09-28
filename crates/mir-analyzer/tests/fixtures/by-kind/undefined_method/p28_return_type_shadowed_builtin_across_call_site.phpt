@@ -1,16 +1,8 @@
 ===description===
-P28 KNOWN RESIDUAL GAP (not yet fixed): P28's fix reconciles a docblock-
-shadowed builtin return type at body-analysis flow-seeding time (within the
-declaring function/method's own body), and centrally in
-`find_property_in_chain` for properties — but a *caller* elsewhere invoking
-a method and chaining a call onto its return value still reads the
-unreconciled stored type via a separate call-resolution path
-(`call/method.rs`), not body-analysis seeding.
-mir currently emits (the bug): UndefinedMethod@21:11-21:30 (Generator::build)
-plus a collateral MixedReturnStatement@21:4-21:31 (the call resolves to
-`mixed`, not a declared return type mismatch).
-Expected: no issue. Remove the ignore marker below to activate once fixed.
-===ignore===
+P28 sibling: a caller in another function chaining a call onto a method's
+docblock-shadowed-builtin return value (`$f->make()->build()`) must resolve
+`make()`'s return type the same way body-analysis flow-seeding does, via
+the reconciliation in `resolve_method_from_db` (`call/method.rs`).
 ===config===
 suppress=UnusedParam
 ===file===
