@@ -1168,6 +1168,7 @@ pub(crate) fn check_typed_callable_arg(
     // (must-fit-into) role.
     if let Some(expected_ret) = expected_return {
         if !expected_ret.is_mixed()
+            && !expected_ret.is_void()
             && !contains_unresolvable_named_type(expected_ret, ea, &template_names)
         {
             for actual_ret in extract_all_callable_return_types(arg_ty, ea) {

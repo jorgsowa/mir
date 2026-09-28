@@ -1,6 +1,5 @@
 ===description===
 Value-returning closures are valid for void callbacks.
-===ignore===
 ===config===
 php_version=8.4
 ===file===

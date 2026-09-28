@@ -1992,6 +1992,10 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
                 params_ok
                     && (sub.return_type.is_mixed()
                         || sup.return_type.is_mixed()
+                        // A void callback discards its return value, so any
+                        // return type satisfies it — PHP places no
+                        // constraint on what an implementation returns here.
+                        || sup.return_type.is_void()
                         || has_nominal_type(&sub.return_type)
                         || has_nominal_type(&sup.return_type)
                         || sub.return_type.is_subtype_structural(&sup.return_type))
