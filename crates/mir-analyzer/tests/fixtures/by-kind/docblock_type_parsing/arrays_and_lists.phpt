@@ -2,9 +2,7 @@
 Array/list pseudo-types, the `T[]`/`T[][]` shorthand, and `iterable`'s
 `array|Traversable` decomposition (Display re-collapses the decomposition
 back to `iterable`/`iterable<K, V>`, so the cross-form checks below still
-match after round-tripping through the parser twice). Also pins down a real
-parser bug in the bare `non-empty-list` keyword (see the comment above
-`check_non_empty_list_bare_keyword_loses_non_empty_bug`).
+match after round-tripping through the parser twice).
 ===config===
 suppress=MissingReturnType,MissingParamType,ForbiddenCode
 ===file===
@@ -33,17 +31,10 @@ function check_list($x) {
     var_dump($x);
 }
 
-// NOTE: this pins down a real parser bug rather than the documented
-// semantics — the bare `non-empty-list` keyword arm in
-// parser/docblock/types.rs builds a plain `Atomic::TList` instead of
-// `Atomic::TNonEmptyList`, so it silently loses the "non-empty" guarantee.
-// The generic form `non-empty-list<T>` (parse_generic) is unaffected and
-// correctly builds `TNonEmptyList`. Flagged separately; this fixture
-// documents current (buggy) behavior rather than the intended one.
-function check_non_empty_list_bare_keyword_loses_non_empty_bug($x) {
+function check_non_empty_list_bare_keyword($x) {
     /**
      * @var non-empty-list $x
-     * @mir-check $x is list<mixed>
+     * @mir-check $x is non-empty-list<mixed>
      */
     var_dump($x);
 }

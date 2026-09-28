@@ -355,7 +355,7 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
             t
         }
         "non-empty-associative-array" => associative_array_type(Type::array_key(), Type::mixed()),
-        "non-empty-list" => Type::single(Atomic::TList {
+        "non-empty-list" => Type::single(Atomic::TNonEmptyList {
             value: Box::new(Type::mixed()),
         }),
         "arraylike-object" => {
