@@ -1,5 +1,10 @@
 //! `is_*`/`ctype_*`/`array_is_list`/`method_exists`/`property_exists` type-check
 //! narrowing, for variable, property, and static-property receivers.
+use std::borrow::Cow;
+
+use php_ast::ast::{BinaryOp, UnaryPrefixOp};
+use php_ast::owned::{Expr, ExprKind};
+
 use mir_types::{Atomic, Type};
 
 use crate::db::MirDatabase;
@@ -84,9 +89,11 @@ pub(super) fn narrow_static_prop_from_type_fn(
 /// Core `is_*`/`ctype_*`/`array_is_list`/`method_exists`/`property_exists`
 /// narrowing logic, shared between the variable-receiver
 /// (`narrow_from_type_fn`) and property-receiver (`narrow_prop_from_type_fn`)
-/// entry points. Returns `None` for an unrecognized function name — the
-/// caller should leave the type untouched.
-pub(super) fn type_fn_narrowed(
+/// entry points, and (via `classify_var_predicate`) any `FlowState`-free
+/// consumer that has its own `(fn_name, is_true)` pair to narrow by — e.g. a
+/// predicate-shaped callback's element-type narrowing. Returns `None` for an
+/// unrecognized function name — the caller should leave the type untouched.
+pub(crate) fn type_fn_narrowed(
     current: &Type,
     fn_name: &str,
     db: &dyn MirDatabase,
@@ -369,4 +376,67 @@ pub(super) fn atom_excluded_from_is_iterable_or_countable(
         return crate::db::extends_or_implements(db, fqcn, interface);
     }
     false
+}
+
+/// Pure, `FlowState`-free counterpart of the guard-condition matching that
+/// drives `narrow_from_type_fn`: does `expr` test `var_name` in one of the
+/// shapes `type_fn_narrowed` understands? Recognizes a bare `fn_name($var)`
+/// call, its negation `!fn_name($var)`, and the `$var === null` /
+/// `$var !== null` (and loose `==`/`!=`) spellings of `is_null($var)` /
+/// `!is_null($var)` that PHP code favors over the function-call form.
+///
+/// Returns the `is_*`/`ctype_*` function name to feed into `type_fn_narrowed`
+/// together with `is_true`: the truth value of `fn_name($var)` implied by
+/// `expr` being true — i.e. exactly the polarity to narrow by when `expr`
+/// itself is the condition being satisfied (a guard's true branch, or a
+/// predicate-callback's "kept" case).
+///
+/// Used by callback-shaped consumers outside `narrowing`'s `FlowState`-driven
+/// guard dispatch (e.g. `array_filter`'s element-type narrowing) that have
+/// already isolated a single subject variable and a boolean body to test it
+/// against, but have no flow-tracked variable to narrow in place.
+pub(crate) fn classify_var_predicate<'a>(
+    expr: &'a Expr,
+    var_name: &str,
+) -> Option<(Cow<'a, str>, bool)> {
+    fn unwrap(e: &Expr) -> &Expr {
+        match &e.kind {
+            ExprKind::Parenthesized(inner) => unwrap(inner),
+            _ => e,
+        }
+    }
+    let is_var = |e: &Expr| {
+        matches!(&unwrap(e).kind, ExprKind::Variable(name) if name.trim_start_matches('$') == var_name)
+    };
+    let call_fn_name = |e: &'a Expr| -> Option<&'a str> {
+        let ExprKind::FunctionCall(call) = &unwrap(e).kind else {
+            return None;
+        };
+        let ExprKind::Identifier(name) = &call.name.kind else {
+            return None;
+        };
+        let [arg] = &*call.args else {
+            return None;
+        };
+        arg.value.as_ref().filter(|v| is_var(v))?;
+        Some(name.as_ref())
+    };
+
+    let e = unwrap(expr);
+    match &e.kind {
+        ExprKind::UnaryPrefix(u) if u.op == UnaryPrefixOp::BooleanNot => {
+            call_fn_name(&u.operand).map(|name| (Cow::Borrowed(name), false))
+        }
+        ExprKind::Binary(b) => {
+            let is_true = match b.op {
+                BinaryOp::Identical | BinaryOp::Equal => true,
+                BinaryOp::NotIdentical | BinaryOp::NotEqual => false,
+                _ => return None,
+            };
+            let matches_null = (is_var(&b.left) && matches!(unwrap(&b.right).kind, ExprKind::Null))
+                || (is_var(&b.right) && matches!(unwrap(&b.left).kind, ExprKind::Null));
+            matches_null.then(|| (Cow::Borrowed("is_null"), is_true))
+        }
+        _ => call_fn_name(e).map(|name| (Cow::Borrowed(name), true)),
+    }
 }

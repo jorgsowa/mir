@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use php_ast::owned::{Expr, ExprKind, StmtKind};
 use php_ast::Span;
 
 use mir_issues::{IssueKind, Severity};
@@ -859,6 +860,40 @@ pub(crate) fn callback_min_arity_spec(fn_name: &str) -> Option<(usize, usize)> {
         "array_walk" | "array_walk_recursive" => Some((1, 1)),
         _ => None,
     }
+}
+
+/// Extract `(single_param_name, body_expr)` from a callback expression shaped
+/// like a single-parameter arrow function (`fn($x) => expr`) or closure
+/// (`function($x) { return expr; }`) — the callback shape used by predicate
+/// consumers (`array_filter`) to test one value at a time. Returns `None` for
+/// any other callable form (multi-param, string/array callable, closure with
+/// a body that isn't exactly one `return`, etc.); callers fall back to their
+/// non-predicate-aware handling in that case.
+pub(crate) fn single_param_predicate_body(callback_expr: &Expr) -> Option<(&str, &Expr)> {
+    fn unwrap_parens(e: &Expr) -> &Expr {
+        match &e.kind {
+            ExprKind::Parenthesized(inner) => unwrap_parens(inner),
+            _ => e,
+        }
+    }
+    let (params, body) = match &unwrap_parens(callback_expr).kind {
+        ExprKind::ArrowFunction(f) => (&f.params, &*f.body),
+        ExprKind::Closure(c) => {
+            let [stmt] = &*c.body.stmts else {
+                return None;
+            };
+            let StmtKind::Return(Some(expr)) = &stmt.kind else {
+                return None;
+            };
+            (&c.params, &**expr)
+        }
+        _ => return None,
+    };
+    let [param] = &**params else {
+        return None;
+    };
+    let param_name = param.name.as_deref()?.trim_start_matches('$');
+    Some((param_name, unwrap_parens(body)))
 }
 
 /// Validate a callback argument against a minimum required arity.

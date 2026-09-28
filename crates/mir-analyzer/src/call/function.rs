@@ -1042,6 +1042,7 @@ impl CallAnalyzer {
                         super::array_builtins::infer_array_filter_return(
                             &arg_types,
                             callback_expr,
+                            ea.db,
                         )
                         .unwrap_or(return_ty)
                     }
