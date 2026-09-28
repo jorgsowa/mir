@@ -1,6 +1,5 @@
 ===description===
 Lists built from subtype elements satisfy their shared base-type return.
-===ignore===
 ===config===
 php_version=8.4
 ===file===

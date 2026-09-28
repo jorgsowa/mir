@@ -741,6 +741,7 @@ pub(crate) fn return_arrays_compatible(
             Atomic::TKeyedArray {
                 properties,
                 is_open,
+                is_list,
                 ..
             } => {
                 // TKeyedArray compatibility:
@@ -779,12 +780,26 @@ pub(crate) fn return_arrays_compatible(
                     if requires_non_list && actual_is_definite_list(a_atomic) {
                         return false;
                     }
+                    let list_values_compatible = |dv: &Type| {
+                        properties.values().all(|prop| {
+                            prop.ty.is_subtype_structural(dv)
+                                || named_object_return_compatible(&prop.ty, dv, db, file)
+                        })
+                    };
                     match declared_atomic {
                         Atomic::TKeyedArray { .. } => true,
                         Atomic::TArray { key: dk, value: dv } => keys_values_compatible(dk, dv),
                         Atomic::TNonEmptyArray { key: dk, value: dv } => {
                             (*is_open || properties.iter().any(|(_, p)| !p.optional))
                                 && keys_values_compatible(dk, dv)
+                        }
+                        // A list-shaped TKeyedArray satisfies list<T> when every element
+                        // is compatible with T (mirrors subtype.rs's TKeyedArray <: TList rule).
+                        Atomic::TList { value: dv } => *is_list && list_values_compatible(dv),
+                        Atomic::TNonEmptyList { value: dv } => {
+                            *is_list
+                                && (*is_open || properties.iter().any(|(_, p)| !p.optional))
+                                && list_values_compatible(dv)
                         }
                         _ => false,
                     }
