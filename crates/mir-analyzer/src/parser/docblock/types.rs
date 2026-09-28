@@ -1328,7 +1328,7 @@ pub(super) fn extract_return_type(s: &str) -> String {
     let mut depth: i32 = 0;
     let mut current_token = String::new();
 
-    for ch in s.chars() {
+    for (i, ch) in s.char_indices() {
         match ch {
             '<' | '(' | '{' => {
                 depth += 1;
@@ -1339,6 +1339,15 @@ pub(super) fn extract_return_type(s: &str) -> String {
                 current_token.push(ch);
             }
             _ if ch.is_whitespace() && depth == 0 => {
+                // A spaced union/intersection (`int | null`) continues the
+                // type across the whitespace instead of ending it here.
+                let after = s[i..].trim_start();
+                let before = s[..i].trim_end();
+                if after.starts_with('|') || after.starts_with('&') || before.ends_with(['|', '&'])
+                {
+                    current_token.push(' ');
+                    continue;
+                }
                 break;
             }
             _ => {

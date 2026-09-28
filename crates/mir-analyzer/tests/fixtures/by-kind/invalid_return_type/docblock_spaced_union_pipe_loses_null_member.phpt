@@ -1,6 +1,5 @@
 ===description===
 Spaced docblock unions preserve nullable members.
-===ignore===
 ===config===
 php_version=8.4
 ===file===
