@@ -112,6 +112,25 @@
 //! the fixture root (stub declarations keep their `stubs/…` path). A failed
 //! lookup renders as `error: NotFound` or `error: NoSourceLocation`.
 //!
+//! **Edits** (`===edit:name===`, after the file sections, multi-file only):
+//! ```text
+//! ===file:Lib.php===
+//! <?php
+//! function lib(): int { return 1; }
+//! ===file:Use.php===
+//! <?php
+//! function run(): int { return lib(); }
+//! ===edit:Lib.php===
+//! <?php
+//! function lib(): string { return ''; }
+//! ===expect===
+//! Use.php: InvalidReturnType@2:22-2:35: Return type 'string' is not compatible with declared 'int'
+//! ```
+//!
+//! Replays an editor session: the files are ingested and warmed on a
+//! snapshot, each edit replaces its file's text in place, then open-file
+//! diagnostics are asserted for the edited files first and the rest after.
+//!
 //! # Validation rules
 //!
 //! - `===file===` (bare, no name) must appear **at most once** per fixture.
@@ -136,6 +155,8 @@
 //! - `===ignore===` must appear **at most once** and before any file section.
 //! - `===cursor===` must appear **at most once** and before any file section,
 //!   and only together with a `<CURSOR>` marker; `suppress` is rejected there.
+//! - `===edit:name===` must follow every file section and name a declared,
+//!   analyzed project file; it can't be combined with `===cursor===`.
 //!
 //! # Expect format
 //!
@@ -223,6 +244,8 @@ pub(crate) struct ParsedFixture {
     pub description: Option<String>,
     /// Set for `===cursor===` fixtures, whose `expected` issue list stays empty.
     cursor: Option<Cursor>,
+    /// `(filename, new content)` from `===edit:name===`, applied in order.
+    edits: Vec<(String, String)>,
     config: FixtureConfig,
 }
 
@@ -252,6 +275,7 @@ struct Cursor {
 
 const BARE_FILE: &str = "===file===";
 const FILE_PREFIX: &str = "===file:";
+const EDIT_PREFIX: &str = "===edit:";
 const CONFIG_MARKER: &str = "===config===";
 const EXPECT_MARKER: &str = "===expect===";
 const DESCRIPTION_MARKER: &str = "===description===";
@@ -316,9 +340,25 @@ pub(crate) fn parse_phpt(content: &str, path: &str) -> ParsedFixture {
 
     let is_multi = named_count > 0;
 
+    let edits = extract_named_sections(header_region, EDIT_PREFIX, path);
+    if let Some(first_edit) = header_region.find(EDIT_PREFIX) {
+        assert!(
+            is_multi,
+            "fixture {path}: {EDIT_PREFIX}name=== needs {FILE_PREFIX}name=== sections"
+        );
+        assert!(
+            header_region.rfind(FILE_PREFIX).unwrap() < first_edit,
+            "fixture {path}: {EDIT_PREFIX}name=== must follow every file section"
+        );
+        assert!(
+            section_body(header_region, CURSOR_MARKER).is_none(),
+            "fixture {path}: {EDIT_PREFIX}name=== can't be combined with {CURSOR_MARKER}"
+        );
+    }
+
     // --- Extract file content(s) ---
     let mut files = if is_multi {
-        extract_named_files(header_region, path)
+        extract_named_sections(header_region, FILE_PREFIX, path)
     } else {
         let bare_pos = header_region.find(BARE_FILE).unwrap();
         let src = header_region[bare_pos + BARE_FILE.len()..]
@@ -336,6 +376,13 @@ pub(crate) fn parse_phpt(content: &str, path: &str) -> ParsedFixture {
         .lines()
         .map(str::trim)
         .filter(|l| !l.is_empty() && !l.starts_with('#'));
+
+    for (name, _) in &edits {
+        assert!(
+            files.iter().any(|(file, _)| file == name),
+            "fixture {path}: {EDIT_PREFIX}{name}=== names no {FILE_PREFIX}{name}=== section"
+        );
+    }
 
     let marker = take_cursor_marker(&mut files, path);
     let (expected, cursor) = match (section_body(header_region, CURSOR_MARKER), marker) {
@@ -374,6 +421,7 @@ pub(crate) fn parse_phpt(content: &str, path: &str) -> ParsedFixture {
         is_multi,
         description,
         cursor,
+        edits,
         config,
     }
 }
@@ -485,25 +533,28 @@ fn parse_config_section(text: &str, path: &str) -> FixtureConfig {
     config
 }
 
-fn extract_named_files(region: &str, path: &str) -> Vec<(String, String)> {
+/// `(name, content)` of every `{prefix}name===` section; content runs to the
+/// next file or edit section.
+fn extract_named_sections(region: &str, prefix: &str, path: &str) -> Vec<(String, String)> {
     let mut files = Vec::new();
     let mut search_from = 0;
 
-    while let Some(marker_rel) = region[search_from..].find(FILE_PREFIX) {
+    while let Some(marker_rel) = region[search_from..].find(prefix) {
         let marker_abs = search_from + marker_rel;
-        let after_prefix = marker_abs + FILE_PREFIX.len();
+        let after_prefix = marker_abs + prefix.len();
 
         let close_rel = region[after_prefix..]
             .find("===")
-            .unwrap_or_else(|| panic!("fixture {path}: unclosed ===file: marker"));
+            .unwrap_or_else(|| panic!("fixture {path}: unclosed {prefix} marker"));
 
         let file_name = region[after_prefix..after_prefix + close_rel].to_string();
         let content_start = after_prefix + close_rel + "===".len();
 
-        let content_end = region[content_start..]
-            .find(FILE_PREFIX)
-            .map(|r| content_start + r)
-            .unwrap_or(region.len());
+        let content_end = [FILE_PREFIX, EDIT_PREFIX]
+            .iter()
+            .filter_map(|next| region[content_start..].find(next))
+            .min()
+            .map_or(region.len(), |r| content_start + r);
 
         let file_content = region[content_start..content_end].trim().to_string();
         files.push((file_name, file_content));
@@ -673,6 +724,7 @@ pub fn run_fixture(path: &str) {
     let mut fixture = parse_phpt(&content, path);
     match fixture.cursor.take() {
         Some(cursor) => run_cursor_fixture(path, &content, &fixture, &cursor),
+        None if !fixture.edits.is_empty() => run_edit_fixture(path, &content, fixture),
         None => run_diagnostic_fixture(path, &content, fixture),
     }
 }
@@ -685,6 +737,77 @@ fn update_requested() -> bool {
 }
 
 fn run_diagnostic_fixture(path: &str, content: &str, mut fixture: ParsedFixture) {
+    suppress_dead_code_by_default(&mut fixture);
+    let actual = run_analyzer(&file_refs(&fixture), &fixture.config);
+
+    if update_requested() {
+        rewrite_expect_section(path, content, &fmt_expect_lines(&actual, fixture.is_multi));
+        return;
+    }
+
+    assert_fixture(path, &fixture, &actual);
+}
+
+fn run_edit_fixture(path: &str, content: &str, mut fixture: ParsedFixture) {
+    suppress_dead_code_by_default(&mut fixture);
+    let suppressed = fixture
+        .config
+        .suppressed_issue_kinds
+        .clone()
+        .unwrap_or_default();
+    let actual = with_fixture_session(&file_refs(&fixture), &fixture.config, |session, ws| {
+        let files: Vec<Arc<str>> = ws
+            .analyzed
+            .iter()
+            .map(|p| Arc::from(p.to_string_lossy().as_ref()))
+            .collect();
+        let read = |file: &str| -> Arc<str> {
+            std::fs::read_to_string(file)
+                .unwrap_or_else(|e| panic!("failed to read {file}: {e}"))
+                .into()
+        };
+        for file in &files {
+            session.ingest_file(file.clone(), read(file));
+        }
+        session.prepare_for_query(None);
+        let warmed = session
+            .snapshot()
+            .warm_files(&files, &crate::IndexCancel::new())
+            .expect("uncancelled warm pass");
+        assert!(warmed, "fixture {path}: warm pass stopped early");
+
+        let mut edited: HashSet<Arc<str>> = HashSet::new();
+        for (name, text) in &fixture.edits {
+            let file = ws.dir.join(name);
+            assert!(
+                ws.analyzed.contains(&file),
+                "fixture {path}: {EDIT_PREFIX}{name}=== must edit an analyzed project file"
+            );
+            std::fs::write(&file, text).unwrap_or_else(|e| panic!("failed to write {name}: {e}"));
+            let file: Arc<str> = Arc::from(file.to_string_lossy().as_ref());
+            session.ingest_file(file.clone(), Arc::from(text.as_str()));
+            edited.insert(file);
+        }
+
+        let (mut order, rest): (Vec<_>, Vec<_>) =
+            files.iter().partition(|file| edited.contains(*file));
+        order.extend(rest);
+        order
+            .into_iter()
+            .flat_map(|file| session.analyze_file_diagnostics(file, &read(file)).issues)
+            .filter(|i| !i.suppressed && !suppressed.contains(i.kind.display_name()))
+            .collect::<Vec<_>>()
+    });
+
+    if update_requested() {
+        rewrite_expect_section(path, content, &fmt_expect_lines(&actual, fixture.is_multi));
+        return;
+    }
+
+    assert_fixture(path, &fixture, &actual);
+}
+
+fn suppress_dead_code_by_default(fixture: &mut ParsedFixture) {
     // Auto-suppression: the dead-code group (UnusedMethod/Property/Function) is
     // suppressed by default so authors don't have to sprinkle boilerplate
     // `suppress=` lines on every fixture whose example code happens to declare
@@ -701,34 +824,24 @@ fn run_diagnostic_fixture(path: &str, content: &str, mut fixture: ParsedFixture)
     // MixedArgument, or MissingParamType — is asserted strictly: a fixture must
     // either expect each issue its example code produces or list the kind in an
     // explicit `suppress=` config line.
-    {
-        let dead = crate::batch::dead_code_issue_kinds();
-        let expects_dead_code = fixture
-            .expected
-            .iter()
-            .any(|e| dead.contains(&e.kind_name.as_str()));
-        let opts_into_dead_code = matches!(
-            &fixture.config.suppressed_issue_kinds,
-            Some(set) if set.is_empty()
-        );
-        if !expects_dead_code && !opts_into_dead_code {
-            let set = fixture
-                .config
-                .suppressed_issue_kinds
-                .get_or_insert_with(Default::default);
-            for kind in dead {
-                set.insert((*kind).to_string());
-            }
+    let dead = crate::batch::dead_code_issue_kinds();
+    let expects_dead_code = fixture
+        .expected
+        .iter()
+        .any(|e| dead.contains(&e.kind_name.as_str()));
+    let opts_into_dead_code = matches!(
+        &fixture.config.suppressed_issue_kinds,
+        Some(set) if set.is_empty()
+    );
+    if !expects_dead_code && !opts_into_dead_code {
+        let set = fixture
+            .config
+            .suppressed_issue_kinds
+            .get_or_insert_with(Default::default);
+        for kind in dead {
+            set.insert((*kind).to_string());
         }
     }
-    let actual = run_analyzer(&file_refs(&fixture), &fixture.config);
-
-    if update_requested() {
-        rewrite_expect_section(path, content, &fmt_expect_lines(&actual, fixture.is_multi));
-        return;
-    }
-
-    assert_fixture(path, &fixture, &actual);
 }
 
 fn run_cursor_fixture(path: &str, content: &str, fixture: &ParsedFixture, cursor: &Cursor) {

@@ -81,6 +81,10 @@ echo gr<CURSOR>eet();
 test.php@2:0-2:41
 ```
 
+Incremental behavior is tested under `tests/fixtures/incremental/`: each
+`===edit:name===` section replaces a file's text after the files are indexed
+and warmed, and `===expect===` holds the open-file diagnostics after the edits.
+
 The full format is documented in `crates/mir-analyzer/src/test_utils.rs`.
 
 Run only the fixture tests, or regenerate one fixture's `===expect===` section
