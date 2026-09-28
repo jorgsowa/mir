@@ -49,10 +49,8 @@ pub trait MirDatabase: salsa::Database {
     /// falls through to real interning and stores the result via
     /// [`Self::cache_fqcn_id`].
     ///
-    /// This only memoizes the *interning* step (hash the name, probe
-    /// salsa's intern table) — an idempotent operation whose result can
-    /// never differ from what `Fqcn::new` would compute, so caching it
-    /// changes no query's output, only its dispatch cost.
+    /// A hit records no salsa read of the id, which is sound only because
+    /// `Fqcn` is never collected.
     fn cached_fqcn_id(&self, name: Name) -> Option<salsa::Id>;
 
     /// Record `id` as `name`'s interned `Fqcn` id for the remainder of this

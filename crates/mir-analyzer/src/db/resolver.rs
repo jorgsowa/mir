@@ -33,7 +33,11 @@ pub struct ResolverConfig {
 /// gives the FQCN a stable interned identity so the resolution result can
 /// be memoized per name. Cheap to construct (`Fqcn::new(db, symbol)`);
 /// equality is by ustr pointer (O(1)).
-#[salsa::interned]
+///
+/// Never collected: [`Self::interned`] reuses ids without recording a salsa
+/// read, which is only sound for slots that can't be reused. Retention is
+/// bounded like [`Name`]'s, whose strings are never freed.
+#[salsa::interned(revisions = usize::MAX)]
 pub struct Fqcn<'db> {
     pub name: Name,
 }
@@ -50,9 +54,7 @@ impl<'db> Fqcn<'db> {
     /// Like [`Self::new`], but checks this db clone's interning memo first
     /// (see [`MirDatabase::cached_fqcn_id`]) — interning is `#[salsa::interned]`,
     /// so even a repeat call for the same `name` still pays a fixed dispatch
-    /// tax (hash the name, probe the intern table) on a memoized hit. The
-    /// memoized result is always identical to what `Self::new` would
-    /// compute, so caching it changes no query's output.
+    /// tax (hash the name, probe the intern table) on a memoized hit.
     #[inline]
     pub fn interned(db: &'db dyn MirDatabase, name: Name) -> Self {
         use salsa::plumbing::{AsId, FromId};

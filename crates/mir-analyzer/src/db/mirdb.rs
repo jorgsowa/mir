@@ -247,10 +247,10 @@ impl NameResolutionCacheInner {
 /// distinct class name touched in a pass) and a file's `use`-import map
 /// (`#[salsa::tracked] collect_file_definitions`, re-fetched by
 /// `resolve_name` on **every** class-name reference even though it cannot
-/// change mid-pass). Both are idempotent, memoized-by-salsa reads —
-/// caching them here changes no query's output, only how many times its
-/// full dispatch (hash the key, probe the memo table, record a
-/// `QueryEdge`) gets paid for an answer already known.
+/// change mid-pass). A hit skips the full dispatch (hash the key, probe the
+/// memo table, record a `QueryEdge`), so the calling query records no
+/// dependency on the answer. That's sound for `Fqcn` ids because the struct
+/// is never collected.
 ///
 /// Keyed defensively by [`salsa::plumbing::current_revision`] — salsa's own
 /// global "some input changed" counter, a plain field read — rather than

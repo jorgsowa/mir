@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Re-analysis after an edit no longer panics with "Data for reusable `Fqcn`
+  was not interned in the latest revision" when a cached inference reused a
+  name another file resolved first in the same pass.
+
 ## [0.79.0] - 2026-09-26
 
 ### Changed
