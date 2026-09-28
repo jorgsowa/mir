@@ -2215,7 +2215,14 @@ impl<'a> DefinitionCollector<'a> {
             is_final: m.is_final,
             is_constructor: method_name == "__construct",
             template_params,
-            assertions: self.build_assertions(&doc, effective_aliases),
+            assertions: {
+                let explicit = self.build_assertions(&doc, effective_aliases);
+                if explicit.is_empty() {
+                    annotation::synthesize_predicate_assertions(m)
+                } else {
+                    explicit
+                }
+            },
             throws,
             deprecated: doc.deprecated.as_deref().map(Arc::from).or_else(|| {
                 if m.attributes.iter().any(|a| {

@@ -44,6 +44,66 @@ pub(super) fn build_assertions(
     assertions
 }
 
+/// Infers an implicit `@psalm-assert-if-true`/`-if-false` pair for a
+/// niladic predicate method whose entire body is `return $this->prop !==
+/// null;` (or `=== null`, either operand order) — the common
+/// `isAssigned()`-style getter. Lets call sites narrow `$this->prop`'s
+/// nullability the same way an explicit docblock assertion would, without
+/// requiring the author to write one.
+pub(super) fn synthesize_predicate_assertions(m: &php_ast::owned::MethodDecl) -> Vec<Assertion> {
+    use php_ast::ast::BinaryOp;
+    use php_ast::owned::{ExprKind, StmtKind};
+
+    let Some(body) = m.body.as_ref() else {
+        return Vec::new();
+    };
+    let [stmt] = body.stmts.as_ref() else {
+        return Vec::new();
+    };
+    let StmtKind::Return(Some(expr)) = &stmt.kind else {
+        return Vec::new();
+    };
+    let ExprKind::Binary(bin) = &expr.kind else {
+        return Vec::new();
+    };
+    // `!==` means the property is asserted non-null when the method returns
+    // true; `===` means the opposite.
+    let not_null_if_true = match bin.op {
+        BinaryOp::NotIdentical => true,
+        BinaryOp::Identical => false,
+        _ => return Vec::new(),
+    };
+    let prop_side = match (&bin.left.kind, &bin.right.kind) {
+        (ExprKind::Null, _) => &bin.right,
+        (_, ExprKind::Null) => &bin.left,
+        _ => return Vec::new(),
+    };
+    let Some((obj, prop)) = crate::narrowing::extract_prop_access(prop_side) else {
+        return Vec::new();
+    };
+    if obj != "this" {
+        return Vec::new();
+    }
+
+    let param: Arc<str> = Arc::from(format!("this->{prop}"));
+    vec![
+        Assertion {
+            kind: AssertionKind::AssertIfTrue,
+            param: param.clone(),
+            param_key: Vec::new(),
+            ty: Type::null(),
+            negated: not_null_if_true,
+        },
+        Assertion {
+            kind: AssertionKind::AssertIfFalse,
+            param,
+            param_key: Vec::new(),
+            ty: Type::null(),
+            negated: !not_null_if_true,
+        },
+    ]
+}
+
 pub(super) fn emit_docblock_issues(
     doc: &crate::parser::ParsedDocblock,
     span_start: u32,

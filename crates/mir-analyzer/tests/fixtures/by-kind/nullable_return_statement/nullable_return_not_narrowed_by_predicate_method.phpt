@@ -1,6 +1,5 @@
 ===description===
 Predicate-method guards narrow properties before return.
-===ignore===
 ===config===
 php_version=8.4
 ===file===
