@@ -8,6 +8,7 @@ function other(): void {}
 <?php
 function run(): void { lib(); }
 ===expect===
+<<none>>
 ===edit:Lib.php===
 <?php
 function other(): void {}

@@ -7,6 +7,7 @@ interface Shape {}
 <?php
 class Square implements Shape {}
 ===expect===
+<<none>>
 ===edit:Shape.php===
 <?php
 interface Shape { public function area(): float; }

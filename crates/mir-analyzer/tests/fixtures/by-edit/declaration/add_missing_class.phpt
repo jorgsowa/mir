@@ -13,3 +13,4 @@ Use.php: UndefinedClass@2:27-2:30: Class Box does not exist
 class Other {}
 class Box {}
 ===expect===
+<<none>>

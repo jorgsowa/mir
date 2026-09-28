@@ -12,6 +12,7 @@ function b() { return a(); }
 <?php
 function c(): int { return b(); }
 ===expect===
+<<none>>
 ===edit:A.php===
 <?php
 function a(): string { return ''; }

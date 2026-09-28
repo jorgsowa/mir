@@ -121,6 +121,7 @@
 //! <?php
 //! function run(): int { return lib(); }
 //! ===expect===
+//! <<none>>
 //! ===edit:Lib.php===
 //! <?php
 //! function lib(): string { return ''; }
@@ -162,6 +163,7 @@
 //!   analyzed project file; it can't be combined with `===cursor===`.
 //! - `===expect===` appears exactly once, except in edit fixtures: there it
 //!   appears twice, between the file and edit sections and after the edits.
+//!   Each edit-fixture section lists issues or holds `<<none>>` alone.
 //!
 //! # Expect format
 //!
@@ -289,6 +291,8 @@ const DESCRIPTION_MARKER: &str = "===description===";
 const IGNORE_MARKER: &str = "===ignore===";
 const CURSOR_MARKER: &str = "===cursor===";
 const CURSOR: &str = "<CURSOR>";
+/// Body of an edit fixture's `===expect===` section that expects no issues.
+const NO_ISSUES: &str = "<<none>>";
 
 /// Parse a `.phpt` fixture file.
 pub(crate) fn parse_phpt(content: &str, path: &str) -> ParsedFixture {
@@ -379,7 +383,7 @@ pub(crate) fn parse_phpt(content: &str, path: &str) -> ParsedFixture {
                 "fixture {path}: the first {EXPECT_MARKER} must sit between the file and edit sections"
             );
             let body = &header_region[pos + EXPECT_MARKER.len()..first_edit.unwrap()];
-            parse_expect_lines(body, is_multi, path)
+            parse_edit_expect_lines(body, is_multi, path)
         }
         None => Vec::new(),
     };
@@ -426,6 +430,10 @@ pub(crate) fn parse_phpt(content: &str, path: &str) -> ParsedFixture {
         }
         (Some(_), None) => panic!("fixture {path}: ===cursor=== needs a {CURSOR} marker"),
         (None, Some(_)) => panic!("fixture {path}: {CURSOR} marker needs a ===cursor=== section"),
+        (None, None) if edit_fixture => (
+            parse_edit_expect_lines(expect_content, is_multi, path),
+            None,
+        ),
         (None, None) => (parse_expect_lines(expect_content, is_multi, path), None),
     };
 
@@ -1394,6 +1402,24 @@ fn rewrite_expect_section(path: &str, content: &str, lines: &[String]) {
     std::fs::write(path, &out).unwrap_or_else(|e| panic!("failed to write fixture {path}: {e}"));
 }
 
+/// Edit-fixture expect lines, where an empty section must read `<<none>>`.
+fn parse_edit_expect_lines(text: &str, is_multi: bool, path: &str) -> Vec<ExpectedIssue> {
+    let lines: Vec<&str> = meaningful_lines(text).collect();
+    match lines.as_slice() {
+        [] => {
+            panic!("fixture {path}: an edit fixture's empty {EXPECT_MARKER} must read {NO_ISSUES}")
+        }
+        [NO_ISSUES] => Vec::new(),
+        _ => {
+            assert!(
+                !lines.contains(&NO_ISSUES),
+                "fixture {path}: {NO_ISSUES} can't be combined with expected issues"
+            );
+            parse_expect_lines(text, is_multi, path)
+        }
+    }
+}
+
 /// Rewrite both `===expect===` sections of an edit fixture, keeping the edits.
 fn rewrite_edit_expect_sections(path: &str, content: &str, before: &[String], after: &[String]) {
     let first = content.find(EXPECT_MARKER).unwrap();
@@ -1404,6 +1430,11 @@ fn rewrite_edit_expect_sections(path: &str, content: &str, before: &[String], af
     for (lines, following) in [(before, &content[edits..last]), (after, "")] {
         out.push_str(EXPECT_MARKER);
         out.push('\n');
+        let lines = if lines.is_empty() {
+            &[NO_ISSUES.to_string()][..]
+        } else {
+            lines
+        };
         for line in lines {
             out.push_str(line);
             out.push('\n');
@@ -1705,7 +1736,7 @@ mod parser_validation {
             "===file:a.php===\n<?php a();\n===file:b.php===\n<?php b();\n\
              ===expect===\na.php: UndefinedFunction@1:6-1:9: Function a() is not defined\n\
              ===edit:b.php===\n<?php b2();\n===edit:a.php===\n<?php a2();\n\
-             ===edit:b.php===\n<?php b3();\n===expect===\n",
+             ===edit:b.php===\n<?php b3();\n===expect===\n<<none>>\n",
         );
         assert_eq!(f.files[0].1, "<?php a();");
         assert_eq!(f.files[1].1, "<?php b();");
@@ -1732,9 +1763,36 @@ mod parser_validation {
     }
 
     #[test]
+    #[should_panic(expected = "an edit fixture's empty ===expect=== must read <<none>>")]
+    fn empty_expect_before_edits() {
+        p("===file:a.php===\n<?php\n===expect===\n===edit:a.php===\n<?php\n===expect===\n<<none>>\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "an edit fixture's empty ===expect=== must read <<none>>")]
+    fn empty_expect_after_edits() {
+        p("===file:a.php===\n<?php\n===expect===\n<<none>>\n===edit:a.php===\n<?php\n===expect===\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "<<none>> can't be combined with expected issues")]
+    fn no_issues_placeholder_with_issues() {
+        p("===file:a.php===\n<?php a();\n===expect===\n<<none>>\n\
+           a.php: UndefinedFunction@1:6-1:9: Function a() is not defined\n\
+           ===edit:a.php===\n<?php\n===expect===\n<<none>>\n");
+    }
+
+    #[test]
+    fn no_issues_placeholder_expects_nothing() {
+        let f = p("===file:a.php===\n<?php\n===expect===\n<<none>>\n\
+                   ===edit:a.php===\n<?php\n===expect===\n<<none>>\n");
+        assert!(f.expected_before_edits.is_empty() && f.expected.is_empty());
+    }
+
+    #[test]
     #[should_panic(expected = "===expect=== must appear twice")]
     fn edit_without_expect_before_edits() {
-        p("===file:a.php===\n<?php\n===edit:a.php===\n<?php\n===expect===\n");
+        p("===file:a.php===\n<?php\n===edit:a.php===\n<?php\n===expect===\n<<none>>\n");
     }
 
     #[test]
@@ -1747,8 +1805,8 @@ mod parser_validation {
     #[should_panic(expected = "the first ===expect=== must sit between the file and edit sections")]
     fn expect_between_edits() {
         p(
-            "===file:a.php===\n<?php\n===edit:a.php===\n<?php\n===expect===\n\
-           ===edit:a.php===\n<?php\n===expect===\n",
+            "===file:a.php===\n<?php\n===edit:a.php===\n<?php\n===expect===\n<<none>>\n\
+           ===edit:a.php===\n<?php\n===expect===\n<<none>>\n",
         );
     }
 
@@ -1756,8 +1814,8 @@ mod parser_validation {
     #[should_panic(expected = "the first ===expect=== must sit between the file and edit sections")]
     fn expect_before_file_section() {
         p(
-            "===file:a.php===\n<?php\n===expect===\n===file:b.php===\n<?php\n\
-           ===edit:a.php===\n<?php\n===expect===\n",
+            "===file:a.php===\n<?php\n===expect===\n<<none>>\n===file:b.php===\n<?php\n\
+           ===edit:a.php===\n<?php\n===expect===\n<<none>>\n",
         );
     }
 
@@ -1765,29 +1823,29 @@ mod parser_validation {
     #[should_panic(expected = "===edit:name=== must follow every file section")]
     fn edit_before_file_section() {
         p(
-            "===file:a.php===\n<?php\n===expect===\n===edit:a.php===\n<?php\n\
-           ===file:b.php===\n<?php\n===expect===\n",
+            "===file:a.php===\n<?php\n===expect===\n<<none>>\n===edit:a.php===\n<?php\n\
+           ===file:b.php===\n<?php\n===expect===\n<<none>>\n",
         );
     }
 
     #[test]
     #[should_panic(expected = "===edit:name=== needs ===file:name=== sections")]
     fn edit_with_bare_file() {
-        p("===file===\n<?php\n===expect===\n===edit:test.php===\n<?php\n===expect===\n");
+        p("===file===\n<?php\n===expect===\n<<none>>\n===edit:test.php===\n<?php\n===expect===\n<<none>>\n");
     }
 
     #[test]
     #[should_panic(expected = "===edit:c.php=== names no ===file:c.php=== section")]
     fn edit_of_undeclared_file() {
-        p("===file:a.php===\n<?php\n===expect===\n===edit:c.php===\n<?php\n===expect===\n");
+        p("===file:a.php===\n<?php\n===expect===\n<<none>>\n===edit:c.php===\n<?php\n===expect===\n<<none>>\n");
     }
 
     #[test]
     #[should_panic(expected = "===edit:name=== can't be combined with ===cursor===")]
     fn edit_in_cursor_fixture() {
         p(
-            "===cursor===\nsymbol\n===file:a.php===\n<?php <CURSOR>\n===expect===\n\
-           ===edit:a.php===\n<?php\n===expect===\n",
+            "===cursor===\nsymbol\n===file:a.php===\n<?php <CURSOR>\n===expect===\n<<none>>\n\
+           ===edit:a.php===\n<?php\n===expect===\n<<none>>\n",
         );
     }
 }

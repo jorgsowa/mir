@@ -87,6 +87,7 @@ what the edit changes (`signature/`, `declaration/`, `inheritance/`, `import/`,
 section and replaces that file's text after the files are indexed and warmed.
 Two `===expect===` sections hold the diagnostics an editor shows: the first,
 between the file and edit sections, before the edits; the last after them.
+A section that expects no issues reads `<<none>>`.
 
 ```
 ===file:Lib.php===
@@ -96,6 +97,7 @@ function lib(): int { return 1; }
 <?php
 function run(): int { return lib(); }
 ===expect===
+<<none>>
 ===edit:Lib.php===
 <?php
 function lib(): string { return ''; }

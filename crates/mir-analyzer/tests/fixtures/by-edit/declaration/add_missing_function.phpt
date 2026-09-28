@@ -13,3 +13,4 @@ Use.php: UndefinedFunction@2:23-2:28: Function lib() is not defined
 function other(): void {}
 function lib(): void {}
 ===expect===
+<<none>>

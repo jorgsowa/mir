@@ -7,6 +7,7 @@ class Cfg { const LIMIT = 10; }
 <?php
 function run(): int { return Cfg::LIMIT; }
 ===expect===
+<<none>>
 ===edit:Cfg.php===
 <?php
 class Cfg { const LIMIT = 'ten'; }

@@ -7,6 +7,7 @@ class Box { public int $v = 1; }
 <?php
 function run(Box $b): int { return $b->v; }
 ===expect===
+<<none>>
 ===edit:Box.php===
 <?php
 class Box { public string $v = ''; }

@@ -7,6 +7,7 @@ function lib(int $n): int { return $n; }
 <?php
 function run(): void { lib(1); }
 ===expect===
+<<none>>
 ===edit:Lib.php===
 <?php
 function lib(string $n): string { return $n; }

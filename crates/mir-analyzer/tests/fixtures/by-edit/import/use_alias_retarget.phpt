@@ -19,6 +19,7 @@ class F {
 namespace App;
 function c(): int { return (new F())->b(); }
 ===expect===
+<<none>>
 ===edit:F.php===
 <?php
 namespace App;

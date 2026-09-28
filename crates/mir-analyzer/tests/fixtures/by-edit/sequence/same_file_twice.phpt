@@ -7,6 +7,7 @@ function lib(): int { return 1; }
 <?php
 function run(): int { return lib(); }
 ===expect===
+<<none>>
 ===edit:Lib.php===
 <?php
 function lib(): string { return ''; }
@@ -14,3 +15,4 @@ function lib(): string { return ''; }
 <?php
 function lib(): int { return 2; }
 ===expect===
+<<none>>

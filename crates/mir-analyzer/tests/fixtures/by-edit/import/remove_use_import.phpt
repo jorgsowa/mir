@@ -10,6 +10,7 @@ namespace App;
 use Lib\Box;
 function run(): void { new Box(); }
 ===expect===
+<<none>>
 ===edit:Use.php===
 <?php
 namespace App;

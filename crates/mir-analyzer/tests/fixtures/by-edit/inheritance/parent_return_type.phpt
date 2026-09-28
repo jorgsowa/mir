@@ -10,6 +10,7 @@ class Child extends Base {}
 <?php
 function run(Child $c): int { return $c->id(); }
 ===expect===
+<<none>>
 ===edit:Base.php===
 <?php
 class Base { public function id(): string { return ''; } }

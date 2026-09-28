@@ -12,3 +12,4 @@ Use.php: InvalidReturnType@2:25-2:38: Return type 'int' is not compatible with d
 <?php
 function run(): int { return lib(); }
 ===expect===
+<<none>>
