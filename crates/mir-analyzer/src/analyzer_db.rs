@@ -209,28 +209,17 @@ impl AnalyzerDb {
         let durability = crate::db::durability_for_path(&file);
 
         // Check in-process parse cache first (fastest path, avoids even disk I/O).
-        let cached = db_snapshot.parse_cache().get(&content_hash, php_v);
+        // Definition locations embed the collecting file's path, so only a
+        // same-path entry is reusable.
+        let cached = db_snapshot
+            .parse_cache()
+            .get(&content_hash, php_v)
+            .filter(|cached| cached.slice.file.as_deref() == Some(&*file));
         if let Some(cached) = cached {
             crate::metrics::record_stub_cache_hit();
-            let same_path = cached.slice.file.as_deref() == Some(&*file);
-            let slice_arc = if same_path {
-                cached.slice
-            } else {
-                let mut owned = (*cached.slice).clone();
-                owned.file = Some(file.clone());
-                Arc::new(owned)
-            };
-            let issues = if same_path {
-                cached.issues
-            } else {
-                Arc::new(crate::parse_cache::patch_issue_locations(
-                    &cached.issues,
-                    &file,
-                ))
-            };
             let file_defs = crate::db::FileDefinitions {
-                slice: slice_arc,
-                issues,
+                slice: cached.slice,
+                issues: cached.issues,
             };
             return PreparedIngest {
                 file,

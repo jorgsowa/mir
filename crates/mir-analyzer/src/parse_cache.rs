@@ -36,34 +36,12 @@ type ParseCacheKey = ([u8; 32], u8);
 /// collecting it (parse errors, `BackedEnumCaseTypeMismatch`, docblock
 /// warnings, etc.).
 ///
-/// Both fields are content-hash-derived and path-agnostic in origin — the
-/// `file` field on the slice, and each issue's `location.file`, get patched
-/// to the caller's actual path by whoever consumes a cache entry (see
-/// [`ParseCache::get`]'s callers), the same way [`crate::stub_cache::StubSliceCache`]
-/// patches `StubSlice::file` on its own hits.
+/// Both fields carry the collecting file's path (`StubSlice::file` and every
+/// definition/issue location), so an entry is only valid for that same path.
 #[derive(Clone)]
 pub struct CachedParse {
     pub slice: Arc<StubSlice>,
     pub issues: Arc<Vec<Issue>>,
-}
-
-/// Re-point every issue's `location.file` at `path` — needed when a cache hit
-/// reuses another file's identically-hashed parse result. A no-op clone when
-/// every issue already points at `path` (the common case: re-collecting the
-/// *same* file after its salsa memo was invalidated, not a cross-file reuse).
-pub fn patch_issue_locations(issues: &[Issue], path: &Arc<str>) -> Vec<Issue> {
-    issues
-        .iter()
-        .map(|issue| {
-            if issue.location.file == *path {
-                issue.clone()
-            } else {
-                let mut patched = issue.clone();
-                patched.location.file = path.clone();
-                patched
-            }
-        })
-        .collect()
 }
 
 /// Content-hash-keyed, capacity-bounded cache of parsed [`StubSlice`]s (and

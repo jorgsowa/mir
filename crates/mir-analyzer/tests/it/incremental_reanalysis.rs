@@ -544,3 +544,38 @@ fn re_analyze_file_flags_unused_suppress_without_cache() {
             .collect::<Vec<_>>()
     );
 }
+
+#[test]
+fn redeclared_function_in_new_file_replaces_invalidated_signature() {
+    let use_src = "<?php\nfunction run(): int { return lib(); }\n";
+    let check_use = |session: &mut AnalysisSession, lib_src: &str| {
+        let dir = create_temp_dir("redeclared function");
+        let lib = write_file(&dir, "Lib.php", lib_src);
+        let usage = write_file(&dir, "Use.php", use_src);
+        let (lib, usage): (Arc<str>, Arc<str>) = (
+            Arc::from(lib.to_string_lossy().as_ref()),
+            Arc::from(usage.to_string_lossy().as_ref()),
+        );
+        session.ingest_file(lib.clone(), Arc::from(lib_src));
+        session.ingest_file(usage.clone(), Arc::from(use_src));
+        let kinds: Vec<String> = session
+            .analyze_file_diagnostics(&usage, use_src)
+            .issues
+            .iter()
+            .map(|i| i.kind.name().to_string())
+            .collect();
+        session.invalidate_file(&lib);
+        session.invalidate_file(&usage);
+        kinds
+    };
+
+    let mut session = new_session();
+    assert!(check_use(&mut session, "<?php\nfunction lib(): int { return 1; }\n").is_empty());
+    assert_eq!(
+        check_use(
+            &mut session,
+            "<?php\nfunction lib(): string { return ''; }\n"
+        ),
+        ["InvalidReturnType"]
+    );
+}

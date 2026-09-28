@@ -603,29 +603,17 @@ pub fn collect_file_definitions_uncached(
     // Fast path 1: in-process parse cache (populated by collect_and_ingest_file).
     // Avoids re-parsing files that were already processed in the same session.
     // Safe inside a tracked query: content-addressed by source hash, not mutated.
+    // Definition locations embed the collecting file's path, so only a
+    // same-path entry is reusable.
     if let Some(cached) = db
         .parse_cache()
         .get(&content_hash, php_version.cache_byte())
+        .filter(|cached| cached.slice.file.as_deref() == Some(path))
     {
         crate::metrics::record_stub_cache_hit();
-        if cached.slice.file.as_deref() == Some(path) {
-            // Path matches — share the Arc directly (no data clone needed).
-            return FileDefinitions {
-                slice: cached.slice,
-                issues: cached.issues,
-            };
-        }
-        // Different path — same source text at a different location.
-        // Must fix the `file` field before returning (slice and issues alike).
-        let mut owned = (*cached.slice).clone();
-        owned.file = Some(path.clone());
-        crate::stub_cache::prepare_for_ingest(&mut owned);
         return FileDefinitions {
-            slice: Arc::new(owned),
-            issues: Arc::new(crate::parse_cache::patch_issue_locations(
-                &cached.issues,
-                path,
-            )),
+            slice: cached.slice,
+            issues: cached.issues,
         };
     }
 
