@@ -1,6 +1,5 @@
 ===description===
 `array_filter()` with a non-null predicate narrows the returned values.
-===ignore===
 ===config===
 php_version=8.4
 ===file===

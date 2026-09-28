@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use indexmap::IndexMap;
-use php_ast::owned::{Expr, ExprKind};
+use php_ast::ast::{BinaryOp, UnaryPrefixOp};
+use php_ast::owned::{Expr, ExprKind, StmtKind};
 use php_ast::Span;
 
 use mir_issues::{IssueKind, Severity};
@@ -573,19 +574,101 @@ pub(crate) fn infer_array_reduce_return(
 /// result carries the source array's key and value types (made possibly-empty;
 /// list-ness is dropped because filtering can leave gaps). Returns `None` when
 /// the source element types are unknown so the generic stub `array` is kept.
-pub(crate) fn infer_array_filter_return(arg_types: &[Type]) -> Option<Type> {
+///
+/// One exception: in the default mode (no `ARRAY_FILTER_USE_KEY`/`_BOTH`), a
+/// callback shaped like `fn($v) => !is_null($v)` / `fn($v) => $v !== null`
+/// provably drops every `null` element, so the value type narrows to non-null.
+pub(crate) fn infer_array_filter_return(
+    arg_types: &[Type],
+    callback_expr: Option<&Expr>,
+) -> Option<Type> {
     let source = arg_types.first()?;
     if source.is_mixed() {
         return None;
     }
-    let (key, value) = crate::stmt::infer_foreach_types(source);
+    let (key, mut value) = crate::stmt::infer_foreach_types(source);
     if key.is_mixed() && value.is_mixed() {
         return None;
+    }
+    let default_mode = arg_types
+        .get(2)
+        .is_none_or(|m| m.types.iter().all(|a| matches!(a, Atomic::TLiteralInt(0))));
+    if default_mode && value.is_nullable() && callback_narrows_non_null(callback_expr) {
+        value = value.remove_null();
     }
     Some(Type::single(Atomic::TArray {
         key: Box::new(key),
         value: Box::new(value),
     }))
+}
+
+/// True when `callback_expr` is a single-param closure/arrow function whose
+/// body is exactly a null-exclusion check on that param: `!is_null($v)`,
+/// `$v !== null`/`null !== $v`, or the loose `!=` equivalents.
+fn callback_narrows_non_null(callback_expr: Option<&Expr>) -> bool {
+    let Some(callback_expr) = callback_expr else {
+        return false;
+    };
+    let (params, body) = match &unwrap_parens(callback_expr).kind {
+        ExprKind::ArrowFunction(f) => (&f.params, &*f.body),
+        ExprKind::Closure(c) => {
+            let [stmt] = &*c.body.stmts else {
+                return false;
+            };
+            let StmtKind::Return(Some(expr)) = &stmt.kind else {
+                return false;
+            };
+            (&c.params, &**expr)
+        }
+        _ => return false,
+    };
+    let [param] = &**params else {
+        return false;
+    };
+    let Some(param_name) = param.name.as_deref().map(|n| n.trim_start_matches('$')) else {
+        return false;
+    };
+    is_non_null_check(unwrap_parens(body), param_name)
+}
+
+fn unwrap_parens(expr: &Expr) -> &Expr {
+    match &expr.kind {
+        ExprKind::Parenthesized(inner) => unwrap_parens(inner),
+        _ => expr,
+    }
+}
+
+fn is_non_null_check(expr: &Expr, param_name: &str) -> bool {
+    let is_var = |e: &Expr| {
+        matches!(&unwrap_parens(e).kind, ExprKind::Variable(name) if name.trim_start_matches('$') == param_name)
+    };
+    match &expr.kind {
+        ExprKind::UnaryPrefix(u) => {
+            u.op == UnaryPrefixOp::BooleanNot && is_is_null_call(&u.operand, &is_var)
+        }
+        ExprKind::Binary(b) => {
+            matches!(b.op, BinaryOp::NotIdentical | BinaryOp::NotEqual)
+                && ((is_var(&b.left) && matches!(unwrap_parens(&b.right).kind, ExprKind::Null))
+                    || (is_var(&b.right) && matches!(unwrap_parens(&b.left).kind, ExprKind::Null)))
+        }
+        _ => false,
+    }
+}
+
+fn is_is_null_call(expr: &Expr, is_var: &impl Fn(&Expr) -> bool) -> bool {
+    let ExprKind::FunctionCall(call) = &unwrap_parens(expr).kind else {
+        return false;
+    };
+    let ExprKind::Identifier(name) = &call.name.kind else {
+        return false;
+    };
+    if crate::util::php_ident_lowercase(name) != "is_null" {
+        return false;
+    }
+    let [arg] = &*call.args else {
+        return false;
+    };
+    arg.value.as_ref().is_some_and(is_var)
 }
 
 /// Infer the result type of `array_slice($array, $offset, $length, $preserve_keys)`.

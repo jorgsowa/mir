@@ -1037,8 +1037,14 @@ impl CallAnalyzer {
                         )
                         .unwrap_or(return_ty)
                     }
-                    "array_filter" => super::array_builtins::infer_array_filter_return(&arg_types)
-                        .unwrap_or(return_ty),
+                    "array_filter" => {
+                        let callback_expr = call.args.get(1).and_then(|a| a.value.as_ref());
+                        super::array_builtins::infer_array_filter_return(
+                            &arg_types,
+                            callback_expr,
+                        )
+                        .unwrap_or(return_ty)
+                    }
                     "array_reduce" => {
                         let callback_expr = call.args.get(1).and_then(|a| a.value.as_ref());
                         super::array_builtins::infer_array_reduce_return(
