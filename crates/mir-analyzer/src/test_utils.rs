@@ -128,8 +128,9 @@
 //! ```
 //!
 //! Replays an editor session: the files are ingested and warmed on a
-//! snapshot, each edit replaces its file's text in place, then open-file
-//! diagnostics are asserted for the edited files first and the rest after.
+//! snapshot, each edit replaces its file's text in place, then open-file and
+//! class-level diagnostics are asserted for the edited files first and the
+//! rest after.
 //!
 //! # Validation rules
 //!
@@ -794,7 +795,11 @@ fn run_edit_fixture(path: &str, content: &str, mut fixture: ParsedFixture) {
         order.extend(rest);
         order
             .into_iter()
-            .flat_map(|file| session.analyze_file_diagnostics(file, &read(file)).issues)
+            .flat_map(|file| {
+                let mut issues = session.analyze_file_diagnostics(file, &read(file)).issues;
+                issues.extend(session.class_issues(std::slice::from_ref(file)));
+                issues
+            })
             .filter(|i| !i.suppressed && !suppressed.contains(i.kind.display_name()))
             .collect::<Vec<_>>()
     });
@@ -1607,5 +1612,55 @@ mod parser_validation {
     #[should_panic(expected = "===cursor=== must appear before the first ===file===")]
     fn cursor_after_file_marker() {
         p("===file===\n<?php <CURSOR>\n===cursor===\nsymbol\n===expect===\n");
+    }
+
+    #[test]
+    fn edits_are_split_from_files_in_order() {
+        let f = p(
+            "===file:a.php===\n<?php a();\n===file:b.php===\n<?php b();\n\
+                   ===edit:b.php===\n<?php b2();\n===edit:a.php===\n<?php a2();\n\
+                   ===edit:b.php===\n<?php b3();\n===expect===\n",
+        );
+        assert_eq!(f.files[0].1, "<?php a();");
+        assert_eq!(f.files[1].1, "<?php b();");
+        let edits: Vec<_> = f
+            .edits
+            .iter()
+            .map(|(n, t)| (n.as_str(), t.as_str()))
+            .collect();
+        assert_eq!(
+            edits,
+            [
+                ("b.php", "<?php b2();"),
+                ("a.php", "<?php a2();"),
+                ("b.php", "<?php b3();")
+            ]
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "===edit:name=== must follow every file section")]
+    fn edit_before_file_section() {
+        p("===file:a.php===\n<?php\n===edit:a.php===\n<?php\n\
+           ===file:b.php===\n<?php\n===expect===\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "===edit:name=== needs ===file:name=== sections")]
+    fn edit_with_bare_file() {
+        p("===file===\n<?php\n===edit:test.php===\n<?php\n===expect===\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "===edit:c.php=== names no ===file:c.php=== section")]
+    fn edit_of_undeclared_file() {
+        p("===file:a.php===\n<?php\n===edit:c.php===\n<?php\n===expect===\n");
+    }
+
+    #[test]
+    #[should_panic(expected = "===edit:name=== can't be combined with ===cursor===")]
+    fn edit_in_cursor_fixture() {
+        p("===cursor===\nsymbol\n===file:a.php===\n<?php <CURSOR>\n\
+           ===edit:a.php===\n<?php\n===expect===\n");
     }
 }
