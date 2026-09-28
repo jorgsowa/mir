@@ -9,6 +9,7 @@ class Child extends Base {}
 ===file:Use.php===
 <?php
 function run(Child $c): int { return $c->id(); }
+===expect===
 ===edit:Base.php===
 <?php
 class Base { public function id(): string { return ''; } }

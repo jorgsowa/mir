@@ -84,8 +84,9 @@ test.php@2:0-2:41
 Incremental behavior is tested under `tests/fixtures/by-edit/`, grouped by
 what the edit changes (`signature/`, `declaration/`, `inheritance/`, `import/`,
 `body/`, `sequence/`). Each `===edit:name===` section follows every file
-section and replaces that file's text after the files are indexed and warmed;
-`===expect===` holds the diagnostics an editor shows after the edits.
+section and replaces that file's text after the files are indexed and warmed.
+Two `===expect===` sections hold the diagnostics an editor shows: the first,
+between the file and edit sections, before the edits; the last after them.
 
 ```
 ===file:Lib.php===
@@ -94,6 +95,7 @@ function lib(): int { return 1; }
 ===file:Use.php===
 <?php
 function run(): int { return lib(); }
+===expect===
 ===edit:Lib.php===
 <?php
 function lib(): string { return ''; }

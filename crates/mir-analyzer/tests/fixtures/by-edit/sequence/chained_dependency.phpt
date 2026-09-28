@@ -11,6 +11,7 @@ function b() { return a(); }
 ===file:C.php===
 <?php
 function c(): int { return b(); }
+===expect===
 ===edit:A.php===
 <?php
 function a(): string { return ''; }

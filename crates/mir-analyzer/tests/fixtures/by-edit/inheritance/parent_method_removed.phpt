@@ -9,6 +9,7 @@ class Child extends Base {}
 ===file:Use.php===
 <?php
 function run(Child $c): void { $c->hello(); }
+===expect===
 ===edit:Base.php===
 <?php
 class Base {}

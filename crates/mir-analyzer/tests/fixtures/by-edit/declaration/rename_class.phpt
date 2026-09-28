@@ -6,6 +6,7 @@ class Box {}
 ===file:Use.php===
 <?php
 function run(): void { new Box(); }
+===expect===
 ===edit:Box.php===
 <?php
 class Crate {}

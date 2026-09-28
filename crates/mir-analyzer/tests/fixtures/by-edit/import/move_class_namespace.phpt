@@ -9,6 +9,7 @@ class Box {}
 namespace App;
 use Lib\Box;
 function run(): void { new Box(); }
+===expect===
 ===edit:Lib.php===
 <?php
 namespace Other;

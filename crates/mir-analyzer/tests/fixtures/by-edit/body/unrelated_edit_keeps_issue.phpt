@@ -6,6 +6,8 @@ function lib(): string { return ''; }
 ===file:Use.php===
 <?php
 function run(): int { return lib(); }
+===expect===
+Use.php: InvalidReturnType@2:22-2:35: Return type 'string' is not compatible with declared 'int'
 ===edit:Lib.php===
 <?php
 function lib(): string { return 'changed'; }
