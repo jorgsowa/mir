@@ -12,6 +12,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Re-analysis after an edit no longer panics with "Data for reusable `Fqcn`
   was not interned in the latest revision" when a cached inference reused a
   name another file resolved first in the same pass.
+- Inferred return types through a cross-file cycle (`A::f()` → `B::g()` →
+  `A::h()`) no longer depend on which file a session analyzes first, and
+  calls between unannotated functions in the same file now use the callee's
+  inferred type instead of `mixed`. A return type that keeps growing through
+  recursion widens to `mixed`.
+
+### Changed
+
+- Inferred return types are computed only for calls whose declared return type
+  doesn't already decide the result, cutting cold analysis of Laravel from
+  ~2.6s to ~1.5s and peak memory by ~37%.
 
 ## [0.79.0] - 2026-09-26
 

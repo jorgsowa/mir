@@ -779,12 +779,36 @@ fn infer_file_return_types_initial(
 
 fn infer_file_return_types_cycle(
     _db: &dyn MirDatabase,
-    _cycle: &salsa::Cycle,
-    _last: &InferredFileTypes,
-    _value: InferredFileTypes,
+    cycle: &salsa::Cycle,
+    last: &InferredFileTypes,
+    value: InferredFileTypes,
     _file: SourceFile,
 ) -> InferredFileTypes {
-    InferredFileTypes::empty()
+    if !crate::db::inferred_types::should_widen(cycle) {
+        return value;
+    }
+    InferredFileTypes {
+        functions: Arc::new(widen_unstable_map(&last.functions, &value.functions)),
+        methods: Arc::new(widen_unstable_map(&last.methods, &value.methods)),
+        properties: Arc::new(widen_unstable_map(&last.properties, &value.properties)),
+    }
+}
+
+fn widen_unstable_map<K: Eq + std::hash::Hash + Clone>(
+    last: &FxHashMap<K, Arc<Type>>,
+    value: &FxHashMap<K, Arc<Type>>,
+) -> FxHashMap<K, Arc<Type>> {
+    value
+        .iter()
+        .map(|(k, ty)| {
+            let ty = if last.get(k) == Some(ty) {
+                ty.clone()
+            } else {
+                mir_codebase::definitions::wrap_var_type(Type::mixed())
+            };
+            (k.clone(), ty)
+        })
+        .collect()
 }
 
 /// Memoized parse of the configured PHP version string.

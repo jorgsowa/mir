@@ -23,6 +23,7 @@ mod incremental_index;
 mod incremental_reanalysis;
 mod indexed_queries;
 mod indexing_responsiveness;
+mod inferred_type_cycles;
 mod inline_suppression_cache;
 mod lazy_load;
 mod lazy_load_open_file;

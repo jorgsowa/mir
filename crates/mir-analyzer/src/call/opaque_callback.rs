@@ -22,8 +22,6 @@
 //! positional args) — a reasonable V1 simplification since the vast
 //! majority of `array_map`-style callback params are positional.
 
-use std::cell::RefCell;
-use std::collections::HashSet;
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
@@ -173,47 +171,17 @@ pub(crate) fn file_callable_call_args(
     Arc::from(scanner.out)
 }
 
-thread_local! {
-    // Guards against re-entrant demand for the same (callee, position) key.
-    // Nothing in this module triggers full body analysis (only pre-computed
-    // declared signatures and a purely syntactic per-file scan are
-    // consulted), so a genuine cycle is unlikely, but a defensive guard
-    // costs nothing and mirrors the proven idiom in
-    // `db::inferred_types::INFER_IN_PROGRESS`.
-    static OPAQUE_CB_IN_PROGRESS: RefCell<HashSet<(CalleeKey, u16)>> = RefCell::new(HashSet::new());
-}
-
-struct OpaqueCbGuard(CalleeKey, u16);
-
-impl Drop for OpaqueCbGuard {
-    fn drop(&mut self) {
-        OPAQUE_CB_IN_PROGRESS.with(|s| {
-            s.borrow_mut().remove(&(self.0.clone(), self.1));
-        });
-    }
-}
-
 /// Union the return types of every statically-resolvable concrete callable
 /// passed to `callee` at `arg_position` across the whole workspace. Returns
 /// `None` when no caller passes a resolvable callable there (no callers at
-/// all, every caller's argument is itself opaque, or re-entrant recursion
-/// was detected and broken) — callers treat this exactly like "no callback
-/// return type known," falling back to the generic stub return.
+/// all, or every caller's argument is itself opaque) — callers treat this
+/// exactly like "no callback return type known," falling back to the
+/// generic stub return.
 pub(crate) fn opaque_callback_return_type(
     db: &dyn MirDatabase,
     callee: &CalleeKey,
     arg_position: u16,
 ) -> Option<Type> {
-    let key = (callee.clone(), arg_position);
-    let already_active = OPAQUE_CB_IN_PROGRESS.with(|s| s.borrow().contains(&key));
-    if already_active {
-        return None;
-    }
-    OPAQUE_CB_IN_PROGRESS.with(|s| {
-        s.borrow_mut().insert(key.clone());
-    });
-    let _guard = OpaqueCbGuard(callee.clone(), arg_position);
-
     let mut acc: Option<Type> = None;
     for file in db.all_source_files() {
         for rec in file_callable_call_args(db, file).iter() {

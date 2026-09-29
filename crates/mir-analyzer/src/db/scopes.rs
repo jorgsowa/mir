@@ -57,6 +57,20 @@ pub struct ScopeInferenceResult {
     pub(crate) inferred_types: Arc<crate::body_analysis::InferredTypes>,
 }
 
+impl ScopeInferenceResult {
+    fn empty() -> Arc<Self> {
+        Arc::new(Self {
+            issues: Arc::from([]),
+            ref_locs: Arc::from([]),
+            inferred_types: Arc::new(crate::body_analysis::InferredTypes {
+                functions: Vec::new(),
+                methods: Vec::new(),
+                properties: Vec::new(),
+            }),
+        })
+    }
+}
+
 /// Declaration scopes of `file` in source order (file-frame scopes are
 /// implicit). Drives [`analyze_file_per_scope`]'s merge order.
 #[salsa::tracked]
@@ -131,32 +145,23 @@ fn for_each_top_level_decl<'a>(
 ///
 /// `lru = 4096` bounds the memo table: keys embed the resolved FQN, so a
 /// rename storm would otherwise mint a permanent memo per historical name.
-#[salsa::tracked(lru = 4096)]
+///
+/// Cross-file inferred-type demands can re-enter a scope still on the stack
+/// (`A::f` → `B::g` → `A::h`); salsa then fixpoint-iterates from an empty
+/// result, so the memo is independent of which scope was demanded first.
+#[salsa::tracked(lru = 4096, cycle_fn = infer_scope_cycle, cycle_initial = infer_scope_initial)]
 pub fn infer_scope(
     db: &dyn MirDatabase,
     file: SourceFile,
     scope: ScopeKey,
 ) -> Arc<ScopeInferenceResult> {
     let prepared = super::queries::prepare_analysis_file(db, file);
-    let _guard = super::inferred_types::try_mark_infer_in_progress(prepared.path.clone());
     let path = &prepared.path;
     let text = &prepared.text;
     let parsed = prepared.parse_result();
 
-    let empty = || {
-        Arc::new(ScopeInferenceResult {
-            issues: Arc::from([]),
-            ref_locs: Arc::from([]),
-            inferred_types: Arc::new(crate::body_analysis::InferredTypes {
-                functions: Vec::new(),
-                methods: Vec::new(),
-                properties: Vec::new(),
-            }),
-        })
-    };
-
     if prepared.has_hard_parse_errors {
-        return empty();
+        return ScopeInferenceResult::empty();
     }
 
     let driver = BodyAnalyzer::new(db, prepared.php_version);
@@ -297,6 +302,38 @@ pub fn infer_scope(
         issues: issues.into(),
         ref_locs: ref_locs.into(),
         inferred_types,
+    })
+}
+
+fn infer_scope_initial(
+    _db: &dyn MirDatabase,
+    _id: salsa::Id,
+    _file: SourceFile,
+    _scope: ScopeKey,
+) -> Arc<ScopeInferenceResult> {
+    ScopeInferenceResult::empty()
+}
+
+fn infer_scope_cycle(
+    _db: &dyn MirDatabase,
+    cycle: &salsa::Cycle,
+    last: &Arc<ScopeInferenceResult>,
+    value: Arc<ScopeInferenceResult>,
+    _file: SourceFile,
+    _scope: ScopeKey,
+) -> Arc<ScopeInferenceResult> {
+    if !super::inferred_types::should_widen(cycle) {
+        return value;
+    }
+    use super::inferred_types::widen_unstable;
+    let (prev, mut next) = (&last.inferred_types, (*value.inferred_types).clone());
+    widen_unstable(&prev.functions, &mut next.functions, |e| &mut e.1);
+    widen_unstable(&prev.methods, &mut next.methods, |e| &mut e.2);
+    widen_unstable(&prev.properties, &mut next.properties, |e| &mut e.2);
+    Arc::new(ScopeInferenceResult {
+        issues: value.issues.clone(),
+        ref_locs: value.ref_locs.clone(),
+        inferred_types: Arc::new(next),
     })
 }
 

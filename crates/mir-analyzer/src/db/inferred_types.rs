@@ -5,38 +5,32 @@
 //! return types on demand via the salsa query graph.  No pre-committed
 //! singleton is needed.
 
-use std::cell::RefCell;
-use std::collections::HashSet;
 use std::sync::Arc;
 
 use mir_types::Type;
 
 use crate::db::{Fqcn, MirDatabase};
 
-thread_local! {
-    // Guards against re-entrant demand for a file currently being inferred on
-    // this thread. When mutually-referential classes trigger a cycle that salsa
-    // hasn't closed yet, the same file can be demanded again before the first
-    // inference completes.  Returning None (→ mixed) breaks the recursion and
-    // lets the fixpoint converge.
-    static INFER_IN_PROGRESS: RefCell<HashSet<Arc<str>>> = RefCell::new(HashSet::new());
+/// Fixpoint iterations after which a cycle head's still-changing inferred
+/// types widen to `mixed`, so an ever-growing type (`return [$this->f()];`)
+/// converges instead of hitting salsa's iteration cap.
+const WIDEN_AFTER_ITERATIONS: u32 = 3;
+
+pub(crate) fn should_widen(cycle: &salsa::Cycle) -> bool {
+    cycle.iteration() >= WIDEN_AFTER_ITERATIONS
 }
 
-pub(crate) struct InferGuard(Arc<str>);
-
-impl Drop for InferGuard {
-    fn drop(&mut self) {
-        INFER_IN_PROGRESS.with(|s| s.borrow_mut().remove(&self.0));
+/// Replace each entry of `value` absent from `last` with `mixed`.
+pub(crate) fn widen_unstable<T: PartialEq>(
+    last: &[T],
+    value: &mut [T],
+    ty: impl Fn(&mut T) -> &mut Type,
+) {
+    for entry in value.iter_mut() {
+        if !last.contains(entry) {
+            *ty(entry) = Type::mixed();
+        }
     }
-}
-
-pub(crate) fn try_mark_infer_in_progress(path: Arc<str>) -> Option<InferGuard> {
-    let already_active = INFER_IN_PROGRESS.with(|s| s.borrow().contains(&path));
-    if already_active {
-        return None;
-    }
-    INFER_IN_PROGRESS.with(|s| s.borrow_mut().insert(path.clone()));
-    Some(InferGuard(path))
 }
 
 /// Demand-driven inferred return type lookup for a function.
@@ -47,8 +41,6 @@ pub(crate) fn try_mark_infer_in_progress(path: Arc<str>) -> Option<InferGuard> {
 /// Returns `None` when the function is unknown.
 pub fn inferred_function_return_type_demand(db: &dyn MirDatabase, fqn: &str) -> Option<Arc<Type>> {
     let sf = crate::db::function_loc(db, Fqcn::from_str(db, fqn))?.file();
-    let path = sf.path(db).clone();
-    let _guard = try_mark_infer_in_progress(path)?;
     let inferred = crate::db::infer_file_return_types(db, sf);
     inferred.functions.get(fqn).cloned()
 }
@@ -65,8 +57,6 @@ pub fn inferred_method_return_type_demand(
     method_name_lower: &str,
 ) -> Option<Arc<Type>> {
     let sf = crate::db::class_like_loc(db, Fqcn::from_str(db, fqcn))?.file();
-    let path = sf.path(db).clone();
-    let _guard = try_mark_infer_in_progress(path)?;
     let inferred = crate::db::infer_file_return_types(db, sf);
     inferred
         .methods
@@ -90,8 +80,6 @@ pub fn inferred_property_type_demand(
     name: &str,
 ) -> Option<Arc<Type>> {
     let sf = crate::db::class_like_loc(db, Fqcn::from_str(db, fqcn))?.file();
-    let path = sf.path(db).clone();
-    let _guard = try_mark_infer_in_progress(path)?;
     let inferred = crate::db::infer_file_return_types(db, sf);
     inferred
         .properties

@@ -64,28 +64,24 @@ pub(crate) struct ResolvedMethod {
     pub(crate) assertions: Vec<Assertion>,
 }
 
-fn inferred_refines_native_bare_object_return(native: &Type, inferred: &Type) -> bool {
-    if native.from_docblock || inferred.is_mixed() {
-        return false;
+/// FQCN of a native (non-docblock) bare object hint like `: Collection`, which
+/// an inferred `Collection<int, User>` may refine.
+fn bare_native_object_fqcn(native: &Type) -> Option<&mir_types::Name> {
+    if native.from_docblock {
+        return None;
     }
-    let [Atomic::TNamedObject {
-        fqcn: native_fqcn,
-        type_params: native_params,
-    }] = native.types.as_slice()
-    else {
-        return false;
-    };
-    if !native_params.is_empty() {
-        return false;
+    match native.types.as_slice() {
+        [Atomic::TNamedObject { fqcn, type_params }] if type_params.is_empty() => Some(fqcn),
+        _ => None,
     }
-    let [Atomic::TNamedObject {
-        fqcn: inferred_fqcn,
-        type_params: inferred_params,
-    }] = inferred.types.as_slice()
-    else {
-        return false;
-    };
-    native_fqcn == inferred_fqcn && !inferred_params.is_empty()
+}
+
+fn inferred_refines_bare_object(native_fqcn: &mir_types::Name, inferred: &Type) -> bool {
+    matches!(
+        inferred.types.as_slice(),
+        [Atomic::TNamedObject { fqcn, type_params }]
+            if fqcn == native_fqcn && !type_params.is_empty()
+    )
 }
 
 /// Resolve a method via the Salsa db, walking the class ancestor chain.
@@ -105,7 +101,8 @@ pub(crate) fn resolve_method_from_db(
         } else {
             name.clone()
         };
-        let inferred = crate::db::inferred_method_return_type_demand(db, &owner_fqcn, &name_lower);
+        let inferred =
+            || crate::db::inferred_method_return_type_demand(db, &owner_fqcn, &name_lower);
 
         // Resolve @inheritDoc: when the method has no docblock-annotated return type
         // or unannotated params, inherit them from the nearest ancestor that has them.
@@ -135,14 +132,12 @@ pub(crate) fn resolve_method_from_db(
             own_return
         } else if let Some(parent_return) = parent.as_ref().and_then(|p| p.return_type.clone()) {
             Some(parent_return)
-        } else if let (Some(native), Some(inferred_return)) = (&own_return, &inferred) {
-            if inferred_refines_native_bare_object_return(native, inferred_return) {
-                inferred
-            } else {
-                own_return
-            }
+        } else if let Some(native) = own_return {
+            let refined = bare_native_object_fqcn(&native)
+                .and_then(|fqcn| inferred().filter(|t| inferred_refines_bare_object(fqcn, t)));
+            Some(refined.unwrap_or(native))
         } else {
-            own_return.or(inferred)
+            inferred()
         }
         .map(|t| crate::util::reconcile_docblock_builtin_shadow(db, return_type_file, (*t).clone()))
         .unwrap_or_else(Type::mixed);

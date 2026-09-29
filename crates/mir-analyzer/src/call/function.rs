@@ -41,7 +41,6 @@ struct ResolvedFn {
 
 fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
     let db = ea.db;
-    let inferred = crate::db::inferred_function_return_type_demand(db, fqn);
     let here = crate::db::Fqcn::from_str(db, fqn);
     if let Some(f) = crate::db::find_function(db, here) {
         let param_file = f
@@ -52,7 +51,7 @@ fn resolve_fn(ea: &ExpressionAnalyzer<'_>, fqn: &str) -> Option<ResolvedFn> {
         let return_ty_raw = f
             .return_type
             .clone()
-            .or(inferred)
+            .or_else(|| crate::db::inferred_function_return_type_demand(db, fqn))
             .map(|t| (*t).clone())
             .unwrap_or_else(Type::mixed);
         return Some(ResolvedFn {
