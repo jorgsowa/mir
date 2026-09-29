@@ -1,6 +1,5 @@
 ===description===
 Go-to-definition on the class token of a class-constant fetch lands on the class.
-===ignore===
 ===cursor===
 definition
 ===file===

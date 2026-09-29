@@ -1635,6 +1635,11 @@ impl<'a> ExpressionAnalyzer<'a> {
         }
 
         self.record_class_ref(&fqcn, cca.class.span);
+        self.record_symbol(
+            cca.class.span,
+            ReferenceKind::ClassReference(Arc::from(fqcn.as_str())),
+            Type::single(Atomic::TClassString(None)),
+        );
 
         let here = crate::db::Fqcn::from_str(self.db, &fqcn);
         // Check if the class is deprecated
