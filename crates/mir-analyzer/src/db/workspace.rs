@@ -398,6 +398,22 @@ impl WorkspaceSymbolIndex {
     }
 }
 
+impl WorkspaceSymbolIndex {
+    pub(crate) fn same_contents(&self, other: &Self) -> bool {
+        fn same<V: PartialEq>(a: &Arc<FxHashMap<Name, V>>, b: &Arc<FxHashMap<Name, V>>) -> bool {
+            Arc::ptr_eq(a, b) || **a == **b
+        }
+        same(&self.class_like, &other.class_like)
+            && same(&self.functions, &other.functions)
+            && same(&self.constants, &other.constants)
+            && same(&self.class_like_collisions, &other.class_like_collisions)
+            && same(&self.function_collisions, &other.function_collisions)
+            && same(&self.constant_collisions, &other.constant_collisions)
+    }
+}
+
+// Pointer equality on purpose: the fallback walk `workspace_symbol_index` must not backdate,
+// or memos computed before the singleton existed would never switch over to it.
 impl PartialEq for WorkspaceSymbolIndex {
     fn eq(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.class_like, &other.class_like)

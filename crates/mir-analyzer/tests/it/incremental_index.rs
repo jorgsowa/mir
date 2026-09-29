@@ -273,6 +273,32 @@ fn declaration_edit_reruns_only_scopes_whose_lookups_changed() {
     assert_eq!(undefined_class_count(&session), 1);
 }
 
+/// Rebuilding an index with unchanged contents leaves the singleton input untouched.
+#[test]
+fn rebuild_with_unchanged_declarations_does_not_write_the_index() {
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ingest_file(
+        Arc::from("/proj/Dep.php"),
+        Arc::from("<?php\nnamespace App;\nclass Dep {}\nfunction dep(): void {}\n"),
+    );
+    let index_revision = |session: &AnalysisSession| {
+        let db = session.snapshot_db();
+        let revision = *db.workspace_symbol_index_singleton().unwrap().revision(&db);
+        revision
+    };
+    session.rebuild_workspace_symbol_index();
+    let before = index_revision(&session);
+
+    session.rebuild_workspace_symbol_index();
+    assert_eq!(index_revision(&session), before);
+
+    session.ingest_file(
+        Arc::from("/proj/Extra.php"),
+        Arc::from("<?php\nnamespace App;\nclass Extra {}\n"),
+    );
+    assert_ne!(index_revision(&session), before);
+}
+
 // ─── cancellation ─────────────────────────────────────────────────────────────
 
 /// A pre-cancelled token makes `index_batch` a no-op that reports `cancelled`.

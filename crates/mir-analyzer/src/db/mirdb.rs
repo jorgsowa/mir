@@ -791,7 +791,7 @@ impl MirDbStorage {
 
     /// Commit a freshly-built [`WorkspaceSymbolIndex`] onto the singleton
     /// input (creating it on first call), at `Durability::HIGH`. Skips the
-    /// write when the new index is `Arc::ptr_eq`-equal to the existing one.
+    /// write when the new index has the same contents as the existing one.
     fn set_workspace_index(&mut self, new_index: crate::db::WorkspaceSymbolIndex) {
         use crate::db::WorkspaceSymbolIndexSingleton;
         use salsa::Setter as _;
@@ -799,7 +799,7 @@ impl MirDbStorage {
         match existing {
             Some(s) => {
                 let old = s.index(self);
-                if *old != new_index {
+                if !old.same_contents(&new_index) {
                     // Bump `revision` in lockstep with `index` so frozen-path
                     // readers (which anchor on `revision` to avoid cloning the
                     // maps) are invalidated exactly when the index changes.
