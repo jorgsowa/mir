@@ -67,6 +67,15 @@ impl<'a> DbView<'a> {
 
 // Without a `Drop` impl, NLL ends the owner borrow at the view's last use
 // while its db clone lives on to the end of scope.
+struct ConstantDeclSite {
+    file: Arc<str>,
+    line: u32,
+    stmt_col: u32,
+    stmt_end: u32,
+    name_col: u32,
+    name_len: u32,
+}
+
 impl Drop for DbView<'_> {
     fn drop(&mut self) {}
 }
@@ -217,7 +226,9 @@ impl AnalysisSnapshot {
                 crate::db::member_location(db, class, name)
                     .ok_or(crate::SymbolLookupError::NotFound)
             }
-            crate::Name::GlobalConstant(_) => Err(crate::SymbolLookupError::NoSourceLocation),
+            crate::Name::GlobalConstant(fqn) => self
+                .global_constant_location(fqn)
+                .ok_or(crate::SymbolLookupError::NoSourceLocation),
         }
     }
 
@@ -855,12 +866,11 @@ impl AnalysisSnapshot {
         fallback
     }
 
-    /// Declaration name span for a global constant. Constant slices carry no
-    /// stored location, so this finds the declaring file via the workspace
-    /// constants index and locates the `const NAME` / `define('NAME'` token
-    /// textually.
-    fn global_constant_decl_range(&self, fqn: &str) -> Option<(Arc<str>, crate::Range)> {
-        let short = crate::db::subtype_index::short_name_of(fqn).to_string();
+    /// Declaring line of a global constant. Constant slices carry no stored
+    /// location, so this finds the declaring file via the workspace constants
+    /// index and locates the `const NAME` / `define('NAME'` line textually.
+    fn global_constant_decl_site(&self, fqn: &str) -> Option<ConstantDeclSite> {
+        let short = crate::db::subtype_index::short_name_of(fqn);
         let db = &self.db;
         let index = crate::db::workspace_index(db);
         let loc = index.constant_loc(mir_types::Name::from(fqn.trim_start_matches('\\')))?;
@@ -875,12 +885,40 @@ impl AnalysisSnapshot {
             if !is_decl_line {
                 continue;
             }
-            if let Some(col) = identifier_char_col(line, &short, 0, false) {
-                let n = short.chars().count() as u32;
-                return Some((file, span_range(idx as u32 + 1, col, col + n)));
+            if let Some(name_col) = identifier_char_col(line, short, 0, false) {
+                let stmt_end = match line.find(';') {
+                    Some(byte) => line[..=byte].chars().count(),
+                    None => line.chars().count(),
+                };
+                return Some(ConstantDeclSite {
+                    file,
+                    line: idx as u32 + 1,
+                    stmt_col: (line.chars().count() - trimmed.chars().count()) as u32,
+                    stmt_end: stmt_end as u32,
+                    name_col,
+                    name_len: short.chars().count() as u32,
+                });
             }
         }
         None
+    }
+
+    fn global_constant_decl_range(&self, fqn: &str) -> Option<(Arc<str>, crate::Range)> {
+        let site = self.global_constant_decl_site(fqn)?;
+        let range = span_range(site.line, site.name_col, site.name_col + site.name_len);
+        Some((site.file, range))
+    }
+
+    /// Whole-statement location of a user global constant's declaration.
+    fn global_constant_location(&self, fqn: &str) -> Option<mir_types::Location> {
+        let site = self.global_constant_decl_site(fqn)?;
+        Some(mir_types::Location {
+            file: site.file,
+            line: site.line,
+            line_end: site.line,
+            col_start: site.stmt_col as u16,
+            col_end: site.stmt_end as u16,
+        })
     }
 
     /// Files declaring transitive subclasses of `class_fqn` anywhere in the

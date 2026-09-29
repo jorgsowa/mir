@@ -1,6 +1,5 @@
 ===description===
 Go-to-definition on a user-defined global constant lands on its `const` declaration.
-===ignore===
 ===cursor===
 definition
 ===file===

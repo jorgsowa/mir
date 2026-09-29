@@ -1,6 +1,5 @@
 ===description===
 Go-to-definition on a `define()`d constant lands on the `define()` call.
-===ignore===
 ===cursor===
 definition
 ===file===
