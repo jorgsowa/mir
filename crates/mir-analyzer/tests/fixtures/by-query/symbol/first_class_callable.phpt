@@ -1,6 +1,5 @@
 ===description===
 A first-class callable resolves to the function, typed as the Closure the expression produces.
-===ignore===
 ===cursor===
 symbol
 ===file===

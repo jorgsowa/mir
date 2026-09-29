@@ -758,17 +758,6 @@ impl<'a> ExpressionAnalyzer<'a> {
                             .as_deref()
                             .cloned()
                             .unwrap_or_else(Type::mixed);
-                        // Record a hover/go-to-definition symbol, matching the plain
-                        // `foo()` call form — otherwise the direct-call path records
-                        // both record_ref and record_symbol, but this first-class-
-                        // callable form (`foo(...)`) only got the former, so
-                        // find-references/dead-code worked but hover on the name
-                        // token inside `(...)` silently resolved nothing.
-                        self.record_symbol(
-                            name_expr.span,
-                            ReferenceKind::FunctionCall(f.fqn.clone()),
-                            return_ty.clone(),
-                        );
                         // No receiver for a plain function — self/static/parent can't
                         // legally appear in its signature, so an empty fqcn/type-param
                         // list is a safe no-op for build_closure_from_resolved_params's
@@ -778,7 +767,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         // doc comment) instead of leaking as bare, unchecked
                         // TTemplateParam atoms into every call through the closure.
                         let empty_fqcn: Arc<str> = Arc::from("");
-                        return Type::single(Self::build_closure_from_resolved_params(
+                        let closure_ty = Type::single(Self::build_closure_from_resolved_params(
                             &f.params,
                             return_ty,
                             &rustc_hash::FxHashMap::default(),
@@ -786,6 +775,13 @@ impl<'a> ExpressionAnalyzer<'a> {
                             &empty_fqcn,
                             &[],
                         ));
+                        // Hover on the name shows the Closure the expression produces.
+                        self.record_symbol(
+                            name_expr.span,
+                            ReferenceKind::FunctionCall(f.fqn.clone()),
+                            closure_ty.clone(),
+                        );
+                        return closure_ty;
                     }
                 }
                 Type::single(bare_closure())
