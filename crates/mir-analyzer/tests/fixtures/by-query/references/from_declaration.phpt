@@ -1,6 +1,5 @@
 ===description===
 Find-references with the cursor on a declaration's name resolves that declaration.
-===ignore===
 ===cursor===
 references include_declaration
 ===file===

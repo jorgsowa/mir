@@ -865,6 +865,19 @@ impl<'a> BodyAnalyzer<'a> {
         use crate::stmt::StatementsAnalyzer;
         let fqcn: &str = cx.fqcn.as_ref();
 
+        if self.collect_navigation_facts {
+            if let Some(name) = method.name.as_deref() {
+                let span = super::method_header_name_span(source, method);
+                if span.end > span.start {
+                    self.navigation_facts.borrow_mut().push(NavigationFact {
+                        span,
+                        expr_span: None,
+                        name: crate::Name::method(cx.fqcn.clone(), name),
+                    });
+                }
+            }
+        }
+
         // Record the declaration name under a name-only key so
         // find-references with an unresolvable receiver (`$x->foo()` on an
         // untyped `$x`) can still surface matching declarations.
