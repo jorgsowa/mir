@@ -14,45 +14,45 @@ impl AnalysisSession {
         for _ in 0..max_depth {
             let mut to_load: Vec<(String, PathBuf)> = Vec::new();
 
-            let mut candidates: Vec<String> = Vec::new();
-            let db = self.snapshot_db();
-            for fqcn in crate::db::workspace_classes(&db).iter() {
-                if scanned.contains(fqcn.as_str()) {
-                    continue;
-                }
-                let here = crate::db::Fqcn::from_str(&db, fqcn.as_str());
-                let Some(class) = crate::db::find_class_like(&db, here) else {
-                    continue;
-                };
-                scanned.insert(Arc::from(fqcn.as_str()));
-                collect_class_referenced_fqcns(&class, &mut candidates);
-            }
-            let import_snapshots = db.file_import_snapshots();
-            let names = candidates.iter().map(String::as_str).chain(
-                import_snapshots
-                    .iter()
-                    .flat_map(|(_, imports)| imports.values().map(|sym| sym.as_str())),
-            );
-            // The same name is referenced from many files; check each once.
-            let mut seen: HashSet<&str> = HashSet::default();
-            let unique: Vec<&str> = names
-                .filter(|fqcn| !loaded.contains(*fqcn) && seen.insert(fqcn))
-                .collect();
-            // `class_exists` loads unindexed classes on demand, a pure read that
-            // is safe (and much faster) to run in parallel.
-            let missing: Vec<bool> = unique
-                .par_iter()
-                .map_with(db.clone(), |db, fqcn| !crate::db::class_exists(db, fqcn))
-                .collect();
-            for (fqcn, missing) in unique.into_iter().zip(missing) {
-                if missing {
+            let mut try_queue = |fqcn: &str| {
+                if !self.type_exists(fqcn) && !loaded.contains(fqcn) {
                     if let Some(path) = psr4.resolve(fqcn) {
                         to_load.push((fqcn.to_string(), path));
                     }
                 }
+            };
+
+            let mut candidates: Vec<String> = Vec::new();
+            let import_candidates = {
+                let db_owned = self.snapshot_db();
+                let db = &db_owned;
+                for fqcn in crate::db::workspace_classes(db).iter() {
+                    if scanned.contains(fqcn.as_str()) {
+                        continue;
+                    }
+                    let here = crate::db::Fqcn::from_str(db, fqcn.as_str());
+                    let Some(class) = crate::db::find_class_like(db, here) else {
+                        continue;
+                    };
+                    scanned.insert(Arc::from(fqcn.as_str()));
+                    collect_class_referenced_fqcns(&class, &mut candidates);
+                }
+                db.file_import_snapshots()
+                    .into_iter()
+                    .flat_map(|(_, imports)| {
+                        imports
+                            .values()
+                            .map(|sym| sym.as_str().to_string())
+                            .collect::<Vec<_>>()
+                    })
+                    .collect::<Vec<_>>()
+            };
+            for fqcn in candidates {
+                try_queue(&fqcn);
             }
-            // A live snapshot would block the index writes below.
-            drop(db);
+            for fqcn in import_candidates {
+                try_queue(&fqcn);
+            }
 
             if to_load.is_empty() {
                 break;

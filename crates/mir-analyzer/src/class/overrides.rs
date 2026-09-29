@@ -204,13 +204,18 @@ impl<'a> ClassAnalyzer<'a> {
             let parent_method = all_parent_methods.first().cloned();
 
             let own_location = own.location.clone();
+            let loc_cell = std::cell::OnceCell::new();
             let loc = || {
-                issue_location(
-                    own_location.as_ref(),
-                    own_location
-                        .as_ref()
-                        .and_then(|l| self.sources.get(&l.file).copied()),
-                )
+                loc_cell
+                    .get_or_init(|| {
+                        issue_location(
+                            own_location.as_ref(),
+                            own_location
+                                .as_ref()
+                                .and_then(|l| self.sources.get(&l.file).copied()),
+                        )
+                    })
+                    .clone()
             };
 
             let (parent_fqcn, parent) = match parent_method {
