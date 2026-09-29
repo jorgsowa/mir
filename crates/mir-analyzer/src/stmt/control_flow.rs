@@ -1043,7 +1043,7 @@ impl<'a> StatementsAnalyzer<'a> {
                             crate::symbol::ReferenceKind::ClassReference(Arc::from(
                                 resolved.as_str(),
                             )),
-                            Type::single(Atomic::TClassString(None)),
+                            crate::symbol::class_token_type(&resolved),
                         );
                     }
                     if self.mode == crate::body_analysis::AnalysisMode::Full {

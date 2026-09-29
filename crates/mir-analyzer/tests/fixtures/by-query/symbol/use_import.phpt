@@ -12,4 +12,4 @@ use App\Gree<CURSOR>ter;
 $g = new Greeter();
 ===expect===
 kind: use import of class App\Greeter
-type: class-string
+type: class-string<App\Greeter>

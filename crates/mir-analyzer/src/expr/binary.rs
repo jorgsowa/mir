@@ -101,8 +101,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                         self.record_class_ref(&fqcn, b.right.span);
                         self.record_symbol(
                             b.right.span,
-                            crate::symbol::ReferenceKind::ClassReference(fqcn),
-                            mir_types::Type::single(mir_types::Atomic::TClassString(None)),
+                            crate::symbol::ReferenceKind::ClassReference(fqcn.clone()),
+                            crate::symbol::class_token_type(&fqcn),
                         );
                     }
                 }
@@ -139,8 +139,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                     self.record_class_ref(&fqcn, b.right.span);
                     self.record_symbol(
                         b.right.span,
-                        crate::symbol::ReferenceKind::ClassReference(fqcn),
-                        mir_types::Type::single(mir_types::Atomic::TClassString(None)),
+                        crate::symbol::ReferenceKind::ClassReference(fqcn.clone()),
+                        crate::symbol::class_token_type(&fqcn),
                     );
                 }
             }

@@ -10,4 +10,4 @@ final class Factory {
 Fact<CURSOR>ory::make();
 ===expect===
 kind: class Factory
-type: class-string
+type: class-string<Factory>

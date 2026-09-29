@@ -9,6 +9,11 @@ use std::sync::Arc;
 use mir_types::Type;
 use php_ast::Span;
 
+/// Type of a class-name token: `class-string<Fqcn>`.
+pub(crate) fn class_token_type(fqcn: &str) -> Type {
+    Type::single(mir_types::Atomic::TClassString(Some(fqcn.into())))
+}
+
 /// Compact navigation payload for cursor-based name resolution.
 #[derive(Debug, Clone)]
 pub struct NavigationFact {

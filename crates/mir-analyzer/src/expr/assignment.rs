@@ -1690,7 +1690,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     self.record_symbol(
                         spa.class.span,
                         crate::symbol::ReferenceKind::ClassReference(fqcn.clone()),
-                        Type::single(Atomic::TClassString(None)),
+                        crate::symbol::class_token_type(&fqcn),
                     );
                     self.record_receiver_type(
                         spa.class.span,

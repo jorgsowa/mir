@@ -405,7 +405,7 @@ fn symbol_at_finds_native_type_hint_symbol() {
         "expected ClassReference(Dep), got {:?}",
         sym.kind
     );
-    assert_eq!(sym.resolved_type.to_string(), "class-string");
+    assert_eq!(sym.resolved_type.to_string(), "class-string<Dep>");
 }
 
 #[test]

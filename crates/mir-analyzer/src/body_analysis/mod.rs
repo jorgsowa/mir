@@ -688,7 +688,7 @@ impl<'a> BodyAnalyzer<'a> {
                         span,
                         expr_span: None,
                         kind: ReferenceKind::ClassReference(fqcn.clone()),
-                        resolved_type: Type::single(mir_types::Atomic::TClassString(None)),
+                        resolved_type: crate::symbol::class_token_type(&fqcn),
                     });
             }
             if self.mode == AnalysisMode::Full && self.record_reference_locations {
@@ -713,8 +713,8 @@ impl<'a> BodyAnalyzer<'a> {
                             file: file.clone(),
                             span,
                             expr_span: None,
+                            resolved_type: crate::symbol::class_token_type(&fqcn),
                             kind: ReferenceKind::ClassReference(fqcn),
-                            resolved_type: Type::single(mir_types::Atomic::TClassString(None)),
                         });
                     }
                 }
@@ -1342,7 +1342,7 @@ pub(crate) fn check_use_decl_casing(
                             kind: ReferenceKind::UseImport(Box::new(
                                 ReferenceKind::ClassReference(fqcn.clone()),
                             )),
-                            resolved_type: Type::single(mir_types::Atomic::TClassString(None)),
+                            resolved_type: crate::symbol::class_token_type(&fqcn),
                         });
                     }
                     if collect_symbols {
@@ -1351,10 +1351,10 @@ pub(crate) fn check_use_decl_casing(
                                 file: file.clone(),
                                 span: item.span,
                                 expr_span: None,
+                                resolved_type: crate::symbol::class_token_type(&fqcn),
                                 kind: ReferenceKind::UseImport(Box::new(
                                     ReferenceKind::ClassReference(fqcn),
                                 )),
-                                resolved_type: Type::single(mir_types::Atomic::TClassString(None)),
                             });
                         }
                     }

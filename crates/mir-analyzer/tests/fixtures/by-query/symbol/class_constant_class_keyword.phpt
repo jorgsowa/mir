@@ -8,4 +8,4 @@ final class Greeter {}
 $c = Gree<CURSOR>ter::class;
 ===expect===
 kind: class Greeter
-type: class-string
+type: class-string<Greeter>

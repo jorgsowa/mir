@@ -1,7 +1,5 @@
 ===description===
-FALSE POSITIVE reproducer. Valid PHP: `instanceof` narrows a union receiver; the method exists on the narrowed member (mir even picks the wrong member).
-mir 0.42.0 currently emits (the bug): UndefinedMethod@10:19-10:40 (getFor on Holders) + UndefinedMethod@12:15-12:39 (findFirst on Relations)
-Expected: no issue. Remove ===ignore=== to activate once fixed.
+`instanceof` narrows a union receiver; the method exists on the narrowed member (mir even picks the wrong member).
 ===config===
 php_version=8.4
 ===file===

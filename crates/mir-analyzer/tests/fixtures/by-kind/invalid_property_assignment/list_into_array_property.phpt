@@ -1,7 +1,5 @@
 ===description===
-FALSE POSITIVE reproducer. Valid PHP: `list<int>` is an `array<array-key,int>`.
-mir 0.42.0 currently emits (the bug): InvalidPropertyAssignment@8:8-8:28: expected array<int|string,int>, actual list<int>
-Expected: no issue. Remove ===ignore=== to activate once fixed.
+`list<int>` is an `array<array-key,int>`.
 ===config===
 php_version=8.4
 ===file===
@@ -11,7 +9,6 @@ class Holder {
     private array $data;
     /** @param list<int> $items */
     public function __construct(array $items) {
-        // FP expected: InvalidPropertyAssignment (list<int> not seen as array<array-key,int>)
         $this->data = $items;
     }
 }

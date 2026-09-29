@@ -783,7 +783,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         self.record_symbol(
                             n.class.span,
                             ReferenceKind::ClassReference(Arc::from(fqcn.as_ref())),
-                            Type::single(Atomic::TClassString(None)),
+                            crate::symbol::class_token_type(fqcn),
                         );
                     }
                 }
@@ -1094,7 +1094,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     self.record_symbol(
                         spa.class.span,
                         ReferenceKind::ClassReference(fqcn.clone()),
-                        Type::single(Atomic::TClassString(None)),
+                        crate::symbol::class_token_type(&fqcn),
                     );
                     if let Some(prop_name) = expr_name_str(&spa.member) {
                         let prop_name = prop_name.trim_start_matches('$');
@@ -1249,7 +1249,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         self.record_symbol(
             class_expr.span,
             ReferenceKind::ClassReference(resolved.clone()),
-            Type::single(Atomic::TClassString(None)),
+            crate::symbol::class_token_type(&resolved),
         );
         self.record_receiver_type(
             class_expr.span,
@@ -1393,7 +1393,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                     self.record_symbol(
                         cca.class.span,
                         ReferenceKind::ClassReference(Arc::from(resolved.as_str())),
-                        Type::single(Atomic::TClassString(None)),
+                        crate::symbol::class_token_type(&resolved),
                     );
                 }
                 // `self`/`static`/`parent::class` must carry the actual enclosing
@@ -1638,7 +1638,7 @@ impl<'a> ExpressionAnalyzer<'a> {
         self.record_symbol(
             cca.class.span,
             ReferenceKind::ClassReference(Arc::from(fqcn.as_str())),
-            Type::single(Atomic::TClassString(None)),
+            crate::symbol::class_token_type(&fqcn),
         );
 
         let here = crate::db::Fqcn::from_str(self.db, &fqcn);

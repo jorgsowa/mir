@@ -1,7 +1,5 @@
 ===description===
-FALSE POSITIVE reproducer. Valid PHP: The `array_key_exists('favicon', ...)` guard proves the offset exists before access.
-mir 0.42.0 currently emits (the bug): NonExistentArrayOffset@7:79-7:88: 'favicon'
-Expected: no issue. Remove ===ignore=== to activate once fixed.
+The `array_key_exists('favicon', ...)` guard proves the offset exists before access.
 ===config===
 php_version=8.4
 ===file===

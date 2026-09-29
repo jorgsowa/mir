@@ -8,4 +8,4 @@ final class Greeter {}
 function f(Gree<CURSOR>ter $g): void {}
 ===expect===
 kind: class Greeter
-type: class-string
+type: class-string<Greeter>

@@ -312,7 +312,7 @@ impl CallAnalyzer {
                 ea.record_symbol(
                     call.class.span,
                     ReferenceKind::ClassReference(Arc::from(fqcn.as_str())),
-                    Type::single(Atomic::TClassString(None)),
+                    crate::symbol::class_token_type(&fqcn),
                 );
             }
             // Check if the class is deprecated (skip self/static/parent)

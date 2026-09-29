@@ -1352,8 +1352,8 @@ impl<'a> ExpressionAnalyzer<'a> {
                     self.record_class_ref(fqcn.as_ref(), hint.span);
                     self.record_symbol(
                         hint.span,
-                        ReferenceKind::ClassReference(fqcn),
-                        mir_types::Type::single(mir_types::Atomic::TClassString(None)),
+                        ReferenceKind::ClassReference(fqcn.clone()),
+                        crate::symbol::class_token_type(&fqcn),
                     );
                 }
             }

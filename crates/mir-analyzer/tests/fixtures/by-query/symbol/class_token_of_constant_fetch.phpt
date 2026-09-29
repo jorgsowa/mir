@@ -8,4 +8,4 @@ final class Status { public const ACTIVE = 1; }
 echo Sta<CURSOR>tus::ACTIVE;
 ===expect===
 kind: class Status
-type: class-string
+type: class-string<Status>

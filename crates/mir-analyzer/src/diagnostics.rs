@@ -380,7 +380,7 @@ fn check_name_class_with_context(
             span,
             expr_span: None,
             kind: ReferenceKind::ClassReference(Arc::from(resolved.as_str())),
-            resolved_type: mir_types::Type::single(mir_types::Atomic::TClassString(None)),
+            resolved_type: crate::symbol::class_token_type(&resolved),
         });
     }
     if let Some(symbols) = symbols {
@@ -389,7 +389,7 @@ fn check_name_class_with_context(
             span,
             expr_span: None,
             kind: ReferenceKind::ClassReference(Arc::from(resolved.as_str())),
-            resolved_type: mir_types::Type::single(mir_types::Atomic::TClassString(None)),
+            resolved_type: crate::symbol::class_token_type(&resolved),
         });
     }
 

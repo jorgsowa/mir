@@ -10,4 +10,4 @@ function f(object $o): bool {
 }
 ===expect===
 kind: class Greeter
-type: class-string
+type: class-string<Greeter>

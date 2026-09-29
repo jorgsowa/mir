@@ -10,4 +10,4 @@ try {
 }
 ===expect===
 kind: class RuntimeException
-type: class-string
+type: class-string<RuntimeException>
