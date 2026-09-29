@@ -1,6 +1,5 @@
 ===description===
 A cursor right after a static method name (before `(`) resolves the call, like instance method calls do.
-===ignore===
 ===cursor===
 symbol
 ===file===
