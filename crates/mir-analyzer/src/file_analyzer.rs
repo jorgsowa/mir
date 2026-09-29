@@ -67,6 +67,13 @@ fn symbol_at(symbols: &[ResolvedSymbol], byte_offset: u32) -> Option<&ResolvedSy
                 .is_some_and(|es| span_contains(es, byte_offset))
         })
         .min_by_key(|symbol| symbol.expr_span.map(span_len).unwrap_or(u32::MAX))
+        .or_else(|| {
+            // A cursor just past an identifier still resolves it.
+            symbols
+                .iter()
+                .filter(|symbol| symbol.span.end == byte_offset)
+                .min_by_key(|symbol| span_len(symbol.span))
+        })
 }
 
 fn navigation_fact_at(facts: &[NavigationFact], byte_offset: u32) -> Option<&NavigationFact> {

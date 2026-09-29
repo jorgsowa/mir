@@ -1,6 +1,5 @@
 ===description===
 A cursor right after an identifier (before `(`) still resolves the call.
-===ignore===
 ===cursor===
 symbol
 ===file===
