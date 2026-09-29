@@ -34,4 +34,4 @@ function double(int $x): int {
 
 $partial = process(?, 'double');
 ===expect===
-caller_with_placeholder.php: ParseError@3:19-3:20: Parse error: 'partial function application' requires PHP 8.6 or higher (targeting PHP 8.5)
+caller_with_placeholder.php: ParseError@3:19-3:20: Parse error: 'partial function application' requires PHP 8.6 or higher

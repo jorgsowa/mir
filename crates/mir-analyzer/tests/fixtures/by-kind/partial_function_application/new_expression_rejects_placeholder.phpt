@@ -18,5 +18,5 @@ class Point {
 
 $p = new Point(?, 2);
 ===expect===
-ParseError@10:15-10:16: Parse error: 'partial function application' requires PHP 8.6 or higher (targeting PHP 8.5)
+ParseError@10:15-10:16: Parse error: 'partial function application' requires PHP 8.6 or higher
 ParseError@10:15-10:16: Parse error: Cannot use partial function application in new expression

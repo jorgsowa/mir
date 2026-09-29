@@ -12,4 +12,4 @@ $fn = function (int $a, int $b): int {
 };
 $partial = $fn(?, 5);
 ===expect===
-ParseError@6:15-6:16: Parse error: 'partial function application' requires PHP 8.6 or higher (targeting PHP 8.5)
+ParseError@6:15-6:16: Parse error: 'partial function application' requires PHP 8.6 or higher
