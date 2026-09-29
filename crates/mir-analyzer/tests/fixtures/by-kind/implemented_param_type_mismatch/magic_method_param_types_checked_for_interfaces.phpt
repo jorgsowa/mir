@@ -13,4 +13,4 @@ interface A
 interface B extends A {}
 
 ===expect===
-MethodSignatureMismatch@10:0-10:24: Method B::a() signature mismatch: parameter $a type 'int' is narrower than parent type 'string'
+MethodSignatureMismatch@10:0-10:24: Method B::a() signature mismatch: parameter $a type 'int' is incompatible with parent type 'string'

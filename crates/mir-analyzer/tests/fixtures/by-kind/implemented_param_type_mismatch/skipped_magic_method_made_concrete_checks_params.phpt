@@ -16,4 +16,4 @@ class FooModel extends Model {
     }
 }
 ===expect===
-MethodSignatureMismatch@11:4-11:52: Method FooModel::create() signature mismatch: parameter $x type 'object' is narrower than parent type 'array'
+MethodSignatureMismatch@11:4-11:52: Method FooModel::create() signature mismatch: parameter $x type 'object' is incompatible with parent type 'array'

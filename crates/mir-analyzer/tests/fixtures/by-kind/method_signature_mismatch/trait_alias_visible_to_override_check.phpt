@@ -13,4 +13,4 @@ class Child extends Base {
     public function sayHello(int $s): void {}
 }
 ===expect===
-MethodSignatureMismatch@5:4-5:45: Method Child::sayhello() signature mismatch: parameter $s type 'int' is narrower than parent type 'string'
+MethodSignatureMismatch@5:4-5:45: Method Child::sayhello() signature mismatch: parameter $s type 'int' is incompatible with parent type 'string'

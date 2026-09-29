@@ -16,4 +16,4 @@ class GrandChild extends ParentClass {
     public function f(int $x): void { var_dump($x); }
 }
 ===expect===
-GrandChild.php: MethodSignatureMismatch@3:4-3:53: Method GrandChild::f() signature mismatch: parameter $x type 'int' is narrower than parent type 'string'
+GrandChild.php: MethodSignatureMismatch@3:4-3:53: Method GrandChild::f() signature mismatch: parameter $x type 'int' is incompatible with parent type 'string'

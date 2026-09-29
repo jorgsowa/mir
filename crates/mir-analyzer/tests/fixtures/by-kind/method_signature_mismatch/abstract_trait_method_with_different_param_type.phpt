@@ -19,4 +19,4 @@ class C {
     public function foo(B $a) : void {}
 }
 ===expect===
-MethodSignatureMismatch@12:4-12:39: Method C::foo() signature mismatch: parameter $a type 'B' is narrower than parent type 'A'
+MethodSignatureMismatch@12:4-12:39: Method C::foo() signature mismatch: parameter $a type 'B' is incompatible with parent type 'A'

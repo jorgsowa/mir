@@ -743,6 +743,11 @@ impl<'a> ClassAnalyzer<'a> {
                     };
 
                     if narrowed {
+                        let relation = if crate::subtype::is_subtype(self.db, child_ty, parent_ty) {
+                            "narrower than"
+                        } else {
+                            "incompatible with"
+                        };
                         if seen_narrowing.insert((i, child_ty.to_string(), parent_ty.to_string())) {
                             issues.push(
                                 Issue::new(
@@ -750,7 +755,7 @@ impl<'a> ClassAnalyzer<'a> {
                                         class: fqcn.to_string(),
                                         method: method_name_lower.to_string(),
                                         detail: format!(
-                                            "parameter ${} type '{}' is narrower than parent type '{}'",
+                                            "parameter ${} type '{}' is {relation} parent type '{}'",
                                             child_param.name, child_ty, parent_ty
                                         ),
                                     },

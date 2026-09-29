@@ -15,4 +15,4 @@ class A
 class B extends A {}
 
 ===expect===
-MethodSignatureMismatch@10:0-10:20: Method B::a() signature mismatch: parameter $a type 'string' is narrower than parent type 'int'
+MethodSignatureMismatch@10:0-10:20: Method B::a() signature mismatch: parameter $a type 'string' is incompatible with parent type 'int'

@@ -33,5 +33,5 @@ class StringBox extends Box {
     }
 }
 ===expect===
-MethodSignatureMismatch@17:4-17:43: Method IntBox::set() signature mismatch: parameter $x type 'string' is narrower than parent type 'int'
+MethodSignatureMismatch@17:4-17:43: Method IntBox::set() signature mismatch: parameter $x type 'string' is incompatible with parent type 'int'
 MethodSignatureMismatch@22:4-22:35: Method StringBox::get() signature mismatch: return type 'string' is not a subtype of parent 'int'

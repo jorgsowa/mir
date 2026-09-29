@@ -16,4 +16,4 @@ class B extends A {
     }
 }
 ===expect===
-MethodSignatureMismatch@9:4-9:50: Method B::foofoo() signature mismatch: parameter $b type 'int' is narrower than parent type 'bool'
+MethodSignatureMismatch@9:4-9:50: Method B::foofoo() signature mismatch: parameter $b type 'int' is incompatible with parent type 'bool'

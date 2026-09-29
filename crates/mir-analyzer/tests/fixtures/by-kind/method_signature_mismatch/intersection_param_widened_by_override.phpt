@@ -32,4 +32,4 @@ final class Impl implements Logger {
     public function bad(string $context): void {}
 }
 ===expect===
-MethodSignatureMismatch@25:4-25:49: Method Impl::bad() signature mismatch: parameter $context type 'string' is narrower than parent type 'array<string, mixed>&array{'actor': array{'id': int|string}&array<string, mixed>}'
+MethodSignatureMismatch@25:4-25:49: Method Impl::bad() signature mismatch: parameter $context type 'string' is incompatible with parent type 'array<string, mixed>&array{'actor': array{'id': int|string}&array<string, mixed>}'
