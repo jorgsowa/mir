@@ -241,7 +241,13 @@ impl<'a> ClassAnalyzer<'a> {
         parent_ty: &mir_types::Type,
         child_ty: &mir_types::Type,
     ) -> bool {
-        !parent_ty.is_subtype_structural(child_ty)
+        // `A&B` accepts everything its part `A` does, so a child widened to `A` is valid
+        let intersection_part_fits = matches!(
+            parent_ty.types.as_slice(),
+            [mir_types::Atomic::TIntersection { parts }]
+                if parts.iter().any(|part| part.is_subtype_structural(child_ty))
+        );
+        !(intersection_part_fits || parent_ty.is_subtype_structural(child_ty))
     }
 
     pub(super) fn check_magic_method_casing(&self, fqcn: &Arc<str>, issues: &mut Vec<Issue>) {
