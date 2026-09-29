@@ -134,43 +134,59 @@ fn resolver_file_on_demand(db: &dyn MirDatabase, fqcn: Fqcn<'_>) -> Option<Sourc
     })
 }
 
-/// Where class-like `fqcn` is declared: the symbol index, else on demand.
-pub(crate) fn class_like_loc(db: &dyn MirDatabase, fqcn: Fqcn<'_>) -> Option<SymbolLoc> {
+// Per-name projections of the symbol index. An index write re-runs only
+// these lookups; unchanged ones backdate, so their dependents stay memoized.
+
+#[salsa::tracked]
+fn indexed_class_like_loc<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option<SymbolLoc> {
     let key = fqcn.name(db).ascii_lowercase();
     workspace_symbol_loc(db, |index| index.class_like_loc(key))
-        .or_else(|| *class_like_loc_on_demand(db, fqcn))
+}
+
+#[salsa::tracked]
+fn indexed_function_loc<'db>(db: &'db dyn MirDatabase, fqn: Fqcn<'db>) -> Option<SymbolLoc> {
+    let key = fqn.name(db).ascii_lowercase();
+    workspace_symbol_loc(db, |index| index.function_loc(key))
+}
+
+/// Constants are keyed case-sensitively, unlike class-likes and functions.
+#[salsa::tracked]
+fn indexed_constant_loc<'db>(db: &'db dyn MirDatabase, fqn: Fqcn<'db>) -> Option<SymbolLoc> {
+    let key = *fqn.name(db);
+    workspace_symbol_loc(db, |index| index.constant_loc(key))
+}
+
+/// Where a class-like, function or global constant named `fqn` is declared,
+/// per the symbol index alone.
+pub(crate) fn indexed_symbol_loc(db: &dyn MirDatabase, fqn: Fqcn<'_>) -> Option<SymbolLoc> {
+    indexed_class_like_loc(db, fqn)
+        .or_else(|| *indexed_function_loc(db, fqn))
+        .or_else(|| *indexed_constant_loc(db, fqn))
+}
+
+/// Where class-like `fqcn` is declared: the symbol index, else on demand.
+pub(crate) fn class_like_loc(db: &dyn MirDatabase, fqcn: Fqcn<'_>) -> Option<SymbolLoc> {
+    indexed_class_like_loc(db, fqcn).or_else(|| *class_like_loc_on_demand(db, fqcn))
 }
 
 /// Where function `fqn` is declared: the symbol index, else on demand.
 pub(crate) fn function_loc(db: &dyn MirDatabase, fqn: Fqcn<'_>) -> Option<SymbolLoc> {
-    let key = fqn.name(db).ascii_lowercase();
-    workspace_symbol_loc(db, |index| index.function_loc(key))
-        .or_else(|| *function_loc_on_demand(db, fqn))
+    indexed_function_loc(db, fqn).or_else(|| *function_loc_on_demand(db, fqn))
 }
 
 /// Where global constant `fqn` is declared: the symbol index, else on demand.
-/// Constants are keyed case-sensitively, unlike class-likes and functions.
 fn constant_loc(db: &dyn MirDatabase, fqn: Fqcn<'_>) -> Option<SymbolLoc> {
-    let key = *fqn.name(db);
-    workspace_symbol_loc(db, |index| index.constant_loc(key))
-        .or_else(|| *constant_loc_on_demand(db, fqn))
+    indexed_constant_loc(db, fqn).or_else(|| *constant_loc_on_demand(db, fqn))
 }
 
 /// Where a class-like, function or global constant named `symbol` is
 /// declared, trying every kind in the index before loading any on demand.
 pub(crate) fn symbol_loc(db: &dyn MirDatabase, symbol: &str) -> Option<SymbolLoc> {
     let fqn = Fqcn::from_str(db, symbol);
-    let lower = fqn.name(db).ascii_lowercase();
-    let exact = *fqn.name(db);
-    workspace_symbol_loc(db, |index| {
-        index
-            .class_like_loc(lower)
-            .or_else(|| index.function_loc(lower))
-            .or_else(|| index.constant_loc(exact))
-    })
-    .or_else(|| *class_like_loc_on_demand(db, fqn))
-    .or_else(|| *function_loc_on_demand(db, fqn))
-    .or_else(|| *constant_loc_on_demand(db, fqn))
+    indexed_symbol_loc(db, fqn)
+        .or_else(|| *class_like_loc_on_demand(db, fqn))
+        .or_else(|| *function_loc_on_demand(db, fqn))
+        .or_else(|| *constant_loc_on_demand(db, fqn))
 }
 
 /// [`class_like_loc_on_demand`] for a built-in function's stub.
@@ -733,8 +749,7 @@ pub fn find_class_like<'db>(db: &'db dyn MirDatabase, fqcn: Fqcn<'db>) -> Option
 /// Whether the workspace symbol index already holds `fqcn`, as opposed to
 /// [`find_class_like`] finding it on demand.
 pub fn class_like_indexed(db: &dyn MirDatabase, fqcn: Fqcn<'_>) -> bool {
-    let key = fqcn.name(db).ascii_lowercase();
-    workspace_symbol_loc(db, |index| index.class_like_loc(key)).is_some()
+    indexed_class_like_loc(db, fqcn).is_some()
 }
 
 /// The file a class-like symbol is declared in, if known.

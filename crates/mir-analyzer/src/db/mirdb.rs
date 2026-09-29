@@ -150,10 +150,9 @@ pub struct MirDbStorage {
     /// Sharded so parallel workers don't serialise on one lock.
     parse_cache: Arc<crate::parse_cache::ParseCache>,
     /// Pre-built FQCN symbol index singleton. Written imperatively by
-    /// `rebuild_workspace_symbol_index` and read by `find_class_like` /
-    /// `find_function` / `find_global_constant` via `singleton.index(db)`
-    /// (one HIGH-durability tracked dep) instead of the O(N_files) tracked
-    /// dep list that `workspace_symbol_index` accumulates.
+    /// `rebuild_workspace_symbol_index` and read only by the per-name
+    /// `indexed_*_loc` projections (one HIGH-durability dep each) instead of
+    /// the O(N_files) tracked dep list that `workspace_symbol_index` accumulates.
     workspace_symbol_index_input:
         Arc<parking_lot::RwLock<Option<crate::db::WorkspaceSymbolIndexSingleton>>>,
     /// Shared per-file declaration tables used both for name-change detection
@@ -713,9 +712,9 @@ impl MirDbStorage {
     /// Iterates every registered `SourceFile`, calls `collect_file_declarations`
     /// on each (salsa-memoized — cheap after Parse-1 primes the caches), builds
     /// a fresh `WorkspaceSymbolIndex`, and sets it on the singleton input with
-    /// `Durability::HIGH`.  Tracked queries that read `singleton.index(db)` get
-    /// a single HIGH-durability dep; on LOW-durability project-file body edits
-    /// salsa short-circuits the dep in O(1) instead of walking O(N_files).
+    /// `Durability::HIGH`. Lookups read it through per-name `indexed_*_loc`
+    /// projections: body edits leave it untouched, and a write re-runs only
+    /// those projections, backdating every name whose location didn't change.
     ///
     /// Also updates `file_decl_snapshots` so `file_declarations_changed` can
     /// quickly detect whether a subsequent edit changed any declared names.
@@ -818,6 +817,9 @@ impl MirDbStorage {
                     .durability(salsa::Durability::HIGH)
                     .new(self);
                 *self.workspace_symbol_index_input.write() = Some(s);
+                // Lookups memoized before this read the fallback walk, which
+                // is keyed on the workspace revision, not on the singleton.
+                self.advance_workspace_revision();
             }
         }
     }
@@ -1618,7 +1620,6 @@ impl MirDbStorage {
     /// invalidates every body-analysis memo. Body-only edits add no files and
     /// never bump.
     pub(crate) fn bump_workspace_revision(&mut self) {
-        use salsa::Setter as _;
         // Deferral is only sound while the singleton exists: without one,
         // `find_class_like` falls back to the tracked walk keyed on this
         // revision, and a deferred bump would leave `contains_class` blind
@@ -1629,6 +1630,11 @@ impl MirDbStorage {
             self.revision_bump_deferral.owed = true;
             return;
         }
+        self.advance_workspace_revision();
+    }
+
+    fn advance_workspace_revision(&mut self) {
+        use salsa::Setter as _;
         let rev = self.workspace_revision();
         let cur = *rev.revision(self);
         rev.set_revision(self).to(cur.wrapping_add(1));

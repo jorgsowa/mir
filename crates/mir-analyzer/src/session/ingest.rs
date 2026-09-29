@@ -417,10 +417,9 @@ impl AnalysisSession {
     /// registered files.
     ///
     /// After this call, `find_class_like`, `find_function`, and
-    /// `find_global_constant` read `singleton.index(db)` — a single
-    /// `Durability::HIGH` tracked dep — instead of recomputing the full
-    /// O(N_files) dep list via `workspace_symbol_index`. On subsequent
-    /// LOW-durability (project-file) body edits the dep short-circuits in O(1).
+    /// `find_global_constant` read the singleton through per-name
+    /// projections instead of recomputing the full O(N_files) dep list via
+    /// `workspace_symbol_index`.
     ///
     /// Call this once after all vendor + stub + project files have been
     /// ingested (end of workspace warm-up). Also called automatically by

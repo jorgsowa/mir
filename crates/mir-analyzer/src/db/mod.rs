@@ -158,10 +158,9 @@ pub trait MirDatabase: salsa::Database {
     fn workspace_revision(&self) -> WorkspaceRevision;
 
     /// Return the pre-built workspace symbol index singleton, if populated.
-    /// **Side channel** — not salsa-tracked. Call `singleton.index(db)` on
-    /// the returned handle to read the index with an O(1) tracked dep
-    /// (`Durability::HIGH`). Falls back to the tracked `workspace_symbol_index`
-    /// query when `None`.
+    /// **Side channel** — not salsa-tracked. Tracked queries read the index
+    /// only through the per-name `indexed_*_loc` projections. Falls back to
+    /// the tracked `workspace_symbol_index` query when `None`.
     fn workspace_symbol_index_singleton(&self) -> Option<WorkspaceSymbolIndexSingleton>;
 
     /// Borrow a frozen, immutable snapshot of the workspace symbol index, if
@@ -242,7 +241,7 @@ pub use self::find_queries::{
     has_method_in_chain, interface_in_file, is_method_concretely_implemented,
     method_is_pure_in_chain, property_in_own_composition, trait_in_file, ClassLike,
 };
-pub(crate) use self::find_queries::{class_like_loc, function_loc, symbol_loc};
+pub(crate) use self::find_queries::{class_like_loc, function_loc, indexed_symbol_loc, symbol_loc};
 pub use self::inferred_types::{
     inferred_function_return_type_demand, inferred_method_return_type_demand,
     inferred_property_type_demand,

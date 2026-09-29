@@ -4,6 +4,7 @@
 use std::fs;
 use std::sync::Arc;
 
+use mir_analyzer::db::{analyze_file, MirDatabase, Work};
 use mir_analyzer::{AnalysisSession, IndexCancel, IndexParallelism, PhpVersion};
 
 use crate::common::create_temp_dir;
@@ -224,6 +225,52 @@ fn duplicate_winner_rename_preserves_surviving_symbol() {
         session.contains_class("App\\Unique"),
         "edited file's replacement declaration must resolve after rebuild"
     );
+}
+
+/// Adding or removing a class re-runs only the scopes whose symbol lookups it changes.
+#[test]
+fn declaration_edit_reruns_only_scopes_whose_lookups_changed() {
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    session.ingest_file(
+        Arc::from("/proj/Dep.php"),
+        Arc::from("<?php\nnamespace App;\nclass Dep { public function go(): int { return 1; } }\n"),
+    );
+    session.ingest_file(
+        Arc::from("/proj/User.php"),
+        Arc::from(
+            "<?php\nnamespace App;\n\
+            function useDep(Dep $d): int { return $d->go(); }\n\
+            function useFresh(): object { return new Fresh(); }\n",
+        ),
+    );
+    let undefined_class_count = |session: &AnalysisSession| {
+        let db = session.snapshot_db();
+        let file = db.lookup_source_file("/proj/User.php").unwrap();
+        analyze_file(&db, file)
+            .issues
+            .iter()
+            .filter(|i| i.kind.name() == "UndefinedClass")
+            .count()
+    };
+    assert_eq!(undefined_class_count(&session), 1);
+
+    let before = session.work_count(Work::ScopeAnalysis);
+    session.ingest_file(
+        Arc::from("/proj/Fresh.php"),
+        Arc::from("<?php\nnamespace App;\nclass Fresh {}\n"),
+    );
+    assert_eq!(undefined_class_count(&session), 0);
+    assert_eq!(
+        session.work_count(Work::ScopeAnalysis) - before,
+        1,
+        "only useFresh() looks up the added class"
+    );
+
+    session.ingest_file(
+        Arc::from("/proj/Fresh.php"),
+        Arc::from("<?php\nnamespace App;\nclass Other {}\n"),
+    );
+    assert_eq!(undefined_class_count(&session), 1);
 }
 
 // ─── cancellation ─────────────────────────────────────────────────────────────
