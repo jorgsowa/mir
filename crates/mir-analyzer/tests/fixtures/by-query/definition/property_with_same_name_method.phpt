@@ -1,6 +1,5 @@
 ===description===
 A property fetch lands on the property even when a method shares its name.
-===ignore===
 ===cursor===
 definition
 ===file===

@@ -403,29 +403,32 @@ pub fn has_unknown_ancestor(db: &dyn MirDatabase, fqcn: &str) -> bool {
         .any(|ancestor| !class_exists(db, ancestor))
 }
 
-pub fn member_location(db: &dyn MirDatabase, fqcn: &str, member_name: &str) -> Option<Location> {
-    let here = crate::db::Fqcn::from_str(db, fqcn);
-    // `find_method_respecting_precedence` (not the plain `find_method_in_chain`
-    // walk) so go-to-def resolves a trait-aliased method name (`use T { foo as
-    // bar; }`) and picks the `insteadof`-winning copy on a trait conflict —
-    // both invisible to a plain own-methods lookup on the using class.
-    if let Some((_, storage)) = crate::db::find_method_respecting_precedence(db, here, member_name)
-    {
-        if let Some(loc) = storage.location.clone() {
-            return Some(loc);
+/// Declaration site of the class member `symbol` names; the lookup is kind-specific
+/// because a class may declare a method and a property with the same name.
+pub fn member_location(db: &dyn MirDatabase, symbol: &crate::Name) -> Option<Location> {
+    match symbol {
+        // Precedence-aware so trait aliases and `insteadof` winners resolve.
+        crate::Name::Method { class, name } => {
+            let here = crate::db::Fqcn::from_str(db, class);
+            crate::db::find_method_respecting_precedence(db, here, name)?
+                .1
+                .location
+                .clone()
         }
-    }
-    if let Some((_, storage)) = crate::db::find_property_in_chain(db, here, member_name) {
-        if let Some(loc) = storage.location {
-            return Some(loc);
+        crate::Name::Property { class, name } => {
+            let here = crate::db::Fqcn::from_str(db, class);
+            crate::db::find_property_in_chain(db, here, name)?
+                .1
+                .location
         }
-    }
-    if let Some((_, storage)) = crate::db::find_class_constant_in_chain(db, here, member_name) {
-        if let Some(loc) = storage.location {
-            return Some(loc);
+        crate::Name::ClassConstant { class, name } => {
+            let here = crate::db::Fqcn::from_str(db, class);
+            crate::db::find_class_constant_in_chain(db, here, name)?
+                .1
+                .location
         }
+        _ => None,
     }
-    None
 }
 
 pub fn class_constant_exists_in_chain(db: &dyn MirDatabase, fqcn: &str, const_name: &str) -> bool {

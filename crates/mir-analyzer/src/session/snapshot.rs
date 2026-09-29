@@ -220,11 +220,10 @@ impl AnalysisSnapshot {
                     .clone()
                     .ok_or(crate::SymbolLookupError::NoSourceLocation)
             }
-            crate::Name::Method { class, name }
-            | crate::Name::Property { class, name }
-            | crate::Name::ClassConstant { class, name } => {
-                crate::db::member_location(db, class, name)
-                    .ok_or(crate::SymbolLookupError::NotFound)
+            crate::Name::Method { .. }
+            | crate::Name::Property { .. }
+            | crate::Name::ClassConstant { .. } => {
+                crate::db::member_location(db, symbol).ok_or(crate::SymbolLookupError::NotFound)
             }
             crate::Name::GlobalConstant(fqn) => self
                 .global_constant_location(fqn)
