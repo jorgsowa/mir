@@ -1,6 +1,5 @@
 ===description===
 Go-to-definition on `self::CONST` lands on the constant, not on a method whose name differs only in case.
-===ignore===
 ===cursor===
 definition
 ===file===
