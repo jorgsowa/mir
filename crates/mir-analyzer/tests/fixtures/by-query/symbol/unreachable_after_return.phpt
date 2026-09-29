@@ -1,6 +1,5 @@
 ===description===
 Code after a `return` still resolves, so navigation works in dead code.
-===ignore===
 ===cursor===
 symbol
 ===file===

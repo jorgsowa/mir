@@ -1,6 +1,5 @@
 ===description===
 Code after an always-true early return still resolves, so navigation works in code mir proves unreachable.
-===ignore===
 ===cursor===
 symbol
 ===file===

@@ -367,6 +367,15 @@ impl<'a> StatementsAnalyzer<'a> {
                         crate::parser::span_text(self.source, stmt.span).unwrap_or_default(),
                     ),
                 );
+                // Dead code is analyzed so symbol queries resolve, but it must
+                // not report issues or count as a usage of any member.
+                let mark = self.issues.issue_count();
+                let records_refs = std::mem::replace(&mut self.record_reference_locations, false);
+                let mut dead_ctx = ctx.clone();
+                dead_ctx.diverges = false;
+                self.analyze_stmts(&stmts[i..], &mut dead_ctx);
+                self.record_reference_locations = records_refs;
+                self.issues.truncate_to(mark);
                 break;
             }
 
