@@ -204,12 +204,14 @@ impl<'a> ClassAnalyzer<'a> {
             let parent_method = all_parent_methods.first().cloned();
 
             let own_location = own.location.clone();
-            let loc = issue_location(
-                own_location.as_ref(),
-                own_location
-                    .as_ref()
-                    .and_then(|l| self.sources.get(&l.file).copied()),
-            );
+            let loc = || {
+                issue_location(
+                    own_location.as_ref(),
+                    own_location
+                        .as_ref()
+                        .and_then(|l| self.sources.get(&l.file).copied()),
+                )
+            };
 
             let (parent_fqcn, parent) = match parent_method {
                 Some(m) => m,
@@ -222,7 +224,7 @@ impl<'a> ClassAnalyzer<'a> {
                                 method: method_name_lower.to_string(),
                                 detail: "no parent method exists to override".to_string(),
                             },
-                            loc,
+                            loc(),
                         );
                         if let Some(snippet) = extract_snippet(own_location.as_ref(), &self.sources)
                         {
@@ -246,7 +248,7 @@ impl<'a> ClassAnalyzer<'a> {
                             parent_fqcn, method_name_lower
                         ),
                     },
-                    loc.clone(),
+                    loc(),
                 );
                 if let Some(snippet) = extract_snippet(own_location.as_ref(), &self.sources) {
                     issue = issue.with_snippet(snippet);
@@ -287,7 +289,7 @@ impl<'a> ClassAnalyzer<'a> {
                                     parent_fqcn, method_name_lower
                                 ),
                             },
-                            loc.clone(),
+                            loc(),
                         )
                         .with_snippet(method_name_lower.to_string()),
                     );
@@ -304,7 +306,7 @@ impl<'a> ClassAnalyzer<'a> {
                         method: method_name_lower.to_string(),
                         parent: final_parent_fqcn.to_string(),
                     },
-                    loc.clone(),
+                    loc(),
                 );
                 if let Some(snippet) = extract_snippet(own_location.as_ref(), &self.sources) {
                     issue = issue.with_snippet(snippet);
@@ -337,7 +339,7 @@ impl<'a> ClassAnalyzer<'a> {
                         method: method_name_lower.to_string(),
                         detail,
                     },
-                    loc.clone(),
+                    loc(),
                 );
                 if let Some(snippet) = extract_snippet(own_location.as_ref(), &self.sources) {
                     issue = issue.with_snippet(snippet);
@@ -363,7 +365,7 @@ impl<'a> ClassAnalyzer<'a> {
                             parent_fqcn, method_name_lower
                         ),
                     },
-                    loc.clone(),
+                    loc(),
                 );
                 if let Some(snippet) = extract_snippet(own_location.as_ref(), &self.sources) {
                     issue = issue.with_snippet(snippet);
@@ -385,7 +387,7 @@ impl<'a> ClassAnalyzer<'a> {
                             parent_fqcn, method_name_lower
                         ),
                     },
-                    loc.clone(),
+                    loc(),
                 );
                 if let Some(snippet) = extract_snippet(own_location.as_ref(), &self.sources) {
                     issue = issue.with_snippet(snippet);
@@ -408,7 +410,7 @@ impl<'a> ClassAnalyzer<'a> {
                         class: fqcn.to_string(),
                         method: method_name_lower.to_string(),
                     },
-                    loc.clone(),
+                    loc(),
                 );
                 if let Some(snippet) = extract_snippet(own_location.as_ref(), &self.sources) {
                     issue = issue.with_snippet(snippet);
@@ -534,7 +536,7 @@ impl<'a> ClassAnalyzer<'a> {
                                     method: method_name_lower.to_string(),
                                     detail,
                                 },
-                                loc.clone(),
+                                loc(),
                             )
                             .with_snippet(method_name_lower.to_string()),
                         );
@@ -602,7 +604,7 @@ impl<'a> ClassAnalyzer<'a> {
                                     "overriding method requires {child_required} argument(s) but parent requires {parent_required}"
                                 ),
                             },
-                            loc.clone(),
+                            loc(),
                         )
                         .with_snippet(method_name_lower.to_string()),
                     );
@@ -633,7 +635,7 @@ impl<'a> ClassAnalyzer<'a> {
                                     parent_params.len()
                                 ),
                             },
-                            loc.clone(),
+                            loc(),
                         )
                         .with_snippet(method_name_lower.to_string()),
                     );
@@ -662,7 +664,7 @@ impl<'a> ClassAnalyzer<'a> {
                                             method_name_lower
                                         ),
                                     },
-                                    loc.clone(),
+                                    loc(),
                                 )
                                 .with_snippet(method_name_lower.to_string()),
                             );
@@ -759,7 +761,7 @@ impl<'a> ClassAnalyzer<'a> {
                                             child_param.name, child_ty, parent_ty
                                         ),
                                     },
-                                    loc.clone(),
+                                    loc(),
                                 )
                                 .with_snippet(method_name_lower.to_string()),
                             );
