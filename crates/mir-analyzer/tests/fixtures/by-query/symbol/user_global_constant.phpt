@@ -1,6 +1,5 @@
 ===description===
 A user global constant resolves with its literal type.
-===ignore===
 ===cursor===
 symbol
 ===file===

@@ -1786,7 +1786,9 @@ impl<'a> OwnedVisitor for DefinitionCollector<'a> {
                     } else {
                         Arc::from(name_str)
                     };
-                    self.slice.constants.push((fqn, Type::mixed()));
+                    let const_type =
+                        infer_const_value(self, &item.value.kind).unwrap_or_else(Type::mixed);
+                    self.slice.constants.push((fqn, const_type));
                 }
             }
 
