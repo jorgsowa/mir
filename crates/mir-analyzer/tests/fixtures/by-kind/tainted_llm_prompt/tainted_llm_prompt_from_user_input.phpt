@@ -13,5 +13,5 @@ class LlmAgent {
 
 $agent = new LlmAgent();
 $agent->prompt((string) $_GET["question"]);
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedLlmPrompt: Tainted LLM prompt — possible prompt injection
 ===expect===
-TaintedLlmPrompt@10:0-10:42: Tainted LLM prompt — possible prompt injection

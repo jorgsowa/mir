@@ -24,6 +24,7 @@ class IntBox implements Box {}
 // Violates the bound — string is not int|float.
 /** @implements Box<string> */
 class StringBox implements Box {}
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'string' does not satisfy bound 'int|float'
 
 /**
  * @psalm-type IntOrFloat = int|float
@@ -31,4 +32,3 @@ class StringBox implements Box {}
  */
 trait BoxTrait {}
 ===expect===
-InvalidTemplateParam@14:0-14:33: Template type 'T' inferred as 'string' does not satisfy bound 'int|float'

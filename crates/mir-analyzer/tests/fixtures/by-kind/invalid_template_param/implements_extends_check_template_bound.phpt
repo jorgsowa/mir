@@ -27,8 +27,8 @@ class OkBox extends AbstractBox {}
 // Violates the bound — NotBase does not extend Base.
 /** @implements Container<NotBase> */
 class BadBag implements Container {}
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'NotBase' does not satisfy bound 'Base'
 /** @extends AbstractBox<NotBase> */
 class BadBox extends AbstractBox {}
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'NotBase' does not satisfy bound 'Base'
 ===expect===
-InvalidTemplateParam@21:0-21:36: Template type 'T' inferred as 'NotBase' does not satisfy bound 'Base'
-InvalidTemplateParam@23:0-23:35: Template type 'T' inferred as 'NotBase' does not satisfy bound 'Base'

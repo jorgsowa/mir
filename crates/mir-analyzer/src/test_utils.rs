@@ -114,8 +114,9 @@
 //!
 //! **Annotations** (diagnostic fixtures): a `// ^^^ Kind: message` comment line
 //! under a source line expects that issue on the line above, starting at the
-//! first caret's column and spanning the carets. Single-line spans only, so the
-//! span can't start before column 3; use `===expect===` for anything else.
+//! first caret's column and spanning the carets. `//<^^^` starts at column 0.
+//! A `+N:C` token after the carets (`// ^ +2:1 Kind`) ends the span at column
+//! `C` of the source line `N` lines below (annotation lines don't count). A column 1 start needs `===expect===`.
 //! Annotations combine with `===expect===`; `UPDATE_FIXTURES=1` leaves matched
 //! ones out of the rewritten section.
 //! ```text
@@ -469,12 +470,15 @@ pub(crate) fn parse_phpt(content: &str, path: &str) -> ParsedFixture {
 
 /// Expected issues from `// ^^^ Kind: message` lines under a source line.
 /// Carets give the 0-based start column and length on the nearest preceding
-/// non-annotation line. Single-line spans only.
+/// non-annotation line. `//<^^^` starts at column 0; a `+N:C` token after the
+/// carets ends the span at column `C` of the source line `N` lines below
+/// (annotation lines don't count).
 fn parse_annotations(files: &[(String, String)], is_multi: bool, path: &str) -> Vec<ExpectedIssue> {
     let mut out = Vec::new();
     for (name, src) in files {
+        let lines: Vec<&str> = src.lines().collect();
         let mut target: Option<u32> = None;
-        for (idx, text) in src.lines().enumerate() {
+        for (idx, &text) in lines.iter().enumerate() {
             let Some((col, len, rest)) = split_annotation(text) else {
                 target = Some(idx as u32 + 1);
                 continue;
@@ -485,6 +489,12 @@ fn parse_annotations(files: &[(String, String)], is_multi: bool, path: &str) -> 
                     idx + 1
                 )
             });
+            let (line_end, col_end, rest) = match parse_span_end(rest) {
+                Some((lines_below, end_col, rest)) => {
+                    (nth_source_line_after(&lines, line, lines_below), end_col, rest)
+                }
+                None => (line, col + len, rest),
+            };
             let (kind, message) = match rest.split_once(": ") {
                 Some((kind, message)) => (kind, message.trim()),
                 None => (rest, ""),
@@ -500,25 +510,55 @@ fn parse_annotations(files: &[(String, String)], is_multi: bool, path: &str) -> 
                 message: message.to_string(),
                 line: Some(line),
                 col_start: Some(col),
-                line_end: Some(line),
-                col_end: Some(col + len),
+                line_end: Some(line_end),
+                col_end: Some(col_end),
             });
         }
     }
     out
 }
 
+/// 1-based file line of the `n`th source (non-annotation) line after `line`.
+fn nth_source_line_after(lines: &[&str], line: u32, n: u32) -> u32 {
+    let mut remaining = n;
+    let mut at = line;
+    while remaining > 0 && (at as usize) < lines.len() {
+        at += 1;
+        if split_annotation(lines[at as usize - 1]).is_none() {
+            remaining -= 1;
+        }
+    }
+    at
+}
+
+/// `(lines below, end column, remaining text)` for a leading `+N:C` token.
+fn parse_span_end(rest: &str) -> Option<(u32, u16, &str)> {
+    let body = rest.strip_prefix('+')?;
+    let (span, remaining) = body.split_once(' ').unwrap_or((body, ""));
+    let (lines_below, end_col) = span.split_once(':')?;
+    Some((
+        lines_below.parse().ok()?,
+        end_col.parse().ok()?,
+        remaining.trim(),
+    ))
+}
+
 /// `(caret column, caret count, text after the carets)` for an annotation line.
 fn split_annotation(text: &str) -> Option<(u16, u16, &str)> {
     let after_slashes = text.trim_start().strip_prefix("//")?;
-    let carets_at = after_slashes.trim_start();
+    let (carets_at, col) = match after_slashes.strip_prefix('<') {
+        Some(rest) => (rest, 0),
+        None => {
+            let carets_at = after_slashes.trim_start();
+            (carets_at, (text.chars().count() - carets_at.chars().count()) as u16)
+        }
+    };
     if !carets_at.starts_with('^') {
         return None;
     }
-    let col = text.chars().count() - carets_at.chars().count();
     let len = carets_at.chars().take_while(|&c| c == '^').count();
     let rest = carets_at.trim_start_matches('^').trim();
-    Some((col as u16, len as u16, rest))
+    Some((col, len as u16, rest))
 }
 
 fn meaningful_lines(text: &str) -> impl Iterator<Item = &str> {
@@ -1677,6 +1717,22 @@ mod parser_validation {
             (Some(3), Some(3), Some(5))
         );
         assert_eq!((b.kind_name.as_str(), b.message.as_str()), ("Other", ""));
+    }
+
+    #[test]
+    fn annotation_at_column_zero_and_multiline_end() {
+        let f = p("===file===\n<?php\nfoo();\n//<^^^ K\nfoo(\n// ^ +1:2 M: multi\n);\n===expect===\n");
+        let a = &f.expected[0];
+        assert_eq!(
+            (a.line, a.col_start, a.line_end, a.col_end),
+            (Some(2), Some(0), Some(2), Some(3))
+        );
+        let b = &f.expected[1];
+        assert_eq!(
+            (b.line, b.col_start, b.line_end, b.col_end),
+            (Some(4), Some(3), Some(6), Some(2))
+        );
+        assert_eq!((b.kind_name.as_str(), b.message.as_str()), ("M", "multi"));
     }
 
     #[test]

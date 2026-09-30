@@ -7,9 +7,9 @@ readonly class A {
 }
 
 class B extends A {
+//<^^^^^^^^^^^^^^^^^^^ ReadonlyClassExtendsMismatch: Non-readonly class B cannot extend readonly class A
     public function __construct(int $x) {
         parent::__construct($x);
     }
 }
 ===expect===
-ReadonlyClassExtendsMismatch@6:0-6:19: Non-readonly class B cannot extend readonly class A

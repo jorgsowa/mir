@@ -23,5 +23,5 @@ $b = new Builder();
 $b->build();
 $b->paint();
 $b->missing();
+//<^^^^^^^^^^^^^ UndefinedMethod: Method Widget::missing() does not exist
 ===expect===
-UndefinedMethod@17:0-17:13: Method Widget::missing() does not exist

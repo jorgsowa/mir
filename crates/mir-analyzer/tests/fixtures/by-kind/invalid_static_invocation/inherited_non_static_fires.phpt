@@ -9,5 +9,5 @@ class Base {
 class View extends Base {}
 
 View::render();
+//<^^^^^^^^^^^^^^ InvalidStaticInvocation: Non-static method View::render() cannot be called statically
 ===expect===
-InvalidStaticInvocation@8:0-8:14: Non-static method View::render() cannot be called statically

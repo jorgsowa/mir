@@ -21,6 +21,6 @@ function test(array $arr): void {
     $keys = array_key_list($arr);
     /** @mir-check $keys is list<string> */
     $_ = $keys;
+//  ^^^^^^^^^^^ TypeCheckMismatch: Type of $keys is expected to be list<string>, got list<int>
 }
 ===expect===
-App.php: TypeCheckMismatch@8:4-8:15: Type of $keys is expected to be list<string>, got list<int>

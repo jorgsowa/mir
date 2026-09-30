@@ -6,9 +6,9 @@ php_version=8.0
 <?php
 function check_is_list(array $items): void {
     array_is_list($items);
+//  ^^^^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function array_is_list() is not defined
 }
 ===file:App.php===
 <?php
 check_is_list([1, 2, 3]);
 ===expect===
-ArrayHelper.php: UndefinedFunction@3:4-3:25: Function array_is_list() is not defined

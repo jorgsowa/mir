@@ -28,5 +28,5 @@ needsInt(f(null, 5));
 function g($a, $b): void {}
 
 g(null, 5);
+//<^^^^^^^^^^ InvalidTemplateParam: Template type 'U' inferred as '5' does not satisfy bound 'string'
 ===expect===
-InvalidTemplateParam@22:0-22:10: Template type 'U' inferred as '5' does not satisfy bound 'string'

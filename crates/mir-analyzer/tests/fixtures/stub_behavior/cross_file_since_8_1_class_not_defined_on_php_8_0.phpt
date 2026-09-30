@@ -6,9 +6,9 @@ php_version=8.0
 <?php
 function make_fiber(callable $fn): void {
     new Fiber($fn);
+//      ^^^^^ UndefinedClass: Class Fiber does not exist
 }
 ===file:App.php===
 <?php
 make_fiber(function (): void {});
 ===expect===
-Async.php: UndefinedClass@3:8-3:13: Class Fiber does not exist

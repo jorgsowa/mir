@@ -14,9 +14,9 @@ class Sub extends Base {
 }
 
 (new Sub())->returnsSelf()->nope();
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Base::nope() does not exist
 (new Sub())->returnsSelf()->subOnly();
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Base::subOnly() does not exist
 Sub::make()->subOnly();
+//<^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Base::subOnly() does not exist
 ===expect===
-UndefinedMethod@11:0-11:34: Method Base::nope() does not exist
-UndefinedMethod@12:0-12:37: Method Base::subOnly() does not exist
-UndefinedMethod@13:0-13:22: Method Base::subOnly() does not exist

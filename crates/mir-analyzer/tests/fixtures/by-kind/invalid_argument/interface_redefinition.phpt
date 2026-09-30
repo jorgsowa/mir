@@ -4,5 +4,5 @@ Interface redefinition
 <?php
 interface Foo {}
 interface Foo {}
+//<^^^^^^^^^^^^^^^^ DuplicateInterface: Interface Foo has already been defined
 ===expect===
-DuplicateInterface@3:0-3:16: Interface Foo has already been defined

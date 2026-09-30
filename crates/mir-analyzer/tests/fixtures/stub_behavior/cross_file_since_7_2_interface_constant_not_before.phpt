@@ -6,9 +6,9 @@ php_version=7.1
 <?php
 function get_atom_format(): void {
     echo DateTimeInterface::ATOM;
+//       ^^^^^^^^^^^^^^^^^^^^^^^ UndefinedConstant: Constant DateTimeInterface::ATOM is not defined
 }
 ===file:App.php===
 <?php
 get_atom_format();
 ===expect===
-DateHelper.php: UndefinedConstant@3:9-3:32: Constant DateTimeInterface::ATOM is not defined

@@ -10,10 +10,10 @@ enum Direction {
 
     public function label(): string {
         return match($this) {
+//             ^ +3:9 UnhandledMatchCondition: Unhandled match condition: Direction::East, Direction::West
             self::North => "north",
             self::South => "south",
         };
     }
 }
 ===expect===
-UnhandledMatchCondition@9:15-12:9: Unhandled match condition: Direction::East, Direction::West

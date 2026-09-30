@@ -30,5 +30,5 @@ maybe_base2(null);
 
 // A real bound violation on the same union shape must still be caught.
 maybe_base(new NotBase());
+//<^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'NotBase' does not satisfy bound 'Base'
 ===expect===
-InvalidTemplateParam@24:0-24:25: Template type 'T' inferred as 'NotBase' does not satisfy bound 'Base'

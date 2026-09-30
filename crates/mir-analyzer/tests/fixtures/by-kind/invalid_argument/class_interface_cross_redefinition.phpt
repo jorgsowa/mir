@@ -4,5 +4,5 @@ Cross-kind redefinition: class and interface share one PHP symbol namespace
 <?php
 class Foo {}
 interface Foo {}
+//<^^^^^^^^^^^^^^^^ DuplicateInterface: Interface Foo has already been defined
 ===expect===
-DuplicateInterface@3:0-3:16: Interface Foo has already been defined

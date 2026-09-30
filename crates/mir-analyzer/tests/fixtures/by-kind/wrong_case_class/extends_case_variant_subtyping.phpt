@@ -12,8 +12,8 @@ suppress=UnusedParam
 <?php
 class Base {}
 class Child extends base {}
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^ WrongCaseClass: Class name 'base' has incorrect casing; use 'Base'
 function takes_base(Base $x): void {}
 function make(): Base { return new Child(); }
 takes_base(new Child());
 ===expect===
-WrongCaseClass@3:0-3:27: Class name 'base' has incorrect casing; use 'Base'

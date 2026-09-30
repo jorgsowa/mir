@@ -7,8 +7,8 @@ class A extends B
     public function foo(): void {}
 }
 class B extends A
+//<^^^^^^^^^^^^^^^^^ CircularInheritance: Class B has a circular inheritance chain
 {
     public function bar(): void {}
 }
 ===expect===
-CircularInheritance@6:0-6:17: Class B has a circular inheritance chain

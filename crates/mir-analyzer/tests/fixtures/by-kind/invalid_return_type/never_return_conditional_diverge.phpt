@@ -6,6 +6,7 @@ must be flagged. A function that diverges on ALL paths is fine.
 
 // Flagged: only some paths throw
 function conditional_throw(bool $flag): never {
+//                                            ^ +4:1 InvalidReturnType: Return type 'void' is not compatible with declared 'never'
     if ($flag) {
         throw new RuntimeException("throws sometimes");
     }
@@ -13,6 +14,7 @@ function conditional_throw(bool $flag): never {
 
 // Flagged: only some paths exit
 function conditional_exit(bool $flag): never {
+//                                           ^ +4:1 InvalidReturnType: Return type 'void' is not compatible with declared 'never'
     if ($flag) {
         exit(1);
     }
@@ -32,5 +34,3 @@ function calls_never(bool $flag): never {
     always_throws($flag);
 }
 ===expect===
-InvalidReturnType@4:46-8:1: Return type 'void' is not compatible with declared 'never'
-InvalidReturnType@11:45-15:1: Return type 'void' is not compatible with declared 'never'

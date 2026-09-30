@@ -3,6 +3,7 @@ Switch in if
 ===file===
 <?php
 $a = 0;
+//<^^ UnusedVariable: Variable $a is never read
 
 if (rand(0, 1)) {
     switch (rand(0, 4)) {
@@ -19,4 +20,3 @@ if (rand(0, 1)) {
 
 echo $a;
 ===expect===
-UnusedVariable@2:0-2:2: Variable $a is never read

@@ -48,6 +48,6 @@ $f = new Foo(new Unfrozen());
 $f->set("asd", 10);
 $g = $f->freeze();
 $g->set("asd", 20);  // Fails
+//<^^^^^^^^^^^^^^^^^^ IfThisIsMismatch: Cannot call Foo::set() — @if-this-is requires $this to be 'Foo<Unfrozen>', but it is 'Foo<Frozen>'
 
 ===expect===
-IfThisIsMismatch@45:0-45:18: Cannot call Foo::set() — @if-this-is requires $this to be 'Foo<Unfrozen>', but it is 'Foo<Frozen>'

@@ -12,6 +12,7 @@ function runLdapSearchFn(string ...$parts): void {
 }
 
 runLdapSearchFn("a", "b", (string) $_GET["q"]);
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'ldap'
 
 class Searcher {
     /** @taint-sink ldap $parts */
@@ -20,6 +21,5 @@ class Searcher {
 }
 
 (new Searcher())->runLdapSearchMethod("a", "b", (string) $_GET["q"]);
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'ldap'
 ===expect===
-TaintedInput@6:0-6:46: Tainted input reaching sink 'ldap'
-TaintedInput@14:0-14:68: Tainted input reaching sink 'ldap'

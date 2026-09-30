@@ -16,6 +16,6 @@ function use_repo(Repository $r): void {
     $e = $r->find();
     $e->getName();
     $e->missing();
+//  ^^^^^^^^^^^^^ UndefinedMethod: Method Entity::missing() does not exist
 }
 ===expect===
-Service.php: UndefinedMethod@5:4-5:17: Method Entity::missing() does not exist

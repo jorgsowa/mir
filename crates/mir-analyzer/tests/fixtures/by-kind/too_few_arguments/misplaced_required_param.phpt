@@ -6,5 +6,5 @@ suppress=UnusedParam
 <?php
 function foo(string $bar = null, int $bat): void {}
 foo();
+//<^^^^^ TooFewArguments: Too few arguments for foo(): expected 1, got 0
 ===expect===
-TooFewArguments@3:0-3:5: Too few arguments for foo(): expected 1, got 0

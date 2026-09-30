@@ -4,6 +4,7 @@ does not widen child after parent instanceof guard
 <?php
 class Base {}
 class Child extends Base {
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^ MissingConstructor: Class Child has uninitialized properties but no constructor
     public string $childOnly;
 }
 class Other {}
@@ -15,4 +16,3 @@ function test(object $value): void {
     echo $value->childOnly;
 }
 ===expect===
-MissingConstructor@3:0-3:26: Class Child has uninitialized properties but no constructor

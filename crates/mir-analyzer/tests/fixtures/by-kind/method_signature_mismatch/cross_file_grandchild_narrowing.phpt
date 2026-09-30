@@ -14,6 +14,6 @@ class ParentClass extends GrandParent {}
 <?php
 class GrandChild extends ParentClass {
     public function f(int $x): void { var_dump($x); }
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method GrandChild::f() signature mismatch: parameter $x type 'int' is incompatible with parent type 'string'
 }
 ===expect===
-GrandChild.php: MethodSignatureMismatch@3:4-3:53: Method GrandChild::f() signature mismatch: parameter $x type 'int' is incompatible with parent type 'string'

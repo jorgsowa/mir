@@ -6,9 +6,9 @@ php_version=7.4
 <?php
 function from_interface(\DateTimeInterface $dt): void {
     DateTimeImmutable::createFromInterface($dt);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method DateTimeImmutable::createFromInterface() does not exist
 }
 ===file:App.php===
 <?php
 from_interface(new DateTime());
 ===expect===
-DateHelper.php: UndefinedMethod@3:4-3:47: Method DateTimeImmutable::createFromInterface() does not exist

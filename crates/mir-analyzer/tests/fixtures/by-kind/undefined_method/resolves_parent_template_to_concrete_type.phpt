@@ -16,5 +16,5 @@ class UserRepo extends BaseRepo {}
 $repo = new UserRepo();
 $result = $repo->find();
 $result->nonExistentMethod();
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method User::nonExistentMethod() does not exist
 ===expect===
-UndefinedMethod@15:0-15:28: Method User::nonExistentMethod() does not exist

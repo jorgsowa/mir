@@ -6,5 +6,5 @@ reports deprecated class extension
 class OldBase {}
 
 class Child extends OldBase {}
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DeprecatedClass: Class OldBase is deprecated: use NewBase instead
 ===expect===
-DeprecatedClass@5:0-5:30: Class OldBase is deprecated: use NewBase instead

@@ -15,5 +15,5 @@ class C extends B {
 $c = new C();
 /** @mir-check $c->me() is A */
 $c->me()->onlyC();
+//<^^^^^^^^^^^^^^^^^ UndefinedMethod: Method A::onlyC() does not exist
 ===expect===
-UndefinedMethod@12:0-12:17: Method A::onlyC() does not exist

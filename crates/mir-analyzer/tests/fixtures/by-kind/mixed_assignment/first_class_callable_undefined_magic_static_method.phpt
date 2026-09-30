@@ -13,6 +13,6 @@ class Test {
 }
 $closure = Test::length(...);
 $length = $closure();
+//<^^^^^^^^^^^^^^^^^^^^ MixedAssignment: Variable $length is assigned a mixed type
 
 ===expect===
-MixedAssignment@10:0-10:20: Variable $length is assigned a mixed type

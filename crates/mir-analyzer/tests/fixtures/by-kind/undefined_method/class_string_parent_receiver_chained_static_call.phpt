@@ -19,5 +19,5 @@ class Box extends Base {
 }
 
 Box::factory()::doesNotExist();
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Box::doesNotExist() does not exist
 ===expect===
-UndefinedMethod@14:0-14:30: Method Box::doesNotExist() does not exist

@@ -8,9 +8,9 @@ suppress=UnusedParam
 /** @param int-mask<1, 2> $flags */
 function describe(int $flags): string {
     return match($flags) {
+//         ^ +3:5 UnhandledMatchCondition: Unhandled match condition: 2, 3
         0 => "none",
         1 => "first only",
     };
 }
 ===expect===
-UnhandledMatchCondition@4:11-7:5: Unhandled match condition: 2, 3

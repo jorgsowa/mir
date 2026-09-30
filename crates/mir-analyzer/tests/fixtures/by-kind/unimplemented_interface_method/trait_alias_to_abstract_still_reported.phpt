@@ -16,5 +16,5 @@ interface Greets {
     public function helloAlias(int $x): string;
 }
 class D extends C implements Greets {}
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnimplementedInterfaceMethod: Class D must implement Greets::helloAlias() from interface
 ===expect===
-UnimplementedInterfaceMethod@13:0-13:38: Class D must implement Greets::helloAlias() from interface

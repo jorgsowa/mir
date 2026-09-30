@@ -23,6 +23,7 @@ function withFinally(): bool {
 }
 
 function noReturnStillErrors(): bool {
+//                                   ^ +6:1 InvalidReturnType: Return type 'void' is not compatible with declared 'bool'
     try {
         echo "hello";
     } catch (\Exception $e) {
@@ -30,4 +31,3 @@ function noReturnStillErrors(): bool {
     }
 }
 ===expect===
-InvalidReturnType@20:37-26:1: Return type 'void' is not compatible with declared 'bool'

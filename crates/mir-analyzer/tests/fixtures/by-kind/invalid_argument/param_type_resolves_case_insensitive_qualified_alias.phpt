@@ -18,5 +18,5 @@ class C {
 namespace Client;
 $c = new C();
 $c->take("not a service");
+//       ^^^^^^^^^^^^^^^ InvalidArgument: Argument $s of take() expects 'MyApp\Deep\Service', got '"not a service"'
 ===expect===
-Main.php: InvalidArgument@4:9-4:24: Argument $s of take() expects 'MyApp\Deep\Service', got '"not a service"'

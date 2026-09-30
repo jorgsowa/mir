@@ -7,5 +7,5 @@ namespace App;
 class User {}
 
 class User {}
+//<^^^^^^^^^^^^^ DuplicateClass: Class App\User has already been defined
 ===expect===
-DuplicateClass@6:0-6:13: Class App\User has already been defined

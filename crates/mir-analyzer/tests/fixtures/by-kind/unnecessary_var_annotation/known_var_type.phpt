@@ -8,7 +8,7 @@ function foo() : string {
 
 /** @var string */
 $a = foo();
+//<^^^^^^^^^^^ UnnecessaryVarAnnotation: @var annotation for $a is unnecessary
 
 echo $a;
 ===expect===
-UnnecessaryVarAnnotation@7:0-7:11: @var annotation for $a is unnecessary

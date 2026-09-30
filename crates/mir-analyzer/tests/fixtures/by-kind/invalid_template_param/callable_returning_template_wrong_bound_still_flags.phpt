@@ -17,5 +17,5 @@ class Unrelated {}
 function wrap($item): void {}
 
 wrap(fn(): Unrelated => new Unrelated());
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'Unrelated' does not satisfy bound 'Base'
 ===expect===
-InvalidTemplateParam@11:0-11:40: Template type 'T' inferred as 'Unrelated' does not satisfy bound 'Base'

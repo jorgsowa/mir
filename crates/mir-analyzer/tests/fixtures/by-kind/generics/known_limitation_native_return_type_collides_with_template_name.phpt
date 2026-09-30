@@ -47,7 +47,7 @@ $box = new Box(42);
 $real = $box->makeRealT();
 /** @mir-check $real is T */
 $v = $real->x;
+//<^^^^^^^^^^^^^ MixedAssignment: Variable $v is assigned a mixed type
+//<^^^^^^^^^^^^^^ TypeCheckMismatch: Type of $real is expected to be T, got int
+//   ^^^^^^^^ InvalidPropertyFetch: Cannot fetch property on non-object type 'int'
 ===expect===
-MixedAssignment@28:0-28:13: Variable $v is assigned a mixed type
-TypeCheckMismatch@28:0-28:14: Type of $real is expected to be T, got int
-InvalidPropertyFetch@28:5-28:13: Cannot fetch property on non-object type 'int'

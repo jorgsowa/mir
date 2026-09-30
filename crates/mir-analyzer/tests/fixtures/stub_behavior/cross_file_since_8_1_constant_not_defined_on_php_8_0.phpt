@@ -6,9 +6,9 @@ php_version=8.0
 <?php
 function is_avif(int $type): void {
     echo ($type === IMAGETYPE_AVIF ? 'avif' : 'other');
+//                  ^^^^^^^^^^^^^^ UndefinedConstant: Constant IMAGETYPE_AVIF is not defined
 }
 ===file:App.php===
 <?php
 is_avif(19);
 ===expect===
-ImageHelper.php: UndefinedConstant@3:20-3:34: Constant IMAGETYPE_AVIF is not defined

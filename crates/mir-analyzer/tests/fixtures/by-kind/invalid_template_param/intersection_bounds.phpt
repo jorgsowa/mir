@@ -26,9 +26,9 @@ class OnlyReadable extends Base implements Readable {
  * @param T $_stream
  */
 function processStream($_stream): void {}
+//                     ^^^^^^^^ UnusedParam: Parameter $_stream is never used
 
 $readable = new OnlyReadable();
 processStream($readable);
+//<^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'OnlyReadable' does not satisfy bound 'Base&Readable&Writable'
 ===expect===
-test.php: UnusedParam@25:23-25:31: Parameter $_stream is never used
-test.php: InvalidTemplateParam@28:0-28:24: Template type 'T' inferred as 'OnlyReadable' does not satisfy bound 'Base&Readable&Writable'

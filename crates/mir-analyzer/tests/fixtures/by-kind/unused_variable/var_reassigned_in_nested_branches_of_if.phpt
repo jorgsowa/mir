@@ -3,6 +3,7 @@ Var reassigned in nested branches of if
 ===file===
 <?php
 $a = "foo";
+//<^^ UnusedVariable: Variable $a is never read
 
 if (rand(0, 1)) {
     if (rand(0, 1)) {
@@ -16,4 +17,3 @@ if (rand(0, 1)) {
 
 echo $a;
 ===expect===
-UnusedVariable@2:0-2:2: Variable $a is never read

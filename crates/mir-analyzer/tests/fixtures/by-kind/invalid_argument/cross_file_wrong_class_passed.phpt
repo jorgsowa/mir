@@ -13,6 +13,6 @@ class Admin {}
 function createUser(User $u): void { var_dump($u); }
 function test(): void {
     createUser(new Admin());
+//             ^^^^^^^^^^^ InvalidArgument: Argument $u of createUser() expects 'User', got 'Admin'
 }
 ===expect===
-Service.php: InvalidArgument@4:15-4:26: Argument $u of createUser() expects 'User', got 'Admin'

@@ -5,5 +5,5 @@ Class redefinition in unbraced namespace
 namespace A;
 class Foo {}
 class Foo {}
+//<^^^^^^^^^^^^ DuplicateClass: Class A\Foo has already been defined
 ===expect===
-DuplicateClass@4:0-4:12: Class A\Foo has already been defined

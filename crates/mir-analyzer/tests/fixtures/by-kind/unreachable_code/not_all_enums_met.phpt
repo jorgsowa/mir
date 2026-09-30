@@ -7,8 +7,8 @@ Not all enums met
  */
 function foo(string $foo): string {
     return match ($foo) {
+//         ^ +2:5 UnhandledMatchCondition: Unhandled match condition: "bar"
         "foo" => "foo",
     };
 }
 ===expect===
-UnhandledMatchCondition@6:11-8:5: Unhandled match condition: "bar"

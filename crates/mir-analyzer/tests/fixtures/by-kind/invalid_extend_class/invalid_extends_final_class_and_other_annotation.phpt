@@ -9,6 +9,6 @@ Invalid extends final class and other annotation
 final class DoctrineA {}
 
 class DoctrineB extends DoctrineA {}
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidExtendClass: Class DoctrineB cannot extend final class DoctrineA
 
 ===expect===
-InvalidExtendClass@8:0-8:36: Class DoctrineB cannot extend final class DoctrineA

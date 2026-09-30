@@ -6,5 +6,5 @@ class MyClass {
     public static function hello(): void {}
 }
 myclass::hello();
+//<^^^^^^^ WrongCaseClass: Class name 'myclass' has incorrect casing; use 'MyClass'
 ===expect===
-WrongCaseClass@5:0-5:7: Class name 'myclass' has incorrect casing; use 'MyClass'

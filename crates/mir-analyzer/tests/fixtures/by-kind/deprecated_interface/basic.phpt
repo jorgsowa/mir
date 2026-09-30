@@ -10,7 +10,7 @@ interface OldLogger {
 }
 
 class FileLogger implements OldLogger {
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DeprecatedInterface: Interface OldLogger is deprecated: use NewLogger instead
     public function log(string $msg): void {}
 }
 ===expect===
-DeprecatedInterface@7:0-7:39: Interface OldLogger is deprecated: use NewLogger instead

@@ -10,6 +10,7 @@ abstract class TestCaseBase {
     public function __construct() {}
 }
 class WidgetTest extends TestCaseBase {
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MissingConstructor: Class WidgetTest has uninitialized properties but no constructor
     private Logger $logger;
     public function setUp(): void {
         $this->logger = new Logger();
@@ -18,4 +19,3 @@ class WidgetTest extends TestCaseBase {
 class Logger {}
 
 ===expect===
-MissingConstructor@5:0-5:39: Class WidgetTest has uninitialized properties but no constructor

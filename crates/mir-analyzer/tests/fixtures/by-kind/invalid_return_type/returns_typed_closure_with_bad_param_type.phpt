@@ -10,8 +10,8 @@ Returns typed closure with bad param type
  */
 function foo(Closure $f, Closure $g) : Closure {
     return function (int $x) use ($f, $g) : int {
+//  ^ +2:6 InvalidReturnType: Return type 'Closure(int): int' is not compatible with declared 'Closure(string): int'
         return $f($g($x));
     };
 }
 ===expect===
-InvalidReturnType@9:4-11:6: Return type 'Closure(int): int' is not compatible with declared 'Closure(string): int'

@@ -6,5 +6,5 @@ abstract class Base {
     abstract public function doWork(): void;
 }
 class Incomplete extends Base {}
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnimplementedAbstractMethod: Class Incomplete must implement abstract method doWork()
 ===expect===
-UnimplementedAbstractMethod@5:0-5:32: Class Incomplete must implement abstract method doWork()

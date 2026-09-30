@@ -7,9 +7,9 @@ php_version=8.0
 class UnionReturn {
     /** @return string|int */
     public function __toString() {
+//                               ^ +2:5 InvalidToString: Method UnionReturn::__toString() must return a string
         return 42;
     }
 }
 new UnionReturn();
 ===expect===
-InvalidToString@4:33-6:5: Method UnionReturn::__toString() must return a string

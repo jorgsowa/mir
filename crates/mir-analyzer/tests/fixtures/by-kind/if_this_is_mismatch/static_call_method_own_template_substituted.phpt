@@ -32,5 +32,5 @@ class Box {
 
 $box = new Box('hi');
 $box::checkReplace(42);
+//<^^^^^^^^^^^^^^^^^^^^^^ IfThisIsMismatch: Cannot call Box::checkReplace() — @if-this-is requires $this to be 'Box<U>', but it is 'Box<string>'
 ===expect===
-IfThisIsMismatch@27:0-27:22: Cannot call Box::checkReplace() — @if-this-is requires $this to be 'Box<U>', but it is 'Box<string>'

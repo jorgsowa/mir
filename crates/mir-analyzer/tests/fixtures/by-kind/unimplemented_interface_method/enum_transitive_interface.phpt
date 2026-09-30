@@ -12,6 +12,7 @@ interface PrettyPrintable extends Printable {
 }
 
 enum Color implements PrettyPrintable {
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnimplementedInterfaceMethod: Class Color must implement Printable::print() from interface
     case Red;
     case Green;
 
@@ -22,4 +23,3 @@ enum Color implements PrettyPrintable {
     // Missing print() from Printable (via PrettyPrintable)
 }
 ===expect===
-UnimplementedInterfaceMethod@11:0-11:39: Class Color must implement Printable::print() from interface

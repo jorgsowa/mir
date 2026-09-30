@@ -22,5 +22,5 @@ class Registry {
 }
 
 Registry::register(Concrete::class)::doesNotExist();
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Concrete::doesNotExist() does not exist
 ===expect===
-UndefinedMethod@17:0-17:51: Method Concrete::doesNotExist() does not exist

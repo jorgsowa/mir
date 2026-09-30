@@ -8,6 +8,7 @@ bare generic property accepts multi-parameter type
 class Map {}
 
 class Registry {
+//<^^^^^^^^^^^^^^^^ MissingConstructor: Class Registry has uninitialized properties but no constructor
     private Map $mapping;
 
     public function register(): void {
@@ -17,4 +18,3 @@ class Registry {
     }
 }
 ===expect===
-MissingConstructor@7:0-7:16: Class Registry has uninitialized properties but no constructor

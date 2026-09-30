@@ -6,6 +6,7 @@ bare generic property accepts single parameterized type
 class Box {}
 
 class Container {
+//<^^^^^^^^^^^^^^^^^ MissingConstructor: Class Container has uninitialized properties but no constructor
     private Box $item;
 
     public function set(Box $b): void {
@@ -19,4 +20,3 @@ class Container {
     }
 }
 ===expect===
-MissingConstructor@5:0-5:17: Class Container has uninitialized properties but no constructor

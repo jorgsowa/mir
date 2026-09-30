@@ -6,6 +6,6 @@ MixedFunctionCall
 $fn = null;
 
 $fn();
+//<^^^^^ MixedFunctionCall: Cannot call mixed type as a function
 
 ===expect===
-MixedFunctionCall@5:0-5:5: Cannot call mixed type as a function

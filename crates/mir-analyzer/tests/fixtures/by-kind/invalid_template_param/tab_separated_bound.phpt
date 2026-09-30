@@ -7,8 +7,8 @@ A tab-separated `@template T of Bound` line binds the bound instead of dropping 
  * @param T $x
  */
 function f($x): void {}
+//         ^^ UnusedParam: Parameter $x is never used
 
 f(5);
+//<^^^^ InvalidTemplateParam: Template type 'T' inferred as '5' does not satisfy bound 'ArrayAccess'
 ===expect===
-UnusedParam@6:11-6:13: Parameter $x is never used
-InvalidTemplateParam@8:0-8:4: Template type 'T' inferred as '5' does not satisfy bound 'ArrayAccess'

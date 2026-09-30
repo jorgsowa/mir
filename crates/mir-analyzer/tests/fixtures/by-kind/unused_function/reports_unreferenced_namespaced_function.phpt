@@ -5,5 +5,5 @@ reports unreferenced namespaced function
 namespace App;
 
 function helper(): void {}
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedFunction: Function helper() is never called
 ===expect===
-UnusedFunction@4:0-4:26: Function helper() is never called

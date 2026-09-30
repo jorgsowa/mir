@@ -8,6 +8,7 @@ Abstract reflected class method
  * @extends FilterIterator<TKey, TValue, Iterator<TKey, TValue>>
  */
 class DedupeIterator extends FilterIterator {
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnimplementedAbstractMethod: Class DedupeIterator must implement abstract method accept()
     /**
      * @param Iterator<TKey, TValue> $i
      */
@@ -16,4 +17,3 @@ class DedupeIterator extends FilterIterator {
     }
 }
 ===expect===
-UnimplementedAbstractMethod@7:0-7:45: Class DedupeIterator must implement abstract method accept()

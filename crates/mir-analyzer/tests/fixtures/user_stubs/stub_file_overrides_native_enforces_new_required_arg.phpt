@@ -8,5 +8,5 @@ function strlen(string $string, string $encoding): int { return 0; }
 ===file:App.php===
 <?php
 strlen('hello');
+//<^^^^^^^^^^^^^^^ TooFewArguments: Too few arguments for strlen(): expected 2, got 1
 ===expect===
-App.php: TooFewArguments@2:0-2:15: Too few arguments for strlen(): expected 2, got 1

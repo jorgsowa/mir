@@ -4,7 +4,7 @@ interface extends cross file missing
 <?php
 use App\Countable;
 interface Collection extends Countable {
+//                           ^^^^^^^^^ UndefinedClass: Class App\Countable does not exist
     public function isEmpty(): bool;
 }
 ===expect===
-Collection.php: UndefinedClass@3:29-3:38: Class App\Countable does not exist

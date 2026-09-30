@@ -10,7 +10,7 @@ suppress=UnusedParam
 namespace App;
 class Handler {
     public function handle(\Other\Thing $t): void {
+//                         ^^^^^^^^^^^^ UndefinedClass: Class Other\Thing does not exist
     }
 }
 ===expect===
-Handler.php: UndefinedClass@4:27-4:39: Class Other\Thing does not exist

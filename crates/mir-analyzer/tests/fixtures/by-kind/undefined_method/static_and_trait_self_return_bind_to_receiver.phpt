@@ -21,7 +21,7 @@ class Sub extends Base {
 (new Sub())->returnsStatic()->subOnly();
 (new Sub())->chain()->subOnly();
 (new Sub())->returnsStatic()->nope();
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Sub::nope() does not exist
 (new Sub())->chain()->nope();
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Sub::nope() does not exist
 ===expect===
-UndefinedMethod@18:0-18:36: Method Sub::nope() does not exist
-UndefinedMethod@19:0-19:28: Method Sub::nope() does not exist

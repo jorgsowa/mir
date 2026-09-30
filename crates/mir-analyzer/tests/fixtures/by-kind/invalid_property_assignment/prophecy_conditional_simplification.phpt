@@ -6,10 +6,12 @@ conditional type with identical branches collapses to constant type
 class Container {}
 
 class TestFactory {
+//<^^^^^^^^^^^^^^^^^^^ MissingConstructor: Class TestFactory has uninitialized properties but no constructor
     /**
      * @return ($x is null ? Container<object> : Container<object>)
      */
     public function makeContainer($x): Container { return new Container(); }
+//                                ^^ UnusedParam: Parameter $x is never used
 
     public Container $container;
 }
@@ -19,5 +21,3 @@ $container = $factory->makeContainer(null);
 /** @mir-check $container is Container<object> */
 $factory->container = $container;
 ===expect===
-MissingConstructor@5:0-5:19: Class TestFactory has uninitialized properties but no constructor
-UnusedParam@9:34-9:36: Parameter $x is never used

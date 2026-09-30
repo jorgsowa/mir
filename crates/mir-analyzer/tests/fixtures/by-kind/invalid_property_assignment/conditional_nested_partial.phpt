@@ -5,6 +5,7 @@ suppress=UnusedParam
 ===file===
 <?php
 class PartialFactory {
+//<^^^^^^^^^^^^^^^^^^^^^^ MissingConstructor: Class PartialFactory has uninitialized properties but no constructor
     /**
      * Inner conditional has identical branches, but outer branches differ
      * @return ($x is null ? ($y is int ? string : string) : int)
@@ -22,6 +23,5 @@ $factory = new PartialFactory();
 $result = $factory->makePartial(null, 1);
 $factory->stringProp = $result;
 $factory->intProp = $result;
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $intProp expects 'int', cannot assign 'string'
 ===expect===
-MissingConstructor@2:0-2:22: Class PartialFactory has uninitialized properties but no constructor
-InvalidPropertyAssignment@19:0-19:27: Property $intProp expects 'int', cannot assign 'string'

@@ -24,10 +24,13 @@ class NotificationSender
     protected function queueNotification($notifiables, $notification)
     {
         $original = clone $notification;
+//                  ^^^^^^^^^^^^^^^^^^^ MixedClone: cannot clone mixed
 
         foreach ($notifiables as $notifiable) {
             foreach ((array) $original->via($notifiable) as $channel) {
+//                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^ MixedMethodCall: Method via() called on mixed type
                 $notification = clone $original;
+//                              ^^^^^^^^^^^^^^^ MixedClone: cannot clone mixed
 
                 $connection = $notification->connection;
                 if (method_exists($notification, 'viaConnections')) {
@@ -53,7 +56,10 @@ class NotificationSender
                 }
 
                 $this->bus->dispatch(
+//              ^ +6:17 MixedMethodCall: Method dispatch() called on mixed type
                     (new SendQueuedNotifications($notifiable, $notification, [$channel]))
+//                  ^ +2:41 MixedMethodCall: Method onQueue() called on mixed type
+//                       ^^^^^^^^^^^^^^^^^^^^^^^ UndefinedClass: Class SendQueuedNotifications does not exist
                         ->onConnection($connection)
                         ->onQueue($queue)
                         ->delay(is_array($delay) ? ($delay[$channel] ?? null) : $delay)
@@ -64,9 +70,3 @@ class NotificationSender
     }
 }
 ===expect===
-MixedClone@9:20-9:39: cannot clone mixed
-MixedMethodCall@12:29-12:56: Method via() called on mixed type
-MixedClone@13:32-13:47: cannot clone mixed
-MixedMethodCall@38:16-44:17: Method dispatch() called on mixed type
-MixedMethodCall@39:20-41:41: Method onQueue() called on mixed type
-UndefinedClass@39:25-39:48: Class SendQueuedNotifications does not exist

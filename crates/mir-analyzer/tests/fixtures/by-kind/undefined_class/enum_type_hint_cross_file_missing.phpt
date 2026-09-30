@@ -6,8 +6,8 @@ suppress=MixedReturnStatement
 <?php
 use App\MissingEnum;
 function getStatus(): MissingEnum {
+//                    ^^^^^^^^^^^ UndefinedClass: Class App\MissingEnum does not exist
     return MissingEnum::Active;
+//         ^^^^^^^^^^^ UndefinedClass: Class App\MissingEnum does not exist
 }
 ===expect===
-Service.php: UndefinedClass@3:22-3:33: Class App\MissingEnum does not exist
-Service.php: UndefinedClass@4:11-4:22: Class App\MissingEnum does not exist

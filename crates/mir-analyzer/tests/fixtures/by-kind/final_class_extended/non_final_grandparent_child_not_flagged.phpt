@@ -4,6 +4,6 @@ InvalidExtendClass fires only for the direct extends of a final class; a class e
 <?php
 final class Base {}
 class Middle extends Base {}
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidExtendClass: Class Middle cannot extend final class Base
 class Child extends Middle {}
 ===expect===
-InvalidExtendClass@3:0-3:28: Class Middle cannot extend final class Base

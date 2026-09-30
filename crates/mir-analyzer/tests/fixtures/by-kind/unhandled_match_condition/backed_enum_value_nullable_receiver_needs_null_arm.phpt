@@ -12,10 +12,10 @@ enum Kind: string {
 }
 function h(?Kind $type): bool {
     return match ($type->value) {
+//         ^ +3:5 UnhandledMatchCondition: Unhandled match condition: null
+//                ^^^^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $value on possibly null value
         Kind::Foo->value => true,
         Kind::Bar->value => false,
     };
 }
 ===expect===
-UnhandledMatchCondition@7:11-10:5: Unhandled match condition: null
-PossiblyNullPropertyFetch@7:18-7:30: Cannot access property $value on possibly null value

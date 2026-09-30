@@ -52,5 +52,5 @@ new Pair(value: "hello", key: 42);
 // A real bound violation must still be caught regardless of argument order:
 // value=42 is an int, which doesn't satisfy V's `of string` bound.
 makePair(value: 42, key: 1);
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'V' inferred as '42' does not satisfy bound 'string'
 ===expect===
-InvalidTemplateParam@46:0-46:27: Template type 'V' inferred as '42' does not satisfy bound 'string'

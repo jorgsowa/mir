@@ -7,7 +7,7 @@ the #[Deprecated] attribute fallback class.rs has.
 trait T {}
 
 class C {
+//<^^^^^^^^^ DeprecatedTrait: Trait T is deprecated
     use T;
 }
 ===expect===
-DeprecatedTrait@5:0-5:9: Trait T is deprecated

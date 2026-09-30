@@ -4,5 +4,5 @@ Invalid throw class
 <?php
 class A {}
 throw new A();
+//<^^^^^^^^^^^^^^ InvalidThrow: Thrown type 'A' does not extend Throwable
 ===expect===
-InvalidThrow@3:0-3:14: Thrown type 'A' does not extend Throwable

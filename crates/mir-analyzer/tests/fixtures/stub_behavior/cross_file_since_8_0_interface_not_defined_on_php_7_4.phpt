@@ -5,6 +5,7 @@ php_version=7.4
 ===file:Printable.php===
 <?php
 class Label implements \Stringable {
+//                     ^^^^^^^^^^^ UndefinedClass: Class Stringable does not exist
     private string $text;
     public function __construct(string $value) {
         $this->text = $value;
@@ -16,4 +17,3 @@ class Label implements \Stringable {
 $label = new Label('hello');
 echo $label;
 ===expect===
-Printable.php: UndefinedClass@2:23-2:34: Class Stringable does not exist

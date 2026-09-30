@@ -21,5 +21,5 @@ $base->accept($base);
 $base->accept(new Base());
 
 $base->accept(new Unrelated());
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'Unrelated' does not satisfy bound 'self(Base)'
 ===expect===
-InvalidTemplateParam@15:0-15:30: Template type 'T' inferred as 'Unrelated' does not satisfy bound 'self(Base)'

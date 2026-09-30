@@ -7,7 +7,7 @@ trait Timestampable {
 }
 
 trait Timestampable {
+//<^ +2:1 DuplicateTrait: Trait Timestampable has already been defined
     public function updatedAt(): string { return ''; }
 }
 ===expect===
-DuplicateTrait@6:0-8:1: Trait Timestampable has already been defined

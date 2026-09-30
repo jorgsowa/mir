@@ -16,9 +16,9 @@ class Dog extends Base {}
  * @param U $u
  */
 function pair($t, $u): void {}
+//            ^^ UnusedParam: Parameter $t is never used
+//                ^^ UnusedParam: Parameter $u is never used
 
 pair(new Cat(), new Dog());
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'U' inferred as 'Dog' does not satisfy bound 'Cat'
 ===expect===
-test.php: UnusedParam@12:14-12:16: Parameter $t is never used
-test.php: UnusedParam@12:18-12:20: Parameter $u is never used
-test.php: InvalidTemplateParam@14:0-14:26: Template type 'U' inferred as 'Dog' does not satisfy bound 'Cat'

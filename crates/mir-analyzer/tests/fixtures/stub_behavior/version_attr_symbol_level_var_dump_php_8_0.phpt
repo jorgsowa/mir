@@ -6,5 +6,5 @@ suppress=ForbiddenCode
 ===file===
 <?php
 var_dump();
+//<^^^^^^^^^^ TooFewArguments: Too few arguments for var_dump(): expected 1, got 0
 ===expect===
-TooFewArguments@2:0-2:10: Too few arguments for var_dump(): expected 1, got 0

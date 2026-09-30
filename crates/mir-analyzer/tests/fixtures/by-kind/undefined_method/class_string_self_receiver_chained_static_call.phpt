@@ -16,5 +16,5 @@ class Box {
 }
 
 Box::factory()::doesNotExist();
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Box::doesNotExist() does not exist
 ===expect===
-UndefinedMethod@10:0-10:30: Method Box::doesNotExist() does not exist

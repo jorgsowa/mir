@@ -7,5 +7,5 @@ abstract class A {
 }
 
 class B extends A { }
+//<^^^^^^^^^^^^^^^^^^^^^ UnimplementedAbstractMethod: Class B must implement abstract method foo()
 ===expect===
-UnimplementedAbstractMethod@6:0-6:21: Class B must implement abstract method foo()

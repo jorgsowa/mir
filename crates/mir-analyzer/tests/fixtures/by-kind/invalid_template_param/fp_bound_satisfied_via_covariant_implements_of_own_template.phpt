@@ -40,5 +40,5 @@ accept(new TypedList(new Dog()));
 function accept_bad($c): void {}
 
 accept_bad(new TypedList(new Unrelated()));
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'TypedList<Unrelated>' does not satisfy bound 'Collection<Animal>'
 ===expect===
-InvalidTemplateParam@32:0-32:42: Template type 'T' inferred as 'TypedList<Unrelated>' does not satisfy bound 'Collection<Animal>'

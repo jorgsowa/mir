@@ -11,7 +11,7 @@ abstract class Polygon extends Shape {}
 ===file:Triangle.php===
 <?php
 class Triangle extends Polygon {
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnimplementedAbstractMethod: Class Triangle must implement abstract method area()
     # area() NOT implemented despite being required
 }
 ===expect===
-Triangle.php: UnimplementedAbstractMethod@2:0-2:32: Class Triangle must implement abstract method area()

@@ -12,6 +12,7 @@ suppress=UnusedParam
 <?php
 interface IFoo {}
 class Thing implements ifoo {}
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ WrongCaseClass: Class name 'ifoo' has incorrect casing; use 'IFoo'
 enum Color: string {
     case Red = 'red';
 }
@@ -21,4 +22,3 @@ function accept_enum($x): void { echo get_debug_type($x); }
 takes_ifoo(new Thing());
 accept_enum(Color::Red);
 ===expect===
-WrongCaseClass@3:0-3:30: Class name 'ifoo' has incorrect casing; use 'IFoo'

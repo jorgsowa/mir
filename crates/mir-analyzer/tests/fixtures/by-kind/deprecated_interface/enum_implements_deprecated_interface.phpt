@@ -7,8 +7,8 @@ An enum that implements a deprecated interface should trigger DeprecatedInterfac
 interface StatusInterface {}
 
 enum Status: string implements StatusInterface {
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DeprecatedInterface: Interface StatusInterface is deprecated: use NewStatus instead
     case Active = 'active';
 }
 
 ===expect===
-DeprecatedInterface@6:0-6:48: Interface StatusInterface is deprecated: use NewStatus instead

@@ -4,5 +4,5 @@ mir-check on undefined variable
 <?php
 /** @mir-check $undefined is string */
 echo "test";
+//<^^^^^^^^^^^^ TypeCheckMismatch: Type of $undefined is expected to be string, got mixed
 ===expect===
-TypeCheckMismatch@3:0-3:12: Type of $undefined is expected to be string, got mixed

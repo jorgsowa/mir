@@ -11,7 +11,7 @@ class B {}
 $a = rand(0, 10) ? new A() : new B();
 
 $a = match (get_class($a)) {
+//   ^ +2:1 UnhandledMatchCondition: Unhandled match condition: possibly-unmatched value of type 'string'
     C::class => 5,
 };
 ===expect===
-UnhandledMatchCondition@7:5-9:1: Unhandled match condition: possibly-unmatched value of type 'string'

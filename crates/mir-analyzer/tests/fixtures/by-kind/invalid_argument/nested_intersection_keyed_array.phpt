@@ -30,6 +30,7 @@ class ConfigTest {
     public function testMissingNestedKey(): void {
         // SHOULD flag - missing 'ttl' in cache
         $this->configure([
+//                       ^ +6:9 InvalidArgument: Argument $config of configure() expects 'array{'debug': bool, 'environment': string}&array{'cache': array{'enabled': bool, 'ttl': int}}', got 'array{'debug': false, 'environment': "development", 'cache': array{'enabled': false}}'
             'debug' => false,
             'environment' => 'development',
             'cache' => [
@@ -41,6 +42,7 @@ class ConfigTest {
     public function testMissingTopLevelKey(): void {
         // SHOULD flag - missing 'environment'
         $this->configure([
+//                       ^ +6:9 InvalidArgument: Argument $config of configure() expects 'array{'debug': bool, 'environment': string}&array{'cache': array{'enabled': bool, 'ttl': int}}', got 'array{'debug': true, 'cache': array{'enabled': true, 'ttl': 3600}}'
             'debug' => true,
             'cache' => [
                 'enabled' => true,
@@ -50,5 +52,3 @@ class ConfigTest {
     }
 }
 ===expect===
-InvalidArgument@26:25-32:9: Argument $config of configure() expects 'array{'debug': bool, 'environment': string}&array{'cache': array{'enabled': bool, 'ttl': int}}', got 'array{'debug': false, 'environment': "development", 'cache': array{'enabled': false}}'
-InvalidArgument@37:25-43:9: Argument $config of configure() expects 'array{'debug': bool, 'environment': string}&array{'cache': array{'enabled': bool, 'ttl': int}}', got 'array{'debug': true, 'cache': array{'enabled': true, 'ttl': 3600}}'

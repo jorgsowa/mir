@@ -10,6 +10,7 @@ class Box {
 }
 
 class Holder {
+//<^^^^^^^^^^^^^^ MissingConstructor: Class Holder has uninitialized properties but no constructor
     /** @var Box<string> */
     private Box $item;
 
@@ -20,8 +21,7 @@ class Holder {
 
     public function bad(): void {
         $this->item = new Box(1);
+//      ^^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $item expects 'Box<string>', cannot assign 'Box<int>'
     }
 }
 ===expect===
-MissingConstructor@8:0-8:14: Class Holder has uninitialized properties but no constructor
-InvalidPropertyAssignment@18:8-18:32: Property $item expects 'Box<string>', cannot assign 'Box<int>'

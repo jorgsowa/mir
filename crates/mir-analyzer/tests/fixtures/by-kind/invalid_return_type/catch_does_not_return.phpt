@@ -3,9 +3,9 @@ Catch does not return
 ===file===
 <?php
 function missing_return() : bool {
+//                               ^ +4:1 InvalidReturnType: Return type 'void' is not compatible with declared 'bool'
     try {
     } finally {
     }
 }
 ===expect===
-InvalidReturnType@2:33-6:1: Return type 'void' is not compatible with declared 'bool'

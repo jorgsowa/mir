@@ -4,7 +4,7 @@ InvalidExtendClass fires for each class in a chain of final-extends: both Middle
 <?php
 final class Base {}
 final class Middle extends Base {}
+//    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidExtendClass: Class Middle cannot extend final class Base
 class Child extends Middle {}
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidExtendClass: Class Child cannot extend final class Middle
 ===expect===
-InvalidExtendClass@3:6-3:34: Class Middle cannot extend final class Base
-InvalidExtendClass@4:0-4:29: Class Child cannot extend final class Middle

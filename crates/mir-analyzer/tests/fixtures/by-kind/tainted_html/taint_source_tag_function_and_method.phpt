@@ -14,6 +14,7 @@ function readUserInput(): string {
 }
 
 echo readUserInput();
+//<^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 
 class Request {
     /** @taint-source */
@@ -24,7 +25,6 @@ class Request {
 
 function handle(Request $req): void {
     echo $req->getParam('x');
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 ===expect===
-TaintedHtml@7:0-7:21: Tainted HTML output — possible XSS
-TaintedHtml@17:4-17:29: Tainted HTML output — possible XSS

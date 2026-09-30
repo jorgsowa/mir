@@ -4,5 +4,5 @@ Unused var with addition op
 <?php
 $a = 5;
 $a += 1;
+//<^^ UnusedVariable: Variable $a is never read
 ===expect===
-UnusedVariable@3:0-3:2: Variable $a is never read

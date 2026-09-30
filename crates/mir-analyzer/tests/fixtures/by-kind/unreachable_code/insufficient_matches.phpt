@@ -10,10 +10,10 @@ enum Suit {
 
     public function color(): string {
         return match($this) {
+//             ^ +3:9 UnhandledMatchCondition: Unhandled match condition: Suit::Spades
             Suit::Hearts, Suit::Diamonds => "Red",
             Suit::Clubs => "Black",
         };
     }
 }
 ===expect===
-UnhandledMatchCondition@9:15-12:9: Unhandled match condition: Suit::Spades

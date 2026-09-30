@@ -15,7 +15,7 @@ function handle(): void {
         throw new \Exception();
     } catch (RealException $e) {
     } catch (MissingException $e) {
+//           ^^^^^^^^^^^^^^^^ UndefinedClass: Class App\MissingException does not exist
     }
 }
 ===expect===
-Handler.php: UndefinedClass@8:13-8:29: Class App\MissingException does not exist

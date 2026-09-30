@@ -9,5 +9,5 @@ class A {
 }
 
 A::fooFoo();
+//<^^^^^^^^^^^ TooFewArguments: Too few arguments for fooFoo(): expected 1, got 0
 ===expect===
-TooFewArguments@6:0-6:11: Too few arguments for fooFoo(): expected 1, got 0

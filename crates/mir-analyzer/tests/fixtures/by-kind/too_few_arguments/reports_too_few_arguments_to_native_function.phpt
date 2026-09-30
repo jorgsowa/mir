@@ -3,5 +3,5 @@ reports too few arguments to native function
 ===file===
 <?php
 str_repeat('x');
+//<^^^^^^^^^^^^^^^ TooFewArguments: Too few arguments for str_repeat(): expected 2, got 1
 ===expect===
-TooFewArguments@2:0-2:15: Too few arguments for str_repeat(): expected 2, got 1

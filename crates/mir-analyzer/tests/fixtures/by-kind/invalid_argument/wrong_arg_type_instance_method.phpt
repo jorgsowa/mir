@@ -12,6 +12,6 @@ class Processor {
 function run(): void {
     $p = new \Processor();
     $p->process('not-an-int');
+//              ^^^^^^^^^^^^ InvalidArgument: Argument $n of process() expects 'int', got '"not-an-int"'
 }
 ===expect===
-App.php: InvalidArgument@4:16-4:28: Argument $n of process() expects 'int', got '"not-an-int"'

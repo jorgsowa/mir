@@ -37,6 +37,7 @@ class SecurityLoggerTest {
     public function testMissingRequiredKey(): void {
         // This SHOULD flag - missing required 'actor' key
         $this->info([
+//                  ^ +3:9 InvalidArgument: Argument $context of info() expects 'array<string, mixed>&array{'actor': string, 'target'?: string, 'outcome': string}', got 'array{'target': "resource456", 'outcome': "success"}'
             'target' => 'resource456',
             'outcome' => 'success'
         ]);
@@ -45,11 +46,10 @@ class SecurityLoggerTest {
     public function testWrongTypeForRequiredKey(): void {
         // This SHOULD flag - 'actor' should be string, got int
         $this->info([
+//                  ^ +3:9 InvalidArgument: Argument $context of info() expects 'array<string, mixed>&array{'actor': string, 'target'?: string, 'outcome': string}', got 'array{'actor': 123, 'outcome': "success"}'
             'actor' => 123,
             'outcome' => 'success'
         ]);
     }
 }
 ===expect===
-InvalidArgument@31:20-34:9: Argument $context of info() expects 'array<string, mixed>&array{'actor': string, 'target'?: string, 'outcome': string}', got 'array{'target': "resource456", 'outcome': "success"}'
-InvalidArgument@39:20-42:9: Argument $context of info() expects 'array<string, mixed>&array{'actor': string, 'target'?: string, 'outcome': string}', got 'array{'actor': 123, 'outcome': "success"}'

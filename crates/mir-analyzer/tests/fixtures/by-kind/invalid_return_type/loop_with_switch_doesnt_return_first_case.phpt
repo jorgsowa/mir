@@ -5,6 +5,7 @@ suppress=MissingThrowsDocblock,UnusedForeachValue
 ===file===
 <?php
 function b(): int {
+//                ^ +11:1 InvalidReturnType: Return type 'void' is not compatible with declared 'int'
     switch (random_int(1, 10)) {
         case 1:
             foreach([1,2] as $i) {
@@ -17,4 +18,3 @@ function b(): int {
     }
 }
 ===expect===
-InvalidReturnType@2:18-13:1: Return type 'void' is not compatible with declared 'int'

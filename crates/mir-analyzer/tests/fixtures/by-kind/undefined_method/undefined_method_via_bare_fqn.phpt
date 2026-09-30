@@ -10,6 +10,6 @@ class Service {
 function consume(): void {
     $s = new \Service();
     $s->nonexistent();
+//  ^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Service::nonexistent() does not exist
 }
 ===expect===
-Consumer.php: UndefinedMethod@4:4-4:21: Method Service::nonexistent() does not exist

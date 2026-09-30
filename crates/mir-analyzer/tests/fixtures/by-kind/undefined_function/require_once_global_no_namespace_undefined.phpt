@@ -10,6 +10,6 @@ function helper(): string {
 require_once __DIR__ . '/Helpers.php';
 function run(): void {
     missing_helper();
+//  ^^^^^^^^^^^^^^^^ UndefinedFunction: Function missing_helper() is not defined
 }
 ===expect===
-Main.php: UndefinedFunction@4:4-4:20: Function missing_helper() is not defined

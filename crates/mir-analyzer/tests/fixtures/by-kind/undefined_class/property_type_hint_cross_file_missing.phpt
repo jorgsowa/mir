@@ -8,8 +8,8 @@ class Dep {}
 <?php
 use Vendor\Lib\Missing;
 class Bar {
+//<^^^^^^^^^^^ MissingConstructor: Class Bar has uninitialized properties but no constructor
     public Missing $prop;
+//         ^^^^^^^ UndefinedClass: Class Vendor\Lib\Missing does not exist
 }
 ===expect===
-Main.php: MissingConstructor@3:0-3:11: Class Bar has uninitialized properties but no constructor
-Main.php: UndefinedClass@4:11-4:18: Class Vendor\Lib\Missing does not exist

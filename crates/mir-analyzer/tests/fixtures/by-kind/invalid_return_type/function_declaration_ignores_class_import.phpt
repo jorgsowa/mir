@@ -19,6 +19,6 @@ use Other\helper;
 
 function helper(): string {
     return 1;
+//  ^^^^^^^^^ InvalidReturnType: Return type '1' is not compatible with declared 'string'
 }
 ===expect===
-Main.php: InvalidReturnType@7:4-7:13: Return type '1' is not compatible with declared 'string'

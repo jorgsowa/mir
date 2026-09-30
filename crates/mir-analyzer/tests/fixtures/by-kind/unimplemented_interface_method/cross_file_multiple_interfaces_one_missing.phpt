@@ -13,8 +13,8 @@ interface HasCount {
 ===file:Entity.php===
 <?php
 class Entity implements HasLabel, HasCount {
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnimplementedInterfaceMethod: Class Entity must implement HasCount::getCount() from interface
     public function getLabel(): string { return ""; }
     # getCount() is NOT implemented
 }
 ===expect===
-Entity.php: UnimplementedInterfaceMethod@2:0-2:44: Class Entity must implement HasCount::getCount() from interface

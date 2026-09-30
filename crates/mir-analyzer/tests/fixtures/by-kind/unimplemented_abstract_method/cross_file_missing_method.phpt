@@ -9,7 +9,7 @@ abstract class Shape {
 ===file:Circle.php===
 <?php
 class Circle extends Shape {
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnimplementedAbstractMethod: Class Circle must implement abstract method perimeter()
     public function area(): float { return 3.14; }
 }
 ===expect===
-Circle.php: UnimplementedAbstractMethod@2:0-2:28: Class Circle must implement abstract method perimeter()

@@ -7,5 +7,5 @@ interface A {
 }
 
 class B implements A { }
+//<^^^^^^^^^^^^^^^^^^^^^^^^ UnimplementedInterfaceMethod: Class B must implement A::fooFoo() from interface
 ===expect===
-UnimplementedInterfaceMethod@6:0-6:24: Class B must implement A::fooFoo() from interface

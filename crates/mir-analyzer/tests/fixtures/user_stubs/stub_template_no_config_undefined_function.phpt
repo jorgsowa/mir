@@ -6,7 +6,7 @@ suppress=MixedAssignment,UnusedFunction,UnusedVariable
 <?php
 function test(): void {
     $keys = array_key_list(['x' => 1, 'y' => 2]);
+//          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function array_key_list() is not defined
     $_ = $keys;
 }
 ===expect===
-App.php: UndefinedFunction@3:12-3:48: Function array_key_list() is not defined

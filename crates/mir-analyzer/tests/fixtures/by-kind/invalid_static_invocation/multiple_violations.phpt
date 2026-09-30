@@ -8,7 +8,7 @@ class Api {
 }
 
 Api::getUser();
+//<^^^^^^^^^^^^^^ InvalidStaticInvocation: Non-static method Api::getUser() cannot be called statically
 Api::postUser();
+//<^^^^^^^^^^^^^^^ InvalidStaticInvocation: Non-static method Api::postUser() cannot be called statically
 ===expect===
-InvalidStaticInvocation@7:0-7:14: Non-static method Api::getUser() cannot be called statically
-InvalidStaticInvocation@8:0-8:15: Non-static method Api::postUser() cannot be called statically

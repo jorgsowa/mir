@@ -5,5 +5,5 @@ InvalidPropertyFetch fires on array type.
 /** @var array<int, string> $items */
 $items = [];
 $items->foo;
+//<^^^^^^^^^^^ InvalidPropertyFetch: Cannot fetch property on non-object type 'array<int, string>'
 ===expect===
-InvalidPropertyFetch@4:0-4:11: Cannot fetch property on non-object type 'array<int, string>'

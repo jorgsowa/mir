@@ -10,5 +10,5 @@ class Foo {
 $a = (new Foo());
 
 $a->barBar();
+//<^^^^^^^^^^^^ MixedMethodCall: Method barBar() called on mixed type
 ===expect===
-MixedMethodCall@9:0-9:12: Method barBar() called on mixed type

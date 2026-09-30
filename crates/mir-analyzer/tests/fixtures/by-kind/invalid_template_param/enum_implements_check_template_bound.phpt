@@ -21,5 +21,5 @@ enum OkStatus implements Container { case Active; }
 // Violates the bound — NotBase does not extend Base.
 /** @implements Container<NotBase> */
 enum BadStatus implements Container { case Active; }
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'NotBase' does not satisfy bound 'Base'
 ===expect===
-InvalidTemplateParam@15:0-15:52: Template type 'T' inferred as 'NotBase' does not satisfy bound 'Base'

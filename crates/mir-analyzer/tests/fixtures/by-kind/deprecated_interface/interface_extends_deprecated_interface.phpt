@@ -11,6 +11,6 @@ interface OldLogger {
 }
 
 interface ExtendedLogger extends OldLogger {}
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DeprecatedInterface: Interface OldLogger is deprecated: Use NewLogger instead
 
 ===expect===
-DeprecatedInterface@10:0-10:45: Interface OldLogger is deprecated: Use NewLogger instead

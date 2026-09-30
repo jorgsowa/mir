@@ -7,7 +7,7 @@ trait TraitA {
     use TraitB;
 }
 trait TraitB {
+//<^^^^^^^^^^^^^^ InvalidTraitUse: Trait TraitB used incorrectly: TraitB has a circular trait composition chain
     use TraitA;
 }
 ===expect===
-InvalidTraitUse@5:0-5:14: Trait TraitB used incorrectly: TraitB has a circular trait composition chain

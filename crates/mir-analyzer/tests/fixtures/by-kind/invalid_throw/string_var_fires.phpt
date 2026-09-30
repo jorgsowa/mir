@@ -5,5 +5,5 @@ Throwing a string variable fires InvalidThrow
 /** @var string $e */
 $e = 'error message';
 throw $e;
+//<^^^^^^^^^ InvalidThrow: Thrown type 'string' does not extend Throwable
 ===expect===
-InvalidThrow@4:0-4:9: Thrown type 'string' does not extend Throwable

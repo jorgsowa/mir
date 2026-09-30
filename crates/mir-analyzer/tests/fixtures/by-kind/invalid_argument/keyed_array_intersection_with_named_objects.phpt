@@ -35,9 +35,9 @@ class LoggerTest {
     public function testMissingKey(): void {
         // SHOULD flag - missing 'level' key
         $this->log([
+//                 ^ +2:9 InvalidArgument: Argument $entry of log() expects 'array{'message': string, 'level': string}&Loggable&Timestamped', got 'array{'message': "Test message"}'
             'message' => 'Test message'
         ]);
     }
 }
 ===expect===
-InvalidArgument@31:19-33:9: Argument $entry of log() expects 'array{'message': string, 'level': string}&Loggable&Timestamped', got 'array{'message': "Test message"}'

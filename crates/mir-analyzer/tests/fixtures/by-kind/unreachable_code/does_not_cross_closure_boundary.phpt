@@ -5,8 +5,8 @@ does not cross closure boundary
 function foo(): void {
     return;
     $cb = function (): void {
+//  ^ +2:6 UnreachableCode: Unreachable code detected
         $x = 1;
     };
 }
 ===expect===
-UnreachableCode@4:4-6:6: Unreachable code detected

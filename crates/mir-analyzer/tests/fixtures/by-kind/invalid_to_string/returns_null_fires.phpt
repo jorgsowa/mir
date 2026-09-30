@@ -6,9 +6,9 @@ php_version=8.0
 <?php
 class NullReturn {
     public function __toString(): null {
+//                                     ^ +2:5 InvalidToString: Method NullReturn::__toString() must return a string
         return null;
     }
 }
 new NullReturn();
 ===expect===
-InvalidToString@3:39-5:5: Method NullReturn::__toString() must return a string

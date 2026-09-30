@@ -10,8 +10,8 @@ function myFunc(): void {}
 <?php
 
 use function Lib\MYFUNC;
+//           ^^^^^^^^^^ WrongCaseFunction: Function name 'MYFUNC' has incorrect casing; use 'myFunc'
 
 MYFUNC();
+//<^^^^^^ WrongCaseFunction: Function name 'MYFUNC' has incorrect casing; use 'myFunc'
 ===expect===
-Main.php: WrongCaseFunction@3:13-3:23: Function name 'MYFUNC' has incorrect casing; use 'myFunc'
-Main.php: WrongCaseFunction@5:0-5:6: Function name 'MYFUNC' has incorrect casing; use 'myFunc'

@@ -6,6 +6,7 @@ final class Target {
 }
 
 final class Orphan {
+//    ^ +1:1 UnusedClass: Class Orphan is never referenced
 }
 
 #[Attribute]
@@ -19,4 +20,3 @@ final class Consumer {
 
 new Consumer();
 ===expect===
-UnusedClass@5:6-6:1: Class Orphan is never referenced

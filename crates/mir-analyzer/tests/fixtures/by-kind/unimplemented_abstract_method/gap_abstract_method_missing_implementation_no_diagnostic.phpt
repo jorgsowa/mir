@@ -7,8 +7,8 @@ abstract class AbstractBase {
     abstract public function render(): string;
 }
 class ConcreteChild extends AbstractBase {
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnimplementedAbstractMethod: Class ConcreteChild must implement abstract method compute()
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnimplementedAbstractMethod: Class ConcreteChild must implement abstract method render()
     // implements neither compute() nor render()
 }
 ===expect===
-UnimplementedAbstractMethod@6:0-6:42: Class ConcreteChild must implement abstract method compute()
-UnimplementedAbstractMethod@6:0-6:42: Class ConcreteChild must implement abstract method render()

@@ -12,6 +12,7 @@ interface Labeled {
 }
 
 enum Suit implements Colorful, Labeled {
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnimplementedInterfaceMethod: Class Suit must implement Labeled::label() from interface
     case Hearts;
     case Diamonds;
 
@@ -22,4 +23,3 @@ enum Suit implements Colorful, Labeled {
     // Missing label()
 }
 ===expect===
-UnimplementedInterfaceMethod@11:0-11:40: Class Suit must implement Labeled::label() from interface

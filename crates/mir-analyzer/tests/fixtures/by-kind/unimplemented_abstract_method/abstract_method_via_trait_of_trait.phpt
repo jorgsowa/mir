@@ -11,7 +11,7 @@ trait Mid {
     use Leaf;
 }
 class Incomplete {
+//<^^^^^^^^^^^^^^^^^^ UnimplementedAbstractMethod: Class Incomplete must implement abstract method foo()
     use Mid;
 }
 ===expect===
-UnimplementedAbstractMethod@8:0-8:18: Class Incomplete must implement abstract method foo()

@@ -7,5 +7,5 @@ class Service {
 }
 
 Service::build();
+//<^^^^^^^^^^^^^^^^ InvalidStaticInvocation: Non-static method Service::build() cannot be called statically
 ===expect===
-InvalidStaticInvocation@6:0-6:16: Non-static method Service::build() cannot be called statically

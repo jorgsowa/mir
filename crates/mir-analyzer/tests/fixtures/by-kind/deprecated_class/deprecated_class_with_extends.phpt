@@ -8,5 +8,5 @@ Deprecated class with extends
 class Foo { }
 
 class Bar extends Foo {}
+//<^^^^^^^^^^^^^^^^^^^^^^^^ DeprecatedClass: Class Foo is deprecated
 ===expect===
-DeprecatedClass@7:0-7:24: Class Foo is deprecated

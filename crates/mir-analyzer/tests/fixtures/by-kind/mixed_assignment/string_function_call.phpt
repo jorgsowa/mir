@@ -6,5 +6,5 @@ suppress=UnusedVariable
 <?php
 $bad_one = "hello";
 $a = $bad_one(1);
+//<^^^^^^^^^^^^^^^^ MixedAssignment: Variable $a is assigned a mixed type
 ===expect===
-MixedAssignment@3:0-3:16: Variable $a is assigned a mixed type

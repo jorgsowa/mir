@@ -16,9 +16,9 @@ class Collection {
  * @param T $c
  */
 function process($c): void {}
+//               ^^ UnusedParam: Parameter $c is never used
 
 $c = new Collection(new Cat());
 process($c);
+//<^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'Collection<Cat>' does not satisfy bound 'Collection<Animal>'
 ===expect===
-UnusedParam@15:17-15:19: Parameter $c is never used
-InvalidTemplateParam@18:0-18:11: Template type 'T' inferred as 'Collection<Cat>' does not satisfy bound 'Collection<Animal>'

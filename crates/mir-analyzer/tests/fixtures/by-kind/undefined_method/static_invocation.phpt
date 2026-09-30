@@ -7,5 +7,5 @@ class Foo {
 }
 
 Foo::barBar();
+//<^^^^^^^^^^^^^ InvalidStaticInvocation: Non-static method Foo::barBar() cannot be called statically
 ===expect===
-InvalidStaticInvocation@6:0-6:13: Non-static method Foo::barBar() cannot be called statically

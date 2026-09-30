@@ -6,5 +6,5 @@ suppress=UnusedVariable
 <?php
 $a = true;
 $a++;
+//<^^ InvalidOperand: Operator '++' not supported for operand of type 'true'
 ===expect===
-InvalidOperand@3:0-3:2: Operator '++' not supported for operand of type 'true'

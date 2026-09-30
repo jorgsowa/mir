@@ -7,5 +7,5 @@ class Greeter {
 }
 
 Greeter::hello();
+//<^^^^^^^^^^^^^^^^ InvalidStaticInvocation: Non-static method Greeter::hello() cannot be called statically
 ===expect===
-InvalidStaticInvocation@6:0-6:16: Non-static method Greeter::hello() cannot be called statically

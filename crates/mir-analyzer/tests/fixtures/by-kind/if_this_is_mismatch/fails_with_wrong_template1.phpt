@@ -28,6 +28,6 @@ class a {
 
 $i = new a("test");
 $i->test();
+//<^^^^^^^^^^ IfThisIsMismatch: Cannot call a::test() — @if-this-is requires $this to be 'a<int>', but it is 'a<string>'
 
 ===expect===
-IfThisIsMismatch@25:0-25:10: Cannot call a::test() — @if-this-is requires $this to be 'a<int>', but it is 'a<string>'

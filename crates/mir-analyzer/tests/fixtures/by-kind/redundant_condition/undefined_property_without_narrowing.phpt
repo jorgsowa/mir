@@ -3,10 +3,12 @@ undefined property error when template not narrowed correctly
 ===file===
 <?php
 class File {
+//<^^^^^^^^^^^^ MissingConstructor: Class File has uninitialized properties but no constructor
     public string $path;
 }
 
 class Stream {
+//<^^^^^^^^^^^^^^ MissingConstructor: Class Stream has uninitialized properties but no constructor
     public int $handle;
 }
 
@@ -23,5 +25,3 @@ function processResource(File|Stream $resource): void {
 
 }
 ===expect===
-MissingConstructor@2:0-2:12: Class File has uninitialized properties but no constructor
-MissingConstructor@6:0-6:14: Class Stream has uninitialized properties but no constructor

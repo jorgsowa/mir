@@ -15,8 +15,8 @@ interface ReadWritable extends Readable {
 ===file:Stream.php===
 <?php
 class Stream implements ReadWritable {
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnimplementedInterfaceMethod: Class Stream must implement Readable::read() from interface
     public function write(string $data): void { var_dump($data); }
     # read() inherited from Readable is NOT implemented
 }
 ===expect===
-Stream.php: UnimplementedInterfaceMethod@2:0-2:38: Class Stream must implement Readable::read() from interface

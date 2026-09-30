@@ -12,8 +12,8 @@ function n() { return n() + 1; }
 
 /** @mir-check $a is mixed */
 $a = (new T)->f();
+//<^^^^^^^^^^^^^^^^^ MixedAssignment: Variable $a is assigned a mixed type
 /** @mir-check $b is mixed */
 $b = n();
+//<^^^^^^^^ MixedAssignment: Variable $b is assigned a mixed type
 ===expect===
-MixedAssignment@8:0-8:17: Variable $a is assigned a mixed type
-MixedAssignment@10:0-10:8: Variable $b is assigned a mixed type

@@ -4,13 +4,13 @@ property and adds no constructor of its own (nor does its parent provide one).
 ===file===
 <?php
 class Base {
+//<^^^^^^^^^^^^ MissingConstructor: Class Base has uninitialized properties but no constructor
     public string $name;
 }
 
 class Child extends Base {}
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^ MissingConstructor: Class Child has uninitialized properties but no constructor
 
 new Child();
 
 ===expect===
-MissingConstructor@2:0-2:12: Class Base has uninitialized properties but no constructor
-MissingConstructor@6:0-6:27: Class Child has uninitialized properties but no constructor

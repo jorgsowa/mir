@@ -13,6 +13,6 @@ class Mailer {
 function run(): void {
     $m = new \Svc\Mailer();
     $m->send(42);
+//           ^^ ArgumentTypeCoercion: Argument $address of send() expects 'string', got '42' — coercion may fail at runtime
 }
 ===expect===
-App.php: ArgumentTypeCoercion@4:13-4:15: Argument $address of send() expects 'string', got '42' — coercion may fail at runtime

@@ -8,8 +8,8 @@ interface Colorful {
 }
 
 enum Suit implements Colorful {
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnimplementedInterfaceMethod: Class Suit must implement Colorful::getColor() from interface
     case Hearts;
     case Diamonds;
 }
 ===expect===
-UnimplementedInterfaceMethod@7:0-7:31: Class Suit must implement Colorful::getColor() from interface

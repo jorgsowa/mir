@@ -25,10 +25,10 @@ class Consumer {
     public function handle(): void {
         $s = new Service();
         $s->nope();
+//      ^^^^^^^^^^ UndefinedMethod: Method App\Service::nope() does not exist
         $h = new Legacy_Helper();
         $h->nope();
+//      ^^^^^^^^^^ UndefinedMethod: Method Legacy_Helper::nope() does not exist
     }
 }
 ===expect===
-Consumer.php: UndefinedMethod@6:8-6:18: Method App\Service::nope() does not exist
-Consumer.php: UndefinedMethod@8:8-8:18: Method Legacy_Helper::nope() does not exist

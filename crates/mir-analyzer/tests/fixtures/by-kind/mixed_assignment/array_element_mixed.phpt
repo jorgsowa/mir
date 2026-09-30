@@ -8,6 +8,6 @@ suppress=UnusedVariable
 /** @var array<string, mixed> $data */
 $data = [];
 $value = $data["key"];
+//<^^^^^^^^^^^^^^^^^^^^^ MixedAssignment: Variable $value is assigned a mixed type
 
 ===expect===
-MixedAssignment@4:0-4:21: Variable $value is assigned a mixed type

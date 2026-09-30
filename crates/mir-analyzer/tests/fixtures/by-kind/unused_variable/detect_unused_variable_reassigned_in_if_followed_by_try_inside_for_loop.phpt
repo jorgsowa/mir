@@ -5,6 +5,7 @@ Detect unused variable reassigned in if followed by try inside for loop
 ===file===
 <?php
 $user_id = 0;
+//<^^^^^^^^ UnusedVariable: Variable $user_id is never read
 $user = null;
 
 if (rand(0, 1)) {
@@ -16,10 +17,9 @@ if ($user !== null && $user !== 0) {
     $a = 0;
     for ($i = 1; $i <= 10; $i++) {
         $a += $i;
+//      ^^ UnusedVariable: Variable $a is never read
         try {} catch (Exception $e) {}
     }
     echo $i;
 }
 ===expect===
-UnusedVariable@2:0-2:8: Variable $user_id is never read
-UnusedVariable@13:8-13:10: Variable $a is never read

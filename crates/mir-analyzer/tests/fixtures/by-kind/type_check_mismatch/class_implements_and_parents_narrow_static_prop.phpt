@@ -13,11 +13,13 @@ class Cat extends Animal {}
 class Rock {}
 
 class Holder {
+//<^^^^^^^^^^^^^^ MissingConstructor: Class Holder has uninitialized properties but no constructor
     /** @var Animal|Duck */
     public static mixed $pet;
 
     public static function testStaticPropClassImplementsTrue(): void {
         if (array_key_exists('Quacks', class_implements(self::$pet))) {
+//                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PossiblyInvalidArgument: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
             /** @mir-check self::$pet is Animal&Quacks|Duck */
             $_ = self::$pet;
         }
@@ -28,6 +30,7 @@ class Holder {
 
     public static function testStaticPropClassImplementsFalse(): void {
         if (!array_key_exists('Quacks', class_implements(self::$pet2))) {
+//                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PossiblyInvalidArgument: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
             /** @mir-check self::$pet2 is Cat */
             $_ = self::$pet2;
         }
@@ -38,13 +41,10 @@ class Holder {
 
     public static function testStaticPropClassParentsTrue(): void {
         if (array_key_exists('Animal', class_parents(self::$pet3))) {
+//                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PossiblyInvalidArgument: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
             /** @mir-check self::$pet3 is Duck */
             $_ = self::$pet3;
         }
     }
 }
 ===expect===
-MissingConstructor@8:0-8:14: Class Holder has uninitialized properties but no constructor
-PossiblyInvalidArgument@13:39-13:67: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
-PossiblyInvalidArgument@23:40-23:69: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
-PossiblyInvalidArgument@33:39-33:65: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided

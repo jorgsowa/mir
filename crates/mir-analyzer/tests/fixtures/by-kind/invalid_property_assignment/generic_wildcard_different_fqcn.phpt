@@ -9,6 +9,7 @@ class GenericA {}
 class GenericB {}
 
 class Config {
+//<^^^^^^^^^^^^^^ MissingConstructor: Class Config has uninitialized properties but no constructor
     public GenericA $a;
 }
 
@@ -17,6 +18,5 @@ $a = new GenericA();
 $c->a = $a;
 // This should error: GenericB value cannot assign to GenericA property
 $c->a = new GenericB();
+//<^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $a expects 'GenericA', cannot assign 'GenericB'
 ===expect===
-MissingConstructor@8:0-8:14: Class Config has uninitialized properties but no constructor
-InvalidPropertyAssignment@16:0-16:22: Property $a expects 'GenericA', cannot assign 'GenericB'

@@ -6,9 +6,9 @@ php_version=7.4
 <?php
 function check_contains(string $text, string $needle): void {
     str_contains($text, $needle);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function str_contains() is not defined
 }
 ===file:App.php===
 <?php
 check_contains('hello world', 'world');
 ===expect===
-StringHelper.php: UndefinedFunction@3:4-3:32: Function str_contains() is not defined

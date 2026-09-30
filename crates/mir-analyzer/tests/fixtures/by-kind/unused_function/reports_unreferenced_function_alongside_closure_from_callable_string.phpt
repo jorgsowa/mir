@@ -6,7 +6,7 @@ suppress=
 <?php
 function helper(): void {}
 function unused(): void {}
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedFunction: Function unused() is never called
 
 Closure::fromCallable('helper');
 ===expect===
-UnusedFunction@3:0-3:26: Function unused() is never called

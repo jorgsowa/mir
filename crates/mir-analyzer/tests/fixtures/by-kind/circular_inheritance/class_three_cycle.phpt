@@ -5,5 +5,5 @@ class three cycle
 class A extends B {}
 class B extends C {}
 class C extends A {}
+//<^^^^^^^^^^^^^^^^^^^^ CircularInheritance: Class C has a circular inheritance chain
 ===expect===
-CircularInheritance@4:0-4:20: Class C has a circular inheritance chain

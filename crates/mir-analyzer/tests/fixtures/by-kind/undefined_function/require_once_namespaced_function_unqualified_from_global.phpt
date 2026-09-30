@@ -11,6 +11,6 @@ function helper(): string {
 require_once __DIR__ . '/Helpers.php';
 function run(): void {
     helper();
+//  ^^^^^^^^ UndefinedFunction: Function helper() is not defined
 }
 ===expect===
-Main.php: UndefinedFunction@4:4-4:12: Function helper() is not defined

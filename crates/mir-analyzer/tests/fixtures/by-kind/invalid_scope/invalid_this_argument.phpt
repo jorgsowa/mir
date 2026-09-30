@@ -3,5 +3,5 @@ Invalid this argument
 ===file===
 <?php
 $this = "hello";
+//<^^^^^^^^^^^^^^^ InvalidScope: $this cannot be used outside of a class
 ===expect===
-InvalidScope@2:0-2:15: $this cannot be used outside of a class

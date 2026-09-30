@@ -4,5 +4,5 @@ Enum redefinition
 <?php
 enum Foo {}
 enum Foo {}
+//<^^^^^^^^^^^ DuplicateEnum: Enum Foo has already been defined
 ===expect===
-DuplicateEnum@3:0-3:11: Enum Foo has already been defined

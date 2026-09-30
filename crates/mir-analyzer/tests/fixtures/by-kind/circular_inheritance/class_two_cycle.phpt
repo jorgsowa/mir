@@ -4,5 +4,5 @@ class two cycle
 <?php
 class A extends B {}
 class B extends A {}
+//<^^^^^^^^^^^^^^^^^^^^ CircularInheritance: Class B has a circular inheritance chain
 ===expect===
-CircularInheritance@3:0-3:20: Class B has a circular inheritance chain

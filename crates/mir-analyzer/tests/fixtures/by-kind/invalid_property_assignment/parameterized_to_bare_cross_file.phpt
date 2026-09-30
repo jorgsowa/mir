@@ -19,6 +19,7 @@ class TestCase {
      * @return ObjectProphecy<T>
      */
     public function prophesize(string $classOrInterface): ObjectProphecy {
+//                             ^^^^^^^^^^^^^^^^^^^^^^^^ UnusedParam: Parameter $classOrInterface is never used
         return new ObjectProphecy();
     }
 }
@@ -30,6 +31,7 @@ use Prophecy\Prophecy\ObjectProphecy;
 class Foo {}
 
 class MyTest extends TestCase {
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MissingConstructor: Class MyTest has uninitialized properties but no constructor
     public ObjectProphecy $prophecy;
 
     public function setUp(): void {
@@ -39,5 +41,3 @@ class MyTest extends TestCase {
     }
 }
 ===expect===
-App.php: MissingConstructor@7:0-7:31: Class MyTest has uninitialized properties but no constructor
-TestCase.php: UnusedParam@12:31-12:55: Parameter $classOrInterface is never used

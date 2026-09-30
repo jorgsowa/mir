@@ -13,5 +13,5 @@ class Foo {
 $a = (new Foo());
 
 $a->foo = "hello";
+//<^^^^^^^^^^^^^^^^^ MixedPropertyAssignment: Property $foo assigned on mixed type
 ===expect===
-MixedPropertyAssignment@10:0-10:17: Property $foo assigned on mixed type

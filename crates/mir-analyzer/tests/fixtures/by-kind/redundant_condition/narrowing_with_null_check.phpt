@@ -3,6 +3,7 @@ template narrowing combined with null check
 ===file===
 <?php
 class DataSet {
+//<^^^^^^^^^^^^^^^ MissingConstructor: Class DataSet has uninitialized properties but no constructor
     public string $name;
 }
 
@@ -34,4 +35,3 @@ function handleValue(string|int|null $value): void {
     }
 }
 ===expect===
-MissingConstructor@2:0-2:15: Class DataSet has uninitialized properties but no constructor

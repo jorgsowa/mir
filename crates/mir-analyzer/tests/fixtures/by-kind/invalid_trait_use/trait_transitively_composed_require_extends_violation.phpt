@@ -17,7 +17,7 @@ trait ComposesTimestamps {
 }
 
 class NotAModel {
+//<^ +2:1 InvalidTraitUse: Trait HasTimestamps used incorrectly: Class NotAModel uses trait HasTimestamps but does not extend Model
     use ComposesTimestamps;
 }
 ===expect===
-InvalidTraitUse@15:0-17:1: Trait HasTimestamps used incorrectly: Class NotAModel uses trait HasTimestamps but does not extend Model

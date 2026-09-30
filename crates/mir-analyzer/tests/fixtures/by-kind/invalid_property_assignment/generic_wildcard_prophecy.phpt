@@ -12,9 +12,11 @@ class WrapperFactory {
      * @return GenericWrapper<T>
      */
     public function make(string $cls): GenericWrapper { return new GenericWrapper(); }
+//                       ^^^^^^^^^^^ UnusedParam: Parameter $cls is never used
 }
 
 class Container {
+//<^^^^^^^^^^^^^^^^^ MissingConstructor: Class Container has uninitialized properties but no constructor
     public GenericWrapper $bare;
 }
 
@@ -24,5 +26,3 @@ $wrapper = $factory->make(stdClass::class);
 /** @mir-check $wrapper is GenericWrapper<stdClass> */
 $c->bare = $wrapper;
 ===expect===
-UnusedParam@11:25-11:36: Parameter $cls is never used
-MissingConstructor@14:0-14:17: Class Container has uninitialized properties but no constructor

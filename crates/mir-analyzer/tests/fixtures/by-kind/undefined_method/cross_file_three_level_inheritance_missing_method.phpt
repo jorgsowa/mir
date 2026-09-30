@@ -14,6 +14,6 @@ class Child extends Middle {}
 function test(): void {
     $c = new Child();
     $c->missing();
+//  ^^^^^^^^^^^^^ UndefinedMethod: Method Child::missing() does not exist
 }
 ===expect===
-Child.php: UndefinedMethod@5:4-5:17: Method Child::missing() does not exist

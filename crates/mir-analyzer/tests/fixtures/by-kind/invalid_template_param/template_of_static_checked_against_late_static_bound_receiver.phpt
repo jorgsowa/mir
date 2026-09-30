@@ -20,5 +20,5 @@ class Sub extends Base {}
 
 $sub = new Sub();
 $sub->accept(new Base());
+//<^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'Base' does not satisfy bound 'Sub'
 ===expect===
-InvalidTemplateParam@12:0-12:24: Template type 'T' inferred as 'Base' does not satisfy bound 'Sub'

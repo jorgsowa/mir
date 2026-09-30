@@ -12,6 +12,7 @@ class TestCase {
      * @return ObjectProphecy<T>
      */
     public function prophesize(string $cls): ObjectProphecy {
+//                             ^^^^^^^^^^^ UnusedParam: Parameter $cls is never used
         return new ObjectProphecy();
     }
 }
@@ -19,6 +20,7 @@ class TestCase {
 class Foo {}
 
 class MyTest extends TestCase {
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MissingConstructor: Class MyTest has uninitialized properties but no constructor
     public ObjectProphecy $prophecy;
 
     public function setUp(): void {
@@ -28,5 +30,3 @@ class MyTest extends TestCase {
     }
 }
 ===expect===
-UnusedParam@11:31-11:42: Parameter $cls is never used
-MissingConstructor@18:0-18:31: Class MyTest has uninitialized properties but no constructor

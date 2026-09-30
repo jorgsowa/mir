@@ -7,6 +7,6 @@ evaluates to mixed.
 function getMixed(): mixed { return null; }
 
 getMixed()();
+//<^^^^^^^^^^^^ MixedFunctionCall: Cannot call mixed type as a function
 
 ===expect===
-MixedFunctionCall@5:0-5:12: Cannot call mixed type as a function

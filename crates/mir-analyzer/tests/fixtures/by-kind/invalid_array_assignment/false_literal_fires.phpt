@@ -6,5 +6,5 @@ suppress=UnusedVariable
 <?php
 $a = false;
 $a[0] = 5;
+//<^^^^^^^^^ InvalidArrayAssignment: Cannot use [] assignment on non-array type 'false'
 ===expect===
-InvalidArrayAssignment@3:0-3:9: Cannot use [] assignment on non-array type 'false'

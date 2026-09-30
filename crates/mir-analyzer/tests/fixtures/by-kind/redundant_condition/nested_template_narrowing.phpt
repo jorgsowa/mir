@@ -4,6 +4,7 @@ nested instanceof checks with template narrowing
 <?php
 class Base {}
 class Extended extends Base {
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MissingConstructor: Class Extended has uninitialized properties but no constructor
     public string $data;
 }
 class Other {}
@@ -20,4 +21,3 @@ function nestedCheck(Base|Other $value): void {
     }
 }
 ===expect===
-MissingConstructor@3:0-3:29: Class Extended has uninitialized properties but no constructor

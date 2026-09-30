@@ -13,9 +13,9 @@ enum Kind: string {
 }
 function h(Kind $type): bool {
     return match ($type->value) {
+//         ^ +3:5 UnhandledMatchCondition: Unhandled match condition: Kind::Baz->value
         Kind::Foo->value => true,
         Kind::Bar->value => false,
     };
 }
 ===expect===
-UnhandledMatchCondition@8:11-11:5: Unhandled match condition: Kind::Baz->value

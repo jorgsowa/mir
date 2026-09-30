@@ -13,5 +13,5 @@ class Maker {
 <?php
 function expect_banana(Banana $v): void {}
 expect_banana((new Maker)->make());
+//            ^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $v of expect_banana() expects 'Banana', got 'Apple'
 ===expect===
-Consumer.php: InvalidArgument@3:14-3:33: Argument $v of expect_banana() expects 'Banana', got 'Apple'

@@ -12,8 +12,8 @@ enum Status: string {
 
 function label(Status $s): string {
     return match($s) {
+//         ^ +2:5 UnhandledMatchCondition: Unhandled match condition: Status::Inactive, Status::Pending
         Status::Active => "active",
     };
 }
 ===expect===
-UnhandledMatchCondition@9:11-11:5: Unhandled match condition: Status::Inactive, Status::Pending

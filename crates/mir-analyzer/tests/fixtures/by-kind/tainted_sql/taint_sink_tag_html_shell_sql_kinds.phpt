@@ -19,9 +19,9 @@ function runShell(string $cmd): void {
 }
 
 renderHtml((string) $_GET["a"]);
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 runQuery((string) $_GET["b"]);
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedSql: Tainted SQL query — possible SQL injection
 runShell((string) $_GET["c"]);
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedShell: Tainted shell command — possible command injection
 ===expect===
-TaintedHtml@14:0-14:31: Tainted HTML output — possible XSS
-TaintedSql@15:0-15:29: Tainted SQL query — possible SQL injection
-TaintedShell@16:0-16:29: Tainted shell command — possible command injection

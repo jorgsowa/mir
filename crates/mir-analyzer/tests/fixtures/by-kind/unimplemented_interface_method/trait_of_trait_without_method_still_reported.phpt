@@ -13,7 +13,7 @@ trait RunsTrait {
     // run() is not provided anywhere in the chain
 }
 class Task implements Runnable {
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnimplementedInterfaceMethod: Class Task must implement Runnable::run() from interface
     use RunsTrait;
 }
 ===expect===
-UnimplementedInterfaceMethod@12:0-12:32: Class Task must implement Runnable::run() from interface

@@ -14,6 +14,7 @@ class BoxFactory {
 }
 
 class Container {
+//<^^^^^^^^^^^^^^^^^ MissingConstructor: Class Container has uninitialized properties but no constructor
     public Box $box;
 }
 
@@ -28,4 +29,3 @@ $intBox = $factory->makeInt();
 $c->box = $stringBox;
 $c->box = $intBox;
 ===expect===
-MissingConstructor@13:0-13:17: Class Container has uninitialized properties but no constructor

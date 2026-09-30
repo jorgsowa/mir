@@ -7,5 +7,5 @@ suppress=UnusedVariable
 $x = 42;
 /** @trace $x */
 $y = $x + 1;
+//<^^^^^^^^^^^^ Trace: Type of $x is 42
 ===expect===
-Trace@4:0-4:12: Type of $x is 42

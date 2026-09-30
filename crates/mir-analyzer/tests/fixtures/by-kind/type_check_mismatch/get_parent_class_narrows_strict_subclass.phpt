@@ -37,6 +37,7 @@ function test_false_branch_no_narrowing(Animal $obj): void {
 }
 
 class HasAnimalProp {
+//<^^^^^^^^^^^^^^^^^^^^^ MissingConstructor: Class HasAnimalProp has uninitialized properties but no constructor
     /** @var Animal|Dog */
     public mixed $pet;
 
@@ -48,4 +49,3 @@ class HasAnimalProp {
     }
 }
 ===expect===
-MissingConstructor@30:0-30:21: Class HasAnimalProp has uninitialized properties but no constructor

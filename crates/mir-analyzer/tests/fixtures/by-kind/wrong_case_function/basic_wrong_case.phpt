@@ -4,5 +4,5 @@ Calling a function with wrong casing is reported.
 <?php
 function myFunc(): void {}
 MYFUNC();
+//<^^^^^^ WrongCaseFunction: Function name 'MYFUNC' has incorrect casing; use 'myFunc'
 ===expect===
-WrongCaseFunction@3:0-3:6: Function name 'MYFUNC' has incorrect casing; use 'myFunc'

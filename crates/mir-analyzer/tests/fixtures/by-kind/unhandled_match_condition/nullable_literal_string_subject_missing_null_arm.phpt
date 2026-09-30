@@ -7,9 +7,9 @@ literal is covered.
 /** @param "a"|"b"|null $s */
 function label($s): string {
     return match ($s) {
+//         ^ +3:5 UnhandledMatchCondition: Unhandled match condition: null
         "a" => "A",
         "b" => "B",
     };
 }
 ===expect===
-UnhandledMatchCondition@4:11-7:5: Unhandled match condition: null

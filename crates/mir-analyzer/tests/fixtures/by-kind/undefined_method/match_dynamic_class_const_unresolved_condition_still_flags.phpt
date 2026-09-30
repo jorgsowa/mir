@@ -16,10 +16,10 @@ class ErrorB {
 
 function describe(ErrorA|ErrorB $error, string $dynamicClass): string {
     return match ($error::class) {
+//  ^ +3:6 MixedReturnStatement: Cannot return a mixed type from function with declared return type 'string'
         $dynamicClass => $error->aOnlyMethod(),
+//                       ^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method ErrorB::aOnlyMethod() does not exist
         default => 'x',
     };
 }
 ===expect===
-MixedReturnStatement@10:4-13:6: Cannot return a mixed type from function with declared return type 'string'
-UndefinedMethod@11:25-11:46: Method ErrorB::aOnlyMethod() does not exist

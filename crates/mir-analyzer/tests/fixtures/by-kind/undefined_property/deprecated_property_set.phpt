@@ -13,5 +13,5 @@ class A{
 }
 $a = new A;
 $a->foo = 5;
+//<^^^^^^^^^^^ DeprecatedProperty: Property A::$foo is deprecated
 ===expect===
-DeprecatedProperty@10:0-10:11: Property A::$foo is deprecated

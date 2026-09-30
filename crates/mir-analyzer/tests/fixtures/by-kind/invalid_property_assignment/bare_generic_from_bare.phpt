@@ -6,6 +6,7 @@ bare generic property accepts bare generic value (no parameterization)
 class Item {}
 
 class Holder {
+//<^^^^^^^^^^^^^^ MissingConstructor: Class Holder has uninitialized properties but no constructor
     private Item $value;
 
     public function set(): void {
@@ -14,4 +15,3 @@ class Holder {
     }
 }
 ===expect===
-MissingConstructor@5:0-5:14: Class Holder has uninitialized properties but no constructor

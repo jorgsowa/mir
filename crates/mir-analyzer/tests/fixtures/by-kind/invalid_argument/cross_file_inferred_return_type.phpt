@@ -7,6 +7,7 @@ suppress=ForbiddenCode,MissingReturnType
 function requireInt(int $n): void { var_dump($n); }
 function test(): void {
     requireInt(getFruit());
+//             ^^^^^^^^^^ InvalidArgument: Argument $n of requireInt() expects 'int', got 'Apple'
 }
 ===file:Provider.php===
 <?php
@@ -16,4 +17,3 @@ function getFruit() {
     return new Apple();
 }
 ===expect===
-Consumer.php: InvalidArgument@4:15-4:25: Argument $n of requireInt() expects 'int', got 'Apple'

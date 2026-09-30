@@ -20,6 +20,7 @@ class Rock {}
 /** @param Animal|Duck $obj */
 function test_class_implements_true(mixed $obj): void {
     if (array_key_exists('Quacks', class_implements($obj))) {
+//                                 ^^^^^^^^^^^^^^^^^^^^^^ PossiblyInvalidArgument: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
         /** @mir-check $obj is Animal&Quacks|Duck */
         $_ = $obj;
     }
@@ -28,6 +29,7 @@ function test_class_implements_true(mixed $obj): void {
 /** @param Duck|Cat $obj */
 function test_class_implements_false(mixed $obj): void {
     if (!array_key_exists('Quacks', class_implements($obj))) {
+//                                  ^^^^^^^^^^^^^^^^^^^^^^ PossiblyInvalidArgument: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
         /** @mir-check $obj is Cat */
         $_ = $obj;
     }
@@ -36,25 +38,23 @@ function test_class_implements_false(mixed $obj): void {
 /** @param Duck|Rock $obj */
 function test_class_parents_true(mixed $obj): void {
     if (array_key_exists('Animal', class_parents($obj))) {
+//                                 ^^^^^^^^^^^^^^^^^^^ PossiblyInvalidArgument: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
         /** @mir-check $obj is Duck */
         $_ = $obj;
     }
 }
 
 class HasAnimalProp {
+//<^^^^^^^^^^^^^^^^^^^^^ MissingConstructor: Class HasAnimalProp has uninitialized properties but no constructor
     /** @var Animal|Duck */
     public mixed $pet;
 
     public function testPropClassImplements(): void {
         if (array_key_exists('Quacks', class_implements($this->pet))) {
+//                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PossiblyInvalidArgument: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
             /** @mir-check $this->pet is Animal&Quacks|Duck */
             $_ = $this->pet;
         }
     }
 }
 ===expect===
-PossiblyInvalidArgument@10:35-10:57: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
-PossiblyInvalidArgument@18:36-18:58: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
-PossiblyInvalidArgument@26:35-26:54: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
-MissingConstructor@32:0-32:21: Class HasAnimalProp has uninitialized properties but no constructor
-PossiblyInvalidArgument@37:39-37:67: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided

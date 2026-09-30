@@ -9,6 +9,7 @@ suppress=UnusedVariable,UnusedParam,MixedArgument
 class Foo {}
 
 class HasGettypeProp {
+//<^^^^^^^^^^^^^^^^^^^^^^ MissingConstructor: Class HasGettypeProp has uninitialized properties but no constructor
     /** @var int|string */
     public mixed $x;
 
@@ -35,6 +36,7 @@ class HasGettypeProp {
 }
 
 class HasGetDebugTypeProp {
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^ MissingConstructor: Class HasGetDebugTypeProp has uninitialized properties but no constructor
     /** @var Foo|string */
     public mixed $x;
 
@@ -67,5 +69,3 @@ class HasGetDebugTypeProp {
     }
 }
 ===expect===
-MissingConstructor@4:0-4:22: Class HasGettypeProp has uninitialized properties but no constructor
-MissingConstructor@30:0-30:27: Class HasGetDebugTypeProp has uninitialized properties but no constructor

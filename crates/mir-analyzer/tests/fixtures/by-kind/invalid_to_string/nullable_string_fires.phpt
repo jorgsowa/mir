@@ -4,9 +4,9 @@ __toString() with ?string (string|null) return type fires — null atom is not a
 <?php
 class NullableReturn {
     public function __toString(): ?string {
+//                                        ^ +2:5 InvalidToString: Method NullableReturn::__toString() must return a string
         return null;
     }
 }
 new NullableReturn();
 ===expect===
-InvalidToString@3:42-5:5: Method NullableReturn::__toString() must return a string

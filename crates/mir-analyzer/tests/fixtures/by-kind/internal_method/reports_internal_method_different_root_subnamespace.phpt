@@ -16,5 +16,5 @@ class Foo {
 namespace App\Service;
 $foo = new \Vendor\Library\Foo();
 $foo->internalHelper();
+//<^^^^^^^^^^^^^^^^^^^^^^ InternalMethod: Method Vendor\Library\Foo::internalHelper() is marked @internal
 ===expect===
-App.php: InternalMethod@4:0-4:22: Method Vendor\Library\Foo::internalHelper() is marked @internal

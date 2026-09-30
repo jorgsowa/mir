@@ -6,9 +6,9 @@ php_version=8.0
 <?php
 function format_hebrew(string $text): void {
     hebrevc($text);
+//  ^^^^^^^^^^^^^^ UndefinedFunction: Function hebrevc() is not defined
 }
 ===file:App.php===
 <?php
 format_hebrew('שלום');
 ===expect===
-TextHelper.php: UndefinedFunction@3:4-3:18: Function hebrevc() is not defined

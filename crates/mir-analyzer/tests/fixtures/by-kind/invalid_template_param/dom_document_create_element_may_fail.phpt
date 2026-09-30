@@ -11,5 +11,5 @@ function elementName(): string {
 
 $document = new DOMDocument();
 $document->appendChild($document->createElement(elementName()));
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'TNode' inferred as 'DOMElement|false' can be false and therefore does not satisfy bound 'DOMNode'
 ===expect===
-InvalidTemplateParam@8:0-8:63: Template type 'TNode' inferred as 'DOMElement|false' can be false and therefore does not satisfy bound 'DOMNode'

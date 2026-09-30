@@ -3,6 +3,7 @@ Switch var reassigned in branch with default
 ===file===
 <?php
 $a = false;
+//<^^ UnusedVariable: Variable $a is never read
 
 switch (rand(0, 2)) {
     case 0:
@@ -13,4 +14,3 @@ switch (rand(0, 2)) {
         $a = false;
 }
 ===expect===
-UnusedVariable@2:0-2:2: Variable $a is never read

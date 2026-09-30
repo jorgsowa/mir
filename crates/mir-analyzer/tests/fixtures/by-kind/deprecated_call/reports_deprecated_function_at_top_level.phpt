@@ -4,8 +4,8 @@ reports deprecated function at top level
 <?php
 /** @deprecated use newGreet() instead */
 function oldGreet(string $name): void {}
+//                ^^^^^^^^^^^^ UnusedParam: Parameter $name is never used
 
 oldGreet('Alice');
+//<^^^^^^^^^^^^^^^^^ DeprecatedCall: Call to deprecated function oldGreet: use newGreet() instead
 ===expect===
-UnusedParam@3:18-3:30: Parameter $name is never used
-DeprecatedCall@5:0-5:17: Call to deprecated function oldGreet: use newGreet() instead

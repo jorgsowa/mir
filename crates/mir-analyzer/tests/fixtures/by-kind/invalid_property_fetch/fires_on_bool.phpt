@@ -5,5 +5,5 @@ InvalidPropertyFetch fires on bool type.
 /** @var bool $flag */
 $flag = true;
 $flag->foo;
+//<^^^^^^^^^^ InvalidPropertyFetch: Cannot fetch property on non-object type 'bool'
 ===expect===
-InvalidPropertyFetch@4:0-4:10: Cannot fetch property on non-object type 'bool'

@@ -23,5 +23,5 @@ class AGrandChild extends AChild {
 }
 
 AGrandChild::getInstance()->foo();
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method AChild::foo() does not exist
 ===expect===
-UndefinedMethod@22:0-22:33: Method AChild::foo() does not exist

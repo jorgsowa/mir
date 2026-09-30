@@ -4,8 +4,8 @@ property type hint via use
 <?php
 use Vendor\Missing\Foo;
 class Bar {
+//<^^^^^^^^^^^ MissingConstructor: Class Bar has uninitialized properties but no constructor
     public Foo $prop;
+//         ^^^ UndefinedClass: Class Vendor\Missing\Foo does not exist
 }
 ===expect===
-MissingConstructor@3:0-3:11: Class Bar has uninitialized properties but no constructor
-UndefinedClass@4:11-4:14: Class Vendor\Missing\Foo does not exist

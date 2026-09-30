@@ -12,10 +12,12 @@ suppress=UnusedVariable
 ===file===
 <?php
 class HasScalarProp {
+//<^^^^^^^^^^^^^^^^^^^^^ MissingConstructor: Class HasScalarProp has uninitialized properties but no constructor
     /** @var int|string|bool */
     public mixed $x;
 
     private function acceptIntOrString(int|string $v): void {}
+//                                     ^^^^^^^^^^^^^ UnusedParam: Parameter $v is never used
 
     public function matchArm(): void {
         match (true) {
@@ -35,5 +37,3 @@ class HasScalarProp {
     }
 }
 ===expect===
-MissingConstructor@2:0-2:21: Class HasScalarProp has uninitialized properties but no constructor
-UnusedParam@6:39-6:52: Parameter $v is never used

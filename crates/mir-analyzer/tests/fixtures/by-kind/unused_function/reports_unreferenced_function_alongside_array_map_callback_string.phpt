@@ -6,7 +6,7 @@ suppress=
 <?php
 function formatRow(int $row): string { return (string) $row; }
 function unused(): void {}
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedFunction: Function unused() is never called
 
 array_map('formatRow', [1, 2, 3]);
 ===expect===
-UnusedFunction@3:0-3:26: Function unused() is never called

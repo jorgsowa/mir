@@ -24,6 +24,7 @@ class Config
 function make(Config $configuration, Logger $logger): UnpackerS3Client
 {
     return new UnpackerS3Client(
+//         ^ +7:5 TooManyArguments: Too many arguments for UnpackerS3Client::__construct(): expected 0, got 6
         $logger,
         $configuration->amazonKey,
         $configuration->amazonSecret,
@@ -33,4 +34,3 @@ function make(Config $configuration, Logger $logger): UnpackerS3Client
     );
 }
 ===expect===
-TooManyArguments@18:11-25:5: Too many arguments for UnpackerS3Client::__construct(): expected 0, got 6

@@ -5,6 +5,7 @@ suppress=MissingThrowsDocblock
 ===file===
 <?php
 function foo() : bool {
+//                    ^ +8:1 InvalidReturnType: Return type 'void' is not compatible with declared 'bool'
     try {
         if (rand(0, 1)) throw new Exception("bad");
         return true;
@@ -14,4 +15,3 @@ function foo() : bool {
     }
 }
 ===expect===
-InvalidReturnType@2:22-10:1: Return type 'void' is not compatible with declared 'bool'

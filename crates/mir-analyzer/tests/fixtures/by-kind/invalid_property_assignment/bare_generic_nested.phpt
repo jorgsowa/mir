@@ -6,6 +6,7 @@ bare generic property accepts nested parameterized types
 class Container {}
 
 class Wrapper {
+//<^^^^^^^^^^^^^^^ MissingConstructor: Class Wrapper has uninitialized properties but no constructor
     private Container $data;
 
     public function store(): void {
@@ -15,4 +16,3 @@ class Wrapper {
     }
 }
 ===expect===
-MissingConstructor@5:0-5:15: Class Wrapper has uninitialized properties but no constructor

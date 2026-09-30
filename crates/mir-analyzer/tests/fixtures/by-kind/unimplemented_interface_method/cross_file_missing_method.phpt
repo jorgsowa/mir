@@ -9,7 +9,7 @@ interface Runnable {
 ===file:Task.php===
 <?php
 class Task implements Runnable {
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnimplementedInterfaceMethod: Class Task must implement Runnable::stop() from interface
     public function run(): void {}
 }
 ===expect===
-Task.php: UnimplementedInterfaceMethod@2:0-2:32: Class Task must implement Runnable::stop() from interface

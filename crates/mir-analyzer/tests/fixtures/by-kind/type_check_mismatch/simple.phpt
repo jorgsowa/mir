@@ -5,5 +5,5 @@ mir-check with simple int vs string mismatch
 $x = 42;
 /** @mir-check $x is string */
 echo $x;
+//<^^^^^^^^ TypeCheckMismatch: Type of $x is expected to be string, got int
 ===expect===
-TypeCheckMismatch@4:0-4:8: Type of $x is expected to be string, got int

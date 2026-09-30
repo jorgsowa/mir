@@ -6,5 +6,5 @@ suppress=UnusedVariable
 <?php
 /** @trace $a */
 $a = getmypid();
+//<^^^^^^^^^^^^^^^^ Trace: Type of $a is mixed
 ===expect===
-Trace@3:0-3:16: Type of $a is mixed

@@ -4,6 +4,6 @@ Simple unused variable
 <?php
 $a = 5;
 $b = [];
+//<^^ UnusedVariable: Variable $b is never read
 echo $a;
 ===expect===
-UnusedVariable@3:0-3:2: Variable $b is never read

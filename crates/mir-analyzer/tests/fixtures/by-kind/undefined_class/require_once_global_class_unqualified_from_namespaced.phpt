@@ -9,6 +9,6 @@ namespace App\Service;
 require_once __DIR__ . '/Foo.php';
 function run(): void {
     new Foo();
+//      ^^^ UndefinedClass: Class App\Service\Foo does not exist
 }
 ===expect===
-Main.php: UndefinedClass@5:8-5:11: Class App\Service\Foo does not exist

@@ -7,6 +7,6 @@ class A {
 }
 $a = new A;
 $a->__construct();
+//<^^^^^^^^^^^^^^^^^ DirectConstructorCall: Cannot call constructor of A directly
 
 ===expect===
-DirectConstructorCall@6:0-6:17: Cannot call constructor of A directly

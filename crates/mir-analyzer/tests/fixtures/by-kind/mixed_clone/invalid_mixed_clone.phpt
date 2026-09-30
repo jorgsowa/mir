@@ -6,5 +6,5 @@ Invalid mixed clone
 $a = 5;
 /** @mir-check $a is mixed */
 clone $a;
+//<^^^^^^^^ MixedClone: cannot clone mixed
 ===expect===
-MixedClone@5:0-5:8: cannot clone mixed

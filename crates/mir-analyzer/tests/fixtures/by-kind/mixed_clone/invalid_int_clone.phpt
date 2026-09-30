@@ -4,5 +4,5 @@ Invalid int clone
 <?php
 $a = 5;
 clone $a;
+//<^^^^^^^^ InvalidClone: cannot clone non-object 5
 ===expect===
-InvalidClone@3:0-3:8: cannot clone non-object 5

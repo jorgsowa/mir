@@ -6,5 +6,5 @@ class Base {
     private static function secret(): void {}
 }
 Base::secret();
+//<^^^^^^^^^^^^^^ UndefinedMethod: Method Base::secret() does not exist
 ===expect===
-UndefinedMethod@5:0-5:14: Method Base::secret() does not exist

@@ -6,10 +6,12 @@ bare generic PHP-typed property accepts parameterized actual where type param is
 class Container {}
 
 class Factory {
+//<^^^^^^^^^^^^^^^ MissingConstructor: Class Factory has uninitialized properties but no constructor
     /**
      * @return ($x is null ? Container<object> : Container<object>)
      */
     public function make($x): Container { return new Container(); }
+//                       ^^ UnusedParam: Parameter $x is never used
 
     public Container $prop;
 }
@@ -19,5 +21,3 @@ $result = $f->make(null);
 /** @mir-check $result is Container<object> */
 $f->prop = $result;
 ===expect===
-MissingConstructor@5:0-5:15: Class Factory has uninitialized properties but no constructor
-UnusedParam@9:25-9:27: Parameter $x is never used

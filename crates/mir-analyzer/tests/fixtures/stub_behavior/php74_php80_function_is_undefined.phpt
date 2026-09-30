@@ -10,10 +10,10 @@ suppress=MixedReturnStatement
 <?php
 function check(string $s): bool {
     return str_contains($s, 'x');
+//         ^^^^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function str_contains() is not defined
 }
 ===file:Other.php===
 <?php
 require_once 'App.php';
 check('hello');
 ===expect===
-App.php: UndefinedFunction@3:11-3:32: Function str_contains() is not defined

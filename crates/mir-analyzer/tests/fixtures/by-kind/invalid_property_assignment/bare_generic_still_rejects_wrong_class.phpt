@@ -9,6 +9,7 @@ class ProphecyA {}
 class ProphecyB {}
 
 class Holder {
+//<^^^^^^^^^^^^^^ MissingConstructor: Class Holder has uninitialized properties but no constructor
     public ProphecyA $prop;
 }
 
@@ -16,6 +17,5 @@ $h = new Holder();
 /** @var ProphecyB<string> $b */
 $b = new ProphecyB();
 $h->prop = $b;
+//<^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $prop expects 'ProphecyA', cannot assign 'ProphecyB<string>'
 ===expect===
-MissingConstructor@8:0-8:14: Class Holder has uninitialized properties but no constructor
-InvalidPropertyAssignment@15:0-15:13: Property $prop expects 'ProphecyA', cannot assign 'ProphecyB<string>'

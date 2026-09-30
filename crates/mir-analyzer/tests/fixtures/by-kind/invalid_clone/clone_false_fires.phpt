@@ -6,5 +6,5 @@ suppress=UnusedVariable
 <?php
 $x = false;
 clone $x;
+//<^^^^^^^^ InvalidClone: cannot clone non-object false
 ===expect===
-InvalidClone@3:0-3:8: cannot clone non-object false

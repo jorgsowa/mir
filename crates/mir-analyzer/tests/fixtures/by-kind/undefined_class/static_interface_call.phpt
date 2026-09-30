@@ -9,5 +9,5 @@ interface Foo {
 }
 
 Foo::doFoo();
+//<^^^ UndefinedClass: Class Foo does not exist
 ===expect===
-UndefinedClass@6:0-6:3: Class Foo does not exist

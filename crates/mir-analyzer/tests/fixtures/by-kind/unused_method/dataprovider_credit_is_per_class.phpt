@@ -17,15 +17,15 @@ class FooTest {
     }
 
     private static function unrelatedHelper(): array {
+//  ^ +2:5 UnusedMethod: Private method FooTest::unrelatedhelper() is never called
         return [];
     }
 }
 
 class OtherTest {
     private static function providecases(): array {
+//  ^ +2:5 UnusedMethod: Private method OtherTest::providecases() is never called
         return [];
     }
 }
 ===expect===
-UnusedMethod@14:4-16:5: Private method FooTest::unrelatedhelper() is never called
-UnusedMethod@20:4-22:5: Private method OtherTest::providecases() is never called

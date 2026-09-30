@@ -9,6 +9,6 @@ class Child extends Base {}
 function test(): void {
     $c = new Child();
     $c->foo();
+//  ^^^^^^^^^ UndefinedMethod: Method Child::foo() does not exist
 }
 ===expect===
-Child.php: UndefinedMethod@5:4-5:13: Method Child::foo() does not exist

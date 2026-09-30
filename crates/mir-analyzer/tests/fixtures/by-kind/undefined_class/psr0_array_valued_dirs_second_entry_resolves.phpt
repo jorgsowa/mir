@@ -16,5 +16,5 @@ class Legacy_Thing {
 $t = new Legacy_Thing();
 echo $t->name();
 $t->nope();
+//<^^^^^^^^^^ UndefinedMethod: Method Legacy_Thing::nope() does not exist
 ===expect===
-Consumer.php: UndefinedMethod@4:0-4:10: Method Legacy_Thing::nope() does not exist

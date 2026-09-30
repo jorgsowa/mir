@@ -18,5 +18,5 @@ class B {
 ===file:Z.php===
 <?php
 function test(): string { return B::g(); }
+//                        ^^^^^^^^^^^^^^ InvalidReturnType: Return type '1' is not compatible with declared 'string'
 ===expect===
-Z.php: InvalidReturnType@2:26-2:40: Return type '1' is not compatible with declared 'string'

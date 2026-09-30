@@ -3,6 +3,7 @@ Default above case that breaks
 ===file===
 <?php
 function foo(string $a) : string {
+//                               ^ +12:1 InvalidReturnType: Return type 'void' is not compatible with declared 'string'
   switch ($a) {
     case "a":
       return "hello";
@@ -16,4 +17,3 @@ function foo(string $a) : string {
   }
 }
 ===expect===
-InvalidReturnType@2:33-14:1: Return type 'void' is not compatible with declared 'string'

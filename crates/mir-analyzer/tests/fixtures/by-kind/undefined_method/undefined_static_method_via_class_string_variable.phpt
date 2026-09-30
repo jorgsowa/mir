@@ -6,5 +6,5 @@ class Foo {}
 
 $cls = Foo::class;
 $cls::missing();
+//<^^^^^^^^^^^^^^^ UndefinedMethod: Method Foo::missing() does not exist
 ===expect===
-UndefinedMethod@5:0-5:15: Method Foo::missing() does not exist

@@ -4,5 +4,5 @@ Function name with mixed (not all-caps) wrong casing is detected.
 <?php
 function processRequest(): void {}
 ProcessRequest();
+//<^^^^^^^^^^^^^^ WrongCaseFunction: Function name 'ProcessRequest' has incorrect casing; use 'processRequest'
 ===expect===
-WrongCaseFunction@3:0-3:14: Function name 'ProcessRequest' has incorrect casing; use 'processRequest'

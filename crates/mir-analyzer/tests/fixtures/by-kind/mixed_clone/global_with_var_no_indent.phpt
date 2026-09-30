@@ -5,5 +5,5 @@ Global with var no indent
 /** @var mixed $a */
 $a = 5;
 clone $a;
+//<^^^^^^^^ MixedClone: cannot clone mixed
 ===expect===
-MixedClone@4:0-4:8: cannot clone mixed

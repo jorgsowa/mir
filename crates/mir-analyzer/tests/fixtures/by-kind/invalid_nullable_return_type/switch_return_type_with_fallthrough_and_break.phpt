@@ -5,6 +5,7 @@ Switch return type with fallthrough and break
 class A {
     /** @return bool */
     public function fooFoo() {
+//                           ^ +7:5 InvalidReturnType: Return type 'void' is not compatible with declared 'bool'
         switch (rand(0,10)) {
             case 1:
                 break;
@@ -14,4 +15,3 @@ class A {
     }
 }
 ===expect===
-InvalidReturnType@4:29-11:5: Return type 'void' is not compatible with declared 'bool'

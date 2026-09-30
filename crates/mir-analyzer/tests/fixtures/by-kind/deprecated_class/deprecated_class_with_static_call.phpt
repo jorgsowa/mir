@@ -11,5 +11,5 @@ class Foo {
 }
 
 Foo::barBar();
+//<^^^ DeprecatedClass: Class Foo is deprecated
 ===expect===
-DeprecatedClass@10:0-10:3: Class Foo is deprecated

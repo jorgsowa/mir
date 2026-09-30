@@ -6,8 +6,8 @@ suppress=MissingReturnType
 <?php
 function foo(int $i) {
     match ($i) {
+//  ^ +2:5 UnhandledMatchCondition: Unhandled match condition: no arms
 
     };
 }
 ===expect===
-UnhandledMatchCondition@3:4-5:5: Unhandled match condition: no arms

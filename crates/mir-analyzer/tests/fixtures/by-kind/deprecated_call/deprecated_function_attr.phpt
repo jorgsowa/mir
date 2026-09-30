@@ -5,6 +5,6 @@ Deprecated function attr
 #[Deprecated]
 function a(): void {}
 a();
+//<^^^ DeprecatedCall: Call to deprecated function a
 
 ===expect===
-DeprecatedCall@4:0-4:3: Call to deprecated function a

@@ -11,9 +11,9 @@ enum Suit {
 
 foreach (Suit::cases() as $case) {
     echo match($case) {
+//       ^ +3:5 UnhandledMatchCondition: Unhandled match condition: Suit::Spades
         Suit::Hearts, Suit::Diamonds => "Red",
         Suit::Clubs => "Black",
     };
 }
 ===expect===
-UnhandledMatchCondition@10:9-13:5: Unhandled match condition: Suit::Spades

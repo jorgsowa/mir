@@ -12,9 +12,9 @@ namespace App;
 use function App\Helpers\foo;
 class Widget {
     public function make(): foo
+//                          ^^^ UndefinedClass: Class App\foo does not exist
     {
+//  ^ +1:5 InvalidReturnType: Return type 'void' is not compatible with declared 'App\foo'
     }
 }
 ===expect===
-Main.php: UndefinedClass@5:28-5:31: Class App\foo does not exist
-Main.php: InvalidReturnType@6:4-7:5: Return type 'void' is not compatible with declared 'App\foo'

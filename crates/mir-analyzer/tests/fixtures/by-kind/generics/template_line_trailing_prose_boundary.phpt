@@ -16,5 +16,5 @@ suppress=UnusedParam
 function f($x): void {}
 
 f(5);
+//<^^^^ InvalidTemplateParam: Template type 'T' inferred as '5' does not satisfy bound 'ArrayAccess'
 ===expect===
-InvalidTemplateParam@8:0-8:4: Template type 'T' inferred as '5' does not satisfy bound 'ArrayAccess'

@@ -6,5 +6,5 @@ namespace App;
 
 function greet(): string { return 'hello'; }
 function greet(): string { return 'hi'; }
+//<^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DuplicateFunction: Function App\greet() has already been defined
 ===expect===
-DuplicateFunction@5:0-5:41: Function App\greet() has already been defined

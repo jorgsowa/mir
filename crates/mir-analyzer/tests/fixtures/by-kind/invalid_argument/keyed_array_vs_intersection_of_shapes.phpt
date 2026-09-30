@@ -36,6 +36,7 @@ class ContextTest {
     public function testMissingUser_id(): void {
         // SHOULD flag - missing required 'user_id'
         $this->process([
+//                     ^ +2:9 InvalidArgument: Argument $ctx of process() expects 'array{'user_id': int, 'action': string}&array{'user_id': int, 'action': string, 'metadata'?: array}', got 'array{'action': "update"}'
             'action' => 'update'
         ]);
     }
@@ -43,10 +44,9 @@ class ContextTest {
     public function testMissingAction(): void {
         // SHOULD flag - missing required 'action'
         $this->process([
+//                     ^ +2:9 InvalidArgument: Argument $ctx of process() expects 'array{'user_id': int, 'action': string}&array{'user_id': int, 'action': string, 'metadata'?: array}', got 'array{'user_id': 123}'
             'user_id' => 123
         ]);
     }
 }
 ===expect===
-InvalidArgument@32:23-34:9: Argument $ctx of process() expects 'array{'user_id': int, 'action': string}&array{'user_id': int, 'action': string, 'metadata'?: array}', got 'array{'action': "update"}'
-InvalidArgument@39:23-41:9: Argument $ctx of process() expects 'array{'user_id': int, 'action': string}&array{'user_id': int, 'action': string, 'metadata'?: array}', got 'array{'user_id': 123}'

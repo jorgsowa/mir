@@ -10,8 +10,8 @@ interface Repository
 }
 
 interface Repository
+//<^ +3:1 DuplicateInterface: Interface App\Repository has already been defined
 {
     public function findAll(): array;
 }
 ===expect===
-DuplicateInterface@9:0-12:1: Interface App\Repository has already been defined

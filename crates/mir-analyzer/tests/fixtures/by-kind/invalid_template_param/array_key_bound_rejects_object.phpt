@@ -16,6 +16,6 @@ function array_key_list(array $array): array {}
 /** @param array<object, int> $arr */
 function test(array $arr): void {
     array_key_list($arr);
+//  ^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'TKey' inferred as 'object' does not satisfy bound 'int|string'
 }
 ===expect===
-App.php: InvalidTemplateParam@4:4-4:24: Template type 'TKey' inferred as 'object' does not satisfy bound 'int|string'

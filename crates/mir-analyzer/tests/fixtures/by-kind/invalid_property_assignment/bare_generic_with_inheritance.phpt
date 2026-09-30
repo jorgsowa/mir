@@ -8,6 +8,7 @@ class Base {}
 class Derived extends Base {}
 
 class Holder {
+//<^^^^^^^^^^^^^^ MissingConstructor: Class Holder has uninitialized properties but no constructor
     private Base $item;
 
     public function assign(): void {
@@ -17,4 +18,3 @@ class Holder {
     }
 }
 ===expect===
-MissingConstructor@7:0-7:14: Class Holder has uninitialized properties but no constructor

@@ -9,8 +9,8 @@ class C {
 /** @param 'a'|'b' $x */
 function f(string $x): string {
     return match ($x) {
+//         ^ +2:5 UnhandledMatchCondition: Unhandled match condition: "b"
         C::A => 'x',
     };
 }
 ===expect===
-UnhandledMatchCondition@8:11-10:5: Unhandled match condition: "b"

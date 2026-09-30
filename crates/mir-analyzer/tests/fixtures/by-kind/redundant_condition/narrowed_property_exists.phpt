@@ -3,10 +3,12 @@ property access only valid after template narrowing
 ===file===
 <?php
 class Document {
+//<^^^^^^^^^^^^^^^^ MissingConstructor: Class Document has uninitialized properties but no constructor
     public string $name;
 }
 
 class Image {
+//<^^^^^^^^^^^^^ MissingConstructor: Class Image has uninitialized properties but no constructor
     public int $width;
 }
 
@@ -18,10 +20,8 @@ function getAssetInfo(Document|Image $asset): void {
     if ($asset instanceof Document) {
         echo $asset->name;
     } elseif ($asset instanceof Image) {
+//            ^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         echo $asset->width;
     }
 }
 ===expect===
-MissingConstructor@2:0-2:16: Class Document has uninitialized properties but no constructor
-MissingConstructor@6:0-6:13: Class Image has uninitialized properties but no constructor
-RedundantCondition@17:14-17:37: Condition is always true/false for type 'bool'
