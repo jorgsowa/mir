@@ -113,6 +113,7 @@ impl<'a> BodyAnalyzer<'a> {
             };
             self.analyze_method_scope(
                 method,
+                &member.span,
                 &scope_cx,
                 file,
                 source,
@@ -200,6 +201,7 @@ impl<'a> BodyAnalyzer<'a> {
             };
             self.analyze_method_scope(
                 method,
+                &member.span,
                 &scope_cx,
                 file,
                 source,
@@ -353,6 +355,7 @@ impl<'a> BodyAnalyzer<'a> {
             };
             self.analyze_method_scope(
                 method,
+                &member.span,
                 &scope_cx,
                 file,
                 source,
@@ -454,6 +457,7 @@ impl<'a> BodyAnalyzer<'a> {
             };
             self.analyze_method_scope(
                 method,
+                &member.span,
                 &scope_cx,
                 file,
                 source,
@@ -559,12 +563,29 @@ impl<'a> BodyAnalyzer<'a> {
             };
             // Interface methods have no body, so they never reach
             // `analyze_method_scope` (the class/trait/enum method-body core) —
-            // record the same name-only `methdecl:` fallback here so an
-            // unknown-owner query still surfaces an interface's own method
-            // declarations.
+            // record the declaration's navigation fact and the name-only
+            // `methdecl:` fallback here so an unknown-owner query still
+            // surfaces an interface's own method declarations.
+            if self.collect_navigation_facts {
+                if let Some(name) = method.name.as_deref() {
+                    let span = super::method_decl_name_span(source, &member.span, method);
+                    if span.end > span.start {
+                        self.navigation_facts
+                            .borrow_mut()
+                            .push(crate::symbol::NavigationFact {
+                                span,
+                                expr_span: None,
+                                name: crate::Name::method(
+                                    Arc::<str>::from(iface_fqcn.as_str()),
+                                    name,
+                                ),
+                            });
+                    }
+                }
+            }
             if self.mode == AnalysisMode::Full && self.record_reference_locations {
                 if let Some(name) = method.name.as_deref() {
-                    let span = super::bare_name_span_in(source, &member.span, name);
+                    let span = super::method_decl_name_span(source, &member.span, method);
                     if span.end > span.start {
                         let (line, col_start) =
                             crate::diagnostics::offset_to_line_col(source, span.start, source_map);

@@ -1238,6 +1238,44 @@ pub(super) fn property_name_span(
     }
 }
 
+/// Span of a method's declared name, found after the `function` keyword inside
+/// the member's span. Works for bodyless (abstract/interface) methods, which
+/// have no param or body to anchor on.
+pub(super) fn method_decl_name_span(
+    source: &str,
+    member_span: &php_ast::Span,
+    method: &php_ast::owned::MethodDecl,
+) -> php_ast::Span {
+    let Some(name) = method.name.as_deref().filter(|n| !n.is_empty()) else {
+        return method_header_name_span(source, method);
+    };
+    let start = member_span.start as usize;
+    let end = (member_span.end as usize).min(source.len());
+    let Some(text) = source.get(start..end) else {
+        return method_header_name_span(source, method);
+    };
+    let lowered = text.to_ascii_lowercase();
+    let mut from = 0;
+    while let Some(rel) = lowered[from..].find("function") {
+        let after_keyword = from + rel + "function".len();
+        let rest = &text[after_keyword..];
+        let trimmed = rest.trim_start_matches(|c: char| c.is_whitespace() || c == '&');
+        let name_start = after_keyword + (rest.len() - trimmed.len());
+        if trimmed.starts_with(name)
+            && !trimmed[name.len()..]
+                .starts_with(|c: char| c.is_alphanumeric() || c == '_' || !c.is_ascii())
+        {
+            let abs = (start + name_start) as u32;
+            return php_ast::Span {
+                start: abs,
+                end: abs + name.len() as u32,
+            };
+        }
+        from = after_keyword;
+    }
+    method_header_name_span(source, method)
+}
+
 /// Tight span for a bare identifier (no `$` sigil) within a bounded region —
 /// a class constant's name within its declaration span, or an interface
 /// method's name within its member span (interface methods have no body and

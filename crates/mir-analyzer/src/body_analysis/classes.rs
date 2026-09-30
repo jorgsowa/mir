@@ -853,6 +853,7 @@ impl<'a> BodyAnalyzer<'a> {
     pub(super) fn analyze_method_scope(
         &self,
         method: &php_ast::owned::MethodDecl,
+        member_span: &php_ast::Span,
         cx: &MethodScopeCx,
         file: &Arc<str>,
         source: &str,
@@ -867,7 +868,7 @@ impl<'a> BodyAnalyzer<'a> {
 
         if self.collect_navigation_facts {
             if let Some(name) = method.name.as_deref() {
-                let span = super::method_header_name_span(source, method);
+                let span = super::method_decl_name_span(source, member_span, method);
                 if span.end > span.start {
                     self.navigation_facts.borrow_mut().push(NavigationFact {
                         span,
@@ -883,7 +884,7 @@ impl<'a> BodyAnalyzer<'a> {
         // untyped `$x`) can still surface matching declarations.
         if self.mode == AnalysisMode::Full {
             if let Some(name) = method.name.as_deref() {
-                let span = super::method_header_name_span(source, method);
+                let span = super::method_decl_name_span(source, member_span, method);
                 if span.end > span.start {
                     let (line, col_start) =
                         crate::diagnostics::offset_to_line_col(source, span.start, source_map);
@@ -1560,6 +1561,7 @@ impl<'a> BodyAnalyzer<'a> {
             };
             self.analyze_method_scope(
                 method,
+                &member.span,
                 &scope_cx,
                 file,
                 source,
@@ -1789,6 +1791,7 @@ impl<'a> BodyAnalyzer<'a> {
             };
             self.analyze_method_scope(
                 method,
+                &member.span,
                 &scope_cx,
                 file,
                 source,
