@@ -1,11 +1,10 @@
 ===description===
-header with superglobal is reported
+`header()` is not an HTML output sink.
 ===config===
 suppress=MixedArrayAccess
 ===file===
 <?php
 function redirect(): void {
     header('Location: ' . $_GET['next']);
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 ===expect===
