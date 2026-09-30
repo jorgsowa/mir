@@ -87,7 +87,7 @@ impl<'a> DefinitionCollector<'a> {
 
         // See `class.rs` for why this runs before the loop and only covers
         // self/static references to this same trait's constants.
-        let self_int_constants: Arc<rustc_hash::FxHashMap<Arc<str>, i64>> = Arc::new(
+        let self_int_constants: Arc<Vec<(Arc<str>, mir_types::Atomic)>> = Arc::new(
             decl.body
                 .members
                 .iter()
@@ -96,7 +96,10 @@ impl<'a> DefinitionCollector<'a> {
                         let name = c.name.as_deref()?;
                         match super::infer_const_value(self, &c.value.kind) {
                             Some(t) if t.types.len() == 1 => match &t.types[0] {
-                                mir_types::Atomic::TLiteralInt(n) => Some((Arc::from(name), *n)),
+                                a @ (mir_types::Atomic::TLiteralInt(_)
+                                | mir_types::Atomic::TLiteralString(_)) => {
+                                    Some((Arc::from(name), a.clone()))
+                                }
                                 _ => None,
                             },
                             _ => None,

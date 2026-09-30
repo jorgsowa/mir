@@ -18,3 +18,4 @@ class Airport {
     }
 }
 ===expect===
+UnhandledMatchCondition@11:15-14:9: Unhandled match condition: "lga"

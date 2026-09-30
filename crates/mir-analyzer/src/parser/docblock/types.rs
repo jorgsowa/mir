@@ -1,6 +1,5 @@
 use super::*;
 use crate::expr::helpers::canonical_int_array_key;
-use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 
 fn associative_array_marker() -> Type {
@@ -478,6 +477,9 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
             if let Ok(n) = s.parse::<i64>() {
                 return Type::single(Atomic::TLiteralInt(n));
             }
+            if let Some(t) = resolve_class_constant_type(s) {
+                return t;
+            }
             Type::single(Atomic::TNamedObject {
                 fqcn: normalize_fqcn(s).into(),
                 type_params: mir_types::union::empty_type_params(),
@@ -828,7 +830,7 @@ pub(super) fn expand_int_mask_members(members: &[i64]) -> Option<Type> {
 }
 
 /// `(declaring class FQCN, its own literal-int constants)`.
-type SelfIntConstants = (Arc<str>, Arc<FxHashMap<Arc<str>, i64>>);
+type SelfIntConstants = (Arc<str>, Arc<Vec<(Arc<str>, Atomic)>>);
 
 thread_local! {
     /// Ambient constants of the class currently being collected, so
@@ -850,7 +852,7 @@ pub(crate) struct SelfIntConstantsGuard {
 }
 
 impl SelfIntConstantsGuard {
-    pub(crate) fn activate(fqcn: &str, constants: &Arc<FxHashMap<Arc<str>, i64>>) -> Self {
+    pub(crate) fn activate(fqcn: &str, constants: &Arc<Vec<(Arc<str>, Atomic)>>) -> Self {
         let previous = SELF_INT_CONSTANTS
             .with(|cell| cell.replace(Some((Arc::from(fqcn), constants.clone()))));
         Self { previous }
@@ -863,21 +865,16 @@ impl Drop for SelfIntConstantsGuard {
     }
 }
 
-/// Resolve `int-mask-of<T::CONST_PREFIX*>` (or bare `T::*`) using the ambient
-/// class constants set by `SelfIntConstantsGuard`. Returns `None` when there
-/// is no active guard, `T` isn't a self-reference, no constants match the
-/// prefix, or the match set can't be expanded (see `expand_int_mask_members`).
-pub(super) fn resolve_int_mask_of(inner: &str) -> Option<Type> {
-    let (class_ref, pattern) = inner.trim().split_once("::")?;
+/// Literal values of the active class's constants matching `pattern` (`NAME` or
+/// `PREFIX*`), when `class_ref` is `self`/`static`/the class's own name.
+fn self_constant_values(class_ref: &str, pattern: &str) -> Option<Vec<Atomic>> {
     let class_ref = class_ref.trim();
-    let prefix = pattern.trim().strip_suffix('*')?;
+    let pattern = pattern.trim();
     SELF_INT_CONSTANTS.with(|cell| {
         let active = cell.borrow();
         let (fqcn, constants) = active.as_ref()?;
-        // A bare (non-backslash-qualified) reference to the class's own short
-        // name is the common case for a namespaced class referencing itself
-        // (`int-mask-of<Flags::*>` inside `namespace App; class Flags {...}`)
-        // — `class_ref` here is the raw docblock text, never namespace-resolved.
+        // `class_ref` is raw docblock text, never namespace-resolved, so a bare
+        // short name counts as a self-reference.
         let short_name = fqcn.rsplit('\\').next().unwrap_or(fqcn);
         let is_self_ref = matches!(class_ref, "self" | "static" | "$this")
             || normalize_fqcn(class_ref).eq_ignore_ascii_case(fqcn)
@@ -885,15 +882,52 @@ pub(super) fn resolve_int_mask_of(inner: &str) -> Option<Type> {
         if !is_self_ref {
             return None;
         }
-        let mut members: Vec<i64> = constants
-            .iter()
-            .filter(|(name, _)| name.starts_with(prefix))
-            .map(|(_, &v)| v)
-            .collect();
-        members.sort_unstable();
-        members.dedup();
-        expand_int_mask_members(&members)
+        Some(
+            constants
+                .iter()
+                .filter(|(name, _)| match pattern.strip_suffix('*') {
+                    Some(prefix) => name.starts_with(prefix),
+                    None => name.as_ref() == pattern,
+                })
+                .map(|(_, v)| v.clone())
+                .collect(),
+        )
     })
+}
+
+/// Resolve `int-mask-of<T::CONST_PREFIX*>` (or bare `T::*`) using the ambient
+/// class constants set by `SelfIntConstantsGuard`. Returns `None` when there
+/// is no active guard, `T` isn't a self-reference, no constants match the
+/// prefix, or the match set can't be expanded (see `expand_int_mask_members`).
+pub(super) fn resolve_int_mask_of(inner: &str) -> Option<Type> {
+    let (class_ref, pattern) = inner.trim().split_once("::")?;
+    pattern.trim().strip_suffix('*')?;
+    let mut members: Vec<i64> = self_constant_values(class_ref, pattern)?
+        .into_iter()
+        .filter_map(|a| match a {
+            Atomic::TLiteralInt(n) => Some(n),
+            _ => None,
+        })
+        .collect();
+    members.sort_unstable();
+    members.dedup();
+    expand_int_mask_members(&members)
+}
+
+/// Resolve `self::NAME` / `self::PREFIX_*` to the union of the matching literal
+/// int/string constants. `None` for other classes and non-literal constants,
+/// which keep their named-class fallback.
+fn resolve_class_constant_type(s: &str) -> Option<Type> {
+    let (class_ref, pattern) = s.split_once("::")?;
+    let values = self_constant_values(class_ref, pattern)?;
+    if values.is_empty() {
+        return None;
+    }
+    let mut u = Type::empty();
+    for v in values {
+        u.add_type(v);
+    }
+    Some(u)
 }
 
 /// Case-insensitive ASCII prefix strip that can never panic on a char
