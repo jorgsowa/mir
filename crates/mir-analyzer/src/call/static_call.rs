@@ -988,7 +988,8 @@ impl CallAnalyzer {
                 })
                 .collect();
 
-            let ret_substituted = substitute_static_in_return(ret_raw, &fqcn_arc, &own_type_params);
+            let ret_substituted =
+                substitute_static_in_return(ea.db, ret_raw, &fqcn_arc, &own_type_params);
             let ret_substituted = if return_class_bindings.is_empty() {
                 ret_substituted
             } else {
@@ -1072,8 +1073,12 @@ impl CallAnalyzer {
                 };
                 // `@param-out self`/`@param-out static` must resolve to the receiver's
                 // concrete class, the same way `@return static` already does.
-                let out_ty =
-                    substitute_static_in_return((**out_ty).clone(), &fqcn_arc, &own_type_params);
+                let out_ty = substitute_static_in_return(
+                    ea.db,
+                    (**out_ty).clone(),
+                    &fqcn_arc,
+                    &own_type_params,
+                );
                 let out_ty = if out_bindings.is_empty() {
                     out_ty
                 } else {
@@ -1208,6 +1213,7 @@ impl CallAnalyzer {
                     // merged with any `@extends`/`@implements`-declared binding)
                     // or the class's own type argument is erased entirely.
                     let self_out_ty = substitute_static_in_return(
+                        ea.db,
                         (*self_out_raw).clone(),
                         &fqcn_arc,
                         &own_type_params,

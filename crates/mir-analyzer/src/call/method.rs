@@ -1288,7 +1288,7 @@ fn resolve_method_return<'a>(
         }
 
         let ret_raw =
-            substitute_static_in_return(resolved.return_ty_raw, fqcn, receiver_type_params);
+            substitute_static_in_return(ea.db, resolved.return_ty_raw, fqcn, receiver_type_params);
 
         if !resolved.template_params.is_empty() {
             let (method_bindings, unchecked) = infer_template_bindings(
@@ -1493,7 +1493,7 @@ fn resolve_method_return<'a>(
             // `@param-out self`/`@param-out static` must resolve to the receiver's
             // concrete class, the same way `@return static` already does.
             let out_ty =
-                substitute_static_in_return((**out_ty).clone(), fqcn, receiver_type_params);
+                substitute_static_in_return(ea.db, (**out_ty).clone(), fqcn, receiver_type_params);
             let out_ty = if bindings.is_empty() {
                 out_ty
             } else {
@@ -1536,8 +1536,12 @@ fn resolve_method_return<'a>(
         // (including `$this`), the same way a by-ref `@param-out` retypes its
         // argument above.
         if let Some(self_out_raw) = resolved.self_out.clone() {
-            let self_out_ty =
-                substitute_static_in_return((*self_out_raw).clone(), fqcn, receiver_type_params);
+            let self_out_ty = substitute_static_in_return(
+                ea.db,
+                (*self_out_raw).clone(),
+                fqcn,
+                receiver_type_params,
+            );
             let self_out_ty = if !bindings.is_empty() {
                 // Widen literal argument types (e.g. a bare `"hello"` binding
                 // `U`) before substituting — carrying a literal into the
@@ -1655,6 +1659,7 @@ fn resolve_method_return<'a>(
             resolve_method_from_db(ea.db, fqcn, "__call")
                 .map(|call_magic| {
                     substitute_static_in_return(
+                        ea.db,
                         call_magic.return_ty_raw,
                         fqcn,
                         receiver_type_params,

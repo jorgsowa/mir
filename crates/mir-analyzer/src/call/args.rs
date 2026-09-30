@@ -7,6 +7,7 @@ use mir_codebase::definitions::{DeclaredParam, TemplateParam, Visibility};
 use mir_issues::{IssueKind, Severity};
 use mir_types::{ArrayKey, Atomic, Name, Type};
 
+use crate::db::MirDatabase;
 use crate::expr::ExpressionAnalyzer;
 use crate::flow_state::FlowState;
 
@@ -238,6 +239,7 @@ pub fn distinct_spans_for_expansion(span: Span, count: usize) -> Vec<Span> {
 }
 
 fn substitute_static_in_type(
+    db: &dyn MirDatabase,
     t: Type,
     receiver_fqcn: &Arc<str>,
     receiver_type_params: &[Type],
@@ -246,15 +248,34 @@ fn substitute_static_in_type(
     let types: Vec<Atomic> = t
         .types
         .into_iter()
-        .map(|a| substitute_static_atom(a, receiver_fqcn, receiver_type_params))
+        .map(|a| substitute_static_atom(db, a, receiver_fqcn, receiver_type_params))
         .collect();
     let mut result = Type::from_vec(types);
     result.from_docblock = from_docblock;
     result
 }
 
-fn substitute_static_atom(a: Atomic, fqcn: &Arc<str>, receiver_type_params: &[Type]) -> Atomic {
+fn substitute_static_atom(
+    db: &dyn MirDatabase,
+    a: Atomic,
+    fqcn: &Arc<str>,
+    receiver_type_params: &[Type],
+) -> Atomic {
     match a {
+        // `self` is the declaring class, not the caller's subclass. A trait's
+        // `self` is the using class, so it still binds to the receiver, as does
+        // a generic receiver: its type args can't be mapped onto the declaring class.
+        Atomic::TSelf { fqcn: declaring }
+            if receiver_type_params.is_empty()
+                && !declaring.is_empty()
+                && declaring.as_ref() != fqcn.as_ref()
+                && !crate::db::class_kind(db, declaring.as_ref()).is_some_and(|k| k.is_trait) =>
+        {
+            Atomic::TNamedObject {
+                fqcn: declaring,
+                type_params: mir_types::union::vec_to_type_params(Vec::new()),
+            }
+        }
         // Preserve the receiver's own inferred type params (e.g. `Box<int>`)
         // rather than erasing them to a bare `Box` — otherwise a fluent
         // `: static`-returning method loses generic tracking for the rest of
@@ -266,6 +287,7 @@ fn substitute_static_atom(a: Atomic, fqcn: &Arc<str>, receiver_type_params: &[Ty
         },
         Atomic::TList { value } => Atomic::TList {
             value: Box::new(substitute_static_in_type(
+                db,
                 *value,
                 fqcn,
                 receiver_type_params,
@@ -273,22 +295,35 @@ fn substitute_static_atom(a: Atomic, fqcn: &Arc<str>, receiver_type_params: &[Ty
         },
         Atomic::TNonEmptyList { value } => Atomic::TNonEmptyList {
             value: Box::new(substitute_static_in_type(
+                db,
                 *value,
                 fqcn,
                 receiver_type_params,
             )),
         },
         Atomic::TArray { key, value } => Atomic::TArray {
-            key: Box::new(substitute_static_in_type(*key, fqcn, receiver_type_params)),
+            key: Box::new(substitute_static_in_type(
+                db,
+                *key,
+                fqcn,
+                receiver_type_params,
+            )),
             value: Box::new(substitute_static_in_type(
+                db,
                 *value,
                 fqcn,
                 receiver_type_params,
             )),
         },
         Atomic::TNonEmptyArray { key, value } => Atomic::TNonEmptyArray {
-            key: Box::new(substitute_static_in_type(*key, fqcn, receiver_type_params)),
+            key: Box::new(substitute_static_in_type(
+                db,
+                *key,
+                fqcn,
+                receiver_type_params,
+            )),
             value: Box::new(substitute_static_in_type(
+                db,
                 *value,
                 fqcn,
                 receiver_type_params,
@@ -308,7 +343,7 @@ fn substitute_static_atom(a: Atomic, fqcn: &Arc<str>, receiver_type_params: &[Ty
         } if matches!(obj_fqcn.as_ref(), "self" | "static" | "parent" | "$this") => {
             let substituted: Vec<Type> = type_params
                 .iter()
-                .map(|t| substitute_static_in_type(t.clone(), fqcn, receiver_type_params))
+                .map(|t| substitute_static_in_type(db, t.clone(), fqcn, receiver_type_params))
                 .collect();
             Atomic::TNamedObject {
                 fqcn: Name::from(fqcn.as_ref()),
@@ -324,7 +359,7 @@ fn substitute_static_atom(a: Atomic, fqcn: &Arc<str>, receiver_type_params: &[Ty
         } if !type_params.is_empty() => {
             let substituted: Vec<Type> = type_params
                 .iter()
-                .map(|t| substitute_static_in_type(t.clone(), fqcn, receiver_type_params))
+                .map(|t| substitute_static_in_type(db, t.clone(), fqcn, receiver_type_params))
                 .collect();
             Atomic::TNamedObject {
                 fqcn: obj_fqcn,
@@ -335,17 +370,18 @@ fn substitute_static_atom(a: Atomic, fqcn: &Arc<str>, receiver_type_params: &[Ty
     }
 }
 
-/// Replace `TStaticObject` / `TSelf` in a method's return type with the actual receiver FQCN.
+/// Replace `TStaticObject` (and a trait's `TSelf`) in a method's return type with the actual receiver FQCN.
 /// Also recurses into array and list value types so `@return static[]` is correctly resolved.
 /// `receiver_type_params` carries the receiver's own inferred type params (empty for a
 /// receiver with no known params, e.g. a plain `Foo::bar()` static call) so a `: static`
 /// return doesn't erase them.
 pub(crate) fn substitute_static_in_return(
+    db: &dyn MirDatabase,
     ret: Type,
     receiver_fqcn: &Arc<str>,
     receiver_type_params: &[Type],
 ) -> Type {
-    substitute_static_in_type(ret, receiver_fqcn, receiver_type_params)
+    substitute_static_in_type(db, ret, receiver_fqcn, receiver_type_params)
 }
 
 pub(crate) fn check_method_visibility(

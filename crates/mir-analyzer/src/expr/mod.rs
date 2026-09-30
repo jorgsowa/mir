@@ -776,6 +776,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         // TTemplateParam atoms into every call through the closure.
                         let empty_fqcn: Arc<str> = Arc::from("");
                         let closure_ty = Type::single(Self::build_closure_from_resolved_params(
+                            self.db,
                             &f.params,
                             return_ty,
                             &rustc_hash::FxHashMap::default(),
@@ -879,6 +880,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                             bindings.extend(inherited_bindings);
                         }
                         let closure = Self::build_closure_from_resolved_params(
+                            self.db,
                             &resolved.params,
                             resolved.return_ty_raw,
                             &bindings,
@@ -1049,6 +1051,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                         bindings.extend(inherited_bindings);
                     }
                     return Type::single(Self::build_closure_from_resolved_params(
+                        self.db,
                         &resolved.params,
                         resolved.return_ty_raw,
                         &bindings,
@@ -1140,6 +1143,7 @@ impl<'a> ExpressionAnalyzer<'a> {
     }
 
     fn build_closure_from_resolved_params(
+        db: &dyn crate::db::MirDatabase,
         params: &[mir_codebase::definitions::DeclaredParam],
         return_ty: Type,
         bindings: &rustc_hash::FxHashMap<mir_types::Name, Type>,
@@ -1170,7 +1174,7 @@ impl<'a> ExpressionAnalyzer<'a> {
             // same way a direct call's return type already does — otherwise a
             // late-static-bound method's FCC closure carries the class that
             // physically declares the method instead of the real receiver.
-            crate::call::substitute_static_in_return(t, receiver_fqcn, receiver_type_params)
+            crate::call::substitute_static_in_return(db, t, receiver_fqcn, receiver_type_params)
                 .substitute_templates(&bindings)
         };
         let fn_params: Box<[mir_types::atomic::FnParam]> = params
