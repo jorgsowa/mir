@@ -107,11 +107,16 @@ pub(crate) fn variance_compatible_across_hierarchy(
     if !sub_tps.is_empty() && !sub_params.is_empty() && sub_tps.len() != sub_params.len() {
         return false;
     }
-    let own_bindings: FxHashMap<Name, Type> = sub_tps
-        .iter()
-        .zip(sub_params)
-        .map(|(tp, ty)| (tp.name, ty.clone()))
-        .collect();
+    // A bare instantiation leaves its own templates unbound, i.e. `mixed`.
+    let own_bindings: FxHashMap<Name, Type> = if sub_params.is_empty() {
+        sub_tps.iter().map(|tp| (tp.name, Type::mixed())).collect()
+    } else {
+        sub_tps
+            .iter()
+            .zip(sub_params)
+            .map(|(tp, ty)| (tp.name, ty.clone()))
+            .collect()
+    };
     let ancestor_bindings = inherited_template_bindings(db, sub_fqcn, &own_bindings);
     let sup_tps = class_template_params(db, sup_fqcn).unwrap_or_default();
     let resolved_sup_params: Vec<Type> = sup_tps
@@ -123,6 +128,9 @@ pub(crate) fn variance_compatible_across_hierarchy(
                 .unwrap_or_else(Type::mixed)
         })
         .collect();
+    if sub_params.is_empty() && resolved_sup_params.iter().all(Type::is_mixed) {
+        return true;
+    }
     variance_compatible(db, sup_fqcn, &resolved_sup_params, sup_params)
 }
 
@@ -150,6 +158,9 @@ pub(crate) fn named_object_type_params_ok(
         || sub_params == sup_params
         || sup_params.iter().all(sup_param_is_free)
         || (!sub_params.is_empty() && sub_params.iter().all(|p| p.is_mixed() || p.is_never()))
+        // A bare instantiation (`new Gen()` with nothing to infer from) leaves
+        // every template unbound, i.e. `Gen<mixed, ...>`.
+        || (sub_params.is_empty() && sub_fqcn == sup_fqcn)
         || (sub_fqcn == sup_fqcn
             && variance_compatible(db, sub_fqcn.as_ref(), sub_params, sup_params))
         || variance_compatible_across_hierarchy(
