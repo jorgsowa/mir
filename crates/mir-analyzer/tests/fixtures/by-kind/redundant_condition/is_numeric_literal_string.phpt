@@ -8,7 +8,7 @@ suppress=UnusedVariable,UnusedParam
 function test_always_true(string $s): void {
     $s = "123";
     if (is_numeric($s)) {
-//      ^^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the else branch is never reached
+//      ^^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the check is redundant
         // always taken
     }
 }

@@ -16,6 +16,6 @@ function assertNotEmpty($value) : void {}
 function foo(bool $bar) : void {
     assertNotEmpty($bar);
     if ($bar) {}
-//      ^^^^ RedundantCondition: Condition is always true, so the else branch is never reached
+//      ^^^^ RedundantCondition: Condition is always true, so the check is redundant
 }
 ===expect===

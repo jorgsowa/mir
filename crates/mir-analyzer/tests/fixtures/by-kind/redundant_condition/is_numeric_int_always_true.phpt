@@ -6,7 +6,7 @@ suppress=UnusedVariable,UnusedParam
 <?php
 function test(int $n): void {
     if (is_numeric($n)) {
-//      ^^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the else branch is never reached
+//      ^^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the check is redundant
         $_ = $n;
     }
 }

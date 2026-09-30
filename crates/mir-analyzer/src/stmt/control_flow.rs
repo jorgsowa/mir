@@ -66,7 +66,7 @@ impl<'a> StatementsAnalyzer<'a> {
         let else_unreachable_from_narrowing = running_ctx.diverges;
 
         let mut elseif_ctxs: Vec<FlowState> = vec![];
-        for elseif in if_stmt.elseif_branches.iter() {
+        for (idx, elseif) in if_stmt.elseif_branches.iter().enumerate() {
             let pre_elseif_diverges = running_ctx.diverges;
             let mut pre_elseif = running_ctx.clone();
 
@@ -102,9 +102,13 @@ impl<'a> StatementsAnalyzer<'a> {
                     elseif.condition.span,
                     !then_dead,
                     if then_dead {
-                        "then branch"
+                        Some("then branch")
+                    } else if idx + 1 < if_stmt.elseif_branches.len()
+                        || if_stmt.else_branch.is_some()
+                    {
+                        Some("else branch")
                     } else {
-                        "else branch"
+                        None
                     },
                 );
             }
@@ -137,9 +141,11 @@ impl<'a> StatementsAnalyzer<'a> {
                 if_stmt.condition.span,
                 !then_unreachable_from_narrowing,
                 if then_unreachable_from_narrowing {
-                    "then branch"
+                    Some("then branch")
+                } else if !if_stmt.elseif_branches.is_empty() || if_stmt.else_branch.is_some() {
+                    Some("else branch")
                 } else {
-                    "else branch"
+                    None
                 },
             );
         }
@@ -156,7 +162,7 @@ impl<'a> StatementsAnalyzer<'a> {
         &mut self,
         span: php_ast::Span,
         always_true: bool,
-        unreachable: &str,
+        unreachable: Option<&str>,
     ) {
         let (line, line_end, col_start, col_end) = self.span_to_location(span);
         let location = Location {
@@ -173,7 +179,7 @@ impl<'a> StatementsAnalyzer<'a> {
             Issue::new(
                 IssueKind::RedundantCondition {
                     always_true,
-                    unreachable: unreachable.to_string(),
+                    unreachable: unreachable.map(String::from),
                 },
                 location,
             )
@@ -194,7 +200,7 @@ impl<'a> StatementsAnalyzer<'a> {
         // is unreachable. `while (true)` (the idiomatic infinite loop) is
         // exempted since it narrows the other way and is always intentional.
         if !pre_diverges && entry.diverges {
-            self.emit_redundant_condition(w.condition.span, false, "loop body");
+            self.emit_redundant_condition(w.condition.span, false, Some("loop body"));
         }
 
         // `while (1)` (and any other nonzero int literal) is just as much an
@@ -276,7 +282,7 @@ impl<'a> StatementsAnalyzer<'a> {
         if let Some(last_cond) = f.condition.last() {
             narrow_from_condition(last_cond, &mut entry, true, self.db, &self.file);
             if !pre_diverges && entry.diverges {
-                self.emit_redundant_condition(last_cond.span, false, "loop body");
+                self.emit_redundant_condition(last_cond.span, false, Some("loop body"));
             }
         }
 

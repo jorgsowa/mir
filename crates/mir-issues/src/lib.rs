@@ -294,8 +294,8 @@ pub enum IssueKind {
     /// Fixtures: `tests/fixtures/by-kind/redundant_condition/`.
     RedundantCondition {
         always_true: bool,
-        /// The branch that can never run (`then branch`, `else branch`, `loop body`).
-        unreachable: String,
+        /// The branch that can never run (`then branch`, `else branch`, `loop body`); `None` when there is no such branch to name.
+        unreachable: Option<String>,
     },
     /// Emitted by `mir-analyzer/src/expr/casts.rs`.
     /// Fixtures: `tests/fixtures/by-kind/redundant_cast/`.
@@ -1733,9 +1733,12 @@ impl IssueKind {
             IssueKind::RedundantCondition {
                 always_true,
                 unreachable,
-            } => {
-                format!("Condition is always {always_true}, so the {unreachable} is never reached")
-            }
+            } => match unreachable {
+                Some(branch) => {
+                    format!("Condition is always {always_true}, so the {branch} is never reached")
+                }
+                None => format!("Condition is always {always_true}, so the check is redundant"),
+            },
             IssueKind::RedundantCast { from, to } => {
                 format!("Casting '{from}' to '{to}' is redundant")
             }
@@ -2529,7 +2532,7 @@ mod code_tests {
             IssueKind::DuplicateArrayKey { key: s() },
             IssueKind::RedundantCondition {
                 always_true: true,
-                unreachable: s(),
+                unreachable: None,
             },
             IssueKind::RedundantCast { from: s(), to: s() },
             IssueKind::UnnecessaryVarAnnotation { var: s() },

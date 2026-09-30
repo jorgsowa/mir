@@ -22,7 +22,7 @@ function renderContent(Article|Photo $content): void {
     if ($content instanceof Article) {
         echo $content->getTitle();
     } elseif ($content instanceof Photo) {
-//            ^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the else branch is never reached
+//            ^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the check is redundant
         echo $content->getThumbnail();
     }
 }

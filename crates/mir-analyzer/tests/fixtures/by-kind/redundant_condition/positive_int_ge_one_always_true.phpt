@@ -7,7 +7,7 @@ suppress=UnusedVariable,UnusedParam
 /** @param positive-int $n */
 function test(int $n): void {
     if ($n >= 1) {
-//      ^^^^^^^ RedundantCondition: Condition is always true, so the else branch is never reached
+//      ^^^^^^^ RedundantCondition: Condition is always true, so the check is redundant
         echo "always";
     }
 }

@@ -7,7 +7,7 @@ suppress=UnusedVariable,UnusedParam
 /** @param non-empty-array<string, int> $arr */
 function test(array $arr): void {
     if ($arr) {
-//      ^^^^ RedundantCondition: Condition is always true, so the else branch is never reached
+//      ^^^^ RedundantCondition: Condition is always true, so the check is redundant
         $_ = $arr;
     }
 }

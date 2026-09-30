@@ -8,7 +8,7 @@ suppress=UnusedVariable,UnusedParam
 /** @param int<5, 5> $n */
 function test_ne_out_of_range(int $n): void {
     if ($n !== 0) {
-//      ^^^^^^^^ RedundantCondition: Condition is always true, so the else branch is never reached
+//      ^^^^^^^^ RedundantCondition: Condition is always true, so the check is redundant
         $_ = $n; // always reached
     }
 }

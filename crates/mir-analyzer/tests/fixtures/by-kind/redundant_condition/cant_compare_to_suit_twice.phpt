@@ -15,7 +15,7 @@ enum Suit {
 function foo(Suit $s): void {
     if ($s === Suit::Clubs)  {
         if ($s === Suit::Clubs) {
-//          ^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the else branch is never reached
+//          ^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the check is redundant
             echo "bad";
         }
     }

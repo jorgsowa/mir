@@ -10,7 +10,7 @@ function test(string $s): void {
     if ($r) {
         /** @mir-check $r is int<1, 1> */
         if ($r === 1) {
-//          ^^^^^^^^ RedundantCondition: Condition is always true, so the else branch is never reached
+//          ^^^^^^^^ RedundantCondition: Condition is always true, so the check is redundant
             $_ = 'always here';
         }
     }

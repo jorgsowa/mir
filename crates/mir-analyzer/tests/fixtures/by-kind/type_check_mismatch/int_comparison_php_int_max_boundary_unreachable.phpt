@@ -22,7 +22,7 @@ function test_greater_than_int_max_is_unreachable(int $x): void {
 /** @param int<0,10> $x */
 function test_not_less_or_equal_int_max_is_unreachable(int $x): void {
     if ($x <= 9223372036854775807) {
-//      ^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the else branch is never reached
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the check is redundant
         return;
     }
     /** @mir-check $_ is never */

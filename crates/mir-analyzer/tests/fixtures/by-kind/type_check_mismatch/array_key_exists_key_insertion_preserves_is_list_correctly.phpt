@@ -12,7 +12,7 @@ suppress=UnusedVariable,MissingConstructor
 function plainListLiteralStaysList(): void {
     $arr = [1, 2, 3];
     if (array_is_list($arr)) {
-//      ^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the else branch is never reached
+//      ^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the check is redundant
         /** @mir-check $_ is never */
         $_ = 1;
 //      ^^^^^^^ TypeCheckMismatch: Type of $_ is expected to be never, got mixed
@@ -34,7 +34,7 @@ function keyExistsContiguousIntKeyPreservesList(): void {
     $arr = [1, 2, 3];
     if (array_key_exists(3, $arr)) {
         if (array_is_list($arr)) {
-//          ^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the else branch is never reached
+//          ^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the check is redundant
             /** @mir-check $_ is never */
             $_ = 1;
 //          ^^^^^^^ TypeCheckMismatch: Type of $_ is expected to be never, got mixed

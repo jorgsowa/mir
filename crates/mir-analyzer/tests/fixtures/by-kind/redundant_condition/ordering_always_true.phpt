@@ -8,7 +8,7 @@ suppress=UnusedVariable,UnusedParam
 /** @param int<min, 5> $a */
 function test(int $a): void {
     if ($a < 10) {
-//      ^^^^^^^ RedundantCondition: Condition is always true, so the else branch is never reached
+//      ^^^^^^^ RedundantCondition: Condition is always true, so the check is redundant
         // always taken
     }
 }

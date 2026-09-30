@@ -10,7 +10,7 @@ function foo(string|null $x): void {
     if ($x === null) {
         // $x is null
     } elseif (is_string($x)) {
-//            ^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the else branch is never reached
+//            ^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the check is redundant
         // $x is already string (null excluded by the if above)
     }
 }

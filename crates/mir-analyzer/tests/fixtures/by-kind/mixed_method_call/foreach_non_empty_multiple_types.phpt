@@ -16,7 +16,7 @@ foreach ($items as $i) {
 // A non-empty literal guarantees one assignment, so null is eliminated.
 /** @mir-check $result is string|int */
 if (is_string($result) || is_int($result)) {
-//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the else branch is never reached
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the check is redundant
     echo "valid";
 }
 ===expect===

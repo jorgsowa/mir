@@ -20,7 +20,7 @@ function doTry() : void {
         throw $exception;
     } finally {
         if ($exception) {
-//          ^^^^^^^^^^ RedundantCondition: Condition is always true, so the else branch is never reached
+//          ^^^^^^^^^^ RedundantCondition: Condition is always true, so the check is redundant
             echo "here";
         }
     }
