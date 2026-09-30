@@ -857,9 +857,11 @@ impl<'a> ClassAnalyzer<'a> {
             // either direction. Only real PHP properties carry this contract — `@readonly`
             // is advisory and not runtime-enforced, so skip docblock-only entries. A private
             // ancestor property isn't inherited, so a same-named child property is an
-            // unrelated declaration, not a redeclaration.
+            // unrelated declaration, not a redeclaration. A get-only hook parent is virtual
+            // and imposes no readonly contract.
             if !own_prop.from_docblock
                 && !parent_prop.from_docblock
+                && !parent_prop.get_only_hook
                 && parent_prop.visibility != Visibility::Private
                 && own_prop.has_native_readonly != parent_prop.has_native_readonly
             {
