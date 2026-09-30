@@ -519,6 +519,14 @@ impl<'a> ClassAnalyzer<'a> {
                                 }
                             }
                         });
+                    // A native-only child inherits the parent's docblock refinement
+                    // (`class-string<Item>`), so its hint need only admit that type.
+                    let compatible = compatible
+                        || (parent_ret_raw.from_docblock
+                            && !child_ret_raw.from_docblock
+                            && !child_has_object
+                            && !parent_has_object
+                            && parent_ret.is_subtype_structural(child_ret));
                     if !compatible {
                         // Primary parent uses the original message format for
                         // backwards-compatibility with existing fixtures. Additional
