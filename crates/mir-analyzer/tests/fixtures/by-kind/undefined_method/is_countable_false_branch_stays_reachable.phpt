@@ -9,7 +9,6 @@ class Box {}
 function f($x): void {
     if (is_countable($x)) {
         count($x);
-//            ^^ PossiblyInvalidArgument: Argument $value of count() expects 'array|Countable', possibly different type 'Box|array<int, int>' provided
     } else {
         $x->method();
 //      ^^^^^^^^^^^^ UndefinedMethod: Method Box::method() does not exist

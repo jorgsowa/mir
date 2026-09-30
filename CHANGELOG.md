@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `MethodSignatureMismatch` no longer compares a variadic override against the parent's docblock `list<X>` as the collected array; the element type is compared.
+- `method_exists($obj, 'm')` now suppresses `UndefinedMethod` for an array callable held in a variable (`$cb = [$obj, 'm']`).
+- `is_countable()` narrows a non-final class to `C&Countable` and drops a final non-countable class; an argument union containing an intersection no longer reports `PossiblyInvalidArgument` when every atom fits.
+- `header()` is no longer a `TaintedHtml` sink.
+- Duplicate named arguments report "overwrites a previous argument" instead of "has no parameter named".
 
 ### Changed
 

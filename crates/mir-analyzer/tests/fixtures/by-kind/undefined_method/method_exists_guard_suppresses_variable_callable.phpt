@@ -1,5 +1,5 @@
 ===description===
-`method_exists()` does not suppress callable variables.
+`method_exists()` on the receiver suppresses UndefinedMethod for an array callable held in a variable.
 ===config===
 suppress=MissingReturnType
 ===file===
@@ -14,7 +14,6 @@ function dispatch(Notification $n): void {
     if (method_exists($n, 'broadcastOn')) {
         $cb = [$n, 'broadcastOn'];
         register_shutdown($cb);
-//                        ^^^ UndefinedMethod: Method Notification::broadcastOn() does not exist
     }
 }
 ===expect===

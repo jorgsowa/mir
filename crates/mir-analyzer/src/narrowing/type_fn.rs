@@ -226,7 +226,7 @@ pub(crate) fn type_fn_narrowed(
         }
         "is_countable" => {
             if is_true {
-                current.narrow_to_countable()
+                narrow_to_countable_with_interface(current, db)
             } else {
                 current.filter(|t| !atom_excluded_from_is_iterable_or_countable(t, "Countable", db))
             }
@@ -348,6 +348,44 @@ pub(crate) fn type_fn_narrowed(
         }
         _ => return None,
     })
+}
+
+/// `is_countable()` true branch: arrays stay, and each named-object atom is
+/// narrowed as `instanceof Countable` (a non-final class becomes `C&Countable`,
+/// a final class that can't be Countable drops out).
+fn narrow_to_countable_with_interface(current: &Type, db: &dyn MirDatabase) -> Type {
+    let countable = current.narrow_to_countable();
+    let no_templates = rustc_hash::FxHashSet::default();
+    let mut result = Type::empty();
+    result.possibly_undefined = countable.possibly_undefined;
+    result.from_docblock = countable.from_docblock;
+    for atom in &countable.types {
+        match atom {
+            Atomic::TNamedObject { .. }
+            | Atomic::TSelf { .. }
+            | Atomic::TStaticObject { .. }
+            | Atomic::TParent { .. } => {
+                if let Atomic::TNamedObject { fqcn, .. } = atom {
+                    if crate::db::is_final(db, fqcn)
+                        && !crate::db::extends_or_implements(db, fqcn, "Countable")
+                    {
+                        continue;
+                    }
+                }
+                let narrowed = super::instanceof_core::narrow_instanceof_preserving_subtypes(
+                    &Type::single(atom.clone()),
+                    "Countable",
+                    db,
+                    &no_templates,
+                );
+                for t in narrowed.types {
+                    result.add_type(t);
+                }
+            }
+            _ => result.add_type(atom.clone()),
+        }
+    }
+    result
 }
 
 /// Whether `t` is provably excluded from `is_iterable()`/`is_countable()`'s

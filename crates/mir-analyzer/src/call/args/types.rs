@@ -207,6 +207,14 @@ pub(crate) fn check_one(
         && !super::param_contains_template_or_unknown(arg_ty, arg_ty, ea, template_params)
         && !array_list_compatible(arg_ty, param_ty, ea)
         && !(arg_ty.is_single() && param_accepts_wider_than_arg(param_ty, arg_ty))
+        && !(!arg_ty.is_single()
+            && arg_ty.types.iter().all(|a| {
+                let single = Type::single(a.clone());
+                scalar_arg_fits_param(&single, param_ty)
+                    || named_object_subtype(&single, param_ty, ea)
+                    || array_list_compatible(&single, param_ty, ea)
+                    || param_accepts_wider_than_arg(param_ty, &single)
+            }))
         && !(arg_ty.is_single() && param_accepts_wider_than_arg(&param_ty.remove_null(), arg_ty))
         && !(arg_ty.is_single()
             && param_ty
@@ -1369,6 +1377,28 @@ fn method_exists_guarded(ctx: &FlowState, guard_key: &Arc<str>, method_name: &st
     ))
 }
 
+/// True when a `method_exists($var, 'method')` guard is active for a plain
+/// variable currently typed as `class` — the receiver of a callable held in a
+/// variable (`$cb = [$var, 'method']`), whose array literal is out of sight.
+fn guarded_receiver_variable(
+    ea: &ExpressionAnalyzer<'_>,
+    ctx: &FlowState,
+    class: &str,
+    method_name: &str,
+) -> bool {
+    let method_lc = crate::util::php_ident_lowercase(method_name);
+    ctx.method_exists_guards.iter().any(|(key, guarded)| {
+        guarded.as_ref() == method_lc
+            && !key.contains(['-', ':'])
+            && ctx.get_var(key).types.iter().any(|a| match a {
+                Atomic::TNamedObject { fqcn, .. } => {
+                    crate::db::resolve_name(ea.db, &ea.file, fqcn.as_ref()) == class
+                }
+                _ => false,
+            })
+    })
+}
+
 /// The `method_exists()` guard key of the *receiver* of an array callable
 /// argument (`[receiver, 'method']`) — taken only from the array literal's
 /// own first element (list position `0`, implicit or explicit). `None` for
@@ -1692,10 +1722,18 @@ fn validate_callable_type(
                                 // in `call/method.rs` (which consults the same
                                 // `method_exists_guards` set for `$obj->method()`),
                                 // applied to array callables passed by value.
-                                let guarded = array_callable_guard_key(ea, ctx, arg_expr)
-                                    .is_some_and(|key| {
-                                        method_exists_guarded(ctx, &key, method_name)
-                                    });
+                                let guarded =
+                                    array_callable_guard_key(ea, ctx, arg_expr).is_some_and(
+                                        |key| method_exists_guarded(ctx, &key, method_name),
+                                    ) || (!matches!(
+                                        arg_expr.map(|e| &e.kind),
+                                        Some(ExprKind::Array(_))
+                                    ) && guarded_receiver_variable(
+                                        ea,
+                                        ctx,
+                                        &resolved_class,
+                                        method_name,
+                                    ));
                                 if !guarded {
                                     ea.emit(
                                         IssueKind::UndefinedMethod {
