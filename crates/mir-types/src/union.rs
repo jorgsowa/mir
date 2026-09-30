@@ -1845,6 +1845,7 @@ pub fn atomic_subtype(sub: &Atomic, sup: &Atomic) -> bool {
         // Instantiability (`new $x()`) is guarded separately, since an interface
         // name can never be `new`-ed even though it satisfies class-string.
         (Atomic::TInterfaceString(_), Atomic::TClassString(None)) => true,
+        (Atomic::TClassString(Some(_)), Atomic::TClassString(None)) => true,
         (Atomic::TInterfaceString(Some(a)), Atomic::TClassString(Some(b))) => a == b,
         (Atomic::TEnumString, Atomic::TString) => true,
         (Atomic::TTraitString, Atomic::TString) => true,
