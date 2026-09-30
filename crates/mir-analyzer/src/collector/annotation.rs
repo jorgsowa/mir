@@ -104,6 +104,103 @@ pub(super) fn synthesize_predicate_assertions(m: &php_ast::owned::MethodDecl) ->
     ]
 }
 
+/// Gives an assertion-less method the `@psalm-assert $this->prop` assertions of a
+/// same-class method it calls as a top-level `$this->callee();` statement,
+/// unless a later top-level statement reassigns that property.
+pub(super) fn propagate_delegated_assertions(
+    members: &[php_ast::owned::ClassMember],
+    own_methods: &mut mir_codebase::definitions::MemberMap<
+        Arc<mir_codebase::definitions::MethodDef>,
+    >,
+) {
+    use php_ast::owned::{ClassMemberKind, ExprKind, StmtKind};
+
+    fn this_prop_assert(a: &Assertion) -> Option<&str> {
+        if a.kind != AssertionKind::Assert || !a.param_key.is_empty() {
+            return None;
+        }
+        a.param
+            .strip_prefix("this->")
+            .filter(|p| !p.contains("->") && !p.contains('['))
+    }
+
+    let methods: Vec<&php_ast::owned::MethodDecl> = members
+        .iter()
+        .filter_map(|m| match &m.kind {
+            ClassMemberKind::Method(m) if !m.is_static => Some(m),
+            _ => None,
+        })
+        .collect();
+
+    // Each pass resolves one more hop of delegation (`a()` -> `b()` -> `c()`).
+    for _ in 0..methods.len() {
+        let mut changed = false;
+        for m in &methods {
+            let key = crate::util::php_ident_lowercase(m.name.as_deref().unwrap_or_default());
+            let Some(body) = m.body.as_ref() else {
+                continue;
+            };
+            if own_methods
+                .get(key.as_str())
+                .is_none_or(|d| !d.assertions.is_empty())
+            {
+                continue;
+            }
+            let mut inferred = Vec::new();
+            for (i, stmt) in body.stmts.iter().enumerate() {
+                let StmtKind::Expression(e) = &stmt.kind else {
+                    continue;
+                };
+                let ExprKind::MethodCall(mc) = &e.kind else {
+                    continue;
+                };
+                let (ExprKind::Variable(obj), ExprKind::Identifier(callee)) =
+                    (&mc.object.kind, &mc.method.kind)
+                else {
+                    continue;
+                };
+                if obj.trim_start_matches('$') != "this" {
+                    continue;
+                }
+                let Some(callee_def) =
+                    own_methods.get(crate::util::php_ident_lowercase(callee).as_str())
+                else {
+                    continue;
+                };
+                for a in callee_def.assertions.iter() {
+                    let Some(prop) = this_prop_assert(a) else {
+                        continue;
+                    };
+                    let reassigned_later = body.stmts[i + 1..].iter().any(|s| {
+                        let StmtKind::Expression(e) = &s.kind else {
+                            return false;
+                        };
+                        let ExprKind::Assign(asg) = &e.kind else {
+                            return false;
+                        };
+                        matches!(
+                            crate::narrowing::extract_prop_access(&asg.target),
+                            Some((o, p)) if o == "this" && p == prop
+                        )
+                    });
+                    if !reassigned_later {
+                        inferred.push(a.clone());
+                    }
+                }
+            }
+            if !inferred.is_empty() {
+                if let Some(def) = own_methods.get_mut(key.as_str()) {
+                    Arc::make_mut(def).assertions = inferred;
+                    changed = true;
+                }
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+}
+
 pub(super) fn emit_docblock_issues(
     doc: &crate::parser::ParsedDocblock,
     span_start: u32,

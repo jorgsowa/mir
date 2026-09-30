@@ -492,6 +492,8 @@ impl<'a> DefinitionCollector<'a> {
             }
         }
 
+        super::annotation::propagate_delegated_assertions(&decl.body.members, &mut own_methods);
+
         self.add_docblock_members(
             &class_doc,
             &type_aliases,
