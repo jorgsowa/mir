@@ -26,7 +26,7 @@ function lessThanOnNullableReceiverReachable(?Holder $h): void {
 // Negative: a non-nullable receiver keeps the old, sound behavior.
 function lessThanOnNonNullableReceiverDiverges(Holder $h): void {
     if ($h->level < -5) {
-//      ^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
+//      ^^^^^^^^^^^^^^ RedundantCondition: Condition is always false, so the then branch is never reached
         echo "unreachable";
     }
 }

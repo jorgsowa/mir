@@ -15,7 +15,7 @@ enum Suit {
 function foo(Suit $s): void {
     if ($s === Suit::Clubs)  {
         if ($s === Suit::Clubs) {
-//          ^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
+//          ^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the else branch is never reached
             echo "bad";
         }
     }

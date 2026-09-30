@@ -19,7 +19,7 @@ impl<'a> StatementsAnalyzer<'a> {
     pub(super) fn analyze_if_stmt(&mut self, if_stmt: &IfStmt, ctx: &mut FlowState) {
         let pre_ctx = ctx.clone();
 
-        let cond_type = self.expr_analyzer(ctx).analyze(&if_stmt.condition, ctx);
+        self.expr_analyzer(ctx).analyze(&if_stmt.condition, ctx);
         self.check_docblock_contradiction(&if_stmt.condition, ctx);
         let pre_diverges = ctx.diverges;
 
@@ -97,29 +97,15 @@ impl<'a> StatementsAnalyzer<'a> {
                 &self.file,
             );
             if !pre_elseif_diverges && (elseif_true_ctx.diverges || elseif_false_ctx.diverges) {
-                let (line, line_end, col_start, col_end) =
-                    self.span_to_location(elseif.condition.span);
-                let elseif_cond_type = self
-                    .expr_analyzer(ctx)
-                    .analyze(&elseif.condition, &mut ctx.branch());
-                self.issues.add(
-                    mir_issues::Issue::new(
-                        IssueKind::RedundantCondition {
-                            ty: format!("{elseif_cond_type}"),
-                        },
-                        mir_issues::Location {
-                            file: self.file.clone(),
-                            line,
-                            line_end,
-                            col_start,
-                            col_end: crate::diagnostics::clamp_col_end(
-                                line, line_end, col_start, col_end,
-                            ),
-                        },
-                    )
-                    .with_snippet(
-                        parser::span_text(self.source, elseif.condition.span).unwrap_or_default(),
-                    ),
+                let then_dead = elseif_true_ctx.diverges;
+                self.emit_redundant_condition(
+                    elseif.condition.span,
+                    !then_dead,
+                    if then_dead {
+                        "then branch"
+                    } else {
+                        "else branch"
+                    },
                 );
             }
 
@@ -147,26 +133,14 @@ impl<'a> StatementsAnalyzer<'a> {
         }
 
         if !pre_diverges && (then_unreachable_from_narrowing || else_unreachable_from_narrowing) {
-            let (line, line_end, col_start, col_end) =
-                self.span_to_location(if_stmt.condition.span);
-            self.issues.add(
-                Issue::new(
-                    IssueKind::RedundantCondition {
-                        ty: format!("{cond_type}"),
-                    },
-                    Location {
-                        file: self.file.clone(),
-                        line,
-                        line_end,
-                        col_start,
-                        col_end: crate::diagnostics::clamp_col_end(
-                            line, line_end, col_start, col_end,
-                        ),
-                    },
-                )
-                .with_snippet(
-                    parser::span_text(self.source, if_stmt.condition.span).unwrap_or_default(),
-                ),
+            self.emit_redundant_condition(
+                if_stmt.condition.span,
+                !then_unreachable_from_narrowing,
+                if then_unreachable_from_narrowing {
+                    "then branch"
+                } else {
+                    "else branch"
+                },
             );
         }
 
@@ -178,27 +152,37 @@ impl<'a> StatementsAnalyzer<'a> {
 
     /// Emit `RedundantCondition` for a condition whose type-narrowing proves
     /// it can only ever resolve one way.
-    fn emit_redundant_condition(&mut self, cond_ty: &Type, span: php_ast::Span) {
+    fn emit_redundant_condition(
+        &mut self,
+        span: php_ast::Span,
+        always_true: bool,
+        unreachable: &str,
+    ) {
         let (line, line_end, col_start, col_end) = self.span_to_location(span);
+        let location = Location {
+            file: self.file.clone(),
+            line,
+            line_end,
+            col_start,
+            col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
+        };
+        if self.issues.has_impossible_comparison_within(&location) {
+            return;
+        }
         self.issues.add(
             Issue::new(
                 IssueKind::RedundantCondition {
-                    ty: format!("{cond_ty}"),
+                    always_true,
+                    unreachable: unreachable.to_string(),
                 },
-                Location {
-                    file: self.file.clone(),
-                    line,
-                    line_end,
-                    col_start,
-                    col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
-                },
+                location,
             )
             .with_snippet(parser::span_text(self.source, span).unwrap_or_default()),
         );
     }
 
     pub(super) fn analyze_while_stmt(&mut self, w: &WhileStmt, ctx: &mut FlowState) {
-        let cond_type = self.expr_analyzer(ctx).analyze(&w.condition, ctx);
+        self.expr_analyzer(ctx).analyze(&w.condition, ctx);
         self.check_docblock_contradiction(&w.condition, ctx);
         let pre_diverges = ctx.diverges;
         let pre = ctx.clone();
@@ -210,7 +194,7 @@ impl<'a> StatementsAnalyzer<'a> {
         // is unreachable. `while (true)` (the idiomatic infinite loop) is
         // exempted since it narrows the other way and is always intentional.
         if !pre_diverges && entry.diverges {
-            self.emit_redundant_condition(&cond_type, w.condition.span);
+            self.emit_redundant_condition(w.condition.span, false, "loop body");
         }
 
         // `while (1)` (and any other nonzero int literal) is just as much an
@@ -281,9 +265,8 @@ impl<'a> StatementsAnalyzer<'a> {
         let pre_diverges = ctx.diverges;
         let pre = ctx.clone();
         let mut entry = ctx.branch();
-        let mut last_cond_type = None;
         for cond in f.condition.iter() {
-            last_cond_type = Some(self.expr_analyzer(&entry).analyze(cond, &mut entry));
+            self.expr_analyzer(&entry).analyze(cond, &mut entry);
             self.check_docblock_contradiction(cond, &mut entry);
         }
         // Only the last comma-separated condition's truthiness controls the
@@ -293,9 +276,7 @@ impl<'a> StatementsAnalyzer<'a> {
         if let Some(last_cond) = f.condition.last() {
             narrow_from_condition(last_cond, &mut entry, true, self.db, &self.file);
             if !pre_diverges && entry.diverges {
-                if let Some(cond_type) = &last_cond_type {
-                    self.emit_redundant_condition(cond_type, last_cond.span);
-                }
+                self.emit_redundant_condition(last_cond.span, false, "loop body");
             }
         }
 

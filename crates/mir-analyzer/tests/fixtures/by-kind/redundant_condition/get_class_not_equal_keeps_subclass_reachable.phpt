@@ -30,7 +30,7 @@ final class Sealed {}
 // really is unreachable.
 function isFinal(Sealed $x): void {
     if (get_class($x) !== 'Sealed') {
-//      ^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always false, so the then branch is never reached
         echo "unreachable";
     }
 }

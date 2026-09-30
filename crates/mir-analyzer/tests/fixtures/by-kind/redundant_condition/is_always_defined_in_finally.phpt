@@ -20,7 +20,7 @@ function doTry() : void {
         throw $exception;
     } finally {
         if ($exception) {
-//          ^^^^^^^^^^ RedundantCondition: Condition of type 'Exception' always evaluates the same way, so one branch is unreachable
+//          ^^^^^^^^^^ RedundantCondition: Condition is always true, so the else branch is never reached
             echo "here";
         }
     }

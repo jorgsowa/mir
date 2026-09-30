@@ -7,7 +7,7 @@ suppress=UnusedVariable,UnusedParam
 /** @param int<0, 0> $n */
 function test(int $n): void {
     if ($n) {
-//      ^^ RedundantCondition: Condition of type 'int<0, 0>' always evaluates the same way, so one branch is unreachable
+//      ^^ RedundantCondition: Condition is always false, so the then branch is never reached
         $_ = $n;
     }
 }

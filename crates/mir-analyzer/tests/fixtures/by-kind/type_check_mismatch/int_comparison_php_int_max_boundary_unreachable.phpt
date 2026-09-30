@@ -14,7 +14,6 @@ suppress=UnusedVariable,UnusedParam
 function test_greater_than_int_max_is_unreachable(int $x): void {
     if ($x > 9223372036854775807) {
 //      ^^^^^^^^^^^^^^^^^^^^^^^^ DocblockTypeContradiction: Type 'int<0, 10>' makes '$x > 9223372036854775807' impossible — this can never hold
-//      ^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
         /** @mir-check $_ is never */
         $_ = 1;
     }
@@ -23,7 +22,7 @@ function test_greater_than_int_max_is_unreachable(int $x): void {
 /** @param int<0,10> $x */
 function test_not_less_or_equal_int_max_is_unreachable(int $x): void {
     if ($x <= 9223372036854775807) {
-//      ^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the else branch is never reached
         return;
     }
     /** @mir-check $_ is never */

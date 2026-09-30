@@ -16,7 +16,7 @@ foreach ([new Item()] as $item) {
 // After loop, $result should be just string, not string|null
 // because the loop is guaranteed to execute
 if (is_string($result)) {
-//  ^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
+//  ^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the else branch is never reached
     echo $result;
 }
 ===expect===

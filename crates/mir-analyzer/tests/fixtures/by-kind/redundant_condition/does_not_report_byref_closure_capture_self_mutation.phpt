@@ -23,7 +23,7 @@ $cb = static function (string $h) use (&$flag) {
 $flag2 = false;
 $cb2 = static function () use ($flag2) {
     if ($flag2) {
-//      ^^^^^^ RedundantCondition: Condition of type 'false' always evaluates the same way, so one branch is unreachable
+//      ^^^^^^ RedundantCondition: Condition is always false, so the then branch is never reached
         echo "never\n";
     }
 };

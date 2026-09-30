@@ -12,7 +12,7 @@ suppress=UnusedVariable,UnusedParam
 /** @param int<9223372036854775807, 9223372036854775807> $x */
 function test_excluding_int_max_from_pinned_max_is_unreachable(int $x): void {
     if ($x !== 9223372036854775807) {
-//      ^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always false, so the then branch is never reached
         /** @mir-check $_ is never */
         $_ = 1;
     }
@@ -21,7 +21,7 @@ function test_excluding_int_max_from_pinned_max_is_unreachable(int $x): void {
 /** @param int<1,1> $x */
 function test_ordinary_single_point_exclusion_still_unreachable(int $x): void {
     if ($x !== 1) {
-//      ^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
+//      ^^^^^^^^ RedundantCondition: Condition is always false, so the then branch is never reached
         /** @mir-check $_ is never */
         $_ = 1;
     }

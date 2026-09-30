@@ -30,7 +30,7 @@ function handleObject(Logger|Cache $handler): void {
     if ($handler instanceof Logger) {
         $handler->log("test");
     } elseif ($handler instanceof Cache) {
-//            ^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
+//            ^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the else branch is never reached
         $handler->get("key");
     }
 }

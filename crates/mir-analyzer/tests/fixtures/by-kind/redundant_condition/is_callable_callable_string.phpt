@@ -13,13 +13,13 @@ function needs_string(string $s): void {}
 /** @param callable-string $fn */
 function test_not_callable_of_callable_string_is_redundant(mixed $fn): void {
     if (!is_callable($fn)) {}
-//      ^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
+//      ^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always false, so the then branch is never reached
 }
 
 /** @param callable-string $fn */
 function test_callable_of_callable_string_is_redundant(mixed $fn): void {
     if (is_callable($fn)) {
-//      ^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
+//      ^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true, so the else branch is never reached
         needs_int($fn);
 //                ^^^ InvalidArgument: Argument $i of needs_int() expects 'int', got 'callable-string'
     }

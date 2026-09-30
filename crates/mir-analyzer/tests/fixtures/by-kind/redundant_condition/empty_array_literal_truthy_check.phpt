@@ -7,7 +7,7 @@ suppress=UnusedVariable
 function test(): void {
     $a = [];
     if ($a) {
-//      ^^ RedundantCondition: Condition of type 'array{}' always evaluates the same way, so one branch is unreachable
+//      ^^ RedundantCondition: Condition is always false, so the then branch is never reached
         $_ = $a;
     }
 }

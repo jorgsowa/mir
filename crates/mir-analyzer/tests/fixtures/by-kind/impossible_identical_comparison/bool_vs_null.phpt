@@ -7,6 +7,5 @@ suppress=UnusedVariable,UnusedParam
 function test(bool $b): void {
     if ($b === null) {}
 //      ^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between 'bool' and 'null' is always false — these types can never be identical
-//      ^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
 }
 ===expect===

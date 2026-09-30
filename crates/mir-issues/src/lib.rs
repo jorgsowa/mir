@@ -292,7 +292,11 @@ pub enum IssueKind {
     // --- Redundancy ---------------------------------------------------------
     /// Emitted by `mir-analyzer/src/stmt/control_flow.rs`.
     /// Fixtures: `tests/fixtures/by-kind/redundant_condition/`.
-    RedundantCondition { ty: String },
+    RedundantCondition {
+        always_true: bool,
+        /// The branch that can never run (`then branch`, `else branch`, `loop body`).
+        unreachable: String,
+    },
     /// Emitted by `mir-analyzer/src/expr/casts.rs`.
     /// Fixtures: `tests/fixtures/by-kind/redundant_cast/`.
     RedundantCast { from: String, to: String },
@@ -1726,8 +1730,11 @@ impl IssueKind {
                 format!("Array key {key} is duplicated — the earlier entry is silently overwritten")
             }
 
-            IssueKind::RedundantCondition { ty } => {
-                format!("Condition of type '{ty}' always evaluates the same way, so one branch is unreachable")
+            IssueKind::RedundantCondition {
+                always_true,
+                unreachable,
+            } => {
+                format!("Condition is always {always_true}, so the {unreachable} is never reached")
             }
             IssueKind::RedundantCast { from, to } => {
                 format!("Casting '{from}' to '{to}' is redundant")
@@ -2246,6 +2253,22 @@ impl IssueBuffer {
         }
     }
 
+    /// True when an issue that already explains a constant condition (an
+    /// impossible comparison) starts inside `span`.
+    pub fn has_impossible_comparison_within(&self, span: &Location) -> bool {
+        self.issues.iter().any(|i| {
+            matches!(
+                i.kind,
+                IssueKind::ImpossibleIdenticalComparison { .. }
+                    | IssueKind::ImpossibleLooseComparison { .. }
+                    | IssueKind::DocblockTypeContradiction { .. }
+                    | IssueKind::TypeDoesNotContainType { .. }
+            ) && i.location.file == span.file
+                && (i.location.line, i.location.col_start) >= (span.line, span.col_start)
+                && (i.location.line, i.location.col_start) < (span.line_end, span.col_end)
+        })
+    }
+
     pub fn add_suppression(&mut self, name: impl Into<String>) {
         self.file_suppressions.push(name.into());
     }
@@ -2504,7 +2527,10 @@ mod code_tests {
                 actual: s(),
             },
             IssueKind::DuplicateArrayKey { key: s() },
-            IssueKind::RedundantCondition { ty: s() },
+            IssueKind::RedundantCondition {
+                always_true: true,
+                unreachable: s(),
+            },
             IssueKind::RedundantCast { from: s(), to: s() },
             IssueKind::UnnecessaryVarAnnotation { var: s() },
             IssueKind::TypeDoesNotContainType {

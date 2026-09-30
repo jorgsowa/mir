@@ -38,7 +38,6 @@ function looseNotNullProvesReceiverNonNull(?Holder $h): void {
 function looseNullOnNonNullableReceiverDiverges(Holder $h): void {
     if ($h->prop == null) {
 //      ^^^^^^^^^^^^^^^^ ImpossibleLooseComparison: '==' between 'Bar' and 'null' is always false — these types can never be loosely equal
-//      ^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
         echo "unreachable";
     }
 }

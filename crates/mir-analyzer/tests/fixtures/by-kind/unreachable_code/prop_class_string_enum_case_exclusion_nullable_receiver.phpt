@@ -30,7 +30,7 @@ function classStringExclusionReachableOnNullableReceiver(?ClsHolder $h): void {
 
 function classStringExclusionDivergesOnNonNullableReceiver(ClsHolder $h): void {
     if ($h->cls !== Foo::class) {
-//      ^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
+//      ^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always false, so the then branch is never reached
         /** @mir-check $_ is never */
         $_ = 1;
     }
@@ -47,7 +47,7 @@ function enumCaseExclusionReachableOnNullableReceiver(?StatusHolder $h): void {
 
 function enumCaseExclusionDivergesOnNonNullableReceiver(StatusHolder $h): void {
     if ($h->status !== Status::Active) {
-//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always false, so the then branch is never reached
         /** @mir-check $_ is never */
         $_ = 1;
     }

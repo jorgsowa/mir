@@ -20,7 +20,7 @@ function narrowsParamToNull(?string $x): void {
 
 function nonNullableParamUnreachable(string $x): void {
     if (!isset($x)) {
-//      ^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
+//      ^^^^^^^^^^ RedundantCondition: Condition is always false, so the then branch is never reached
         /** @mir-check $_ is never */
         $_ = 1;
     }

@@ -14,7 +14,7 @@ suppress=UnusedVariable,UnusedParam
 function stringSequentialExclusionUnreachable($s): void {
     if ($s !== 'a') {
         if ($s !== 'b') {
-//          ^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
+//          ^^^^^^^^^^ RedundantCondition: Condition is always false, so the then branch is never reached
             /** @mir-check $_ is never */
             $_ = 1;
         }
@@ -25,7 +25,7 @@ function stringSequentialExclusionUnreachable($s): void {
 function intSequentialExclusionUnreachable($n): void {
     if ($n !== 1) {
         if ($n !== 2) {
-//          ^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
+//          ^^^^^^^^ RedundantCondition: Condition is always false, so the then branch is never reached
             /** @mir-check $_ is never */
             $_ = 1;
         }

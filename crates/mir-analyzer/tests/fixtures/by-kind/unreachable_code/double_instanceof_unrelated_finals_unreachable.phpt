@@ -18,7 +18,7 @@ final class Dog {}
 
 function bothFinals(Cat|Dog $animal): void {
     if ($animal instanceof Cat && $animal instanceof Dog) {
-//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always false, so the then branch is never reached
         echo "unreachable";
     }
 }

@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   issues below the configured Psalm level are downgraded to info. Unset keeps
   mir's own severities.
 
+### Changed
+
+- `RedundantCondition` states whether the condition is always true or false and which branch is unreachable, and is no longer reported alongside an impossible-comparison issue on the same condition.
+
 ### Fixed
 
 - Class, trait, enum and interface declarations in a later `namespace X { }` block resolve their own FQCN, so method parameters are no longer reported as `UndefinedVariable`.
