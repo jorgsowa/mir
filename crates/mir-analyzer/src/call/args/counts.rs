@@ -62,6 +62,7 @@ pub(super) fn check_counts(
                         IssueKind::InvalidNamedArgument {
                             fn_name: fn_name.to_string(),
                             name: name.to_string(),
+                            overwrites: true,
                         },
                         Severity::Error,
                         *span,
@@ -88,6 +89,7 @@ pub(super) fn check_counts(
                     IssueKind::InvalidNamedArgument {
                         fn_name: fn_name.to_string(),
                         name: name.to_string(),
+                        overwrites: false,
                     },
                     Severity::Error,
                     *span,
@@ -102,6 +104,7 @@ pub(super) fn check_counts(
                 IssueKind::InvalidNamedArgument {
                     fn_name: fn_name.to_string(),
                     name: format!("#{}", i + 1),
+                    overwrites: false,
                 },
                 Severity::Error,
                 *span,

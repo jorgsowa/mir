@@ -5,5 +5,5 @@ reports duplicate named argument
 function greet(string $name): void {}
 //             ^^^^^^^^^^^^ UnusedParam: Parameter $name is never used
 greet(name: 'Ada', name: 'Grace');
-//                 ^^^^^^^^^^^^^ InvalidNamedArgument: greet() has no parameter named $name
+//                 ^^^^^^^^^^^^^ InvalidNamedArgument: greet() argument $name overwrites a previous argument
 ===expect===

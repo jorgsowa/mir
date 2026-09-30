@@ -183,7 +183,11 @@ pub enum IssueKind {
     },
     /// Emitted by `mir-analyzer/src/call/args.rs`.
     /// Fixtures: `tests/fixtures/by-kind/invalid_named_argument/`.
-    InvalidNamedArgument { fn_name: String, name: String },
+    InvalidNamedArgument {
+        fn_name: String,
+        name: String,
+        overwrites: bool,
+    },
     /// Emitted when a function/method tagged `@no-named-arguments` is called with named args.
     /// Fixtures: `tests/fixtures/by-kind/invalid_named_argument/`.
     InvalidNamedArguments { fn_name: String },
@@ -1600,7 +1604,17 @@ impl IssueKind {
                     fn_name, expected, actual
                 )
             }
-            IssueKind::InvalidNamedArgument { fn_name, name } => {
+            IssueKind::InvalidNamedArgument {
+                fn_name,
+                name,
+                overwrites: true,
+            } => {
+                format!(
+                    "{}() argument ${} overwrites a previous argument",
+                    fn_name, name
+                )
+            }
+            IssueKind::InvalidNamedArgument { fn_name, name, .. } => {
                 format!("{}() has no parameter named ${}", fn_name, name)
             }
             IssueKind::InvalidNamedArguments { fn_name } => {
@@ -2409,6 +2423,7 @@ mod code_tests {
             IssueKind::InvalidNamedArgument {
                 fn_name: s(),
                 name: s(),
+                overwrites: false,
             },
             IssueKind::InvalidNamedArguments { fn_name: s() },
             IssueKind::InvalidPassByReference {
