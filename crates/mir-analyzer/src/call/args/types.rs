@@ -911,27 +911,28 @@ fn generic_type_params_compatible(
             .map(|tp| tp.variance)
             .unwrap_or(mir_types::Variance::Invariant);
 
-        let compatible = match variance {
-            mir_types::Variance::Covariant => {
-                scalar_arg_fits_param(arg_p, param_p)
-                    || param_p.is_mixed()
-                    || arg_p.is_mixed()
-                    || strict_named_object_subtype(arg_p, param_p, ea)
-            }
-            mir_types::Variance::Contravariant => {
-                scalar_arg_fits_param(param_p, arg_p)
-                    || arg_p.is_mixed()
-                    || param_p.is_mixed()
-                    || strict_named_object_subtype(param_p, arg_p, ea)
-            }
-            mir_types::Variance::Invariant => {
-                arg_p == param_p
-                    || arg_p.is_mixed()
-                    || param_p.is_mixed()
-                    || (scalar_arg_fits_param(arg_p, param_p)
-                        && scalar_arg_fits_param(param_p, arg_p))
-            }
-        };
+        let compatible = static_arg_fits_param(arg_p, param_p, ea)
+            || match variance {
+                mir_types::Variance::Covariant => {
+                    scalar_arg_fits_param(arg_p, param_p)
+                        || param_p.is_mixed()
+                        || arg_p.is_mixed()
+                        || strict_named_object_subtype(arg_p, param_p, ea)
+                }
+                mir_types::Variance::Contravariant => {
+                    scalar_arg_fits_param(param_p, arg_p)
+                        || arg_p.is_mixed()
+                        || param_p.is_mixed()
+                        || strict_named_object_subtype(param_p, arg_p, ea)
+                }
+                mir_types::Variance::Invariant => {
+                    arg_p == param_p
+                        || arg_p.is_mixed()
+                        || param_p.is_mixed()
+                        || (scalar_arg_fits_param(arg_p, param_p)
+                            && scalar_arg_fits_param(param_p, arg_p))
+                }
+            };
 
         if !compatible {
             return false;
@@ -939,6 +940,29 @@ fn generic_type_params_compatible(
     }
 
     true
+}
+
+/// A `static`/`self` nested in a param's generic args (`G<static>`) is never resolved against
+/// the receiver (empty fqcn), so any class arg on the declaring class's hierarchy line fits.
+fn static_arg_fits_param(arg: &Type, param: &Type, ea: &ExpressionAnalyzer<'_>) -> bool {
+    let is_static = |a: &Atomic| matches!(a, Atomic::TStaticObject { .. } | Atomic::TSelf { .. });
+    if !param.types.iter().all(is_static) {
+        return false;
+    }
+    arg.types.iter().all(|a| {
+        let Atomic::TNamedObject { fqcn: arg_fqcn, .. } = a else {
+            return is_static(a);
+        };
+        param.types.iter().any(|p| match p {
+            Atomic::TStaticObject { fqcn } | Atomic::TSelf { fqcn } => {
+                fqcn.is_empty()
+                    || arg_fqcn == fqcn
+                    || crate::db::extends_or_implements(ea.db, arg_fqcn, fqcn)
+                    || crate::db::extends_or_implements(ea.db, fqcn, arg_fqcn)
+            }
+            _ => false,
+        })
+    })
 }
 
 /// Binds each of `tps` to the corresponding entry in `args` by position,
