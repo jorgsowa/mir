@@ -15,7 +15,7 @@ final class B {}
 
 function orInstanceofUnrelatedFinalsUnreachable(Baz $x): void {
     if ($x instanceof A || $x instanceof B) {
-//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
         /** @mir-check $_ is never */
         $_ = 1;
     }
@@ -27,7 +27,7 @@ class Holder {
 
 function propOrInstanceofUnrelatedFinalsUnreachable(Holder $h): void {
     if ($h->prop instanceof A || $h->prop instanceof B) {
-//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
         /** @mir-check $_ is never */
         $_ = 1;
     }

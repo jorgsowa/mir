@@ -25,7 +25,7 @@ function notFooOnNullableReceiverReachable(?Holder $h): void {
 // Negative: a non-nullable receiver keeps the old, sound behavior.
 function notFooOnNonNullableReceiverDiverges(Holder $h): void {
     if (get_debug_type($h->obj) !== 'Foo') {
-//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
         echo "unreachable";
     }
 }

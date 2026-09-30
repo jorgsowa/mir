@@ -8,7 +8,7 @@ suppress=UnusedVariable,UnusedParam
 /** @param positive-int $n */
 function test_pos_gt_zero(int $n): void {
     if ($n > 0) {
-//      ^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//      ^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
         $_ = $n;
     }
 }
@@ -16,7 +16,7 @@ function test_pos_gt_zero(int $n): void {
 /** @param non-negative-int $n */
 function test_nonneg_ge_zero(int $n): void {
     if ($n >= 0) {
-//      ^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//      ^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
         $_ = $n;
     }
 }
@@ -24,7 +24,7 @@ function test_nonneg_ge_zero(int $n): void {
 /** @param negative-int $n */
 function test_neg_lt_zero(int $n): void {
     if ($n < 0) {
-//      ^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//      ^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
         $_ = $n;
     }
 }

@@ -5,7 +5,7 @@ reports redundant check after narrowing
 function f(string|int $x): void {
     if (is_string($x)) {
         if (is_string($x)) {}
-//          ^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//          ^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
     }
 }
 ===expect===

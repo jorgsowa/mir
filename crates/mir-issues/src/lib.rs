@@ -1727,7 +1727,7 @@ impl IssueKind {
             }
 
             IssueKind::RedundantCondition { ty } => {
-                format!("Condition is always true/false for type '{ty}'")
+                format!("Condition of type '{ty}' always evaluates the same way, so one branch is unreachable")
             }
             IssueKind::RedundantCast { from, to } => {
                 format!("Casting '{from}' to '{to}' is redundant")

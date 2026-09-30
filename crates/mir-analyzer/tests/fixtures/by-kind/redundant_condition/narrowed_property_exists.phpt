@@ -20,7 +20,7 @@ function getAssetInfo(Document|Image $asset): void {
     if ($asset instanceof Document) {
         echo $asset->name;
     } elseif ($asset instanceof Image) {
-//            ^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//            ^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
         echo $asset->width;
     }
 }

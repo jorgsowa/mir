@@ -12,7 +12,7 @@ suppress=UnusedVariable,UnusedParam,MissingParamType,DocblockTypeContradiction
 function test_ne_impossible($n): void {
     if ($n !== 5) {
 //      ^^^^^^^^ ImpossibleIdenticalComparison: '!==' between '1|2|3' and '5' is always true — these types can never be identical
-//      ^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//      ^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
         $_ = $n; // always here
     }
 }

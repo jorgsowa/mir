@@ -10,7 +10,7 @@ suppress=MissingReturnType,UnusedParam
  */
 function route($callback) {
   if (!is_callable($callback)) {  }
-//    ^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//    ^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
   takes_int("string");
 //          ^^^^^^^^ InvalidArgument: Argument $i of takes_int() expects 'int', got '"string"'
 }

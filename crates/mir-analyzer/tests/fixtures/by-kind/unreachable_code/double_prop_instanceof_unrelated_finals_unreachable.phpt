@@ -16,7 +16,7 @@ class Holder {
 
 function bothFinals(Holder $h): void {
     if ($h->animal instanceof Cat && $h->animal instanceof Dog) {
-//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
         echo "unreachable";
     }
 }

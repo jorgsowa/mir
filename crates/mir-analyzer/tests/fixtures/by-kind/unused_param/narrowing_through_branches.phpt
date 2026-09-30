@@ -16,7 +16,7 @@ function testBranches(int|string|bool $value) {
         /** @mir-check $value is string */
         return strlen($value);
     } elseif (is_bool($value)) {
-//            ^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//            ^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
         /** @mir-check $value is bool */
         return $value ? 'true' : 'false';
     }

@@ -34,14 +34,14 @@ function isAFalseOnNullableReceiverReachable(?Holder $h): void {
 // Negative: a non-nullable receiver keeps the old, sound behavior.
 function instanceofFalseOnNonNullableReceiverDiverges(Holder $h): void {
     if (!($h->prop instanceof Bar)) {
-//      ^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
         echo "unreachable";
     }
 }
 
 function isAFalseOnNonNullableReceiverDiverges(Holder $h): void {
     if (!is_a($h->prop, Bar::class)) {
-//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
         echo "unreachable";
     }
 }

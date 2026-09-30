@@ -14,7 +14,7 @@ class Box {
 
     public static function useIt(): void {
         if (self::$n > 5) {
-//          ^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//          ^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
             /** @mir-check $_ is never */
             $_ = 1;
         }
@@ -31,7 +31,7 @@ class Box {
 class ChildBox extends Box {
     public static function useItViaStatic(): void {
         if (static::$n > 5) {
-//          ^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//          ^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
             /** @mir-check $_ is never */
             $_ = 1;
         }

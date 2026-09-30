@@ -12,7 +12,7 @@ suppress=UnusedVariable,MissingConstructor
 function plainListLiteralStaysList(): void {
     $arr = [1, 2, 3];
     if (array_is_list($arr)) {
-//      ^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//      ^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
         /** @mir-check $_ is never */
         $_ = 1;
 //      ^^^^^^^ TypeCheckMismatch: Type of $_ is expected to be never, got mixed
@@ -23,7 +23,7 @@ function keyExistsStringKeyBreaksListNarrowing(): void {
     $arr = [1, 2, 3];
     if (array_key_exists('foo', $arr)) {
         if (array_is_list($arr)) {
-//          ^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//          ^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
             /** @mir-check $_ is never */
             $_ = 1;
         }
@@ -34,7 +34,7 @@ function keyExistsContiguousIntKeyPreservesList(): void {
     $arr = [1, 2, 3];
     if (array_key_exists(3, $arr)) {
         if (array_is_list($arr)) {
-//          ^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//          ^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
             /** @mir-check $_ is never */
             $_ = 1;
 //          ^^^^^^^ TypeCheckMismatch: Type of $_ is expected to be never, got mixed

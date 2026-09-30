@@ -23,7 +23,7 @@ function isNullTrueBranchReachableOnNullableReceiver(?Holder $h): void {
 
 function isNullTrueBranchDivergesOnNonNullableReceiver(Holder $h): void {
     if (is_null($h->name)) {
-//      ^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//      ^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
         /** @mir-check $_ is never */
         $_ = 1;
     }
@@ -40,7 +40,7 @@ function isStringFalseBranchReachableOnNullableReceiver(?Holder $h): void {
 
 function isStringFalseBranchDivergesOnNonNullableReceiver(Holder $h): void {
     if (!is_string($h->name)) {
-//      ^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//      ^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
         /** @mir-check $_ is never */
         $_ = 1;
     }

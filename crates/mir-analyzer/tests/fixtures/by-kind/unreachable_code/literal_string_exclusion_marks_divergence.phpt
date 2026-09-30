@@ -18,7 +18,7 @@ function varUnionMismatchUnreachable(string $s): void {
     if ($s === 'c') {
 //      ^^^^^^^^^^ DocblockTypeContradiction: Type '"a"|"b"' makes '$s === "c"' impossible — this can never hold
 //      ^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between '"a"|"b"' and '"c"' is always false — these types can never be identical
-//      ^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//      ^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
         /** @mir-check $_ is never */
         $_ = 1;
     }
@@ -39,7 +39,7 @@ class Bag {
     public function propUnionMismatchUnreachable(): void {
         if ($this->label === 'c') {
 //          ^^^^^^^^^^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between '"a"|"b"' and '"c"' is always false — these types can never be identical
-//          ^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//          ^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
             /** @mir-check $_ is never */
             $_ = 1;
         }
@@ -53,7 +53,7 @@ class StaticBag {
     public static function staticPropUnionMismatchUnreachable(): void {
         if (self::$label === 'c') {
 //          ^^^^^^^^^^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between '"a"|"b"' and '"c"' is always false — these types can never be identical
-//          ^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//          ^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
             /** @mir-check $_ is never */
             $_ = 1;
         }

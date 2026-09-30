@@ -11,7 +11,7 @@ suppress=UnusedVariable,UnusedParam
 <?php
 function methodExistsUnreachable(int $x): void {
     if (method_exists($x, 'foo')) {
-//      ^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//      ^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
 //                    ^^ ArgumentTypeCoercion: Argument $object_or_class of method_exists() expects 'object|string', got 'int' — coercion may fail at runtime
         /** @mir-check $_ is never */
         $_ = 1;
@@ -20,7 +20,7 @@ function methodExistsUnreachable(int $x): void {
 
 function propertyExistsUnreachable(int $x): void {
     if (property_exists($x, 'foo')) {
-//      ^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
 //                      ^^ ArgumentTypeCoercion: Argument $object_or_class of property_exists() expects 'object|string', got 'int' — coercion may fail at runtime
         /** @mir-check $_ is never */
         $_ = 1;

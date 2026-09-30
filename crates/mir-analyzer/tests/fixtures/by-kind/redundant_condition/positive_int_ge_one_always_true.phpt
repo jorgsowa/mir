@@ -7,7 +7,7 @@ suppress=UnusedVariable,UnusedParam
 /** @param positive-int $n */
 function test(int $n): void {
     if ($n >= 1) {
-//      ^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//      ^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
         echo "always";
     }
 }

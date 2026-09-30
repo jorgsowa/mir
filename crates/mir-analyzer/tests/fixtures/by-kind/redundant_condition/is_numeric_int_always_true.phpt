@@ -6,7 +6,7 @@ suppress=UnusedVariable,UnusedParam
 <?php
 function test(int $n): void {
     if (is_numeric($n)) {
-//      ^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//      ^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
         $_ = $n;
     }
 }

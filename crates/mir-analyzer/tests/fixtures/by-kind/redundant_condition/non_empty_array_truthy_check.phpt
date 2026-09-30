@@ -7,7 +7,7 @@ suppress=UnusedVariable,UnusedParam
 /** @param non-empty-array<string, int> $arr */
 function test(array $arr): void {
     if ($arr) {
-//      ^^^^ RedundantCondition: Condition is always true/false for type 'non-empty-array<string, int>'
+//      ^^^^ RedundantCondition: Condition of type 'non-empty-array<string, int>' always evaluates the same way, so one branch is unreachable
         $_ = $arr;
     }
 }

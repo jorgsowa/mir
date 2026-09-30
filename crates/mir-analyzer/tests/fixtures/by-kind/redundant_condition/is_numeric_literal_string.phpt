@@ -8,14 +8,14 @@ suppress=UnusedVariable,UnusedParam
 function test_always_true(string $s): void {
     $s = "123";
     if (is_numeric($s)) {
-//      ^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//      ^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
         // always taken
     }
 }
 function test_always_false(string $s): void {
     $s = "hello";
     if (is_numeric($s)) {
-//      ^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//      ^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
         // never taken
     }
 }

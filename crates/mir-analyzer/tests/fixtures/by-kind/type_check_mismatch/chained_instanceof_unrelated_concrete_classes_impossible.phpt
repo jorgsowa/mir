@@ -13,7 +13,7 @@ class B {}
 /** @param A|B $x */
 function f($x): void {
     if ($x instanceof A && $x instanceof B) {
-//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
         echo get_class($x);
     }
 }

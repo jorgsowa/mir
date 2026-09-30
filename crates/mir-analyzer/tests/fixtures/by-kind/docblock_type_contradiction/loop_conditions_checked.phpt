@@ -10,7 +10,7 @@ suppress=UnusedParam
 function test_while(int $n): void {
     while ($n < 4) {
 //         ^^^^^^ DocblockTypeContradiction: Type 'int<5, max>' makes '$n < 4' impossible — this can never hold
-//         ^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//         ^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
         echo "never";
 //      ^^^^^^^^^^^^^ UnreachableCode: Unreachable code detected
     }
@@ -20,7 +20,7 @@ function test_while(int $n): void {
 function test_for(int $n): void {
     for ($i = 0; $n < 4; $i++) {
 //               ^^^^^^ DocblockTypeContradiction: Type 'int<5, max>' makes '$n < 4' impossible — this can never hold
-//               ^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//               ^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
         echo "never";
 //      ^^^^^^^^^^^^^ UnreachableCode: Unreachable code detected
     }

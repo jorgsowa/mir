@@ -4,6 +4,6 @@ reports is string on string type
 <?php
 function f(string $x): void {
     if (is_string($x)) {}
-//      ^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//      ^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
 }
 ===expect===

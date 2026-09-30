@@ -9,6 +9,6 @@ suppress=UnusedVariable,UnusedParam
 function test(array $arr): void {
     if ($arr == null) {}
 //      ^^^^^^^^^^^^ ImpossibleLooseComparison: '==' between 'non-empty-array<int|string, string>' and 'null' is always false — these types can never be loosely equal
-//      ^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//      ^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
 }
 ===expect===

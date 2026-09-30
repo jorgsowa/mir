@@ -23,7 +23,7 @@ final class Handler {
 
 function stillImpossible(\Closure $c): void {
     if ($c instanceof Handler) {
-//      ^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
+//      ^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition of type 'bool' always evaluates the same way, so one branch is unreachable
         echo "unreachable\n";
     }
 }
