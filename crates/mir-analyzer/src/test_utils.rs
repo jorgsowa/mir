@@ -490,9 +490,11 @@ fn parse_annotations(files: &[(String, String)], is_multi: bool, path: &str) -> 
                 )
             });
             let (line_end, col_end, rest) = match parse_span_end(rest) {
-                Some((lines_below, end_col, rest)) => {
-                    (nth_source_line_after(&lines, line, lines_below), end_col, rest)
-                }
+                Some((lines_below, end_col, rest)) => (
+                    nth_source_line_after(&lines, line, lines_below),
+                    end_col,
+                    rest,
+                ),
                 None => (line, col + len, rest),
             };
             let (kind, message) = match rest.split_once(": ") {
@@ -550,7 +552,10 @@ fn split_annotation(text: &str) -> Option<(u16, u16, &str)> {
         Some(rest) => (rest, 0),
         None => {
             let carets_at = after_slashes.trim_start();
-            (carets_at, (text.chars().count() - carets_at.chars().count()) as u16)
+            (
+                carets_at,
+                (text.chars().count() - carets_at.chars().count()) as u16,
+            )
         }
     };
     if !carets_at.starts_with('^') {
@@ -1721,7 +1726,8 @@ mod parser_validation {
 
     #[test]
     fn annotation_at_column_zero_and_multiline_end() {
-        let f = p("===file===\n<?php\nfoo();\n//<^^^ K\nfoo(\n// ^ +1:2 M: multi\n);\n===expect===\n");
+        let f =
+            p("===file===\n<?php\nfoo();\n//<^^^ K\nfoo(\n// ^ +1:2 M: multi\n);\n===expect===\n");
         let a = &f.expected[0];
         assert_eq!(
             (a.line, a.col_start, a.line_end, a.col_end),
