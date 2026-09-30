@@ -29,7 +29,14 @@ impl<'a> BodyAnalyzer<'a> {
             );
         }
 
-        let resolved = resolve_name(self.db, file.as_ref(), decl.name.as_deref().unwrap_or(""));
+        let resolved = super::declared_class_like_fqcn(
+            self.db,
+            file.as_ref(),
+            decl.name.as_deref().unwrap_or(""),
+            decl.body.span.start,
+            source,
+            source_map,
+        );
         let fqcn: &str = &resolved;
         self.check_class_generic_type_args(
             &decl.doc_comment,
@@ -145,7 +152,14 @@ impl<'a> BodyAnalyzer<'a> {
             );
         }
 
-        let resolved = resolve_name(self.db, file.as_ref(), decl.name.as_deref().unwrap_or(""));
+        let resolved = super::declared_class_like_fqcn(
+            self.db,
+            file.as_ref(),
+            decl.name.as_deref().unwrap_or(""),
+            decl.body.span.start,
+            source,
+            source_map,
+        );
         let fqcn: &str = &resolved;
         self.check_class_generic_type_args(
             &decl.doc_comment,
@@ -311,7 +325,14 @@ impl<'a> BodyAnalyzer<'a> {
         }
 
         let enum_name = decl.name.as_deref().unwrap_or("<anonymous>");
-        let resolved = resolve_name(self.db, file.as_ref(), enum_name);
+        let resolved = super::declared_class_like_fqcn(
+            self.db,
+            file.as_ref(),
+            enum_name,
+            decl.body.span.start,
+            source,
+            source_map,
+        );
         let fqcn: &str = &resolved;
 
         let scope_cx = MethodScopeCx {
@@ -405,7 +426,14 @@ impl<'a> BodyAnalyzer<'a> {
         }
 
         let enum_name = decl.name.as_deref().unwrap_or("<anonymous>");
-        let resolved = resolve_name(self.db, file.as_ref(), enum_name);
+        let resolved = super::declared_class_like_fqcn(
+            self.db,
+            file.as_ref(),
+            enum_name,
+            decl.body.span.start,
+            source,
+            source_map,
+        );
         let fqcn: &str = &resolved;
 
         let scope_cx = MethodScopeCx {
@@ -477,7 +505,14 @@ impl<'a> BodyAnalyzer<'a> {
             );
         }
         let iface_name = decl.name.as_deref().unwrap_or("<anonymous>");
-        let iface_fqcn = resolve_name(self.db, file.as_ref(), iface_name);
+        let iface_fqcn = super::declared_class_like_fqcn(
+            self.db,
+            file.as_ref(),
+            iface_name,
+            decl.body.span.start,
+            source,
+            source_map,
+        );
         self.check_class_generic_type_args(
             &decl.doc_comment,
             &iface_fqcn,

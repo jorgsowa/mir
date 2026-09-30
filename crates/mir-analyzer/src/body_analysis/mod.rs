@@ -274,6 +274,63 @@ fn lookup_function_node_for_decl(
         .map(|definition| (fqn, definition))
 }
 
+/// Canonical FQCN of a class-like declaration, matched by source range so a
+/// declaration in a later `namespace X { }` block isn't resolved against the
+/// file's first namespace. Falls back to `resolve_name` when nothing matches.
+fn declared_class_like_fqcn(
+    db: &dyn MirDatabase,
+    file: &str,
+    name: &str,
+    body_span_start: u32,
+    source: &str,
+    source_map: &php_rs_parser::source_map::SourceMap,
+) -> String {
+    let (line, col) = crate::diagnostics::offset_to_line_col(source, body_span_start, source_map);
+    let contains_body = |location: &Option<mir_types::Location>| {
+        let Some(loc) = location.as_ref() else {
+            return false;
+        };
+        loc.file.as_ref() == file
+            && (loc.line < line || (loc.line == line && loc.col_start <= col))
+            && (loc.line_end > line || (loc.line_end == line && loc.col_end >= col))
+    };
+    let matches_name = |short_name: &str| short_name.eq_ignore_ascii_case(name);
+
+    if let Some(source_file) = db.lookup_source_file(file) {
+        let slice = &crate::db::collect_file_definitions(db, source_file).slice;
+        let found = slice
+            .classes
+            .iter()
+            .find(|d| matches_name(&d.short_name) && contains_body(&d.location))
+            .map(|d| &d.fqcn)
+            .or_else(|| {
+                slice
+                    .interfaces
+                    .iter()
+                    .find(|d| matches_name(&d.short_name) && contains_body(&d.location))
+                    .map(|d| &d.fqcn)
+            })
+            .or_else(|| {
+                slice
+                    .traits
+                    .iter()
+                    .find(|d| matches_name(&d.short_name) && contains_body(&d.location))
+                    .map(|d| &d.fqcn)
+            })
+            .or_else(|| {
+                slice
+                    .enums
+                    .iter()
+                    .find(|d| matches_name(&d.short_name) && contains_body(&d.location))
+                    .map(|d| &d.fqcn)
+            });
+        if let Some(fqcn) = found {
+            return fqcn.to_string();
+        }
+    }
+    resolve_name(db, file, name)
+}
+
 /// Build `DeclaredParam`s directly from the declaration AST when no storage match is
 /// available.  Defaults are typed as `mixed` since their value type isn't tracked.
 fn ast_derived_fn_params(params: &[php_ast::owned::Param]) -> Vec<mir_codebase::DeclaredParam> {

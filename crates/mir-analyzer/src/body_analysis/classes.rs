@@ -1388,7 +1388,14 @@ impl<'a> BodyAnalyzer<'a> {
             .unwrap_or("<anonymous>")
             .to_string();
         let class_name = class_name_owned.as_str();
-        let resolved = resolve_name(self.db, file.as_ref(), class_name);
+        let resolved = super::declared_class_like_fqcn(
+            self.db,
+            file.as_ref(),
+            class_name,
+            decl.body.span.start,
+            source,
+            source_map,
+        );
         let fqcn: &str = &resolved;
         let here = crate::db::Fqcn::from_str(self.db, fqcn);
         let parent_fqcn =
@@ -1652,7 +1659,14 @@ impl<'a> BodyAnalyzer<'a> {
             .unwrap_or("<anonymous>")
             .to_string();
         let class_name = class_name_owned.as_str();
-        let resolved = resolve_name(self.db, file.as_ref(), class_name);
+        let resolved = super::declared_class_like_fqcn(
+            self.db,
+            file.as_ref(),
+            class_name,
+            decl.body.span.start,
+            source,
+            source_map,
+        );
         let fqcn: &str = &resolved;
         let here = crate::db::Fqcn::from_str(self.db, fqcn);
         let parent_fqcn =
