@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.81.0] - 2026-10-01
+
 ### Added
 
 - `TaintedHeader` (MIR0805) for tainted input reaching `header()`, and `TaintedCookie` (MIR0806) for `setcookie()`/`setrawcookie()`. Also accepted as `@taint-sink header` / `@taint-sink cookie`.
@@ -15,13 +17,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optional Psalm-compatible `errorLevel` (1–8, root attribute or `--error-level`):
   issues below the configured Psalm level are downgraded to info. Unset keeps
   mir's own severities.
+- `$this->prop` assertions propagate through methods that delegate to an asserting sibling method.
+- rust-analyzer style `^^^` annotations in phpt fixtures.
 
 ### Changed
 
+- `PropertyPossiblyUninitialized` is reported at Info severity (hidden unless `--show-info`).
+- `--error-level` no longer reveals info issues at 7 and above; use `--show-info`.
 - `RedundantCondition` states whether the condition is always true or false and which branch is unreachable, and is no longer reported alongside an impossible-comparison issue on the same condition.
 
 ### Fixed
 
+- `G<Class>` arguments are accepted for a `G<static>`/`G<self>` `@param` when `Class` is the receiver class.
+- `class-string<X>` satisfies a bare `class-string` bound.
 - `$x->get() instanceof Y` (and null/type checks) now narrow later identical zero-argument calls on `$x` when `get()` is `@psalm-pure`/`@psalm-mutation-free`; the narrowing is dropped after an impure call on, or reassignment of, `$x`.
 - Reassigning a variable drops narrowed property types recorded for its old value.
 - Class, trait, enum and interface declarations in a later `namespace X { }` block resolve their own FQCN, so method parameters are no longer reported as `UndefinedVariable`.
@@ -34,10 +42,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `is_countable()` narrows a non-final class to `C&Countable` and drops a final non-countable class; an argument union containing an intersection no longer reports `PossiblyInvalidArgument` when every atom fits.
 - `header()` is no longer a `TaintedHtml` sink.
 - Duplicate named arguments report "overwrites a previous argument" instead of "has no parameter named".
-
-### Changed
-
-- `--error-level` no longer reveals info issues at 7 and above; use `--show-info`.
 
 ## [0.80.0] - 2026-09-30
 
