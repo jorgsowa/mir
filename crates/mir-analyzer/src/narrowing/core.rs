@@ -52,6 +52,9 @@ pub(crate) fn resolve_prop_current_type(
     if let Some(refined) = ctx.get_prop_refined(obj_var, prop) {
         return refined.clone();
     }
+    if prop.ends_with("()") {
+        return resolve_method_call_current_type(ctx, obj_var, prop, db);
+    }
     // Resolve through the object variable's type
     let obj_ty = ctx.get_var(obj_var);
     let mut prop_ty = mir_types::Type::mixed();
@@ -215,9 +218,60 @@ pub(crate) fn extract_prop_access(expr: &php_ast::owned::Expr) -> Option<(String
             };
             Some((obj, prop))
         }
+        ExprKind::MethodCall(call) if call.args.is_empty() => {
+            let obj = extract_var_name(&call.object)?;
+            let ExprKind::Identifier(name) = &call.method.kind else {
+                return None;
+            };
+            Some((obj, method_call_key(name)))
+        }
         ExprKind::Parenthesized(inner) => extract_prop_access(inner),
         _ => None,
     }
+}
+
+/// `prop_refined` key for a zero-arg method call; `()` keeps it disjoint from property names.
+pub(crate) fn method_call_key(method: &str) -> String {
+    format!("{}()", method.to_ascii_lowercase())
+}
+
+/// Declared return type of a mutation-free `$obj_var->method()` with a single concrete receiver
+/// class, or `mixed` when repeated calls aren't provably equal or the type isn't receiver-independent.
+fn resolve_method_call_current_type(
+    ctx: &FlowState,
+    obj_var: &str,
+    key: &str,
+    db: &dyn MirDatabase,
+) -> Type {
+    let method = key.trim_end_matches("()");
+    let obj_ty = ctx.get_var(obj_var);
+    let [Atomic::TNamedObject { fqcn, .. }] = obj_ty.types.as_slice() else {
+        return Type::mixed();
+    };
+    let Some(resolved) = crate::call::method::resolve_method_from_db(
+        db,
+        &std::sync::Arc::from(fqcn.as_ref()),
+        method,
+    ) else {
+        return Type::mixed();
+    };
+    let receiver_independent = resolved.template_params.is_empty()
+        && resolved.return_ty_raw.types.iter().all(|a| match a {
+            Atomic::TNamedObject { type_params, .. } => type_params.is_empty(),
+            Atomic::TSelf { .. }
+            | Atomic::TStaticObject { .. }
+            | Atomic::TParent { .. }
+            | Atomic::TTemplateParam { .. }
+            | Atomic::TConditional { .. } => false,
+            _ => true,
+        });
+    if resolved.is_static
+        || !(resolved.is_pure || resolved.is_mutation_free)
+        || !receiver_independent
+    {
+        return Type::mixed();
+    }
+    resolved.return_ty_raw
 }
 
 /// Like `extract_prop_access`, but only matches the nullsafe (`?->`) form.

@@ -1623,6 +1623,14 @@ fn resolve_method_return<'a>(
             span,
             &mut return_ty,
         );
+        if call.args.is_empty() && (resolved.is_pure || resolved.is_mutation_free) {
+            if let ExprKind::Variable(recv) = &call.object.kind {
+                let key = crate::narrowing::method_call_key(method_name);
+                if let Some(refined) = ctx.get_prop_refined(recv, &key) {
+                    return_ty = refined.clone();
+                }
+            }
+        }
         return_ty
     } else if crate::db::class_exists(ea.db, fqcn) && !crate::db::has_unknown_ancestor(ea.db, fqcn)
     {

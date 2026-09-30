@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `$x->get() instanceof Y` (and null/type checks) now narrow later identical zero-argument calls on `$x` when `get()` is `@psalm-pure`/`@psalm-mutation-free`; the narrowing is dropped after an impure call on, or reassignment of, `$x`.
+- Reassigning a variable drops narrowed property types recorded for its old value.
 - Class, trait, enum and interface declarations in a later `namespace X { }` block resolve their own FQCN, so method parameters are no longer reported as `UndefinedVariable`.
 - A method declared `: self` returns the declaring class rather than the calling subclass (`(new Sub())->returnsSelf()->nope()` reports `Base::nope()`); `static`, trait `self` and generic receivers still bind to the receiver.
 - `name_at` resolves the declaration name of interface and abstract methods, and abstract methods are indexed for find-references.

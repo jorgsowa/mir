@@ -456,6 +456,7 @@ impl<'a> ExpressionAnalyzer<'a> {
                 }
                 match &a.target.kind {
                     ExprKind::Variable(name) => {
+                        ctx.invalidate_prop_refined_receiver(name);
                         if rhs_tainted {
                             ctx.taint_var(name.as_ref());
                         } else {
