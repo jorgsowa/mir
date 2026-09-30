@@ -20,6 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Class, trait, enum and interface declarations in a later `namespace X { }` block resolve their own FQCN, so method parameters are no longer reported as `UndefinedVariable`.
 - A method declared `: self` returns the declaring class rather than the calling subclass (`(new Sub())->returnsSelf()->nope()` reports `Base::nope()`); `static`, trait `self` and generic receivers still bind to the receiver.
+- `name_at` resolves the declaration name of interface and abstract methods, and abstract methods are indexed for find-references.
+- `name_at`/`symbol_at` resolve names in files with hard parse errors using the recovered AST instead of returning nothing.
+- A cursor right after an identifier (`$obj->m($obj|)`) resolves that identifier instead of the enclosing method call.
 - `MethodSignatureMismatch` no longer compares a variadic override against the parent's docblock `list<X>` as the collected array; the element type is compared.
 - `method_exists($obj, 'm')` now suppresses `UndefinedMethod` for an array callable held in a variable (`$cb = [$obj, 'm']`).
 - `is_countable()` narrows a non-final class to `C&Countable` and drops a final non-countable class; an argument union containing an intersection no longer reports `PossiblyInvalidArgument` when every atom fits.

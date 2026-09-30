@@ -51,66 +51,71 @@ fn span_len(span: Span) -> u32 {
     span.end.saturating_sub(span.start)
 }
 
-fn symbol_at(symbols: &[ResolvedSymbol], byte_offset: u32) -> Option<&ResolvedSymbol> {
-    if let Some(symbol) = symbols
+/// Innermost item by precedence: one whose own span contains `byte_offset`, then
+/// one whose span ends exactly there (a cursor just past an identifier), then
+/// one whose enclosing expression span contains it (whitespace inside a call).
+fn best_at<T>(
+    items: &[T],
+    span: impl Fn(&T) -> Span,
+    expr_span: impl Fn(&T) -> Option<Span>,
+    byte_offset: u32,
+    allow_expr_fallback: bool,
+) -> Option<&T> {
+    items
         .iter()
-        .filter(|f| span_contains(f.span, byte_offset))
-        .min_by_key(|f| span_len(f.span))
-    {
-        return Some(symbol);
-    }
-    symbols
-        .iter()
-        .filter(|symbol| {
-            symbol
-                .expr_span
-                .is_some_and(|es| span_contains(es, byte_offset))
-        })
-        .min_by_key(|symbol| symbol.expr_span.map(span_len).unwrap_or(u32::MAX))
+        .filter(|item| span_contains(span(item), byte_offset))
+        .min_by_key(|item| span_len(span(item)))
         .or_else(|| {
-            // A cursor just past an identifier still resolves it.
-            symbols
+            items
                 .iter()
-                .filter(|symbol| symbol.span.end == byte_offset)
-                .min_by_key(|symbol| span_len(symbol.span))
+                .filter(|item| span(item).end == byte_offset)
+                .min_by_key(|item| span_len(span(item)))
+        })
+        .or_else(|| {
+            if !allow_expr_fallback {
+                return None;
+            }
+            items
+                .iter()
+                .filter(|item| expr_span(item).is_some_and(|es| span_contains(es, byte_offset)))
+                .min_by_key(|item| expr_span(item).map(span_len).unwrap_or(u32::MAX))
         })
 }
 
-fn navigation_fact_at(facts: &[NavigationFact], byte_offset: u32) -> Option<&NavigationFact> {
-    if let Some(fact) = facts
-        .iter()
-        .filter(|fact| span_contains(fact.span, byte_offset))
-        .min_by_key(|fact| span_len(fact.span))
-    {
-        return Some(fact);
-    }
-    facts
-        .iter()
-        .filter(|fact| {
-            fact.expr_span
-                .is_some_and(|span| span_contains(span, byte_offset))
-        })
-        .min_by_key(|fact| fact.expr_span.map(span_len).unwrap_or(u32::MAX))
+/// True when `byte_offset` sits right after the last character of an
+/// identifier or variable name.
+fn ends_identifier(source: &str, byte_offset: u32) -> bool {
+    let is_ident = |b: u8| b.is_ascii_alphanumeric() || b == b'_' || b >= 0x80;
+    let bytes = source.as_bytes();
+    let at = byte_offset as usize;
+    at > 0
+        && bytes.get(at - 1).is_some_and(|b| is_ident(*b))
+        && !bytes.get(at).is_some_and(|b| is_ident(*b))
+}
+
+fn symbol_at(symbols: &[ResolvedSymbol], byte_offset: u32) -> Option<&ResolvedSymbol> {
+    best_at(symbols, |s| s.span, |s| s.expr_span, byte_offset, true)
+}
+
+fn navigation_fact_at(
+    facts: &[NavigationFact],
+    byte_offset: u32,
+    allow_expr_fallback: bool,
+) -> Option<&NavigationFact> {
+    best_at(
+        facts,
+        |f| f.span,
+        |f| f.expr_span,
+        byte_offset,
+        allow_expr_fallback,
+    )
 }
 
 fn resolved_navigation_fact_at(
     facts: &[ResolvedNavigationFact],
     byte_offset: u32,
 ) -> Option<&ResolvedNavigationFact> {
-    if let Some(fact) = facts
-        .iter()
-        .filter(|fact| span_contains(fact.span, byte_offset))
-        .min_by_key(|fact| span_len(fact.span))
-    {
-        return Some(fact);
-    }
-    facts
-        .iter()
-        .filter(|fact| {
-            fact.expr_span
-                .is_some_and(|span| span_contains(span, byte_offset))
-        })
-        .min_by_key(|fact| fact.expr_span.map(span_len).unwrap_or(u32::MAX))
+    best_at(facts, |f| f.span, |f| f.expr_span, byte_offset, true)
 }
 
 fn for_each_navigation_scope<'a>(stmts: &'a [Stmt], f: &mut impl FnMut(&'a Stmt)) {
@@ -570,9 +575,6 @@ fn resolve_name_at(
 ) -> Option<crate::Name> {
     let sf = db.lookup_source_file(file.as_ref())?;
     let prepared = crate::db::prepare_analysis_file(db, sf);
-    if prepared.has_hard_parse_errors {
-        return None;
-    }
     let parsed = prepared.parse_result();
     if let Some(name) = resolve_name_at_via_compact_facts(
         db,
@@ -600,7 +602,17 @@ fn resolve_name_at(
         false,
         true,
     );
-    symbol_at(&symbols, byte_offset).and_then(ResolvedSymbol::to_symbol)
+    // Codebase-only symbols omit variables, so an enclosing call's span must
+    // not claim a cursor sitting right after one.
+    let allow_expr_fallback = !ends_identifier(prepared.text.as_ref(), byte_offset);
+    best_at(
+        &symbols,
+        |s| s.span,
+        |s| s.expr_span,
+        byte_offset,
+        allow_expr_fallback,
+    )
+    .and_then(ResolvedSymbol::to_symbol)
 }
 
 fn resolve_symbol_at(
@@ -612,9 +624,6 @@ fn resolve_symbol_at(
 ) -> Option<ResolvedSymbol> {
     let sf = db.lookup_source_file(file.as_ref())?;
     let prepared = crate::db::prepare_analysis_file(db, sf);
-    if prepared.has_hard_parse_errors {
-        return None;
-    }
     let parsed = prepared.parse_result();
     if let Some(symbol) = symbol_at_via_compact_facts(
         db,
@@ -714,7 +723,7 @@ fn resolve_name_at_via_compact_facts(
                 true,
                 false,
             );
-            return navigation_fact_at(&navigation_facts, byte_offset)
+            return navigation_fact_at(&navigation_facts, byte_offset, true)
                 .map(|fact| fact.name.clone());
         }
         _ => {
@@ -723,7 +732,10 @@ fn resolve_name_at_via_compact_facts(
     }
 
     let facts = driver.take_navigation_facts();
-    navigation_fact_at(&facts, byte_offset).map(|fact| fact.name.clone())
+    // A variable just before the cursor isn't a navigation fact, so the
+    // enclosing call's span must not claim it.
+    let allow_expr_fallback = !ends_identifier(source, byte_offset);
+    navigation_fact_at(&facts, byte_offset, allow_expr_fallback).map(|fact| fact.name.clone())
 }
 
 #[allow(clippy::too_many_arguments)]
