@@ -4,6 +4,9 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
+mod psalm_levels;
+pub use psalm_levels::psalm_error_level;
+
 // ---------------------------------------------------------------------------
 // Severity
 // ---------------------------------------------------------------------------

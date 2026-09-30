@@ -68,7 +68,7 @@ pub fn run_output(
         None => (None, None),
     };
 
-    let show_info = cli.show_info || config.error_level >= 7;
+    let show_info = cli.show_info;
 
     let visible_candidates: Vec<(usize, &Issue, Severity)> = result
         .issues
@@ -304,10 +304,20 @@ fn effective_severity(issue: &Issue, config: &Config) -> Option<Severity> {
             ErrorLevel::Info => Severity::Info,
             ErrorLevel::Suppress => return None,
         }
+    } else if downgraded_by_psalm_level(issue, config) {
+        Severity::Info
     } else {
         issue.severity
     };
     Some(sev)
+}
+
+fn downgraded_by_psalm_level(issue: &Issue, config: &Config) -> bool {
+    let Some(configured) = config.error_level else {
+        return false;
+    };
+    mir_issues::psalm_error_level(issue.kind.display_name())
+        .is_some_and(|issue_level| issue_level < configured)
 }
 
 fn baseline_from_issues(issues: &[Issue]) -> Baseline {

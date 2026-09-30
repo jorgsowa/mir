@@ -78,7 +78,7 @@ struct Cli {
     #[arg(long, value_name = "FILE")]
     baseline: Option<PathBuf>,
 
-    /// Override global error level (1 = errors only, 2 = +warnings, 3+ = +info)
+    /// Psalm-compatible strictness: 1 (strictest) to 8 (most lenient); unset keeps mir's severities
     #[arg(long, value_name = "1-8")]
     error_level: Option<u8>,
 
@@ -144,7 +144,7 @@ fn main() {
     let (mut config, config_base) = load_config(&cli);
 
     if let Some(level) = cli.error_level {
-        config.error_level = level.clamp(1, 8);
+        config.error_level = Some(level.clamp(1, 8));
     }
     if let Some(ver) = &cli.php_version {
         config.php_version = Some(ver.clone());

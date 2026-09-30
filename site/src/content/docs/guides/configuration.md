@@ -41,13 +41,17 @@ You can also point to a config file explicitly with `-c`.
 
 | Field | Description |
 |-------|-------------|
-| `errorLevel` attribute | Global strictness: `1` (errors only) to `8` (lenient). Default: `2`. |
+| `errorLevel` attribute | Optional Psalm-compatible strictness: `1` (strictest) to `8` (most lenient). Default: unset, mir's own severities. See [Psalm error levels](#psalm-error-levels). |
 | `<projectFiles>` | Source directories to analyze. |
 | `<ignoreFiles>` | Directories or files to exclude (e.g. `vendor/`). |
 | `<issueHandlers>` | Per-issue-kind severity overrides (see below). |
 | `<phpVersion>` | Target PHP version string, e.g. `8.2`. Supported range: `7.4`–`8.5`. |
 | `<findUnusedCode>` | Enable dead-code detection (`true`/`false`). Default: `false`. |
 | `<findUnusedVariables>` | Enable unused-variable checking (`true`/`false`). Default: `false`. |
+
+### Psalm error levels
+
+Set `errorLevel` to apply [Psalm's per-issue levels](https://psalm.dev/docs/running_psalm/error_levels/). An issue whose Psalm level is below the configured level is downgraded to info, so it is hidden unless `--show-info` is passed. Issues Psalm always reports, and mir-only issues, keep their severity. Issue handlers take precedence over the level.
 
 ### Issue handlers
 
@@ -57,7 +61,7 @@ Each child element of `<issueHandlers>` is an issue kind name with an `errorLeve
 |-------|--------|
 | `error` | Treat as error (exit code 1) |
 | `warning` | Treat as warning |
-| `info` | Treat as info (only shown with `--show-info` or `errorLevel >= 7`) |
+| `info` | Treat as info (only shown with `--show-info`) |
 | `suppress` | Silence the issue entirely |
 
 ```xml
@@ -78,7 +82,7 @@ CLI flags always override values from the config file.
 | `--set-baseline [FILE]` | `psalm-baseline.xml` | Write all current issues to a baseline file and exit. |
 | `--update-baseline` | off | Remove resolved issues from the baseline. |
 | `--ignore-baseline` | off | Report all issues, ignoring the baseline. |
-| `--error-level <1-8>` | from config | Override global error level. |
+| `--error-level <1-8>` | from config | Psalm-compatible strictness, 1 (strictest) to 8 (most lenient). |
 | `--php-version <X.Y>` | from config | Target PHP version (e.g. `8.2`). |
 | `--format <FORMAT>` | `text` | Output format: `text`, `json`, `github`, `junit`, `sarif`. |
 | `--show-info` | off | Include info-level issues (redundancies, style). |

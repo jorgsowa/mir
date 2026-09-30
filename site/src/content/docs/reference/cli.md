@@ -26,7 +26,7 @@ Paths default to the current directory when omitted.
 | `--php-version <X.Y>` | `8.5` | Target PHP version (e.g. `7.4`, `8.2`). Supported range: `7.4`–`8.5`. |
 | `-c, --config <FILE>` | auto | Config file (`mir.xml` / `psalm.xml` auto-discovered) |
 | `--baseline <FILE>` | off | Suppress issues listed in a baseline XML |
-| `--error-level <1-8>` | — | Override global error level (1 = errors only) |
+| `--error-level <1-8>` | — | Psalm-compatible strictness, 1 (strictest) to 8 (most lenient) |
 | `--set-baseline [FILE]` | — | Write all current issues to a baseline file and exit |
 | `--update-baseline` | off | Remove resolved issues from the baseline |
 | `--ignore-baseline` | off | Report all issues, ignoring the baseline |

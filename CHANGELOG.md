@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Optional Psalm-compatible `errorLevel` (1–8, root attribute or `--error-level`):
+  issues below the configured Psalm level are downgraded to info. Unset keeps
+  mir's own severities.
+
+### Changed
+
+- `--error-level` no longer reveals info issues at 7 and above; use `--show-info`.
+
 ## [0.80.0] - 2026-09-30
 
 ### Added

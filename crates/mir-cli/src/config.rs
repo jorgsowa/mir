@@ -39,7 +39,7 @@ pub struct PsalmPluginEntry {
 }
 
 /// Parsed contents of `mir.xml`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Config {
     /// Source directories to analyze (from `<projectFiles>`).
     pub project_dirs: Vec<String>,
@@ -47,8 +47,9 @@ pub struct Config {
     pub ignore_dirs: Vec<String>,
     /// Per-issue-kind severity overrides from `<issueHandlers>`.
     pub issue_handlers: HashMap<String, ErrorLevel>,
-    /// Global error level 1–8 (lower = stricter). 1 = errors only, 2 = +warnings, 3+ = +info.
-    pub error_level: u8,
+    /// Optional Psalm-compatible strictness, 1 (strictest) to 8 (most lenient).
+    /// `None` keeps mir's own severities.
+    pub error_level: Option<u8>,
     /// Target PHP version string (e.g. `"8.2"`). Accepts both root attribute and child element.
     pub php_version: Option<String>,
     /// Whether dead-code detection is enabled.
@@ -63,24 +64,6 @@ pub struct Config {
     pub psalm_plugins: Vec<PsalmPluginEntry>,
     /// Rust cdylib plugins (from `<plugins><rustPlugin path="..."/>`).
     pub rust_plugins: Vec<String>,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            project_dirs: Vec::new(),
-            ignore_dirs: Vec::new(),
-            issue_handlers: HashMap::new(),
-            error_level: 2,
-            php_version: None,
-            find_unused_code: false,
-            find_unused_variables: false,
-            stub_files: Vec::new(),
-            stub_dirs: Vec::new(),
-            psalm_plugins: Vec::new(),
-            rust_plugins: Vec::new(),
-        }
-    }
 }
 
 /// Errors that can occur when loading configuration.
@@ -161,6 +144,12 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
                                 config.php_version = Some(val);
                             }
                         }
+                    }
+                }
+
+                if path.is_empty() {
+                    if let Some(level) = attr_value(&e, "errorLevel").and_then(parse_psalm_level) {
+                        config.error_level = Some(level);
                     }
                 }
 
@@ -270,8 +259,8 @@ fn parse_xml(xml: &str) -> Result<Config, ConfigError> {
                         config.php_version = Some(text_buf.clone());
                     }
                     ("errorLevel", "mir") => {
-                        if let Ok(n) = text_buf.parse::<u8>() {
-                            config.error_level = n.clamp(1, 8);
+                        if let Some(level) = parse_psalm_level(text_buf.clone()) {
+                            config.error_level = Some(level);
                         }
                     }
                     ("findUnusedCode", _) => {
@@ -337,6 +326,10 @@ fn collect_stub_entry<'a>(
 
 fn bytes_to_string(s: impl AsRef<str>) -> String {
     s.as_ref().to_owned()
+}
+
+fn parse_psalm_level(s: String) -> Option<u8> {
+    s.trim().parse::<u8>().ok().map(|n| n.clamp(1, 8))
 }
 
 /// Value of the named attribute on an element, if present.
