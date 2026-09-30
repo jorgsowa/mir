@@ -708,8 +708,14 @@ impl<'a> ClassAnalyzer<'a> {
                     // before giving up on a still-templated param type, so a concretely
                     // bound generic contract (`@extends Box<int>`) is still checked.
                     let parent_had_template = self.return_type_has_template(parent_ty_raw);
-                    let parent_ty = parent_ty_raw.substitute_templates(&inherited_bindings);
-                    let child_ty = child_ty_raw.substitute_templates(&inherited_bindings);
+                    let parent_ty = Self::variadic_element_type(
+                        parent_param.is_variadic,
+                        parent_ty_raw.substitute_templates(&inherited_bindings),
+                    );
+                    let child_ty = Self::variadic_element_type(
+                        child_param.is_variadic,
+                        child_ty_raw.substitute_templates(&inherited_bindings),
+                    );
                     let parent_ty = &parent_ty;
                     let child_ty = &child_ty;
 
@@ -1039,6 +1045,19 @@ impl<'a> ClassAnalyzer<'a> {
             })
             .collect();
         Arc::new(m_clone)
+    }
+
+    /// Docblock `@param list<X> ...$p` describes the collected array; compare its element type.
+    fn variadic_element_type(is_variadic: bool, ty: mir_types::Type) -> mir_types::Type {
+        if !(is_variadic && ty.from_docblock && ty.is_single()) {
+            return ty;
+        }
+        match &ty.types[0] {
+            mir_types::Atomic::TList { value } | mir_types::Atomic::TNonEmptyList { value } => {
+                (**value).clone().from_docblock()
+            }
+            _ => ty,
+        }
     }
 
     fn type_has_self_or_static_atomic(ty: &mir_types::Type) -> bool {

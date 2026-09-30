@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   issues below the configured Psalm level are downgraded to info. Unset keeps
   mir's own severities.
 
+### Fixed
+
+- `MethodSignatureMismatch` no longer compares a variadic override against the parent's docblock `list<X>` as the collected array; the element type is compared.
+
 ### Changed
 
 - `--error-level` no longer reveals info issues at 7 and above; use `--show-info`.
