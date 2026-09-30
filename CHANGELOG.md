@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Adding, removing or renaming a declaration re-analyzes only the code whose
   symbol lookups it changes, instead of everything that resolved any name.
   Cold analysis of Laravel drops from ~1.45s to ~1.3s.
+- Lazy-loading vendor classes reads their files in parallel before the serial
+  load. On macOS with many threads this cuts that phase by ~40% (Laravel, 18
+  threads: 190ms to 86ms with a cold cache dir).
+- `SourceProvider` gains default `prefetch` and `clear_prefetch` methods, and
+  `FsSourceProvider` is constructed with `FsSourceProvider::new()` instead of
+  as a unit struct.
 
 ## [0.79.0] - 2026-09-26
 

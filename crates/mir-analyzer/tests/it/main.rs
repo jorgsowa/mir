@@ -40,6 +40,7 @@ mod plugin_hooks;
 mod reference_locations;
 mod regression_timing;
 mod salsa_update_optimization;
+mod source_provider_prefetch;
 mod stub_cache_correctness;
 mod symbol_at;
 mod type_env;

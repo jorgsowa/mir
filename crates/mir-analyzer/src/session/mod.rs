@@ -197,7 +197,7 @@ impl AnalysisSession {
         let mut db = AnalyzerDb::new();
         db.salsa.set_php_version(Arc::from(php_version.to_string()));
         db.salsa
-            .set_source_provider(Arc::new(crate::FsSourceProvider));
+            .set_source_provider(Arc::new(crate::FsSourceProvider::new()));
         Self {
             db,
             cache: None,

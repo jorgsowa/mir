@@ -47,11 +47,34 @@ impl AnalysisSession {
                     })
                     .collect::<Vec<_>>()
             };
+            let provider = {
+                use crate::db::MirDatabase as _;
+                self.snapshot_db().source_provider()
+            };
+            if let Some(provider) = provider.as_ref() {
+                let mut seen: HashSet<&str> = HashSet::default();
+                let db = self.snapshot_db();
+                let paths: Vec<String> = candidates
+                    .iter()
+                    .chain(import_candidates.iter())
+                    .filter(|fqcn| seen.insert(fqcn.as_str()))
+                    .filter(|fqcn| {
+                        !crate::db::class_like_indexed(&db, crate::db::Fqcn::from_str(&db, fqcn))
+                    })
+                    .filter_map(|fqcn| psr4.resolve(fqcn))
+                    .map(|path| path.to_string_lossy().into_owned())
+                    .filter(|path| self.db.lookup_source_file(path).is_none())
+                    .collect();
+                provider.prefetch(&paths);
+            }
             for fqcn in candidates {
                 try_queue(&fqcn);
             }
             for fqcn in import_candidates {
                 try_queue(&fqcn);
+            }
+            if let Some(provider) = provider.as_ref() {
+                provider.clear_prefetch();
             }
 
             if to_load.is_empty() {
