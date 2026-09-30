@@ -134,9 +134,18 @@ impl<'a> ExpressionAnalyzer<'a> {
             crate::db::find_global_constant(self.db, here).map(|arc_union| (*arc_union).clone())
         };
 
-        let resolved = ns_qualified
+        let imported = (!name_str.contains('\\'))
+            .then(|| self.db.file_imports(self.file.as_ref()))
+            .and_then(|imports| imports.get(&mir_types::Name::new(name_str)).cloned());
+
+        let resolved = imported
             .as_deref()
             .and_then(|fqn| resolve_pull(fqn).map(|ty| (fqn.to_string(), ty)))
+            .or_else(|| {
+                ns_qualified
+                    .as_deref()
+                    .and_then(|fqn| resolve_pull(fqn).map(|ty| (fqn.to_string(), ty)))
+            })
             .or_else(|| resolve_pull(name_str).map(|ty| (name_str.to_string(), ty)));
 
         if let Some((fqn, ty)) = resolved {
