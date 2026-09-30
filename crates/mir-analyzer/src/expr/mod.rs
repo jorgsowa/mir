@@ -700,7 +700,15 @@ impl<'a> ExpressionAnalyzer<'a> {
             // --- Exit -------------------------------------------------------
             ExprKind::Exit(opt) => {
                 if let Some(e) = opt {
-                    self.analyze(e, ctx);
+                    let ty = self.analyze(e, ctx);
+                    // A string operand is printed; an int operand is the exit status.
+                    let is_status = ty
+                        .types
+                        .iter()
+                        .all(|a| matches!(a, Atomic::TInt | Atomic::TLiteralInt(_)));
+                    if !is_status && crate::taint::is_expr_tainted(e, ctx, self.db, &self.file) {
+                        self.emit(IssueKind::TaintedHtml, Severity::Error, expr.span);
+                    }
                 }
                 ctx.diverges = true;
                 Type::single(Atomic::TNever)

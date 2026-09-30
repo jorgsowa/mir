@@ -88,11 +88,13 @@ pub fn sink_positional_index_override(fn_name_lower: &str) -> Option<usize> {
 pub fn classify_sink(fn_name: &str) -> Option<SinkKind> {
     match crate::util::php_ident_lowercase(fn_name).as_str() {
         // HTML output
-        "echo" | "print" | "printf" | "vprintf" | "fprintf" | "setcookie" => Some(SinkKind::Html),
+        "echo" | "print" | "printf" | "vprintf" | "fprintf" => Some(SinkKind::Html),
 
         // SQL
-        "mysql_query" | "mysqli_query" | "pg_query" | "pg_exec" | "sqlite_query"
-        | "mssql_query" => Some(SinkKind::Sql),
+        "mysql_query" | "mysqli_query" | "mysqli_real_query" | "mysqli_multi_query"
+        | "pg_query" | "pg_send_query" | "pg_exec" | "sqlite_query" | "mssql_query" => {
+            Some(SinkKind::Sql)
+        }
 
         // Shell
         "system" | "exec" | "shell_exec" | "passthru" | "popen" | "proc_open" | "pcntl_exec" => {
