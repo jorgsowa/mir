@@ -914,7 +914,6 @@ impl IssueKind {
             | IssueKind::ImpossibleLooseComparison { .. }
             | IssueKind::DuplicateArrayKey { .. }
             | IssueKind::ForbiddenCode { .. }
-            | IssueKind::PropertyPossiblyUninitialized { .. }
             | IssueKind::UndefinedThrowsDocblock { .. }
             | IssueKind::InvalidDocblockType { .. } => Severity::Warning,
 
@@ -976,6 +975,7 @@ impl IssueKind {
             | IssueKind::NoInterfaceProperties { .. }
             | IssueKind::UndefinedDocblockClass { .. }
             | IssueKind::MissingConstructor { .. }
+            | IssueKind::PropertyPossiblyUninitialized { .. }
             | IssueKind::MixedFunctionCall
             | IssueKind::MixedReturnStatement { .. }
             | IssueKind::MixedPropertyFetch { .. }
@@ -1262,9 +1262,7 @@ impl IssueKind {
             | "MIR0300" | "MIR0301" | "MIR0302" | "MIR0303" | "MIR0404" | "MIR0405" | "MIR0408"
             | "MIR0500" | "MIR0506" | "MIR0703" | "MIR0710" | "MIR1301" | "MIR1501" | "MIR1502"
             | "MIR1700" | "MIR1701" | "MIR1702" | "MIR1703" | "MIR1704" | "MIR1705" | "MIR1706"
-            | "MIR1707" | "MIR1708" | "MIR1506" | "MIR1510" | "MIR1106" | "MIR1107" => {
-                Some(Severity::Warning)
-            }
+            | "MIR1707" | "MIR1708" | "MIR1506" | "MIR1106" | "MIR1107" => Some(Severity::Warning),
 
             // Info
             "MIR0104" | "MIR0105" | "MIR0106" | "MIR0107" | "MIR0108" | "MIR0207" | "MIR0209"
@@ -1276,7 +1274,7 @@ impl IssueKind {
             | "MIR1200" | "MIR1201" | "MIR1202" | "MIR1203" | "MIR1204" | "MIR1206" | "MIR1208"
             | "MIR1209" | "MIR1210" | "MIR1211" | "MIR1212" | "MIR1504" | "MIR1505" | "MIR1507"
             | "MIR1508" | "MIR1600" | "MIR1601" | "MIR0225" | "MIR0226" | "MIR0227" | "MIR0406"
-            | "MIR0407" | "MIR0902" => Some(Severity::Info),
+            | "MIR0407" | "MIR0902" | "MIR1510" => Some(Severity::Info),
 
             _ => None,
         }
