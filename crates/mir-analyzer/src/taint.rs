@@ -69,9 +69,33 @@ impl SinkKind {
 /// per-parameter name resolution.
 pub fn sink_param_name(fn_name_lower: &str) -> Option<&'static str> {
     match fn_name_lower {
-        "fopen" | "file_get_contents" | "file_put_contents" | "readfile" | "file" | "unlink" => {
-            Some("filename")
-        }
+        "fopen"
+        | "file_get_contents"
+        | "file_put_contents"
+        | "readfile"
+        | "file"
+        | "unlink"
+        | "touch"
+        | "chmod"
+        | "chown"
+        | "parse_ini_file"
+        | "simplexml_load_file"
+        | "highlight_file"
+        | "show_source"
+        | "php_strip_whitespace"
+        | "getimagesize"
+        | "gzopen"
+        | "gzfile"
+        | "readgzfile" => Some("filename"),
+        "mkdir" | "rmdir" | "scandir" | "opendir" | "chdir" => Some("directory"),
+        "copy" | "rename" => Some("from"),
+        "symlink" | "link" => Some("target"),
+        "readlink" => Some("path"),
+        "glob" => Some("pattern"),
+        "fsockopen" => Some("hostname"),
+        "get_headers" | "curl_init" => Some("url"),
+        "stream_socket_client" => Some("address"),
+        "dl" => Some("extension_filename"),
         "move_uploaded_file" => Some("to"),
         "unserialize" => Some("data"),
         _ => None,
@@ -94,27 +118,78 @@ pub fn sink_positional_index_override(fn_name_lower: &str) -> Option<usize> {
 pub fn classify_sink(fn_name: &str) -> Option<SinkKind> {
     match crate::util::php_ident_lowercase(fn_name).as_str() {
         // HTML output
-        "echo" | "print" | "printf" | "vprintf" | "fprintf" => Some(SinkKind::Html),
+        "echo" | "print" | "printf" | "vprintf" | "fprintf" | "vfprintf" => Some(SinkKind::Html),
 
         // HTTP response header / cookie
         "header" => Some(SinkKind::Header),
         "setcookie" | "setrawcookie" => Some(SinkKind::Cookie),
 
         // SQL
-        "mysql_query" | "mysqli_query" | "mysqli_real_query" | "mysqli_multi_query"
-        | "pg_query" | "pg_send_query" | "pg_exec" | "sqlite_query" | "mssql_query" => {
-            Some(SinkKind::Sql)
-        }
+        "mysql_query"
+        | "mysqli_query"
+        | "mysqli_real_query"
+        | "mysqli_multi_query"
+        | "mysql_unbuffered_query"
+        | "mysql_db_query"
+        | "mysqli_prepare"
+        | "mysqli_stmt_prepare"
+        | "pg_query"
+        | "pg_send_query"
+        | "pg_prepare"
+        | "pg_exec"
+        | "sqlite_query"
+        | "sqlite_exec"
+        | "sqlite_array_query"
+        | "sqlite_single_query"
+        | "sqlite_unbuffered_query"
+        | "mssql_query"
+        | "odbc_exec"
+        | "odbc_prepare"
+        | "oci_parse"
+        | "db2_exec"
+        | "db2_prepare" => Some(SinkKind::Sql),
 
         // Shell
-        "system" | "exec" | "shell_exec" | "passthru" | "popen" | "proc_open" | "pcntl_exec" => {
-            Some(SinkKind::Shell)
-        }
+        "system" | "exec" | "shell_exec" | "passthru" | "popen" | "proc_open" | "pcntl_exec"
+        | "ssh2_exec" | "expect_popen" => Some(SinkKind::Shell),
 
         // Filesystem path (path traversal / local-file-inclusion / SSRF). Each
         // of these takes the path/URL as its first argument, except
         // `move_uploaded_file` (see `sink_positional_index_override`).
-        "fopen" | "file_get_contents" | "file_put_contents" | "readfile" | "file" | "unlink"
+        "fopen"
+        | "file_get_contents"
+        | "file_put_contents"
+        | "readfile"
+        | "file"
+        | "unlink"
+        | "touch"
+        | "chmod"
+        | "chown"
+        | "parse_ini_file"
+        | "simplexml_load_file"
+        | "highlight_file"
+        | "show_source"
+        | "php_strip_whitespace"
+        | "getimagesize"
+        | "gzopen"
+        | "gzfile"
+        | "readgzfile"
+        | "mkdir"
+        | "rmdir"
+        | "scandir"
+        | "opendir"
+        | "chdir"
+        | "copy"
+        | "rename"
+        | "symlink"
+        | "link"
+        | "readlink"
+        | "glob"
+        | "fsockopen"
+        | "get_headers"
+        | "curl_init"
+        | "stream_socket_client"
+        | "dl"
         | "move_uploaded_file" => Some(SinkKind::File),
 
         // Object injection.
