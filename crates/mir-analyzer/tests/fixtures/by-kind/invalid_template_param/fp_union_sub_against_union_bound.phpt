@@ -11,9 +11,9 @@ class MyCountable implements Countable {}
  * @param T $value
  */
 function process($value): void {}
+//               ^^^^^^ UnusedParam: Parameter $value is never used
 
 $cond = true;
 $x = $cond ? 'hello' : new MyCountable();
 process($x); // T = string|MyCountable, should pass - each arm satisfies one arm of bound
 ===expect===
-UnusedParam@10:17-10:23: Parameter $value is never used

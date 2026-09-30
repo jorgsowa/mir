@@ -16,6 +16,6 @@ class Bag {
 function mutate(Bag $b): void {
     $ref = &$b->x;
     $ref = 5;
+//  ^^^^^^^^ ImpurePropertyAssignment: Assigning to property x of a parameter in a pure or external-mutation-free context
 }
 ===expect===
-ImpurePropertyAssignment@9:4-9:12: Assigning to property x of a parameter in a pure or external-mutation-free context

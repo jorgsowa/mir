@@ -11,6 +11,6 @@ class Parser {
 function readInput(): string|false { return 'data'; }
 function test(Parser $parser): void {
     $parser->parse(readInput());
+//                 ^^^^^^^^^^^ PossiblyInvalidArgument: Argument $input of parse() expects 'string', possibly different type 'string|false' provided
 }
 ===expect===
-PossiblyInvalidArgument@8:19-8:30: Argument $input of parse() expects 'string', possibly different type 'string|false' provided

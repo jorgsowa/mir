@@ -22,6 +22,6 @@ class TypedMap implements ArrayAccess {
 function reads(TypedMap $m): void {
     $a = $m['x'];
     $b = $m[42];
+//          ^^ InvalidArgument: Argument $offset of offsetGet() expects 'string', got '42'
 }
 ===expect===
-InvalidArgument@17:12-17:14: Argument $offset of offsetGet() expects 'string', got '42'

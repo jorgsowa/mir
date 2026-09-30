@@ -24,6 +24,7 @@ function test_open_shape_survives_merge(bool $cond, array $openArr, array $listA
         $arr = $listArr;
     }
     $s->x = $arr;
+//  ^^^^^^^^^^^^ InvalidPropertyAssignment: Property $x expects 'list<int>', cannot assign 'array{}|list<int>'
 }
 
 /**
@@ -39,4 +40,3 @@ function test_closed_empty_shape_still_subsumed(bool $cond, array $emptyArr, arr
     $s->x = $arr;
 }
 ===expect===
-InvalidPropertyAssignment@18:4-18:16: Property $x expects 'list<int>', cannot assign 'array{}|list<int>'

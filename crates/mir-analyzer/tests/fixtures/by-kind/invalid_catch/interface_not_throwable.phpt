@@ -7,5 +7,5 @@ interface Loggable {}
 try {
     echo "ok";
 } catch (Loggable $e) {}
+//       ^^^^^^^^ InvalidCatch: Caught type 'Loggable' does not extend Throwable
 ===expect===
-InvalidCatch@6:9-6:17: Caught type 'Loggable' does not extend Throwable

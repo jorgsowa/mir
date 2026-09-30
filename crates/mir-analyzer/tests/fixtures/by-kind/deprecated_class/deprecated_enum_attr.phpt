@@ -9,5 +9,5 @@ suppress=UnusedParam
 enum OldStatus { case A; case B; }
 
 function foo(OldStatus $s): void {}
+//           ^^^^^^^^^ DeprecatedClass: Class OldStatus is deprecated
 ===expect===
-DeprecatedClass@5:13-5:22: Class OldStatus is deprecated

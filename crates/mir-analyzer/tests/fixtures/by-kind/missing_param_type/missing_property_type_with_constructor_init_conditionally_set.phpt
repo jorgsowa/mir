@@ -4,6 +4,7 @@ Missing property type with constructor init conditionally set
 <?php
 class A {
     public $foo;
+//  ^^^^^^^^^^^ MissingPropertyType: Property A::$foo has no type annotation
 
     public function __construct() {
         if (rand(0, 1)) {
@@ -12,4 +13,3 @@ class A {
     }
 }
 ===expect===
-MissingPropertyType@3:4-3:15: Property A::$foo has no type annotation

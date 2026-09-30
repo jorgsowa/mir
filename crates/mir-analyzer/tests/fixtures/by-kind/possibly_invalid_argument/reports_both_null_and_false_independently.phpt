@@ -9,7 +9,7 @@ function takesInt(int $n): void { var_dump($n); }
 function getResult(): int|null|false { return 1; }
 function test(): void {
     takesInt(getResult());
+//           ^^^^^^^^^^^ PossiblyInvalidArgument: Argument $n of takesInt() expects 'int', possibly different type 'int|null|false' provided
+//           ^^^^^^^^^^^ PossiblyNullArgument: Argument $n of takesInt() might be null
 }
 ===expect===
-PossiblyInvalidArgument@6:13-6:24: Argument $n of takesInt() expects 'int', possibly different type 'int|null|false' provided
-PossiblyNullArgument@6:13-6:24: Argument $n of takesInt() might be null

@@ -14,6 +14,7 @@ function dangerous(): string {
 
 function callDangerous(): void {
     $s = null;
+//  ^^ UnusedVariable: Variable $s is never read
 
     try {
         $s = dangerous();
@@ -22,4 +23,3 @@ function callDangerous(): void {
     }
 }
 ===expect===
-UnusedVariable@11:4-11:6: Variable $s is never read

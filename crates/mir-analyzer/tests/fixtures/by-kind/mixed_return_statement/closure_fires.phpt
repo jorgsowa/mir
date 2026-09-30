@@ -6,6 +6,6 @@ suppress=UnusedVariable
 <?php
 $fn = function (): string {
     return json_decode('{}');
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'string'
 };
 ===expect===
-MixedReturnStatement@3:4-3:29: Cannot return a mixed type from function with declared return type 'string'

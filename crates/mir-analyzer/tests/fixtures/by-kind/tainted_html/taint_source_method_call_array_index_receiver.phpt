@@ -21,7 +21,7 @@ class Handler {
 
     public function handle(): void {
         echo $this->repos['main']->getParam('x');
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 ===expect===
-TaintedHtml@14:8-14:49: Tainted HTML output — possible XSS

@@ -5,5 +5,5 @@ ImplicitToStringCast in print statement
 class Foo {}
 $f = new Foo();
 print $f;
+//    ^^ ImplicitToStringCast: Class Foo is implicitly cast to string
 ===expect===
-ImplicitToStringCast@4:6-4:8: Class Foo is implicitly cast to string

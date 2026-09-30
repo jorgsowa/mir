@@ -36,6 +36,6 @@ function test(): void {
     // Dog-only collection, even through the covariant interface.
     $animals = new TypedList(new Animal());
     needsDogs($animals);
+//            ^^^^^^^^ InvalidArgument: Argument $c of needsDogs() expects 'Collection<Dog>', got 'TypedList<Animal>'
 }
 ===expect===
-InvalidArgument@30:14-30:22: Argument $c of needsDogs() expects 'Collection<Dog>', got 'TypedList<Animal>'

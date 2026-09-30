@@ -7,5 +7,5 @@ suppress=UnusedVariable
 function myFunc(int $x): int { return $x; }
 
 $fn = MYFUNC(...);
+//    ^^^^^^ WrongCaseFunction: Function name 'MYFUNC' has incorrect casing; use 'myFunc'
 ===expect===
-WrongCaseFunction@4:6-4:12: Function name 'MYFUNC' has incorrect casing; use 'myFunc'

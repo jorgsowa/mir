@@ -6,5 +6,5 @@ suppress=UnusedParam
 <?php
 class Request {}
 function handle(request $r): void {}
+//              ^^^^^^^ WrongCaseClass: Class name 'request' has incorrect casing; use 'Request'
 ===expect===
-WrongCaseClass@3:16-3:23: Class name 'request' has incorrect casing; use 'Request'

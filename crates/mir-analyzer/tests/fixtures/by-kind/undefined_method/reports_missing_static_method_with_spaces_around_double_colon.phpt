@@ -5,6 +5,6 @@ reports missing static method with spaces around double colon
 class Math {}
 function test(): void {
     Math :: missing();
+//  ^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Math::missing() does not exist
 }
 ===expect===
-UndefinedMethod@4:4-4:21: Method Math::missing() does not exist

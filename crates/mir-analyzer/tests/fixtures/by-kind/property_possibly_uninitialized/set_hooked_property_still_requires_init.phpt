@@ -11,7 +11,7 @@ final class Box {
     }
 
     public function __construct() {
+//                  ^^^^^^^^^^^ PropertyPossiblyUninitialized: Property Box::$value may be left uninitialized by the constructor
     }
 }
 ===expect===
-PropertyPossiblyUninitialized@8:20-8:31: Property Box::$value may be left uninitialized by the constructor

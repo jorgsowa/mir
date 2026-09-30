@@ -12,7 +12,7 @@ class Box {
 
     public function bad(int $n): void {
         $this->label = $n;
+//      ^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $label expects 'string', cannot assign 'int'
     }
 }
 ===expect===
-InvalidPropertyAssignment@10:8-10:25: Property $label expects 'string', cannot assign 'int'

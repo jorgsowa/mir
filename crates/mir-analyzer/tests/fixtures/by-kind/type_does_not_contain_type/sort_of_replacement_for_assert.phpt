@@ -13,13 +13,13 @@ namespace Bar;
 function myAssert($_b) : void {
     if ($_b !== true) {
         throw new Exception("bad");
+//                ^^^^^^^^^ UndefinedClass: Class Bar\Exception does not exist
     }
 }
 
 function bar(?string $s) : string {
     myAssert($s);
     return $s;
+//  ^^^^^^^^^^ InvalidReturnType: Return type 'true' is not compatible with declared 'string'
 }
 ===expect===
-UndefinedClass@10:18-10:27: Class Bar\Exception does not exist
-InvalidReturnType@16:4-16:14: Return type 'true' is not compatible with declared 'string'

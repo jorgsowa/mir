@@ -23,9 +23,9 @@ $barRef = &$foo->bar;
 if (assertBarNotNull($foo)) {
     $barRef = null;
     requiresString($foo->bar);
+//                 ^^^^^^^^^ PossiblyNullArgument: Argument $_str of requiresString() might be null
 }
 
 function requiresString(string $_str): void {}
 
 ===expect===
-PossiblyNullArgument@20:19-20:28: Argument $_str of requiresString() might be null

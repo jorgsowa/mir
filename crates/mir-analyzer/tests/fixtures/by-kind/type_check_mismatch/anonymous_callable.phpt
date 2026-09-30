@@ -5,5 +5,5 @@ suppress=UnusedVariable
 ===file===
 <?php
 $fn = fn(int $x): int => (/** @mir-check $x is string */ $x * 2);
+//                                                       ^^^^^^ TypeCheckMismatch: Type of $x is expected to be string, got int
 ===expect===
-TypeCheckMismatch@2:57-2:63: Type of $x is expected to be string, got int

@@ -22,6 +22,6 @@ $obj = new SomeClass();
 
 if ($obj->getInt() !== null) {
     printInt($obj->getInt());
+//           ^^^^^^^^^^^^^^ PossiblyNullArgument: Argument $int of printInt() might be null
 }
 ===expect===
-PossiblyNullArgument@21:13-21:27: Argument $int of printInt() might be null

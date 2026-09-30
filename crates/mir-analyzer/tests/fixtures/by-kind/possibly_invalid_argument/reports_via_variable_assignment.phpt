@@ -9,6 +9,6 @@ function test(string $s): void {
     $pos = strpos($s, 'x');
     /** @mir-check $pos is int|false */
     takesInt($pos);
+//           ^^^^ PossiblyInvalidArgument: Argument $n of takesInt() expects 'int', possibly different type 'int<0, max>|false' provided
 }
 ===expect===
-PossiblyInvalidArgument@6:13-6:17: Argument $n of takesInt() expects 'int', possibly different type 'int<0, max>|false' provided

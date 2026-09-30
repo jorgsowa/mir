@@ -7,6 +7,6 @@ suppress=UnusedVariable
 <?php
 $x = true;
 $y = (bool)$x;
+//         ^^ RedundantCast: Casting 'true' to 'bool' is redundant
 
 ===expect===
-RedundantCast@3:11-3:13: Casting 'true' to 'bool' is redundant

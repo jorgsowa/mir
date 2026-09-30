@@ -11,9 +11,9 @@ suppress=UnusedVariable,UnusedParam,MissingParamType,DocblockTypeContradiction
  */
 function test_ne_impossible($n): void {
     if ($n !== 5) {
+//      ^^^^^^^^ ImpossibleIdenticalComparison: '!==' between '1|2|3' and '5' is always true — these types can never be identical
+//      ^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         $_ = $n; // always here
     }
 }
 ===expect===
-ImpossibleIdenticalComparison@6:8-6:16: '!==' between '1|2|3' and '5' is always true — these types can never be identical
-RedundantCondition@6:8-6:16: Condition is always true/false for type 'bool'

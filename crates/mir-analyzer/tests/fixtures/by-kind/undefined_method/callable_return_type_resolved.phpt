@@ -18,6 +18,6 @@ function test(): void {
     $resolver = $reg->resolver();
     /** @mir-check $resolver is callable():Service */
     $resolver()->undefinedMethod();
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Service::undefinedMethod() does not exist
 }
 ===expect===
-UndefinedMethod@15:4-15:34: Method Service::undefinedMethod() does not exist

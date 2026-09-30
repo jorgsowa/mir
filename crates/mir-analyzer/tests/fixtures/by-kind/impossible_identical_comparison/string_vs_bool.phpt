@@ -6,8 +6,8 @@ suppress=UnusedVariable,UnusedParam
 <?php
 function test(string $s): void {
     if ($s === false) {}
+//      ^^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between 'string' and 'false' is always false — these types can never be identical
     if ($s === true) {}
+//      ^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between 'string' and 'true' is always false — these types can never be identical
 }
 ===expect===
-ImpossibleIdenticalComparison@3:8-3:20: '===' between 'string' and 'false' is always false — these types can never be identical
-ImpossibleIdenticalComparison@4:8-4:19: '===' between 'string' and 'true' is always false — these types can never be identical

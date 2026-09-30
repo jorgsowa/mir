@@ -14,7 +14,7 @@ class Point {
     public function __construct(int $x) {
         $this->x = $x;
         $this->x = $x + 1;
+//      ^^^^^^^^^^^^^^^^^ ReadonlyPropertyAlreadyInitialized: Cannot modify readonly property Point::$x — already initialized
     }
 }
 ===expect===
-ReadonlyPropertyAlreadyInitialized@8:8-8:25: Cannot modify readonly property Point::$x — already initialized

@@ -12,8 +12,8 @@ class Model {
 
 class FooModel extends Model {
     public static function create(object $x): void {
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method FooModel::create() signature mismatch: parameter $x type 'object' is incompatible with parent type 'array'
         $x;
     }
 }
 ===expect===
-MethodSignatureMismatch@11:4-11:52: Method FooModel::create() signature mismatch: parameter $x type 'object' is incompatible with parent type 'array'

@@ -15,9 +15,9 @@ class Bag {
 /** @pure */
 function bumpAll(): void {
     foreach (Bag::$queue as &$v) {
+//           ^^^^^^^^^^^ ImpureStaticPropertyAssignment: Assigning to static property Bag::$queue in a @pure function
+//                ^^^^^^ ImpureStaticPropertyAccess: Reading static property Bag::$queue in a @pure function
         $v++;
     }
 }
 ===expect===
-ImpureStaticPropertyAssignment@8:13-8:24: Assigning to static property Bag::$queue in a @pure function
-ImpureStaticPropertyAccess@8:18-8:24: Reading static property Bag::$queue in a @pure function

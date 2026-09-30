@@ -9,7 +9,7 @@ class Container {
     private int $value = 42;
 }
 $getter = fn (): int => $this->value;
+//                      ^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'int'
 $bound = $getter->bindTo(new Container(), Container::class);
 echo $bound();
 ===expect===
-MixedReturnStatement@5:24-5:36: Cannot return a mixed type from function with declared return type 'int'

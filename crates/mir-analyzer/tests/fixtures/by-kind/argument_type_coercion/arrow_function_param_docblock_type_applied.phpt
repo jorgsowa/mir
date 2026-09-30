@@ -11,5 +11,5 @@ class B extends A {}
 function takesB(B $_b) : void {}
 
 $cb = /** @param A $x */ fn($x) => takesB($x);
+//                                        ^^ ArgumentTypeCoercion: Argument $_b of takesB() expects 'B', got 'A' — coercion may fail at runtime
 ===expect===
-ArgumentTypeCoercion@7:42-7:44: Argument $_b of takesB() expects 'B', got 'A' — coercion may fail at runtime

@@ -8,7 +8,7 @@ use const ast\AST_CLASS as KIND;
 
 function f(): int {
     return KIND + AST_CLASS;
+//  ^^^^^^^^^^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'int'
+//                ^^^^^^^^^ UndefinedConstant: Constant AST_CLASS is not defined
 }
 ===expect===
-MixedReturnStatement@7:4-7:28: Cannot return a mixed type from function with declared return type 'int'
-UndefinedConstant@7:18-7:27: Constant AST_CLASS is not defined

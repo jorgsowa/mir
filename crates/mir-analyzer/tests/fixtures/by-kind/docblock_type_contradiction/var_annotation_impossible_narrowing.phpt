@@ -11,6 +11,6 @@ function f(): void {
     $x = 1;
     /** @var string $x */
     echo strlen($x);
+//  ^^^^^^^^^^^^^^^^ DocblockTypeContradiction: Type '1' makes '@var string $x' impossible — this can never hold
 }
 ===expect===
-DocblockTypeContradiction@5:4-5:20: Type '1' makes '@var string $x' impossible — this can never hold

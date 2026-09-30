@@ -7,6 +7,6 @@ suppress=UnusedVariable
 <?php
 $x = new class {
     use UndefinedTrait;
+//      ^^^^^^^^^^^^^^ UndefinedTrait: Trait UndefinedTrait does not exist
 };
 ===expect===
-UndefinedTrait@3:8-3:22: Trait UndefinedTrait does not exist

@@ -6,5 +6,5 @@ class A {
 }
 
 echo (new A)->foo;
+//            ^^^ UndefinedProperty: Property A::$foo does not exist
 ===expect===
-UndefinedProperty@5:14-5:17: Property A::$foo does not exist

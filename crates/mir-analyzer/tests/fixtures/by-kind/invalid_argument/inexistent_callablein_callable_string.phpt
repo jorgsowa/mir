@@ -10,5 +10,5 @@ function c(string $c): void {
 }
 
 c("hii");
+//^^^^^ UndefinedFunction: Function hii() is not defined
 ===expect===
-UndefinedFunction@9:2-9:7: Function hii() is not defined

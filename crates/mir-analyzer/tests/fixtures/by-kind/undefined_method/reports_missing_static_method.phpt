@@ -5,6 +5,6 @@ reports missing static method
 class Foo {}
 function test(): void {
     Foo::missing();
+//  ^^^^^^^^^^^^^^ UndefinedMethod: Method Foo::missing() does not exist
 }
 ===expect===
-UndefinedMethod@4:4-4:18: Method Foo::missing() does not exist

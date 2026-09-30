@@ -20,6 +20,7 @@ class Counter {
 function bumpViaMethod(Counter $c): void {
     $fn = function () use (&$c) {
         $c->increment();
+//      ^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method increment() in a pure or immutable context
     };
     $fn();
 }
@@ -28,9 +29,8 @@ function bumpViaMethod(Counter $c): void {
 function bumpViaProperty(Counter $c): void {
     $fn = function () use (&$c) {
         $c->n = 5;
+//      ^^^^^^^^^ ImpurePropertyAssignment: Assigning to property n of a parameter in a pure or external-mutation-free context
     };
     $fn();
 }
 ===expect===
-ImpureMethodCall@12:8-12:23: Calling impure method increment() in a pure or immutable context
-ImpurePropertyAssignment@20:8-20:17: Assigning to property n of a parameter in a pure or external-mutation-free context

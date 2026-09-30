@@ -11,6 +11,6 @@ class NewApi {
 
 function check(): void {
     NewApi::run(1);
+//  ^^^^^^^^^^^^^^ TooFewArguments: Too few arguments for run(): expected 2, got 1
 }
 ===expect===
-TooFewArguments@7:4-7:18: Too few arguments for run(): expected 2, got 1

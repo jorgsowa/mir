@@ -7,8 +7,8 @@ suppress=InvalidReturnType
 interface Countable2 {}
 /** @return Countable2&NonExistentMember */
 function missing(): mixed {
+//       ^^^^^^^ UndefinedDocblockClass: Docblock type 'NonExistentMember' does not exist
     return null;
 }
 
 ===expect===
-UndefinedDocblockClass@4:9-4:16: Docblock type 'NonExistentMember' does not exist

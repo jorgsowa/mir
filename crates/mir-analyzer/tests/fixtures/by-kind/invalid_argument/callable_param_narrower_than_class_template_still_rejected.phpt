@@ -30,6 +30,6 @@ class Dog extends Animal {}
 /** @param Box<Animal> $b */
 function test(Box $b): void {
     $r = $b->apply(fn(Dog $d): string => "x");
+//                 ^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $fn of apply() expects 'callable whose parameter #1 accepts Animal', got 'callable whose parameter #1 only accepts Dog'
 }
 ===expect===
-InvalidArgument@22:19-22:44: Argument $fn of apply() expects 'callable whose parameter #1 accepts Animal', got 'callable whose parameter #1 only accepts Dog'

@@ -18,6 +18,7 @@ class Holder
     {
         foreach (array_keys(self::$items) as $key) {
             takesString($key);
+//                      ^^^^ PossiblyInvalidArgument: Argument $s of takesString() expects 'string', possibly different type 'int|string' provided
         }
     }
 }
@@ -27,4 +28,3 @@ function takesString(string $s): void
     var_dump($s);
 }
 ===expect===
-PossiblyInvalidArgument@15:24-15:28: Argument $s of takesString() expects 'string', possibly different type 'int|string' provided

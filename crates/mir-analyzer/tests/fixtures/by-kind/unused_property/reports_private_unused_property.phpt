@@ -4,6 +4,6 @@ reports private unused property
 <?php
 class Foo {
     private string $name = 'bar';
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedProperty: Private property Foo::$name is never read
 }
 ===expect===
-UnusedProperty@3:4-3:32: Private property Foo::$name is never read

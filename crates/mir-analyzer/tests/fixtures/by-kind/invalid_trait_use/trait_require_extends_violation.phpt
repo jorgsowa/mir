@@ -17,6 +17,6 @@ class Post extends Model {
 
 class NotAModel {
     use HasTimestamps;
+//      ^^^^^^^^^^^^^ InvalidTraitUse: Trait HasTimestamps used incorrectly: Class NotAModel uses trait HasTimestamps but does not extend Model
 }
 ===expect===
-InvalidTraitUse@16:8-16:21: Trait HasTimestamps used incorrectly: Class NotAModel uses trait HasTimestamps but does not extend Model

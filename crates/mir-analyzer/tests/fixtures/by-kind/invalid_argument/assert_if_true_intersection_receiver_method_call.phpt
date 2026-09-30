@@ -24,7 +24,7 @@ class Validator implements Bar {
 function doWork(Validator&Bar $obj, $p): void {
     if ($obj->isInt($p)) {
         strlen($p);
+//             ^^ ArgumentTypeCoercion: Argument $string of strlen() expects 'string', got 'int' — coercion may fail at runtime
     }
 }
 ===expect===
-ArgumentTypeCoercion@17:15-17:17: Argument $string of strlen() expects 'string', got 'int' — coercion may fail at runtime

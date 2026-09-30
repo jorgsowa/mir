@@ -9,5 +9,5 @@ suppress=UnusedParam
 function f($email): void {}
 
 f('other@example.com');
+//^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $email of f() expects '"admin@example.com"|"guest@example.com"', got '"other@example.com"'
 ===expect===
-InvalidArgument@5:2-5:21: Argument $email of f() expects '"admin@example.com"|"guest@example.com"', got '"other@example.com"'

@@ -6,7 +6,7 @@ was unconditionally `mixed` regardless of the initializer's real type.
 <?php
 function foo(): void {
     static $x = totallyUndefinedFunctionXyz();
+//              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function totallyUndefinedFunctionXyz() is not defined
     echo $x;
 }
 ===expect===
-UndefinedFunction@3:16-3:45: Function totallyUndefinedFunctionXyz() is not defined

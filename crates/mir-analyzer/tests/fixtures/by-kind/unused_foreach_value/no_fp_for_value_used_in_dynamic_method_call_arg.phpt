@@ -5,8 +5,10 @@ foreach value used only as an argument to a dynamic method call is not reported 
 class Mailer {
     /** @param array<string> $addresses */
     public function to(array $addresses): void {}
+//                     ^^^^^^^^^^^^^^^^ UnusedParam: Parameter $addresses is never used
     /** @param array<string> $addresses */
     public function cc(array $addresses): void {}
+//                     ^^^^^^^^^^^^^^^^ UnusedParam: Parameter $addresses is never used
 }
 
 function sendMail(Mailer $mailer): void {
@@ -19,5 +21,3 @@ function sendMail(Mailer $mailer): void {
     }
 }
 ===expect===
-UnusedParam@4:23-4:39: Parameter $addresses is never used
-UnusedParam@6:23-6:39: Parameter $addresses is never used

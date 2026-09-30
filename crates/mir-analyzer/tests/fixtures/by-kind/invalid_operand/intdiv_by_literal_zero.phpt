@@ -9,10 +9,10 @@ suppress=UnusedParam,MissingThrowsDocblock
 <?php
 function intdiv_by_zero(int $x): int {
     return intdiv($x, 0);
+//                    ^ DivisionByZero: Division by zero: right operand of 'intdiv' is always 0
 }
 
 function intdiv_by_nonzero(int $x): int {
     return intdiv($x, 5);
 }
 ===expect===
-DivisionByZero@3:22-3:23: Division by zero: right operand of 'intdiv' is always 0

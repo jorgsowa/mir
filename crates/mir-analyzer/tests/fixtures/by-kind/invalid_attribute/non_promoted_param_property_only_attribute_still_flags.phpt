@@ -10,5 +10,5 @@ suppress=UnusedParam
 class OnlyProperty {}
 
 function foo(#[OnlyProperty] int $id): void {}
+//             ^^^^^^^^^^^^ InvalidAttribute: Attribute OnlyProperty cannot be used on this target
 ===expect===
-InvalidAttribute@5:15-5:27: Attribute OnlyProperty cannot be used on this target

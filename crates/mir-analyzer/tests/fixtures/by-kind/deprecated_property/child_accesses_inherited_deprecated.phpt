@@ -13,5 +13,5 @@ class DbConnection extends Connection {}
 
 $db = new DbConnection();
 echo $db->timeout;
+//        ^^^^^^^ DeprecatedProperty: Property DbConnection::$timeout is deprecated: Use $timeout_ms instead.
 ===expect===
-DeprecatedProperty@12:10-12:17: Property DbConnection::$timeout is deprecated: Use $timeout_ms instead.

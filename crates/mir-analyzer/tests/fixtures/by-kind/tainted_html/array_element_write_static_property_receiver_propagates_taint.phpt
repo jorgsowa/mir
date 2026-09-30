@@ -10,7 +10,7 @@ class Cache {
     public static function remember(): void {
         self::$items['id'] = $_GET['id'];
         echo self::$items['id'];
+//      ^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 ===expect===
-TaintedHtml@6:8-6:32: Tainted HTML output — possible XSS

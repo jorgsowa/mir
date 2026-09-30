@@ -15,6 +15,7 @@ class Box extends Base {}
  * @return T
  */
 function extract(mixed $item): mixed { return null; }
+//               ^^^^^^^^^^^ UnusedParam: Parameter $item is never used
 
 /** @var Box<string> $b */
 $b = new Box();
@@ -24,4 +25,3 @@ $val = extract($b);
 /** @mir-check $val is string */
 echo $val;
 ===expect===
-UnusedParam@14:17-14:28: Parameter $item is never used

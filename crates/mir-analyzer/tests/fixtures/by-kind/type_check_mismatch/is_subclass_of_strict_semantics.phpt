@@ -30,6 +30,7 @@ function test_false_branch_stays_alive(Animal $obj): void {
     // After the fix: false branch does no narrowing → branch alive → InvalidArgument fires.
     if (!is_subclass_of($obj, 'Animal')) {
         needs_int($obj);
+//                ^^^^ InvalidArgument: Argument $i of needs_int() expects 'int', got 'Animal'
     }
 }
 
@@ -46,4 +47,3 @@ function test_true_branch_drops_exact_and_non_object(mixed $obj): void {
     }
 }
 ===expect===
-InvalidArgument@25:18-25:22: Argument $i of needs_int() expects 'int', got 'Animal'

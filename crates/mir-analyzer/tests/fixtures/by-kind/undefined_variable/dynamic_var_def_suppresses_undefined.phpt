@@ -16,8 +16,8 @@ function in_branch(bool $c, string $key): void {
 
 function reported_before_def(): void {
     echo $early;        // still an error: nothing dynamic has happened yet
+//       ^^^^^^ UndefinedVariable: Variable $early is not defined
     ${"x"} = 1;
 }
 
 ===expect===
-UndefinedVariable@15:9-15:15: Variable $early is not defined

@@ -9,5 +9,5 @@ suppress=MissingParamType,UnusedParam
 /** @param array<int,int> $x */
 function needsIntArray(array $x): void {}
 needsIntArray(['a' => 'b']);
+//            ^^^^^^^^^^^^ InvalidArgument: Argument $x of needsIntArray() expects 'array<int, int>', got 'array{'a': "b"}'
 ===expect===
-InvalidArgument@4:14-4:26: Argument $x of needsIntArray() expects 'array<int, int>', got 'array{'a': "b"}'

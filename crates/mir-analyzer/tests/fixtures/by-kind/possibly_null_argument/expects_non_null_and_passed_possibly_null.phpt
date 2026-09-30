@@ -6,11 +6,11 @@ Expects non null and passed possibly null
  * @param mixed|null $mixed_or_null
  */
 function foo($mixed, $mixed_or_null): void {
+//           ^^^^^^ MissingParamType: Parameter $mixed of foo() has no type annotation
+//           ^^^^^^ UnusedParam: Parameter $mixed is never used
     /**
      * @suppress MixedArgument
      */
     new Exception($mixed_or_null);
 }
 ===expect===
-MissingParamType@5:13-5:19: Parameter $mixed of foo() has no type annotation
-UnusedParam@5:13-5:19: Parameter $mixed is never used

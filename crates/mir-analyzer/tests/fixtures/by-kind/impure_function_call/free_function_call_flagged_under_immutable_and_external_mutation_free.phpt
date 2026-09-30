@@ -22,6 +22,7 @@ class Holder {
 
     public function corruptThis(): void {
         mutate($this->box);
+//      ^^^^^^^^^^^^^^^^^^ ImpureFunctionCall: Calling impure function mutate() in a @pure function
     }
 }
 
@@ -29,6 +30,7 @@ class Wrapper {
     /** @psalm-external-mutation-free */
     public function corruptParam(Box $box): void {
         mutate($box);
+//      ^^^^^^^^^^^^ ImpureFunctionCall: Calling impure function mutate() in a @pure function
     }
 
     /** @psalm-external-mutation-free */
@@ -37,5 +39,3 @@ class Wrapper {
     }
 }
 ===expect===
-ImpureFunctionCall@15:8-15:26: Calling impure function mutate() in a @pure function
-ImpureFunctionCall@22:8-22:20: Calling impure function mutate() in a @pure function

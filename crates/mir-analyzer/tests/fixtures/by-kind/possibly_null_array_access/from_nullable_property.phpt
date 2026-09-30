@@ -8,7 +8,7 @@ class Container {
 
     public function first(): void {
         echo $this->items[0];
+//           ^^^^^^^^^^^^^^^ PossiblyNullArrayAccess: Cannot access array on possibly null value
     }
 }
 ===expect===
-PossiblyNullArrayAccess@7:13-7:28: Cannot access array on possibly null value

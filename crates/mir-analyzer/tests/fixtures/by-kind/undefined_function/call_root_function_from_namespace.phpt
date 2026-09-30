@@ -10,6 +10,6 @@ namespace {
 }
 namespace A {
     Aoo();
+//    ^^ ParseError: Parse error: expected ';' after expression
 }
 ===expect===
-ParseError@9:6-9:8: Parse error: expected ';' after expression

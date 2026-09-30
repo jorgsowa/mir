@@ -7,6 +7,6 @@ blanket relaxation of array nullability.
 <?php
 function f(?array $data): array {
     return $data;
+//  ^^^^^^^^^^^^^ NullableReturnStatement: Return type 'array|null' is not compatible with declared 'array'
 }
 ===expect===
-NullableReturnStatement@3:4-3:17: Return type 'array|null' is not compatible with declared 'array'

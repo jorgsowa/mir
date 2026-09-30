@@ -21,7 +21,7 @@ final class Other
  * @param Other $g
  */
 function useIt(Generator $g): void
+//                       ^^ MismatchingDocblockParamType: Docblock type 'App\Other' for $g does not match inferred 'App\Generator'
 {
 }
 ===expect===
-MismatchingDocblockParamType@16:25-16:27: Docblock type 'App\Other' for $g does not match inferred 'App\Generator'

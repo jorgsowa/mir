@@ -7,5 +7,5 @@ An anonymous class is never collected into the codebase, so the batch check
 final class Base {}
 
 new class extends Base {};
+//                ^^^^ InvalidExtendClass: Class <anonymous> cannot extend final class Base
 ===expect===
-InvalidExtendClass@5:18-5:22: Class <anonymous> cannot extend final class Base

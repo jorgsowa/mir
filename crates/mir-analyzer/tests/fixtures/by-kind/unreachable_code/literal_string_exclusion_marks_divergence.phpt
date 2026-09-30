@@ -16,6 +16,9 @@ suppress=UnusedVariable,UnusedParam,MissingConstructor
 /** @param "a"|"b" $s */
 function varUnionMismatchUnreachable(string $s): void {
     if ($s === 'c') {
+//      ^^^^^^^^^^ DocblockTypeContradiction: Type '"a"|"b"' makes '$s === "c"' impossible — this can never hold
+//      ^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between '"a"|"b"' and '"c"' is always false — these types can never be identical
+//      ^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         /** @mir-check $_ is never */
         $_ = 1;
     }
@@ -35,6 +38,8 @@ class Bag {
 
     public function propUnionMismatchUnreachable(): void {
         if ($this->label === 'c') {
+//          ^^^^^^^^^^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between '"a"|"b"' and '"c"' is always false — these types can never be identical
+//          ^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
             /** @mir-check $_ is never */
             $_ = 1;
         }
@@ -47,16 +52,11 @@ class StaticBag {
 
     public static function staticPropUnionMismatchUnreachable(): void {
         if (self::$label === 'c') {
+//          ^^^^^^^^^^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between '"a"|"b"' and '"c"' is always false — these types can never be identical
+//          ^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
             /** @mir-check $_ is never */
             $_ = 1;
         }
     }
 }
 ===expect===
-DocblockTypeContradiction@4:8-4:18: Type '"a"|"b"' makes '$s === "c"' impossible — this can never hold
-ImpossibleIdenticalComparison@4:8-4:18: '===' between '"a"|"b"' and '"c"' is always false — these types can never be identical
-RedundantCondition@4:8-4:18: Condition is always true/false for type 'bool'
-ImpossibleIdenticalComparison@23:12-23:32: '===' between '"a"|"b"' and '"c"' is always false — these types can never be identical
-RedundantCondition@23:12-23:32: Condition is always true/false for type 'bool'
-ImpossibleIdenticalComparison@35:12-35:32: '===' between '"a"|"b"' and '"c"' is always false — these types can never be identical
-RedundantCondition@35:12-35:32: Condition is always true/false for type 'bool'

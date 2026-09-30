@@ -6,7 +6,7 @@ Null comparisons on required shape keys remain impossible.
 function test(array $shape): void {
     $v = $shape['a'];
     if ($v !== null) {}
+//      ^^^^^^^^^^^ ImpossibleIdenticalComparison: '!==' between 'int' and 'null' is always true — these types can never be identical
+//      ^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
 }
 ===expect===
-ImpossibleIdenticalComparison@5:8-5:19: '!==' between 'int' and 'null' is always true — these types can never be identical
-RedundantCondition@5:8-5:19: Condition is always true/false for type 'bool'

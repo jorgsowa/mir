@@ -8,7 +8,7 @@ class A {
     public function __unserialize(array $data): void {
         $other = new A();
         $other->__construct();
+//      ^^^^^^^^^^^^^^^^^^^^^ DirectConstructorCall: Cannot call constructor of A directly
     }
 }
 ===expect===
-DirectConstructorCall@7:8-7:29: Cannot call constructor of A directly

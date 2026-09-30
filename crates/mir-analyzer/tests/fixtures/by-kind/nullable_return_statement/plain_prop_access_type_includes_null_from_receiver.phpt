@@ -15,6 +15,8 @@ class Foo {
 // Positive: real bug now caught.
 function returnsPossiblyNull(?Foo $obj): string {
     return $obj->bar;
+//  ^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'string|null' is not compatible with declared 'string'
+//         ^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $bar on possibly null value
 }
 
 // Negative: non-nullable receiver, no over-widening.
@@ -30,5 +32,3 @@ function narrowedFirst(?Foo $obj): string {
     return $obj->bar;
 }
 ===expect===
-NullableReturnStatement@8:4-8:21: Return type 'string|null' is not compatible with declared 'string'
-PossiblyNullPropertyFetch@8:11-8:20: Cannot access property $bar on possibly null value

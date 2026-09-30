@@ -7,6 +7,6 @@ Continue is not break
                             echo "two
 ";
                             continue 2;
+//                          ^^^^^^^^ ParseError: Parse error: Cannot 'continue' 2 levels
                     }
 ===expect===
-ParseError@6:28-6:36: Parse error: Cannot 'continue' 2 levels

@@ -5,7 +5,7 @@ Narrowing applies correctly when !isset() check is nested within && and || chain
 <?php
 function someFunc(): bool { return true; }
 if (someFunc() && (!isset($x) || $x->method())) {
+//                               ^^^^^^^^^^^^ MixedMethodCall: Method method() called on mixed type
     // After fix: $x should be narrowed in RHS of !isset($x) ||
 }
 ===expect===
-MixedMethodCall@3:33-3:45: Method method() called on mixed type

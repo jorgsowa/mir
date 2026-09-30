@@ -13,8 +13,8 @@ class A{
     public function bar(): void
     {
         echo $this->foo;
+//                  ^^^ DeprecatedProperty: Property A::$foo is deprecated
     }
 }
 
 ===expect===
-DeprecatedProperty@10:20-10:23: Property A::$foo is deprecated

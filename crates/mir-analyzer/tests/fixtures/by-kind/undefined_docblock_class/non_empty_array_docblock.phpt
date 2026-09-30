@@ -18,11 +18,11 @@ function makeList(): array {
 /** @return non-empty-array */
 function makeEmptyList(): array {
     return [];
+//  ^^^^^^^^^^ InvalidReturnType: Return type 'array{}' is not compatible with declared 'non-empty-array'
 }
 
 useList([1]);
 useList([]);
+//      ^^ InvalidArgument: Argument $xs of useList() expects 'non-empty-array', got 'array{}'
 
 ===expect===
-InvalidReturnType@15:4-15:14: Return type 'array{}' is not compatible with declared 'non-empty-array'
-InvalidArgument@19:8-19:10: Argument $xs of useList() expects 'non-empty-array', got 'array{}'

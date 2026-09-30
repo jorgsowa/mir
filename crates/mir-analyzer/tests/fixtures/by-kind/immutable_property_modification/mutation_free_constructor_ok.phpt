@@ -17,9 +17,9 @@ class ImmutablePoint {
     /** @psalm-mutation-free */
     public function translate(float $dx, float $dy): void {
         $this->x += $dx;
+//      ^^^^^^^^^^^^^^^ ImmutablePropertyModification: Assigning to property x of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
         $this->y += $dy;
+//      ^^^^^^^^^^^^^^^ ImmutablePropertyModification: Assigning to property y of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
     }
 }
 ===expect===
-ImmutablePropertyModification@15:8-15:23: Assigning to property x of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
-ImmutablePropertyModification@16:8-16:23: Assigning to property y of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)

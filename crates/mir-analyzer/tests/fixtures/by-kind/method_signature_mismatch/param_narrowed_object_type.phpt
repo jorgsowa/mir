@@ -12,6 +12,6 @@ class Base {
 }
 class Kitten extends Base {
     public function feed(Cat $a): void {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method Kitten::feed() signature mismatch: parameter $a type 'Cat' is narrower than parent type 'Animal'
 }
 ===expect===
-MethodSignatureMismatch@8:4-8:41: Method Kitten::feed() signature mismatch: parameter $a type 'Cat' is narrower than parent type 'Animal'

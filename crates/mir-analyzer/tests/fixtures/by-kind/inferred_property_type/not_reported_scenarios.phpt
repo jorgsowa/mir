@@ -18,6 +18,7 @@ class HasDocblock {
 
     public function __construct() {
         $this->thing = new B();
+//      ^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $thing expects 'A', cannot assign 'B'
     }
 
     public function read(): void {
@@ -50,4 +51,3 @@ class OnlyOneBranchAssigns {
     }
 }
 ===expect===
-InvalidPropertyAssignment@10:8-10:30: Property $thing expects 'A', cannot assign 'B'

@@ -4,6 +4,6 @@ Returning a string literal from a function declared to return int reports Invali
 <?php
 function f(): int {
     return 'hello';
+//  ^^^^^^^^^^^^^^^ InvalidReturnType: Return type '"hello"' is not compatible with declared 'int'
 }
 ===expect===
-InvalidReturnType@3:4-3:19: Return type '"hello"' is not compatible with declared 'int'

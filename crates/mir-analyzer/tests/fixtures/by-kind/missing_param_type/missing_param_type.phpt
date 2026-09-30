@@ -4,6 +4,6 @@ Missing param type
 <?php
 interface foo {
     public function withoutAnyReturnType($s) : void;
+//                                       ^^ MissingParamType: Parameter $s of foo::withoutAnyReturnType() has no type annotation
 }
 ===expect===
-MissingParamType@3:41-3:43: Parameter $s of foo::withoutAnyReturnType() has no type annotation

@@ -10,6 +10,6 @@ suppress=UnusedVariable,UnusedParam
 function test(int $n): void {
     $s = "foo";
     if ($s == $n) {}
+//      ^^^^^^^^ ImpossibleLooseComparison: '==' between '"foo"' and 'positive-int' is always false — these types can never be loosely equal
 }
 ===expect===
-ImpossibleLooseComparison@5:8-5:16: '==' between '"foo"' and 'positive-int' is always false — these types can never be loosely equal

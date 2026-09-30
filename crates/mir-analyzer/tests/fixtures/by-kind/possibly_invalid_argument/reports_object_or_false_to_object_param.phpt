@@ -10,6 +10,6 @@ function takesConnection(Connection $c): void { var_dump($c); }
 function getConnection(): Connection|false { return new Connection(); }
 function test(): void {
     takesConnection(getConnection());
+//                  ^^^^^^^^^^^^^^^ PossiblyInvalidArgument: Argument $c of takesConnection() expects 'Connection', possibly different type 'Connection|false' provided
 }
 ===expect===
-PossiblyInvalidArgument@7:20-7:35: Argument $c of takesConnection() expects 'Connection', possibly different type 'Connection|false' provided

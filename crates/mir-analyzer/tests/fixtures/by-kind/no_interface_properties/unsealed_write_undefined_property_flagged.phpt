@@ -19,7 +19,7 @@ class Circle implements Shape {
 
 function resize(Shape $s, float $value): void {
     $s->radius = $value;
+//  ^^^^^^^^^^^^^^^^^^^ NoInterfaceProperties: Property $radius is not defined on this interface
 }
 
 ===expect===
-NoInterfaceProperties@14:4-14:23: Property $radius is not defined on this interface

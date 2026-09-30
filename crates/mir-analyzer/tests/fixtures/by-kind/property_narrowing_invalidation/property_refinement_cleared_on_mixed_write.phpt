@@ -26,7 +26,7 @@ class Buffer {
         // After the mixed write, $this->data is ?string again (declared type),
         // so returning it directly without a null-check should emit NullableReturnStatement.
         return $this->data;
+//      ^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'string|null' is not compatible with declared 'string'
     }
 }
 ===expect===
-NullableReturnStatement@20:8-20:27: Return type 'string|null' is not compatible with declared 'string'

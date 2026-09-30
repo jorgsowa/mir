@@ -27,6 +27,6 @@ function withEarlyReturn(array $option): array {
 /** @param array{0: string, 1: ?string} $option */
 function withoutGuard(array $option): array {
     return explode('=', $option[1]);
+//                      ^^^^^^^^^^ PossiblyNullArgument: Argument $string of explode() might be null
 }
 ===expect===
-PossiblyNullArgument@18:24-18:34: Argument $string of explode() might be null

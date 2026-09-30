@@ -17,6 +17,6 @@ class Counter {
 /** @pure */
 function callIt(): void {
     Counter::bump();
+//  ^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method bump() in a pure or immutable context
 }
 ===expect===
-ImpureMethodCall@12:4-12:19: Calling impure method bump() in a pure or immutable context

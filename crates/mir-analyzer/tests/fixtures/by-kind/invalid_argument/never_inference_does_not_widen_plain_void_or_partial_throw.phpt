@@ -28,11 +28,11 @@ function run(string $sql): void {}
 
 function usePlain(Service $s, $n): void {
     run($s->plain($n));
+//      ^^^^^^^^^^^^^ InvalidArgument: Argument $sql of run() expects 'string', got 'void'
 }
 
 function useConditional(Service $s, $n): void {
     run($s->conditional($n));
+//      ^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $sql of run() expects 'string', got 'void'
 }
 ===expect===
-InvalidArgument@20:8-20:21: Argument $sql of run() expects 'string', got 'void'
-InvalidArgument@24:8-24:27: Argument $sql of run() expects 'string', got 'void'

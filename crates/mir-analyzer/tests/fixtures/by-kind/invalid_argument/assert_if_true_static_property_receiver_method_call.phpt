@@ -27,8 +27,8 @@ class Service {
     public function doWork($p): void {
         if (self::$validator->isInt($p)) {
             strlen($p);
+//                 ^^ ArgumentTypeCoercion: Argument $string of strlen() expects 'string', got 'int' — coercion may fail at runtime
         }
     }
 }
 ===expect===
-ArgumentTypeCoercion@19:19-19:21: Argument $string of strlen() expects 'string', got 'int' — coercion may fail at runtime

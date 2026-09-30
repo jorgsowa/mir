@@ -18,9 +18,9 @@ class Filter {
     public function make(DeepCopy $copier) {
         $copy = function ($list) use ($copier) {
             return $copier->recursiveCopy($list);
+//                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method DeepCopy::recursiveCopy() does not exist
         };
         return Closure::bind($copy, null, Other::class);
     }
 }
 ===expect===
-UndefinedMethod@12:19-12:48: Method DeepCopy::recursiveCopy() does not exist

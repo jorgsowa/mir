@@ -24,7 +24,7 @@ function f($x): void {
     if ($x instanceof C || $x instanceof D) {
         /** @mir-check $x is C|D */
         $_ = 1;
+//      ^^^^^^^ TypeCheckMismatch: Type of $x is expected to be C|D, got A&B&C|D|C|D
     }
 }
 ===expect===
-TypeCheckMismatch@11:8-11:15: Type of $x is expected to be C|D, got A&B&C|D|C|D

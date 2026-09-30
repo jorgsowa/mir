@@ -14,6 +14,7 @@ class Foo {
 // Positive: reachable when $obj is null, so not RedundantCondition.
 function nullCaseReachable(?Foo $obj): void {
     if ($obj->bar === null) {
+//      ^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $bar on possibly null value
         echo "reached when \$obj is null";
     }
 }
@@ -26,9 +27,8 @@ class Box {
 // Positive: proving $value non-null also proves the receiver non-null.
 function receiverNarrowed(?Box $b): void {
     if ($b->value !== null) {
+//      ^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $value on possibly null value
         echo $b->other;
     }
 }
 ===expect===
-PossiblyNullPropertyFetch@8:8-8:17: Cannot access property $bar on possibly null value
-PossiblyNullPropertyFetch@20:8-20:17: Cannot access property $value on possibly null value

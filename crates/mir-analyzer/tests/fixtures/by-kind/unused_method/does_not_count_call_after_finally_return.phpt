@@ -11,10 +11,10 @@ class Foo {
         }
 
         $this->helper();
+//      ^^^^^^^^^^^^^^^^ UnreachableCode: Unreachable code detected
     }
 
     private function helper(): void {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedMethod: Private method Foo::helper() is never called
 }
 ===expect===
-UnreachableCode@10:8-10:24: Unreachable code detected
-UnusedMethod@13:4-13:38: Private method Foo::helper() is never called

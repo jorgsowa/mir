@@ -7,5 +7,5 @@ function nullReturn(): null {
 }
 $x = nullReturn();
 echo $x[0];
+//   ^^^^^ NullArrayAccess: Cannot access array on null
 ===expect===
-NullArrayAccess@6:5-6:10: Cannot access array on null

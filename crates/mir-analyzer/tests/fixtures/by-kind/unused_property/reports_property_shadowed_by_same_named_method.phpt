@@ -6,6 +6,7 @@ to share one reference-index key and the method's usage hid the property).
 <?php
 class Foo {
     private string $bar = 'x';
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedProperty: Private property Foo::$bar is never read
 
     private function bar(): string {
         return 'y';
@@ -16,4 +17,3 @@ class Foo {
     }
 }
 ===expect===
-UnusedProperty@3:4-3:29: Private property Foo::$bar is never read

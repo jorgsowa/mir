@@ -12,6 +12,6 @@ function foo(int $n): void {
 
 $x = 3.7;
 foo($x);
+//  ^^ InvalidArgument: Argument $n of foo() expects 'int', got '3.7'
 
 ===expect===
-InvalidArgument@9:4-9:6: Argument $n of foo() expects 'int', got '3.7'

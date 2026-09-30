@@ -14,5 +14,5 @@ function process(callable $c): void {
     $c(true);
 }
 process(function (int $a): void {});
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $c of process() expects 'callable whose parameter #1 accepts bool', got 'callable whose parameter #1 only accepts int'
 ===expect===
-InvalidArgument@6:8-6:34: Argument $c of process() expects 'callable whose parameter #1 accepts bool', got 'callable whose parameter #1 only accepts int'

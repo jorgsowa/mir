@@ -28,6 +28,6 @@ function not_narrowed_when_key_is_not_a_literal(array $meta, string $key): strin
     // $key is an unnarrowed string, not a proven literal — must not be
     // treated as if it were the literal 'favicon'.
     return array_key_exists($key, $meta) ? (string) $meta['favicon'] : '';
+//                                                        ^^^^^^^^^ NonExistentArrayOffset: Array offset 'favicon' does not exist
 }
 ===expect===
-NonExistentArrayOffset@24:58-24:67: Array offset 'favicon' does not exist

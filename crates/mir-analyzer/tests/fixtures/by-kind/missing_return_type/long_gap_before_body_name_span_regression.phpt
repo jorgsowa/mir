@@ -6,7 +6,7 @@ the function name. The span must still land on the name.
 ===file===
 <?php
 function veryLongFunctionNameForRegressionTest() /* AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA */ {
+//       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MissingReturnType: Function veryLongFunctionNameForRegressionTest() has no return type annotation
     return 1;
 }
 ===expect===
-MissingReturnType@2:9-2:46: Function veryLongFunctionNameForRegressionTest() has no return type annotation

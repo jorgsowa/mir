@@ -15,6 +15,7 @@ class Box {
 /** @param array{a?: int} $optionalShape */
 function assign_optional_to_required(Box $b, array $optionalShape): void {
     $b->shape = $optionalShape;
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $shape expects 'array{'a': int}', cannot assign 'array{'a'?: int}'
 }
 
 /** @param array{a: int} $requiredShape */
@@ -22,4 +23,3 @@ function assign_required_to_required(Box $b, array $requiredShape): void {
     $b->shape = $requiredShape;
 }
 ===expect===
-InvalidPropertyAssignment@10:4-10:30: Property $shape expects 'array{'a': int}', cannot assign 'array{'a'?: int}'

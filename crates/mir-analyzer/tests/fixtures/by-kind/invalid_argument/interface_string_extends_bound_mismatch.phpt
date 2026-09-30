@@ -16,6 +16,6 @@ function needsPolygon(string $className) {
 function forward(string $shape): void {
     /** @var interface-string<Shape> $shape */
     needsPolygon($shape);
+//               ^^^^^^ InvalidArgument: Argument $className of needsPolygon() expects 'interface-string<Polygon>', got 'interface-string<Shape>'
 }
 ===expect===
-InvalidArgument@12:17-12:23: Argument $className of needsPolygon() expects 'interface-string<Polygon>', got 'interface-string<Shape>'

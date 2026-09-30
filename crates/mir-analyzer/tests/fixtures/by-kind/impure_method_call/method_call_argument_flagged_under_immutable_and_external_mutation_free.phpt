@@ -26,6 +26,7 @@ class Holder {
     public function corruptThis(): void {
         $logger = new Logger();
         $logger->record($this->box);
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method record() in a pure or immutable context
     }
 }
 
@@ -34,6 +35,7 @@ class Wrapper {
     public function corruptParam(Box $box): void {
         $logger = new Logger();
         $logger->record($box);
+//      ^^^^^^^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method record() in a pure or immutable context
     }
 
     /** @psalm-external-mutation-free */
@@ -43,5 +45,3 @@ class Wrapper {
     }
 }
 ===expect===
-ImpureMethodCall@18:8-18:35: Calling impure method record() in a pure or immutable context
-ImpureMethodCall@26:8-26:29: Calling impure method record() in a pure or immutable context

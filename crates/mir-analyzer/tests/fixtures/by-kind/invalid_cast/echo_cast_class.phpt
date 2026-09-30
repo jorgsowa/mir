@@ -4,5 +4,5 @@ Echo cast class
 <?php
 class A {}
 echo (string)(new A);
+//           ^^^^^^^ InvalidCast: Cannot cast 'A' to 'string'
 ===expect===
-InvalidCast@3:13-3:20: Cannot cast 'A' to 'string'

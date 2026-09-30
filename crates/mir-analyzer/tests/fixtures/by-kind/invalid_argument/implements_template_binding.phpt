@@ -12,10 +12,10 @@ interface Processor {
 class IntProcessor implements Processor {
     /** @param V $v */
     public function process($v): void {}
+//                  ^^^^^^^ UndefinedDocblockClass: Docblock type 'V' does not exist
 }
 
 $p = new IntProcessor();
 $p->process("this should be an int, not a string");
+//          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $v of process() expects 'int', got '"this should be an int, not a string"'
 ===expect===
-UndefinedDocblockClass@11:20-11:27: Docblock type 'V' does not exist
-InvalidArgument@15:12-15:49: Argument $v of process() expects 'int', got '"this should be an int, not a string"'

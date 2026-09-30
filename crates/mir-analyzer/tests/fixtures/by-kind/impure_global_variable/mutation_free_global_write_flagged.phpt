@@ -18,14 +18,14 @@ class Registry {
     public function corrupt(): void {
         global $counter;
         $counter = $counter + 1;
+//      ^^^^^^^^^^^^^^^^^^^^^^^ ImpureGlobalVariable: Using global variable $counter in a @pure function
     }
 
     /** @psalm-external-mutation-free */
     public function corrupt2(): void {
         global $registry;
         $registry->count = 5;
+//      ^^^^^^^^^^^^^^^^^^^^ ImpurePropertyAssignment: Assigning to property count of a parameter in a pure or external-mutation-free context
     }
 }
 ===expect===
-ImpureGlobalVariable@10:8-10:31: Using global variable $counter in a @pure function
-ImpurePropertyAssignment@16:8-16:28: Assigning to property count of a parameter in a pure or external-mutation-free context

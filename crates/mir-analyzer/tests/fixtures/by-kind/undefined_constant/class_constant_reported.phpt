@@ -7,6 +7,6 @@ class Foo {
 }
 function test(): void {
     echo Foo::MISSING;
+//       ^^^^^^^^^^^^ UndefinedConstant: Constant Foo::MISSING is not defined
 }
 ===expect===
-UndefinedConstant@6:9-6:21: Constant Foo::MISSING is not defined

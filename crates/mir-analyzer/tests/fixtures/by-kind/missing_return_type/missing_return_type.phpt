@@ -4,6 +4,6 @@ Missing return type
 <?php
 interface foo {
     public function withoutAnyReturnType();
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MissingReturnType: Function foo::withoutAnyReturnType() has no return type annotation
 }
 ===expect===
-MissingReturnType@3:4-3:43: Function foo::withoutAnyReturnType() has no return type annotation

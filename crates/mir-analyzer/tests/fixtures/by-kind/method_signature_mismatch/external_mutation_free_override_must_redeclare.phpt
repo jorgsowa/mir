@@ -12,9 +12,9 @@ interface Cache {
 class Mutates implements Cache {
     public int $calls = 0;
     public function bump(): int {
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method Mutates::bump() signature mismatch: Cache::bump() is declared @external-mutation-free and must be re-declared @external-mutation-free when overridden
         $this->calls++;
         return $this->calls;
     }
 }
 ===expect===
-MethodSignatureMismatch@8:4-8:33: Method Mutates::bump() signature mismatch: Cache::bump() is declared @external-mutation-free and must be re-declared @external-mutation-free when overridden

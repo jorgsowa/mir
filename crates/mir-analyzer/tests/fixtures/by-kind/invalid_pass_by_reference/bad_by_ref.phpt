@@ -6,5 +6,5 @@ suppress=UnusedParam
 <?php
 function fooFoo(string &$v): void {}
 fooFoo("a");
+//     ^^^ InvalidPassByReference: Argument $v of fooFoo() must be passed by reference
 ===expect===
-InvalidPassByReference@3:7-3:10: Argument $v of fooFoo() must be passed by reference

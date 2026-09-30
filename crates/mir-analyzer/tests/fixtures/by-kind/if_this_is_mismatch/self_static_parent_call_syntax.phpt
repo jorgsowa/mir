@@ -24,7 +24,9 @@ class Baz {
 
     public function callIt(): void {
         self::onlyBar();
+//      ^^^^^^^^^^^^^^^ IfThisIsMismatch: Cannot call Baz::onlyBar() — @if-this-is requires $this to be 'Bar', but it is 'Baz'
         static::onlyBar();
+//      ^^^^^^^^^^^^^^^^^ IfThisIsMismatch: Cannot call Baz::onlyBar() — @if-this-is requires $this to be 'Bar', but it is 'Baz'
     }
 }
 
@@ -43,5 +45,3 @@ class Box {
     }
 }
 ===expect===
-IfThisIsMismatch@19:8-19:23: Cannot call Baz::onlyBar() — @if-this-is requires $this to be 'Bar', but it is 'Baz'
-IfThisIsMismatch@20:8-20:25: Cannot call Baz::onlyBar() — @if-this-is requires $this to be 'Bar', but it is 'Baz'

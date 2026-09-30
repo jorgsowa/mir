@@ -10,6 +10,6 @@ interface X {
      * @param B $class
      */
     public function boo(A $class): void {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ParseError: Parse error: interface method cannot contain a body
 }
 ===expect===
-ParseError@9:4-9:42: Parse error: interface method cannot contain a body

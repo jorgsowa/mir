@@ -8,6 +8,6 @@ function sumAll(...$nums): int {
 }
 
 sumAll("a", "b");
+//     ^^^ InvalidArgument: Argument $nums of sumAll() expects 'int', got '"a"'
+//          ^^^ InvalidArgument: Argument $nums of sumAll() expects 'int', got '"b"'
 ===expect===
-InvalidArgument@7:7-7:10: Argument $nums of sumAll() expects 'int', got '"a"'
-InvalidArgument@7:12-7:15: Argument $nums of sumAll() expects 'int', got '"b"'

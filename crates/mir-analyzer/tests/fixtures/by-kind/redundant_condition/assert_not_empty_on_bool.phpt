@@ -16,6 +16,6 @@ function assertNotEmpty($value) : void {}
 function foo(bool $bar) : void {
     assertNotEmpty($bar);
     if ($bar) {}
+//      ^^^^ RedundantCondition: Condition is always true/false for type 'true'
 }
 ===expect===
-RedundantCondition@10:8-10:12: Condition is always true/false for type 'true'

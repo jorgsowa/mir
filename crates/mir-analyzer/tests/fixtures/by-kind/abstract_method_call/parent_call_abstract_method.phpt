@@ -8,7 +8,7 @@ abstract class Base {
 class Child extends Base {
     public function foo(): void {
         parent::foo();
+//      ^^^^^^^^^^^^^ AbstractMethodCall: Cannot call abstract method Base::foo()
     }
 }
 ===expect===
-AbstractMethodCall@7:8-7:21: Cannot call abstract method Base::foo()

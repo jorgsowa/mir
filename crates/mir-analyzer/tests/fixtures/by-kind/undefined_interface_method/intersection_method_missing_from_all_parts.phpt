@@ -8,6 +8,6 @@ interface B {}
 /** @param B&A $p */
 function f($p): void {
     $p->zugzug();
+//  ^^^^^^^^^^^^ UndefinedMethod: Method B&A::zugzug() does not exist
 }
 ===expect===
-UndefinedMethod@7:4-7:16: Method B&A::zugzug() does not exist

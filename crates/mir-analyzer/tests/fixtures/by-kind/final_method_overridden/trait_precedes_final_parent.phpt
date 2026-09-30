@@ -13,6 +13,6 @@ class Base {
 class Child extends Base {
     use T;
     public function foo(): void {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FinalMethodOverridden: Method Child::foo() cannot override final method from Base
 }
 ===expect===
-FinalMethodOverridden@10:4-10:34: Method Child::foo() cannot override final method from Base

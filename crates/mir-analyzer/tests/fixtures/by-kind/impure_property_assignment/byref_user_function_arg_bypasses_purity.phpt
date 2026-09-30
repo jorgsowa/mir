@@ -18,6 +18,6 @@ function bump(int &$n): void {
 /** @pure */
 function run(Box $b): void {
     bump($b->n);
+//       ^^^^^ ImpurePropertyAssignment: Assigning to property n of a parameter in a pure or external-mutation-free context
 }
 ===expect===
-ImpurePropertyAssignment@12:9-12:14: Assigning to property n of a parameter in a pure or external-mutation-free context

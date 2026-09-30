@@ -15,8 +15,8 @@ class Repo {
         $list = $factory();
         foreach ($list as $v) {
             strlen($v);
+//                 ^^ ArgumentTypeCoercion: Argument $string of strlen() expects 'string', got 'int' — coercion may fail at runtime
         }
     }
 }
 ===expect===
-ArgumentTypeCoercion@8:19-8:21: Argument $string of strlen() expects 'string', got 'int' — coercion may fail at runtime

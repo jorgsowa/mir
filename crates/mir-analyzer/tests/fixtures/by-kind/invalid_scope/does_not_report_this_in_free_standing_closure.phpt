@@ -11,8 +11,8 @@ class Container {
 }
 $getter = function (): int {
     return $this->value;
+//  ^^^^^^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'int'
 };
 $bound = Closure::bind($getter, new Container(), Container::class);
 echo $bound();
 ===expect===
-MixedReturnStatement@6:4-6:24: Cannot return a mixed type from function with declared return type 'int'

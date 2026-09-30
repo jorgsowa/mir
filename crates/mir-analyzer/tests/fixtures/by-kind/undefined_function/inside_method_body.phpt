@@ -5,7 +5,7 @@ inside method body
 class A {
     public function go(): void {
         missing();
+//      ^^^^^^^^^ UndefinedFunction: Function missing() is not defined
     }
 }
 ===expect===
-UndefinedFunction@4:8-4:17: Function missing() is not defined

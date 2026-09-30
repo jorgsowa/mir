@@ -4,6 +4,6 @@ reports private unused method
 <?php
 class Foo {
     private function helper(): void {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedMethod: Private method Foo::helper() is never called
 }
 ===expect===
-UnusedMethod@3:4-3:38: Private method Foo::helper() is never called

@@ -42,8 +42,8 @@ class Box {
     public function checkPropEqualsZeroStaysUnnarrowed(): void {
         if ($this->count == 0) {
             $this->takesInt($this->count);
+//                          ^^^^^^^^^^^^ PossiblyNullArgument: Argument $x of takesInt() might be null
         }
     }
 }
 ===expect===
-PossiblyNullArgument@36:28-36:40: Argument $x of takesInt() might be null

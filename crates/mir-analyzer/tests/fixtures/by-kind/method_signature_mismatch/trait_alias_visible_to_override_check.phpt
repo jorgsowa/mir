@@ -11,6 +11,6 @@ trait T { public function greet(string $s): void {} }
 class Base { use T { greet as sayHello; } }
 class Child extends Base {
     public function sayHello(int $s): void {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method Child::sayhello() signature mismatch: parameter $s type 'int' is incompatible with parent type 'string'
 }
 ===expect===
-MethodSignatureMismatch@5:4-5:45: Method Child::sayhello() signature mismatch: parameter $s type 'int' is incompatible with parent type 'string'

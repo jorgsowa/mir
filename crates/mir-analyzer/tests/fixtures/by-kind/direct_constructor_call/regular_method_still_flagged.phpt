@@ -9,7 +9,7 @@ class Foo {
 
     public function reset(int $x): void {
         $this->__construct($x);
+//      ^^^^^^^^^^^^^^^^^^^^^^ DirectConstructorCall: Cannot call constructor of Foo directly
     }
 }
 ===expect===
-DirectConstructorCall@6:8-6:30: Cannot call constructor of Foo directly

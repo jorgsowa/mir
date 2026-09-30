@@ -8,5 +8,5 @@ function getItems(): ?array {
 
 $arr = getItems();
 echo $arr[0];
+//   ^^^^^^^ PossiblyNullArrayAccess: Cannot access array on possibly null value
 ===expect===
-PossiblyNullArrayAccess@7:5-7:12: Cannot access array on possibly null value

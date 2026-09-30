@@ -8,6 +8,6 @@ class Grandparent {
 class Middle extends Grandparent {}
 class Child extends Middle {
     public function locked(): void {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FinalMethodOverridden: Method Child::locked() cannot override final method from Grandparent
 }
 ===expect===
-FinalMethodOverridden@7:4-7:37: Method Child::locked() cannot override final method from Grandparent

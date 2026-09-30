@@ -17,6 +17,6 @@ function test(): void {
     /** @var Pair<int, Cat> $p */
     $p = new Pair();
     f($p);
+//    ^^ InvalidArgument: Argument $p of f() expects 'Pair<string, Animal>', got 'Pair<int, Cat>'
 }
 ===expect===
-InvalidArgument@14:6-14:8: Argument $p of f() expects 'Pair<string, Animal>', got 'Pair<int, Cat>'

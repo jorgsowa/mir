@@ -18,5 +18,5 @@ class GrandChildBox extends ChildBox {}
 
 $gc = new GrandChildBox();
 $gc->process("this is a string, not an int");
+//           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $v of process() expects 'int', got '"this is a string, not an int"'
 ===expect===
-InvalidArgument@17:13-17:43: Argument $v of process() expects 'int', got '"this is a string, not an int"'

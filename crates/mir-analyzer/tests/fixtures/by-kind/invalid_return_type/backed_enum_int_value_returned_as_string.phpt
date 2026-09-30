@@ -8,6 +8,6 @@ enum Color: int {
 }
 function test(Color $color): string {
     return $color->value;
+//  ^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'int' is not compatible with declared 'string'
 }
 ===expect===
-InvalidReturnType@7:4-7:25: Return type 'int' is not compatible with declared 'string'

@@ -9,5 +9,5 @@ class Opaque {}
 function render(string $s): void {}
 
 render(new Opaque());
+//     ^^^^^^^^^^^^ InvalidArgument: Argument $s of render() expects 'string', got 'Opaque'
 ===expect===
-InvalidArgument@6:7-6:19: Argument $s of render() expects 'string', got 'Opaque'

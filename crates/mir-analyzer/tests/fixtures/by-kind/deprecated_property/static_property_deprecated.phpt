@@ -8,5 +8,5 @@ class App {
 }
 
 echo App::$old;
+//        ^^^^ DeprecatedProperty: Property App::$old is deprecated: use $instance instead
 ===expect===
-DeprecatedProperty@7:10-7:14: Property App::$old is deprecated: use $instance instead

@@ -12,8 +12,8 @@ class Registry {
     /** @pure */
     public static function corrupt(): void {
         self::$items['x'] = 1;
+//      ^^^^^^^^^^^^^^^^^^^^^ ImpureStaticPropertyAssignment: Assigning to static property Registry::$items in a @pure function
+//            ^^^^^^ ImpureStaticPropertyAccess: Reading static property Registry::$items in a @pure function
     }
 }
 ===expect===
-ImpureStaticPropertyAssignment@7:8-7:29: Assigning to static property Registry::$items in a @pure function
-ImpureStaticPropertyAccess@7:14-7:20: Reading static property Registry::$items in a @pure function

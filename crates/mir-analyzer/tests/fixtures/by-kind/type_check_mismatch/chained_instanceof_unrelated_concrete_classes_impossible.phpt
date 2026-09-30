@@ -13,8 +13,8 @@ class B {}
 /** @param A|B $x */
 function f($x): void {
     if ($x instanceof A && $x instanceof B) {
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         echo get_class($x);
     }
 }
 ===expect===
-RedundantCondition@7:8-7:42: Condition is always true/false for type 'bool'

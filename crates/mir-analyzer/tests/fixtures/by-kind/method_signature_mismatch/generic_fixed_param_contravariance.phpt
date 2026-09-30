@@ -22,6 +22,7 @@ class Box {
 class AnimalBox extends Box {
     /** @param Cat $x */
     public function set($x): void {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method AnimalBox::set() signature mismatch: parameter $x type 'Cat' is narrower than parent type 'Animal'
 }
 
 interface Renderer {
@@ -33,4 +34,3 @@ class AnimalRenderer implements Renderer {
     public function draw(Animal $shape): void {}
 }
 ===expect===
-MethodSignatureMismatch@14:4-14:36: Method AnimalBox::set() signature mismatch: parameter $x type 'Cat' is narrower than parent type 'Animal'

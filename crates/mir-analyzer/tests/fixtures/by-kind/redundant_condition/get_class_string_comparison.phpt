@@ -22,8 +22,8 @@ function testGetClassElseif(Foo|Bar $obj) {
     if (get_class($obj) === 'Foo') {
         $obj->foo();
     } elseif (get_class($obj) === 'Bar') {
+//            ^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         $obj->bar();
     }
 }
 ===expect===
-RedundantCondition@19:14-19:39: Condition is always true/false for type 'bool'

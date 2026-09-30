@@ -12,6 +12,7 @@ abstract class Base {
 }
 class Foo extends Base {
     public function configure(?object $svc = null): void {}
+//                            ^^^^^^^^^^^^^^^^^^^ UnusedParam: Parameter $svc is never used
 }
 class T {
     private Base $foo;
@@ -23,4 +24,3 @@ class T {
     }
 }
 ===expect===
-UnusedParam@6:30-6:49: Parameter $svc is never used

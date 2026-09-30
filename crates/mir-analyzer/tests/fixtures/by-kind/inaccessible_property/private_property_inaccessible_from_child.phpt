@@ -12,7 +12,7 @@ class Child extends Base
     public function getSecret(): string
     {
         return $this->secret;
+//                    ^^^^^^ InaccessibleProperty: Cannot access property Base::$secret
     }
 }
 ===expect===
-InaccessibleProperty@11:22-11:28: Cannot access property Base::$secret

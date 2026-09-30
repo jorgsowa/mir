@@ -6,6 +6,6 @@ namespace bar;
 
 function fooFoo(): string {
     return rand(0, 5) ? "hello" : null;
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type '"hello"|null' is not compatible with declared 'string'
 }
 ===expect===
-NullableReturnStatement@5:4-5:39: Return type '"hello"|null' is not compatible with declared 'string'

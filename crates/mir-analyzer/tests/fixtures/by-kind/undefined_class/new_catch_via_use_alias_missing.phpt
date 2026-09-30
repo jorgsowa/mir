@@ -7,10 +7,10 @@ suppress=MissingThrowsDocblock,UnusedVariable,UnusedFunction
 use App\Model\MissingEntity;
 function wrap(): void {
     $x = new MissingEntity();
+//           ^^^^^^^^^^^^^ UndefinedClass: Class App\Model\MissingEntity does not exist
     try {
         throw new \Exception();
     } catch (MissingEntity $e) {}
+//           ^^^^^^^^^^^^^ UndefinedClass: Class App\Model\MissingEntity does not exist
 }
 ===expect===
-UndefinedClass@4:13-4:26: Class App\Model\MissingEntity does not exist
-UndefinedClass@7:13-7:26: Class App\Model\MissingEntity does not exist

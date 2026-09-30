@@ -8,5 +8,5 @@ class Config
 }
 
 echo (new Config())->internal;
+//                   ^^^^^^^^ InaccessibleProperty: Cannot access property Config::$internal
 ===expect===
-InaccessibleProperty@7:21-7:29: Cannot access property Config::$internal

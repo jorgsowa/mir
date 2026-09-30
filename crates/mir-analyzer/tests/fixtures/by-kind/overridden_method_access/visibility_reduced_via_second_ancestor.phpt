@@ -12,6 +12,6 @@ interface Iface {
 }
 class Child extends Base implements Iface {
     protected function foo(): void {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ OverriddenMethodAccess: Method Child::foo() overrides with less visibility
 }
 ===expect===
-OverriddenMethodAccess@9:4-9:37: Method Child::foo() overrides with less visibility

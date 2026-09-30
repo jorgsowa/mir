@@ -10,6 +10,6 @@ function make(): array {
 }
 function test(): void {
     sort(make());
+//       ^^^^^^ InvalidPassByReference: Argument $array of sort() must be passed by reference
 }
 ===expect===
-InvalidPassByReference@6:9-6:15: Argument $array of sort() must be passed by reference

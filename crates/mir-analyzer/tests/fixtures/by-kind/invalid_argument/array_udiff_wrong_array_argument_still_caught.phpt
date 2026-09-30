@@ -7,5 +7,5 @@ suppress=MissingClosureReturnType
 <?php
 $cmp = function ($x, $y) { return $x <=> $y; };
 array_udiff('not an array', ['b' => 2], $cmp);
+//          ^^^^^^^^^^^^^^ InvalidArgument: Argument $array of array_udiff() expects 'array', got '"not an array"'
 ===expect===
-InvalidArgument@3:12-3:26: Argument $array of array_udiff() expects 'array', got '"not an array"'

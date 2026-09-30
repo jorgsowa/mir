@@ -7,6 +7,6 @@ suppress=MixedArrayAccess
 function run_query(mysqli $db): void {
     $sql = 'SELECT * FROM users WHERE id = ' . $_GET['id'];
     mysqli_query($db, $sql);
+//  ^^^^^^^^^^^^^^^^^^^^^^^ TaintedSql: Tainted SQL query — possible SQL injection
 }
 ===expect===
-TaintedSql@4:4-4:27: Tainted SQL query — possible SQL injection

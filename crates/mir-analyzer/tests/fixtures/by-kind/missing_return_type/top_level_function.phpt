@@ -4,6 +4,8 @@ docblock @return; either declaration form satisfies it.
 ===file===
 <?php
 function noReturnType($x) {
+//       ^^^^^^^^^^^^ MissingReturnType: Function noReturnType() has no return type annotation
+//                    ^^ MissingParamType: Parameter $x of noReturnType() has no type annotation
     return $x;
 }
 
@@ -18,5 +20,3 @@ function docTyped() {
     return 'x';
 }
 ===expect===
-MissingReturnType@2:9-2:21: Function noReturnType() has no return type annotation
-MissingParamType@2:22-2:24: Parameter $x of noReturnType() has no type annotation

@@ -23,7 +23,7 @@ class Holder {
 
     public function corrupt(Filler $filler): void {
         $filler->fill(out: $this->bag->items, skip: 1);
+//                         ^^^^^^^^^^^^^^^^^ ImmutablePropertyModification: Assigning to property items of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
     }
 }
 ===expect===
-ImmutablePropertyModification@17:27-17:44: Assigning to property items of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)

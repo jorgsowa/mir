@@ -8,6 +8,6 @@ suppress=MissingReturnType
 function test() {
     $foo = 'bar';
     $$foo = 42;
+//  ^^^^^ UnusedVariable: Variable $bar is never read
 }
 ===expect===
-UnusedVariable@4:4-4:9: Variable $bar is never read

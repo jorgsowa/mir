@@ -7,6 +7,6 @@ Assert out of range
  */
 function scope(int $a): void{
     assert($a === 0);
+//         ^^^^^^^^ DocblockTypeContradiction: Type 'int<1, 5>' makes '$a === 0' impossible — this can never hold
 }
 ===expect===
-DocblockTypeContradiction@6:11-6:19: Type 'int<1, 5>' makes '$a === 0' impossible — this can never hold

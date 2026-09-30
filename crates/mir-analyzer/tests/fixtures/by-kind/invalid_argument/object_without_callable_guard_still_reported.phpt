@@ -12,6 +12,6 @@ function needsCallable(callable $fn): void {}
 /** @param object $x */
 function test(object $x): void {
     needsCallable($x);
+//                ^^ InvalidArgument: Argument $fn of needsCallable() expects 'callable', got 'object'
 }
 ===expect===
-InvalidArgument@7:18-7:20: Argument $fn of needsCallable() expects 'callable', got 'object'

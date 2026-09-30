@@ -8,5 +8,5 @@ suppress=UnusedParam
 ===file===
 <?php
 function f(NotARealZookeeperClass $x): void {}
+//         ^^^^^^^^^^^^^^^^^^^^^^ UndefinedClass: Class NotARealZookeeperClass does not exist
 ===expect===
-UndefinedClass@2:11-2:33: Class NotARealZookeeperClass does not exist

@@ -4,6 +4,6 @@ Wrong return type1
 <?php
 function fooFoo(): string {
     return 5;
+//  ^^^^^^^^^ InvalidReturnType: Return type '5' is not compatible with declared 'string'
 }
 ===expect===
-InvalidReturnType@3:4-3:13: Return type '5' is not compatible with declared 'string'

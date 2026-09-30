@@ -33,6 +33,7 @@ function takesBoxOfString(Box $b): void { var_dump($b); }
 /** @param TypedContainer<int> $c */
 function mismatchIsCaught(TypedContainer $c): void {
     takesBoxOfString($c);
+//                   ^^ InvalidArgument: Argument $b of takesBoxOfString() expects 'Box<string>', got 'TypedContainer<int>'
 }
 
 /** @param TypedContainer<string> $c */
@@ -40,4 +41,3 @@ function matchIsAccepted(TypedContainer $c): void {
     takesBoxOfString($c);
 }
 ===expect===
-InvalidArgument@24:21-24:23: Argument $b of takesBoxOfString() expects 'Box<string>', got 'TypedContainer<int>'

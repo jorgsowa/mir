@@ -6,6 +6,6 @@ suppress=MissingReturnType
 <?php
 function test(bool $flag) {
     new $flag();
+//      ^^^^^ InvalidStringClass: Dynamic class instantiation requires string or class-string type, got 'bool'
 }
 ===expect===
-InvalidStringClass@3:8-3:13: Dynamic class instantiation requires string or class-string type, got 'bool'

@@ -4,7 +4,7 @@ Detect useless array assignment
 <?php
 function foo() : void {
     $a = [];
+//  ^^ UnusedVariable: Variable $a is never read
     $a[0] = 1;
 }
 ===expect===
-UnusedVariable@3:4-3:6: Variable $a is never read

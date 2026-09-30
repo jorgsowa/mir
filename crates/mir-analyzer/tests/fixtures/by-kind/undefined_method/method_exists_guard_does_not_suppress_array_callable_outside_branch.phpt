@@ -14,6 +14,6 @@ function dispatch(Notification $n): void {
     if (method_exists($n, 'broadcastOn')) {
     }
     register_shutdown([$n, 'broadcastOn']);
+//                    ^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Notification::broadcastOn() does not exist
 }
 ===expect===
-UndefinedMethod@11:22-11:41: Method Notification::broadcastOn() does not exist

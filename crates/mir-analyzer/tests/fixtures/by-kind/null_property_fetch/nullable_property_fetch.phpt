@@ -5,5 +5,5 @@ Nullable property fetch
 $a = null;
 
 echo $a->foo;
+//   ^^^^^^^ NullPropertyFetch: Cannot access property $foo on null
 ===expect===
-NullPropertyFetch@4:5-4:12: Cannot access property $foo on null

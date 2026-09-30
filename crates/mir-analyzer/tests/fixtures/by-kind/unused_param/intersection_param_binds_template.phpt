@@ -18,12 +18,14 @@ class TaggedBox implements Taggable {}
  * @return T
  */
 function extract(mixed $item): mixed { return null; }
+//               ^^^^^^^^^^^ UnusedParam: Parameter $item is never used
 
 /** @var Box<string> $b */
 $b = new Box();
 
 // Box<string> does not implement Taggable — error fires, T=string still inferred
 $val = extract($b);
+//             ^^ InvalidArgument: Argument $item of extract() expects 'Box<T>&Taggable', got 'Box<string>'
 /** @mir-check $val is string */
 echo $val;
 
@@ -35,5 +37,3 @@ $val2 = extract($tb);
 /** @mir-check $val2 is mixed */
 echo $val2;
 ===expect===
-UnusedParam@15:17-15:28: Parameter $item is never used
-InvalidArgument@21:15-21:17: Argument $item of extract() expects 'Box<T>&Taggable', got 'Box<string>'

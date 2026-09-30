@@ -17,7 +17,7 @@ class C {
 function doWork(C $c, mixed $p): void {
     if ($c->isInt($p)) {
         strlen($p);
+//             ^^ ArgumentTypeCoercion: Argument $string of strlen() expects 'string', got 'int' — coercion may fail at runtime
     }
 }
 ===expect===
-ArgumentTypeCoercion@14:15-14:17: Argument $string of strlen() expects 'string', got 'int' — coercion may fail at runtime

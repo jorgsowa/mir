@@ -15,7 +15,7 @@ function test(): void {
     $box = new Box();
     foreach ($box->items() as $item) {
         $item->undefinedMethod();
+//      ^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Item::undefinedMethod() does not exist
     }
 }
 ===expect===
-UndefinedMethod@14:8-14:32: Method Item::undefinedMethod() does not exist

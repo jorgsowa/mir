@@ -8,5 +8,5 @@ suppress=UnusedParam
 ===file===
 <?php
 function f(MongoDB\Driver\NotARealClass $x): void {}
+//         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedClass: Class MongoDB\Driver\NotARealClass does not exist
 ===expect===
-UndefinedClass@2:11-2:39: Class MongoDB\Driver\NotARealClass does not exist

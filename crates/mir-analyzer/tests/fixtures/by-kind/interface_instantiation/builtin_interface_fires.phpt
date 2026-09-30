@@ -5,5 +5,5 @@ suppress=UnusedVariable
 ===file===
 <?php
 $t = new Traversable();
+//       ^^^^^^^^^^^ InterfaceInstantiation: Cannot instantiate interface Traversable
 ===expect===
-InterfaceInstantiation@2:9-2:20: Cannot instantiate interface Traversable

@@ -7,7 +7,7 @@ Callable with too many args
  */
 function test(callable $fn): void {
     $fn('hello', 'world');
+//               ^^^^^^^ TooManyArguments: Too many arguments for callable(): expected 1, got 2
 }
 
 ===expect===
-TooManyArguments@6:17-6:24: Too many arguments for callable(): expected 1, got 2

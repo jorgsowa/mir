@@ -11,6 +11,6 @@ suppress=UnusedParam
 function register(Closure $cb): void {}
 
 register(function (int $a, string $b): void {});
+//       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $cb of register() expects 'callable with 1 required parameter(s)', got 'callable with 2 required parameter(s)'
 
 ===expect===
-InvalidArgument@5:9-5:46: Argument $cb of register() expects 'callable with 1 required parameter(s)', got 'callable with 2 required parameter(s)'

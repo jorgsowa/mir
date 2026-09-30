@@ -6,7 +6,7 @@ suppress=MixedPropertyFetch
 ===file===
 <?php
 if (!isset($obj) || $obj->prop->method()) {
+//                  ^^^^^^^^^^^^^^^^^^^^ MixedMethodCall: Method method() called on mixed type
     // After fix: $obj should be narrowed as defined in RHS
 }
 ===expect===
-MixedMethodCall@2:20-2:40: Method method() called on mixed type

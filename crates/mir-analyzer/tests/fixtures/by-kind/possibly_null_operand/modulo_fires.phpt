@@ -4,6 +4,6 @@ PossiblyNullOperand fires for the modulo operator when the divisor might be null
 <?php
 function remainder(int $a, ?int $b): int {
     return $a % $b;
+//         ^^^^^^^ PossiblyNullOperand: Operator '%' operand 'int|null' might be null
 }
 ===expect===
-PossiblyNullOperand@3:11-3:18: Operator '%' operand 'int|null' might be null

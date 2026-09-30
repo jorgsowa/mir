@@ -26,13 +26,13 @@ class IntBox extends Box {}
 function viaInstanceFcc(IntBox $box): void {
     $fn = $box->set(...);
     $fn("bad-not-int");
+//      ^^^^^^^^^^^^^ InvalidArgument: Argument $x of {closure}() expects 'int', got '"bad-not-int"'
 }
 
 /** @param IntBox<int> $box */
 function viaStaticFccThroughReceiver(IntBox $box): void {
     $fn = $box::make(...);
     $fn("also-bad");
+//      ^^^^^^^^^^ InvalidArgument: Argument $x of {closure}() expects 'int', got '"also-bad"'
 }
 ===expect===
-InvalidArgument@16:8-16:21: Argument $x of {closure}() expects 'int', got '"bad-not-int"'
-InvalidArgument@22:8-22:18: Argument $x of {closure}() expects 'int', got '"also-bad"'

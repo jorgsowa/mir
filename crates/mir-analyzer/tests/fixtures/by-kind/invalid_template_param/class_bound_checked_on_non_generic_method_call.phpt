@@ -20,6 +20,7 @@ class Box {
 /** @param Box<NotAnimal> $box */
 function test_instance_call_on_bad_receiver_is_flagged($box): void {
     $box->get();
+//  ^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'NotAnimal' does not satisfy bound 'Animal'
 }
 
 /** @param Box<Animal> $box */
@@ -30,6 +31,7 @@ function test_instance_call_on_good_receiver_is_silent($box): void {
 /** @param Box<NotAnimal> $box */
 function test_static_call_on_bad_receiver_is_flagged($box): void {
     $box::make();
+//  ^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'NotAnimal' does not satisfy bound 'Animal'
 }
 
 /** @param Box<Animal> $box */
@@ -37,5 +39,3 @@ function test_static_call_on_good_receiver_is_silent($box): void {
     $box::make();
 }
 ===expect===
-InvalidTemplateParam@13:4-13:15: Template type 'T' inferred as 'NotAnimal' does not satisfy bound 'Animal'
-InvalidTemplateParam@23:4-23:16: Template type 'T' inferred as 'NotAnimal' does not satisfy bound 'Animal'

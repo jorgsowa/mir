@@ -38,7 +38,7 @@ function narrowsOnNull(?Bar $bar): void {
 function doesNotNarrowWhenReturnIsNullable(?Bar $bar): void {
     if ($bar?->maybeVal() !== null) {
         $bar->ping();
+//      ^^^^^^^^^^^^ PossiblyNullMethodCall: Cannot call method ping() on possibly null value
     }
 }
 ===expect===
-PossiblyNullMethodCall@29:8-29:20: Cannot call method ping() on possibly null value

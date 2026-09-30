@@ -4,6 +4,6 @@ PossiblyNullOperand fires when the right operand of concatenation might be null.
 <?php
 function combine(string $x, ?string $sfx): string {
     return $x . $sfx;
+//              ^^^^ PossiblyNullOperand: Operator '.' operand 'string|null' might be null
 }
 ===expect===
-PossiblyNullOperand@3:16-3:20: Operator '.' operand 'string|null' might be null

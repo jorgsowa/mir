@@ -5,8 +5,8 @@ the union does not exist.
 <?php
 /** @return GhostClass|null */
 function maybeGhost(): mixed {
+//       ^^^^^^^^^^ UndefinedDocblockClass: Docblock type 'GhostClass' does not exist
     return null;
 }
 
 ===expect===
-UndefinedDocblockClass@3:9-3:19: Docblock type 'GhostClass' does not exist

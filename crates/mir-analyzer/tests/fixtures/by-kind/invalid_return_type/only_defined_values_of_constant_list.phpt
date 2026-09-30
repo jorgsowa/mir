@@ -9,8 +9,8 @@ class A {
     /** @return key-of<A::FOO> */
     public function getValue() {
         return "adams";
+//      ^^^^^^^^^^^^^^^ InvalidReturnType: Return type '"adams"' is not compatible with declared 'key-of<A::FOO>'
     }
 }
 
 ===expect===
-InvalidReturnType@8:8-8:23: Return type '"adams"' is not compatible with declared 'key-of<A::FOO>'

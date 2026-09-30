@@ -6,6 +6,6 @@ suppress=UnusedVariable
 ===file===
 <?php
 $x = (int)[];
+//        ^^ InvalidCast: Cannot cast 'array{}' to 'int'
 
 ===expect===
-InvalidCast@2:10-2:12: Cannot cast 'array{}' to 'int'

@@ -7,5 +7,5 @@ suppress=UnusedVariable
 class MyException extends \Exception {}
 $e = new MyException();
 $result = $e instanceof myexception;
+//                      ^^^^^^^^^^^ WrongCaseClass: Class name 'myexception' has incorrect casing; use 'MyException'
 ===expect===
-WrongCaseClass@4:24-4:35: Class name 'myexception' has incorrect casing; use 'MyException'

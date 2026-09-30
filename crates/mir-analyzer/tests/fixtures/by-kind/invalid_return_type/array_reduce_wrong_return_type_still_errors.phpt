@@ -10,6 +10,6 @@ suppress=UnusedVariable
  */
 function sumInts(array $ints): string {
     return array_reduce($ints, fn(int $c, int $x): int => $c + $x, 0);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'int' is not compatible with declared 'string'
 }
 ===expect===
-InvalidReturnType@7:4-7:70: Return type 'int' is not compatible with declared 'string'

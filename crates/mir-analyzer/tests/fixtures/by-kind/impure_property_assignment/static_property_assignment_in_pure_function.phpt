@@ -12,7 +12,7 @@ class Counter {
     /** @pure */
     public static function bump(): void {
         self::$count = 5;
+//      ^^^^^^^^^^^^^^^^ ImpureStaticPropertyAssignment: Assigning to static property Counter::$count in a @pure function
     }
 }
 ===expect===
-ImpureStaticPropertyAssignment@7:8-7:24: Assigning to static property Counter::$count in a @pure function

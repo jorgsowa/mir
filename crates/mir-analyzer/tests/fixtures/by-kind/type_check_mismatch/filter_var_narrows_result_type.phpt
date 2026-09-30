@@ -47,9 +47,9 @@ function test_ip(string $s): void {
 // A 3rd (options) argument may carry FILTER_NULL_ON_FAILURE — bail to mixed.
 function test_with_options_bails_to_stub(string $s): void {
     $v = filter_var($s, FILTER_VALIDATE_INT, FILTER_NULL_ON_FAILURE);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MixedAssignment: Variable $v is assigned a mixed type
     /** @mir-check $v is mixed */
     $_ = $v;
+//  ^^^^^^^ MixedAssignment: Variable $_ is assigned a mixed type
 }
 ===expect===
-MixedAssignment@40:4-40:68: Variable $v is assigned a mixed type
-MixedAssignment@42:4-42:11: Variable $_ is assigned a mixed type

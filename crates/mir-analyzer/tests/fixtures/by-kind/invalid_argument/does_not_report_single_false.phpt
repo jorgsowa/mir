@@ -7,6 +7,6 @@ suppress=ForbiddenCode
 function takesInt(int $n): void { var_dump($n); }
 function test(): void {
     takesInt(false);
+//           ^^^^^ InvalidArgument: Argument $n of takesInt() expects 'int', got 'false'
 }
 ===expect===
-InvalidArgument@4:13-4:18: Argument $n of takesInt() expects 'int', got 'false'

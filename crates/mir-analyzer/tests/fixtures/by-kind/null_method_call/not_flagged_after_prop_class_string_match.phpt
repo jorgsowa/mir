@@ -17,20 +17,20 @@ final class Widget {
 
 function narrows(?Widget $w): void {
     if ($w->type === Foo::class) {
+//      ^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $type on possibly null value
         $w->realMethod();
     }
 }
 
 function narrowsSymmetric(?Widget $w): void {
     if (Foo::class === $w->type) {
+//                     ^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $type on possibly null value
         $w->realMethod();
     }
 }
 
 function stillFlaggedWithoutMatch(?Widget $w): void {
     $w->realMethod();
+//  ^^^^^^^^^^^^^^^^ PossiblyNullMethodCall: Cannot call method realMethod() on possibly null value
 }
 ===expect===
-PossiblyNullPropertyFetch@11:8-11:16: Cannot access property $type on possibly null value
-PossiblyNullPropertyFetch@17:23-17:31: Cannot access property $type on possibly null value
-PossiblyNullMethodCall@23:4-23:20: Cannot call method realMethod() on possibly null value

@@ -17,6 +17,6 @@ function test(): void {
     /** @var Box<Cat> $c */
     $c = new Box();
     f($c);
+//    ^^ InvalidArgument: Argument $b of f() expects 'Box<Animal>', got 'Box<Cat>'
 }
 ===expect===
-InvalidArgument@14:6-14:8: Argument $b of f() expects 'Box<Animal>', got 'Box<Cat>'

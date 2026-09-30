@@ -16,10 +16,10 @@ abstract class Base {
 class Mid extends Base {
     public static function relay(Base $x): void {
         parent::accept($x);
+//      ^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'Base' does not satisfy bound 'Mid'
     }
     public static function relayValid(): void {
         parent::accept(new Mid());
     }
 }
 ===expect===
-InvalidTemplateParam@11:8-11:26: Template type 'T' inferred as 'Base' does not satisfy bound 'Mid'

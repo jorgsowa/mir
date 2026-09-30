@@ -8,8 +8,8 @@ Set in loop thats always entered but not referenced
 function getLastNum(array $a): int {
     foreach ($a as $num) {
         $last = $num;
+//      ^^^^^ UnusedVariable: Variable $last is never read
     }
     return 4;
 }
 ===expect===
-UnusedVariable@7:8-7:13: Variable $last is never read

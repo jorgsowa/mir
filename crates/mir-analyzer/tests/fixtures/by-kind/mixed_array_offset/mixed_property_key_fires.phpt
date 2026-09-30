@@ -11,7 +11,7 @@ class Router {
     public function dispatch(): void {
         $handlers = ['home' => 'HomeHandler', 'about' => 'AboutHandler'];
         echo $handlers[$this->route];
+//                     ^^^^^^^^^^^^ MixedArrayOffset: Mixed type used as array offset
     }
 }
 ===expect===
-MixedArrayOffset@8:23-8:35: Mixed type used as array offset

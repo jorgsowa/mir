@@ -9,8 +9,8 @@ function scope(int $n): void {
         case "integer":
             break;
         case "string":
+//           ^^^^^^^^ UnevaluatedCode: Unevaluated code: gettype() of int never returns "string"
             break;
     }
 }
 ===expect===
-UnevaluatedCode@6:13-6:21: Unevaluated code: gettype() of int never returns "string"

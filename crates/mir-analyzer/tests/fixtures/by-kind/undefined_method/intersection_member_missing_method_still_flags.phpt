@@ -19,7 +19,7 @@ namespace App {
      */
     function f($x): void {
         $x->missing();
+//      ^^^^^^^^^^^^^ UndefinedMethod: Method App\Foo&Glob::missing() does not exist
     }
 }
 ===expect===
-UndefinedMethod@15:8-15:21: Method App\Foo&Glob::missing() does not exist

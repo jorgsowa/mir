@@ -7,6 +7,6 @@ suppress=UnusedVariable
 <?php
 $x = [];
 $y = (array)$x;
+//          ^^ RedundantCast: Casting 'array{}' to 'array' is redundant
 
 ===expect===
-RedundantCast@3:12-3:14: Casting 'array{}' to 'array' is redundant

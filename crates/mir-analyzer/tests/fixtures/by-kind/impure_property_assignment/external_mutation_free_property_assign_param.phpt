@@ -12,7 +12,7 @@ class Configurator {
     /** @psalm-external-mutation-free */
     public function configure(Config $cfg): void {
         $cfg->mode = 'active';
+//      ^^^^^^^^^^^^^^^^^^^^^ ImpurePropertyAssignment: Assigning to property mode of a parameter in a pure or external-mutation-free context
     }
 }
 ===expect===
-ImpurePropertyAssignment@10:8-10:29: Assigning to property mode of a parameter in a pure or external-mutation-free context

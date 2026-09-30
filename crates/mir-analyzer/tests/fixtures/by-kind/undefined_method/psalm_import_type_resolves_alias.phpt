@@ -20,6 +20,6 @@ class Service {}
 function test(Service $s): void {
     $s->find()->greet();
     $s->find()->missing();
+//  ^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method User::missing() does not exist
 }
 ===expect===
-UndefinedMethod@19:4-19:25: Method User::missing() does not exist

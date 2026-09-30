@@ -19,6 +19,6 @@ class Box {
 /** @pure */
 function run(Box $box): void {
     $box->cache->bump();
+//  ^^^^^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method bump() in a pure or immutable context
 }
 ===expect===
-ImpureMethodCall@13:4-13:23: Calling impure method bump() in a pure or immutable context

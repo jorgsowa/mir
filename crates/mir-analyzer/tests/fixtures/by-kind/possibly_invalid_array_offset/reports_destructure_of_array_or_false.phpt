@@ -8,7 +8,7 @@ suppress=ForbiddenCode,MixedAssignment
 function get(): array|false { return false; }
 function test(): void {
     [$a, $b] = get();
+//  ^^^^^^^^^^^^^^^^ PossiblyInvalidArrayOffset: Array offset might be invalid: expects 'array', got 'array|false'
     var_dump($a, $b);
 }
 ===expect===
-PossiblyInvalidArrayOffset@5:4-5:20: Array offset might be invalid: expects 'array', got 'array|false'

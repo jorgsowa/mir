@@ -6,6 +6,6 @@ actually part of the extension must still be flagged undefined.
 <?php
 function inspect(string $code): void {
     ast\parse_codee($code, 90);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function ast\parse_codee() is not defined
 }
 ===expect===
-UndefinedFunction@3:4-3:30: Function ast\parse_codee() is not defined

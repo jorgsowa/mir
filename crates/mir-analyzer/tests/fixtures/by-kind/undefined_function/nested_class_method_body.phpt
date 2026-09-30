@@ -6,8 +6,8 @@ function outer(): void {
     class Inner {
         public function f(): void {
             nonexistent_function();
+//          ^^^^^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function nonexistent_function() is not defined
         }
     }
 }
 ===expect===
-UndefinedFunction@5:12-5:34: Function nonexistent_function() is not defined

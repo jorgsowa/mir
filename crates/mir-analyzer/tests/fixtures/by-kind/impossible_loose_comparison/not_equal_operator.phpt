@@ -6,7 +6,7 @@ suppress=UnusedVariable,UnusedParam
 <?php
 function test(\stdClass $obj): void {
     if ($obj != null) {}
+//      ^^^^^^^^^^^^ ImpossibleLooseComparison: '!=' between 'stdClass' and 'null' is always true — these types can never be loosely equal
+//      ^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
 }
 ===expect===
-ImpossibleLooseComparison@3:8-3:20: '!=' between 'stdClass' and 'null' is always true — these types can never be loosely equal
-RedundantCondition@3:8-3:20: Condition is always true/false for type 'bool'

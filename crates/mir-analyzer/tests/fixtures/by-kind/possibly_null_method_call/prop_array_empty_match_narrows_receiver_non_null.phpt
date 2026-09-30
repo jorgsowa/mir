@@ -16,12 +16,14 @@ class Foo {
 
 function viaStrictEmpty(?Foo $foo): void {
     if ($foo->items === []) {
+//      ^^^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $items on possibly null value
         $foo->ping();
     }
 }
 
 function viaLooseEmpty(?Foo $foo): void {
     if ($foo->items == []) {
+//      ^^^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $items on possibly null value
         $foo->ping();
     }
 }
@@ -29,11 +31,9 @@ function viaLooseEmpty(?Foo $foo): void {
 // Negative: the excluded branch proves nothing about $foo itself.
 function viaStrictNotEmptyFalseBranch(?Foo $foo): void {
     if (!($foo->items === [])) {
+//        ^^^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $items on possibly null value
         $foo->ping();
+//      ^^^^^^^^^^^^ PossiblyNullMethodCall: Cannot call method ping() on possibly null value
     }
 }
 ===expect===
-PossiblyNullPropertyFetch@10:8-10:19: Cannot access property $items on possibly null value
-PossiblyNullPropertyFetch@16:8-16:19: Cannot access property $items on possibly null value
-PossiblyNullPropertyFetch@23:10-23:21: Cannot access property $items on possibly null value
-PossiblyNullMethodCall@24:8-24:20: Cannot call method ping() on possibly null value

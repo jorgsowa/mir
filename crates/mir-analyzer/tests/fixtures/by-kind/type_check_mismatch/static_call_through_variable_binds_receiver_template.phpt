@@ -27,6 +27,6 @@ function reads_bound_template(Box $b): void {
 /** @param Box<int> $b */
 function checks_bound_template(Box $b): void {
     $b::make('not an int');
+//           ^^^^^^^^^^^^ InvalidArgument: Argument $seed of make() expects 'int', got '"not an int"'
 }
 ===expect===
-InvalidArgument@21:13-21:25: Argument $seed of make() expects 'int', got '"not an int"'

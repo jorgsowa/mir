@@ -15,6 +15,6 @@ enum Status implements Greeter {
     case Active;
     case Inactive;
     public function greet(Dog $a): string { return "hi"; }
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method Status::greet() signature mismatch: parameter $a type 'Dog' is narrower than parent type 'Animal'
 }
 ===expect===
-MethodSignatureMismatch@11:4-11:58: Method Status::greet() signature mismatch: parameter $a type 'Dog' is narrower than parent type 'Animal'

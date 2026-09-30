@@ -8,6 +8,6 @@ Possibly invalid generic clone
  */
 function foo($a): void {
     clone $a;
+//  ^^^^^^^^ PossiblyInvalidClone: cannot clone possibly non-object int|Exception
 }
 ===expect===
-PossiblyInvalidClone@7:4-7:12: cannot clone possibly non-object int|Exception

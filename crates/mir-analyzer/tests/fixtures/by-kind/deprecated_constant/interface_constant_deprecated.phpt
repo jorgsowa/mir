@@ -10,5 +10,5 @@ interface Flags {
 }
 
 $v = Flags::OLD_FLAG;
+//          ^^^^^^^^ DeprecatedConstant: Constant Flags::OLD_FLAG is deprecated: use FLAG_NEW instead
 ===expect===
-DeprecatedConstant@7:12-7:20: Constant Flags::OLD_FLAG is deprecated: use FLAG_NEW instead

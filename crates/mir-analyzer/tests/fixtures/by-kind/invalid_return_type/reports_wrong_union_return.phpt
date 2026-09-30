@@ -5,6 +5,6 @@ reports wrong union return
 function f(): int {
     $x = true ? 1 : 'hello';
     return $x;
+//  ^^^^^^^^^^ InvalidReturnType: Return type '1|"hello"' is not compatible with declared 'int'
 }
 ===expect===
-InvalidReturnType@4:4-4:14: Return type '1|"hello"' is not compatible with declared 'int'

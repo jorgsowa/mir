@@ -16,9 +16,9 @@ class CustomerData {
 function foo(array $input) : CustomerData {
     return new CustomerData(
         aage: $input["age"],
+//      ^^^^^^^^^^^^^^^^^^^ InvalidNamedArgument: CustomerData::__construct() has no parameter named $aage
         name: $input["name"],
         email: $input["email"],
     );
 }
 ===expect===
-InvalidNamedArgument@15:8-15:27: CustomerData::__construct() has no parameter named $aage

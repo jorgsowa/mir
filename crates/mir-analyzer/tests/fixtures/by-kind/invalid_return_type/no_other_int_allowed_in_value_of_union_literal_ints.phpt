@@ -7,7 +7,7 @@ No other int allowed in value of union literal ints
  */
 function getValue() {
     return 5;
+//  ^^^^^^^^^ InvalidReturnType: Return type '5' is not compatible with declared '0|1|2|3|4'
 }
 
 ===expect===
-InvalidReturnType@6:4-6:13: Return type '5' is not compatible with declared '0|1|2|3|4'

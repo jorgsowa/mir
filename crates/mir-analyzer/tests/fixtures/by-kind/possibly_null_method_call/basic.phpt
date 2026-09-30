@@ -7,6 +7,6 @@ class Foo {
 }
 function test(?Foo $obj): void {
     $obj->bar();
+//  ^^^^^^^^^^^ PossiblyNullMethodCall: Cannot call method bar() on possibly null value
 }
 ===expect===
-PossiblyNullMethodCall@6:4-6:15: Cannot call method bar() on possibly null value

@@ -6,5 +6,5 @@ suppress=UnusedParam
 <?php
 function fooFoo(int $a): void {}
 fooFoo(null);
+//     ^^^^ NullArgument: Argument $a of fooFoo() cannot be null
 ===expect===
-NullArgument@3:7-3:11: Argument $a of fooFoo() cannot be null

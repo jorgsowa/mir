@@ -6,5 +6,5 @@ suppress=MixedAssignment,UnusedVariable
 <?php
 $x = rand(0, 5) > 2 ? ["a" => 5] : "hello";
 $y = $x[0];
+//      ^ NonExistentArrayOffset: Array offset '0' does not exist
 ===expect===
-NonExistentArrayOffset@3:8-3:9: Array offset '0' does not exist

@@ -12,7 +12,7 @@ class Box {
 
     public function drop(string $k): void {
         unset($this->items[$k]);
+//            ^^^^^^^^^^^^^^^^ ReadonlyPropertyAssignment: Cannot assign to readonly property Box::$items outside of constructor
     }
 }
 ===expect===
-ReadonlyPropertyAssignment@6:14-6:30: Cannot assign to readonly property Box::$items outside of constructor

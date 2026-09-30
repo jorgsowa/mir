@@ -15,8 +15,8 @@ final class Db {
     }
     public function insertWithoutConnect(): int {
         return $this->connection->lastId;
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'int|null' is not compatible with declared 'int'
+//             ^^^^^^^^^^^^^^^^^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $lastId on possibly null value
     }
 }
 ===expect===
-NullableReturnStatement@12:8-12:41: Return type 'int|null' is not compatible with declared 'int'
-PossiblyNullPropertyFetch@12:15-12:40: Cannot access property $lastId on possibly null value

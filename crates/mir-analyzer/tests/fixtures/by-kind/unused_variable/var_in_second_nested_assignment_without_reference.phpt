@@ -9,6 +9,6 @@ if (rand(0, 1)) {
 
 if (rand(0, 1)) {
     $a = "foo";
+//  ^^ UnusedVariable: Variable $a is never read
 }
 ===expect===
-UnusedVariable@8:4-8:6: Variable $a is never read

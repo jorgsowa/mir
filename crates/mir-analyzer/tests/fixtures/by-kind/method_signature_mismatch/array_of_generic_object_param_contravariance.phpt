@@ -27,6 +27,6 @@ class ValidWideningImpl extends Base {
 class InvalidNarrowingImpl extends Base {
     /** @param array<int, Kitten> $items */
     public function process(array $items): void {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method InvalidNarrowingImpl::process() signature mismatch: parameter $items type 'array<int, Kitten>' is narrower than parent type 'array<int, Cat>'
 }
 ===expect===
-MethodSignatureMismatch@21:4-21:50: Method InvalidNarrowingImpl::process() signature mismatch: parameter $items type 'array<int, Kitten>' is narrower than parent type 'array<int, Cat>'

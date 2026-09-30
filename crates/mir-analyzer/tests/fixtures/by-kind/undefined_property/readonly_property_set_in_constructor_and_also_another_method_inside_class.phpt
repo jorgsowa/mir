@@ -14,7 +14,7 @@ class A {
 
     public function setBar() : void {
         $this->bar = "goodbye";
+//      ^^^^^^^^^^^^^^^^^^^^^^ ReadonlyPropertyAssignment: Cannot assign to readonly property A::$bar outside of constructor
     }
 }
 ===expect===
-ReadonlyPropertyAssignment@13:8-13:30: Cannot assign to readonly property A::$bar outside of constructor

@@ -12,8 +12,10 @@ suppress=UnusedVariable,MissingConstructor
 function plainListLiteralStaysList(): void {
     $arr = [1, 2, 3];
     if (array_is_list($arr)) {
+//      ^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         /** @mir-check $_ is never */
         $_ = 1;
+//      ^^^^^^^ TypeCheckMismatch: Type of $_ is expected to be never, got mixed
     }
 }
 
@@ -21,6 +23,7 @@ function keyExistsStringKeyBreaksListNarrowing(): void {
     $arr = [1, 2, 3];
     if (array_key_exists('foo', $arr)) {
         if (array_is_list($arr)) {
+//          ^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
             /** @mir-check $_ is never */
             $_ = 1;
         }
@@ -31,14 +34,11 @@ function keyExistsContiguousIntKeyPreservesList(): void {
     $arr = [1, 2, 3];
     if (array_key_exists(3, $arr)) {
         if (array_is_list($arr)) {
+//          ^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
             /** @mir-check $_ is never */
             $_ = 1;
+//          ^^^^^^^ TypeCheckMismatch: Type of $_ is expected to be never, got mixed
         }
     }
 }
 ===expect===
-RedundantCondition@4:8-4:27: Condition is always true/false for type 'bool'
-TypeCheckMismatch@6:8-6:15: Type of $_ is expected to be never, got mixed
-RedundantCondition@13:12-13:31: Condition is always true/false for type 'bool'
-RedundantCondition@23:12-23:31: Condition is always true/false for type 'bool'
-TypeCheckMismatch@25:12-25:19: Type of $_ is expected to be never, got mixed

@@ -9,6 +9,7 @@ suppress=MissingThrowsDocblock
 ===file===
 <?php
 function h(\ReflectionClass $reflectionClass): void {
+//         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedParam: Parameter $reflectionClass is never used
     try {
         maybeThrow();
     } catch (\Throwable $e) {
@@ -18,4 +19,3 @@ function h(\ReflectionClass $reflectionClass): void {
 
 function maybeThrow(): void {}
 ===expect===
-UnusedParam@2:11-2:44: Parameter $reflectionClass is never used

@@ -19,8 +19,8 @@ final class Db {
     public function insert(): int {
         $this->reset();
         return $this->connection->lastId;
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'int|null' is not compatible with declared 'int'
+//             ^^^^^^^^^^^^^^^^^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $lastId on possibly null value
     }
 }
 ===expect===
-NullableReturnStatement@17:8-17:41: Return type 'int|null' is not compatible with declared 'int'
-PossiblyNullPropertyFetch@17:15-17:40: Cannot access property $lastId on possibly null value

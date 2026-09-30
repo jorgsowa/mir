@@ -19,6 +19,6 @@ class Item { public function process(): void {} }
 function test(object $c): void {
     /** @var Container<Item>&Taggable $c */
     $c->get()->undefinedMethod();
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Item::undefinedMethod() does not exist
 }
 ===expect===
-UndefinedMethod@18:4-18:32: Method Item::undefinedMethod() does not exist

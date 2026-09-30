@@ -16,16 +16,19 @@ class TypedMap {}
 function test_too_few_type_args(): void {
     /** @var TypedMap<string> $m */
     $m = new TypedMap();
+//  ^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: TypedMap expects 2 template argument(s), got 1
 }
 
 function test_too_many_type_args(): void {
     /** @var TypedMap<string, int, bool> $m */
     $m = new TypedMap();
+//  ^^^^^^^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: TypedMap expects 2 template argument(s), got 3
 }
 
 function test_bare_generic_reference_stays_silent(): void {
     /** @var TypedMap $m */
     $m = new TypedMap();
+//  ^^^^^^^^^^^^^^^^^^^^ UnnecessaryVarAnnotation: @var annotation for $m is unnecessary
 }
 
 function test_correct_arity_stays_silent(): void {
@@ -33,6 +36,3 @@ function test_correct_arity_stays_silent(): void {
     $m = new TypedMap();
 }
 ===expect===
-InvalidDocblock@10:4-10:24: Invalid docblock: TypedMap expects 2 template argument(s), got 1
-InvalidDocblock@15:4-15:24: Invalid docblock: TypedMap expects 2 template argument(s), got 3
-UnnecessaryVarAnnotation@20:4-20:24: @var annotation for $m is unnecessary

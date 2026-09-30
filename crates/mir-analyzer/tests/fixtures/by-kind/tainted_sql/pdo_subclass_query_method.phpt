@@ -7,6 +7,6 @@ suppress=MixedArgument,MixedArrayAccess
 class AppDatabase extends PDO {}
 function run_query(AppDatabase $pdo): void {
     $pdo->query($_GET['sql']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedSql: Tainted SQL query — possible SQL injection
 }
 ===expect===
-TaintedSql@4:4-4:29: Tainted SQL query — possible SQL injection

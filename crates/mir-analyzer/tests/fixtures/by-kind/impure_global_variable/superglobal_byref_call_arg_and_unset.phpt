@@ -13,8 +13,8 @@ suppress=MixedArgument,MixedArrayAccess,ImpureFunctionCall
 /** @pure */
 function f(): void {
     sort($_SESSION);
+//       ^^^^^^^^^ ImpureGlobalVariable: Using global variable $_SESSION in a @pure function
     unset($_SESSION['key']);
+//        ^^^^^^^^^^^^^^^^ ImpureGlobalVariable: Using global variable $_SESSION in a @pure function
 }
 ===expect===
-ImpureGlobalVariable@4:9-4:18: Using global variable $_SESSION in a @pure function
-ImpureGlobalVariable@5:10-5:26: Using global variable $_SESSION in a @pure function

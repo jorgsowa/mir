@@ -8,5 +8,5 @@ function getNumber(): int
 }
 $n = getNumber();
 echo $n[0];
+//   ^^^^^ InvalidArrayAccess: Cannot use [] operator on non-array type 'int'
 ===expect===
-InvalidArrayAccess@7:5-7:10: Cannot use [] operator on non-array type 'int'

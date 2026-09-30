@@ -24,6 +24,6 @@ function reassignedToTaintedStaysTainted(): void {
     $x = $_GET['x'];
     $x = $_POST['y'];
     echo $x;
+//  ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 ===expect===
-TaintedHtml@17:4-17:12: Tainted HTML output — possible XSS

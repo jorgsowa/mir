@@ -14,6 +14,7 @@ class Error { }
  * @param Pair<L, R> $pair
  */
 function processPair(Pair $pair): void {}
+//                   ^^^^^^^^^^ UnusedParam: Parameter $pair is never used
 
 function test(): void {
     // Multiple templates - should not report InvalidArgument for L, R
@@ -22,4 +23,3 @@ function test(): void {
     processPair($pair);
 }
 ===expect===
-UnusedParam@13:21-13:31: Parameter $pair is never used

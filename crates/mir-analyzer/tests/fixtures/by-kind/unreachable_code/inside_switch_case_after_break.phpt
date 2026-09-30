@@ -7,7 +7,7 @@ function test(int $mode): void {
         case 1:
             break;
             echo 'unreachable';
+//          ^^^^^^^^^^^^^^^^^^^ UnreachableCode: Unreachable code detected
     }
 }
 ===expect===
-UnreachableCode@6:12-6:31: Unreachable code detected

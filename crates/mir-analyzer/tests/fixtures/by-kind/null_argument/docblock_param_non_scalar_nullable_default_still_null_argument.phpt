@@ -8,9 +8,9 @@ docblock must still accept a literal `null` argument.
 final class Service {
     /** @param list<string> $ids */
     public function getAll(?array $ids = null): array {
+//                         ^^^^^^^^^^^^^^^^^^ UnusedParam: Parameter $ids is never used
         return [];
     }
 }
 (new Service())->getAll(null);
 ===expect===
-UnusedParam@4:27-4:45: Parameter $ids is never used

@@ -9,7 +9,7 @@ function takesInts(int ...$ns): void { var_dump($ns); }
 function getResult(): int|false { return 1; }
 function test(): void {
     takesInts(getResult(), getResult());
+//            ^^^^^^^^^^^ PossiblyInvalidArgument: Argument $ns of takesInts() expects 'int', possibly different type 'int|false' provided
+//                         ^^^^^^^^^^^ PossiblyInvalidArgument: Argument $ns of takesInts() expects 'int', possibly different type 'int|false' provided
 }
 ===expect===
-PossiblyInvalidArgument@6:14-6:25: Argument $ns of takesInts() expects 'int', possibly different type 'int|false' provided
-PossiblyInvalidArgument@6:27-6:38: Argument $ns of takesInts() expects 'int', possibly different type 'int|false' provided

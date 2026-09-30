@@ -11,7 +11,7 @@ class A {
     public function barBar(): void
     {
         self::$foo = rand(0, 1) ? 5 : "hello";
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $foo expects 'string', cannot assign '5|"hello"'
     }
 }
 ===expect===
-InvalidPropertyAssignment@8:8-8:45: Property $foo expects 'string', cannot assign '5|"hello"'

@@ -10,8 +10,8 @@ interface I2 {
 }
 class A implements I1, I2 {
   public function foo(): string {
+//^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method A::foo() signature mismatch: return type 'string' is not a subtype of I2::foo() 'int'
     return "hello";
   }
 }
 ===expect===
-MethodSignatureMismatch@9:2-9:33: Method A::foo() signature mismatch: return type 'string' is not a subtype of I2::foo() 'int'

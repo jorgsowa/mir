@@ -17,6 +17,6 @@ class ServiceB {
 }
 function test(ServiceA|ServiceB $service): void {
     $service->doSomething(1);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^ TooFewArguments: Too few arguments for doSomething(): expected 2, got 1
 }
 ===expect===
-TooFewArguments@13:4-13:28: Too few arguments for doSomething(): expected 2, got 1

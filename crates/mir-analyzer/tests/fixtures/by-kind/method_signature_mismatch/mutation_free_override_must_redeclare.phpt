@@ -11,9 +11,9 @@ interface Counter {
 class Mutates implements Counter {
     public int $calls = 0;
     public function peek(): int {
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method Mutates::peek() signature mismatch: Counter::peek() is declared @mutation-free and must be re-declared @mutation-free when overridden
         $this->calls++;
         return $this->calls;
     }
 }
 ===expect===
-MethodSignatureMismatch@8:4-8:33: Method Mutates::peek() signature mismatch: Counter::peek() is declared @mutation-free and must be re-declared @mutation-free when overridden

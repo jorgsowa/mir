@@ -7,6 +7,6 @@ enum Status: string {
 }
 function test(Status $status): void {
     echo $status->label;
+//                ^^^^^ UndefinedProperty: Property Status::$label does not exist
 }
 ===expect===
-UndefinedProperty@6:18-6:23: Property Status::$label does not exist

@@ -12,6 +12,6 @@ define('MY_CONST', 'foo');
 
 function f(): bool {
     return MY_CONST === 'bar';
+//         ^^^^^^^^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between '"foo"' and '"bar"' is always false — these types can never be identical
 }
 ===expect===
-ImpossibleIdenticalComparison@6:11-6:29: '===' between '"foo"' and '"bar"' is always false — these types can never be identical

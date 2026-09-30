@@ -16,5 +16,5 @@ enum Flags {
 }
 
 Flags::set(8);
+//         ^ InvalidArgument: Argument $flags of set() expects '0|1|2|3', got '8'
 ===expect===
-InvalidArgument@12:11-12:12: Argument $flags of set() expects '0|1|2|3', got '8'

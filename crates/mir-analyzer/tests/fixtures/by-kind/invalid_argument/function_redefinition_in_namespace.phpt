@@ -5,6 +5,6 @@ Function redefinition in same namespace
 namespace Aye {
     function foo(): void {}
     function foo(): void {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^ DuplicateFunction: Function Aye\foo() has already been defined
 }
 ===expect===
-DuplicateFunction@4:4-4:27: Function Aye\foo() has already been defined

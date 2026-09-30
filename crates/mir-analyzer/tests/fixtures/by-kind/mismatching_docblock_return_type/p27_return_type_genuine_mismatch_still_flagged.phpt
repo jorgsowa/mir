@@ -24,9 +24,9 @@ final class Other
  * @return Other
  */
 function make(): Generator
+//       ^^^^ MismatchingDocblockReturnType: Docblock return type 'App\Other' does not match inferred 'App\Generator'
 {
     return new Generator();
+//  ^^^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'App\Generator' is not compatible with declared 'App\Other'
 }
 ===expect===
-MismatchingDocblockReturnType@17:9-17:13: Docblock return type 'App\Other' does not match inferred 'App\Generator'
-InvalidReturnType@19:4-19:27: Return type 'App\Generator' is not compatible with declared 'App\Other'

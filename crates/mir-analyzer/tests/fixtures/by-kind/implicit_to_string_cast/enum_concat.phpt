@@ -9,5 +9,5 @@ enum Suit {
     case Hearts;
 }
 $s = 'Suit: ' . Suit::Hearts;
+//              ^^^^^^^^^^^^ ImplicitToStringCast: Class Suit is implicitly cast to string
 ===expect===
-ImplicitToStringCast@5:16-5:28: Class Suit is implicitly cast to string

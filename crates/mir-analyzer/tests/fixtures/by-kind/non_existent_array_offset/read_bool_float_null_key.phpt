@@ -17,6 +17,7 @@ function readBoolKeyResolvesToCanonicalSlot(): void {
 function readMissingBoolKeyIsFlagged(): void {
     $arr = ['a' => 1];
     $v = $arr[true];
+//            ^^^^ NonExistentArrayOffset: Array offset '1' does not exist
 }
 
 function readNullKeyResolvesToCanonicalSlot(): void {
@@ -29,9 +30,8 @@ function readNullKeyResolvesToCanonicalSlot(): void {
 function readFloatKeyResolvesToCanonicalSlot(): void {
     $arr = [1 => 'x', 2 => 'y'];
     $v = $arr[1.9];
+//            ^^^ ImplicitFloatToIntCast: Implicit cast from 1.9 to int truncates the fractional part
     /** @mir-check $v is 'x' */
     $_ = $v;
 }
 ===expect===
-NonExistentArrayOffset@11:14-11:18: Array offset '1' does not exist
-ImplicitFloatToIntCast@23:14-23:17: Implicit cast from 1.9 to int truncates the fractional part

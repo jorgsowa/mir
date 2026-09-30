@@ -17,10 +17,10 @@ $a = rand(0, 10) ? 1 : "two";
 switch (gettype($a)) {
     case "string":
         testInt($a);
+//              ^^ PossiblyInvalidArgument: Argument $var of testInt() expects 'int', possibly different type '1|"two"' provided
 
     case "integer":
         testString($a);
+//                 ^^ PossiblyInvalidArgument: Argument $var of testString() expects 'string', possibly different type '1|"two"' provided
 }
 ===expect===
-PossiblyInvalidArgument@14:16-14:18: Argument $var of testInt() expects 'int', possibly different type '1|"two"' provided
-PossiblyInvalidArgument@17:19-17:21: Argument $var of testString() expects 'string', possibly different type '1|"two"' provided

@@ -20,5 +20,5 @@ class Box {
 $box = new Box(1);
 $fn = $box->set(...);
 $fn("bad-not-int");
+//  ^^^^^^^^^^^^^ InvalidArgument: Argument $x of {closure}() expects 'int', got '"bad-not-int"'
 ===expect===
-InvalidArgument@13:4-13:17: Argument $x of {closure}() expects 'int', got '"bad-not-int"'

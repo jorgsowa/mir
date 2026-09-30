@@ -4,6 +4,6 @@ function throws without @throws (checked exception)
 <?php
 function riskyOperation(): void {
     throw new \Exception('fail');
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MissingThrowsDocblock: Exception Exception is thrown but not declared in @throws
 }
 ===expect===
-MissingThrowsDocblock@3:4-3:33: Exception Exception is thrown but not declared in @throws

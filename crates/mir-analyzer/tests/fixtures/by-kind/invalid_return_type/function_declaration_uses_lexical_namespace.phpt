@@ -13,7 +13,7 @@ namespace First {
 namespace Second {
     function helper(): string {
         return 1;
+//      ^^^^^^^^^ InvalidReturnType: Return type '1' is not compatible with declared 'string'
     }
 }
 ===expect===
-InvalidReturnType@10:8-10:17: Return type '1' is not compatible with declared 'string'

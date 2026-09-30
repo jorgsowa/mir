@@ -4,6 +4,6 @@ global namespace unknown function
 <?php
 function test(): void {
     \nonExistent();
+//  ^^^^^^^^^^^^^^ UndefinedFunction: Function nonExistent() is not defined
 }
 ===expect===
-UndefinedFunction@3:4-3:18: Function nonExistent() is not defined

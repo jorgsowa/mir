@@ -7,5 +7,5 @@ Undefined class one line in file after
  */
 new B();
 new C();
+//  ^ UndefinedClass: Class C does not exist
 ===expect===
-UndefinedClass@6:4-6:5: Class C does not exist

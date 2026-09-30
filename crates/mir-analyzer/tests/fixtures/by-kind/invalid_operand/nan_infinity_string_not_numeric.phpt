@@ -6,8 +6,8 @@ suppress=UnusedVariable
 ===file===
 <?php
 $a = "NAN" + 1;
+//   ^^^^^^^^^ InvalidOperand: Operator '+' not supported between '"NAN"' and '1'
 $b = "INF" * 2;
+//   ^^^^^^^^^ InvalidOperand: Operator '*' not supported between '"INF"' and '2'
 $c = "5" + 1;
 ===expect===
-InvalidOperand@2:5-2:14: Operator '+' not supported between '"NAN"' and '1'
-InvalidOperand@3:5-3:14: Operator '*' not supported between '"INF"' and '2'

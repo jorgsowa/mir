@@ -39,8 +39,8 @@ class MutableBox {
         // change before this closure runs, so its narrowing must NOT survive.
         return function (): int {
             return strlen($this->value);
+//                        ^^^^^^^^^^^^ PossiblyNullArgument: Argument $string of strlen() might be null
         };
     }
 }
 ===expect===
-PossiblyNullArgument@32:26-32:38: Argument $string of strlen() might be null

@@ -9,5 +9,5 @@ suppress=UnusedParam
 function g($x): void {}
 
 g('z');
+//^^^ InvalidArgument: Argument $x of g() expects '"a|b"|"c"', got '"z"'
 ===expect===
-InvalidArgument@5:2-5:5: Argument $x of g() expects '"a|b"|"c"', got '"z"'

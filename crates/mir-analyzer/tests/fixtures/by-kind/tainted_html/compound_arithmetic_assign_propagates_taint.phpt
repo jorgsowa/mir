@@ -10,6 +10,6 @@ function test(): void {
     $id = 0;
     $id += $_GET['id'];
     echo $id;
+//  ^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 ===expect===
-TaintedHtml@5:4-5:13: Tainted HTML output — possible XSS

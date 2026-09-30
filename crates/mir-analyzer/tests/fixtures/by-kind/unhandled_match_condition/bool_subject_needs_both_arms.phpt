@@ -15,6 +15,7 @@ function both_arms(bool $b): string {
 
 function missing_false(bool $b): string {
     return match ($b) { true => 'yes' };
+//         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnhandledMatchCondition: Unhandled match condition: false
 }
 
 class Foo {}
@@ -24,4 +25,3 @@ function match_true_idiom_not_flagged(Foo $foo): int {
     };
 }
 ===expect===
-UnhandledMatchCondition@7:11-7:39: Unhandled match condition: false

@@ -46,6 +46,6 @@ function test(string $c, string $plain): void {
     $r3 = Box::s($c);
     /** @mir-check $r3 is class-string<X> */
     ident($plain);
+//  ^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'string' does not satisfy bound 'class-string'
 }
 ===expect===
-InvalidTemplateParam@41:4-41:17: Template type 'T' inferred as 'string' does not satisfy bound 'class-string'

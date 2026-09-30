@@ -7,6 +7,6 @@ class Box {}
 /** @return Box<string> */
 function makeBox(): mixed {
     return 42;
+//  ^^^^^^^^^^ InvalidReturnType: Return type '42' is not compatible with declared 'Box<string>'
 }
 ===expect===
-InvalidReturnType@6:4-6:14: Return type '42' is not compatible with declared 'Box<string>'

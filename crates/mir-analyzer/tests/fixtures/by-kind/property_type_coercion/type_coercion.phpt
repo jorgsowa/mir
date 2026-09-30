@@ -11,9 +11,9 @@ class A {
     public function barBar(A $a): void
     {
         $this->foo = $a;
+//      ^^^^^^^^^^^^^^^ PropertyTypeCoercion: Property $foo expects 'B|null', cannot assign 'A' — coercion may fail at runtime
     }
 }
 
 class B extends A {}
 ===expect===
-PropertyTypeCoercion@8:8-8:23: Property $foo expects 'B|null', cannot assign 'A' — coercion may fail at runtime

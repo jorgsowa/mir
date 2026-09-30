@@ -19,9 +19,9 @@ function assertString(A $arg): bool {return $arg->b !== null;}
 
 if (assertString($a)) {
     requiresString($a->b);
+//                 ^^^^^ PossiblyNullArgument: Argument $_str of requiresString() might be null
 }
 
 function requiresString(string $_str): void {}
 
 ===expect===
-PossiblyNullArgument@16:19-16:24: Argument $_str of requiresString() might be null

@@ -13,7 +13,7 @@ class Child extends Base {
     /** @return parent */
     public function make(): Base {
         return new Unrelated();
+//      ^^^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'Unrelated' is not compatible with declared 'parent(Child)'
     }
 }
 ===expect===
-InvalidReturnType@8:8-8:31: Return type 'Unrelated' is not compatible with declared 'parent(Child)'

@@ -18,7 +18,7 @@ class Wrapper {
 
     public function mutate(): void {
         $this->caches[0]->v = 5;
+//      ^^^^^^^^^^^^^^^^^^^^^^^ ImmutablePropertyModification: Assigning to property v of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
     }
 }
 ===expect===
-ImmutablePropertyModification@12:8-12:31: Assigning to property v of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)

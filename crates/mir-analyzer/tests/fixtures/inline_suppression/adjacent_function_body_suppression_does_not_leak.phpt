@@ -10,6 +10,6 @@ function f(): void {
 }
 function g(): void {
     new NoSuchClass();
+//      ^^^^^^^^^^^ UndefinedClass: Class NoSuchClass does not exist
 }
 ===expect===
-UndefinedClass@7:8-7:19: Class NoSuchClass does not exist

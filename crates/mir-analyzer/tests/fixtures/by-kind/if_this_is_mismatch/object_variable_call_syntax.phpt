@@ -14,6 +14,7 @@ class Model {
 /** @param Model<string> $m */
 function bad(Model $m): void {
     $m::onlyIntKeyed();
+//  ^^^^^^^^^^^^^^^^^^ IfThisIsMismatch: Cannot call Model::onlyIntKeyed() — @if-this-is requires $this to be 'Model<int>', but it is 'Model<string>'
 }
 
 /** @param Model<int> $m */
@@ -21,4 +22,3 @@ function ok(Model $m): void {
     $m::onlyIntKeyed();
 }
 ===expect===
-IfThisIsMismatch@10:4-10:22: Cannot call Model::onlyIntKeyed() — @if-this-is requires $this to be 'Model<int>', but it is 'Model<string>'

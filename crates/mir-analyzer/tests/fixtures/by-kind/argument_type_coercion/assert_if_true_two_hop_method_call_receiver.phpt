@@ -28,7 +28,7 @@ class Holder {
 function doWork(Holder $h, $p): void {
     if ($h->service->validator->isInt($p)) {
         strlen($p);
+//             ^^ ArgumentTypeCoercion: Argument $string of strlen() expects 'string', got 'int' — coercion may fail at runtime
     }
 }
 ===expect===
-ArgumentTypeCoercion@22:15-22:17: Argument $string of strlen() expects 'string', got 'int' — coercion may fail at runtime

@@ -4,6 +4,6 @@ Undefined trait
 <?php
 class B {
     use A;
+//      ^ UndefinedTrait: Trait A does not exist
 }
 ===expect===
-UndefinedTrait@3:8-3:9: Trait A does not exist

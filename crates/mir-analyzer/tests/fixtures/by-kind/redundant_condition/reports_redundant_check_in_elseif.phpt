@@ -10,8 +10,8 @@ function foo(string|null $x): void {
     if ($x === null) {
         // $x is null
     } elseif (is_string($x)) {
+//            ^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         // $x is already string (null excluded by the if above)
     }
 }
 ===expect===
-RedundantCondition@9:14-9:27: Condition is always true/false for type 'bool'

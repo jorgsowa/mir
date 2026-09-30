@@ -26,7 +26,7 @@ class Unrelated {}
 function takesBar($x): void {}
 
 takesBar("plain-string");
+//       ^^^^^^^^^^^^^^ InvalidArgument: Argument $x of takesBar() expects 'Bar<T>', got '"plain-string"'
 takesBar(new Unrelated());
+//       ^^^^^^^^^^^^^^^ InvalidArgument: Argument $x of takesBar() expects 'Bar<T>', got 'Unrelated'
 ===expect===
-InvalidArgument@16:9-16:23: Argument $x of takesBar() expects 'Bar<T>', got '"plain-string"'
-InvalidArgument@17:9-17:24: Argument $x of takesBar() expects 'Bar<T>', got 'Unrelated'

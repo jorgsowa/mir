@@ -12,7 +12,7 @@ suppress=UnusedVariable
 function test(int|string $x): void {
     if (in_array($x, [1, 2])) {
         strlen($x);
+//             ^^ PossiblyInvalidArgument: Argument $string of strlen() expects 'string', possibly different type 'int|string' provided
     }
 }
 ===expect===
-PossiblyInvalidArgument@4:15-4:17: Argument $string of strlen() expects 'string', possibly different type 'int|string' provided

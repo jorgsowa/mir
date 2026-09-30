@@ -10,6 +10,7 @@ class Counter {
     /** @psalm-mutation-free */
     public function reset(): void {
         $this->count = 0;
+//      ^^^^^^^^^^^^^^^^ ImmutablePropertyModification: Assigning to property count of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
     }
 
     public function increment(): void {
@@ -17,4 +18,3 @@ class Counter {
     }
 }
 ===expect===
-ImmutablePropertyModification@8:8-8:24: Assigning to property count of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)

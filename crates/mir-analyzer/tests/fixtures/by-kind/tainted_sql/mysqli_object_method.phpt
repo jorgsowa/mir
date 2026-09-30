@@ -6,6 +6,6 @@ suppress=MixedArgument,MixedArrayAccess
 <?php
 function run_query(mysqli $db): void {
     $db->query($_GET['sql']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^ TaintedSql: Tainted SQL query — possible SQL injection
 }
 ===expect===
-TaintedSql@3:4-3:28: Tainted SQL query — possible SQL injection

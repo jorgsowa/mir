@@ -5,5 +5,5 @@ MixedArrayAccess fires only on the innermost access when the root is mixed; the 
 /** @var mixed */
 $a = [];
 echo $a[0][1];
+//   ^^^^^ MixedArrayAccess: Array access on mixed type
 ===expect===
-MixedArrayAccess@4:5-4:10: Array access on mixed type

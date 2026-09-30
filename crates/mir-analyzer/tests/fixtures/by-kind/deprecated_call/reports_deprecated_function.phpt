@@ -5,10 +5,10 @@ including the deprecation message from the docblock.
 <?php
 /** @deprecated use newGreet() instead */
 function oldGreet(string $name): void {}
+//                ^^^^^^^^^^^^ UnusedParam: Parameter $name is never used
 
 function test(): void {
     oldGreet('Alice');
+//  ^^^^^^^^^^^^^^^^^ DeprecatedCall: Call to deprecated function oldGreet: use newGreet() instead
 }
 ===expect===
-UnusedParam@3:18-3:30: Parameter $name is never used
-DeprecatedCall@6:4-6:21: Call to deprecated function oldGreet: use newGreet() instead

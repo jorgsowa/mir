@@ -6,6 +6,6 @@ class NotAnException {}
 
 function test(): void {
     throw new NotAnException();
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidThrow: Thrown type 'NotAnException' does not extend Throwable
 }
 ===expect===
-InvalidThrow@5:4-5:31: Thrown type 'NotAnException' does not extend Throwable

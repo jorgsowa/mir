@@ -4,5 +4,5 @@ Interface instantiation
 <?php
 interface myInterface{}
 new myInterface();
+//  ^^^^^^^^^^^ InterfaceInstantiation: Cannot instantiate interface myInterface
 ===expect===
-InterfaceInstantiation@3:4-3:15: Cannot instantiate interface myInterface

@@ -10,6 +10,6 @@ function f($x): void { $_ = $x; }
 
 function test(): void {
     f("hello");
+//    ^^^^^^^ InvalidArgument: Argument $x of f() expects 'Foo', got '"hello"'
 }
 ===expect===
-InvalidArgument@8:6-8:13: Argument $x of f() expects 'Foo', got '"hello"'

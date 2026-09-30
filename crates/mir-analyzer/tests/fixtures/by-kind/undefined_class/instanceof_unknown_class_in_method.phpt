@@ -5,7 +5,7 @@ instanceof unknown class in method
 class A {
     public function f(mixed $x): bool {
         return $x instanceof UnknownClass;
+//                           ^^^^^^^^^^^^ UndefinedClass: Class UnknownClass does not exist
     }
 }
 ===expect===
-UndefinedClass@4:29-4:41: Class UnknownClass does not exist

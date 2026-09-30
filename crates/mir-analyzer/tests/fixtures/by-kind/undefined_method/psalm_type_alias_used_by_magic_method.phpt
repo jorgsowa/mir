@@ -18,6 +18,6 @@ function test(Repository $repo): void {
     $repo->get()->name();
     $repo->getAlternate()->name();
     $repo->get()->missing();
+//  ^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method User::missing() does not exist
 }
 ===expect===
-UndefinedMethod@17:4-17:27: Method User::missing() does not exist

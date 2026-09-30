@@ -6,13 +6,13 @@ Documents that PHP's parse-level enforcement covers bare returns in never functi
 
 function bare_return(): never {
     return;
+//  ^^^^^^^ ParseError: Parse error: A never-returning function must not return
 }
 
 class Foo {
     public function method_bare_return(): never {
         return;
+//      ^^^^^^^ ParseError: Parse error: A never-returning function must not return
     }
 }
 ===expect===
-ParseError@4:4-4:11: Parse error: A never-returning function must not return
-ParseError@9:8-9:15: Parse error: A never-returning function must not return

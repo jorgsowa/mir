@@ -8,5 +8,5 @@ suppress=UnusedVariable
 ===file===
 <?php
 $x = "// @psalm-suppress UndefinedClass"; new NoSuchClass();
+//                                            ^^^^^^^^^^^ UndefinedClass: Class NoSuchClass does not exist
 ===expect===
-UndefinedClass@2:46-2:57: Class NoSuchClass does not exist

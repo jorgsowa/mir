@@ -10,15 +10,15 @@ suppress=MixedArgument,MixedArrayAccess,MixedAssignment,UnusedVariable
 function test(): void {
     $page = $_GET['page'];
     include $page . '.php';
+//  ^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'include'
 }
 
 function testRequire(): void {
     require $_GET['page'];
+//  ^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'include'
 }
 
 function testSafe(): void {
     include 'header.php';
 }
 ===expect===
-TaintedInput@4:4-4:26: Tainted input reaching sink 'include'
-TaintedInput@8:4-8:25: Tainted input reaching sink 'include'

@@ -20,7 +20,7 @@ class Helper {
 /** @pure */
 function run(Box $b, Helper $h): void {
     $h->bump($b->n);
+//  ^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method bump() in a pure or immutable context
+//           ^^^^^ ImpurePropertyAssignment: Assigning to property n of a parameter in a pure or external-mutation-free context
 }
 ===expect===
-ImpureMethodCall@14:4-14:19: Calling impure method bump() in a pure or immutable context
-ImpurePropertyAssignment@14:13-14:18: Assigning to property n of a parameter in a pure or external-mutation-free context

@@ -14,12 +14,12 @@ class Bag {
 
     public function push(int $n): void {
         $this->items[] = $n;
+//      ^^^^^^^^^^^^^^^^^^^ ImmutablePropertyModification: Assigning to property items of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
     }
 
     public function setKey(int $n): void {
         $this->items['k'] = $n;
+//      ^^^^^^^^^^^^^^^^^^^^^^ ImmutablePropertyModification: Assigning to property items of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
     }
 }
 ===expect===
-ImmutablePropertyModification@9:8-9:27: Assigning to property items of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
-ImmutablePropertyModification@13:8-13:30: Assigning to property items of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)

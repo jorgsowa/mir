@@ -7,6 +7,6 @@ suppress=MixedArgument,MixedArrayAccess,MixedAssignment
 function test(): void {
     $cmd = $_GET['cmd'];
     exec($cmd);
+//  ^^^^^^^^^^ TaintedShell: Tainted shell command — possible command injection
 }
 ===expect===
-TaintedShell@4:4-4:14: Tainted shell command — possible command injection

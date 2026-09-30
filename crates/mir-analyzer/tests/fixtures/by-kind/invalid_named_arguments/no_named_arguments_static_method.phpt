@@ -12,6 +12,6 @@ class Math {
 }
 
 Math::max(a: 5, b: 3);
+//        ^^^^ InvalidNamedArguments: max() does not accept named arguments
+//              ^^^^ InvalidNamedArguments: max() does not accept named arguments
 ===expect===
-InvalidNamedArguments@11:10-11:14: max() does not accept named arguments
-InvalidNamedArguments@11:16-11:20: max() does not accept named arguments

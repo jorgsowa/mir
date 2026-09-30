@@ -12,6 +12,6 @@ class Items implements \IteratorAggregate {
 
 function gen(Stream|Items $source): \Generator {
     yield from $source;
+//             ^^^^^^^ PossiblyRawObjectIteration: Cannot iterate over possibly non-iterable object 'Stream|Items'
 }
 ===expect===
-PossiblyRawObjectIteration@11:15-11:22: Cannot iterate over possibly non-iterable object 'Stream|Items'

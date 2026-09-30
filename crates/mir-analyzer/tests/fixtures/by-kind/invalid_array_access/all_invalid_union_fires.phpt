@@ -5,5 +5,5 @@ InvalidArrayAccess fires when every type in a union is non-subscriptable (int|bo
 /** @var int|bool $x */
 $x = 1;
 echo $x[0];
+//   ^^^^^ InvalidArrayAccess: Cannot use [] operator on non-array type 'int|bool'
 ===expect===
-InvalidArrayAccess@4:5-4:10: Cannot use [] operator on non-array type 'int|bool'

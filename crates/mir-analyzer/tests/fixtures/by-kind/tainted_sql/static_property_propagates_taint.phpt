@@ -14,6 +14,6 @@ class Registry {
 function run(mysqli $db): void {
     Registry::$lastQuery = $_GET['q'];
     mysqli_query($db, Registry::$lastQuery);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedSql: Tainted SQL query — possible SQL injection
 }
 ===expect===
-TaintedSql@8:4-8:43: Tainted SQL query — possible SQL injection

@@ -13,6 +13,6 @@ final class Wrong {
 }
 function f(Wrong $w): string {
     return $w->value;
+//  ^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'int' is not compatible with declared 'string'
 }
 ===expect===
-InvalidReturnType@7:4-7:21: Return type 'int' is not compatible with declared 'string'

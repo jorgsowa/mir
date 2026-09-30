@@ -14,6 +14,6 @@ for ($i = 0; $i < 10; ++$i) {
 }
 
 $i = &$foo;
+//    ^^^^ UndefinedVariable: Variable $foo is not defined
 
 ===expect===
-UndefinedVariable@11:6-11:10: Variable $foo is not defined

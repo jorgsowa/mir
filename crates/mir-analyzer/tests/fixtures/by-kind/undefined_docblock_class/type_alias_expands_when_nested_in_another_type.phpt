@@ -26,6 +26,7 @@ class Repo {
     public function viaGenericArg(Box $b): void {
         foreach ($b->value as $x) {
             strlen($x);
+//                 ^^ ArgumentTypeCoercion: Argument $string of strlen() expects 'string', got 'int' — coercion may fail at runtime
         }
     }
 
@@ -36,10 +37,9 @@ class Repo {
         foreach ($x as $inner) {
             foreach ($inner as $v) {
                 strlen($v);
+//                     ^^ ArgumentTypeCoercion: Argument $string of strlen() expects 'string', got 'int' — coercion may fail at runtime
             }
         }
     }
 }
 ===expect===
-ArgumentTypeCoercion@18:19-18:21: Argument $string of strlen() expects 'string', got 'int' — coercion may fail at runtime
-ArgumentTypeCoercion@28:23-28:25: Argument $string of strlen() expects 'string', got 'int' — coercion may fail at runtime

@@ -6,6 +6,6 @@ class Notification {}
 
 function dispatch(Notification $n): void {
     $n->broadcastOn();
+//  ^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Notification::broadcastOn() does not exist
 }
 ===expect===
-UndefinedMethod@5:4-5:21: Method Notification::broadcastOn() does not exist

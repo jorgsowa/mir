@@ -3,8 +3,8 @@ UndefinedAttributeClass fires when an undefined attribute is placed on an enum d
 ===file===
 <?php
 #[Cache]
+//^^^^^ UndefinedAttributeClass: Attribute class Cache does not exist
 enum Status {
     case Active;
 }
 ===expect===
-UndefinedAttributeClass@2:2-2:7: Attribute class Cache does not exist

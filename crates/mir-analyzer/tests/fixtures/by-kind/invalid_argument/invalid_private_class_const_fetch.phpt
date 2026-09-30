@@ -8,5 +8,5 @@ class A
 }
 
 echo A::IS_PRIVATE;
+//      ^^^^^^^^^^ InaccessibleClassConstant: Cannot access constant A::IS_PRIVATE
 ===expect===
-InaccessibleClassConstant@7:8-7:18: Cannot access constant A::IS_PRIVATE

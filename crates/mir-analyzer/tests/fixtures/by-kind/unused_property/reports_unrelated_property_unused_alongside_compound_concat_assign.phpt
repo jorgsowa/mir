@@ -8,10 +8,10 @@ suppress=
 class Foo {
     private string $log = '';
     private string $unused = '';
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedProperty: Private property Foo::$unused is never read
 
     public function run(): void {
         $this->log .= 'x';
     }
 }
 ===expect===
-UnusedProperty@4:4-4:31: Private property Foo::$unused is never read

@@ -6,6 +6,6 @@ body — a different kind on the same body line is unaffected.
 /** @psalm-suppress UndefinedClass */
 function f(): void {
     new NoSuchClass(noSuchFunc());
+//                  ^^^^^^^^^^^^ UndefinedFunction: Function noSuchFunc() is not defined
 }
 ===expect===
-UndefinedFunction@4:20-4:32: Function noSuchFunc() is not defined

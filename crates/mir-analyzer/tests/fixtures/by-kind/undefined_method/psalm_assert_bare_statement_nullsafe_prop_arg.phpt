@@ -27,18 +27,18 @@ function assertIsBar(mixed $x): void {}
 function narrowsViaFreeFunction(?Holder $h): void {
     assertIsBar($h?->child);
     $h->child->foo();
+//  ^^^^^^^^^^^^^^^^ UndefinedMethod: Method Bar::foo() does not exist
 }
 
 function narrowsViaMethod(?Holder $h, Holder $asserter): void {
     $asserter->assertMethod($h?->child);
     $h->child->foo();
+//  ^^^^^^^^^^^^^^^^ UndefinedMethod: Method Bar::foo() does not exist
 }
 
 function narrowsViaStaticMethod(?Holder $h): void {
     Holder::assertStatic($h?->child);
     $h->child->foo();
+//  ^^^^^^^^^^^^^^^^ UndefinedMethod: Method Bar::foo() does not exist
 }
 ===expect===
-UndefinedMethod@20:4-20:20: Method Bar::foo() does not exist
-UndefinedMethod@25:4-25:20: Method Bar::foo() does not exist
-UndefinedMethod@30:4-30:20: Method Bar::foo() does not exist

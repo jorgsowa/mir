@@ -7,8 +7,8 @@ interface A { }
 
 function fooFoo(A $a): void {
     if ($a->bar) {
+//          ^^^ NoInterfaceProperties: Property $bar is not defined on this interface
 
     }
 }
 ===expect===
-NoInterfaceProperties@5:12-5:15: Property $bar is not defined on this interface

@@ -11,6 +11,6 @@ function test(): void {
     $arr = [];
     $arr['x'] = $_GET['name'];
     echo $arr['x'];
+//  ^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 ===expect===
-TaintedHtml@5:4-5:19: Tainted HTML output — possible XSS

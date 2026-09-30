@@ -6,7 +6,7 @@ abstract class AbstractBase {}
 class Child extends AbstractBase {
     public function test(): void {
         new parent();
+//          ^^^^^^ AbstractInstantiation: Cannot instantiate abstract class AbstractBase
     }
 }
 ===expect===
-AbstractInstantiation@5:12-5:18: Cannot instantiate abstract class AbstractBase

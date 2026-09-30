@@ -9,11 +9,11 @@ class A {
 
 trait T {
     abstract public function foo(string $s) : string;
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method B::foo() signature mismatch: return type 'string' is not a subtype of A::foo() 'void'
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method B::foo() signature mismatch: overriding method requires 1 argument(s) but parent requires 0
 }
 
 class B extends A {
     use T;
 }
 ===expect===
-MethodSignatureMismatch@7:4-7:53: Method B::foo() signature mismatch: return type 'string' is not a subtype of A::foo() 'void'
-MethodSignatureMismatch@7:4-7:53: Method B::foo() signature mismatch: overriding method requires 1 argument(s) but parent requires 0

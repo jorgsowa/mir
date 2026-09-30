@@ -8,6 +8,7 @@ suppress=UnusedVariable,UnusedParam
 /** @param int<5, 5> $n */
 function test_ne_out_of_range(int $n): void {
     if ($n !== 0) {
+//      ^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         $_ = $n; // always reached
     }
 }
@@ -15,10 +16,9 @@ function test_ne_out_of_range(int $n): void {
 /** @param int<5, 5> $n */
 function test_eq_out_of_range(int $n): void {
     if ($n === 0) {
+//      ^^^^^^^^ DocblockTypeContradiction: Type 'int<5, 5>' makes '$n === 0' impossible — this can never hold
+//      ^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         $_ = $n; // never reached
     }
 }
 ===expect===
-RedundantCondition@4:8-4:16: Condition is always true/false for type 'bool'
-DocblockTypeContradiction@11:8-11:16: Type 'int<5, 5>' makes '$n === 0' impossible — this can never hold
-RedundantCondition@11:8-11:16: Condition is always true/false for type 'bool'

@@ -20,14 +20,14 @@ class Registry {
 
     public static function buildOutsideGuard(): void {
         self::$factory->create();
+//      ^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Bar::create() does not exist
     }
 
     public static function propertyExistsDoesNotGuardMethod(): void {
         if (property_exists(self::$factory, 'create')) {
             self::$factory->create();
+//          ^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Bar::create() does not exist
         }
     }
 }
 ===expect===
-UndefinedMethod@14:8-14:32: Method Bar::create() does not exist
-UndefinedMethod@19:12-19:36: Method Bar::create() does not exist

@@ -8,10 +8,10 @@ class A {
     public function __construct() {}
     public function init(): void {
         $this->__construct();
+//      ^^^^^^^^^^^^^^^^^^^^ DirectConstructorCall: Cannot call constructor of A directly
     }
     public function unserialize(string $data): void {
         $this->init();
     }
 }
 ===expect===
-DirectConstructorCall@5:8-5:28: Cannot call constructor of A directly

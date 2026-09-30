@@ -10,6 +10,6 @@ class ServiceException extends \RuntimeException {}
 namespace Client;
 try {
 } catch (\myapp\exceptions\ServiceException $e) {
+//       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ WrongCaseClass: Class name 'myapp\exceptions\ServiceException' has incorrect casing; use 'MyApp\Exceptions\ServiceException'
 }
 ===expect===
-WrongCaseClass@7:9-7:43: Class name 'myapp\exceptions\ServiceException' has incorrect casing; use 'MyApp\Exceptions\ServiceException'

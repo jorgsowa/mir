@@ -13,6 +13,6 @@ function takesB(B $_b) : void {}
 
 $cb = /** @param A $x */ function($x) {
     takesB($x);
+//         ^^ ArgumentTypeCoercion: Argument $_b of takesB() expects 'B', got 'A' — coercion may fail at runtime
 };
 ===expect===
-ArgumentTypeCoercion@8:11-8:13: Argument $_b of takesB() expects 'B', got 'A' — coercion may fail at runtime

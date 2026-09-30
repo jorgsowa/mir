@@ -8,8 +8,8 @@ class A {
      */
     public function getKey() {
         return "42";
+//      ^^^^^^^^^^^^ InvalidReturnType: Return type '"42"' is not compatible with declared 'int'
     }
 }
 
 ===expect===
-InvalidReturnType@7:8-7:20: Return type '"42"' is not compatible with declared 'int'

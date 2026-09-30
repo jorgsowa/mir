@@ -14,6 +14,7 @@ function needsTwoInts(int $a, int $b): void {}
  */
 function via_function(array $pair): void {
     needsTwoInts(...$pair);
+//                ^^^^^^^ InvalidArgument: Argument $b of needsTwoInts() expects 'int', got 'string'
 }
 
 class Calc {
@@ -25,6 +26,7 @@ class Calc {
  */
 function via_static_call(array $pair): void {
     Calc::needsTwoInts(...$pair);
+//                      ^^^^^^^ InvalidArgument: Argument $b of needsTwoInts() expects 'int', got 'string'
 }
 
 class Pair {
@@ -36,8 +38,6 @@ class Pair {
  */
 function via_constructor(array $pair): void {
     new Pair(...$pair);
+//            ^^^^^^^ InvalidArgument: Argument $b of Pair::__construct() expects 'int', got 'string'
 }
 ===expect===
-InvalidArgument@8:18-8:25: Argument $b of needsTwoInts() expects 'int', got 'string'
-InvalidArgument@19:24-19:31: Argument $b of needsTwoInts() expects 'int', got 'string'
-InvalidArgument@30:14-30:21: Argument $b of Pair::__construct() expects 'int', got 'string'

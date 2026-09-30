@@ -42,6 +42,7 @@ class Config {
 
     public function arrayKeyExistsNarrowsNestedPropBase(): string {
         if (array_key_exists('name', $this->nested['sub'])) {
+//                                   ^^^^^^^^^^^^^^^^^^^^ PossiblyNullArgument: Argument $array of array_key_exists() might be null
             /** @mir-check $this->nested is array{sub: array{name: string}} */
             $_ = 1;
             return $this->nested['sub']['name'];
@@ -50,4 +51,3 @@ class Config {
     }
 }
 ===expect===
-PossiblyNullArgument@37:37-37:57: Argument $array of array_key_exists() might be null

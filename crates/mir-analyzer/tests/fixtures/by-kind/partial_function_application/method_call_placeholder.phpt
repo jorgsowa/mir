@@ -15,5 +15,5 @@ class Calculator {
 
 $calc = new Calculator();
 $partial = $calc->add(?, 5);
+//                    ^ ParseError: Parse error: 'partial function application' requires PHP 8.6 or higher
 ===expect===
-ParseError@10:22-10:23: Parse error: 'partial function application' requires PHP 8.6 or higher

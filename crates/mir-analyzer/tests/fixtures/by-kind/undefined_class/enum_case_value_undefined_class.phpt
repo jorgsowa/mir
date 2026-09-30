@@ -6,6 +6,6 @@ case values were never walked at all.
 <?php
 enum Status: string {
     case Active = UndefinedClass::VALUE;
+//                ^^^^^^^^^^^^^^ UndefinedClass: Class UndefinedClass does not exist
 }
 ===expect===
-UndefinedClass@3:18-3:32: Class UndefinedClass does not exist

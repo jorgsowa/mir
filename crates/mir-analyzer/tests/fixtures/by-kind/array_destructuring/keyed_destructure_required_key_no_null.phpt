@@ -12,6 +12,6 @@ function test(array $arr): void {
     ['a' => $a] = $arr;
     /** @trace $a */
     strlen($a);
+//  ^^^^^^^^^^^ Trace: Type of $a is string
 }
 ===expect===
-Trace@8:4-8:15: Type of $a is string

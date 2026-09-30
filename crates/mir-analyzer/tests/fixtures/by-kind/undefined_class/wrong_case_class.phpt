@@ -4,5 +4,5 @@ Wrong case class name is now reported as WrongCaseClass, not UndefinedClass.
 <?php
 class Foo {}
 (new foo());
+//   ^^^ WrongCaseClass: Class name 'foo' has incorrect casing; use 'Foo'
 ===expect===
-WrongCaseClass@3:5-3:8: Class name 'foo' has incorrect casing; use 'Foo'

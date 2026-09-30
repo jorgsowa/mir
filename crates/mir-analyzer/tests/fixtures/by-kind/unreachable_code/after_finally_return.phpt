@@ -10,6 +10,6 @@ function test(): void {
     }
 
     echo 'unreachable';
+//  ^^^^^^^^^^^^^^^^^^^ UnreachableCode: Unreachable code detected
 }
 ===expect===
-UnreachableCode@9:4-9:23: Unreachable code detected

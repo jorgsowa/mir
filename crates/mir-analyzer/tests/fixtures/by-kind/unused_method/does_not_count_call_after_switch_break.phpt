@@ -8,11 +8,11 @@ class Foo {
             case 1:
                 break;
                 $this->helper();
+//              ^^^^^^^^^^^^^^^^ UnreachableCode: Unreachable code detected
         }
     }
 
     private function helper(): void {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedMethod: Private method Foo::helper() is never called
 }
 ===expect===
-UnreachableCode@7:16-7:32: Unreachable code detected
-UnusedMethod@11:4-11:38: Private method Foo::helper() is never called

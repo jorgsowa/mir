@@ -19,6 +19,7 @@ class B extends A implements I1, I2 {
 function assertInstanceOfInterfaces(A $var): void {
     if (!$var instanceof I1 && !$var instanceof I2) {
         throw new Exception();
+//      ^^^^^^^^^^^^^^^^^^^^^^ MissingThrowsDocblock: Exception Exception is thrown but not declared in @throws
     }
 }
 
@@ -26,7 +27,6 @@ function takesA(A $a): void {
     assertInstanceOfInterfaces($a);
     $a->bar();
     $a->foo1();
+//  ^^^^^^^^^^ UndefinedMethod: Method A::foo1() does not exist
 }
 ===expect===
-MissingThrowsDocblock@18:8-18:30: Exception Exception is thrown but not declared in @throws
-UndefinedMethod@25:4-25:14: Method A::foo1() does not exist

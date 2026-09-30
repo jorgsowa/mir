@@ -7,5 +7,5 @@ suppress=UnusedParam
 class A {}
 needsA(new A);
 function needsA(a $x): void {}
+//              ^ WrongCaseClass: Class name 'a' has incorrect casing; use 'A'
 ===expect===
-WrongCaseClass@4:16-4:17: Class name 'a' has incorrect casing; use 'A'

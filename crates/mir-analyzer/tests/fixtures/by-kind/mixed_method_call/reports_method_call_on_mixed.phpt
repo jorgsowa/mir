@@ -4,6 +4,6 @@ reports method call on mixed
 <?php
 function test(mixed $value): void {
     $value->someMethod();
+//  ^^^^^^^^^^^^^^^^^^^^ MixedMethodCall: Method someMethod() called on mixed type
 }
 ===expect===
-MixedMethodCall@3:4-3:24: Method someMethod() called on mixed type

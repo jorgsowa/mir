@@ -16,6 +16,6 @@ function f($c): void { $_ = $c; }
 
 function test(): void {
     f("hello");
+//    ^^^^^^^ InvalidArgument: Argument $c of f() expects 'Collection', got '"hello"'
 }
 ===expect===
-InvalidArgument@12:6-12:13: Argument $c of f() expects 'Collection', got '"hello"'

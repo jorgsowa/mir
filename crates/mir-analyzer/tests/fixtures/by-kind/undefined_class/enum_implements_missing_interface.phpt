@@ -3,5 +3,5 @@ enum implements missing interface
 ===file===
 <?php
 enum Status: string implements MissingInterface {}
+//                             ^^^^^^^^^^^^^^^^ UndefinedClass: Class MissingInterface does not exist
 ===expect===
-UndefinedClass@2:31-2:47: Class MissingInterface does not exist

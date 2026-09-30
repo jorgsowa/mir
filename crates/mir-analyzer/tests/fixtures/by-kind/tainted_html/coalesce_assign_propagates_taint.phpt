@@ -11,6 +11,6 @@ function test(): void {
     $name = null;
     $name ??= $_GET['name'];
     echo $name;
+//  ^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 ===expect===
-TaintedHtml@5:4-5:15: Tainted HTML output — possible XSS

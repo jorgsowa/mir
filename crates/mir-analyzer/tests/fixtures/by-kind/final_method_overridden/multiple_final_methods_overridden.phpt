@@ -8,8 +8,8 @@ class ParentClass {
 }
 class Child extends ParentClass {
     public function alpha(): void {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FinalMethodOverridden: Method Child::alpha() cannot override final method from ParentClass
     public function beta(): void {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FinalMethodOverridden: Method Child::beta() cannot override final method from ParentClass
 }
 ===expect===
-FinalMethodOverridden@7:4-7:36: Method Child::alpha() cannot override final method from ParentClass
-FinalMethodOverridden@8:4-8:35: Method Child::beta() cannot override final method from ParentClass

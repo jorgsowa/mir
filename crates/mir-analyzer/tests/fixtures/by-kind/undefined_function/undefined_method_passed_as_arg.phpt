@@ -8,5 +8,5 @@ class A {
 
 $q = new A;
 $q->foo(bar());
+//      ^^^^^ UndefinedFunction: Function bar() is not defined
 ===expect===
-UndefinedFunction@7:8-7:13: Function bar() is not defined

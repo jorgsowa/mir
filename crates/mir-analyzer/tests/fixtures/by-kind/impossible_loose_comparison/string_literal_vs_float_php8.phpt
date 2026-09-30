@@ -9,6 +9,6 @@ suppress=UnusedVariable
 function test(): void {
     $s = "hello";
     if ($s == 1.5) {}
+//      ^^^^^^^^^ ImpossibleLooseComparison: '==' between '"hello"' and '1.5' is always false — these types can never be loosely equal
 }
 ===expect===
-ImpossibleLooseComparison@4:8-4:17: '==' between '"hello"' and '1.5' is always false — these types can never be loosely equal

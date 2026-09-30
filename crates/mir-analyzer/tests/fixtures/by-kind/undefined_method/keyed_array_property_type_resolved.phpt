@@ -15,6 +15,6 @@ function test(): void {
     $box = new Box();
     $result = $box->wrap();
     $result['item']->undefinedMethod();
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Item::undefinedMethod() does not exist
 }
 ===expect===
-UndefinedMethod@14:4-14:38: Method Item::undefinedMethod() does not exist

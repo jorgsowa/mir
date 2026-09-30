@@ -12,6 +12,6 @@ class A {
 class B extends A {
     /** @var string|null */
     private $foo;
+//  ^^^^^^^^^^^^^ OverriddenPropertyAccess: Property B::$foo overrides with less visibility
 }
 ===expect===
-OverriddenPropertyAccess@9:4-9:17: Property B::$foo overrides with less visibility

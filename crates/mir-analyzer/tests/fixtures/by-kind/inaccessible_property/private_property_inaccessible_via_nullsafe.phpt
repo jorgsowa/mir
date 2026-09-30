@@ -10,6 +10,6 @@ class Vault
 function reveal(?Vault $v): ?string
 {
     return $v?->secret;
+//              ^^^^^^ InaccessibleProperty: Cannot access property Vault::$secret
 }
 ===expect===
-InaccessibleProperty@9:16-9:22: Cannot access property Vault::$secret

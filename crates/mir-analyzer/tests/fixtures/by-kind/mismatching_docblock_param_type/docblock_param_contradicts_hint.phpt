@@ -11,5 +11,5 @@ suppress=UnusedParam
  * @param string $c
  */
 function f(string $a, string $b, string $c): void {}
+//                ^^ MismatchingDocblockParamType: Docblock type 'int' for $a does not match inferred 'string'
 ===expect===
-MismatchingDocblockParamType@7:18-7:20: Docblock type 'int' for $a does not match inferred 'string'

@@ -7,6 +7,6 @@ abstract class Loader {
 }
 function run(?Loader $l): string {
     return $l::getType();
+//         ^^ PossiblyNullMethodCall: Cannot call method getType() on possibly null value
 }
 ===expect===
-PossiblyNullMethodCall@6:11-6:13: Cannot call method getType() on possibly null value

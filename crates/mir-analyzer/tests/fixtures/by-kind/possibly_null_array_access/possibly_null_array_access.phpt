@@ -4,5 +4,5 @@ Possibly null array access
 <?php
 $a = rand(0, 1) ? [1, 2] : null;
 echo $a[0];
+//   ^^^^^ PossiblyNullArrayAccess: Cannot access array on possibly null value
 ===expect===
-PossiblyNullArrayAccess@3:5-3:10: Cannot access array on possibly null value

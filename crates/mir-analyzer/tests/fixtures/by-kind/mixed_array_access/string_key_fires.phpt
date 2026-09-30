@@ -5,5 +5,5 @@ MixedArrayAccess fires when using a string key on a mixed-typed variable.
 /** @var mixed */
 $a = [];
 echo $a['key'];
+//   ^^^^^^^^^ MixedArrayAccess: Array access on mixed type
 ===expect===
-MixedArrayAccess@4:5-4:14: Array access on mixed type

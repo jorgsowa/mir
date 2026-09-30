@@ -9,6 +9,7 @@ class Data { }
  * @param callable(T): void $processor
  */
 function processWithCallback(callable $processor): void {}
+//                           ^^^^^^^^^^^^^^^^^^^ UnusedParam: Parameter $processor is never used
 
 /**
  * @template In
@@ -16,12 +17,14 @@ function processWithCallback(callable $processor): void {}
  * @param callable(In): Out $transform
  */
 function applyTransform(callable $transform): void {}
+//                      ^^^^^^^^^^^^^^^^^^^ UnusedParam: Parameter $transform is never used
 
 /**
  * @template T
  * @param callable(T, Data): T $reducer
  */
 function reduce(callable $reducer): void {}
+//              ^^^^^^^^^^^^^^^^^ UnusedParam: Parameter $reducer is never used
 
 function test(): void {
     // Callback that accepts Data
@@ -37,6 +40,3 @@ function test(): void {
     reduce($fn3);
 }
 ===expect===
-UnusedParam@8:29-8:48: Parameter $processor is never used
-UnusedParam@15:24-15:43: Parameter $transform is never used
-UnusedParam@21:16-21:33: Parameter $reducer is never used

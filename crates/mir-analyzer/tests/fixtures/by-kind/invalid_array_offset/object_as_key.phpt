@@ -5,5 +5,5 @@ InvalidArrayOffset fires when an object is used as an array key.
 $arr = ["a" => 1, "b" => 2];
 $obj = new stdClass();
 echo $arr[$obj];
+//        ^^^^ InvalidArrayOffset: Array offset expects 'array-key', got 'stdClass'
 ===expect===
-InvalidArrayOffset@4:10-4:14: Array offset expects 'array-key', got 'stdClass'

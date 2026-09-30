@@ -12,6 +12,7 @@ function wantsIntMap(array $arr): void {}
 /** @param array{a: string, ...} $shape */
 function passBadOpenShape(array $shape): void {
     wantsIntMap($shape);
+//              ^^^^^^ InvalidArgument: Argument $arr of wantsIntMap() expects 'array<string, int>', got 'array{'a': string}'
 }
 
 /** @param array{a: int, ...} $shape */
@@ -25,7 +26,6 @@ function wantsNonEmptyIntMap(array $arr): void {}
 /** @param array{a: string, ...} $shape */
 function passBadOpenShapeNonEmpty(array $shape): void {
     wantsNonEmptyIntMap($shape);
+//                      ^^^^^^ InvalidArgument: Argument $arr of wantsNonEmptyIntMap() expects 'non-empty-array<string, int>', got 'array{'a': string}'
 }
 ===expect===
-InvalidArgument@7:16-7:22: Argument $arr of wantsIntMap() expects 'array<string, int>', got 'array{'a': string}'
-InvalidArgument@20:24-20:30: Argument $arr of wantsNonEmptyIntMap() expects 'non-empty-array<string, int>', got 'array{'a': string}'

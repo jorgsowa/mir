@@ -23,6 +23,6 @@ function args_consume(Mock $k): void {
 
 function still_unused(): void {
     $o = new Mock();
+//  ^^ UnusedVariable: Variable $o is never read
 }
 ===expect===
-UnusedVariable@18:4-18:6: Variable $o is never read

@@ -7,5 +7,5 @@ suppress=UnusedParam
 function foo(callable $c): void {}
 
 foo("trime");
+//  ^^^^^^^ UndefinedFunction: Function trime() is not defined
 ===expect===
-UndefinedFunction@4:4-4:11: Function trime() is not defined

@@ -7,7 +7,7 @@ Closure with too few args
  */
 function test(callable $fn): void {
     $fn('hello');
+//  ^^^^^^^^^^^^ TooFewArguments: Too few arguments for {closure}(): expected 2, got 1
 }
 
 ===expect===
-TooFewArguments@6:4-6:16: Too few arguments for {closure}(): expected 2, got 1

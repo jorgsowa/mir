@@ -4,8 +4,8 @@ Attribute invalid target method
 <?php
 class Foo {
     #[Attribute]
+//    ^^^^^^^^^ InvalidAttribute: #[Attribute] can only be applied to classes, not methods
     public function bar(): void {}
 }
 
 ===expect===
-InvalidAttribute@3:6-3:15: #[Attribute] can only be applied to classes, not methods

@@ -9,10 +9,10 @@ suppress=UnusedParam
 <?php
 function no_default(int $x): string {
     return match ($x) { 1 => 'one', 2 => 'two' };
+//         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnhandledMatchCondition: Unhandled match condition: possibly-unmatched value of type 'int'
 }
 
 function with_default(int $x): string {
     return match ($x) { 1 => 'one', 2 => 'two', default => 'other' };
 }
 ===expect===
-UnhandledMatchCondition@3:11-3:48: Unhandled match condition: possibly-unmatched value of type 'int'

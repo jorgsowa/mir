@@ -16,7 +16,7 @@ class BadFactory extends AnimalFactory {
     /** @inheritdoc */
     public function make(): mixed {
         return 'not a cat';
+//      ^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type '"not a cat"' is not compatible with declared 'Cat'
     }
 }
 ===expect===
-InvalidReturnType@12:8-12:27: Return type '"not a cat"' is not compatible with declared 'Cat'

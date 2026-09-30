@@ -8,8 +8,8 @@ suppress=UnusedVariable,UnusedParam
 /** @param int<min, 5> $a */
 function test(int $a): void {
     if ($a < 10) {
+//      ^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         // always taken
     }
 }
 ===expect===
-RedundantCondition@4:8-4:15: Condition is always true/false for type 'bool'

@@ -13,9 +13,9 @@ $result = null;
 foreach ($items as $item) {
     // $item type is mixed since array is unknown
     $result = $item->transform();
+//            ^^^^^^^^^^^^^^^^^^ MixedMethodCall: Method transform() called on mixed type
 }
 // After loop, $result is mixed|null
 // because array size is unknown and loop might not execute
 echo $result;
 ===expect===
-MixedMethodCall@10:14-10:32: Method transform() called on mixed type

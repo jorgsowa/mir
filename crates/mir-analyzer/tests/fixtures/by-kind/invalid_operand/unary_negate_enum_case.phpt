@@ -9,5 +9,5 @@ enum Suit {
     case Hearts;
 }
 $a = -Suit::Hearts;
+//    ^^^^^^^^^^^^ InvalidOperand: Operator '-' not supported for operand of type 'Suit'
 ===expect===
-InvalidOperand@5:6-5:18: Operator '-' not supported for operand of type 'Suit'

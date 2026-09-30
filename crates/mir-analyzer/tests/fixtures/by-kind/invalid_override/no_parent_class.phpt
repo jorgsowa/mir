@@ -6,7 +6,7 @@ php_version=8.3
 <?php
 class Orphan {
     #[Override]
+//  ^^^^^^^^^^^ InvalidOverride: Method Orphan::render() has #[Override] but no parent method exists to override
     public function render(): void {}
 }
 ===expect===
-InvalidOverride@3:4-3:15: Method Orphan::render() has #[Override] but no parent method exists to override

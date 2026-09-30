@@ -15,6 +15,7 @@ class A {
 /** @pure */
 function filterOdd(int $i, A $a) : ?int {
     $a->foo();
+//  ^^^^^^^^^ ImpureMethodCall: Calling impure method foo() in a pure or immutable context
 
     if ($i % 2 === 0 || $a->a === 2) {
         return $i;
@@ -23,4 +24,3 @@ function filterOdd(int $i, A $a) : ?int {
     return null;
 }
 ===expect===
-ImpureMethodCall@14:4-14:13: Calling impure method foo() in a pure or immutable context

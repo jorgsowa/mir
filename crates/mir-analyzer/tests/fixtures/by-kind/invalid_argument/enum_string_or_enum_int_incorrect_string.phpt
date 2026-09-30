@@ -9,5 +9,5 @@ namespace Ns;
 /** @param ( "foo" | "bar" | 1 | 2 | 3 ) $s */
 function foo($s) : void {}
 foo("bat");
+//  ^^^^^ InvalidArgument: Argument $s of foo() expects '"foo"|"bar"|1|2|3', got '"bat"'
 ===expect===
-InvalidArgument@6:4-6:9: Argument $s of foo() expects '"foo"|"bar"|1|2|3', got '"bat"'

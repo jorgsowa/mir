@@ -8,5 +8,5 @@ class Vault
 }
 
 echo (new Vault())->secret;
+//                  ^^^^^^ InaccessibleProperty: Cannot access property Vault::$secret
 ===expect===
-InaccessibleProperty@7:20-7:26: Cannot access property Vault::$secret

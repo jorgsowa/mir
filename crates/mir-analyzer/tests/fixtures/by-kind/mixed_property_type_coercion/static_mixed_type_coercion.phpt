@@ -15,7 +15,7 @@ class A {
     public static function barBar(array $arr): void
     {
         self::$foo = $arr;
+//      ^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $foo expects 'array<int, A>', cannot assign 'array<int|string, A>'
     }
 }
 ===expect===
-InvalidPropertyAssignment@9:8-9:25: Property $foo expects 'array<int, A>', cannot assign 'array<int|string, A>'

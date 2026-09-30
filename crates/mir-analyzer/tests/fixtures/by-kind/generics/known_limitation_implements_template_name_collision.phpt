@@ -42,10 +42,12 @@ class Bar {}
 class Thing implements Comparable, Container {
     /** @param T $other */
     public function compareTo($other): int {
+//                  ^^^^^^^^^ UndefinedDocblockClass: Docblock type 'T' does not exist
         return 0;
     }
     /** @return T */
     public function get() {
+//                  ^^^ UndefinedDocblockClass: Docblock type 'T' does not exist
         return new Bar();
     }
 }
@@ -55,5 +57,3 @@ $result = $t->get();
 /** @mir-check $result is Foo */
 echo "ok";
 ===expect===
-UndefinedDocblockClass@22:20-22:29: Docblock type 'T' does not exist
-UndefinedDocblockClass@26:20-26:23: Docblock type 'T' does not exist

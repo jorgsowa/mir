@@ -7,9 +7,9 @@ php_version=8.0
 class Point {
     public function __construct(
         public $x,
+//      ^^^^^^^^^ MissingPropertyType: Property Point::$x has no type annotation
         public $y,
+//      ^^^^^^^^^ MissingPropertyType: Property Point::$y has no type annotation
     ) {}
 }
 ===expect===
-MissingPropertyType@4:8-4:17: Property Point::$x has no type annotation
-MissingPropertyType@5:8-5:17: Property Point::$y has no type annotation

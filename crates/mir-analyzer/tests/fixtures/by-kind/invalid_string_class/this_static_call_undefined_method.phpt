@@ -5,7 +5,7 @@ $this::undefinedMethod() should still emit UndefinedMethod
 class Foo {
     public function test(): void {
         $this::nonExistent();
+//      ^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Foo::nonExistent() does not exist
     }
 }
 ===expect===
-UndefinedMethod@4:8-4:28: Method Foo::nonExistent() does not exist

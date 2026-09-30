@@ -4,6 +4,6 @@ Verify UnusedVariable location for variable first assigned via array push.
 <?php
 function test(): void {
     $arr[] = 1;
+//  ^^^^ UnusedVariable: Variable $arr is never read
 }
 ===expect===
-UnusedVariable@3:4-3:8: Variable $arr is never read

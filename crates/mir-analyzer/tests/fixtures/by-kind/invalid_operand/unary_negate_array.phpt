@@ -7,5 +7,5 @@ suppress=UnusedVariable
 <?php
 $a = [1, 2];
 $b = -$a;
+//    ^^ InvalidOperand: Operator '-' not supported for operand of type 'array{0: 1, 1: 2}'
 ===expect===
-InvalidOperand@3:6-3:8: Operator '-' not supported for operand of type 'array{0: 1, 1: 2}'

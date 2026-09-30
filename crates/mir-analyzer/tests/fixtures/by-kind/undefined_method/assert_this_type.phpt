@@ -9,6 +9,7 @@ class Type {
     public function isFoo() : bool {
         if (!$this instanceof FooType) {
             throw new Exception();
+//          ^^^^^^^^^^^^^^^^^^^^^^ MissingThrowsDocblock: Exception Exception is thrown but not declared in @throws
         }
 
         return true;
@@ -21,8 +22,7 @@ class FooType extends Type {
 
 function takesType(Type $t) : void {
     $t->bar();
+//  ^^^^^^^^^ UndefinedMethod: Method Type::bar() does not exist
     $t->isFoo();
 }
 ===expect===
-MissingThrowsDocblock@8:12-8:34: Exception Exception is thrown but not declared in @throws
-UndefinedMethod@20:4-20:13: Method Type::bar() does not exist

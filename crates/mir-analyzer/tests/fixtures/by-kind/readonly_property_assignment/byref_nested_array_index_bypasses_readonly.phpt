@@ -13,6 +13,6 @@ class Frozen {
 
 function tick(Frozen $f): void {
     sort($f->counts['x']['y']);
+//       ^^^^^^^^^^^^^^^^^^^^ ReadonlyPropertyAssignment: Cannot assign to readonly property Frozen::$counts outside of constructor
 }
 ===expect===
-ReadonlyPropertyAssignment@7:9-7:29: Cannot assign to readonly property Frozen::$counts outside of constructor

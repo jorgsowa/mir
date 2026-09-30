@@ -12,6 +12,6 @@ function f($x): void { $_ = $x; }
 
 function test(): void {
     f(new A());
+//    ^^^^^^^ InvalidArgument: Argument $x of f() expects 'array<int, string>|Traversable', got 'A'
 }
 ===expect===
-InvalidArgument@8:6-8:13: Argument $x of f() expects 'array<int, string>|Traversable', got 'A'

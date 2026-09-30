@@ -13,6 +13,6 @@ function take(string $cls): void {}
 
 function test(bool $cond): void {
     take($cond ? 'RealClass' : 'TotallyBogusClassName');
+//       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedClass: Class TotallyBogusClassName does not exist
 }
 ===expect===
-UndefinedClass@8:9-8:54: Class TotallyBogusClassName does not exist

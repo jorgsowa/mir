@@ -47,7 +47,7 @@ function test_false_branch_no_false_diverge(Foo $obj): void {
     // After fix: mark_diverges=false → branch alive → InvalidArgument fires.
     if (!is_a($obj, 'Foo', true)) {
         needs_int($obj);
+//                ^^^^ InvalidArgument: Argument $i of needs_int() expects 'int', got 'Foo'
     }
 }
 ===expect===
-InvalidArgument@42:18-42:22: Argument $i of needs_int() expects 'int', got 'Foo'

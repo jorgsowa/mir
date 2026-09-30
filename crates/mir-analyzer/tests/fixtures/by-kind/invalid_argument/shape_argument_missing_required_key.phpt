@@ -12,5 +12,5 @@ function takesConfig(array $config): void {}
 
 takesConfig(['host' => 'localhost', 'port' => 3306]);
 takesConfig(['host' => 'localhost']);
+//          ^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $config of takesConfig() expects 'array{'host': string, 'port': int}', got 'array{'host': "localhost"}'
 ===expect===
-InvalidArgument@6:12-6:35: Argument $config of takesConfig() expects 'array{'host': string, 'port': int}', got 'array{'host': "localhost"}'

@@ -9,5 +9,5 @@ class Connection {
 }
 function getConn(): ?Connection { return null; }
 $x = getConn()?->GETHANDLE();
+//               ^^^^^^^^^ WrongCaseMethod: Method name 'Connection::GETHANDLE' has incorrect casing; use 'getHandle'
 ===expect===
-WrongCaseMethod@6:17-6:26: Method name 'Connection::GETHANDLE' has incorrect casing; use 'getHandle'

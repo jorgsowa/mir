@@ -21,10 +21,10 @@ class MutableBox {
 
 function mutateImmutable(Box $b): void {
     $b->x = 1;
+//  ^^^^^^^^^ ImmutablePropertyModification: Assigning to property x of $b in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
 }
 
 function mutateMutable(MutableBox $b): void {
     $b->x = 1;
 }
 ===expect===
-ImmutablePropertyModification@16:4-16:13: Assigning to property x of $b in an immutable context (@psalm-immutable class or @psalm-mutation-free method)

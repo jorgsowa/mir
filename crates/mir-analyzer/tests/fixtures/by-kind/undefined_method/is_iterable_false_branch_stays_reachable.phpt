@@ -15,7 +15,7 @@ function f($x): void {
         foreach ($x as $v) {}
     } else {
         $x->method();
+//      ^^^^^^^^^^^^ UndefinedMethod: Method Box::method() does not exist
     }
 }
 ===expect===
-UndefinedMethod@9:8-9:20: Method Box::method() does not exist

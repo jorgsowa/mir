@@ -9,6 +9,6 @@ suppress=UnusedVariable
 function test(array $arr, float $n, bool $cond): void {
     $x = $cond ? $arr : floor($n);
     $x[0];
+//  ^^^^^ PossiblyInvalidArrayAccess: Possibly invalid array access: 'array|float' might not support []
 }
 ===expect===
-PossiblyInvalidArrayAccess@4:4-4:9: Possibly invalid array access: 'array|float' might not support []

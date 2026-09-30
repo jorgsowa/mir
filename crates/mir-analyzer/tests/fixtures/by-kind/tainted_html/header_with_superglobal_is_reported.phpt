@@ -6,6 +6,6 @@ suppress=MixedArrayAccess
 <?php
 function redirect(): void {
     header('Location: ' . $_GET['next']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 ===expect===
-TaintedHtml@3:4-3:40: Tainted HTML output — possible XSS

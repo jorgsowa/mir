@@ -4,5 +4,5 @@ Check variable in unknown class constructor
 <?php
 /** @suppress UndefinedClass */
 new Missing($class_arg);
+//          ^^^^^^^^^^ UndefinedVariable: Variable $class_arg is not defined
 ===expect===
-UndefinedVariable@3:12-3:22: Variable $class_arg is not defined

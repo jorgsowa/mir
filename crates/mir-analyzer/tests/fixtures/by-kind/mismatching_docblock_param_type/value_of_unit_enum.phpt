@@ -10,5 +10,5 @@ Value of unit enum
 
     /** @param value-of<Foo> $arg */
     function foobar(string $arg): void {}
+//                  ^^^^^^^^^^^ UnusedParam: Parameter $arg is never used
 ===expect===
-UnusedParam@9:20-9:31: Parameter $arg is never used

@@ -10,5 +10,5 @@ suppress=UnusedParam
  * @phan-param int $value
  */
 function f(string $value): void {}
+//                ^^^^^^ MismatchingDocblockParamType: Docblock type 'int' for $value does not match inferred 'string'
 ===expect===
-MismatchingDocblockParamType@5:18-5:24: Docblock type 'int' for $value does not match inferred 'string'

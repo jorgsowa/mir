@@ -6,7 +6,7 @@ suppress=UnusedParam,UnusedFunction
 <?php
 class Foo {
     public function __construct(UndefinedClass $o) {}
+//                              ^^^^^^^^^^^^^^ UndefinedClass: Class UndefinedClass does not exist
 }
 new Foo(function() : void {});
 ===expect===
-UndefinedClass@3:32-3:46: Class UndefinedClass does not exist

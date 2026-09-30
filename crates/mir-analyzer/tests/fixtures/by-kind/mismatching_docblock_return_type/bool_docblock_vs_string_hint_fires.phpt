@@ -7,5 +7,5 @@ is runtime truth regardless of what the docblock (wrongly) claims.
 <?php
 /** @return bool */
 function boolDocStringHint(): string { return 'x'; }
+//       ^^^^^^^^^^^^^^^^^ MismatchingDocblockReturnType: Docblock return type 'bool' does not match inferred 'string'
 ===expect===
-MismatchingDocblockReturnType@3:9-3:26: Docblock return type 'bool' does not match inferred 'string'

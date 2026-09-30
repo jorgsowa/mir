@@ -6,6 +6,6 @@ class C {}
 
 function foo() : C {
     return fn (int $i) => "";
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'Closure(int): ""' is not compatible with declared 'C'
 }
 ===expect===
-InvalidReturnType@5:4-5:29: Return type 'Closure(int): ""' is not compatible with declared 'C'

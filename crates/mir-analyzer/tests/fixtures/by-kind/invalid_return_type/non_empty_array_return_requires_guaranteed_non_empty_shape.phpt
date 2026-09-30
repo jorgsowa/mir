@@ -11,6 +11,7 @@ suppress=UnusedParam
 /** @return non-empty-array<string, int> */
 function returns_empty_array(): array {
     return [];
+//  ^^^^^^^^^^ InvalidReturnType: Return type 'array{}' is not compatible with declared 'non-empty-array<string, int>'
 }
 
 /**
@@ -19,6 +20,7 @@ function returns_empty_array(): array {
  */
 function returns_closed_shape_all_optional(array $x): array {
     return $x;
+//  ^^^^^^^^^^ InvalidReturnType: Return type 'array{'a'?: int}' is not compatible with declared 'non-empty-array<string, int>'
 }
 
 /** @return non-empty-array<string, int> */
@@ -34,5 +36,3 @@ function returns_open_shape(array $x): array {
     return $x;
 }
 ===expect===
-InvalidReturnType@5:4-5:14: Return type 'array{}' is not compatible with declared 'non-empty-array<string, int>'
-InvalidReturnType@13:4-13:14: Return type 'array{'a'?: int}' is not compatible with declared 'non-empty-array<string, int>'

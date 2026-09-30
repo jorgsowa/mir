@@ -10,5 +10,5 @@ suppress=UnusedParam
 class DeprecatedClass{}
 
 function foo(DeprecatedClass $deprecatedClass): void {}
+//           ^^^^^^^^^^^^^^^ DeprecatedClass: Class DeprecatedClass is deprecated
 ===expect===
-DeprecatedClass@7:13-7:28: Class DeprecatedClass is deprecated

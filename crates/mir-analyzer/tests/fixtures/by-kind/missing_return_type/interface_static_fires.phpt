@@ -4,6 +4,6 @@ MissingReturnType fires for a static interface method without a return type hint
 <?php
 interface IFoo {
     public static function staticNoReturn();
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MissingReturnType: Function IFoo::staticNoReturn() has no return type annotation
 }
 ===expect===
-MissingReturnType@3:4-3:44: Function IFoo::staticNoReturn() has no return type annotation

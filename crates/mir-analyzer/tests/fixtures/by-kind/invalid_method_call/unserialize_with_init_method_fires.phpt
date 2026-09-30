@@ -6,6 +6,7 @@ class A {
     public function __construct() {}
     public function init(): void {
         $this->__construct();
+//      ^^^^^^^^^^^^^^^^^^^^ DirectConstructorCall: Cannot call constructor of A directly
     }
     /** @param array<string,mixed> $data */
     public function __unserialize(array $data): void {
@@ -13,4 +14,3 @@ class A {
     }
 }
 ===expect===
-DirectConstructorCall@5:8-5:28: Cannot call constructor of A directly

@@ -9,9 +9,9 @@ class Pixel {
 
     public function translate(int $dx, int $dy): void {
         $this->x += $dx;
+//      ^^^^^^^^^^^^^^^ ImmutablePropertyModification: Assigning to property x of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
         $this->y += $dy;
+//      ^^^^^^^^^^^^^^^ ImmutablePropertyModification: Assigning to property y of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
     }
 }
 ===expect===
-ImmutablePropertyModification@8:8-8:23: Assigning to property x of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
-ImmutablePropertyModification@9:8-9:23: Assigning to property y of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)

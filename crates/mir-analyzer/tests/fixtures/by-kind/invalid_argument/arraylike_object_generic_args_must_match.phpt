@@ -26,5 +26,5 @@ final class IntStringBag extends Bag {}
 function takesArraylike($bag): void {}
 
 takesArraylike(new IntStringBag());
+//             ^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $bag of takesArraylike() expects 'ArrayAccess<string, int>&Countable&Traversable<string, int>', got 'IntStringBag'
 ===expect===
-InvalidArgument@23:15-23:33: Argument $bag of takesArraylike() expects 'ArrayAccess<string, int>&Countable&Traversable<string, int>', got 'IntStringBag'

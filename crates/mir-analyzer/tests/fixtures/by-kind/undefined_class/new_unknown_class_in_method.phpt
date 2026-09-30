@@ -5,7 +5,7 @@ new unknown class in method
 class A {
     public function f(): void {
         new UnknownClass();
+//          ^^^^^^^^^^^^ UndefinedClass: Class UnknownClass does not exist
     }
 }
 ===expect===
-UndefinedClass@4:12-4:24: Class UnknownClass does not exist

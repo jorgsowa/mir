@@ -11,6 +11,6 @@ final class Attr {
 }
 function f(Attr $attr): int {
     return match ($attr->value) { 'a' => 1 };
+//         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnhandledMatchCondition: Unhandled match condition: "b"
 }
 ===expect===
-UnhandledMatchCondition@7:11-7:44: Unhandled match condition: "b"

@@ -3,5 +3,5 @@ Undefined class
 ===file===
 <?php
 (new Foo());
+//   ^^^ UndefinedClass: Class Foo does not exist
 ===expect===
-UndefinedClass@2:5-2:8: Class Foo does not exist

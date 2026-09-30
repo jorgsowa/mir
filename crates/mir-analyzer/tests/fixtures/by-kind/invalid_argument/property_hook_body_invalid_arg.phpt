@@ -16,9 +16,9 @@ final class PlainHookExample
     public int $value {
         get {
             takesString(123);
+//                      ^^^ InvalidArgument: Argument $value of takesString() expects 'string', got '123'
             return $this->value;
         }
     }
 }
 ===expect===
-InvalidArgument@12:24-12:27: Argument $value of takesString() expects 'string', got '123'

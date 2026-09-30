@@ -5,5 +5,5 @@ suppress=UnusedParam,UnusedFunction
 ===file===
 <?php
 function f(UnknownClass $x): void {}
+//         ^^^^^^^^^^^^ UndefinedClass: Class UnknownClass does not exist
 ===expect===
-UndefinedClass@2:11-2:23: Class UnknownClass does not exist

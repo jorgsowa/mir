@@ -6,6 +6,6 @@ parameter without a null guard.
 class Obj { public string $name = 'x'; }
 function test(?Obj $obj): void {
     echo $obj->name;
+//       ^^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $name on possibly null value
 }
 ===expect===
-PossiblyNullPropertyFetch@4:9-4:19: Cannot access property $name on possibly null value

@@ -9,6 +9,6 @@ disabled wholesale, only for spread/unknown-arity calls.
  */
 function test(object $fn): void {
     $fn(1, 2);
+//  ^^^^^^^^^ TooFewArguments: Too few arguments for callable(): expected 3, got 2
 }
 ===expect===
-TooFewArguments@6:4-6:13: Too few arguments for callable(): expected 3, got 2

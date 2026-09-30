@@ -12,5 +12,5 @@ function describe(string $ifaceName) {
 }
 
 describe("NonExistentInterface");
+//       ^^^^^^^^^^^^^^^^^^^^^^ UndefinedClass: Class NonExistentInterface does not exist
 ===expect===
-UndefinedClass@9:9-9:31: Class NonExistentInterface does not exist

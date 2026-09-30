@@ -11,15 +11,15 @@ suppress=MixedArgument,MixedArrayAccess,MixedAssignment,UnusedVariable
 function test(): void {
     $dest = $_GET['dest'];
     move_uploaded_file('/tmp/upload_tmp', $dest);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'file'
 }
 
 function testNamedArgs(): void {
     move_uploaded_file(from: '/tmp/upload_tmp', to: $_GET['dest']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'file'
 }
 
 function testSafe(): void {
     move_uploaded_file($_GET['tmp'], '/var/uploads/fixed-name.bin');
 }
 ===expect===
-TaintedInput@4:4-4:48: Tainted input reaching sink 'file'
-TaintedInput@8:4-8:66: Tainted input reaching sink 'file'

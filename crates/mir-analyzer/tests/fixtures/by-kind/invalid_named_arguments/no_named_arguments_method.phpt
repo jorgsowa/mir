@@ -13,6 +13,6 @@ class Calculator {
 
 $calc = new Calculator();
 $calc->add(a: 1, b: 2);
+//         ^^^^ InvalidNamedArguments: add() does not accept named arguments
+//               ^^^^ InvalidNamedArguments: add() does not accept named arguments
 ===expect===
-InvalidNamedArguments@12:11-12:15: add() does not accept named arguments
-InvalidNamedArguments@12:17-12:21: add() does not accept named arguments

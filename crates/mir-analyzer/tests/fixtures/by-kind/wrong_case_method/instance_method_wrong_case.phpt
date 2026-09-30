@@ -7,5 +7,5 @@ class Greeter {
 }
 $g = new Greeter();
 $g->SAYhello();
+//  ^^^^^^^^ WrongCaseMethod: Method name 'Greeter::SAYhello' has incorrect casing; use 'sayHello'
 ===expect===
-WrongCaseMethod@6:4-6:12: Method name 'Greeter::SAYhello' has incorrect casing; use 'sayHello'

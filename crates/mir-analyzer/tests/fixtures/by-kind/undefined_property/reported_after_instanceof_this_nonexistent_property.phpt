@@ -12,7 +12,7 @@ abstract class A
             return;
         }
         echo $other->nonexistent;
+//                   ^^^^^^^^^^^ UndefinedProperty: Property A::$nonexistent does not exist
     }
 }
 ===expect===
-UndefinedProperty@11:21-11:32: Property A::$nonexistent does not exist

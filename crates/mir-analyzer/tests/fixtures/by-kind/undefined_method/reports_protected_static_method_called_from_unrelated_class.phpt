@@ -8,7 +8,7 @@ class Base {
 class Unrelated {
     public function run(): void {
         Base::secret();
+//      ^^^^^^^^^^^^^^ UndefinedMethod: Method Base::secret() does not exist
     }
 }
 ===expect===
-UndefinedMethod@7:8-7:22: Method Base::secret() does not exist

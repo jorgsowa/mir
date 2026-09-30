@@ -7,7 +7,7 @@ class A {
     public function __wakeup(): void {
         $other = new A;
         $other->__construct();
+//      ^^^^^^^^^^^^^^^^^^^^^ DirectConstructorCall: Cannot call constructor of A directly
     }
 }
 ===expect===
-DirectConstructorCall@6:8-6:29: Cannot call constructor of A directly

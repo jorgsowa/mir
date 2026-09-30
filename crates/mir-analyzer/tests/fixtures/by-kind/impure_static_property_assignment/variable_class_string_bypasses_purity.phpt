@@ -16,6 +16,6 @@ class Registry {
 function bump(string $cls): void {
     /** @var class-string<Registry> $cls */
     $cls::$count = 5;
+//  ^^^^^^^^^^^^^^^^ ImpureStaticPropertyAssignment: Assigning to static property Registry::$count in a @pure function
 }
 ===expect===
-ImpureStaticPropertyAssignment@9:4-9:20: Assigning to static property Registry::$count in a @pure function

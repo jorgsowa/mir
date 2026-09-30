@@ -9,7 +9,7 @@ function foo(bool $a, object $obj): void {
         echo $y; // ok: $y definitely assigned in true-branch
     } else {
         echo $y; // error: $a might have been false, so $y was never assigned
+//           ^^ PossiblyUndefinedVariable: Variable $y might not be defined
     }
 }
 ===expect===
-PossiblyUndefinedVariable@6:13-6:15: Variable $y might not be defined

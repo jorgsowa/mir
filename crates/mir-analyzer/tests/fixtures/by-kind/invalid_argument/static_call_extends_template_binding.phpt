@@ -6,6 +6,7 @@ Static method calls resolve class-level template bindings from @extends, like in
 abstract class Repository {
     /** @param T $item */
     public static function validate($item): void {}
+//                                  ^^^^^ UnusedParam: Parameter $item is never used
 }
 
 class User {}
@@ -15,6 +16,5 @@ class Post {}
 class UserRepository extends Repository {}
 
 UserRepository::validate(new Post());
+//                       ^^^^^^^^^^ InvalidArgument: Argument $item of validate() expects 'User', got 'Post'
 ===expect===
-UnusedParam@5:36-5:41: Parameter $item is never used
-InvalidArgument@14:25-14:35: Argument $item of validate() expects 'User', got 'Post'

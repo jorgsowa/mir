@@ -3,7 +3,7 @@ regular function reported
 ===file===
 <?php
 function greet(string $name): string {
+//             ^^^^^^^^^^^^ UnusedParam: Parameter $name is never used
     return 'hello';
 }
 ===expect===
-UnusedParam@2:15-2:27: Parameter $name is never used

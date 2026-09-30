@@ -6,11 +6,11 @@ without a guard.
 <?php
 function test_false(): int {
     return false;
+//  ^^^^^^^^^^^^^ InvalidReturnType: Return type 'false' is not compatible with declared 'int'
 }
 
 function test_null_false(): int {
     return rand(0, 1) ? null : false;
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'null|false' is not compatible with declared 'int'
 }
 ===expect===
-InvalidReturnType@3:4-3:17: Return type 'false' is not compatible with declared 'int'
-InvalidReturnType@7:4-7:37: Return type 'null|false' is not compatible with declared 'int'

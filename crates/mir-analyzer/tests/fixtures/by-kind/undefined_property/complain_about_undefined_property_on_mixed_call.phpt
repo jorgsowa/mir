@@ -7,7 +7,7 @@ class C {
     public function foo($a) : void {
         /** @suppress MixedMethodCall */
         $a->bar($this->d);
+//                     ^ UndefinedProperty: Property C::$d does not exist
     }
 }
 ===expect===
-UndefinedProperty@6:23-6:24: Property C::$d does not exist

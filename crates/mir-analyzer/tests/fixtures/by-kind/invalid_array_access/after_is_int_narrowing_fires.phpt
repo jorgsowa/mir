@@ -6,6 +6,6 @@ InvalidArrayAccess fires inside the is_int branch of a variable declared as int|
 $x = 5;
 if (is_int($x)) {
     echo $x[0];
+//       ^^^^^ InvalidArrayAccess: Cannot use [] operator on non-array type 'int'
 }
 ===expect===
-InvalidArrayAccess@5:9-5:14: Cannot use [] operator on non-array type 'int'

@@ -5,6 +5,6 @@ after exit
 function foo(): void {
     exit(1);
     $x = 2;
+//  ^^^^^^^ UnreachableCode: Unreachable code detected
 }
 ===expect===
-UnreachableCode@4:4-4:11: Unreachable code detected

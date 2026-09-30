@@ -10,6 +10,6 @@ function test(): void {
     $config = [$_GET['env'] => 'active'];
     $active = $config['active'] ?? null;
     echo $active;
+//  ^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 ===expect===
-TaintedHtml@5:4-5:17: Tainted HTML output — possible XSS

@@ -13,6 +13,7 @@ trait HasName {
 }
 readonly class Person {
     use HasName;
+//      ^^^^^^^ InvalidTraitUse: Trait HasName used incorrectly: Readonly class Person cannot use trait HasName: it declares a non-readonly property $name
 }
 
 trait HasReadonlyId {
@@ -25,4 +26,3 @@ readonly class Account {
     }
 }
 ===expect===
-InvalidTraitUse@6:8-6:15: Trait HasName used incorrectly: Readonly class Person cannot use trait HasName: it declares a non-readonly property $name

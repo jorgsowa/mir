@@ -16,6 +16,6 @@ class Card {
 function takesString(string $s): void {}
 function f(): void {
     takesString(Card::DEFAULT);
+//              ^^^^^^^^^^^^^ InvalidArgument: Argument $s of takesString() expects 'string', got 'Suit'
 }
 ===expect===
-InvalidArgument@11:16-11:29: Argument $s of takesString() expects 'string', got 'Suit'

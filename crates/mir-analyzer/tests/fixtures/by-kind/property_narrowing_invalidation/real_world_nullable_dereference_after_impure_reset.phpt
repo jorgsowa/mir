@@ -16,6 +16,7 @@ class Session {
         $this->user = $u;
         $this->reset();
         $this->user->getId();
+//      ^^^^^^^^^^^^^^^^^^^^ PossiblyNullMethodCall: Cannot call method getId() on possibly null value
     }
 
     private function reset(): void {
@@ -25,4 +26,3 @@ class Session {
     }
 }
 ===expect===
-PossiblyNullMethodCall@11:8-11:28: Cannot call method getId() on possibly null value

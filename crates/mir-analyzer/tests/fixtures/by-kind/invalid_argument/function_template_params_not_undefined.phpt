@@ -9,6 +9,7 @@ class User { }
  * @param T $value
  */
 function identity(mixed $value): void {}
+//                ^^^^^^^^^^^^ UnusedParam: Parameter $value is never used
 
 function test(): void {
     // Should accept any concrete type when T is template parameter
@@ -18,4 +19,3 @@ function test(): void {
     identity(null);
 }
 ===expect===
-UnusedParam@8:18-8:30: Parameter $value is never used

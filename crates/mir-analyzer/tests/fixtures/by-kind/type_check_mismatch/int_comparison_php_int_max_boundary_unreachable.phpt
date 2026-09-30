@@ -13,6 +13,8 @@ suppress=UnusedVariable,UnusedParam
 /** @param int<0,10> $x */
 function test_greater_than_int_max_is_unreachable(int $x): void {
     if ($x > 9223372036854775807) {
+//      ^^^^^^^^^^^^^^^^^^^^^^^^ DocblockTypeContradiction: Type 'int<0, 10>' makes '$x > 9223372036854775807' impossible — this can never hold
+//      ^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         /** @mir-check $_ is never */
         $_ = 1;
     }
@@ -21,10 +23,12 @@ function test_greater_than_int_max_is_unreachable(int $x): void {
 /** @param int<0,10> $x */
 function test_not_less_or_equal_int_max_is_unreachable(int $x): void {
     if ($x <= 9223372036854775807) {
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         return;
     }
     /** @mir-check $_ is never */
     $_ = 1;
+//  ^^^^^^^ UnreachableCode: Unreachable code detected
 }
 
 /** @param int<0,10> $x */
@@ -35,7 +39,3 @@ function test_ordinary_comparison_still_narrows(int $x): void {
     }
 }
 ===expect===
-DocblockTypeContradiction@4:8-4:32: Type 'int<0, 10>' makes '$x > 9223372036854775807' impossible — this can never hold
-RedundantCondition@4:8-4:32: Condition is always true/false for type 'bool'
-RedundantCondition@12:8-12:33: Condition is always true/false for type 'bool'
-UnreachableCode@16:4-16:11: Unreachable code detected

@@ -14,6 +14,6 @@ $a = array_map(
         return $uuid;
     },
     $foo[rand(0, 1)]
+//  ^^^^^^^^^^^^^^^^ PossiblyInvalidArgument: Argument $array of array_map() expects 'array', possibly different type '"a"|array{0: "b"}' provided
 );
 ===expect===
-PossiblyInvalidArgument@11:4-11:20: Argument $array of array_map() expects 'array', possibly different type '"a"|array{0: "b"}' provided

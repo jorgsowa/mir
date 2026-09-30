@@ -15,12 +15,12 @@ class Config {
 /** @psalm-external-mutation-free */
 function configureExternal(Config $cfg): void {
     $cfg->mode = 'active';
+//  ^^^^^^^^^^^^^^^^^^^^^ ImpurePropertyAssignment: Assigning to property mode of a parameter in a pure or external-mutation-free context
 }
 
 /** @psalm-mutation-free */
 function configureMutationFree(Config $cfg): void {
     $cfg->mode = 'active';
+//  ^^^^^^^^^^^^^^^^^^^^^ ImpurePropertyAssignment: Assigning to property mode of a parameter in a pure or external-mutation-free context
 }
 ===expect===
-ImpurePropertyAssignment@8:4-8:25: Assigning to property mode of a parameter in a pure or external-mutation-free context
-ImpurePropertyAssignment@13:4-13:25: Assigning to property mode of a parameter in a pure or external-mutation-free context

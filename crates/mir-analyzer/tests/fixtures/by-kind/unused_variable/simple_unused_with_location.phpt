@@ -6,7 +6,7 @@ suppress=MissingReturnType
 <?php
 function example() {
     $unused = 42;
+//  ^^^^^^^ UnusedVariable: Variable $unused is never read
     return 10;
 }
 ===expect===
-UnusedVariable@3:4-3:11: Variable $unused is never read

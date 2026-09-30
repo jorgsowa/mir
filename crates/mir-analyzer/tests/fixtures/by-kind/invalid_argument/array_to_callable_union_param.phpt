@@ -20,5 +20,5 @@ $f->fake([
     '*' => ['result' => ['foo' => 'bar']],
 ]);
 pure_callable(['only-one-element']);
+//            ^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $callback of callable() expects 'callable (string or [object, "method"])', got 'array{0: "only-one-element"}'
 ===expect===
-InvalidArgument@15:14-15:34: Argument $callback of callable() expects 'callable (string or [object, "method"])', got 'array{0: "only-one-element"}'

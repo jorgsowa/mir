@@ -16,11 +16,13 @@ class Base {
 
     public function bumpSelfTyped(self $o): void {
         $o->x++;
+//      ^^^^^ ReadonlyPropertyAssignment: Cannot assign to readonly property Base::$x outside of constructor
     }
 
     /** @param static $o */
     public function bumpStaticTyped($o): void {
         $o->x++;
+//      ^^^^^ ReadonlyPropertyAssignment: Cannot assign to readonly property Base::$x outside of constructor
     }
 }
 
@@ -28,9 +30,7 @@ class Sub extends Base {
     /** @param parent $o */
     public function bumpParentTyped($o): void {
         $o->x++;
+//      ^^^^^ ReadonlyPropertyAssignment: Cannot assign to readonly property Base::$x outside of constructor
     }
 }
 ===expect===
-ReadonlyPropertyAssignment@6:8-6:13: Cannot assign to readonly property Base::$x outside of constructor
-ReadonlyPropertyAssignment@11:8-11:13: Cannot assign to readonly property Base::$x outside of constructor
-ReadonlyPropertyAssignment@18:8-18:13: Cannot assign to readonly property Base::$x outside of constructor

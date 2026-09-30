@@ -5,5 +5,5 @@ Prevent extending interface
 interface Foo {}
 
 class Bar extends Foo {}
+//                ^^^ UndefinedClass: Class Foo does not exist
 ===expect===
-UndefinedClass@4:18-4:21: Class Foo does not exist

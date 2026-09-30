@@ -5,7 +5,7 @@ nested function body
 function outer(): void {
     function inner(): void {
         nonexistent_function();
+//      ^^^^^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function nonexistent_function() is not defined
     }
 }
 ===expect===
-UndefinedFunction@4:8-4:30: Function nonexistent_function() is not defined

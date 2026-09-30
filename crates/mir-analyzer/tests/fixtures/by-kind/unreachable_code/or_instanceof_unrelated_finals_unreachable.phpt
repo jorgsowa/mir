@@ -15,6 +15,7 @@ final class B {}
 
 function orInstanceofUnrelatedFinalsUnreachable(Baz $x): void {
     if ($x instanceof A || $x instanceof B) {
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         /** @mir-check $_ is never */
         $_ = 1;
     }
@@ -26,6 +27,7 @@ class Holder {
 
 function propOrInstanceofUnrelatedFinalsUnreachable(Holder $h): void {
     if ($h->prop instanceof A || $h->prop instanceof B) {
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         /** @mir-check $_ is never */
         $_ = 1;
     }
@@ -42,5 +44,3 @@ function orInstanceofRelatedStillNarrows(Quacks $x): void {
     }
 }
 ===expect===
-RedundantCondition@7:8-7:42: Condition is always true/false for type 'bool'
-RedundantCondition@18:8-18:54: Condition is always true/false for type 'bool'

@@ -4,6 +4,6 @@ PossiblyInvalidOperand fires for subtraction when a union member is an array.
 <?php
 function diff(int|array $a, int $b): int {
     return $a - $b;
+//         ^^^^^^^ PossiblyInvalidOperand: Operator '-' might not be supported between 'int|array' and 'int'
 }
 ===expect===
-PossiblyInvalidOperand@3:11-3:18: Operator '-' might not be supported between 'int|array' and 'int'

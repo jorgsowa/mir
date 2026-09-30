@@ -8,8 +8,8 @@ while (rand(0, 1)) {
 
     if (rand(0, 1)) {
         $a = 1;
+//      ^^ UnusedVariable: Variable $a is never read
         break;
     }
 }
 ===expect===
-UnusedVariable@7:8-7:10: Variable $a is never read

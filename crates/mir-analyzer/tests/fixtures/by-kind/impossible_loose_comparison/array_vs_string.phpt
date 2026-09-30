@@ -6,6 +6,6 @@ suppress=UnusedVariable,UnusedParam
 <?php
 function test(array $arr, string $s): void {
     if ($arr == $s) {}
+//      ^^^^^^^^^^ ImpossibleLooseComparison: '==' between 'array' and 'string' is always false — these types can never be loosely equal
 }
 ===expect===
-ImpossibleLooseComparison@3:8-3:18: '==' between 'array' and 'string' is always false — these types can never be loosely equal

@@ -7,5 +7,5 @@ suppress=UnusedParam
 class Foo {}
 class Bar {}
 function process(FOO|Bar $x): void {}
+//               ^^^ WrongCaseClass: Class name 'FOO' has incorrect casing; use 'Foo'
 ===expect===
-WrongCaseClass@4:17-4:20: Class name 'FOO' has incorrect casing; use 'Foo'

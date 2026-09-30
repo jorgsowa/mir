@@ -9,6 +9,6 @@ class Foo {
     const B = 2;
 }
 Foo::B;
+//   ^ DeprecatedConstant: Constant Foo::B is deprecated
 
 ===expect===
-DeprecatedConstant@8:5-8:6: Constant Foo::B is deprecated

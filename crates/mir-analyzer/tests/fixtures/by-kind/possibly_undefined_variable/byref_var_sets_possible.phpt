@@ -15,5 +15,5 @@ if (rand(0, 1)) {
 }
 
 echo $b;
+//   ^^ PossiblyUndefinedVariable: Variable $b might not be defined
 ===expect===
-PossiblyUndefinedVariable@14:5-14:7: Variable $b might not be defined

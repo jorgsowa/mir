@@ -16,7 +16,7 @@ class Box {
 function test(?Box $b): void {
     if ($b?->value === null) {
         echo $b->other;
+//           ^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $other on possibly null value
     }
 }
 ===expect===
-PossiblyNullPropertyFetch@9:13-9:22: Cannot access property $other on possibly null value

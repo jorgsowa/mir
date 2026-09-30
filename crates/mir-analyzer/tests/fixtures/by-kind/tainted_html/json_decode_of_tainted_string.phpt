@@ -10,6 +10,7 @@ suppress=MixedArrayAccess,MixedArgument,MixedAssignment
 function viaJsonDecode(): void {
     $data = json_decode($_GET['payload'], true);
     echo $data['name'];
+//  ^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function staticOnly(): void {
@@ -17,4 +18,3 @@ function staticOnly(): void {
     echo $data['name'];
 }
 ===expect===
-TaintedHtml@4:4-4:23: Tainted HTML output — possible XSS

@@ -17,6 +17,6 @@ function test(): void {
     /** @var Sink<Cat> $c */
     $c = new Sink();
     f($c);
+//    ^^ InvalidArgument: Argument $s of f() expects 'Sink<Animal>', got 'Sink<Cat>'
 }
 ===expect===
-InvalidArgument@14:6-14:8: Argument $s of f() expects 'Sink<Animal>', got 'Sink<Cat>'

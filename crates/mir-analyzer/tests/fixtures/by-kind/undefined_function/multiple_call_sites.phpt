@@ -4,8 +4,8 @@ multiple call sites
 <?php
 function test(): void {
     foo();
+//  ^^^^^ UndefinedFunction: Function foo() is not defined
     foo();
+//  ^^^^^ UndefinedFunction: Function foo() is not defined
 }
 ===expect===
-UndefinedFunction@3:4-3:9: Function foo() is not defined
-UndefinedFunction@4:4-4:9: Function foo() is not defined

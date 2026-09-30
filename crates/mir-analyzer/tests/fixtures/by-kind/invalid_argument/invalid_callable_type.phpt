@@ -14,5 +14,5 @@ function executeCallback($callback) {
 // Passing an array that's not a valid callable format
 // SHOULD emit InvalidArgument because array is not a valid callable
 executeCallback(["invalid"]);
+//              ^^^^^^^^^^^ InvalidArgument: Argument $callback of callable() expects 'callable (string or [object, "method"])', got 'array{0: "invalid"}'
 ===expect===
-InvalidArgument@11:16-11:27: Argument $callback of callable() expects 'callable (string or [object, "method"])', got 'array{0: "invalid"}'

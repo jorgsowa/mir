@@ -22,6 +22,6 @@ class IntBox extends Box {}
 
 function bad(): void {
     IntBox::$value = 'not an int';
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $value expects 'int', cannot assign '"not an int"'
 }
 ===expect===
-InvalidPropertyAssignment@17:4-17:33: Property $value expects 'int', cannot assign '"not an int"'

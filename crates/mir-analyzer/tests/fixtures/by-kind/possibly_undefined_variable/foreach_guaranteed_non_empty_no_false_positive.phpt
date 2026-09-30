@@ -36,6 +36,7 @@ function all_optional_shape_not_guaranteed(array $items): int {
         $last = $item;
     }
     return $last;
+//         ^^^^^ PossiblyUndefinedVariable: Variable $last might not be defined
 }
 
 /** @param array{a: int}|array<int, int> $items */
@@ -44,7 +45,6 @@ function mixed_shape_union_not_guaranteed(array $items): int {
         $last = $item;
     }
     return $last;
+//         ^^^^^ PossiblyUndefinedVariable: Variable $last might not be defined
 }
 ===expect===
-PossiblyUndefinedVariable@30:11-30:16: Variable $last might not be defined
-PossiblyUndefinedVariable@38:11-38:16: Variable $last might not be defined

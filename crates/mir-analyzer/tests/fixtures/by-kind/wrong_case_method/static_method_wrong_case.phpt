@@ -6,5 +6,5 @@ class Logger {
     public static function logError(): void {}
 }
 Logger::LOGERROR();
+//      ^^^^^^^^ WrongCaseMethod: Method name 'Logger::LOGERROR' has incorrect casing; use 'logError'
 ===expect===
-WrongCaseMethod@5:8-5:16: Method name 'Logger::LOGERROR' has incorrect casing; use 'logError'

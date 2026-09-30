@@ -6,6 +6,6 @@ namespace bar;
 
 function fooFoo(): string {
     return 5;
+//  ^^^^^^^^^ InvalidReturnType: Return type '5' is not compatible with declared 'string'
 }
 ===expect===
-InvalidReturnType@5:4-5:13: Return type '5' is not compatible with declared 'string'

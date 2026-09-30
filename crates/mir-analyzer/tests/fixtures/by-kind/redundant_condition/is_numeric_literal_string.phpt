@@ -8,15 +8,15 @@ suppress=UnusedVariable,UnusedParam
 function test_always_true(string $s): void {
     $s = "123";
     if (is_numeric($s)) {
+//      ^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         // always taken
     }
 }
 function test_always_false(string $s): void {
     $s = "hello";
     if (is_numeric($s)) {
+//      ^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         // never taken
     }
 }
 ===expect===
-RedundantCondition@4:8-4:22: Condition is always true/false for type 'bool'
-RedundantCondition@10:8-10:22: Condition is always true/false for type 'bool'

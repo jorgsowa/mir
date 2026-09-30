@@ -4,6 +4,7 @@ Detect unused variable inside if elseif loop
 <?php
 function foo() : void {
     $a = 1;
+//  ^^ UnusedVariable: Variable $a is never read
 
     if (rand(0, 1)) {
     } elseif (rand(0, 1)) {
@@ -13,4 +14,3 @@ function foo() : void {
     }
 }
 ===expect===
-UnusedVariable@3:4-3:6: Variable $a is never read

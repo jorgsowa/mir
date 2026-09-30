@@ -10,7 +10,7 @@ class OnlyMethods {
 
 enum Status {
     #[OnlyMethods]
+//    ^^^^^^^^^^^ InvalidAttribute: Attribute OnlyMethods cannot be used on this target
     case Active;
 }
 ===expect===
-InvalidAttribute@9:6-9:17: Attribute OnlyMethods cannot be used on this target

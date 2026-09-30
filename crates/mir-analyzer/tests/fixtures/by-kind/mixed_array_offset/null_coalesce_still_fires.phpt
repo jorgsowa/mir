@@ -8,5 +8,5 @@ suppress=UnusedVariable
 $key = 'a';
 $arr = ['a' => 1, 'b' => 2];
 $val = $arr[$key] ?? 0;
+//          ^^^^ MixedArrayOffset: Mixed type used as array offset
 ===expect===
-MixedArrayOffset@5:12-5:16: Mixed type used as array offset

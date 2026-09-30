@@ -30,6 +30,6 @@ function bad_pos(): int {
     /** @var int<0, 10> $x */
     $x = 0;
     return $x;
+//  ^^^^^^^^^^ InvalidReturnType: Return type 'int<0, 10>' is not compatible with declared 'positive-int'
 }
 ===expect===
-InvalidReturnType@28:4-28:14: Return type 'int<0, 10>' is not compatible with declared 'positive-int'

@@ -6,7 +6,7 @@ suppress=UnusedVariable
 <?php
 class HttpClient {}
 $c = new httpclient();
+//       ^^^^^^^^^^ WrongCaseClass: Class name 'httpclient' has incorrect casing; use 'HttpClient'
 $d = new HttpCLIENT();
+//       ^^^^^^^^^^ WrongCaseClass: Class name 'HttpCLIENT' has incorrect casing; use 'HttpClient'
 ===expect===
-WrongCaseClass@3:9-3:19: Class name 'httpclient' has incorrect casing; use 'HttpClient'
-WrongCaseClass@4:9-4:19: Class name 'HttpCLIENT' has incorrect casing; use 'HttpClient'

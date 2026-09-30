@@ -15,6 +15,6 @@ class CatSource implements Source {}
 function acceptsDogSource(Source $source): void { var_dump($source); }
 function test(): void {
     acceptsDogSource(new CatSource());
+//                   ^^^^^^^^^^^^^^^ InvalidArgument: Argument $source of acceptsDogSource() expects 'Source<Dog>', got 'Source<Cat>'
 }
 ===expect===
-InvalidArgument@12:21-12:36: Argument $source of acceptsDogSource() expects 'Source<Dog>', got 'Source<Cat>'

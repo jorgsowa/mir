@@ -8,6 +8,6 @@ class A {
 
 class B extends A {
     private function fooFoo(): void {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ OverriddenMethodAccess: Method B::foofoo() overrides with less visibility
 }
 ===expect===
-OverriddenMethodAccess@7:4-7:38: Method B::foofoo() overrides with less visibility

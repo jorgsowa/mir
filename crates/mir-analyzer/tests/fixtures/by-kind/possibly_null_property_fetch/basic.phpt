@@ -7,6 +7,6 @@ class Foo {
 }
 function test(?Foo $obj): void {
     echo $obj->value;
+//       ^^^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $value on possibly null value
 }
 ===expect===
-PossiblyNullPropertyFetch@6:9-6:20: Cannot access property $value on possibly null value

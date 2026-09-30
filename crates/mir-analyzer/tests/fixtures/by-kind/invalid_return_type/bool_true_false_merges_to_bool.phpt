@@ -7,12 +7,12 @@ principle as `null|bool` when a third `null` branch is added.
 <?php
 function test_true_false(): int {
     return rand(0, 1) ? true : false;
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'bool' is not compatible with declared 'int'
 }
 
 function test_null_true_false(): int {
     $r = rand(0, 2);
     return $r === 0 ? null : ($r === 1 ? true : false);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'null|bool' is not compatible with declared 'int'
 }
 ===expect===
-InvalidReturnType@3:4-3:37: Return type 'bool' is not compatible with declared 'int'
-InvalidReturnType@8:4-8:55: Return type 'null|bool' is not compatible with declared 'int'

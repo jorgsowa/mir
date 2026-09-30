@@ -6,5 +6,5 @@ suppress=UnusedVariable
 ===file===
 <?php
 $a = +"abc";
+//    ^^^^^ InvalidOperand: Operator '+' not supported for operand of type '"abc"'
 ===expect===
-InvalidOperand@2:6-2:11: Operator '+' not supported for operand of type '"abc"'

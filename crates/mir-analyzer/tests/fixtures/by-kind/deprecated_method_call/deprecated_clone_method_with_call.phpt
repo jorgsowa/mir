@@ -14,5 +14,5 @@ class Foo {
 
 $a = new Foo;
 $aa = clone $a;
+//    ^^^^^^^^ DeprecatedMethodCall: Call to deprecated method Foo::__clone
 ===expect===
-DeprecatedMethodCall@11:6-11:14: Call to deprecated method Foo::__clone

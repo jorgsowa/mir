@@ -16,6 +16,7 @@ class Box {}
  * @return Box<never, T>
  */
 function wrap(mixed $value): Box {
+//            ^^^^^^^^^^^^ UnusedParam: Parameter $value is never used
     return new Box();
 }
 
@@ -35,4 +36,3 @@ class Container {
     }
 }
 ===expect===
-UnusedParam@14:14-14:26: Parameter $value is never used

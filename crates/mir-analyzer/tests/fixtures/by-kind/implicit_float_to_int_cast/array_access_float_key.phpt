@@ -8,6 +8,6 @@ suppress=MixedAssignment,UnusedVariable
 $arr = [];
 $x = 3.7;
 $val = $arr[$x];
+//          ^^ ImplicitFloatToIntCast: Implicit cast from 3.7 to int truncates the fractional part
 
 ===expect===
-ImplicitFloatToIntCast@4:12-4:14: Implicit cast from 3.7 to int truncates the fractional part

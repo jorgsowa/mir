@@ -14,6 +14,7 @@ class Either { }
  * @param Result<Success, Error> $result
  */
 function assertSuccessValue(Result $result): void {}
+//                          ^^^^^^^^^^^^^^ UnusedParam: Parameter $result is never used
 
 /**
  * @template LeftType
@@ -21,6 +22,7 @@ function assertSuccessValue(Result $result): void {}
  * @param Either<LeftType, RightType> $either
  */
 function processEither(Either $either): void {}
+//                     ^^^^^^^^^^^^^^ UnusedParam: Parameter $either is never used
 
 class UserData { }
 class ValidationError { }
@@ -42,5 +44,3 @@ function test(): void {
     assertSuccessValue($complexResult);
 }
 ===expect===
-UnusedParam@13:28-13:42: Parameter $result is never used
-UnusedParam@20:23-20:37: Parameter $either is never used

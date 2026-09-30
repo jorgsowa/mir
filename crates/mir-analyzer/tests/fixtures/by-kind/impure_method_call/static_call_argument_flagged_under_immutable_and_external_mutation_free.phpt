@@ -25,6 +25,7 @@ class Holder {
 
     public function corruptThis(): void {
         Logger::record($this->box);
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method record() in a pure or immutable context
     }
 }
 
@@ -32,6 +33,7 @@ class Wrapper {
     /** @psalm-external-mutation-free */
     public function corruptParam(Box $box): void {
         Logger::record($box);
+//      ^^^^^^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method record() in a pure or immutable context
     }
 
     /** @psalm-external-mutation-free */
@@ -43,9 +45,7 @@ class Wrapper {
     public function corruptViaVariableClassString(Box $box, string $loggerCls): void {
         /** @var class-string<Logger> $loggerCls */
         $loggerCls::record($box);
+//      ^^^^^^^^^^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method record() in a pure or immutable context
     }
 }
 ===expect===
-ImpureMethodCall@17:8-17:34: Calling impure method record() in a pure or immutable context
-ImpureMethodCall@24:8-24:28: Calling impure method record() in a pure or immutable context
-ImpureMethodCall@35:8-35:32: Calling impure method record() in a pure or immutable context

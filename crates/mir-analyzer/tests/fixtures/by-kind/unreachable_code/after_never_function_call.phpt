@@ -9,6 +9,6 @@ function stop(): never {
 function test(): void {
     stop();
     echo 'unreachable';
+//  ^^^^^^^^^^^^^^^^^^^ UnreachableCode: Unreachable code detected
 }
 ===expect===
-UnreachableCode@8:4-8:23: Unreachable code detected

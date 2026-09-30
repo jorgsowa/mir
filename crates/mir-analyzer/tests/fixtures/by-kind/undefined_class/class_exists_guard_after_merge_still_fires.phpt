@@ -7,6 +7,6 @@ function test(): void {
         // fine inside
     }
     new \Optional\Pkg();
+//      ^^^^^^^^^^^^^ UndefinedClass: Class Optional\Pkg does not exist
 }
 ===expect===
-UndefinedClass@6:8-6:21: Class Optional\Pkg does not exist

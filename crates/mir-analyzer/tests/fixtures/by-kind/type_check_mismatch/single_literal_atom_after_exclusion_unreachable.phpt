@@ -14,6 +14,7 @@ suppress=UnusedVariable,UnusedParam
 function stringSequentialExclusionUnreachable($s): void {
     if ($s !== 'a') {
         if ($s !== 'b') {
+//          ^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
             /** @mir-check $_ is never */
             $_ = 1;
         }
@@ -24,6 +25,7 @@ function stringSequentialExclusionUnreachable($s): void {
 function intSequentialExclusionUnreachable($n): void {
     if ($n !== 1) {
         if ($n !== 2) {
+//          ^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
             /** @mir-check $_ is never */
             $_ = 1;
         }
@@ -40,5 +42,3 @@ function threeMemberUnionStillReachableAfterOneExclusion($s): void {
     }
 }
 ===expect===
-RedundantCondition@5:12-5:22: Condition is always true/false for type 'bool'
-RedundantCondition@15:12-15:20: Condition is always true/false for type 'bool'

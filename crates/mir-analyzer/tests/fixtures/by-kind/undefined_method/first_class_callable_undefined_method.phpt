@@ -6,7 +6,7 @@ suppress=MixedAssignment,UnusedVariable
 <?php
 $queue = new SplQueue;
 $closure = $queue->undefined(...);
+//                 ^^^^^^^^^ UndefinedMethod: Method SplQueue::undefined() does not exist
 $count = $closure();
 
 ===expect===
-UndefinedMethod@3:19-3:28: Method SplQueue::undefined() does not exist

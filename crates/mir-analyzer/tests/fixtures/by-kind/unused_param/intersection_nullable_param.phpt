@@ -15,6 +15,7 @@ class Box implements Taggable {}
  * @return T|null
  */
 function extract(mixed $item): mixed { return null; }
+//               ^^^^^^^^^^^ UnusedParam: Parameter $item is never used
 
 /** @var Box<string> $b */
 $b = new Box();
@@ -29,4 +30,3 @@ $val2 = extract(null);
 /** @mir-check $val2 is mixed */
 echo $val2;
 ===expect===
-UnusedParam@12:17-12:28: Parameter $item is never used

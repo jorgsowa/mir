@@ -21,7 +21,7 @@ final class Holder {
 
     public function stillFlaggedWithoutGuard(): void {
         $this->foo->realMethod();
+//      ^^^^^^^^^^^^^^^^^^^^^^^^ PossiblyNullMethodCall: Cannot call method realMethod() on possibly null value
     }
 }
 ===expect===
-PossiblyNullMethodCall@16:8-16:32: Cannot call method realMethod() on possibly null value

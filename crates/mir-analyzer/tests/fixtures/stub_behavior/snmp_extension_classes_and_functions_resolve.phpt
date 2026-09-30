@@ -8,6 +8,7 @@ suppress=UnusedParam,UnusedVariable,MixedAssignment,MixedArgument
 <?php
 
 function query(string $host, string $community, string $oid) {
+//       ^^^^^ MissingReturnType: Function query() has no return type annotation
     return snmpget($host, $community, $oid);
 }
 
@@ -15,4 +16,3 @@ function handle(SNMPException $e): string {
     return $e->getMessage();
 }
 ===expect===
-MissingReturnType@3:9-3:14: Function query() has no return type annotation

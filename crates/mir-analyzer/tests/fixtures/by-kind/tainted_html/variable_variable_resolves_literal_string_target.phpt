@@ -19,6 +19,6 @@ function taintPropagates(): void {
     $x = $_GET['input'];
     $name = 'x';
     echo $$name;
+//  ^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 ===expect===
-TaintedHtml@13:4-13:16: Tainted HTML output — possible XSS

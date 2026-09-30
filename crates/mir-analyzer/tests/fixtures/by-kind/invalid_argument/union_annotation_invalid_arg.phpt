@@ -16,5 +16,5 @@ class Child extends ParentClass {}
 $child = new Child();
 
 $b = $child->setBool("hello", 5);
+//                            ^ ArgumentTypeCoercion: Argument $bar of setBool() expects 'string|bool', got '5' — coercion may fail at runtime
 ===expect===
-ArgumentTypeCoercion@13:30-13:31: Argument $bar of setBool() expects 'string|bool', got '5' — coercion may fail at runtime

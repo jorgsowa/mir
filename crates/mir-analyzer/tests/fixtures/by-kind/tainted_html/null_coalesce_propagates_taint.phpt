@@ -10,6 +10,6 @@ suppress=MixedArrayAccess,MixedAssignment
 function test(): void {
     $name = $_GET['name'] ?? 'default';
     echo $name;
+//  ^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 ===expect===
-TaintedHtml@4:4-4:15: Tainted HTML output — possible XSS

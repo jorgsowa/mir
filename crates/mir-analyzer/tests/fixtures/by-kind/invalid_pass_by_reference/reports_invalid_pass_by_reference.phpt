@@ -4,5 +4,5 @@ reports invalid pass by reference
 <?php
 function fill(int &$value): void { $value = 1; }
 fill(1 + 2);
+//   ^^^^^ InvalidPassByReference: Argument $value of fill() must be passed by reference
 ===expect===
-InvalidPassByReference@3:5-3:10: Argument $value of fill() must be passed by reference

@@ -15,6 +15,6 @@ echo $arr[round(1.5)];
 // Regular float key — warning fires
 $d = 1.7;
 echo $arr[$d];
+//        ^^ ImplicitFloatToIntCast: Implicit cast from 1.7 to int truncates the fractional part
 
 ===expect===
-ImplicitFloatToIntCast@11:10-11:12: Implicit cast from 1.7 to int truncates the fractional part

@@ -21,5 +21,5 @@ $ok = new Box(new Unrelated());
 
 // Violates the bound — NotBase does not extend Base.
 $bad = new Box(new NotBase());
+//     ^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'NotBase' does not satisfy bound 'Base'
 ===expect===
-InvalidTemplateParam@16:7-16:29: Template type 'T' inferred as 'NotBase' does not satisfy bound 'Base'

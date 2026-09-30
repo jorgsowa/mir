@@ -17,6 +17,6 @@ function test(): void {
     $f = new Factory();
     $maker = $f->maker();
     $maker()->undefinedMethod();
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Widget::undefinedMethod() does not exist
 }
 ===expect===
-UndefinedMethod@14:4-14:31: Method Widget::undefinedMethod() does not exist

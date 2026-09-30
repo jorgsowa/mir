@@ -14,5 +14,5 @@ class Child extends ParentClass {}
 $child = new Child();
 
 $child->setString("five");
+//                ^^^^^^ InvalidArgument: Argument $integer of setString() expects 'int', got '"five"'
 ===expect===
-InvalidArgument@13:18-13:24: Argument $integer of setString() expects 'int', got '"five"'

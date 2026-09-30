@@ -8,10 +8,10 @@ class Foo {
     }
 
     public function __invoke(int $x): void {}
+//                           ^^^^^^ UnusedParam: Parameter $x is never used
 
     public function __debugInfo(): array {
         return [];
     }
 }
 ===expect===
-UnusedParam@7:29-7:35: Parameter $x is never used

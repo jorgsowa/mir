@@ -19,6 +19,7 @@ final readonly class IssueTriggerPositive {
     /** Calling a method that could mutate an external object must still be flagged. */
     public function isSelf(): bool {
         return $this->callee !== null && $this->callee->mutates();
+//                                       ^^^^^^^^^^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method mutates() in a pure or immutable context
     }
 }
 
@@ -30,4 +31,3 @@ enum Code: string {
     }
 }
 ===expect===
-ImpureMethodCall@16:41-16:65: Calling impure method mutates() in a pure or immutable context

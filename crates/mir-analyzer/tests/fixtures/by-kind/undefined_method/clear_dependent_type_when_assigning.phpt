@@ -18,7 +18,7 @@ function foo(A $a) : void {
     switch ($a_class) {
         case AChild::class:
             $a->bar();
+//          ^^^^^^^^^ UndefinedMethod: Method B::bar() does not exist
     }
 }
 ===expect===
-UndefinedMethod@17:12-17:21: Method B::bar() does not exist

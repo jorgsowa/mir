@@ -7,6 +7,6 @@ is still invalid, unlike the generator case in
 <?php
 function example() : Generator {
     return null;
+//  ^^^^^^^^^^^^ InvalidReturnType: Return type 'null' is not compatible with declared 'Generator'
 }
 ===expect===
-InvalidReturnType@3:4-3:16: Return type 'null' is not compatible with declared 'Generator'

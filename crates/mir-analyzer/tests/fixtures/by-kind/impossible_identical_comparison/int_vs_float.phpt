@@ -7,6 +7,6 @@ suppress=UnusedVariable,UnusedParam
 <?php
 function test(int $x): void {
     if ($x === 1.5) {}
+//      ^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between 'int' and '1.5' is always false — these types can never be identical
 }
 ===expect===
-ImpossibleIdenticalComparison@3:8-3:18: '===' between 'int' and '1.5' is always false — these types can never be identical

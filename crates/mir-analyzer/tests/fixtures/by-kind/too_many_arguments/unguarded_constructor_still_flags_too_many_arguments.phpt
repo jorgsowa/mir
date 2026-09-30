@@ -9,6 +9,6 @@ class NewApi {}
 
 function check(): void {
     new NewApi(1);
+//  ^^^^^^^^^^^^^ TooManyArguments: Too many arguments for NewApi::__construct(): expected 0, got 1
 }
 ===expect===
-TooManyArguments@5:4-5:17: Too many arguments for NewApi::__construct(): expected 0, got 1

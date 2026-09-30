@@ -6,6 +6,6 @@ suppress=UnusedVariable
 ===file===
 <?php
 $x = (string)"hello";
+//           ^^^^^^^ RedundantCast: Casting '"hello"' to 'string' is redundant
 
 ===expect===
-RedundantCast@2:13-2:20: Casting '"hello"' to 'string' is redundant

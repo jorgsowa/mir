@@ -16,10 +16,10 @@ interface Polygon {}
  * @return Wrapper<T>
  */
 function make(string $iface): Wrapper { return new Wrapper(); }
+//            ^^^^^^^^^^^^^ UnusedParam: Parameter $iface is never used
 
 $shapeWrapper = make(Shape::class);
 $polygonWrapper = make(Polygon::class);
 /** @mir-check $shapeWrapper is Wrapper<Shape> */
 /** @mir-check $polygonWrapper is Wrapper<Polygon> */
 ===expect===
-UnusedParam@13:14-13:27: Parameter $iface is never used

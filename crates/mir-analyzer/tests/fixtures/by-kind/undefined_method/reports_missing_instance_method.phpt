@@ -6,6 +6,6 @@ class Foo {}
 function test(): void {
     $f = new Foo();
     $f->missing();
+//  ^^^^^^^^^^^^^ UndefinedMethod: Method Foo::missing() does not exist
 }
 ===expect===
-UndefinedMethod@5:4-5:17: Method Foo::missing() does not exist

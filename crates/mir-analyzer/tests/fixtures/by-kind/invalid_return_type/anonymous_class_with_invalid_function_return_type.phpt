@@ -7,7 +7,7 @@ suppress=UnusedVariable
 $foo = new class {
     public function a(): string {
         return 5;
+//      ^^^^^^^^^ InvalidReturnType: Return type '5' is not compatible with declared 'string'
     }
 };
 ===expect===
-InvalidReturnType@4:8-4:17: Return type '5' is not compatible with declared 'string'

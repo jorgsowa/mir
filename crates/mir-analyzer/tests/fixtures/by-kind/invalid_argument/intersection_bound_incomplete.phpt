@@ -15,5 +15,5 @@ function f(Type&NamedType $t): void {
 }
 
 f(new PartialImpl());
+//^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $t of f() expects 'Type&NamedType', got 'PartialImpl'
 ===expect===
-InvalidArgument@14:2-14:19: Argument $t of f() expects 'Type&NamedType', got 'PartialImpl'

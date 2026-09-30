@@ -5,5 +5,5 @@ ImplicitToStringCast in echo statement
 class Foo {}
 $f = new Foo();
 echo $f;
+//   ^^ ImplicitToStringCast: Class Foo is implicitly cast to string
 ===expect===
-ImplicitToStringCast@4:5-4:7: Class Foo is implicitly cast to string

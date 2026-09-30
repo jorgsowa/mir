@@ -18,11 +18,11 @@ class CustomerData
 function foo(array $input) : CustomerData {
     return new CustomerData(
         age: $input["age"],
+//      ^^^^^^^^^^^^^^^^^^ InvalidNamedArguments: CustomerData::__construct() does not accept named arguments
         name: $input["name"],
+//      ^^^^^^^^^^^^^^^^^^^^ InvalidNamedArguments: CustomerData::__construct() does not accept named arguments
         email: $input["email"],
+//      ^^^^^^^^^^^^^^^^^^^^^^ InvalidNamedArguments: CustomerData::__construct() does not accept named arguments
     );
 }
 ===expect===
-InvalidNamedArguments@17:8-17:26: CustomerData::__construct() does not accept named arguments
-InvalidNamedArguments@18:8-18:28: CustomerData::__construct() does not accept named arguments
-InvalidNamedArguments@19:8-19:30: CustomerData::__construct() does not accept named arguments

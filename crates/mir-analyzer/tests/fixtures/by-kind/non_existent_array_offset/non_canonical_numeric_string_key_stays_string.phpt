@@ -7,6 +7,6 @@ reports NonExistentArrayOffset.
 function f(): void {
     $arr = ['01' => 'x'];
     echo $arr[0];
+//            ^ NonExistentArrayOffset: Array offset '0' does not exist
 }
 ===expect===
-NonExistentArrayOffset@4:14-4:15: Array offset '0' does not exist

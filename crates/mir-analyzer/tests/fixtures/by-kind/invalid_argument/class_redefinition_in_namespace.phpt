@@ -5,6 +5,6 @@ Class redefinition in namespace
 namespace Aye {
     class Foo {}
     class Foo {}
+//  ^^^^^^^^^^^^ DuplicateClass: Class Aye\Foo has already been defined
 }
 ===expect===
-DuplicateClass@4:4-4:16: Class Aye\Foo has already been defined

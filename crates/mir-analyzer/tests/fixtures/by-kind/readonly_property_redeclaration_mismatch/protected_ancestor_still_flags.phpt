@@ -12,9 +12,9 @@ class A {
 
 class B extends A {
     protected int $x;
+//  ^^^^^^^^^^^^^^^^^ ReadonlyPropertyRedeclarationMismatch: Cannot redeclare readonly property A::$x as non-readonly B::$x
     public function __construct(int $x) {
         $this->x = $x;
     }
 }
 ===expect===
-ReadonlyPropertyRedeclarationMismatch@10:4-10:21: Cannot redeclare readonly property A::$x as non-readonly B::$x

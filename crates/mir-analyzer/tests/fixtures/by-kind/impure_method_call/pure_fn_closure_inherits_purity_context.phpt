@@ -18,8 +18,8 @@ class Counter {
 function bump(Counter $c): void {
     $fn = function () use ($c) {
         $c->increment();
+//      ^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method increment() in a pure or immutable context
     };
     $fn();
 }
 ===expect===
-ImpureMethodCall@12:8-12:23: Calling impure method increment() in a pure or immutable context

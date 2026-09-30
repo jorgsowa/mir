@@ -18,5 +18,5 @@ $cb = $flag
     : function (string $a, string $b): void {};
 
 process($cb);
+//      ^^^ InvalidArgument: Argument $c of process() expects 'callable with 1 required parameter(s)', got 'callable with 2 required parameter(s)'
 ===expect===
-InvalidArgument@12:8-12:11: Argument $c of process() expects 'callable with 1 required parameter(s)', got 'callable with 2 required parameter(s)'

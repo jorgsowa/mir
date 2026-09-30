@@ -21,7 +21,7 @@ function needsUnrelated(Unrelated $x): void {}
 function test(Status $s): void {
     if ($s === Status::Active) {
         needsUnrelated($s);
+//                     ^^ InvalidArgument: Argument $x of needsUnrelated() expects 'Unrelated', got 'Status::Active'
     }
 }
 ===expect===
-InvalidArgument@15:23-15:25: Argument $x of needsUnrelated() expects 'Unrelated', got 'Status::Active'

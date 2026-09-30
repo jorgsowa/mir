@@ -22,6 +22,7 @@ function renderContent(Article|Photo $content): void {
     if ($content instanceof Article) {
         echo $content->getTitle();
     } elseif ($content instanceof Photo) {
+//            ^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         echo $content->getThumbnail();
     }
 }
@@ -33,7 +34,6 @@ function renderContent(Article|Photo $content): void {
  */
 function errorCase(Article|Photo $content): void {
     $content->undefinedMethod();
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Article::undefinedMethod() does not exist
 }
 ===expect===
-RedundantCondition@21:14-21:39: Condition is always true/false for type 'bool'
-UndefinedMethod@32:4-32:31: Method Article::undefinedMethod() does not exist

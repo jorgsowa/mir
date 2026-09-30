@@ -10,10 +10,10 @@ suppress=MissingReturnType,UnusedParam
  */
 function route($callback) {
   if (!is_callable($callback)) {  }
+//    ^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
   takes_int("string");
+//          ^^^^^^^^ InvalidArgument: Argument $i of takes_int() expects 'int', got '"string"'
 }
 
 function takes_int(int $i) {}
 ===expect===
-RedundantCondition@7:6-7:29: Condition is always true/false for type 'bool'
-InvalidArgument@8:12-8:20: Argument $i of takes_int() expects 'int', got '"string"'

@@ -7,5 +7,5 @@ suppress=UnusedVariable
 ===file===
 <?php
 $f = fn(): string => json_decode('{}');
+//                   ^^^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'string'
 ===expect===
-MixedReturnStatement@2:21-2:38: Cannot return a mixed type from function with declared return type 'string'

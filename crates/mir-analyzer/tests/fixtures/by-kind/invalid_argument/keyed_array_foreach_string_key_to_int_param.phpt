@@ -14,7 +14,7 @@ function foo(): void {
     $arr = ['hello' => 1, 'world' => 2];
     foreach ($arr as $k => $v) {
         takes_int($k);
+//                ^^ InvalidArgument: Argument $k of takes_int() expects 'int', got '"hello"|"world"'
     }
 }
 ===expect===
-InvalidArgument@11:18-11:20: Argument $k of takes_int() expects 'int', got '"hello"|"world"'

@@ -20,9 +20,9 @@ function narrowsParamToNull(?string $x): void {
 
 function nonNullableParamUnreachable(string $x): void {
     if (!isset($x)) {
+//      ^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         /** @mir-check $_ is never */
         $_ = 1;
     }
 }
 ===expect===
-RedundantCondition@13:8-13:18: Condition is always true/false for type 'bool'

@@ -16,7 +16,7 @@ class Child extends Base {
 class Cousin extends Base {
     public function peek(Child $c): int {
         return $c->offset;
+//                 ^^^^^^ InaccessibleProperty: Cannot access property Child::$offset
     }
 }
 ===expect===
-InaccessibleProperty@11:19-11:25: Cannot access property Child::$offset

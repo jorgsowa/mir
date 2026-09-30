@@ -7,8 +7,8 @@ class Bar {
         $ctx = ['key' => 'value'];
         if ($obj === null) {
             $obj->doSomething($ctx);
+//          ^^^^^^^^^^^^^^^^^^^^^^^ NullMethodCall: Cannot call method doSomething() on null
         }
     }
 }
 ===expect===
-NullMethodCall@6:12-6:35: Cannot call method doSomething() on null

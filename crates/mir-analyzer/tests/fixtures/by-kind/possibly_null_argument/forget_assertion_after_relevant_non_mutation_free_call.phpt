@@ -27,9 +27,9 @@ $foo = new Foo();
 if (assertBarNotNull($foo)) {
     $foo->nonMutationFree();
     requiresString($foo->bar);
+//                 ^^^^^^^^^ PossiblyNullArgument: Argument $_str of requiresString() might be null
 }
 
 function requiresString(string $_str): void {}
 
 ===expect===
-PossiblyNullArgument@24:19-24:28: Argument $_str of requiresString() might be null

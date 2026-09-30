@@ -26,6 +26,7 @@ abstract class Base {
 class MismatchedImpl extends Base {
     /** @return SubBox<Cat> */
     public function make(): SubBox { return new SubBox(); }
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method MismatchedImpl::make() signature mismatch: return type 'SubBox<Cat>' is not a subtype of parent 'Box<Animal>'
 }
 
 /** @extends Base<Animal> */
@@ -50,4 +51,3 @@ class CovariantImpl extends CovariantBase {
     public function make(): SubCovariantBox { return new SubCovariantBox(); }
 }
 ===expect===
-MethodSignatureMismatch@18:4-18:59: Method MismatchedImpl::make() signature mismatch: return type 'SubBox<Cat>' is not a subtype of parent 'Box<Animal>'

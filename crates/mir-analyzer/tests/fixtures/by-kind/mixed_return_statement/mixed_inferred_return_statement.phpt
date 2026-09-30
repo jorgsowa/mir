@@ -4,6 +4,6 @@ Mixed inferred return statement
 <?php
 function fooFoo(array $arr): string {
     return array_pop($arr);
+//  ^^^^^^^^^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'string'
 }
 ===expect===
-MixedReturnStatement@3:4-3:27: Cannot return a mixed type from function with declared return type 'string'

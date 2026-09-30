@@ -8,7 +8,7 @@ switch ($a) {
         break;
 
     case 0:
+//       ^ ParadoxicalCondition: Value 0 is duplicated; this branch can never be reached
         echo "I never get here";
 }
 ===expect===
-ParadoxicalCondition@7:9-7:10: Value 0 is duplicated; this branch can never be reached

@@ -16,7 +16,7 @@ class Crate {
     /** @return T */
     public function bad() {
         return new Plant();
+//      ^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'Plant' is not compatible with declared 'T'
     }
 }
 ===expect===
-InvalidReturnType@11:8-11:27: Return type 'Plant' is not compatible with declared 'T'

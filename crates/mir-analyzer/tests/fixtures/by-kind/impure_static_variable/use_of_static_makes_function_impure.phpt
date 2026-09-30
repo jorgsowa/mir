@@ -8,8 +8,8 @@ suppress=MixedAssignment,UnusedVariable
 function addCumulative(int $left) : int {
     /** @var int */
     static $i = 0;
+//         ^^^^^^ ImpureStaticVariable: Using static variable $i in a @pure function
     $i += $left;
     return $left;
 }
 ===expect===
-ImpureStaticVariable@5:11-5:17: Using static variable $i in a @pure function

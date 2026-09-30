@@ -23,8 +23,8 @@ final class Handler {
 
 function stillImpossible(\Closure $c): void {
     if ($c instanceof Handler) {
+//      ^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         echo "unreachable\n";
     }
 }
 ===expect===
-RedundantCondition@16:8-16:29: Condition is always true/false for type 'bool'

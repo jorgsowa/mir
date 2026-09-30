@@ -23,7 +23,7 @@ final class Bar {
 
 function needsString(string $s): void {}
 needsString((new Foo())->get()['a']);
+//          ^^^^^^^^^^^^^^^^^^^^^^^ ArgumentTypeCoercion: Argument $s of needsString() expects 'string', got 'int' — coercion may fail at runtime
 needsString((new Bar())->get()['a']);
+//          ^^^^^^^^^^^^^^^^^^^^^^^ ArgumentTypeCoercion: Argument $s of needsString() expects 'string', got 'int' — coercion may fail at runtime
 ===expect===
-ArgumentTypeCoercion@15:12-15:35: Argument $s of needsString() expects 'string', got 'int' — coercion may fail at runtime
-ArgumentTypeCoercion@16:12-16:35: Argument $s of needsString() expects 'string', got 'int' — coercion may fail at runtime

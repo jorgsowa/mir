@@ -18,7 +18,7 @@ class Listing {
 final class Unrelated {
     public function peek(Listing $l): int {
         return $l->offset;
+//                 ^^^^^^ InaccessibleProperty: Cannot access property Paging::$offset
     }
 }
 ===expect===
-InaccessibleProperty@13:19-13:25: Cannot access property Paging::$offset

@@ -14,9 +14,9 @@ function takesIntKeyed(array $a): void {}
 /** @var array<string, int> $bad */
 $bad = ['x' => 1];
 takesIntKeyed($bad);
+//            ^^^^ InvalidArgument: Argument $a of takesIntKeyed() expects 'array<int, int>', got 'array<string, int>'
 
 /** @var array<int, int> $good */
 $good = [0 => 1];
 takesIntKeyed($good);
 ===expect===
-InvalidArgument@7:14-7:18: Argument $a of takesIntKeyed() expects 'array<int, int>', got 'array<string, int>'

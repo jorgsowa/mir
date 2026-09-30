@@ -7,6 +7,6 @@ suppress=UnusedVariable,UnusedParam
 /** @param non-empty-array<string> $arr */
 function test(array $arr): void {
     if ($arr == false) {}
+//      ^^^^^^^^^^^^^ ImpossibleLooseComparison: '==' between 'non-empty-array<int|string, string>' and 'false' is always false — these types can never be loosely equal
 }
 ===expect===
-ImpossibleLooseComparison@4:8-4:21: '==' between 'non-empty-array<int|string, string>' and 'false' is always false — these types can never be loosely equal

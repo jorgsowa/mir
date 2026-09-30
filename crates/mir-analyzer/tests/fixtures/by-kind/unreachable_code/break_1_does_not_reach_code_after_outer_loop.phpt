@@ -15,6 +15,6 @@ function foo(array $matrix): void {
         }
     }
     echo "after";
+//  ^^^^^^^^^^^^^ UnreachableCode: Unreachable code detected
 }
 ===expect===
-UnreachableCode@10:4-10:17: Unreachable code detected

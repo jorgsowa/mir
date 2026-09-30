@@ -6,8 +6,8 @@ namespace App {
     trait MyTrait {
         public function go(): void {
             missing_function();
+//          ^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function missing_function() is not defined
         }
     }
 }
 ===expect===
-UndefinedFunction@5:12-5:30: Function missing_function() is not defined

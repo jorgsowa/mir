@@ -16,5 +16,5 @@ function sumMaps(...$maps): int {
 
 sumMaps(['a' => 1, 'b' => 2], ['c' => 3]);
 sumMaps(5);
+//      ^ InvalidArgument: Argument $maps of sumMaps() expects 'array<string, int>', got '5'
 ===expect===
-InvalidArgument@8:8-8:9: Argument $maps of sumMaps() expects 'array<string, int>', got '5'

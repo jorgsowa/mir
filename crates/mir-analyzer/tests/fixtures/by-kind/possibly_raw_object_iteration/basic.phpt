@@ -8,6 +8,6 @@ class Config {
 
 function items(Config|\ArrayIterator $source): \Generator {
     yield from $source;
+//             ^^^^^^^ PossiblyRawObjectIteration: Cannot iterate over possibly non-iterable object 'Config|ArrayIterator'
 }
 ===expect===
-PossiblyRawObjectIteration@7:15-7:22: Cannot iterate over possibly non-iterable object 'Config|ArrayIterator'

@@ -19,7 +19,7 @@ class Service {
 
     public function run(): void {
         $this->logger->write();
+//      ^^^^^^^^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method write() in a pure or immutable context
     }
 }
 ===expect===
-ImpureMethodCall@12:8-12:30: Calling impure method write() in a pure or immutable context

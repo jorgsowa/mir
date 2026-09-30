@@ -7,5 +7,5 @@ class Config {
 }
 
 echo Config::SECRET;
+//           ^^^^^^ InaccessibleClassConstant: Cannot access constant Config::SECRET
 ===expect===
-InaccessibleClassConstant@6:13-6:19: Cannot access constant Config::SECRET

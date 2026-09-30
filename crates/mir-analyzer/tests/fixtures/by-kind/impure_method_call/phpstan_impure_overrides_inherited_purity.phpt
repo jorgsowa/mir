@@ -21,6 +21,6 @@ final class LegacyBuilder implements Builder {
 /** @pure */
 function wrap(LegacyBuilder $builder): string {
     return $builder->build();
+//         ^^^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method build() in a pure or immutable context
 }
 ===expect===
-ImpureMethodCall@16:11-16:28: Calling impure method build() in a pure or immutable context

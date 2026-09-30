@@ -27,6 +27,7 @@ class Wrapper extends Box {
 /** @param Wrapper<string> $w */
 function collision(Wrapper $w): void {
     $w->value = "not an int";
+//  ^^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $value expects 'int', cannot assign '"not an int"'
 }
 
 // Cross-directional check: Wrapper's OWN member (`extra`, declared directly
@@ -36,4 +37,3 @@ function ownMemberStillCorrect(Wrapper $w): void {
     $w->extra = "a string is fine here";
 }
 ===expect===
-InvalidPropertyAssignment@21:4-21:28: Property $value expects 'int', cannot assign '"not an int"'

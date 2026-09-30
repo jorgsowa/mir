@@ -9,6 +9,7 @@ suppress=UnusedParam
 class OneBranch {
     public string $value;
     public function __construct(bool $cond, string $v) {
+//                  ^^^^^^^^^^^ PropertyPossiblyUninitialized: Property OneBranch::$value may be left uninitialized by the constructor
         if ($cond) {
             $this->value = $v;
         }
@@ -24,7 +25,6 @@ class ReadonlyMissing {
 class ReadonlyNeverSet {
     public readonly int $id;
     public function __construct() {}
+//                  ^^^^^^^^^^^ PropertyPossiblyUninitialized: Property ReadonlyNeverSet::$id may be left uninitialized by the constructor
 }
 ===expect===
-PropertyPossiblyUninitialized@4:20-4:31: Property OneBranch::$value may be left uninitialized by the constructor
-PropertyPossiblyUninitialized@19:20-19:31: Property ReadonlyNeverSet::$id may be left uninitialized by the constructor

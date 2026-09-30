@@ -3,5 +3,5 @@ Invalid interface
 ===file===
 <?php
 class C2 implements A { }
+//                  ^ UndefinedClass: Class A does not exist
 ===expect===
-UndefinedClass@2:20-2:21: Class A does not exist

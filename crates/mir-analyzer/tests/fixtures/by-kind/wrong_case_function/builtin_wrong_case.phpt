@@ -5,5 +5,5 @@ suppress=UnusedVariable
 ===file===
 <?php
 $x = STRLEN("hello");
+//   ^^^^^^ WrongCaseFunction: Function name 'STRLEN' has incorrect casing; use 'strlen'
 ===expect===
-WrongCaseFunction@2:5-2:11: Function name 'STRLEN' has incorrect casing; use 'strlen'

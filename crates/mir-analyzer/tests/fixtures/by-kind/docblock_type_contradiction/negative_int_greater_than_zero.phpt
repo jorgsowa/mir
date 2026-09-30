@@ -5,6 +5,6 @@
 /** @param negative-int $n */
 function test(int $n): void {
     assert($n > 0);
+//         ^^^^^^ DocblockTypeContradiction: Type 'negative-int' makes '$n > 0' impossible — this can never hold
 }
 ===expect===
-DocblockTypeContradiction@4:11-4:17: Type 'negative-int' makes '$n > 0' impossible — this can never hold

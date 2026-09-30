@@ -50,8 +50,8 @@ function guardedUses(string $className): void {
 
 function unguarded(string $className): void {
     if (!in_array(Iterator2::class, class_implements($className), true)) {
+//                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PossiblyInvalidArgument: Argument $haystack of in_array() expects 'array', possibly different type 'array<int|string, string>|false' provided
         return;
     }
 }
 ===expect===
-PossiblyInvalidArgument@42:36-42:64: Argument $haystack of in_array() expects 'array', possibly different type 'array<int|string, string>|false' provided

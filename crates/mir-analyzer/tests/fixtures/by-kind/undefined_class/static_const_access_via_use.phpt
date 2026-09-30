@@ -4,5 +4,5 @@ static const access via use
 <?php
 use Vendor\Missing\Foo;
 echo Foo::BAR;
+//   ^^^ UndefinedClass: Class Vendor\Missing\Foo does not exist
 ===expect===
-UndefinedClass@3:5-3:8: Class Vendor\Missing\Foo does not exist

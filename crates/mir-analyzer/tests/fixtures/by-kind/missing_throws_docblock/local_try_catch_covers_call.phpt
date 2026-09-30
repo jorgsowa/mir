@@ -31,6 +31,7 @@ function callCaught(): void {
 function callNotCaught(): void {
     try {
         risky();
+//      ^^^^^^^ MissingThrowsDocblock: Exception Exception is thrown but not declared in @throws
     } catch (\TypeError $e) {
     }
 }
@@ -38,6 +39,7 @@ function callNotCaught(): void {
 function callCaughtBySiblingOnly(): void {
     try {
         risky();
+//      ^^^^^^^ MissingThrowsDocblock: Exception Exception is thrown but not declared in @throws
     } catch (\TypeError $e) {
     } catch (\ValueError $e) {
     }
@@ -53,5 +55,3 @@ function callCaughtByOuterNestedTry(): void {
     }
 }
 ===expect===
-MissingThrowsDocblock@23:8-23:15: Exception Exception is thrown but not declared in @throws
-MissingThrowsDocblock@30:8-30:15: Exception Exception is thrown but not declared in @throws

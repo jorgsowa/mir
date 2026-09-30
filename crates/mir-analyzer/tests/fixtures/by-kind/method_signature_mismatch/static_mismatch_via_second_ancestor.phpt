@@ -12,6 +12,6 @@ interface Iface {
 }
 class Child extends Base implements Iface {
     public static function foo(): void {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method Child::foo() signature mismatch: cannot override non-static method Iface::foo() with a static method
 }
 ===expect===
-MethodSignatureMismatch@9:4-9:41: Method Child::foo() signature mismatch: cannot override non-static method Iface::foo() with a static method

@@ -3,6 +3,6 @@ Missing attribute on function
 ===file===
 <?php
 #[Pure]
+//^^^^ UndefinedAttributeClass: Attribute class Pure does not exist
 function foo() : void {}
 ===expect===
-UndefinedAttributeClass@2:2-2:6: Attribute class Pure does not exist

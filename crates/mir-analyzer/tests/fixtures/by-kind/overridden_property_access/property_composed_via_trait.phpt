@@ -13,9 +13,9 @@ class A {
 trait T {
     /** @var string|null */
     protected $foo;
+//  ^^^^^^^^^^^^^^^ OverriddenPropertyAccess: Property B::$foo overrides with less visibility
 }
 class B extends A {
     use T;
 }
 ===expect===
-OverriddenPropertyAccess@8:4-8:19: Property B::$foo overrides with less visibility

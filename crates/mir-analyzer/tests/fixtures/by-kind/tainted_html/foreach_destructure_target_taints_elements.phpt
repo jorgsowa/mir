@@ -11,7 +11,7 @@ function test(): void {
     $pairs = [[$_GET['id'], $_GET['name']]];
     foreach ($pairs as [$id, $name]) {
         echo $name;
+//      ^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 ===expect===
-TaintedHtml@5:8-5:19: Tainted HTML output — possible XSS

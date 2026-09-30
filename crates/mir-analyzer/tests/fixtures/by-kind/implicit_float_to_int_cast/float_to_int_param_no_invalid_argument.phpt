@@ -11,9 +11,9 @@ function process(int $id): void {
 
 $score = 9.8;
 process($score);
+//      ^^^^^^ ImplicitFloatToIntCast: Implicit cast from 9.8 to int truncates the fractional part
 
 process(7.3);
+//      ^^^ ImplicitFloatToIntCast: Implicit cast from 7.3 to int truncates the fractional part
 
 ===expect===
-ImplicitFloatToIntCast@7:8-7:14: Implicit cast from 9.8 to int truncates the fractional part
-ImplicitFloatToIntCast@9:8-9:11: Implicit cast from 7.3 to int truncates the fractional part

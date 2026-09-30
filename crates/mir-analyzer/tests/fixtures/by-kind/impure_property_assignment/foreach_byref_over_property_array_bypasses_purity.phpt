@@ -14,8 +14,8 @@ class Tally {
 /** @pure */
 function bumpAll(Tally $t): void {
     foreach ($t->items as &$v) {
+//           ^^^^^^^^^ ImpurePropertyAssignment: Assigning to property items of a parameter in a pure or external-mutation-free context
         $v++;
     }
 }
 ===expect===
-ImpurePropertyAssignment@8:13-8:22: Assigning to property items of a parameter in a pure or external-mutation-free context

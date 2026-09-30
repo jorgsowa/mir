@@ -9,6 +9,7 @@ suppress=
 trait Inner {
     public function reveal(): string {
         return $this->secret;
+//      ^^^^^^^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'string'
     }
 }
 
@@ -24,4 +25,3 @@ class Foo {
 
 echo (new Foo())->reveal();
 ===expect===
-MixedReturnStatement@4:8-4:29: Cannot return a mixed type from function with declared return type 'string'

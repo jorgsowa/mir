@@ -15,7 +15,7 @@ class B {
 
 class C extends B {
     public function fooFoo(string $a): void {
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method C::foofoo() signature mismatch: overriding method requires 1 argument(s) but parent requires 0
     }
 }
 ===expect===
-MethodSignatureMismatch@12:4-12:45: Method C::foofoo() signature mismatch: overriding method requires 1 argument(s) but parent requires 0

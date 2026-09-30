@@ -16,7 +16,7 @@ class Child extends Base {
 class Cousin extends Base {
     public function peek(): string {
         return Child::SECRET;
+//                    ^^^^^^ InaccessibleClassConstant: Cannot access constant Child::SECRET
     }
 }
 ===expect===
-InaccessibleClassConstant@11:22-11:28: Cannot access constant Child::SECRET

@@ -6,8 +6,8 @@ suppress=UnusedVariable,UnusedParam
 <?php
 function test(int $n): void {
     if (is_numeric($n)) {
+//      ^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         $_ = $n;
     }
 }
 ===expect===
-RedundantCondition@3:8-3:22: Condition is always true/false for type 'bool'

@@ -8,6 +8,6 @@ class C {
      */
     private function a(): void {}
     private function b(): void {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedMethod: Private method C::b() is never called
 }
 ===expect===
-UnusedMethod@7:4-7:33: Private method C::b() is never called

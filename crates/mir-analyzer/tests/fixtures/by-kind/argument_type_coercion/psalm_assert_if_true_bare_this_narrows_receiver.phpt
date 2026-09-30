@@ -23,6 +23,6 @@ function guarded(TestData $data): void {
 
 function unguarded(TestData $data): void {
     needsSpecific($data);
+//                ^^^^^ ArgumentTypeCoercion: Argument $d of needsSpecific() expects 'DataFromDataProvider', got 'TestData' — coercion may fail at runtime
 }
 ===expect===
-ArgumentTypeCoercion@17:18-17:23: Argument $d of needsSpecific() expects 'DataFromDataProvider', got 'TestData' — coercion may fail at runtime

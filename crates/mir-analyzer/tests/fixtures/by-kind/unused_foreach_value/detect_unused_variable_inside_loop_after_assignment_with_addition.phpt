@@ -5,7 +5,7 @@ Detect unused variable inside loop after assignment with addition
 function foo() : void {
     foreach ([1, 2, 3] as $i) {
         $i = $i + 1;
+//      ^^ UnusedForeachValue: Foreach value $i is never read
     }
 }
 ===expect===
-UnusedForeachValue@4:8-4:10: Foreach value $i is never read

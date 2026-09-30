@@ -9,6 +9,6 @@ function takesBool(bool $b): void { var_dump($b); }
 function getResult(): int|false { return 1; }
 function test(): void {
     takesBool(getResult());
+//            ^^^^^^^^^^^ PossiblyInvalidArgument: Argument $b of takesBool() expects 'bool', possibly different type 'int|false' provided
 }
 ===expect===
-PossiblyInvalidArgument@6:14-6:25: Argument $b of takesBool() expects 'bool', possibly different type 'int|false' provided

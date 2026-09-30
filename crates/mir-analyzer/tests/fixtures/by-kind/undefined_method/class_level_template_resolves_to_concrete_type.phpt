@@ -15,6 +15,6 @@ function test(): void {
     $items = new Collection();
     $first = $items->first();
     $first->nonExistentMethod();
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method User::nonExistentMethod() does not exist
 }
 ===expect===
-UndefinedMethod@14:4-14:31: Method User::nonExistentMethod() does not exist

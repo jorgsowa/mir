@@ -10,5 +10,5 @@ class MyClass {}
 
 $obj = new MyClass();
 $fn = $obj->undefined(...);
+//          ^^^^^^^^^ UndefinedMethod: Method MyClass::undefined() does not exist
 ===expect===
-UndefinedMethod@6:12-6:21: Method MyClass::undefined() does not exist

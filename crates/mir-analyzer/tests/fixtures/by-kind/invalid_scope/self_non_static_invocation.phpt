@@ -7,7 +7,7 @@ class A {
 
     public static function barBar(): void {
         self::fooFoo();
+//      ^^^^^^^^^^^^^^ NonStaticSelfCall: Non-static method A::fooFoo() cannot be called statically
     }
 }
 ===expect===
-NonStaticSelfCall@6:8-6:22: Non-static method A::fooFoo() cannot be called statically

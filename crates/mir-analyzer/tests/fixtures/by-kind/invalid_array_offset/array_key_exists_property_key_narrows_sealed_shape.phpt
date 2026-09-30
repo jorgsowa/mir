@@ -21,7 +21,7 @@ class Holder {
     /** @param array{title: string} $meta */
     public function notNarrowedWhenKeyIsNotALiteral(array $meta): string {
         return array_key_exists($this->unnarrowedKey, $meta) ? (string) $meta['favicon'] : '';
+//                                                                            ^^^^^^^^^ NonExistentArrayOffset: Array offset 'favicon' does not exist
     }
 }
 ===expect===
-NonExistentArrayOffset@16:78-16:87: Array offset 'favicon' does not exist

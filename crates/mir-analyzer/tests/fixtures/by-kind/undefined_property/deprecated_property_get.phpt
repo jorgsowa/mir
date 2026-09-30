@@ -12,5 +12,5 @@ class A{
     public $foo;
 }
 echo (new A)->foo;
+//            ^^^ DeprecatedProperty: Property A::$foo is deprecated
 ===expect===
-DeprecatedProperty@9:14-9:17: Property A::$foo is deprecated

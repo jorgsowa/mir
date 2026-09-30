@@ -11,19 +11,23 @@ suppress=MixedArrayAccess,MixedArgument
 <?php
 function viaStrReplace(): void {
     echo str_replace('a', 'b', $_GET['name']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function viaTrim(): void {
     echo trim($_GET['name']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function viaExplodeImplode(): void {
     $parts = explode(',', $_GET['csv']);
     echo implode('-', $parts);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function viaPregReplace(): void {
     echo preg_replace('/x/', 'y', $_GET['name']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function viaHtmlspecialchars(): void {
@@ -34,7 +38,3 @@ function staticOnly(): void {
     echo str_replace('a', 'b', 'static');
 }
 ===expect===
-TaintedHtml@3:4-3:46: Tainted HTML output — possible XSS
-TaintedHtml@7:4-7:29: Tainted HTML output — possible XSS
-TaintedHtml@12:4-12:30: Tainted HTML output — possible XSS
-TaintedHtml@16:4-16:49: Tainted HTML output — possible XSS

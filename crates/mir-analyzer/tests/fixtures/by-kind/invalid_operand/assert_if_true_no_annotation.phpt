@@ -10,6 +10,6 @@ $myString = rand(0, 1) ? "abacus" : null;
 
 if (isValidString($myString)) {
     echo "Ma chaine " . $myString;
+//                      ^^^^^^^^^ PossiblyNullOperand: Operator '.' operand '"abacus"|null' might be null
 }
 ===expect===
-PossiblyNullOperand@9:24-9:33: Operator '.' operand '"abacus"|null' might be null

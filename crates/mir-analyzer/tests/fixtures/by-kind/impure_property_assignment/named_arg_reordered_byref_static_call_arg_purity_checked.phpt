@@ -20,7 +20,7 @@ class Filler {
 /** @pure */
 function normalize(Bag $b): void {
     Filler::fill(out: $b->items, skip: 1);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method fill() in a pure or immutable context
+//                    ^^^^^^^^^ ImpurePropertyAssignment: Assigning to property items of a parameter in a pure or external-mutation-free context
 }
 ===expect===
-ImpureMethodCall@14:4-14:41: Calling impure method fill() in a pure or immutable context
-ImpurePropertyAssignment@14:22-14:31: Assigning to property items of a parameter in a pure or external-mutation-free context

@@ -11,6 +11,6 @@ class Query {
 function buildSql(): string|false { return 'SELECT 1'; }
 function test(): void {
     new Query(buildSql());
+//            ^^^^^^^^^^ PossiblyInvalidArgument: Argument $sql of Query::__construct() expects 'string', possibly different type 'string|false' provided
 }
 ===expect===
-PossiblyInvalidArgument@8:14-8:24: Argument $sql of Query::__construct() expects 'string', possibly different type 'string|false' provided

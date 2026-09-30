@@ -18,6 +18,7 @@ class Holder {
 // null < -5 compares as false < true = true).
 function lessThanOnNullableReceiverReachable(?Holder $h): void {
     if ($h->level < -5) {
+//      ^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $level on possibly null value
         $_ = 1;
     }
 }
@@ -25,9 +26,8 @@ function lessThanOnNullableReceiverReachable(?Holder $h): void {
 // Negative: a non-nullable receiver keeps the old, sound behavior.
 function lessThanOnNonNullableReceiverDiverges(Holder $h): void {
     if ($h->level < -5) {
+//      ^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         echo "unreachable";
     }
 }
 ===expect===
-PossiblyNullPropertyFetch@10:8-10:17: Cannot access property $level on possibly null value
-RedundantCondition@17:8-17:22: Condition is always true/false for type 'bool'

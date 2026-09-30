@@ -12,7 +12,7 @@ class Runner {
     /** @psalm-external-mutation-free */
     public function run($a): void {
         $a->mutate();
+//      ^^^^^^^^^^^^ ImpureMethodCall: Calling impure method mutate() in a pure or immutable context
     }
 }
 ===expect===
-ImpureMethodCall@5:8-5:20: Calling impure method mutate() in a pure or immutable context

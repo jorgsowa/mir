@@ -20,7 +20,7 @@ class Listing {
 final class SpecialListing extends Listing {
     public function limit(): int {
         return $this->limit;
+//                    ^^^^^ InaccessibleProperty: Cannot access property Paging::$limit
     }
 }
 ===expect===
-InaccessibleProperty@13:22-13:27: Cannot access property Paging::$limit

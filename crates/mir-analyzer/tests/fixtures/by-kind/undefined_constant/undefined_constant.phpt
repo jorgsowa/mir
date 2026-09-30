@@ -3,5 +3,5 @@ Undefined constant
 ===file===
 <?php
 echo HELLO;
+//   ^^^^^ UndefinedConstant: Constant HELLO is not defined
 ===expect===
-UndefinedConstant@2:5-2:10: Constant HELLO is not defined

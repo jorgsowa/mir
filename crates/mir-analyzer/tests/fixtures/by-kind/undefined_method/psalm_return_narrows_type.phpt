@@ -14,6 +14,6 @@ function getProduct(): mixed {
 
 function test(): void {
     getProduct()->missing();
+//  ^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Product::missing() does not exist
 }
 ===expect===
-UndefinedMethod@13:4-13:27: Method Product::missing() does not exist

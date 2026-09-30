@@ -14,6 +14,6 @@ function test(): void {
     $c = new Cache();
     $c->items['id'] = $_GET['id'];
     echo $c->items['id'];
+//  ^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 ===expect===
-TaintedHtml@8:4-8:25: Tainted HTML output — possible XSS

@@ -25,7 +25,7 @@ function isInstanceOf(mixed $value, string $class): bool {
 function test(mixed $x): void {
     if (isInstanceOf(...[$x, Foo::class])) {
         $x->missing();
+//      ^^^^^^^^^^^^^ UndefinedMethod: Method Foo::missing() does not exist
     }
 }
 ===expect===
-UndefinedMethod@18:8-18:21: Method Foo::missing() does not exist

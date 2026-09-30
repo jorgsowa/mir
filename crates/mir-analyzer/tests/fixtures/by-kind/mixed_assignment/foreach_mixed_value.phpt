@@ -5,7 +5,7 @@ Foreach over mixed emits MixedAssignment for value variable
 /** @var mixed */
 $arr = [1, 2, 3];
 foreach ($arr as $v) {
+//               ^^ MixedAssignment: Variable $v is assigned a mixed type
     echo $v;
 }
 ===expect===
-MixedAssignment@4:17-4:19: Variable $v is assigned a mixed type

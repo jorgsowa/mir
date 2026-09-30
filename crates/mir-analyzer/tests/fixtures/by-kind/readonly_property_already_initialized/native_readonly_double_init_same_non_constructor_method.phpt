@@ -12,7 +12,7 @@ class Counter {
     public function init(int $v): void {
         $this->value = $v;
         $this->value = $v + 1;
+//      ^^^^^^^^^^^^^^^^^^^^^ ReadonlyPropertyAlreadyInitialized: Cannot modify readonly property Counter::$value — already initialized
     }
 }
 ===expect===
-ReadonlyPropertyAlreadyInitialized@7:8-7:29: Cannot modify readonly property Counter::$value — already initialized

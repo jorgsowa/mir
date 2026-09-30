@@ -17,6 +17,7 @@ class Holder {
 // Positive: reachable when $h is null (get_debug_type(null) is 'null').
 function notFooOnNullableReceiverReachable(?Holder $h): void {
     if (get_debug_type($h->obj) !== 'Foo') {
+//                     ^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $obj on possibly null value
         $_ = 1;
     }
 }
@@ -24,9 +25,8 @@ function notFooOnNullableReceiverReachable(?Holder $h): void {
 // Negative: a non-nullable receiver keeps the old, sound behavior.
 function notFooOnNonNullableReceiverDiverges(Holder $h): void {
     if (get_debug_type($h->obj) !== 'Foo') {
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         echo "unreachable";
     }
 }
 ===expect===
-PossiblyNullPropertyFetch@9:23-9:30: Cannot access property $obj on possibly null value
-RedundantCondition@16:8-16:41: Condition is always true/false for type 'bool'

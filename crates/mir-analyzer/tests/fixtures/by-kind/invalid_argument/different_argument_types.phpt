@@ -12,8 +12,8 @@ class A {
 
 class B extends A {
     public function fooFoo(int $a, int $b): void {
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method B::foofoo() signature mismatch: parameter $b type 'int' is incompatible with parent type 'bool'
 
     }
 }
 ===expect===
-MethodSignatureMismatch@9:4-9:50: Method B::foofoo() signature mismatch: parameter $b type 'int' is incompatible with parent type 'bool'

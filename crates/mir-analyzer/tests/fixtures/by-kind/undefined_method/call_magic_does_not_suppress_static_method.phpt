@@ -9,6 +9,6 @@ class Magic {
 }
 function test(): void {
     Magic::missing();
+//  ^^^^^^^^^^^^^^^^ UndefinedMethod: Method Magic::missing() does not exist
 }
 ===expect===
-UndefinedMethod@8:4-8:20: Method Magic::missing() does not exist

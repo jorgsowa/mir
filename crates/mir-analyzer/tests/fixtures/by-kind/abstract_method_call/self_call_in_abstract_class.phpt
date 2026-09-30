@@ -7,7 +7,7 @@ abstract class Base {
     abstract public function foo(): void;
     public function bar(): void {
         self::foo();
+//      ^^^^^^^^^^^ AbstractMethodCall: Cannot call abstract method Base::foo()
     }
 }
 ===expect===
-AbstractMethodCall@5:8-5:19: Cannot call abstract method Base::foo()

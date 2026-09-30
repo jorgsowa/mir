@@ -18,6 +18,7 @@ class Greeter {
 // Negative: a non-$this object-variable receiver is unaffected.
 function callViaObjectVariable(Greeter $g): string {
     return $g::hello();
+//         ^^^^^^^^^^^ InvalidStaticInvocation: Non-static method Greeter::hello() cannot be called statically
 }
 
 class MaybeString {
@@ -32,4 +33,3 @@ class MaybeString {
 }
 class ReadyString extends MaybeString {}
 ===expect===
-InvalidStaticInvocation@12:11-12:22: Non-static method Greeter::hello() cannot be called statically

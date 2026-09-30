@@ -7,6 +7,6 @@ Returning a @param-typed mixed value from a function with a concrete declared re
  */
 function pass($x): int {
     return $x;
+//  ^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'int'
 }
 ===expect===
-MixedReturnStatement@6:4-6:14: Cannot return a mixed type from function with declared return type 'int'

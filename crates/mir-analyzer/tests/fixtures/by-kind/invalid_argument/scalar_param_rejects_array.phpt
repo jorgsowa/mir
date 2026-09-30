@@ -11,6 +11,6 @@ function acceptsScalar($v): void {}
 
 function f(array $arr): void {
     acceptsScalar($arr);
+//                ^^^^ InvalidArgument: Argument $v of acceptsScalar() expects 'scalar', got 'array'
 }
 ===expect===
-InvalidArgument@7:18-7:22: Argument $v of acceptsScalar() expects 'scalar', got 'array'

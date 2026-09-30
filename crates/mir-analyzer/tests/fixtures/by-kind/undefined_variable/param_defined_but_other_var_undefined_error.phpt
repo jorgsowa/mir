@@ -4,6 +4,6 @@ param defined but other var undefined error
 <?php
 function transform(string $input): string {
     return $input . $suffix;
+//                  ^^^^^^^ UndefinedVariable: Variable $suffix is not defined
 }
 ===expect===
-UndefinedVariable@3:20-3:27: Variable $suffix is not defined

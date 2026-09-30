@@ -13,6 +13,7 @@ interface ArrayAccess2 {
 }
 
 function needsBoth(Countable2&Iterator2 $y): void {}
+//                 ^^^^^^^^^^^^^^^^^^^^^^^ UnusedParam: Parameter $y is never used
 
 function f(Countable2&Iterator2 $x): void {
     if ($x instanceof ArrayAccess2) {
@@ -20,4 +21,3 @@ function f(Countable2&Iterator2 $x): void {
     }
 }
 ===expect===
-UnusedParam@12:19-12:42: Parameter $y is never used

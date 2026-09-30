@@ -7,6 +7,6 @@ still be flagged undefined.
 <?php
 function f(): void {
     xdebug_break_not_a_real_function();
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function xdebug_break_not_a_real_function() is not defined
 }
 ===expect===
-UndefinedFunction@3:4-3:38: Function xdebug_break_not_a_real_function() is not defined

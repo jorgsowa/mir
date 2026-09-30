@@ -11,7 +11,7 @@ function foo(int $i): void {
         2, 3 => $i,
     };
     $a === "aaa";
+//  ^^^^^^^^^^^^ DocblockTypeContradiction: Type '2|3' makes '$a === "aaa"' impossible — this can never hold
+//  ^^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between '2|3' and '"aaa"' is always false — these types can never be identical
 }
 ===expect===
-DocblockTypeContradiction@10:4-10:16: Type '2|3' makes '$a === "aaa"' impossible — this can never hold
-ImpossibleIdenticalComparison@10:4-10:16: '===' between '2|3' and '"aaa"' is always false — these types can never be identical

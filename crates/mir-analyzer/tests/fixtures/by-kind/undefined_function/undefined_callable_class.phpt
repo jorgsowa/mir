@@ -4,8 +4,10 @@ Undefined callable class
 <?php
 class A {
     public function getFoo(): Foo
+//                            ^^^ UndefinedClass: Class Foo does not exist
     {
         return new Foo([]);
+//                 ^^^ UndefinedClass: Class Foo does not exist
     }
 
     /**
@@ -19,5 +21,3 @@ class A {
     }
 }
 ===expect===
-UndefinedClass@3:30-3:33: Class Foo does not exist
-UndefinedClass@5:19-5:22: Class Foo does not exist

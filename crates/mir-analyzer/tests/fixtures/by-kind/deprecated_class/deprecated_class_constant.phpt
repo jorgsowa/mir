@@ -10,5 +10,5 @@ class Foo {
 }
 
 echo Foo::FOO;
+//   ^^^ DeprecatedClass: Class Foo is deprecated
 ===expect===
-DeprecatedClass@9:5-9:8: Class Foo is deprecated

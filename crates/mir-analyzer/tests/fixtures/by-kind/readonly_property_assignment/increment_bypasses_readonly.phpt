@@ -12,7 +12,7 @@ class Counter {
 
     public function bump(): void {
         $this->n++;
+//      ^^^^^^^^ ReadonlyPropertyAssignment: Cannot assign to readonly property Counter::$n outside of constructor
     }
 }
 ===expect===
-ReadonlyPropertyAssignment@6:8-6:16: Cannot assign to readonly property Counter::$n outside of constructor

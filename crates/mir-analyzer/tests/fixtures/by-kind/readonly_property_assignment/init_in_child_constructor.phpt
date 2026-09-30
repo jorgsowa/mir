@@ -11,7 +11,7 @@ class Base {
 class Child extends Base {
     public function __construct(string $name) {
         $this->name = $name;
+//      ^^^^^^^^^^^^^^^^^^^ ReadonlyPropertyAssignment: Cannot assign to readonly property Base::$name outside of constructor
     }
 }
 ===expect===
-ReadonlyPropertyAssignment@8:8-8:27: Cannot assign to readonly property Base::$name outside of constructor

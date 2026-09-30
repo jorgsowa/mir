@@ -12,8 +12,8 @@ class Cache {
     /** @pure */
     public static function evict(string $k): void {
         unset(self::$store[$k]);
+//            ^^^^^^^^^^^^^^^^ ImpureStaticPropertyAssignment: Assigning to static property Cache::$store in a @pure function
+//                  ^^^^^^ ImpureStaticPropertyAccess: Reading static property Cache::$store in a @pure function
     }
 }
 ===expect===
-ImpureStaticPropertyAssignment@7:14-7:30: Assigning to static property Cache::$store in a @pure function
-ImpureStaticPropertyAccess@7:20-7:26: Reading static property Cache::$store in a @pure function

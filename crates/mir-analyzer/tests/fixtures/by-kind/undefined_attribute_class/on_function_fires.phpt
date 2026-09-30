@@ -3,6 +3,6 @@ UndefinedAttributeClass fires when an undefined attribute is placed on a standal
 ===file===
 <?php
 #[Memoize]
+//^^^^^^^ UndefinedAttributeClass: Attribute class Memoize does not exist
 function foo(): void {}
 ===expect===
-UndefinedAttributeClass@2:2-2:9: Attribute class Memoize does not exist

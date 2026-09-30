@@ -5,5 +5,5 @@ Mixed array access
 /** @var mixed */
 $a = [];
 echo $a[0];
+//   ^^^^^ MixedArrayAccess: Array access on mixed type
 ===expect===
-MixedArrayAccess@4:5-4:10: Array access on mixed type

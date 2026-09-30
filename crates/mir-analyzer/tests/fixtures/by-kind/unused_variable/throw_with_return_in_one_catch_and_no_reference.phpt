@@ -16,6 +16,7 @@ function callDangerous(): void {
     try {
         dangerous();
         $s = true;
+//      ^^ UnusedVariable: Variable $s is never read
     } catch (E1 $e) {
         echo $e->getMessage();
         $s = false;
@@ -24,4 +25,3 @@ function callDangerous(): void {
     }
 }
 ===expect===
-UnusedVariable@13:8-13:10: Variable $s is never read

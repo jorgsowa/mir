@@ -17,6 +17,7 @@ class Holder {
 // receiver-null-ambiguous `Bar|null` type rather than being wrongly emptied.
 function looseNullOnNullableReceiverReachable(?Holder $h): void {
     if ($h->prop == null) {
+//      ^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $prop on possibly null value
         /** @mir-check $h->prop is Bar|null */
         $_ = 1;
     }
@@ -25,6 +26,7 @@ function looseNullOnNullableReceiverReachable(?Holder $h): void {
 // Positive: proving `!= null` also proves the receiver itself is non-null.
 function looseNotNullProvesReceiverNonNull(?Holder $h): void {
     if ($h->prop != null) {
+//      ^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $prop on possibly null value
         /** @mir-check $h is Holder */
         $_ = 1;
     }
@@ -35,11 +37,9 @@ function looseNotNullProvesReceiverNonNull(?Holder $h): void {
 // contradiction.
 function looseNullOnNonNullableReceiverDiverges(Holder $h): void {
     if ($h->prop == null) {
+//      ^^^^^^^^^^^^^^^^ ImpossibleLooseComparison: '==' between 'Bar' and 'null' is always false — these types can never be loosely equal
+//      ^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         echo "unreachable";
     }
 }
 ===expect===
-PossiblyNullPropertyFetch@10:8-10:16: Cannot access property $prop on possibly null value
-PossiblyNullPropertyFetch@18:8-18:16: Cannot access property $prop on possibly null value
-ImpossibleLooseComparison@28:8-28:24: '==' between 'Bar' and 'null' is always false — these types can never be loosely equal
-RedundantCondition@28:8-28:24: Condition is always true/false for type 'bool'

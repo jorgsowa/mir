@@ -27,7 +27,7 @@ class Attr {}
 /** @var Box<Foo> $box */
 $box = new Box();
 $a = $box->pick(Attr::class);
+//   ^^^^^^^^^^^^^^^^^^^^^^^ ShadowedTemplateParam: Method template parameter 'T' shadows class-level template parameter with the same name
 /** @mir-check $a is Attr|null */
 echo $a !== null ? 'y' : 'n';
 ===expect===
-ShadowedTemplateParam@20:5-20:28: Method template parameter 'T' shadows class-level template parameter with the same name

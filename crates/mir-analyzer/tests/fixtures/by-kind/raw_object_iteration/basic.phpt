@@ -10,6 +10,6 @@ class Config {
 function items(): \Generator {
     $c = new Config();
     yield from $c;
+//             ^^ RawObjectIteration: Cannot iterate over non-iterable object 'Config'
 }
 ===expect===
-RawObjectIteration@9:15-9:17: Cannot iterate over non-iterable object 'Config'

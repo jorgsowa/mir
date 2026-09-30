@@ -11,6 +11,6 @@ namespace Baz;
 /** @pure */
 function run($a): void {
     $a->mutate();
+//  ^^^^^^^^^^^^ ImpureMethodCall: Calling impure method mutate() in a pure or immutable context
 }
 ===expect===
-ImpureMethodCall@6:4-6:16: Calling impure method mutate() in a pure or immutable context

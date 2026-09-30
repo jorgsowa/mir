@@ -6,7 +6,7 @@ suppress=UnusedVariable,UnusedParam
 <?php
 function test(\Closure $fn): void {
     if ($fn == null) {}
+//      ^^^^^^^^^^^ ImpossibleLooseComparison: '==' between 'Closure' and 'null' is always false — these types can never be loosely equal
+//      ^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
 }
 ===expect===
-ImpossibleLooseComparison@3:8-3:19: '==' between 'Closure' and 'null' is always false — these types can never be loosely equal
-RedundantCondition@3:8-3:19: Condition is always true/false for type 'bool'

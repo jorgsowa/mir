@@ -6,5 +6,5 @@ enum Suit {
     case Hearts;
 }
 echo Suit::Hearts;
+//   ^^^^^^^^^^^^ ImplicitToStringCast: Class Suit is implicitly cast to string
 ===expect===
-ImplicitToStringCast@5:5-5:17: Class Suit is implicitly cast to string

@@ -7,8 +7,8 @@ suppress=MissingReturnType
 <?php
 function test() {
     $unused = 'never_used';
+//  ^^^^^^^ UnusedVariable: Variable $unused is never read
     $key = 'value';
     echo $$key;
 }
 ===expect===
-UnusedVariable@3:4-3:11: Variable $unused is never read

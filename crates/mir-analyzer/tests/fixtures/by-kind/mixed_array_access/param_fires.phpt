@@ -4,6 +4,6 @@ MixedArrayAccess fires when indexing into a mixed-typed parameter.
 <?php
 function foo(mixed $a): void {
     echo $a[0];
+//       ^^^^^ MixedArrayAccess: Array access on mixed type
 }
 ===expect===
-MixedArrayAccess@3:9-3:14: Array access on mixed type

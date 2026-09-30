@@ -4,5 +4,5 @@ InvalidArrayAccess fires when accessing a boolean true literal with []
 <?php
 $a = true;
 echo $a[0];
+//   ^^^^^ InvalidArrayAccess: Cannot use [] operator on non-array type 'true'
 ===expect===
-InvalidArrayAccess@3:5-3:10: Cannot use [] operator on non-array type 'true'

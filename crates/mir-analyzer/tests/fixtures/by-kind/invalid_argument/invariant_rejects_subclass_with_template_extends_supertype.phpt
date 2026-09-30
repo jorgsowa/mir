@@ -14,6 +14,6 @@ class CatBox extends Box {}
 function acceptsAnimalBox(Box $box): void { var_dump($box); }
 function test(): void {
     acceptsAnimalBox(new CatBox());
+//                   ^^^^^^^^^^^^ InvalidArgument: Argument $box of acceptsAnimalBox() expects 'Box<Animal>', got 'Box<Cat>'
 }
 ===expect===
-InvalidArgument@11:21-11:33: Argument $box of acceptsAnimalBox() expects 'Box<Animal>', got 'Box<Cat>'

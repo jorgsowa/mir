@@ -8,6 +8,6 @@ function foo(bool $c): int {
         $c = false;
     }
     return $x;
+//         ^^ PossiblyUndefinedVariable: Variable $x might not be defined
 }
 ===expect===
-PossiblyUndefinedVariable@7:11-7:13: Variable $x might not be defined

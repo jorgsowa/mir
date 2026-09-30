@@ -8,5 +8,5 @@ suppress=UnusedParam
 ===file===
 <?php
 function f(NotARealSNMPClass $x): void {}
+//         ^^^^^^^^^^^^^^^^^ UndefinedClass: Class NotARealSNMPClass does not exist
 ===expect===
-UndefinedClass@2:11-2:28: Class NotARealSNMPClass does not exist

@@ -13,6 +13,6 @@ class Box {
 
 function readValue(Box $b): string {
     return $b->value;
+//             ^^^^^ InaccessibleProperty: Cannot access property Box::$value
 }
 ===expect===
-InaccessibleProperty@7:15-7:20: Cannot access property Box::$value

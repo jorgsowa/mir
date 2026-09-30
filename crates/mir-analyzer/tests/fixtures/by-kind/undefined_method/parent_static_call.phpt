@@ -11,7 +11,7 @@ class B extends A {
     /** @return void */
     public static function bar(){
         parent::foo();
+//      ^^^^^^^^^^^^^ NonStaticSelfCall: Non-static method A::foo() cannot be called statically
     }
 }
 ===expect===
-NonStaticSelfCall@10:8-10:21: Non-static method A::foo() cannot be called statically

@@ -5,6 +5,6 @@ Unused conditional code
 $a = 5;
 if (rand(0, 1)) {
   $a = $a + 5;
+//^^ UnusedVariable: Variable $a is never read
 }
 ===expect===
-UnusedVariable@4:2-4:4: Variable $a is never read

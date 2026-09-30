@@ -14,6 +14,6 @@ class Bag {
 /** @pure */
 function mutate(Bag $b, string $prop): void {
     $b->$prop = 5;
+//  ^^^^^^^^^^^^^ ImpurePropertyAssignment: Assigning to property $prop of a parameter in a pure or external-mutation-free context
 }
 ===expect===
-ImpurePropertyAssignment@8:4-8:17: Assigning to property $prop of a parameter in a pure or external-mutation-free context

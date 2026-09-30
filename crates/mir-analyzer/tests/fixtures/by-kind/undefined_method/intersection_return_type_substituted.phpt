@@ -26,6 +26,6 @@ function test(): void {
     /** @var Wrapper<Item> $w */
     $w = new Wrapper();
     $w->unwrap()->get()->undefinedMethod();
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Item::undefinedMethod() does not exist
 }
 ===expect===
-UndefinedMethod@25:4-25:42: Method Item::undefinedMethod() does not exist

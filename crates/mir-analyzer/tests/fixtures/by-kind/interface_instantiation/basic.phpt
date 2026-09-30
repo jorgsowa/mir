@@ -9,5 +9,5 @@ interface Countable {
 }
 
 $c = new Countable();
+//       ^^^^^^^^^ InterfaceInstantiation: Cannot instantiate interface Countable
 ===expect===
-InterfaceInstantiation@6:9-6:18: Cannot instantiate interface Countable

@@ -5,12 +5,12 @@
 /** @param positive-int $n */
 function test_lt(int $n): void {
     assert($n < 0);
+//         ^^^^^^ DocblockTypeContradiction: Type 'positive-int' makes '$n < 0' impossible — this can never hold
 }
 
 /** @param positive-int $n */
 function test_identical(int $n): void {
     assert($n === 0);
+//         ^^^^^^^^ DocblockTypeContradiction: Type 'positive-int' makes '$n === 0' impossible — this can never hold
 }
 ===expect===
-DocblockTypeContradiction@4:11-4:17: Type 'positive-int' makes '$n < 0' impossible — this can never hold
-DocblockTypeContradiction@9:11-9:19: Type 'positive-int' makes '$n === 0' impossible — this can never hold

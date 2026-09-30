@@ -17,7 +17,7 @@ class Box {
             $this->value = $v + 1;
         }
         $this->value = $v + 2;
+//      ^^^^^^^^^^^^^^^^^^^^^ ReadonlyPropertyAlreadyInitialized: Cannot modify readonly property Box::$value — already initialized
     }
 }
 ===expect===
-ReadonlyPropertyAlreadyInitialized@11:8-11:29: Cannot modify readonly property Box::$value — already initialized

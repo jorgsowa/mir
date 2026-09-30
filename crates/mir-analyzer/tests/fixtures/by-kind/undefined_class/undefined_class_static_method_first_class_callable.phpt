@@ -6,5 +6,5 @@ suppress=UnusedVariable
 ===file===
 <?php
 $c = MissingClass::baz(...);
+//   ^^^^^^^^^^^^ UndefinedClass: Class MissingClass does not exist
 ===expect===
-UndefinedClass@2:5-2:17: Class MissingClass does not exist

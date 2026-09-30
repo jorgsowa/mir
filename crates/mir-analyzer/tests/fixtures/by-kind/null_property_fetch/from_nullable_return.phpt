@@ -12,6 +12,6 @@ function test(): void {
     $x = maybeNull();
     /** @mir-check $x is Obj|null */
     echo $x->val;
+//       ^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $val on possibly null value
 }
 ===expect===
-PossiblyNullPropertyFetch@11:9-11:16: Cannot access property $val on possibly null value

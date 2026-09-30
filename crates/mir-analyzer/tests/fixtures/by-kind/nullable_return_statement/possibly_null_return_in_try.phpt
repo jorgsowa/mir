@@ -11,6 +11,7 @@ function foo() : string {
         $a = dangerous();
     } catch (Exception $e) {
         return $a;
+//      ^^^^^^^^^^ NullableReturnStatement: Return type 'string|null' is not compatible with declared 'string'
     }
 
     return $a;
@@ -23,4 +24,3 @@ function dangerous() : string {
     return "hello";
 }
 ===expect===
-NullableReturnStatement@8:8-8:18: Return type 'string|null' is not compatible with declared 'string'

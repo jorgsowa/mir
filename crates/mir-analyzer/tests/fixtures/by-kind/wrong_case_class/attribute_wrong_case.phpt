@@ -6,6 +6,6 @@ Wrong case in attribute class name is reported.
 class myAttr {}
 
 #[myattr]
+//^^^^^^ WrongCaseClass: Class name 'myattr' has incorrect casing; use 'myAttr'
 class Foo {}
 ===expect===
-WrongCaseClass@5:2-5:8: Class name 'myattr' has incorrect casing; use 'myAttr'

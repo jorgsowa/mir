@@ -18,5 +18,5 @@ class A {
 }
 
 iterator(new A());
+//       ^^^^^^^ InvalidArgument: Argument $iter of iterator() expects 'iterable<int|string, string>', got 'A'
 ===expect===
-InvalidArgument@15:9-15:16: Argument $iter of iterator() expects 'iterable<int|string, string>', got 'A'

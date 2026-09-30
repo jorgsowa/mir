@@ -8,7 +8,7 @@ class Service {
      * @throws NonExistentServiceException
      */
     public function run(): void {
+//                  ^^^ UndefinedThrowsDocblock: @throws class 'NonExistentServiceException' does not exist
     }
 }
 ===expect===
-UndefinedThrowsDocblock@6:20-6:23: @throws class 'NonExistentServiceException' does not exist

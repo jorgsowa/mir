@@ -5,8 +5,8 @@ Missing attribute on property
 class Baz
 {
     #[Pure]
+//    ^^^^ UndefinedAttributeClass: Attribute class Pure does not exist
     public string $foo = "bar";
 }
 
 ===expect===
-UndefinedAttributeClass@4:6-4:10: Attribute class Pure does not exist

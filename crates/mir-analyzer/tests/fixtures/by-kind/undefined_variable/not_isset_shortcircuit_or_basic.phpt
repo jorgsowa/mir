@@ -4,8 +4,8 @@ Classic PHP idiom: !isset($x) || use($x) should not error on UndefinedVariable i
 ===file===
 <?php
 if (!isset($x) || $x->method()) {
+//                ^^^^^^^^^^^^ MixedMethodCall: Method method() called on mixed type
     // After fix: should NOT error on UndefinedVariable
     // If !isset($x) is false, then $x IS defined
 }
 ===expect===
-MixedMethodCall@2:18-2:30: Method method() called on mixed type

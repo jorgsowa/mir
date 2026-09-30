@@ -4,8 +4,8 @@ Each variable narrowed independently based on its !isset() check in nested condi
 ===file===
 <?php
 if (!isset($x) || (!isset($y) || ($x->foo() && $y->bar()))) {
+//                                ^^^^^^^^^ MixedMethodCall: Method foo() called on mixed type
+//                                             ^^^^^^^^^ MixedMethodCall: Method bar() called on mixed type
     // Should not error: $x and $y are both defined in their respective branches
 }
 ===expect===
-MixedMethodCall@2:34-2:43: Method foo() called on mixed type
-MixedMethodCall@2:47-2:56: Method bar() called on mixed type

@@ -8,5 +8,5 @@ suppress=UnusedParam
 ===file===
 <?php
 function f(NotARealAMQPClass $x): void {}
+//         ^^^^^^^^^^^^^^^^^ UndefinedClass: Class NotARealAMQPClass does not exist
 ===expect===
-UndefinedClass@2:11-2:28: Class NotARealAMQPClass does not exist

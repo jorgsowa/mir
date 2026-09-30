@@ -5,8 +5,8 @@ __construct() cannot declare a self return type.
 class A
 {
     public function __construct(): self
+//                                 ^^^^ ParseError: Parse error: Method __construct() cannot declare a return type
     {
     }
 }
 ===expect===
-ParseError@4:35-4:39: Parse error: Method __construct() cannot declare a return type

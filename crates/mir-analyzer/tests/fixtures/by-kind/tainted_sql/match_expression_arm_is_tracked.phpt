@@ -12,6 +12,6 @@ function run_query(mysqli $db, int $mode): void {
         default => 'SELECT 1',
     };
     mysqli_query($db, $sql);
+//  ^^^^^^^^^^^^^^^^^^^^^^^ TaintedSql: Tainted SQL query — possible SQL injection
 }
 ===expect===
-TaintedSql@7:4-7:27: Tainted SQL query — possible SQL injection

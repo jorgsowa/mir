@@ -9,6 +9,6 @@ suppress=UnusedParam
  */
 function throws_null($e): never {
     throw $e;
+//  ^^^^^^^^^ InvalidThrow: Thrown type 'null' does not extend Throwable
 }
 ===expect===
-InvalidThrow@6:4-6:13: Thrown type 'null' does not extend Throwable

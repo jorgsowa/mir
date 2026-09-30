@@ -11,6 +11,6 @@ suppress=MixedArgument,MixedArrayAccess
 <?php
 function test(): void {
     echo (fn() => $_GET['x'])();
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 ===expect===
-TaintedHtml@3:4-3:32: Tainted HTML output — possible XSS

@@ -22,7 +22,7 @@ class Bar
     {
         self::foobar();
         return $__tmp_mixin_var__;
+//             ^^^^^^^^^^^^^^^^^^ UndefinedVariable: Variable $__tmp_mixin_var__ is not defined
     }
 }
 ===expect===
-UndefinedVariable@19:15-19:33: Variable $__tmp_mixin_var__ is not defined

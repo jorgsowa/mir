@@ -7,6 +7,6 @@ ImplicitFloatToIntCast still fires when the result is passed to an int param.
 function takes_int(int $n): void { echo $n; }
 
 takes_int(round(3.14159, 2));
+//        ^^^^^^^^^^^^^^^^^ ImplicitFloatToIntCast: Implicit cast from float to int truncates the fractional part
 
 ===expect===
-ImplicitFloatToIntCast@4:10-4:27: Implicit cast from float to int truncates the fractional part

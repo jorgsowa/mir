@@ -5,5 +5,5 @@ suppress=UnusedVariable
 ===file===
 <?php
 $date = new DateTime(null);
+//                   ^^^^ NullArgument: Argument $datetime of DateTime::__construct() cannot be null
 ===expect===
-NullArgument@2:21-2:25: Argument $datetime of DateTime::__construct() cannot be null

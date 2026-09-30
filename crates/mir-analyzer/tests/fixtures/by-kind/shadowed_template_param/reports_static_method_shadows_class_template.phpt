@@ -24,6 +24,6 @@ class StringBox extends Box {
 
 function test(): void {
     StringBox::transform('hello');
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ShadowedTemplateParam: Method template parameter 'T' shadows class-level template parameter with the same name
 }
 ===expect===
-ShadowedTemplateParam@18:4-18:33: Method template parameter 'T' shadows class-level template parameter with the same name

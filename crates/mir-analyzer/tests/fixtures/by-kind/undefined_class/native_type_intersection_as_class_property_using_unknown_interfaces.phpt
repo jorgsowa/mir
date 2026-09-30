@@ -6,11 +6,11 @@ suppress=InvalidPropertyAssignment,UnusedProperty
 <?php
 class C {
     private ExampleUnknownA&ExampleUnknownB $other;
+//          ^^^^^^^^^^^^^^^ UndefinedClass: Class ExampleUnknownA does not exist
+//                          ^^^^^^^^^^^^^^^ UndefinedClass: Class ExampleUnknownB does not exist
     public function __construct() {
         $this->other = new ExampleUnknownAB();
+//                         ^^^^^^^^^^^^^^^^ UndefinedClass: Class ExampleUnknownAB does not exist
     }
 }
 ===expect===
-UndefinedClass@3:12-3:27: Class ExampleUnknownA does not exist
-UndefinedClass@3:28-3:43: Class ExampleUnknownB does not exist
-UndefinedClass@5:27-5:43: Class ExampleUnknownAB does not exist

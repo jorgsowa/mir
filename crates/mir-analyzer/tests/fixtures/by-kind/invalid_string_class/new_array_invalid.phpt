@@ -6,6 +6,6 @@ suppress=MissingReturnType
 <?php
 function test(array $config) {
     new $config();
+//      ^^^^^^^ InvalidStringClass: Dynamic class instantiation requires string or class-string type, got 'array'
 }
 ===expect===
-InvalidStringClass@3:8-3:15: Dynamic class instantiation requires string or class-string type, got 'array'

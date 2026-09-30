@@ -18,6 +18,7 @@ function test_string_branch_alive(string $fn): void {
         // Branch must be reachable: $fn is string so needs_int fires.
         // Before fix: branch diverges → suppressed → test fails.
         needs_int($fn);
+//                ^^^ InvalidArgument: Argument $i of needs_int() expects 'int', got 'string'
     }
 }
 
@@ -25,6 +26,7 @@ function test_array_branch_alive(array $pair): void {
     if (is_callable($pair)) {
         // Same: array must survive into the true branch.
         needs_int($pair);
+//                ^^^^^ InvalidArgument: Argument $i of needs_int() expects 'int', got 'array'
     }
 }
 
@@ -34,6 +36,7 @@ function test_int_dropped_string_kept(mixed $x): void {
         // After fix: $x is string (int dropped). needs_int(string) fires.
         // Before fix: branch diverges → suppressed → test fails.
         needs_int($x);
+//                ^^ InvalidArgument: Argument $i of needs_int() expects 'int', got 'string'
     }
 }
 
@@ -46,6 +49,3 @@ function test_false_branch_keeps_string(mixed $x): void {
     }
 }
 ===expect===
-InvalidArgument@9:18-9:21: Argument $i of needs_int() expects 'int', got 'string'
-InvalidArgument@16:18-16:23: Argument $i of needs_int() expects 'int', got 'array'
-InvalidArgument@25:18-25:20: Argument $i of needs_int() expects 'int', got 'string'

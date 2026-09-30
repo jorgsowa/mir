@@ -15,6 +15,6 @@ class Bag {
 /** @pure */
 function normalize(Bag $b): void {
     sort($b->buckets['x']);
+//       ^^^^^^^^^^^^^^^^ ImpurePropertyAssignment: Assigning to property buckets of a parameter in a pure or external-mutation-free context
 }
 ===expect===
-ImpurePropertyAssignment@8:9-8:25: Assigning to property buckets of a parameter in a pure or external-mutation-free context

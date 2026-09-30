@@ -8,5 +8,5 @@ suppress=UnusedParam
 ===file===
 <?php
 function f(Relay\NotARealClass $x): void {}
+//         ^^^^^^^^^^^^^^^^^^^ UndefinedClass: Class Relay\NotARealClass does not exist
 ===expect===
-UndefinedClass@2:11-2:30: Class Relay\NotARealClass does not exist

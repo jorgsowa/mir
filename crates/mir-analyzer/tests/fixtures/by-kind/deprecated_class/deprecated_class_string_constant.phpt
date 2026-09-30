@@ -8,5 +8,5 @@ Deprecated class string constant
 class Foo {}
 
 echo Foo::class;
+//   ^^^ DeprecatedClass: Class Foo is deprecated
 ===expect===
-DeprecatedClass@7:5-7:8: Class Foo is deprecated

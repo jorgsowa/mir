@@ -11,12 +11,12 @@ suppress=MixedReturnStatement
 /** @pure */
 function dumpServer(): array {
     return $_SERVER;
+//         ^^^^^^^^ ImpureGlobalVariable: Using global variable $_SERVER in a @pure function
 }
 
 /** @pure */
 function resetSession(): void {
     $_SESSION = [];
+//  ^^^^^^^^^^^^^^ ImpureGlobalVariable: Using global variable $_SESSION in a @pure function
 }
 ===expect===
-ImpureGlobalVariable@4:11-4:19: Using global variable $_SERVER in a @pure function
-ImpureGlobalVariable@9:4-9:18: Using global variable $_SESSION in a @pure function

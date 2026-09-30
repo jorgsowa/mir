@@ -16,9 +16,9 @@ function f(?Foo $foo): void {
         echo 'ok';
     } else {
         $foo->bar->baz();
+//      ^^^^^^^^^^^^^^^^ PossiblyNullMethodCall: Cannot call method baz() on possibly null value
+//      ^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $bar on possibly null value
+//      ^^^^^^^^^^^^^^^^ UndefinedMethod: Method Bar::baz() does not exist
     }
 }
 ===expect===
-PossiblyNullMethodCall@15:8-15:24: Cannot call method baz() on possibly null value
-PossiblyNullPropertyFetch@15:8-15:17: Cannot access property $bar on possibly null value
-UndefinedMethod@15:8-15:24: Method Bar::baz() does not exist

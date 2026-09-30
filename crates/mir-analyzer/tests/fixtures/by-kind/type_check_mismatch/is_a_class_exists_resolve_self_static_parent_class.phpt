@@ -13,6 +13,7 @@ class Animal {}
 class Dog extends Animal {
     public function checkSelf($x): void {
         if (is_a($x, self::class)) {
+//               ^^ MixedArgument: Argument $object_or_class of is_a() is mixed
             /** @mir-check $x is Dog */
             $_ = 1;
         }
@@ -20,6 +21,7 @@ class Dog extends Animal {
 
     public function checkStatic($x): void {
         if (is_a($x, static::class)) {
+//               ^^ MixedArgument: Argument $object_or_class of is_a() is mixed
             /** @mir-check $x is Dog */
             $_ = 1;
         }
@@ -29,12 +31,10 @@ class Dog extends Animal {
 class Puppy extends Dog {
     public function checkParent($x): void {
         if (is_subclass_of($x, parent::class)) {
+//                         ^^ MixedArgument: Argument $object_or_class of is_subclass_of() is mixed
             /** @mir-check $x is Dog */
             $_ = 1;
         }
     }
 }
 ===expect===
-MixedArgument@6:17-6:19: Argument $object_or_class of is_a() is mixed
-MixedArgument@13:17-13:19: Argument $object_or_class of is_a() is mixed
-MixedArgument@22:27-22:29: Argument $object_or_class of is_subclass_of() is mixed

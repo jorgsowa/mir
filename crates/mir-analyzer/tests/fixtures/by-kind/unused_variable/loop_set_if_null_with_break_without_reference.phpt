@@ -9,10 +9,10 @@ $a = null;
 while (rand(0, 1)) {
     if ($a !== null) {
         $a = 4;
+//      ^^ UnusedVariable: Variable $a is never read
         break;
     }
 
     $a = 5;
 }
 ===expect===
-UnusedVariable@6:8-6:10: Variable $a is never read

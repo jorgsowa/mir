@@ -9,6 +9,6 @@ function takes_int(int $n): void { echo $n; }
 
 $x = floor(3.7) + 1.5;
 takes_int($x);
+//        ^^ ImplicitFloatToIntCast: Implicit cast from float to int truncates the fractional part
 
 ===expect===
-ImplicitFloatToIntCast@5:10-5:12: Implicit cast from float to int truncates the fractional part

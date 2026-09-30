@@ -4,5 +4,5 @@ AbstractInstantiation fires when directly instantiating an abstract class.
 <?php
 abstract class Repo {}
 new Repo();
+//  ^^^^ AbstractInstantiation: Cannot instantiate abstract class Repo
 ===expect===
-AbstractInstantiation@3:4-3:8: Cannot instantiate abstract class Repo

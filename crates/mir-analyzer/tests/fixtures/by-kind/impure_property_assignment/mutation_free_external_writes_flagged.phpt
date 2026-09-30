@@ -22,25 +22,25 @@ class Counter {
     /** @mutation-free */
     public function bumpStatic(): void {
         self::$count = 5;
+//      ^^^^^^^^^^^^^^^^ ImpureStaticPropertyAssignment: Assigning to static property Counter::$count in a @pure function
     }
 
     /** @mutation-free */
     public function overwriteSession(): void {
         $_SESSION = [];
+//      ^^^^^^^^^^^^^^ ImpureGlobalVariable: Using global variable $_SESSION in a @pure function
     }
 
     /** @mutation-free */
     public function clearStatic(): void {
         unset(self::$store['k']);
+//            ^^^^^^^^^^^^^^^^^ ImpureStaticPropertyAssignment: Assigning to static property Counter::$store in a @pure function
     }
 
     /** @mutation-free */
     public function mutateByRef(int &$n): void {
         $n = 5;
+//      ^^^^^^ ImpureByRefAssignment: Assigning to by-reference parameter $n in a @pure function
     }
 }
 ===expect===
-ImpureStaticPropertyAssignment@9:8-9:24: Assigning to static property Counter::$count in a @pure function
-ImpureGlobalVariable@14:8-14:22: Using global variable $_SESSION in a @pure function
-ImpureStaticPropertyAssignment@19:14-19:31: Assigning to static property Counter::$store in a @pure function
-ImpureByRefAssignment@24:8-24:14: Assigning to by-reference parameter $n in a @pure function

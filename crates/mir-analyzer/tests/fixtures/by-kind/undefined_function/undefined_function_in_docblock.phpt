@@ -14,5 +14,5 @@ function executeCallback($callback) {
 // Passing a non-existent function reference in docblock context
 // SHOULD emit UndefinedFunction because it's documented as callable
 executeCallback("nonExistentFunction");
+//              ^^^^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function nonExistentFunction() is not defined
 ===expect===
-UndefinedFunction@11:16-11:37: Function nonExistentFunction() is not defined

@@ -9,5 +9,5 @@ class A {
 }
 
 (new A)->fooFoo(5, "dfd");
+//                 ^^^^^ TooManyArguments: Too many arguments for fooFoo(): expected 1, got 2
 ===expect===
-TooManyArguments@6:19-6:24: Too many arguments for fooFoo(): expected 1, got 2

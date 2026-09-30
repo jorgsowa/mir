@@ -13,7 +13,7 @@ interface Writable {
 }
 
 $r = new Readable();
+//       ^^^^^^^^ InterfaceInstantiation: Cannot instantiate interface Readable
 $w = new Writable();
+//       ^^^^^^^^ InterfaceInstantiation: Cannot instantiate interface Writable
 ===expect===
-InterfaceInstantiation@10:9-10:17: Cannot instantiate interface Readable
-InterfaceInstantiation@11:9-11:17: Cannot instantiate interface Writable

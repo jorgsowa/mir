@@ -24,7 +24,7 @@ function ok_assoc(): Box {
 /** @return Box<string> */
 function wrong(): Box {
     return new Box(5);
+//  ^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'Box<int>' is not compatible with declared 'Box<string>'
 }
 
 ===expect===
-InvalidReturnType@20:4-20:22: Return type 'Box<int>' is not compatible with declared 'Box<string>'

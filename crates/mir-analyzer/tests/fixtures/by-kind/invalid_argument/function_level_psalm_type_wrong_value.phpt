@@ -13,5 +13,5 @@ namespace App;
 function move(string $dir): void {}
 
 move("up");
+//   ^^^^ InvalidArgument: Argument $dir of move() expects '"north"|"south"|"east"|"west"', got '"up"'
 ===expect===
-InvalidArgument@10:5-10:9: Argument $dir of move() expects '"north"|"south"|"east"|"west"', got '"up"'

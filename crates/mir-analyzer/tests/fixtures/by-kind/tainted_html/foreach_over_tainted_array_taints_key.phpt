@@ -10,7 +10,7 @@ suppress=MixedAssignment,UnusedForeachValue
 function test(): void {
     foreach ($_GET as $k => $v) {
         echo $k;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 ===expect===
-TaintedHtml@4:8-4:16: Tainted HTML output — possible XSS

@@ -9,6 +9,6 @@ suppress=UnusedParam
  * @param NonExistentParamClass $x
  */
 function process($x): void {}
+//       ^^^^^^^ UndefinedDocblockClass: Docblock type 'NonExistentParamClass' does not exist
 
 ===expect===
-UndefinedDocblockClass@5:9-5:16: Docblock type 'NonExistentParamClass' does not exist

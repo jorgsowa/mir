@@ -34,12 +34,14 @@ function test_instance_call(Validator $v, mixed $value): void {
     $v->assertUserInstance($value);
     $value->name();
     $value->missing();
+//  ^^^^^^^^^^^^^^^^^ UndefinedMethod: Method User::missing() does not exist
 }
 
 function test_static_call(mixed $value): void {
     Validator::assertUserStatic($value);
     $value->name();
     $value->missing();
+//  ^^^^^^^^^^^^^^^^^ UndefinedMethod: Method User::missing() does not exist
 }
 
 function test_template_bearing(Validator $v, Dog $seed, mixed $target): void {
@@ -48,5 +50,3 @@ function test_template_bearing(Validator $v, Dog $seed, mixed $target): void {
     $target;
 }
 ===expect===
-UndefinedMethod@26:4-26:21: Method User::missing() does not exist
-UndefinedMethod@32:4-32:21: Method User::missing() does not exist

@@ -6,5 +6,5 @@ suppress=UnusedVariable
 ===file===
 <?php
 $x = new class implements UndefinedIface {};
+//                        ^^^^^^^^^^^^^^ UndefinedClass: Class UndefinedIface does not exist
 ===expect===
-UndefinedClass@2:26-2:40: Class UndefinedIface does not exist

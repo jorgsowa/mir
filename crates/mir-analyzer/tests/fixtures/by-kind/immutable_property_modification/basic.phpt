@@ -13,7 +13,7 @@ class Point {
 
     public function mutate(): void {
         $this->x = 0.0;
+//      ^^^^^^^^^^^^^^ ImmutablePropertyModification: Assigning to property x of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
     }
 }
 ===expect===
-ImmutablePropertyModification@11:8-11:22: Assigning to property x of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)

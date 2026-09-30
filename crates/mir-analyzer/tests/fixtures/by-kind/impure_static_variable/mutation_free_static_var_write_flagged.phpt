@@ -14,16 +14,16 @@ class Counter {
     public function tick(): int {
         static $n = 0;
         $n++;
+//      ^^ ImpureStaticVariable: Using static variable $n in a @pure function
         return $n;
     }
 
     /** @psalm-mutation-free */
     public function reset(): void {
         static $m = 0;
+//             ^^^^^^ UnusedVariable: Variable $m is never read
         $m = 0;
+//      ^^^^^^ ImpureStaticVariable: Using static variable $m in a @pure function
     }
 }
 ===expect===
-ImpureStaticVariable@6:8-6:10: Using static variable $n in a @pure function
-UnusedVariable@12:15-12:21: Variable $m is never read
-ImpureStaticVariable@13:8-13:14: Using static variable $m in a @pure function

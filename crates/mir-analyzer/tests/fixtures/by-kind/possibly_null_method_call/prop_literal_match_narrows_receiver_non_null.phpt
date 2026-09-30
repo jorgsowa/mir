@@ -29,30 +29,35 @@ class Foo {
 
 function viaInstanceof(?Foo $foo): void {
     if ($foo->bar instanceof Baz) {
+//      ^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $bar on possibly null value
         $foo->ping();
     }
 }
 
 function viaBoolTrue(?Foo $foo): void {
     if ($foo->flag === true) {
+//      ^^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $flag on possibly null value
         $foo->ping();
     }
 }
 
 function viaInt(?Foo $foo): void {
     if ($foo->num === 42) {
+//      ^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $num on possibly null value
         $foo->ping();
     }
 }
 
 function viaString(?Foo $foo): void {
     if ($foo->label === 'x') {
+//      ^^^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $label on possibly null value
         $foo->ping();
     }
 }
 
 function viaEnumCase(?Foo $foo): void {
     if ($foo->status === Status::Active) {
+//      ^^^^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $status on possibly null value
         $foo->ping();
     }
 }
@@ -60,14 +65,9 @@ function viaEnumCase(?Foo $foo): void {
 // Negative: the excluded branch proves nothing about $foo itself.
 function viaInstanceofFalseBranch(?Foo $foo): void {
     if (!($foo->bar instanceof Baz)) {
+//        ^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $bar on possibly null value
         $foo->ping();
+//      ^^^^^^^^^^^^ PossiblyNullMethodCall: Cannot call method ping() on possibly null value
     }
 }
 ===expect===
-PossiblyNullPropertyFetch@21:8-21:17: Cannot access property $bar on possibly null value
-PossiblyNullPropertyFetch@27:8-27:18: Cannot access property $flag on possibly null value
-PossiblyNullPropertyFetch@33:8-33:17: Cannot access property $num on possibly null value
-PossiblyNullPropertyFetch@39:8-39:19: Cannot access property $label on possibly null value
-PossiblyNullPropertyFetch@45:8-45:20: Cannot access property $status on possibly null value
-PossiblyNullPropertyFetch@52:10-52:19: Cannot access property $bar on possibly null value
-PossiblyNullMethodCall@53:8-53:20: Cannot call method ping() on possibly null value

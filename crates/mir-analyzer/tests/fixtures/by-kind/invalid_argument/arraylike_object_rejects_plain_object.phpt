@@ -10,5 +10,5 @@ final class PlainObject {}
 function takesArraylike($bag): void {}
 
 takesArraylike(new PlainObject());
+//             ^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $bag of takesArraylike() expects 'ArrayAccess<string, int>&Countable&Traversable<string, int>', got 'PlainObject'
 ===expect===
-InvalidArgument@7:15-7:32: Argument $bag of takesArraylike() expects 'ArrayAccess<string, int>&Countable&Traversable<string, int>', got 'PlainObject'

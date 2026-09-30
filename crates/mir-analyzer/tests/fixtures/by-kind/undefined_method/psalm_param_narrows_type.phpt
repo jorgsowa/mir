@@ -13,6 +13,6 @@ class User {
 function process($value): void {
     $value->name();
     $value->missing();
+//  ^^^^^^^^^^^^^^^^^ UndefinedMethod: Method User::missing() does not exist
 }
 ===expect===
-UndefinedMethod@12:4-12:21: Method User::missing() does not exist

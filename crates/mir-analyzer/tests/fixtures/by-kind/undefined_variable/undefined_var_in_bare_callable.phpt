@@ -7,7 +7,7 @@ suppress=UnusedVariable
 $fn = function(int $a): void{};
 function a(callable $fn): void{
   $fn(++$a);
+//      ^^ UndefinedVariable: Variable $a is not defined
 }
 a($fn);
 ===expect===
-UndefinedVariable@4:8-4:10: Variable $a is not defined

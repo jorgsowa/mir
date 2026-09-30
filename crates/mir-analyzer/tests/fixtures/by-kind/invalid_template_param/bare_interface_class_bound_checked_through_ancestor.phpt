@@ -23,6 +23,7 @@ interface DogContainer extends AnimalContainer {}
 /** @param DogContainer<NotAnimal> $c */
 function test_bad_receiver_is_flagged($c): void {
     $c->get();
+//  ^^^^^^^^^ InvalidTemplateParam: Template type 'T' inferred as 'NotAnimal' does not satisfy bound 'Animal'
 }
 
 /** @param DogContainer<Animal> $c */
@@ -30,4 +31,3 @@ function test_good_receiver_is_silent($c): void {
     $c->get();
 }
 ===expect===
-InvalidTemplateParam@14:4-14:13: Template type 'T' inferred as 'NotAnimal' does not satisfy bound 'Animal'

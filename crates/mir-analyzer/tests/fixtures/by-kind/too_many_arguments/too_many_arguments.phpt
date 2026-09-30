@@ -6,5 +6,5 @@ suppress=UnusedParam
 <?php
 function fooFoo(int $a): void {}
 fooFoo(5, "dfd");
+//        ^^^^^ TooManyArguments: Too many arguments for fooFoo(): expected 1, got 2
 ===expect===
-TooManyArguments@3:10-3:15: Too many arguments for fooFoo(): expected 1, got 2

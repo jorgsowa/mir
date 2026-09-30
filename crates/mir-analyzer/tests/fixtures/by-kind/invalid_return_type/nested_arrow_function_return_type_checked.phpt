@@ -7,5 +7,5 @@ suppress=UnusedVariable
 ===file===
 <?php
 $f = fn(): string => (fn(): string => 123)();
+//                                    ^^^ InvalidReturnType: Return type '123' is not compatible with declared 'string'
 ===expect===
-InvalidReturnType@2:38-2:41: Return type '123' is not compatible with declared 'string'

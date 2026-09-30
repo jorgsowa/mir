@@ -14,5 +14,5 @@ $script = <<<BASH
 echo hello
 BASH;
 new NoSuchClass();
+//  ^^^^^^^^^^^ UndefinedClass: Class NoSuchClass does not exist
 ===expect===
-UndefinedClass@7:4-7:15: Class NoSuchClass does not exist

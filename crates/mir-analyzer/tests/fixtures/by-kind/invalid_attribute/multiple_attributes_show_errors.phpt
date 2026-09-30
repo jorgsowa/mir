@@ -9,7 +9,7 @@ class Foo {}
 class Bar {}
 
 #[Foo, Bar]
+//     ^^^ InvalidAttribute: Attribute Bar cannot be used on this target
 class Baz {}
 
 ===expect===
-InvalidAttribute@8:7-8:10: Attribute Bar cannot be used on this target

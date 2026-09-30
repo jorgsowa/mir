@@ -3,7 +3,7 @@ UndefinedAttributeClass fires when an undefined attribute is placed on a functio
 ===file===
 <?php
 function foo(#[Inject] string $svc): string {
+//             ^^^^^^ UndefinedAttributeClass: Attribute class Inject does not exist
     return $svc;
 }
 ===expect===
-UndefinedAttributeClass@2:15-2:21: Attribute class Inject does not exist

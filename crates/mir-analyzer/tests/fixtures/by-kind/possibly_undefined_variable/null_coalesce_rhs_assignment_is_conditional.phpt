@@ -10,6 +10,6 @@ function test(): void {
     $x = foo() ?? ($y = bar());
     echo $x;
     echo $y;
+//       ^^ PossiblyUndefinedVariable: Variable $y might not be defined
 }
 ===expect===
-PossiblyUndefinedVariable@8:9-8:11: Variable $y might not be defined

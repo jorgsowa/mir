@@ -11,7 +11,7 @@ class Registry {
 
     public static function put(string $k, int $v): void {
         self::$store[$k] = $v;
+//      ^^^^^^^^^^^^^^^^^^^^^ ReadonlyPropertyAssignment: Cannot assign to readonly property Registry::$store outside of constructor
     }
 }
 ===expect===
-ReadonlyPropertyAssignment@7:8-7:29: Cannot assign to readonly property Registry::$store outside of constructor

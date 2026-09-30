@@ -39,7 +39,7 @@ final class Holder {
     #[\ReturnTypeWillChange]
     public function iter(): StateIterator {
         return new StateIterator($this->state);
+//             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ImpureFunctionCall: Calling impure function StateIterator::__construct() in a @pure function
     }
 }
 ===expect===
-ImpureFunctionCall@36:15-36:46: Calling impure function StateIterator::__construct() in a @pure function

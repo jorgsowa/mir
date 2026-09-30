@@ -7,6 +7,6 @@ class B {}
 function foo($a) : void {
     /** @suppress MixedMethodCall */
     $a->bar(B::bat());
+//          ^^^^^^^^ UndefinedMethod: Method B::bat() does not exist
 }
 ===expect===
-UndefinedMethod@6:12-6:20: Method B::bat() does not exist

@@ -17,6 +17,6 @@ interface TakesId {
 
 function f(TakesId $takesId, Application $application): void {
    ($takesId)($application->getLocation()->getId());
+//            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PossiblyNullMethodCall: Cannot call method getId() on possibly null value
 }
 ===expect===
-PossiblyNullMethodCall@16:14-16:50: Cannot call method getId() on possibly null value

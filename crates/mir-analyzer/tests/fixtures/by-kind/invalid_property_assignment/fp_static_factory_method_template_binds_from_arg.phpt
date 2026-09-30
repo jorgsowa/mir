@@ -18,6 +18,7 @@ class Option {
      * @return Option<T>
      */
     public static function some(mixed $value): self {
+//                              ^^^^^^^^^^^^ UnusedParam: Parameter $value is never used
         unset($value);
         return new self();
     }
@@ -44,4 +45,3 @@ class Dto {
     }
 }
 ===expect===
-UnusedParam@12:32-12:44: Parameter $value is never used

@@ -9,8 +9,8 @@ abstract class A
     public function equals(mixed $other): bool
     {
         $other->greet();
+//      ^^^^^^^^^^^^^^^ MixedMethodCall: Method greet() called on mixed type
         return true;
     }
 }
 ===expect===
-MixedMethodCall@8:8-8:23: Method greet() called on mixed type

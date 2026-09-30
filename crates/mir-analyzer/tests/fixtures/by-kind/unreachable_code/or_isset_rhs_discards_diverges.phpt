@@ -22,7 +22,7 @@ function reachable(?string $x, int $y): void {
 function definitely_null(?string $x, int $y): void {
     if (!isset($x) || $y instanceof Marker) {
         echo strlen($x);
+//                  ^^ NullArgument: Argument $string of strlen() cannot be null
     }
 }
 ===expect===
-NullArgument@17:20-17:22: Argument $string of strlen() cannot be null

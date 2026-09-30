@@ -7,5 +7,5 @@ suppress=UnusedVariable
 class Foo {}
 $f = new Foo();
 $s = "Value: {$f}";
+//            ^^ ImplicitToStringCast: Class Foo is implicitly cast to string
 ===expect===
-ImplicitToStringCast@4:14-4:16: Class Foo is implicitly cast to string

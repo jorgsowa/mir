@@ -8,6 +8,6 @@ class Config {
 function run(): void {
     $cls = Config::class;
     echo $cls::SECRET;
+//             ^^^^^^ InaccessibleClassConstant: Cannot access constant Config::SECRET
 }
 ===expect===
-InaccessibleClassConstant@7:15-7:21: Cannot access constant Config::SECRET

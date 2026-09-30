@@ -20,9 +20,9 @@ function doTry() : void {
         throw $exception;
     } finally {
         if ($exception) {
+//          ^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'Exception'
             echo "here";
         }
     }
 }
 ===expect===
-RedundantCondition@17:12-17:22: Condition is always true/false for type 'Exception'

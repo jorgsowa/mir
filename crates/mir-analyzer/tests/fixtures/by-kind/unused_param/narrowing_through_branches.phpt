@@ -16,10 +16,12 @@ function testBranches(int|string|bool $value) {
         /** @mir-check $value is string */
         return strlen($value);
     } elseif (is_bool($value)) {
+//            ^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         /** @mir-check $value is bool */
         return $value ? 'true' : 'false';
     }
     return null;
+//  ^^^^^^^^^^^^ UnreachableCode: Unreachable code detected
 }
 
 function testMultipleBranches(int|string|float|null $x) {
@@ -48,5 +50,3 @@ function testElseAfterNarrowing(string|null $value) {
     }
 }
 ===expect===
-RedundantCondition@9:14-9:29: Condition is always true/false for type 'bool'
-UnreachableCode@13:4-13:16: Unreachable code detected

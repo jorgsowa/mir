@@ -13,8 +13,8 @@ suppress=UnusedVariable
 function pureFn(int &$x): void {
     $f = function () use (&$x): void {
         $x = 5;
+//      ^^^^^^ ImpureByRefAssignment: Assigning to by-reference parameter $x in a @pure function
     };
     $f();
 }
 ===expect===
-ImpureByRefAssignment@5:8-5:14: Assigning to by-reference parameter $x in a @pure function

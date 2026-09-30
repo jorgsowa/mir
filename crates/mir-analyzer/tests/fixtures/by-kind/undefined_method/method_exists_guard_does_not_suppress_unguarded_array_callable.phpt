@@ -12,6 +12,6 @@ function register_shutdown(callable $cb): void {
 
 function free(): void {
     register_shutdown([Other::class, 'gateStatic']);
+//                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Other::gateStatic() does not exist
 }
 ===expect===
-UndefinedMethod@9:22-9:50: Method Other::gateStatic() does not exist

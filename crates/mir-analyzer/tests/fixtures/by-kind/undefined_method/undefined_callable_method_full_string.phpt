@@ -9,8 +9,8 @@ class A {
 }
 
 function foo(callable $c): void {}
+//           ^^^^^^^^^^^ UnusedParam: Parameter $c is never used
 
 foo("A::barr");
+//  ^^^^^^^^^ UndefinedMethod: Method A::barr() does not exist
 ===expect===
-UnusedParam@8:13-8:24: Parameter $c is never used
-UndefinedMethod@10:4-10:13: Method A::barr() does not exist

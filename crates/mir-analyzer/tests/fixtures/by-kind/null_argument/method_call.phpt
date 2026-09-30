@@ -10,5 +10,5 @@ class Foo {
 
 $f = new Foo();
 $f->bar(null);
+//      ^^^^ NullArgument: Argument $n of bar() cannot be null
 ===expect===
-NullArgument@7:8-7:12: Argument $n of bar() cannot be null

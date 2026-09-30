@@ -30,8 +30,8 @@ final class Sealed {}
 // really is unreachable.
 function isFinal(Sealed $x): void {
     if (get_class($x) !== 'Sealed') {
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         echo "unreachable";
     }
 }
 ===expect===
-RedundantCondition@24:8-24:34: Condition is always true/false for type 'bool'

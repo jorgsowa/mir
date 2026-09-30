@@ -21,7 +21,7 @@ class Point {
 
     public function mutateExternal(self $other): void {
         $other->x = 1.0;
+//      ^^^^^^^^^^^^^^^ ImmutablePropertyModification: Assigning to property x of $other in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
     }
 }
 ===expect===
-ImmutablePropertyModification@16:8-16:23: Assigning to property x of $other in an immutable context (@psalm-immutable class or @psalm-mutation-free method)

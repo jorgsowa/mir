@@ -8,6 +8,6 @@ final class KnownException extends \RuntimeException {}
  * @throws KnownException|MissingException
  */
 function risky(): void {
+//       ^^^^^ UndefinedThrowsDocblock: @throws class 'MissingException' does not exist
 }
 ===expect===
-UndefinedThrowsDocblock@7:9-7:14: @throws class 'MissingException' does not exist

@@ -9,8 +9,8 @@ suppress=MixedArrayAccess,MixedAssignment
 function test(): void {
     [$a, $b] = $_GET['pair'];
     echo $a;
+//  ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     echo $b;
+//  ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 ===expect===
-TaintedHtml@4:4-4:12: Tainted HTML output — possible XSS
-TaintedHtml@5:4-5:12: Tainted HTML output — possible XSS

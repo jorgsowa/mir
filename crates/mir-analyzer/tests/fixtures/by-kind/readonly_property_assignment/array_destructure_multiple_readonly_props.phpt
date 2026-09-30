@@ -15,8 +15,8 @@ class Point {
 
     public function reset(array $vals): void {
         [$this->x, $this->y] = $vals;
+//       ^^^^^^^^ ReadonlyPropertyAssignment: Cannot assign to readonly property Point::$x outside of constructor
+//                 ^^^^^^^^ ReadonlyPropertyAssignment: Cannot assign to readonly property Point::$y outside of constructor
     }
 }
 ===expect===
-ReadonlyPropertyAssignment@9:9-9:17: Cannot assign to readonly property Point::$x outside of constructor
-ReadonlyPropertyAssignment@9:19-9:27: Cannot assign to readonly property Point::$y outside of constructor

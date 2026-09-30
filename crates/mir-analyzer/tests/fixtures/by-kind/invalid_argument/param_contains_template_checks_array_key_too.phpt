@@ -24,6 +24,6 @@ function needsConcreteMap($map): void {}
 
 function test_concrete_array_param_still_flagged(): void {
     needsConcreteMap(5);
+//                   ^ InvalidArgument: Argument $map of needsConcreteMap() expects 'array<int, string>', got '5'
 }
 ===expect===
-InvalidArgument@16:21-16:22: Argument $map of needsConcreteMap() expects 'array<int, string>', got '5'

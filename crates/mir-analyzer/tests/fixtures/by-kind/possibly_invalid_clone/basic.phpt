@@ -6,6 +6,6 @@ class Repo {}
 
 function copy(Repo|int $source): Repo|int {
     return clone $source;
+//         ^^^^^^^^^^^^^ PossiblyInvalidClone: cannot clone possibly non-object Repo|int
 }
 ===expect===
-PossiblyInvalidClone@5:11-5:24: cannot clone possibly non-object Repo|int

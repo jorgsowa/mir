@@ -14,5 +14,5 @@ $foo = rand(0, 1) ? new A : new B;
 function bar($b) : void {}
 
 bar($foo);
+//  ^^^^ PossiblyInvalidArgument: Argument $b of bar() expects 'B|C', possibly different type 'A|B' provided
 ===expect===
-PossiblyInvalidArgument@11:4-11:8: Argument $b of bar() expects 'B|C', possibly different type 'A|B' provided

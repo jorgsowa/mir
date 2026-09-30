@@ -8,6 +8,6 @@ enum Direction {
 }
 function test(Direction $dir): mixed {
     return $dir->value;
+//               ^^^^^ UndefinedProperty: Property Direction::$value does not exist
 }
 ===expect===
-UndefinedProperty@7:17-7:22: Property Direction::$value does not exist

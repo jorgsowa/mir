@@ -9,6 +9,6 @@ function takes_int(int $value): void { var_dump($value); }
 function test(string $key): void {
     $row = ['id' => 123, 'name' => 'Ada'];
     takes_int($row[$key]);
+//            ^^^^^^^^^^ PossiblyInvalidArgument: Argument $value of takes_int() expects 'int', possibly different type '123|"Ada"' provided
 }
 ===expect===
-PossiblyInvalidArgument@6:14-6:24: Argument $value of takes_int() expects 'int', possibly different type '123|"Ada"' provided

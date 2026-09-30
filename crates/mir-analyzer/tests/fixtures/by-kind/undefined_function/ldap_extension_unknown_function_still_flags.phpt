@@ -7,6 +7,6 @@ flagged undefined.
 <?php
 function f(): void {
     ldap_connect_not_a_real_function('x');
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function ldap_connect_not_a_real_function() is not defined
 }
 ===expect===
-UndefinedFunction@3:4-3:41: Function ldap_connect_not_a_real_function() is not defined

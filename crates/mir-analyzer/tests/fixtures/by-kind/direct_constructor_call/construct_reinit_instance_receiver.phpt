@@ -20,7 +20,7 @@ class Base {
 class Caller extends Base {
     public function run(): void {
         $this->w->__construct();
+//      ^^^^^^^^^^^^^^^^^^^^^^^ DirectConstructorCall: Cannot call constructor of Widget directly
     }
 }
 ===expect===
-DirectConstructorCall@13:8-13:31: Cannot call constructor of Widget directly

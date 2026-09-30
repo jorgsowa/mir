@@ -3,6 +3,7 @@ does not report after null check
 ===file===
 <?php
 function greet(string $name): void {}
+//             ^^^^^^^^^^^^ UnusedParam: Parameter $name is never used
 
 function test(?string $value): void {
     if ($value !== null) {
@@ -10,4 +11,3 @@ function test(?string $value): void {
     }
 }
 ===expect===
-UnusedParam@2:15-2:27: Parameter $name is never used

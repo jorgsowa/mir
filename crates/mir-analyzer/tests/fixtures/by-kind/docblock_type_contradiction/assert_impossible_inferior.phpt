@@ -7,6 +7,6 @@ Assert impossible inferior
  */
 function scope(int $a): void{
     assert($a < 4);
+//         ^^^^^^ DocblockTypeContradiction: Type 'int<5, max>' makes '$a < 4' impossible — this can never hold
 }
 ===expect===
-DocblockTypeContradiction@6:11-6:17: Type 'int<5, max>' makes '$a < 4' impossible — this can never hold

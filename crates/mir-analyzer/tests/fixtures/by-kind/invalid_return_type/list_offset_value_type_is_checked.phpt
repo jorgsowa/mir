@@ -5,6 +5,6 @@ list offset value type is checked
 function first(): int {
     $values = ['alpha', 'beta'];
     return $values[0];
+//  ^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type '"alpha"' is not compatible with declared 'int'
 }
 ===expect===
-InvalidReturnType@4:4-4:22: Return type '"alpha"' is not compatible with declared 'int'

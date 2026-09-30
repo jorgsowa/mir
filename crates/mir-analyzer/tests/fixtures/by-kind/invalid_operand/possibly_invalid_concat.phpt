@@ -4,5 +4,5 @@ Possibly invalid concat
 <?php
 $b = rand(0, 1) ? [] : "hello";
 echo $b . "goodbye";
+//   ^^^^^^^^^^^^^^ PossiblyInvalidOperand: Operator '.' might not be supported between 'array{}|"hello"' and '"goodbye"'
 ===expect===
-PossiblyInvalidOperand@3:5-3:19: Operator '.' might not be supported between 'array{}|"hello"' and '"goodbye"'

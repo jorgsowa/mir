@@ -4,6 +4,6 @@ reports this outside class
 <?php
 function test(): void {
     $this->close();
+//  ^^^^^ InvalidScope: $this cannot be used outside of a class
 }
 ===expect===
-InvalidScope@3:4-3:9: $this cannot be used outside of a class

@@ -6,6 +6,6 @@ suppress=MixedArgument,MixedArrayAccess
 <?php
 function run_query(PDO $pdo): void {
     $pdo->query($_GET['sql']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedSql: Tainted SQL query — possible SQL injection
 }
 ===expect===
-TaintedSql@3:4-3:29: Tainted SQL query — possible SQL injection

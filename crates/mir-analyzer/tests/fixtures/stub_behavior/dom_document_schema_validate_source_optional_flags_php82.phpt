@@ -13,5 +13,5 @@ $schema = '<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" />';
 $defaultFlags = $document->schemaValidateSource($schema);
 $namedFlags = $document->schemaValidateSource(source: $schema, flags: 0);
 $missingSource = $document->schemaValidateSource();
+//               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TooFewArguments: Too few arguments for schemaValidateSource(): expected 1, got 0
 ===expect===
-TooFewArguments@8:17-8:50: Too few arguments for schemaValidateSource(): expected 1, got 0

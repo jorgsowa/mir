@@ -18,12 +18,14 @@ class Base implements Marker {
     public function checkSelf(Marker $x): void {
         if ($x instanceof self) {
             $x->needsInt("not an int");
+//                       ^^^^^^^^^^^^ InvalidArgument: Argument $n of needsInt() expects 'int', got '"not an int"'
         }
     }
 
     public function checkStatic(Marker $x): void {
         if ($x instanceof static) {
             $x->needsInt("not an int");
+//                       ^^^^^^^^^^^^ InvalidArgument: Argument $n of needsInt() expects 'int', got '"not an int"'
         }
     }
 }
@@ -32,10 +34,8 @@ class Derived extends Base {
     public function checkParent(Marker $x): void {
         if ($x instanceof parent) {
             $x->needsInt("not an int");
+//                       ^^^^^^^^^^^^ InvalidArgument: Argument $n of needsInt() expects 'int', got '"not an int"'
         }
     }
 }
 ===expect===
-InvalidArgument@9:25-9:37: Argument $n of needsInt() expects 'int', got '"not an int"'
-InvalidArgument@15:25-15:37: Argument $n of needsInt() expects 'int', got '"not an int"'
-InvalidArgument@23:25-23:37: Argument $n of needsInt() expects 'int', got '"not an int"'

@@ -16,6 +16,6 @@ class Ready extends A {
 function test(?A $x): void {
     $x?->touch();
     $x->commit();
+//  ^^^^^^^^^^^^ PossiblyNullMethodCall: Cannot call method commit() on possibly null value
 }
 ===expect===
-PossiblyNullMethodCall@11:4-11:16: Cannot call method commit() on possibly null value

@@ -14,6 +14,6 @@ function test(): void {
     $b = new Box();
     $b->value = $_GET['x'];
     echo $b->value;
+//  ^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 ===expect===
-TaintedHtml@8:4-8:19: Tainted HTML output — possible XSS

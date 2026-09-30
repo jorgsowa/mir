@@ -9,5 +9,5 @@ enum Status: string {
 }
 
 Status::tryFrom(123);
+//              ^^^ ArgumentTypeCoercion: Argument $value of tryFrom() expects 'string', got '123' — coercion may fail at runtime
 ===expect===
-ArgumentTypeCoercion@6:16-6:19: Argument $value of tryFrom() expects 'string', got '123' — coercion may fail at runtime

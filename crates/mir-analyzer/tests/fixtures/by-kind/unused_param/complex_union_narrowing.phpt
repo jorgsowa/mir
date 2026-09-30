@@ -30,6 +30,7 @@ function handleObject(Logger|Cache $handler): void {
     if ($handler instanceof Logger) {
         $handler->log("test");
     } elseif ($handler instanceof Cache) {
+//            ^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         $handler->get("key");
     }
 }
@@ -49,4 +50,3 @@ function threeWayCheck(Console|File|Memory $obj): void {
     }
 }
 ===expect===
-RedundantCondition@29:14-29:39: Condition is always true/false for type 'bool'

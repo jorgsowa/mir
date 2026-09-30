@@ -6,7 +6,7 @@ abstract class Foo {}
 class Bar {
     public function test(): void {
         new Foo();
+//          ^^^ AbstractInstantiation: Cannot instantiate abstract class Foo
     }
 }
 ===expect===
-AbstractInstantiation@5:12-5:15: Cannot instantiate abstract class Foo

@@ -18,5 +18,5 @@ function add(int $a, int $b): int {
 }
 
 $partial = add(?, 5);
+//             ^ ParseError: Parse error: 'partial function application' requires PHP 8.6 or higher
 ===expect===
-ParseError@7:15-7:16: Parse error: 'partial function application' requires PHP 8.6 or higher

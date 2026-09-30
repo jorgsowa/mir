@@ -8,6 +8,6 @@ class A {
 
 abstract class B extends A {
     abstract public function foo() : void;
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method B::foo() signature mismatch: cannot make non-abstract method A::foo() abstract
 }
 ===expect===
-MethodSignatureMismatch@7:4-7:42: Method B::foo() signature mismatch: cannot make non-abstract method A::foo() abstract

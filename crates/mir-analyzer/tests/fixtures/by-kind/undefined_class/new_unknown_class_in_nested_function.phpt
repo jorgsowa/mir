@@ -5,7 +5,7 @@ new unknown class in nested function
 function outer(): void {
     function inner(): void {
         new UnknownClass();
+//          ^^^^^^^^^^^^ UndefinedClass: Class UnknownClass does not exist
     }
 }
 ===expect===
-UndefinedClass@4:12-4:24: Class UnknownClass does not exist

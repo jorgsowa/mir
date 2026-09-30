@@ -32,6 +32,6 @@ class IntBox extends Box {
 /** @param Box<Impl> $b */
 function assign_wrong_type(Box $b): void {
     $b->item = 'x';
+//  ^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $item expects 'Impl', cannot assign '"x"'
 }
 ===expect===
-InvalidPropertyAssignment@23:4-23:18: Property $item expects 'Impl', cannot assign '"x"'

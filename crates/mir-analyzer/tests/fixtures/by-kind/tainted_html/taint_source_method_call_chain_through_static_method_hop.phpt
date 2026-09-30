@@ -23,6 +23,6 @@ class Factory {
 
 function leak(): void {
     echo Factory::repo()->get('id');
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 ===expect===
-TaintedHtml@16:4-16:36: Tainted HTML output — possible XSS

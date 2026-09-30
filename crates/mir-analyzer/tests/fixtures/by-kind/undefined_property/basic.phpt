@@ -8,6 +8,6 @@ class Foo {
 function test(): void {
     $f = new Foo();
     echo $f->nonexistent;
+//           ^^^^^^^^^^^ UndefinedProperty: Property Foo::$nonexistent does not exist
 }
 ===expect===
-UndefinedProperty@7:13-7:24: Property Foo::$nonexistent does not exist

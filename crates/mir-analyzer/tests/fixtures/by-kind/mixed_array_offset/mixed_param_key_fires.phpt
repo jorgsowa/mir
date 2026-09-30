@@ -10,6 +10,6 @@ suppress=UnusedParam
 function lookup($key): void {
     $arr = ['a' => 1, 'b' => 2, 'c' => 3];
     echo $arr[$key];
+//            ^^^^ MixedArrayOffset: Mixed type used as array offset
 }
 ===expect===
-MixedArrayOffset@7:14-7:18: Mixed type used as array offset

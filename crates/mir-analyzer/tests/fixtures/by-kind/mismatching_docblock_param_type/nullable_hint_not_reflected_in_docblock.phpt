@@ -12,11 +12,11 @@ suppress=UnusedParam
  * @param string $name
  */
 function greet(?string $name): void {}
+//                     ^^^^^ MismatchingDocblockParamType: Docblock type 'string' for $name does not match inferred 'string|null'
 
 /**
  * @param list<int> $items
  */
 function takesItems(?array $items): void {}
+//                         ^^^^^^ MismatchingDocblockParamType: Docblock type 'list<int>' for $items does not match inferred 'array|null'
 ===expect===
-MismatchingDocblockParamType@5:23-5:28: Docblock type 'string' for $name does not match inferred 'string|null'
-MismatchingDocblockParamType@10:27-10:33: Docblock type 'list<int>' for $items does not match inferred 'array|null'

@@ -19,7 +19,7 @@ $a = new A();
 if (is_string($a->getValue())) {
     $a->val = 5;
     echo strlen($a->getValue());
+//              ^^^^^^^^^^^^^^ PossiblyInvalidArgument: Argument $string of strlen() expects 'string', possibly different type 'int|string|null' provided
+//              ^^^^^^^^^^^^^^ PossiblyNullArgument: Argument $string of strlen() might be null
 }
 ===expect===
-PossiblyInvalidArgument@16:16-16:30: Argument $string of strlen() expects 'string', possibly different type 'int|string|null' provided
-PossiblyNullArgument@16:16-16:30: Argument $string of strlen() might be null

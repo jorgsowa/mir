@@ -16,6 +16,7 @@ class Container {
 
 function trueBranchNarrowsReceiver(?Container $c): void {
     if (get_parent_class($c->child) === 'Base') {
+//                       ^^^^^^^^^ PossiblyNullArgument: Argument $object_or_class of get_parent_class() might be null
         /** @mir-check $c is Container */
         $_ = 1;
     }
@@ -23,10 +24,9 @@ function trueBranchNarrowsReceiver(?Container $c): void {
 
 function falseBranchAlsoNarrowsReceiver(?Container $c): void {
     if (get_parent_class($c->child) !== 'Base') {
+//                       ^^^^^^^^^ PossiblyNullArgument: Argument $object_or_class of get_parent_class() might be null
         /** @mir-check $c is Container */
         $_ = 1;
     }
 }
 ===expect===
-PossiblyNullArgument@9:25-9:34: Argument $object_or_class of get_parent_class() might be null
-PossiblyNullArgument@16:25-16:34: Argument $object_or_class of get_parent_class() might be null

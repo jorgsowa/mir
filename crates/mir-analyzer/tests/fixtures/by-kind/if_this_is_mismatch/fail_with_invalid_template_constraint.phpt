@@ -26,5 +26,5 @@ final class ArrayList
 /** @var ArrayList<int> $list */
 $list = new ArrayList();
 $numbers = $list->compact();
+//         ^^^^^^^^^^^^^^^^ IfThisIsMismatch: Cannot call ArrayList::compact() — @if-this-is requires $this to be 'ArrayList<Option<A>>', but it is 'ArrayList<int>'
 ===expect===
-IfThisIsMismatch@23:11-23:27: Cannot call ArrayList::compact() — @if-this-is requires $this to be 'ArrayList<Option<A>>', but it is 'ArrayList<int>'

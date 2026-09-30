@@ -17,8 +17,8 @@ abstract class Container {
 
 final class BadContainer extends Container {
     public function get(): Other {
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method BadContainer::get() signature mismatch: return type 'Other' is not a subtype of parent 'Concrete'
         return new Other();
     }
 }
 ===expect===
-MethodSignatureMismatch@11:4-11:34: Method BadContainer::get() signature mismatch: return type 'Other' is not a subtype of parent 'Concrete'

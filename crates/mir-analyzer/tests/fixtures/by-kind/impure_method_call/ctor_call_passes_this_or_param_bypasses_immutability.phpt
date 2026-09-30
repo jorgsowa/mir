@@ -21,6 +21,7 @@ class Config {
 
     public function wrapSelf(): Wrapper {
         return new Wrapper($this);
+//             ^^^^^^^^^^^^^^^^^^ ImpureFunctionCall: Calling impure function Wrapper::__construct() in a @pure function
     }
 
     public function withTimeout(int $timeout): self {
@@ -32,8 +33,7 @@ class Service {
     /** @psalm-external-mutation-free */
     public function wrapParam(Config $cfg): Wrapper {
         return new Wrapper($cfg);
+//             ^^^^^^^^^^^^^^^^^ ImpureFunctionCall: Calling impure function Wrapper::__construct() in a @pure function
     }
 }
 ===expect===
-ImpureFunctionCall@11:15-11:33: Calling impure function Wrapper::__construct() in a @pure function
-ImpureFunctionCall@22:15-22:32: Calling impure function Wrapper::__construct() in a @pure function

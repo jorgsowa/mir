@@ -19,7 +19,7 @@ function f(): void {
         use1($a);
     } elseif ($a === null) {
         use1($never_assigned);
+//           ^^^^^^^^^^^^^^^ UndefinedVariable: Variable $never_assigned is not defined
     }
 }
 ===expect===
-UndefinedVariable@13:13-13:28: Variable $never_assigned is not defined

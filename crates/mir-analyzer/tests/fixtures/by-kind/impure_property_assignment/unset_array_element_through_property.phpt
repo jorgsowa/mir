@@ -16,14 +16,14 @@ class Bag {
 /** @pure */
 function clearInPure(Bag $b): void {
     unset($b->items['a']);
+//        ^^^^^^^^^^^^^^ ImpurePropertyAssignment: Assigning to property items of a parameter in a pure or external-mutation-free context
 }
 
 class Clearer {
     /** @psalm-external-mutation-free */
     public function clearInMutationFree(Bag $b): void {
         unset($b->items['a']);
+//            ^^^^^^^^^^^^^^ ImpurePropertyAssignment: Assigning to property items of a parameter in a pure or external-mutation-free context
     }
 }
 ===expect===
-ImpurePropertyAssignment@10:10-10:24: Assigning to property items of a parameter in a pure or external-mutation-free context
-ImpurePropertyAssignment@16:14-16:28: Assigning to property items of a parameter in a pure or external-mutation-free context

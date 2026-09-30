@@ -11,9 +11,9 @@ class Holder {
     public $name;
 }
 $f = fn(Holder $h): string => $h->name;
+//                            ^^^^^^^^ NullableReturnStatement: Return type 'null|string' is not compatible with declared 'string'
 $g = function (Holder $h): string {
     return $h->name;
+//  ^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'null|string' is not compatible with declared 'string'
 };
 ===expect===
-NullableReturnStatement@6:30-6:38: Return type 'null|string' is not compatible with declared 'string'
-NullableReturnStatement@8:4-8:20: Return type 'null|string' is not compatible with declared 'string'

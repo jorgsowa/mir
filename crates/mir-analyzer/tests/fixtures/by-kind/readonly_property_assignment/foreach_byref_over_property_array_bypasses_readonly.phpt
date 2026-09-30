@@ -13,8 +13,8 @@ class Frozen {
 
 function tick(Frozen $f): void {
     foreach ($f->items as &$v) {
+//           ^^^^^^^^^ ReadonlyPropertyAssignment: Cannot assign to readonly property Frozen::$items outside of constructor
         $v++;
     }
 }
 ===expect===
-ReadonlyPropertyAssignment@7:13-7:22: Cannot assign to readonly property Frozen::$items outside of constructor

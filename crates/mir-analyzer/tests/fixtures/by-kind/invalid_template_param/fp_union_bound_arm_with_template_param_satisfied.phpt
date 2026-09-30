@@ -13,9 +13,9 @@ should pass the bound check — not trigger InvalidTemplateParam.
  * @param T $value
  */
 function accept(mixed $value): void {}
+//              ^^^^^^^^^^^^ UnusedParam: Parameter $value is never used
 
 accept('hello');          // satisfies string arm
 accept([1, 2, 3]);        // satisfies list<I> arm (I = int)
 accept(['a' => 1]);       // satisfies array<K, V> arm
 ===expect===
-UnusedParam@10:16-10:28: Parameter $value is never used

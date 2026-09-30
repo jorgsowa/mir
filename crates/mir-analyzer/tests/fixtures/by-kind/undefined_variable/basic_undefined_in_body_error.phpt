@@ -6,6 +6,6 @@ suppress=MixedReturnStatement
 <?php
 function foo(): string {
     return $result;
+//         ^^^^^^^ UndefinedVariable: Variable $result is not defined
 }
 ===expect===
-UndefinedVariable@3:11-3:18: Variable $result is not defined

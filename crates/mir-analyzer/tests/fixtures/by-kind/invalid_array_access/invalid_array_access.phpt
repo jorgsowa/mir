@@ -4,5 +4,5 @@ Invalid array access
 <?php
 $a = 5;
 echo $a[0];
+//   ^^^^^ InvalidArrayAccess: Cannot use [] operator on non-array type '5'
 ===expect===
-InvalidArrayAccess@3:5-3:10: Cannot use [] operator on non-array type '5'

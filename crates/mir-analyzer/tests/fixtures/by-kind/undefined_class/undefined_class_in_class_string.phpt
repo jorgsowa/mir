@@ -14,5 +14,5 @@ function instantiateClass($className) {
 // Passing a non-existent class reference
 // SHOULD emit UndefinedClass because it's documented as class-string
 instantiateClass("NonExistentClass");
+//               ^^^^^^^^^^^^^^^^^^ UndefinedClass: Class NonExistentClass does not exist
 ===expect===
-UndefinedClass@11:17-11:35: Class NonExistentClass does not exist

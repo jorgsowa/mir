@@ -5,6 +5,6 @@ Basic
 function test(): void {
     $x = null;
     echo $x[0];
+//       ^^^^^ NullArrayAccess: Cannot access array on null
 }
 ===expect===
-NullArrayAccess@4:9-4:14: Cannot access array on null

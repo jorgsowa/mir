@@ -7,6 +7,6 @@ namespace Aye {
 }
 namespace Aye {
     class Foo {}
+//  ^^^^^^^^^^^^ DuplicateClass: Class Aye\Foo has already been defined
 }
 ===expect===
-DuplicateClass@6:4-6:16: Class Aye\Foo has already been defined

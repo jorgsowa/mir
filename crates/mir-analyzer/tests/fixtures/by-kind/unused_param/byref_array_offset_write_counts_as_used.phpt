@@ -12,7 +12,7 @@ function setArr(array &$a): void {
 
 function localArrNotByref(): void {
     $a = [];
+//  ^^ UnusedVariable: Variable $a is never read
     $a[0] = 1;
 }
 ===expect===
-UnusedVariable@7:4-7:6: Variable $a is never read

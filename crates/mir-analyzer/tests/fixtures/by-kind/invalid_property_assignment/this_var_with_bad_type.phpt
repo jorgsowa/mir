@@ -14,10 +14,10 @@ class A {
     public function fooFoo(): string
     {
         list($this->a, $this->b) = ["a", "b"];
+//           ^^^^^^^^ InvalidPropertyAssignment: Property $a expects 'int', cannot assign '"a"'
 
         return $this->a;
+//      ^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'int' is not compatible with declared 'string'
     }
 }
 ===expect===
-InvalidPropertyAssignment@11:13-11:21: Property $a expects 'int', cannot assign '"a"'
-InvalidReturnType@13:8-13:24: Return type 'int' is not compatible with declared 'string'

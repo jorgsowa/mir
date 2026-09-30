@@ -8,8 +8,8 @@ class Foo {}
 
 function test(Foo $obj): void {
     if ($obj === "foo") {}
+//      ^^^^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between 'Foo' and '"foo"' is always false — these types can never be identical
     if ($obj === 42) {}
+//      ^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between 'Foo' and '42' is always false — these types can never be identical
 }
 ===expect===
-ImpossibleIdenticalComparison@5:8-5:22: '===' between 'Foo' and '"foo"' is always false — these types can never be identical
-ImpossibleIdenticalComparison@6:8-6:19: '===' between 'Foo' and '42' is always false — these types can never be identical

@@ -21,5 +21,5 @@ function process($item) {
 
 $fn = process(...);
 $fn(new NotBase());
+//  ^^^^^^^^^^^^^ InvalidArgument: Argument $item of {closure}() expects 'Base', got 'NotBase'
 ===expect===
-InvalidArgument@15:4-15:17: Argument $item of {closure}() expects 'Base', got 'NotBase'

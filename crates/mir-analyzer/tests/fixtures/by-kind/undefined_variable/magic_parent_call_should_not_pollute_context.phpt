@@ -21,7 +21,7 @@ class Bar extends Foo
     {
         parent::baz();
         return $__tmp_parent_var__;
+//             ^^^^^^^^^^^^^^^^^^^ UndefinedVariable: Variable $__tmp_parent_var__ is not defined
     }
 }
 ===expect===
-UndefinedVariable@18:15-18:34: Variable $__tmp_parent_var__ is not defined

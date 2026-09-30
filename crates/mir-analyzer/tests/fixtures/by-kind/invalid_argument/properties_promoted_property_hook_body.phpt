@@ -19,16 +19,16 @@ final class PromotedHookExample
             }
             set {
                 takesString($value);
+//                          ^^^^^^ InvalidArgument: Argument $value of takesString() expects 'string', got 'int'
             }
         },
         public int $other {
             get {
                 takesString($this->other);
+//                          ^^^^^^^^^^^^ InvalidArgument: Argument $value of takesString() expects 'string', got 'int'
                 return $this->other;
             }
         },
     ) {}
 }
 ===expect===
-InvalidArgument@16:28-16:34: Argument $value of takesString() expects 'string', got 'int'
-InvalidArgument@21:28-21:40: Argument $value of takesString() expects 'string', got 'int'

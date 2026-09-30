@@ -6,7 +6,7 @@ and is still reported as UnusedVariable.
 function foo(): array {
     $name = 'Alice';
     $unlisted = 'ignored';
+//  ^^^^^^^^^ UnusedVariable: Variable $unlisted is never read
     return compact('name');
 }
 ===expect===
-UnusedVariable@4:4-4:13: Variable $unlisted is never read

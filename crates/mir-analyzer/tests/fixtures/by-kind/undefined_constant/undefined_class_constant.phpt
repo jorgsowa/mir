@@ -4,5 +4,5 @@ Undefined class constant
 <?php
 class A {}
 echo A::HELLO;
+//   ^^^^^^^^ UndefinedConstant: Constant A::HELLO is not defined
 ===expect===
-UndefinedConstant@3:5-3:13: Constant A::HELLO is not defined

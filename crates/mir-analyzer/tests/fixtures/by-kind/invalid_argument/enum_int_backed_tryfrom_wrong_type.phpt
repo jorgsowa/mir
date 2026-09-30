@@ -9,5 +9,5 @@ enum Priority: int {
 }
 
 Priority::tryFrom('low');
+//                ^^^^^ InvalidArgument: Argument $value of tryFrom() expects 'int', got '"low"'
 ===expect===
-InvalidArgument@6:18-6:23: Argument $value of tryFrom() expects 'int', got '"low"'

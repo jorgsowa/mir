@@ -43,6 +43,6 @@ function needs_string(string $s): void {}
 
 function test_typed_const_triggers_invalid_argument(): void {
     needs_string(Config::MAX_RETRIES);
+//               ^^^^^^^^^^^^^^^^^^^ ArgumentTypeCoercion: Argument $s of needs_string() expects 'string', got '3' — coercion may fail at runtime
 }
 ===expect===
-ArgumentTypeCoercion@37:17-37:36: Argument $s of needs_string() expects 'string', got '3' — coercion may fail at runtime

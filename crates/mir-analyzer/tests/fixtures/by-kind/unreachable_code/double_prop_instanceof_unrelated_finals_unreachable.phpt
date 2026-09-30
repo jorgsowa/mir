@@ -16,8 +16,8 @@ class Holder {
 
 function bothFinals(Holder $h): void {
     if ($h->animal instanceof Cat && $h->animal instanceof Dog) {
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         echo "unreachable";
     }
 }
 ===expect===
-RedundantCondition@11:8-11:62: Condition is always true/false for type 'bool'

@@ -8,6 +8,6 @@ suppress=MissingPropertyType
 class Wallet {
     /** @var NonExistentMoneyClass */
     private $money;
+//  ^^^^^^^^^^^^^^ UndefinedDocblockClass: Docblock type 'NonExistentMoneyClass' does not exist
 }
 ===expect===
-UndefinedDocblockClass@4:4-4:18: Docblock type 'NonExistentMoneyClass' does not exist

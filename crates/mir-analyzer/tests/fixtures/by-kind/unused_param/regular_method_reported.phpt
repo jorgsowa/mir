@@ -4,8 +4,8 @@ regular method reported
 <?php
 class Foo {
     public function bar(int $x): int {
+//                      ^^^^^^ UnusedParam: Parameter $x is never used
         return 42;
     }
 }
 ===expect===
-UnusedParam@3:24-3:30: Parameter $x is never used

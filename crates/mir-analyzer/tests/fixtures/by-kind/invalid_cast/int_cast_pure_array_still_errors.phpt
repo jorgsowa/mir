@@ -9,5 +9,5 @@ function getArray(): array {
 }
 
 $x = (int) getArray();
+//         ^^^^^^^^^^ InvalidCast: Cannot cast 'array' to 'int'
 ===expect===
-InvalidCast@6:11-6:21: Cannot cast 'array' to 'int'

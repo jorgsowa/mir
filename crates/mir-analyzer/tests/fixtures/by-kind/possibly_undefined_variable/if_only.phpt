@@ -5,6 +5,6 @@ if only
 function foo(bool $c): string {
     if ($c) { $r = 'hello'; }
     return $r;
+//         ^^ PossiblyUndefinedVariable: Variable $r might not be defined
 }
 ===expect===
-PossiblyUndefinedVariable@4:11-4:13: Variable $r might not be defined

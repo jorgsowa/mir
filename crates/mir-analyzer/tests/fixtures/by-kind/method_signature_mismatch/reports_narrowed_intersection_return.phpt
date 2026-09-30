@@ -9,8 +9,8 @@ interface Boxed {
 }
 class Impl implements Boxed {
     public function getBox(): Countable&ArrayAccess {
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method Impl::getbox() signature mismatch: return type 'Countable&ArrayAccess' is not a subtype of parent 'Countable&ArrayAccess&Iterator'
         throw new RuntimeException();
     }
 }
 ===expect===
-MethodSignatureMismatch@6:4-6:53: Method Impl::getbox() signature mismatch: return type 'Countable&ArrayAccess' is not a subtype of parent 'Countable&ArrayAccess&Iterator'

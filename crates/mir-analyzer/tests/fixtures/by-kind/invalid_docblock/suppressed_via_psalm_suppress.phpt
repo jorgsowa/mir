@@ -7,5 +7,5 @@ suppressed via psalm suppress
  * @return array<
  */
 function foo(): mixed { return []; }
+//       ^^^ UndefinedDocblockClass: Docblock type 'array<' does not exist
 ===expect===
-UndefinedDocblockClass@6:9-6:12: Docblock type 'array<' does not exist

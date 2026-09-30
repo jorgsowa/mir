@@ -10,5 +10,5 @@ class NonThrowable {}
 try {
     throw new ValidExc();
 } catch (ValidExc|NonThrowable $e) {}
+//                ^^^^^^^^^^^^ InvalidCatch: Caught type 'NonThrowable' does not extend Throwable
 ===expect===
-InvalidCatch@7:18-7:30: Caught type 'NonThrowable' does not extend Throwable

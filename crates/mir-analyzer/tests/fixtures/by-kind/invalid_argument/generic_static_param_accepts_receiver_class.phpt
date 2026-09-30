@@ -9,8 +9,10 @@ class H {
     public function mk(): G { return new G; }
     /** @param G<static> $g */
     public function take(G $g): void {}
+//                       ^^^^ UnusedParam: Parameter $g is never used
     /** @param G<self> $g */
     public function takeSelf(G $g): void {}
+//                           ^^^^ UnusedParam: Parameter $g is never used
     public function viaThis(): void {
         $made = $this->mk();
         /** @mir-check $made is G<H> */
@@ -30,5 +32,3 @@ function viaDeclared(H $o, G $h): void {
     $o->takeSelf($h);
 }
 ===expect===
-UnusedParam@8:25-8:29: Parameter $g is never used
-UnusedParam@10:29-10:33: Parameter $g is never used

@@ -8,7 +8,7 @@ class A {}
 class B extends A {
     public function foo(): string {
         return parent::foo();
+//             ^^^^^^^^^^^^^ UndefinedMethod: Method A::foo() does not exist
     }
 }
 ===expect===
-UndefinedMethod@5:15-5:28: Method A::foo() does not exist

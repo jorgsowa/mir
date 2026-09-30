@@ -4,6 +4,6 @@ ForbiddenCode fires when calling var_dump.
 <?php
 function debug(mixed $v): void {
     var_dump($v);
+//  ^^^^^^^^^^^^ ForbiddenCode: Use of var_dump is forbidden
 }
 ===expect===
-ForbiddenCode@3:4-3:16: Use of var_dump is forbidden

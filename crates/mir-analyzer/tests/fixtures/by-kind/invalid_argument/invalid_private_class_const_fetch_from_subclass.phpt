@@ -13,7 +13,7 @@ class B extends A
 {
     function fooFoo(): int {
         return A::IS_PRIVATE;
+//                ^^^^^^^^^^ InaccessibleClassConstant: Cannot access constant A::IS_PRIVATE
     }
 }
 ===expect===
-InaccessibleClassConstant@10:18-10:28: Cannot access constant A::IS_PRIVATE

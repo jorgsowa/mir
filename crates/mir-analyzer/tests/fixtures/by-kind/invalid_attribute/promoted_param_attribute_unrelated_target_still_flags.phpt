@@ -12,7 +12,7 @@ class OnlyClassConstant {}
 class Foo {
     public function __construct(
         #[OnlyClassConstant] public int $id,
+//        ^^^^^^^^^^^^^^^^^ InvalidAttribute: Attribute OnlyClassConstant cannot be used on this target
     ) {}
 }
 ===expect===
-InvalidAttribute@7:10-7:27: Attribute OnlyClassConstant cannot be used on this target

@@ -14,6 +14,7 @@ class Box {
 
     public static function useIt(): void {
         if (self::$n > 5) {
+//          ^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
             /** @mir-check $_ is never */
             $_ = 1;
         }
@@ -30,11 +31,10 @@ class Box {
 class ChildBox extends Box {
     public static function useItViaStatic(): void {
         if (static::$n > 5) {
+//          ^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
             /** @mir-check $_ is never */
             $_ = 1;
         }
     }
 }
 ===expect===
-RedundantCondition@7:12-7:24: Condition is always true/false for type 'bool'
-RedundantCondition@23:12-23:26: Condition is always true/false for type 'bool'

@@ -6,6 +6,6 @@ suppress=MixedAssignment,UnusedVariable
 <?php
 class Widget {}
 $closure = Widget::undefined(...);
+//                 ^^^^^^^^^ UndefinedMethod: Method Widget::undefined() does not exist
 $count = $closure();
 ===expect===
-UndefinedMethod@3:19-3:28: Method Widget::undefined() does not exist

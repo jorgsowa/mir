@@ -23,10 +23,10 @@ final class Other {}
  * @param Other $g
  */
 function useIt(Generator $g): string
+//                       ^^ MismatchingDocblockParamType: Docblock type 'App\Other' for $g does not match inferred 'App\Generator'
 {
     return $g->build();
+//  ^^^^^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'string'
+//         ^^^^^^^^^^^ UndefinedMethod: Method App\Other::build() does not exist
 }
 ===expect===
-MismatchingDocblockParamType@15:25-15:27: Docblock type 'App\Other' for $g does not match inferred 'App\Generator'
-MixedReturnStatement@17:4-17:23: Cannot return a mixed type from function with declared return type 'string'
-UndefinedMethod@17:11-17:22: Method App\Other::build() does not exist

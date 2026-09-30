@@ -11,6 +11,6 @@ function test(): void {
     global $x, $y;
     $x->bar();
     $y->bar();
+//  ^^^^^^^^^ MixedMethodCall: Method bar() called on mixed type
 }
 ===expect===
-MixedMethodCall@10:4-10:13: Method bar() called on mixed type

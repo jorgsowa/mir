@@ -6,6 +6,6 @@ should be flagged as InvalidReturnType.
 /** @return array<int, int> */
 function test(): array {
     return ['a' => 'hello'];
+//  ^^^^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'array{'a': "hello"}' is not compatible with declared 'array<int, int>'
 }
 ===expect===
-InvalidReturnType@4:4-4:28: Return type 'array{'a': "hello"}' is not compatible with declared 'array<int, int>'

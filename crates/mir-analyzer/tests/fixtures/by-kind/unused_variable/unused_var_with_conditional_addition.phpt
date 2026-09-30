@@ -5,6 +5,6 @@ Unused var with conditional addition
 $a = 5;
 if (rand(0, 1)) {
     $a = $a + 1;
+//  ^^ UnusedVariable: Variable $a is never read
 }
 ===expect===
-UnusedVariable@4:4-4:6: Variable $a is never read

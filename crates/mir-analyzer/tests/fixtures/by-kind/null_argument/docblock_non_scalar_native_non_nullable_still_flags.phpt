@@ -8,15 +8,15 @@ method, since each has its own param-merging code path.
 <?php
 /** @param object $x */
 function requiresObject(object $x): void {}
+//                      ^^^^^^^^^ UnusedParam: Parameter $x is never used
 requiresObject(null);
+//             ^^^^ NullArgument: Argument $x of requiresObject() cannot be null
 
 final class C {
     /** @param object $x */
     public function requiresObject(object $x): void {}
+//                                 ^^^^^^^^^ UnusedParam: Parameter $x is never used
 }
 (new C())->requiresObject(null);
+//                        ^^^^ NullArgument: Argument $x of requiresObject() cannot be null
 ===expect===
-UnusedParam@3:24-3:33: Parameter $x is never used
-NullArgument@4:15-4:19: Argument $x of requiresObject() cannot be null
-UnusedParam@8:35-8:44: Parameter $x is never used
-NullArgument@10:26-10:30: Argument $x of requiresObject() cannot be null

@@ -5,7 +5,7 @@ reports this in static method
 class Foo {
     public static function bar(): void {
         $this->close();
+//      ^^^^^ InvalidScope: $this cannot be used in a static method
     }
 }
 ===expect===
-InvalidScope@4:8-4:13: $this cannot be used in a static method

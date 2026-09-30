@@ -18,6 +18,6 @@ function json_encode($value): string {
 
 function useIt($x): void {
     json_encode($x);
+//  ^^^^^^^^^^^^^^^ DeprecatedCall: Call to deprecated function App\json_encode: use PHP's json_encode() instead.
 }
 ===expect===
-DeprecatedCall@10:4-10:19: Call to deprecated function App\json_encode: use PHP's json_encode() instead.

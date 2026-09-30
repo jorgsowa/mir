@@ -9,5 +9,5 @@ $key = 'x';
 /** @var array<string, array<string, int>> $matrix */
 $matrix = [];
 $val = $matrix['row'][$key];
+//                    ^^^^ MixedArrayOffset: Mixed type used as array offset
 ===expect===
-MixedArrayOffset@6:22-6:26: Mixed type used as array offset

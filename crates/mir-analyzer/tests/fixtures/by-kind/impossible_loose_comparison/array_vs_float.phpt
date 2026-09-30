@@ -6,6 +6,6 @@ suppress=UnusedVariable,UnusedParam
 <?php
 function test(array $arr, float $f): void {
     if ($arr == $f) {}
+//      ^^^^^^^^^^ ImpossibleLooseComparison: '==' between 'array' and 'float' is always false — these types can never be loosely equal
 }
 ===expect===
-ImpossibleLooseComparison@3:8-3:18: '==' between 'array' and 'float' is always false — these types can never be loosely equal

@@ -14,13 +14,16 @@ class Holder {
 
 function isNullTrueBranchReachableOnNullableReceiver(?Holder $h): void {
     if (is_null($h->name)) {
+//              ^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $name on possibly null value
         /** @mir-check $_ is never */
         $_ = 1;
+//      ^^^^^^^ TypeCheckMismatch: Type of $_ is expected to be never, got mixed
     }
 }
 
 function isNullTrueBranchDivergesOnNonNullableReceiver(Holder $h): void {
     if (is_null($h->name)) {
+//      ^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         /** @mir-check $_ is never */
         $_ = 1;
     }
@@ -28,21 +31,18 @@ function isNullTrueBranchDivergesOnNonNullableReceiver(Holder $h): void {
 
 function isStringFalseBranchReachableOnNullableReceiver(?Holder $h): void {
     if (!is_string($h->name)) {
+//                 ^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $name on possibly null value
         /** @mir-check $_ is never */
         $_ = 1;
+//      ^^^^^^^ TypeCheckMismatch: Type of $_ is expected to be never, got mixed
     }
 }
 
 function isStringFalseBranchDivergesOnNonNullableReceiver(Holder $h): void {
     if (!is_string($h->name)) {
+//      ^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         /** @mir-check $_ is never */
         $_ = 1;
     }
 }
 ===expect===
-PossiblyNullPropertyFetch@7:16-7:24: Cannot access property $name on possibly null value
-TypeCheckMismatch@9:8-9:15: Type of $_ is expected to be never, got mixed
-RedundantCondition@14:8-14:25: Condition is always true/false for type 'bool'
-PossiblyNullPropertyFetch@21:19-21:27: Cannot access property $name on possibly null value
-TypeCheckMismatch@23:8-23:15: Type of $_ is expected to be never, got mixed
-RedundantCondition@28:8-28:28: Condition is always true/false for type 'bool'

@@ -5,6 +5,6 @@ but the native hint is string (incompatible type families).
 <?php
 /** @return array */
 function arrayDocStringHint(): string { return 'x'; }
+//       ^^^^^^^^^^^^^^^^^^ MismatchingDocblockReturnType: Docblock return type 'array' does not match inferred 'string'
+//                                      ^^^^^^^^^^^ InvalidReturnType: Return type '"x"' is not compatible with declared 'array'
 ===expect===
-MismatchingDocblockReturnType@3:9-3:27: Docblock return type 'array' does not match inferred 'string'
-InvalidReturnType@3:40-3:51: Return type '"x"' is not compatible with declared 'array'

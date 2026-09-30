@@ -8,5 +8,5 @@ suppress=UnusedParam
 ===file===
 <?php
 function f(Ds\NotARealClass $x): void {}
+//         ^^^^^^^^^^^^^^^^ UndefinedClass: Class Ds\NotARealClass does not exist
 ===expect===
-UndefinedClass@2:11-2:27: Class Ds\NotARealClass does not exist

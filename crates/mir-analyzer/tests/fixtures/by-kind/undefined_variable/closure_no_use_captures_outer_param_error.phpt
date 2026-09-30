@@ -7,7 +7,7 @@ suppress=MixedReturnStatement
 function outer(string $x): callable {
     return function(): string {
         return $x;
+//             ^^ UndefinedVariable: Variable $x is not defined
     };
 }
 ===expect===
-UndefinedVariable@4:15-4:17: Variable $x is not defined

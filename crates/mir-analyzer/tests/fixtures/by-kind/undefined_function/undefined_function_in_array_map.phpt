@@ -4,7 +4,7 @@ Undefined function in array map
 <?php
 array_map(
     "undefined_function",
+//  ^^^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function undefined_function() is not defined
     [1, 2, 3]
 );
 ===expect===
-UndefinedFunction@3:4-3:24: Function undefined_function() is not defined

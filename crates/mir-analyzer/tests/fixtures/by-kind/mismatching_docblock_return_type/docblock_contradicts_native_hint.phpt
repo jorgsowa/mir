@@ -8,9 +8,11 @@ what a contradicting docblock claims.
 <?php
 /** @return string|null */
 function widerThanHint(): string { return 'x'; }
+//       ^^^^^^^^^^^^^ MismatchingDocblockReturnType: Docblock return type 'string|null' does not match inferred 'string'
 
 /** @return int */
 function disjointFromHint(): string { return 'x'; }
+//       ^^^^^^^^^^^^^^^^ MismatchingDocblockReturnType: Docblock return type 'int' does not match inferred 'string'
 
 /** @return non-empty-string */
 function narrowsHint(): string { return 'x'; }
@@ -25,5 +27,3 @@ function exactMatch(): string { return 'x'; }
  */
 function templated(mixed $x): mixed { return $x; }
 ===expect===
-MismatchingDocblockReturnType@3:9-3:22: Docblock return type 'string|null' does not match inferred 'string'
-MismatchingDocblockReturnType@6:9-6:25: Docblock return type 'int' does not match inferred 'string'

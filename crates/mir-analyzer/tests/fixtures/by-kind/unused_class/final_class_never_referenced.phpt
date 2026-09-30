@@ -4,6 +4,6 @@ UnusedClass fires for a final class that is never instantiated or type-hinted.
 <?php
 /** @psalm-internal */
 final class Ghost {}
+//    ^^^^^^^^^^^^^^ UnusedClass: Class Ghost is never referenced
 
 ===expect===
-UnusedClass@3:6-3:20: Class Ghost is never referenced

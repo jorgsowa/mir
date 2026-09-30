@@ -9,5 +9,5 @@ function formatDate(string $d): string { return $d; }
 
 namespace Client;
 $x = \myapp\utils\formatDate("2024-01-01");
+//   ^^^^^^^^^^^^^^^^^^^^^^^ WrongCaseFunction: Function name 'myapp\utils\formatDate' has incorrect casing; use 'MyApp\Utils\formatDate'
 ===expect===
-WrongCaseFunction@6:5-6:28: Function name 'myapp\utils\formatDate' has incorrect casing; use 'MyApp\Utils\formatDate'

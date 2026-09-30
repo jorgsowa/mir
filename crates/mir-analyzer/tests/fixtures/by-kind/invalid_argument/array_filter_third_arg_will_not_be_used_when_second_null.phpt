@@ -5,5 +5,5 @@ suppress=MixedArgument
 ===file===
 <?php
 array_filter( $arg, null, ARRAY_FILTER_USE_BOTH );
+//            ^^^^ UndefinedVariable: Variable $arg is not defined
 ===expect===
-UndefinedVariable@2:14-2:18: Variable $arg is not defined

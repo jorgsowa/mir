@@ -22,8 +22,8 @@ class Foo {
 
     private function helper(): void {}
     private function trulyunused(): void {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedMethod: Private method Foo::trulyunused() is never called
 }
 
 (new Foo())->pub();
 ===expect===
-UnusedMethod@16:4-16:43: Private method Foo::trulyunused() is never called

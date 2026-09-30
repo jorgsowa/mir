@@ -16,6 +16,6 @@ class C {
 }
 class D extends C {
     public function f(): void {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FinalMethodOverridden: Method D::f() cannot override final method from Inner
 }
 ===expect===
-FinalMethodOverridden@12:4-12:32: Method D::f() cannot override final method from Inner

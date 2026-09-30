@@ -21,13 +21,13 @@ function test(
     array $maybe_empty_values
 ): void {
     $combined = array_combine($names, $ages);
+//              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MissingThrowsDocblock: Exception ValueError is thrown but not declared in @throws
     /** @mir-check $combined is non-empty-array<string, int> */
     $_ = $combined;
 
     $maybe_empty = array_combine($maybe_empty_names, $maybe_empty_values);
+//                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MissingThrowsDocblock: Exception ValueError is thrown but not declared in @throws
     /** @mir-check $maybe_empty is array<string, int> */
     $_ = $maybe_empty;
 }
 ===expect===
-MissingThrowsDocblock@14:16-14:44: Exception ValueError is thrown but not declared in @throws
-MissingThrowsDocblock@18:19-18:73: Exception ValueError is thrown but not declared in @throws

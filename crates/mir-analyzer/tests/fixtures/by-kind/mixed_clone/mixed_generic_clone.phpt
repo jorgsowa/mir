@@ -8,6 +8,6 @@ Mixed generic clone
  */
 function foo($a): void {
     clone $a;
+//  ^^^^^^^^ MixedClone: cannot clone mixed
 }
 ===expect===
-MixedClone@7:4-7:12: cannot clone mixed

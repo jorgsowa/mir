@@ -19,6 +19,6 @@ function earlyReturnOnMatch(array $arr): void {
         return;
     }
     $arr['item']->fooOnly();
+//  ^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Bar::fooOnly() does not exist
 }
 ===expect===
-UndefinedMethod@18:4-18:27: Method Bar::fooOnly() does not exist

@@ -7,7 +7,7 @@ No literal c allowed in key of union list and keyed array
  */
 function getKey() {
     return "c";
+//  ^^^^^^^^^^^ InvalidReturnType: Return type '"c"' is not compatible with declared 'int|"a"|"b"'
 }
 
 ===expect===
-InvalidReturnType@6:4-6:15: Return type '"c"' is not compatible with declared 'int|"a"|"b"'

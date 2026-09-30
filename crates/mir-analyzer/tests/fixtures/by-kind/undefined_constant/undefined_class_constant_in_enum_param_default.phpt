@@ -8,7 +8,7 @@ enum Suit {
     case Hearts;
 
     public function doSomething(int $howManyTimes = self::DEFAULT_TIMES): void {}
+//                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedParam: Parameter $howManyTimes is never used
+//                                                  ^^^^^^^^^^^^^^^^^^^ UndefinedConstant: Constant Suit::DEFAULT_TIMES is not defined
 }
 ===expect===
-UnusedParam@5:32-5:71: Parameter $howManyTimes is never used
-UndefinedConstant@5:52-5:71: Constant Suit::DEFAULT_TIMES is not defined

@@ -11,6 +11,6 @@ class Logger {
 
 function test(Logger $l): void {
     $l->write('hello');
+//  ^^^^^^^^^^^^^^^^^^ DeprecatedMethod: Method Logger::write() is deprecated: use log() instead
 }
 ===expect===
-DeprecatedMethod@8:4-8:22: Method Logger::write() is deprecated: use log() instead

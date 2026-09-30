@@ -4,7 +4,7 @@ Conditional foreach with unused value
 <?php
 if (rand(0, 1) > 0) {
     foreach ([1, 2, 3] as $val) {}
+//                        ^^^^ UnusedForeachValue: Foreach value $val is never read
 }
 
 ===expect===
-UnusedForeachValue@3:26-3:30: Foreach value $val is never read

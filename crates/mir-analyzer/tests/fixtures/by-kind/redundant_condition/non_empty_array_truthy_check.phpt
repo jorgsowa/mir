@@ -7,8 +7,8 @@ suppress=UnusedVariable,UnusedParam
 /** @param non-empty-array<string, int> $arr */
 function test(array $arr): void {
     if ($arr) {
+//      ^^^^ RedundantCondition: Condition is always true/false for type 'non-empty-array<string, int>'
         $_ = $arr;
     }
 }
 ===expect===
-RedundantCondition@4:8-4:12: Condition is always true/false for type 'non-empty-array<string, int>'

@@ -20,6 +20,6 @@ function fill(Bag $skip, array &$out): void {
 /** @pure */
 function normalize(Bag $b): void {
     fill(out: $b->items, skip: $b);
+//            ^^^^^^^^^ ImpurePropertyAssignment: Assigning to property items of a parameter in a pure or external-mutation-free context
 }
 ===expect===
-ImpurePropertyAssignment@12:14-12:23: Assigning to property items of a parameter in a pure or external-mutation-free context

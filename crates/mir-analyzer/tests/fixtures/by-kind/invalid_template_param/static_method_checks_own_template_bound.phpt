@@ -29,5 +29,5 @@ $ok = Box::make(new Base());
 
 // Violates the bound — NotBase does not extend Base.
 $bad = Box::make(new NotBase());
+//     ^^^^^^^^^^^^^^^^^^^^^^^^ InvalidTemplateParam: Template type 'U' inferred as 'NotBase' does not satisfy bound 'Base'
 ===expect===
-InvalidTemplateParam@24:7-24:31: Template type 'U' inferred as 'NotBase' does not satisfy bound 'Base'

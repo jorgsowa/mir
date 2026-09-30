@@ -11,6 +11,7 @@ final class Db {
     public ?Conn $connection = null;
     /** @psalm-assert Conn $this->connection */
     public function connect(string $dsn): void {
+//                          ^^^^^^^^^^^ UnusedParam: Parameter $dsn is never used
         $this->connection = new Conn();
     }
     public function insert(): int {
@@ -19,4 +20,3 @@ final class Db {
     }
 }
 ===expect===
-UnusedParam@8:28-8:39: Parameter $dsn is never used

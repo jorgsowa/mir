@@ -20,6 +20,7 @@ class Duck extends Animal {
 /** @param Duck|Animal $obj */
 function narrowsVarToStrictSubclass(mixed $obj): void {
     if (array_key_exists('Animal', class_parents($obj))) {
+//                                 ^^^^^^^^^^^^^^^^^^^ PossiblyInvalidArgument: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
         $obj->onlyOnDuck();
     }
 }
@@ -30,6 +31,7 @@ class Holder {
 
     public function narrowsPropToStrictSubclass(): void {
         if (array_key_exists('Animal', class_parents($this->pet))) {
+//                                     ^^^^^^^^^^^^^^^^^^^^^^^^^ PossiblyInvalidArgument: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
             $this->pet->onlyOnDuck();
         }
     }
@@ -41,6 +43,7 @@ class StaticHolder {
 
     public static function narrowsStaticPropToStrictSubclass(): void {
         if (array_key_exists('Animal', class_parents(self::$pet))) {
+//                                     ^^^^^^^^^^^^^^^^^^^^^^^^^ PossiblyInvalidArgument: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
             self::$pet->onlyOnDuck();
         }
     }
@@ -49,15 +52,12 @@ class StaticHolder {
 /** @param Duck|Animal $obj */
 function falseBranchDoesNotNarrow(mixed $obj): void {
     if (!array_key_exists('Animal', class_parents($obj))) {
+//                                  ^^^^^^^^^^^^^^^^^^^ PossiblyInvalidArgument: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
         // array_key_exists was false — class_parents() narrowing never
         // narrows on the false branch, so $obj stays Duck|Animal here;
         // Animal has no onlyOnDuck(), so this must still be flagged.
         $obj->onlyOnDuck();
+//      ^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Animal::onlyOnDuck() does not exist
     }
 }
 ===expect===
-PossiblyInvalidArgument@11:35-11:54: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
-PossiblyInvalidArgument@21:39-21:64: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
-PossiblyInvalidArgument@32:39-32:64: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
-PossiblyInvalidArgument@40:36-40:55: Argument $array of array_key_exists() expects 'array', possibly different type 'array<int|string, string>|false' provided
-UndefinedMethod@44:8-44:26: Method Animal::onlyOnDuck() does not exist

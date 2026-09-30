@@ -18,6 +18,6 @@ class Request {
 function test(string $requestCls): void {
     /** @var class-string<Request> $requestCls */
     echo $requestCls::getQuery();
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 ===expect===
-TaintedHtml@11:4-11:33: Tainted HTML output — possible XSS

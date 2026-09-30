@@ -16,5 +16,5 @@ function giveInt(int $x): int {
 }
 
 takesCb('giveInt');
+//      ^^^^^^^^^ InvalidArgument: Argument $cb of takesCb() expects 'callable returning string', got 'callable returning int'
 ===expect===
-InvalidArgument@13:8-13:17: Argument $cb of takesCb() expects 'callable returning string', got 'callable returning int'

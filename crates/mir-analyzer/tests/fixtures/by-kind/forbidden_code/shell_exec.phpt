@@ -6,6 +6,6 @@ suppress=UnusedParam
 <?php
 function run(string $cmd): string {
     return `$cmd`;
+//         ^^^^^^ ForbiddenCode: Use of shell_exec (backtick) is forbidden
 }
 ===expect===
-ForbiddenCode@3:11-3:17: Use of shell_exec (backtick) is forbidden

@@ -5,6 +5,6 @@ kind name that follows it — @MIR-IGNORE suppresses the same as @mir-ignore
 <?php
 function test(): void {
     noSuchFunc(new NoSuchClass()); // @MIR-IGNORE undefinedclass
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function noSuchFunc() is not defined
 }
 ===expect===
-UndefinedFunction@3:4-3:33: Function noSuchFunc() is not defined

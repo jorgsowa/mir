@@ -9,6 +9,6 @@ suppress=MixedArgument,MixedArrayAccess,MixedAssignment
 function run_query(mysqli $db): void {
     $arr = ['q' => $_GET['x']];
     mysqli_query($db, $arr['q']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedSql: Tainted SQL query — possible SQL injection
 }
 ===expect===
-TaintedSql@4:4-4:32: Tainted SQL query — possible SQL injection

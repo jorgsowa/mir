@@ -7,7 +7,7 @@ enum Status: string {
 }
 function test(?Status $status): string {
     return $status->value;
+//  ^^^^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'string|null' is not compatible with declared 'string'
+//         ^^^^^^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $value on possibly null value
 }
 ===expect===
-NullableReturnStatement@6:4-6:26: Return type 'string|null' is not compatible with declared 'string'
-PossiblyNullPropertyFetch@6:11-6:25: Cannot access property $value on possibly null value

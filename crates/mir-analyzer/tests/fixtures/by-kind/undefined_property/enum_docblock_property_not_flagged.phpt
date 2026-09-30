@@ -23,6 +23,6 @@ function test(Status $s): string {
 
 function stillFlagsRealUndefinedProperty(Status $s): string {
     return $s->nope;
+//             ^^^^ UndefinedProperty: Property Status::$nope does not exist
 }
 ===expect===
-UndefinedProperty@17:15-17:19: Property Status::$nope does not exist

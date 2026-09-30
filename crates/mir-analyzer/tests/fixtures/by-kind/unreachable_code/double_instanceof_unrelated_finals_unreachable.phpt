@@ -18,6 +18,7 @@ final class Dog {}
 
 function bothFinals(Cat|Dog $animal): void {
     if ($animal instanceof Cat && $animal instanceof Dog) {
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         echo "unreachable";
     }
 }
@@ -34,4 +35,3 @@ function connect(PdoLike|Closure $conn): PdoLike {
     return $conn;
 }
 ===expect===
-RedundantCondition@7:8-7:56: Condition is always true/false for type 'bool'

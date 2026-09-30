@@ -7,7 +7,7 @@ class Widget {
 
     public static function renderStatic(): string {
         return static::render();
+//             ^^^^^^^^^^^^^^^^ NonStaticSelfCall: Non-static method Widget::render() cannot be called statically
     }
 }
 ===expect===
-NonStaticSelfCall@6:15-6:31: Non-static method Widget::render() cannot be called statically

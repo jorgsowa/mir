@@ -12,6 +12,6 @@ function test(): void {
     /** @var Box<int> $box */
     $box = new Box();
     $box->set("hello");
+//            ^^^^^^^ InvalidArgument: Argument $value of set() expects 'int', got '"hello"'
 }
 ===expect===
-InvalidArgument@11:14-11:21: Argument $value of set() expects 'int', got '"hello"'

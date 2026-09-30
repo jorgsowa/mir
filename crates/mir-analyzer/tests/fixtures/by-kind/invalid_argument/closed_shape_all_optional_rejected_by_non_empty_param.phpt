@@ -17,8 +17,8 @@ function takesNonEmptyArray(array $counts): void {}
  */
 function test(array $allOptional, array $required, array $open): void {
     takesNonEmptyArray($allOptional);
+//                     ^^^^^^^^^^^^ InvalidArgument: Argument $counts of takesNonEmptyArray() expects 'non-empty-array<string, int>', got 'array{'a'?: int}'
     takesNonEmptyArray($required);
     takesNonEmptyArray($open);
 }
 ===expect===
-InvalidArgument@11:23-11:35: Argument $counts of takesNonEmptyArray() expects 'non-empty-array<string, int>', got 'array{'a'?: int}'

@@ -7,8 +7,8 @@ suppress=UnusedVariable,UnusedParam
 /** @param int<0, 0> $n */
 function test(int $n): void {
     if ($n) {
+//      ^^ RedundantCondition: Condition is always true/false for type 'int<0, 0>'
         $_ = $n;
     }
 }
 ===expect===
-RedundantCondition@4:8-4:10: Condition is always true/false for type 'int<0, 0>'

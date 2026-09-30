@@ -6,9 +6,9 @@ explicit keys.
 <?php
 function test(): array {
     return ['b', 0 => 'a'];
+//               ^ DuplicateArrayKey: Array key 0 is duplicated — the earlier entry is silently overwritten
 }
 function no_collision(): array {
     return [1 => 'a', 'b'];
 }
 ===expect===
-DuplicateArrayKey@3:17-3:18: Array key 0 is duplicated — the earlier entry is silently overwritten

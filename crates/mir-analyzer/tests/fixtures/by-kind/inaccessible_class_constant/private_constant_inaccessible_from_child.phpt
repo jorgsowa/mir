@@ -9,7 +9,7 @@ class Base {
 class Child extends Base {
     public function getSecret(): string {
         return Base::SECRET;
+//                   ^^^^^^ InaccessibleClassConstant: Cannot access constant Base::SECRET
     }
 }
 ===expect===
-InaccessibleClassConstant@8:21-8:27: Cannot access constant Base::SECRET

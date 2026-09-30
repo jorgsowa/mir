@@ -8,6 +8,6 @@ class P {
 
 class C extends P {
     public function f() : void {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FinalMethodOverridden: Method C::f() cannot override final method from P
 }
 ===expect===
-FinalMethodOverridden@7:4-7:33: Method C::f() cannot override final method from P

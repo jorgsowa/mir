@@ -9,7 +9,7 @@ class A {
          */
         new B();
         new C();
+//          ^ UndefinedClass: Class C does not exist
     }
 }
 ===expect===
-UndefinedClass@8:12-8:13: Class C does not exist

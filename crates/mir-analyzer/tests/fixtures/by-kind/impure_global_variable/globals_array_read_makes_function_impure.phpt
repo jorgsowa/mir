@@ -9,6 +9,6 @@ suppress=MixedArrayAccess,MixedReturnStatement
 /** @pure */
 function test(): int {
     return $GLOBALS['x'];
+//         ^^^^^^^^^^^^^ ImpureGlobalVariable: Using global variable $x in a @pure function
 }
 ===expect===
-ImpureGlobalVariable@4:11-4:24: Using global variable $x in a @pure function

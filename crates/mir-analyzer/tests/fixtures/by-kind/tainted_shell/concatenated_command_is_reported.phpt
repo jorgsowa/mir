@@ -7,6 +7,6 @@ suppress=ForbiddenCode,MixedArrayAccess
 function run(): void {
     $cmd = 'grep ' . $_GET['needle'];
     shell_exec($cmd);
+//  ^^^^^^^^^^^^^^^^ TaintedShell: Tainted shell command — possible command injection
 }
 ===expect===
-TaintedShell@4:4-4:20: Tainted shell command — possible command injection

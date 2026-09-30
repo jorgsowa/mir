@@ -10,8 +10,8 @@ class A {
 
 class B extends A {
     public function foo(string $s): string {
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method B::foo() signature mismatch: parameter $s type 'string' is narrower than parent type 'string|null'
         return $s;
     }
 }
 ===expect===
-MethodSignatureMismatch@9:4-9:44: Method B::foo() signature mismatch: parameter $s type 'string' is narrower than parent type 'string|null'

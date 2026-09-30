@@ -14,7 +14,7 @@ class Service {
     /** @psalm-external-mutation-free */
     public function process(Logger $logger, string $msg): void {
         $logger->log($msg);
+//      ^^^^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method log() in a pure or immutable context
     }
 }
 ===expect===
-ImpureMethodCall@12:8-12:26: Calling impure method log() in a pure or immutable context

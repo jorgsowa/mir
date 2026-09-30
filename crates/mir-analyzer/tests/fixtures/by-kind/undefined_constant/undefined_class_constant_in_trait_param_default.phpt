@@ -8,7 +8,7 @@ it on the using class — so this uses a global constant instead.)
 <?php
 trait T {
     public function doSomething(int $howManyTimes = UNDEFINED_CONST): void {}
+//                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UnusedParam: Parameter $howManyTimes is never used
+//                                                  ^^^^^^^^^^^^^^^ UndefinedConstant: Constant UNDEFINED_CONST is not defined
 }
 ===expect===
-UnusedParam@3:32-3:67: Parameter $howManyTimes is never used
-UndefinedConstant@3:52-3:67: Constant UNDEFINED_CONST is not defined

@@ -12,8 +12,8 @@ class A {
 
 class B extends A {
     public function fooFoo(int $a): void {
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method B::foofoo() signature mismatch: method has fewer parameters (1) than parent A::foofoo() (2)
 
     }
 }
 ===expect===
-MethodSignatureMismatch@9:4-9:42: Method B::foofoo() signature mismatch: method has fewer parameters (1) than parent A::foofoo() (2)

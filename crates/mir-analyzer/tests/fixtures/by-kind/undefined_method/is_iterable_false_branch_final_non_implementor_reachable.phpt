@@ -13,7 +13,7 @@ final class Money {
 function describe(Money $m): void {
     if (!is_iterable($m)) {
         $m->missingMethod();
+//      ^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Money::missingMethod() does not exist
     }
 }
 ===expect===
-UndefinedMethod@8:8-8:27: Method Money::missingMethod() does not exist

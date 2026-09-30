@@ -6,6 +6,6 @@ suppress=MissingReturnType
 <?php
 function test(int $value) {
     $value::method();
+//  ^^^^^^ InvalidStringClass: Dynamic class instantiation requires string or class-string type, got 'int'
 }
 ===expect===
-InvalidStringClass@3:4-3:10: Dynamic class instantiation requires string or class-string type, got 'int'

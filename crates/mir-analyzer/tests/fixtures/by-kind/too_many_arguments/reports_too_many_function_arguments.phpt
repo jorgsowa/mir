@@ -3,7 +3,7 @@ reports too many function arguments
 ===file===
 <?php
 function takes_one(int $a): void {}
+//                 ^^^^^^ UnusedParam: Parameter $a is never used
 takes_one(1, 2);
+//           ^ TooManyArguments: Too many arguments for takes_one(): expected 1, got 2
 ===expect===
-UnusedParam@2:19-2:25: Parameter $a is never used
-TooManyArguments@3:13-3:14: Too many arguments for takes_one(): expected 1, got 2

@@ -13,15 +13,15 @@ class Counter {
     /** @pure */
     public function increment(): int {
         $this->n = $this->n + 1;
+//      ^^^^^^^^^^^^^^^^^^^^^^^ ImmutablePropertyModification: Assigning to property n of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
         return $this->n;
     }
 
     /** @psalm-mutation-free */
     public function incrementMutationFree(): int {
         $this->n = $this->n + 1;
+//      ^^^^^^^^^^^^^^^^^^^^^^^ ImmutablePropertyModification: Assigning to property n of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
         return $this->n;
     }
 }
 ===expect===
-ImmutablePropertyModification@7:8-7:31: Assigning to property n of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
-ImmutablePropertyModification@13:8-13:31: Assigning to property n of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)

@@ -19,5 +19,5 @@ class Box {
 
 $fn = Box::make(...);
 $fn(new NotBase());
+//  ^^^^^^^^^^^^^ InvalidArgument: Argument $item of {closure}() expects 'Base', got 'NotBase'
 ===expect===
-InvalidArgument@13:4-13:17: Argument $item of {closure}() expects 'Base', got 'NotBase'

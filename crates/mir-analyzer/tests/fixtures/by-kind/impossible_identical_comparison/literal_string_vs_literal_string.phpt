@@ -8,6 +8,6 @@ function test(): void {
     $a = "foo";
     $b = "bar";
     if ($a === $b) {}
+//      ^^^^^^^^^ ImpossibleIdenticalComparison: '===' between '"foo"' and '"bar"' is always false — these types can never be identical
 }
 ===expect===
-ImpossibleIdenticalComparison@5:8-5:17: '===' between '"foo"' and '"bar"' is always false — these types can never be identical

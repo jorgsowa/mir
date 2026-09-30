@@ -10,8 +10,8 @@ interface A {
 
 class B implements A {
     public function fooFoo(string $a): void {
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method B::foofoo() signature mismatch: parameter $a type 'string' is incompatible with parent type 'int'
 
     }
 }
 ===expect===
-MethodSignatureMismatch@7:4-7:45: Method B::foofoo() signature mismatch: parameter $a type 'string' is incompatible with parent type 'int'

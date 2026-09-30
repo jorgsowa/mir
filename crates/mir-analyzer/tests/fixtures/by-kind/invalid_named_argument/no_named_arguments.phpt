@@ -9,7 +9,7 @@ No named arguments
 function foo(int $arg1, int $arg2): void {}
 
 foo(arg2: 0, arg1: 1);
+//  ^^^^^^^ InvalidNamedArguments: foo() does not accept named arguments
+//           ^^^^^^^ InvalidNamedArguments: foo() does not accept named arguments
 
 ===expect===
-InvalidNamedArguments@8:4-8:11: foo() does not accept named arguments
-InvalidNamedArguments@8:13-8:20: foo() does not accept named arguments

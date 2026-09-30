@@ -8,7 +8,7 @@ class Base {
 class Child extends Base {
     public static function run(): string {
         return parent::greet();
+//             ^^^^^^^^^^^^^^^ NonStaticSelfCall: Non-static method Base::greet() cannot be called statically
     }
 }
 ===expect===
-NonStaticSelfCall@7:15-7:30: Non-static method Base::greet() cannot be called statically

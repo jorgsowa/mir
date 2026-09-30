@@ -12,6 +12,6 @@ function example() : Generator {
     $arr = new A;
 
     yield from $arr;
+//             ^^^^ RawObjectIteration: Cannot iterate over non-iterable object 'A'
 }
 ===expect===
-RawObjectIteration@9:15-9:19: Cannot iterate over non-iterable object 'A'

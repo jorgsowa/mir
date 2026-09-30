@@ -23,8 +23,8 @@ $cb = static function (string $h) use (&$flag) {
 $flag2 = false;
 $cb2 = static function () use ($flag2) {
     if ($flag2) {
+//      ^^^^^^ RedundantCondition: Condition is always true/false for type 'false'
         echo "never\n";
     }
 };
 ===expect===
-RedundantCondition@14:8-14:14: Condition is always true/false for type 'false'

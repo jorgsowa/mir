@@ -11,6 +11,7 @@ class A {
 /** @pure */
 function filterOdd(int $i, A $a) : ?int {
     $a->a = $i;
+//  ^^^^^^^^^^ ImpurePropertyAssignment: Assigning to property a of a parameter in a pure or external-mutation-free context
 
     if ($i % 2 === 0 || $a->a === 2) {
         return $i;
@@ -19,4 +20,3 @@ function filterOdd(int $i, A $a) : ?int {
     return null;
 }
 ===expect===
-ImpurePropertyAssignment@10:4-10:14: Assigning to property a of a parameter in a pure or external-mutation-free context

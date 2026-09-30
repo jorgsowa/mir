@@ -6,10 +6,10 @@ Undefined constant in attribute
 class Foo
 {
     public function __construct(int $i) {}
+//                              ^^^^^^ UnusedParam: Parameter $i is never used
 }
 
 #[Foo(self::BAR_CONST)]
 class Bar {}
                 
 ===expect===
-UnusedParam@5:32-5:38: Parameter $i is never used

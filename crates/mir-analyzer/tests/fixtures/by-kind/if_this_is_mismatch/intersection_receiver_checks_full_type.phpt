@@ -22,6 +22,6 @@ function withBoth(Foo&HasBar $x): void {
 }
 function withFooOnly(Foo $y): void {
     $y->onlyWithBar();
+//  ^^^^^^^^^^^^^^^^^ IfThisIsMismatch: Cannot call Foo::onlyWithBar() — @if-this-is requires $this to be 'Foo&HasBar', but it is 'Foo'
 }
 ===expect===
-IfThisIsMismatch@13:4-13:21: Cannot call Foo::onlyWithBar() — @if-this-is requires $this to be 'Foo&HasBar', but it is 'Foo'

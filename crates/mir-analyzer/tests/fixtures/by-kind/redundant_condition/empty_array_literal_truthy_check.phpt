@@ -7,8 +7,8 @@ suppress=UnusedVariable
 function test(): void {
     $a = [];
     if ($a) {
+//      ^^ RedundantCondition: Condition is always true/false for type 'array{}'
         $_ = $a;
     }
 }
 ===expect===
-RedundantCondition@4:8-4:10: Condition is always true/false for type 'array{}'

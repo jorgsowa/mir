@@ -11,7 +11,7 @@ class A {
     public function barBar(): void
     {
         $this->foo = 5;
+//      ^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $foo expects 'string', cannot assign '5'
     }
 }
 ===expect===
-InvalidPropertyAssignment@8:8-8:22: Property $foo expects 'string', cannot assign '5'

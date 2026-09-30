@@ -15,5 +15,5 @@ class Service {
 }
 
 $v = Service::LIMIT;
+//            ^^^^^ DeprecatedConstant: Constant Service::LIMIT is deprecated
 ===expect===
-DeprecatedConstant@11:14-11:19: Constant Service::LIMIT is deprecated

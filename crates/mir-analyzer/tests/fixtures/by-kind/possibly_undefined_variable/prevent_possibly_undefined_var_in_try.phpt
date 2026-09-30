@@ -25,6 +25,6 @@ try {
     }
 } catch (Exception $e) {
     echo $a;
+//       ^^ PossiblyUndefinedVariable: Variable $a might not be defined
 }
 ===expect===
-PossiblyUndefinedVariable@22:9-22:11: Variable $a might not be defined

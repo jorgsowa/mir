@@ -4,8 +4,8 @@ Attribute invalid target property
 <?php
 class Foo {
     #[Attribute]
+//    ^^^^^^^^^ InvalidAttribute: #[Attribute] can only be applied to classes, not properties
     public string $bar = "baz";
 }
 
 ===expect===
-InvalidAttribute@3:6-3:15: #[Attribute] can only be applied to classes, not properties

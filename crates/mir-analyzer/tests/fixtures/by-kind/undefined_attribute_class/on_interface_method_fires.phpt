@@ -4,7 +4,7 @@ UndefinedAttributeClass fires when an undefined attribute is placed on an interf
 <?php
 interface Repository {
     #[Cache]
+//    ^^^^^ UndefinedAttributeClass: Attribute class Cache does not exist
     public function findAll(): array;
 }
 ===expect===
-UndefinedAttributeClass@3:6-3:11: Attribute class Cache does not exist

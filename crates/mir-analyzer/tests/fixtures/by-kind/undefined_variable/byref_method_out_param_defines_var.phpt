@@ -14,8 +14,8 @@ class T {
     }
     public function genuinelyUndef(): void {
         echo $nope;
+//           ^^^^^ UndefinedVariable: Variable $nope is not defined
     }
 }
 
 ===expect===
-UndefinedVariable@12:13-12:18: Variable $nope is not defined

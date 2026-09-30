@@ -6,8 +6,8 @@ suppress=MixedArgument
 ===file===
 <?php
 function doSomething(object $obj): bool { return true; }
+//                   ^^^^^^^^^^^ UnusedParam: Parameter $obj is never used
 if (!isset($x) || doSomething($x)) {
     // After fix: $x in function call should be narrowed as defined
 }
 ===expect===
-UnusedParam@2:21-2:32: Parameter $obj is never used

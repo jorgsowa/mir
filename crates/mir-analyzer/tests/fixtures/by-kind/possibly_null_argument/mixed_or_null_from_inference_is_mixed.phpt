@@ -26,6 +26,6 @@ function takesString(string $s): void {}
 function run(Bag $bag): void
 {
     takesString($bag->column);
+//              ^^^^^^^^^^^^ MixedArgument: Argument $s of takesString() is mixed
 }
 ===expect===
-MixedArgument@19:16-19:28: Argument $s of takesString() is mixed

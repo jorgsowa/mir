@@ -7,7 +7,7 @@ No other string allowed for value of keyed array
  */
 function getValue() {
     return "adams";
+//  ^^^^^^^^^^^^^^^ InvalidReturnType: Return type '"adams"' is not compatible with declared '"foo"|"bar"'
 }
 
 ===expect===
-InvalidReturnType@6:4-6:19: Return type '"adams"' is not compatible with declared '"foo"|"bar"'

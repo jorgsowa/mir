@@ -8,7 +8,7 @@ class Base {}
 
 class Child extends Base {
     #[Override]
+//  ^^^^^^^^^^^ InvalidOverride: Method Child::render() has #[Override] but no parent method exists to override
     public function render(): void {}
 }
 ===expect===
-InvalidOverride@5:4-5:15: Method Child::render() has #[Override] but no parent method exists to override

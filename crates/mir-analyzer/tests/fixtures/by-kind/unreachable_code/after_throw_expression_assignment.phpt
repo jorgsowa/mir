@@ -5,6 +5,6 @@ after throw expression assignment
 function test(): void {
     $value = throw new RuntimeException('stop');
     echo 'unreachable';
+//  ^^^^^^^^^^^^^^^^^^^ UnreachableCode: Unreachable code detected
 }
 ===expect===
-UnreachableCode@4:4-4:23: Unreachable code detected

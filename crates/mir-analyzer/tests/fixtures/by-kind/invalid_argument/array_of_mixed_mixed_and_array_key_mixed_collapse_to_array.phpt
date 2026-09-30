@@ -15,8 +15,8 @@ function g($b): void { $_ = $b; }
 
 function test(): void {
     f(new A());
+//    ^^^^^^^ InvalidArgument: Argument $a of f() expects 'array', got 'A'
     g(new A());
+//    ^^^^^^^ InvalidArgument: Argument $b of g() expects 'array', got 'A'
 }
 ===expect===
-InvalidArgument@11:6-11:13: Argument $a of f() expects 'array', got 'A'
-InvalidArgument@12:6-12:13: Argument $b of g() expects 'array', got 'A'

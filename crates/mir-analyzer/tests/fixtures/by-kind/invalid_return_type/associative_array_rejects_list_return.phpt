@@ -7,6 +7,6 @@
  */
 function buildAssociativeArray() {
     return [1, 2, 3];
+//  ^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'array{0: 1, 1: 2, 2: 3}' is not compatible with declared 'array<string, int>&array{}'
 }
 ===expect===
-InvalidReturnType@6:4-6:21: Return type 'array{0: 1, 1: 2, 2: 3}' is not compatible with declared 'array<string, int>&array{}'

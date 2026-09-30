@@ -4,6 +4,6 @@
 <?php
 if (!isset($x) && true) {
     echo $x;
+//       ^^ UndefinedVariable: Variable $x is not defined
 }
 ===expect===
-UndefinedVariable@3:9-3:11: Variable $x is not defined

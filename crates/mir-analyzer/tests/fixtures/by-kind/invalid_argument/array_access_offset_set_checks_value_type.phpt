@@ -23,6 +23,6 @@ class TypedMap implements ArrayAccess {
 function stores(TypedMap $m): void {
     $m['x'] = 1;
     $m['y'] = 'not an int';
+//  ^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $value of offsetSet() expects 'int', got '"not an int"'
 }
 ===expect===
-InvalidArgument@18:4-18:26: Argument $value of offsetSet() expects 'int', got '"not an int"'

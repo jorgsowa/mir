@@ -33,8 +33,8 @@ function needsInt(int $x): int {
 }
 
 new IntBox("hello");
+//         ^^^^^^^ InvalidArgument: Argument $value of IntBox::__construct() expects 'int', got '"hello"'
 
 $b = new IntBox(5);
 needsInt($b->getValue());
 ===expect===
-InvalidArgument@24:11-24:18: Argument $value of IntBox::__construct() expects 'int', got '"hello"'

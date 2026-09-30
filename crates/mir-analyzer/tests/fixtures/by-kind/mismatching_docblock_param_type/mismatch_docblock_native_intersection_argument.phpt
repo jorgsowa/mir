@@ -13,8 +13,8 @@ interface C {
  * @param A&C $in
  */
 function test(A&B $in): void {
+//                ^^^ MismatchingDocblockParamType: Docblock type 'A&C' for $in does not match inferred 'A&B'
     $in->foo();
 }
 
 ===expect===
-MismatchingDocblockParamType@12:18-12:21: Docblock type 'A&C' for $in does not match inferred 'A&B'

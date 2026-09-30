@@ -14,9 +14,11 @@ class TypedMap {}
 
 /** @param TypedMap<string> $m */
 function tooFewParamArgs($m): void {}
+//       ^^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: TypedMap expects 2 template argument(s), got 1
 
 /** @return TypedMap<string, int, bool> */
 function tooManyReturnArgs(): TypedMap { return new TypedMap(); }
+//       ^^^^^^^^^^^^^^^^^ InvalidDocblock: Invalid docblock: TypedMap expects 2 template argument(s), got 3
 
 /** @param TypedMap $m */
 function bareGenericReferenceStaysSilent($m): void {}
@@ -24,5 +26,3 @@ function bareGenericReferenceStaysSilent($m): void {}
 /** @param TypedMap<string, int> $m */
 function correctArityStaysSilent($m): void {}
 ===expect===
-InvalidDocblock@9:9-9:24: Invalid docblock: TypedMap expects 2 template argument(s), got 1
-InvalidDocblock@12:9-12:26: Invalid docblock: TypedMap expects 2 template argument(s), got 3

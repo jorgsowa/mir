@@ -12,7 +12,7 @@ class Counter {
     /** @pure */
     public static function peek(): int {
         return self::$n;
+//                   ^^ ImpureStaticPropertyAccess: Reading static property Counter::$n in a @pure function
     }
 }
 ===expect===
-ImpureStaticPropertyAccess@7:21-7:23: Reading static property Counter::$n in a @pure function

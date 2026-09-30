@@ -22,6 +22,6 @@ class D extends C {
 
 function callFromOutside(C $c): void {
     $c->foo();
+//  ^^^^^^^^^ UndefinedMethod: Method C::foo() does not exist
 }
 ===expect===
-UndefinedMethod@21:4-21:13: Method C::foo() does not exist

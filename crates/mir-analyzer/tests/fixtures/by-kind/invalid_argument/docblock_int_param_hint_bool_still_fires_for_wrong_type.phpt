@@ -15,5 +15,5 @@ class Converter {
 }
 
 Converter::convert('hello', 'yes');
+//                          ^^^^^ InvalidArgument: Argument $withQuote of convert() expects 'bool', got '"yes"'
 ===expect===
-InvalidArgument@11:28-11:33: Argument $withQuote of convert() expects 'bool', got '"yes"'

@@ -12,6 +12,6 @@ php_version=8.2
 function run(): void {
     preg_match('/(\d+)/', $_GET['input'], $matches);
     echo $matches[0];
+//  ^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 ===expect===
-TaintedHtml@4:4-4:21: Tainted HTML output — possible XSS

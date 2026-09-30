@@ -8,5 +8,5 @@ class Config
 }
 
 echo Config::$secret;
+//           ^^^^^^^ InaccessibleProperty: Cannot access property Config::$secret
 ===expect===
-InaccessibleProperty@7:13-7:20: Cannot access property Config::$secret

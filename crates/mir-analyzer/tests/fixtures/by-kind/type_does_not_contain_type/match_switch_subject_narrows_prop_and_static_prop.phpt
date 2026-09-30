@@ -58,9 +58,9 @@ class Holder {
     public function stillCatchesRealMismatch(): string {
         return match ($this->id) {
             true => 'never',
+//          ^^^^ TypeDoesNotContainType: Type 'int|string' can never contain type 'true'
             default => 'x',
         };
     }
 }
 ===expect===
-TypeDoesNotContainType@51:12-51:16: Type 'int|string' can never contain type 'true'

@@ -14,6 +14,7 @@ class Calc {
 /** @param array{0: int, 1: string} $pair */
 function checksEachArg(Calc $c, array $pair): void {
     $c->needsTwoInts(...$pair);
+//                    ^^^^^^^ InvalidArgument: Argument $b of needsTwoInts() expects 'int', got 'string'
 }
 
 class Pair {
@@ -35,4 +36,3 @@ function infersTemplatesFromSpread(Pair $p): void {
     $_ = 1;
 }
 ===expect===
-InvalidArgument@8:22-8:29: Argument $b of needsTwoInts() expects 'int', got 'string'

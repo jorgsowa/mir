@@ -13,6 +13,6 @@ while (rand(0, 1)) {
     }
 
     $a = 3;
+//  ^^ UnusedVariable: Variable $a is never read
 }
 ===expect===
-UnusedVariable@12:4-12:6: Variable $a is never read

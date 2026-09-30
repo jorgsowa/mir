@@ -7,6 +7,6 @@ flagged undefined.
 <?php
 function f(): void {
     imap_open_not_a_real_function('x', 'y', 'z');
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function imap_open_not_a_real_function() is not defined
 }
 ===expect===
-UndefinedFunction@3:4-3:48: Function imap_open_not_a_real_function() is not defined

@@ -4,5 +4,5 @@ Bad fetch
 <?php
 $a = "hello";
 echo $a->foo;
+//   ^^^^^^^ InvalidPropertyFetch: Cannot fetch property on non-object type '"hello"'
 ===expect===
-InvalidPropertyFetch@3:5-3:12: Cannot fetch property on non-object type '"hello"'

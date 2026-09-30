@@ -13,12 +13,15 @@ function needs_string(string $s): void {}
 /** @param callable-string $fn */
 function test_not_callable_of_callable_string_is_redundant(mixed $fn): void {
     if (!is_callable($fn)) {}
+//      ^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
 }
 
 /** @param callable-string $fn */
 function test_callable_of_callable_string_is_redundant(mixed $fn): void {
     if (is_callable($fn)) {
+//      ^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         needs_int($fn);
+//                ^^^ InvalidArgument: Argument $i of needs_int() expects 'int', got 'callable-string'
     }
 }
 
@@ -26,6 +29,7 @@ function test_callable_of_callable_string_is_redundant(mixed $fn): void {
 function test_union_true_branch_narrows_out_int(mixed $x): void {
     if (is_callable($x)) {
         needs_int($x);
+//                ^^ InvalidArgument: Argument $i of needs_int() expects 'int', got 'callable-string'
     }
 }
 
@@ -33,11 +37,7 @@ function test_union_true_branch_narrows_out_int(mixed $x): void {
 function test_union_false_branch_narrows_out_callable_string(mixed $x): void {
     if (!is_callable($x)) {
         needs_string($x);
+//                   ^^ ArgumentTypeCoercion: Argument $s of needs_string() expects 'string', got 'int' — coercion may fail at runtime
     }
 }
 ===expect===
-RedundantCondition@8:8-8:25: Condition is always true/false for type 'bool'
-RedundantCondition@13:8-13:24: Condition is always true/false for type 'bool'
-InvalidArgument@14:18-14:21: Argument $i of needs_int() expects 'int', got 'callable-string'
-InvalidArgument@21:18-21:20: Argument $i of needs_int() expects 'int', got 'callable-string'
-ArgumentTypeCoercion@28:21-28:23: Argument $s of needs_string() expects 'string', got 'int' — coercion may fail at runtime

@@ -15,8 +15,8 @@ class B {
 function process(A|B $cell): void {
     if ($cell instanceof A) {
     } elseif ($cell->value !== null && $cell->value !== null) {
+//                                     ^^^^^^^^^^^^^^^^^^^^^ ImpossibleIdenticalComparison: '!==' between 'string' and 'null' is always true — these types can never be identical
         echo $cell->value;
     }
 }
 ===expect===
-ImpossibleIdenticalComparison@10:39-10:60: '!==' between 'string' and 'null' is always true — these types can never be identical

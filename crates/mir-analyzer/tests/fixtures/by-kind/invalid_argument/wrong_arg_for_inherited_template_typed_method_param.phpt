@@ -13,6 +13,6 @@ class IntBox extends Box {}
 function test(): void {
     $box = new IntBox();
     $box->set("hello");
+//            ^^^^^^^ InvalidArgument: Argument $value of set() expects 'int', got '"hello"'
 }
 ===expect===
-InvalidArgument@12:14-12:21: Argument $value of set() expects 'int', got '"hello"'

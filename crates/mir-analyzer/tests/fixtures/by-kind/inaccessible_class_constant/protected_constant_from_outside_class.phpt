@@ -7,5 +7,5 @@ class Config {
 }
 
 echo Config::INTERNAL;
+//           ^^^^^^^^ InaccessibleClassConstant: Cannot access constant Config::INTERNAL
 ===expect===
-InaccessibleClassConstant@6:13-6:21: Cannot access constant Config::INTERNAL

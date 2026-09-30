@@ -5,5 +5,5 @@ Mixed array offset
 /** @var mixed */
 $a = 5;
 echo [1, 2, 3, 4][$a];
+//                ^^ MixedArrayOffset: Mixed type used as array offset
 ===expect===
-MixedArrayOffset@4:18-4:20: Mixed type used as array offset

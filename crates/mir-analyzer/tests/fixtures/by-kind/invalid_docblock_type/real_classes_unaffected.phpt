@@ -12,7 +12,7 @@ suppress=UnusedParam
  * @return \Foo\Bar
  */
 function f($a, $e, $b, $c): string {
+//       ^ UndefinedDocblockClass: Docblock type 'Foo\Bar' does not exist
     return "x";
 }
 ===expect===
-UndefinedDocblockClass@9:9-9:10: Docblock type 'Foo\Bar' does not exist

@@ -6,6 +6,6 @@ class ActiveClass {}
 
 function test(): void {
     $obj = new ActiveClass();
+//  ^^^^ UnusedVariable: Variable $obj is never read
 }
 ===expect===
-UnusedVariable@5:4-5:8: Variable $obj is never read

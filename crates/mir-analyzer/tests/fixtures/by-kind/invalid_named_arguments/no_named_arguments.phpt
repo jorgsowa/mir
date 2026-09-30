@@ -10,5 +10,5 @@ function sum(int ...$values): int {
 }
 
 sum(a: 1);
+//  ^^^^ InvalidNamedArguments: sum() does not accept named arguments
 ===expect===
-InvalidNamedArguments@9:4-9:8: sum() does not accept named arguments

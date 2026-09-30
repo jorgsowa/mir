@@ -16,8 +16,8 @@ class Pipe {
     /** @psalm-external-mutation-free */
     public function transfer(Reader $r, Writer $w): void {
         $w->write($r->read());
+//      ^^^^^^^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method write() in a pure or immutable context
+//                ^^^^^^^^^^ ImpureMethodCall: Calling impure method read() in a pure or immutable context
     }
 }
 ===expect===
-ImpureMethodCall@14:8-14:29: Calling impure method write() in a pure or immutable context
-ImpureMethodCall@14:18-14:28: Calling impure method read() in a pure or immutable context

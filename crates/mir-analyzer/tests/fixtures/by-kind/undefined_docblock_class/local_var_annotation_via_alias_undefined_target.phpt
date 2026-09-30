@@ -13,6 +13,7 @@ class Repo {
     public function find(): void {
         /** @var Result $x */
         $x = fetchSomething();
+//      ^^^^^^^^^^^^^^^^^^^^^^ UndefinedDocblockClass: Docblock type 'TotallyMissingClass' does not exist
         $x->doStuff();
     }
 }
@@ -21,4 +22,3 @@ function fetchSomething(): mixed {
     return null;
 }
 ===expect===
-UndefinedDocblockClass@8:8-8:30: Docblock type 'TotallyMissingClass' does not exist

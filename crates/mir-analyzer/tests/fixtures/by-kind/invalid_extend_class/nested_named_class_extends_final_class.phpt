@@ -8,6 +8,6 @@ final class Base {}
 
 function make(): void {
     class Inner extends Base {}
+//                      ^^^^ InvalidExtendClass: Class Inner cannot extend final class Base
 }
 ===expect===
-InvalidExtendClass@6:24-6:28: Class Inner cannot extend final class Base

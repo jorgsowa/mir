@@ -9,6 +9,6 @@ function takesString(string $s): void { var_dump($s); }
 function getResult(): string|false { return 'x'; }
 function test(): void {
     takesString(getResult());
+//              ^^^^^^^^^^^ PossiblyInvalidArgument: Argument $s of takesString() expects 'string', possibly different type 'string|false' provided
 }
 ===expect===
-PossiblyInvalidArgument@6:16-6:27: Argument $s of takesString() expects 'string', possibly different type 'string|false' provided

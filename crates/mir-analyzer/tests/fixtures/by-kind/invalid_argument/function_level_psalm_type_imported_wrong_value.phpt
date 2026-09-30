@@ -18,5 +18,5 @@ class Logger {}
 function log(string $level): void {}
 
 log("trace");
+//  ^^^^^^^ InvalidArgument: Argument $level of log() expects '"debug"|"info"|"warning"|"error"', got '"trace"'
 ===expect===
-InvalidArgument@15:4-15:11: Argument $level of log() expects '"debug"|"info"|"warning"|"error"', got '"trace"'

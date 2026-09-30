@@ -15,5 +15,5 @@ class Child extends ParentClass {}
 $child = new Child();
 
 $child->setInts([1, 2, 3]);
+//              ^^^^^^^^^ InvalidArgument: Argument $foo of setInts() expects 'int', got 'array{0: 1, 1: 2, 2: 3}'
 ===expect===
-InvalidArgument@13:16-13:25: Argument $foo of setInts() expects 'int', got 'array{0: 1, 1: 2, 2: 3}'

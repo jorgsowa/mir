@@ -10,7 +10,7 @@ class Base {
 class Child extends Base {
     public function legacy(): void {
         echo parent::OLD;
+//                   ^^^ DeprecatedConstant: Constant Base::OLD is deprecated: use BASE_NEW instead
     }
 }
 ===expect===
-DeprecatedConstant@9:21-9:24: Constant Base::OLD is deprecated: use BASE_NEW instead

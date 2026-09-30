@@ -10,8 +10,8 @@ suppress=UnusedParam
 function test(): void {
     static $x = null;
     if ($x !== null) {
+//      ^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         echo 'unreachable';
     }
 }
 ===expect===
-RedundantCondition@4:8-4:19: Condition is always true/false for type 'bool'

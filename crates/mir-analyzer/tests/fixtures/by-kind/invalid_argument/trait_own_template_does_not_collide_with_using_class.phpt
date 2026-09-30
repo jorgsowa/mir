@@ -28,6 +28,6 @@ function takesString(string $x): void {}
 function f(Container $c): void {
     takesInt($c->value);
     takesString($c->traitValue);
+//              ^^^^^^^^^^^^^^ MixedArgument: Argument $x of takesString() is mixed
 }
 ===expect===
-MixedArgument@21:16-21:30: Argument $x of takesString() is mixed

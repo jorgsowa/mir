@@ -12,6 +12,6 @@ if (isInvalidString($myString)) {
     // do something
 } else {
     echo "Ma chaine " . $myString;
+//                      ^^^^^^^^^ PossiblyNullOperand: Operator '.' operand '"abacus"|null' might be null
 }
 ===expect===
-PossiblyNullOperand@11:24-11:33: Operator '.' operand '"abacus"|null' might be null

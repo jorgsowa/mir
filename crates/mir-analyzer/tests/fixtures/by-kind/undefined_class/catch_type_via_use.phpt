@@ -9,7 +9,7 @@ function f(): void {
     try {
         throw new \Exception();
     } catch (MyException $e) {
+//           ^^^^^^^^^^^ UndefinedClass: Class Vendor\Missing\MyException does not exist
     }
 }
 ===expect===
-UndefinedClass@6:13-6:24: Class Vendor\Missing\MyException does not exist

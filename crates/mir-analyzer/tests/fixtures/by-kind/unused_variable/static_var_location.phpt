@@ -4,6 +4,6 @@ Verify UnusedVariable location for static variable declaration.
 <?php
 function test(): void {
     static $count;
+//         ^^^^^^ UnusedVariable: Variable $count is never read
 }
 ===expect===
-UnusedVariable@3:11-3:17: Variable $count is never read

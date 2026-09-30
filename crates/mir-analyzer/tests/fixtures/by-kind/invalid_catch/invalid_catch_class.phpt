@@ -9,5 +9,5 @@ try {
     $worked = true;
 }
 catch (A $e) {}
+//     ^ InvalidCatch: Caught type 'A' does not extend Throwable
 ===expect===
-InvalidCatch@6:7-6:8: Caught type 'A' does not extend Throwable

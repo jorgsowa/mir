@@ -13,26 +13,31 @@ suppress=MissingReturnType,UnusedForeachValue,MixedAssignment,UnusedParam,Impure
 /** @pure */
 function concatByRef(string &$s): void {
     $s .= 'x';
+//  ^^^^^^^^^ ImpureByRefAssignment: Assigning to by-reference parameter $s in a @pure function
 }
 
 /** @pure */
 function incByRef(int &$n): void {
     $n++;
+//  ^^ ImpureByRefAssignment: Assigning to by-reference parameter $n in a @pure function
 }
 
 /** @pure */
 function arrWriteByRef(array &$arr): void {
     $arr['k'] = 1;
+//  ^^^^^^^^^^^^^ ImpureByRefAssignment: Assigning to by-reference parameter $arr in a @pure function
 }
 
 /** @pure */
 function unsetByRef(array &$arr): void {
     unset($arr['k']);
+//        ^^^^^^^^^ ImpureByRefAssignment: Assigning to by-reference parameter $arr in a @pure function
 }
 
 /** @pure */
 function foreachByRef(array &$arr): void {
     foreach ($arr as &$v) {
+//           ^^^^ ImpureByRefAssignment: Assigning to by-reference parameter $arr in a @pure function
         $v = 1;
     }
 }
@@ -40,11 +45,6 @@ function foreachByRef(array &$arr): void {
 /** @pure */
 function sortByRef(array &$arr): void {
     sort($arr);
+//       ^^^^ ImpureByRefAssignment: Assigning to by-reference parameter $arr in a @pure function
 }
 ===expect===
-ImpureByRefAssignment@4:4-4:13: Assigning to by-reference parameter $s in a @pure function
-ImpureByRefAssignment@9:4-9:6: Assigning to by-reference parameter $n in a @pure function
-ImpureByRefAssignment@14:4-14:17: Assigning to by-reference parameter $arr in a @pure function
-ImpureByRefAssignment@19:10-19:19: Assigning to by-reference parameter $arr in a @pure function
-ImpureByRefAssignment@24:13-24:17: Assigning to by-reference parameter $arr in a @pure function
-ImpureByRefAssignment@31:9-31:13: Assigning to by-reference parameter $arr in a @pure function

@@ -5,7 +5,7 @@ Two separate abstract class instantiations each produce their own AbstractInstan
 abstract class Alpha {}
 abstract class Beta {}
 new Alpha();
+//  ^^^^^ AbstractInstantiation: Cannot instantiate abstract class Alpha
 new Beta();
+//  ^^^^ AbstractInstantiation: Cannot instantiate abstract class Beta
 ===expect===
-AbstractInstantiation@4:4-4:9: Cannot instantiate abstract class Alpha
-AbstractInstantiation@5:4-5:8: Cannot instantiate abstract class Beta

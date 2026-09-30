@@ -5,8 +5,8 @@ does not exist anywhere in the codebase.
 <?php
 /** @return NonExistentReturnClass */
 function missing(): mixed {
+//       ^^^^^^^ UndefinedDocblockClass: Docblock type 'NonExistentReturnClass' does not exist
     return null;
 }
 
 ===expect===
-UndefinedDocblockClass@3:9-3:16: Docblock type 'NonExistentReturnClass' does not exist

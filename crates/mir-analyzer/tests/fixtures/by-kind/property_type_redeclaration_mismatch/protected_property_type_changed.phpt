@@ -8,6 +8,6 @@ class Base {
 
 class Derived extends Base {
     protected int $ratio = 1;
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^ PropertyTypeRedeclarationMismatch: Type of Derived::$ratio must be float (as in parent class), int given
 }
 ===expect===
-PropertyTypeRedeclarationMismatch@7:4-7:29: Type of Derived::$ratio must be float (as in parent class), int given

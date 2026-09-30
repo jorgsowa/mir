@@ -11,7 +11,7 @@ interface Storage {
 class Cache {
     public function clear(): void {
         $s = new Storage();
+//               ^^^^^^^ InterfaceInstantiation: Cannot instantiate interface Storage
     }
 }
 ===expect===
-InterfaceInstantiation@8:17-8:24: Cannot instantiate interface Storage

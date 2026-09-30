@@ -6,5 +6,5 @@ suppress=UnusedParam,UnusedFunction
 <?php
 use Swoole\Coroutine;
 function f(Coroutine $x): void {}
+//         ^^^^^^^^^ UndefinedClass: Class Swoole\Coroutine does not exist
 ===expect===
-UndefinedClass@3:11-3:20: Class Swoole\Coroutine does not exist

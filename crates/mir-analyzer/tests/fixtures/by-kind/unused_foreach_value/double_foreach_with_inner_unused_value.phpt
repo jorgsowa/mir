@@ -11,9 +11,9 @@ suppress=PossiblyUndefinedVariable,UnusedFunction
 function f(array $arr): array {
     foreach ($arr as $elt) {
         foreach ($elt as $subelt) {}
+//                       ^^^^^^^ UnusedForeachValue: Foreach value $subelt is never read
     }
     return $elt;
 }
 
 ===expect===
-UnusedForeachValue@8:25-8:32: Foreach value $subelt is never read

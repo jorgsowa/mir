@@ -3,7 +3,7 @@ Attribute invalid target function
 ===file===
 <?php
 #[Attribute]
+//^^^^^^^^^ InvalidAttribute: #[Attribute] can only be applied to classes, not functions
 function foo(): void {}
 
 ===expect===
-InvalidAttribute@2:2-2:11: #[Attribute] can only be applied to classes, not functions

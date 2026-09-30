@@ -11,7 +11,7 @@ class Bag {
 
     public function clear(): void {
         unset($this->x);
+//            ^^^^^^^^ ImmutablePropertyModification: Assigning to property x of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
     }
 }
 ===expect===
-ImmutablePropertyModification@8:14-8:22: Assigning to property x of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)

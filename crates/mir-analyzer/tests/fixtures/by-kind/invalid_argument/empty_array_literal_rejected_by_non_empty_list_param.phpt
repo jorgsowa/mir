@@ -15,9 +15,9 @@ function takesNonEmptyArray(array $counts): void {}
 
 takesNonEmptyList([1, 2, 3]);
 takesNonEmptyList([]);
+//                ^^ InvalidArgument: Argument $values of takesNonEmptyList() expects 'non-empty-list<int>', got 'array{}'
 
 takesNonEmptyArray(['a' => 1]);
 takesNonEmptyArray([]);
+//                 ^^ InvalidArgument: Argument $counts of takesNonEmptyArray() expects 'non-empty-array<string, int>', got 'array{}'
 ===expect===
-InvalidArgument@9:18-9:20: Argument $values of takesNonEmptyList() expects 'non-empty-list<int>', got 'array{}'
-InvalidArgument@12:19-12:21: Argument $counts of takesNonEmptyArray() expects 'non-empty-array<string, int>', got 'array{}'

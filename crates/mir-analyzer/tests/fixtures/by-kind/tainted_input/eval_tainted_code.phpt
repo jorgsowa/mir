@@ -9,10 +9,10 @@ suppress=MixedArgument,MixedArrayAccess,MixedAssignment,UnusedVariable
 function test(): void {
     $code = $_GET['code'];
     eval($code);
+//  ^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'eval'
 }
 
 function testSafe(): void {
     eval('1 + 1;');
 }
 ===expect===
-TaintedInput@4:4-4:15: Tainted input reaching sink 'eval'

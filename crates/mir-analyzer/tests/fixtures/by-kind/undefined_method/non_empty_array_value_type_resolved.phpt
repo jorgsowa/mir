@@ -15,7 +15,7 @@ function test(): void {
     $w = new Wrapper();
     foreach ($w->asMap() as $tag) {
         $tag->noSuchMethod();
+//      ^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Tag::noSuchMethod() does not exist
     }
 }
 ===expect===
-UndefinedMethod@14:8-14:28: Method Tag::noSuchMethod() does not exist

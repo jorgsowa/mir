@@ -9,9 +9,9 @@ suppress=UnusedVariable,PossiblyUndefinedVariable,MissingParamType
 function f($x): void {
     if (!isset($x) || class_exists(\Totally\Undefined\GuardLeak::class)) {
         new \Totally\Undefined\GuardLeak();
+//          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedClass: Class Totally\Undefined\GuardLeak does not exist
     }
     new \Totally\Undefined\GuardLeak();
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedClass: Class Totally\Undefined\GuardLeak does not exist
 }
 ===expect===
-UndefinedClass@4:12-4:40: Class Totally\Undefined\GuardLeak does not exist
-UndefinedClass@6:8-6:36: Class Totally\Undefined\GuardLeak does not exist

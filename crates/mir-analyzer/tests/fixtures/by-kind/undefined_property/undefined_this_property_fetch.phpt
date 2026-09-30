@@ -5,7 +5,7 @@ Undefined this property fetch
 class A {
     public function fooFoo(): void {
         echo $this->foo;
+//                  ^^^ UndefinedProperty: Property A::$foo does not exist
     }
 }
 ===expect===
-UndefinedProperty@4:20-4:23: Property A::$foo does not exist

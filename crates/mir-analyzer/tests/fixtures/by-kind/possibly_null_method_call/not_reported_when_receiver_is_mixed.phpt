@@ -22,6 +22,6 @@ class Bag {
 function run(Bag $bag): void
 {
     $bag->column->doSomething();
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ MixedMethodCall: Method doSomething() called on mixed type
 }
 ===expect===
-MixedMethodCall@17:4-17:31: Method doSomething() called on mixed type

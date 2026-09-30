@@ -9,7 +9,7 @@ class Consumer {
     public function run(): string {
         $cls = Loader::class;
         return $cls::getType();
+//             ^^^^^^^^^^^^^^^ AbstractMethodCall: Cannot call abstract method Loader::getType()
     }
 }
 ===expect===
-AbstractMethodCall@8:15-8:30: Cannot call abstract method Loader::getType()

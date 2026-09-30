@@ -15,7 +15,7 @@ class T {
     }
     public function run(): void {
         $this->foo->configure(new stdClass());
+//                            ^^^^^^^^^^^^^^ TooManyArguments: Too many arguments for configure(): expected 0, got 1
     }
 }
 ===expect===
-TooManyArguments@11:30-11:44: Too many arguments for configure(): expected 0, got 1

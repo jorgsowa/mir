@@ -16,6 +16,7 @@ class Holder {
 // Positive: reachable when $h is null.
 function instanceofFalseOnNullableReceiverReachable(?Holder $h): void {
     if (!($h->prop instanceof Bar)) {
+//        ^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $prop on possibly null value
         /** @mir-check $h->prop is Bar|null */
         $_ = 1;
     }
@@ -23,6 +24,8 @@ function instanceofFalseOnNullableReceiverReachable(?Holder $h): void {
 
 function isAFalseOnNullableReceiverReachable(?Holder $h): void {
     if (!is_a($h->prop, Bar::class)) {
+//            ^^^^^^^^ PossiblyNullArgument: Argument $object_or_class of is_a() might be null
+//            ^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $prop on possibly null value
         /** @mir-check $h->prop is Bar|null */
         $_ = 1;
     }
@@ -31,18 +34,15 @@ function isAFalseOnNullableReceiverReachable(?Holder $h): void {
 // Negative: a non-nullable receiver keeps the old, sound behavior.
 function instanceofFalseOnNonNullableReceiverDiverges(Holder $h): void {
     if (!($h->prop instanceof Bar)) {
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         echo "unreachable";
     }
 }
 
 function isAFalseOnNonNullableReceiverDiverges(Holder $h): void {
     if (!is_a($h->prop, Bar::class)) {
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         echo "unreachable";
     }
 }
 ===expect===
-PossiblyNullPropertyFetch@9:10-9:18: Cannot access property $prop on possibly null value
-PossiblyNullArgument@16:14-16:22: Argument $object_or_class of is_a() might be null
-PossiblyNullPropertyFetch@16:14-16:22: Cannot access property $prop on possibly null value
-RedundantCondition@24:8-24:34: Condition is always true/false for type 'bool'
-RedundantCondition@30:8-30:35: Condition is always true/false for type 'bool'

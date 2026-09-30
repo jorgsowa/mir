@@ -8,9 +8,9 @@ namespace Regression\DocblockTypePrecedence;
  * @param integer $value
  */
 function acceptsIntegerPseudo($value): void
+//                            ^^^^^^ UnusedParam: Parameter $value is never used
 {
 }
 
 acceptsIntegerPseudo(5);
 ===expect===
-UnusedParam@7:30-7:36: Parameter $value is never used

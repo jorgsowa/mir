@@ -3,6 +3,6 @@ Trait cannot be attribute class
 ===file===
 <?php
 #[Attribute]
+//^^^^^^^^^ InvalidAttribute: Traits cannot be attribute classes
 trait Foo {}
 ===expect===
-InvalidAttribute@2:2-2:11: Traits cannot be attribute classes

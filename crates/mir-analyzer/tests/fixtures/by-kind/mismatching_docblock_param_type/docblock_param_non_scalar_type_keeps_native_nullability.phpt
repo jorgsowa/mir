@@ -10,12 +10,12 @@ suppress=UnusedVariable
 <?php
 /** @param object ...$objects */
 function validate(?object ...$objects): void {
+//                           ^^^^^^^^ MismatchingDocblockParamType: Docblock type 'object' for $objects does not match inferred 'object|null'
     foreach ($objects as $obj) {
         if ($obj === null || $obj->foo) {
             $id = $obj !== null ? $obj->id : 'unknown';
+//          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MixedAssignment: Variable $id is assigned a mixed type
         }
     }
 }
 ===expect===
-MismatchingDocblockParamType@3:29-3:37: Docblock type 'object' for $objects does not match inferred 'object|null'
-MixedAssignment@6:12-6:54: Variable $id is assigned a mixed type

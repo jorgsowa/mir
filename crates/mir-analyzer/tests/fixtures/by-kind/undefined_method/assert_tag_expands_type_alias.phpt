@@ -21,6 +21,6 @@ function process($value): void {
     assertIsUser($value);
     $value->name();
     $value->missing();
+//  ^^^^^^^^^^^^^^^^^ UndefinedMethod: Method User::missing() does not exist
 }
 ===expect===
-UndefinedMethod@15:4-15:21: Method User::missing() does not exist

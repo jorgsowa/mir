@@ -4,10 +4,10 @@ Missing property type with constructor init and null default
 <?php
 class A {
     public $foo = null;
+//  ^^^^^^^^^^^^^^^^^^ MissingPropertyType: Property A::$foo has no type annotation
 
     public function __construct() {
         $this->foo = 5;
     }
 }
 ===expect===
-MissingPropertyType@3:4-3:22: Property A::$foo has no type annotation

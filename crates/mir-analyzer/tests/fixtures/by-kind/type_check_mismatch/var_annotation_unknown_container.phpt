@@ -10,8 +10,8 @@ class UserRepository {
 function main(mixed $container): void {
     /** @var UserRepository $repo */
     $repo = $container->get(UserRepository::class);
+//          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MixedMethodCall: Method get() called on mixed type
     /** @mir-check $repo is UserRepository */
     $repo->find(1);
 }
 ===expect===
-MixedMethodCall@7:12-7:50: Method get() called on mixed type

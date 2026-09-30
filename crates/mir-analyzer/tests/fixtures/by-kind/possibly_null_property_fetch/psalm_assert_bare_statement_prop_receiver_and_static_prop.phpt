@@ -22,14 +22,14 @@ function assertIsBar(mixed $x): void {}
 
 function narrowsPropReceiver(?Holder $h): void {
     assertIsBar($h->child);
+//              ^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $child on possibly null value
     $h->child->foo();
+//  ^^^^^^^^^^^^^^^^ UndefinedMethod: Method Bar::foo() does not exist
 }
 
 function narrowsStaticProp(): void {
     assertIsBar(Holder::$staticChild);
     Holder::$staticChild->foo();
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Bar::foo() does not exist
 }
 ===expect===
-PossiblyNullPropertyFetch@16:16-16:25: Cannot access property $child on possibly null value
-UndefinedMethod@17:4-17:20: Method Bar::foo() does not exist
-UndefinedMethod@22:4-22:31: Method Bar::foo() does not exist

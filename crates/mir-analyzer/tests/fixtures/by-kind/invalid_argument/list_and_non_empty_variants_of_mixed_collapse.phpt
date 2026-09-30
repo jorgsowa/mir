@@ -17,10 +17,10 @@ function h($c): void { $_ = $c; }
 
 function test(): void {
     f(new A());
+//    ^^^^^^^ InvalidArgument: Argument $a of f() expects 'list', got 'A'
     g(new A());
+//    ^^^^^^^ InvalidArgument: Argument $b of g() expects 'non-empty-list', got 'A'
     h(new A());
+//    ^^^^^^^ InvalidArgument: Argument $c of h() expects 'non-empty-array', got 'A'
 }
 ===expect===
-InvalidArgument@14:6-14:13: Argument $a of f() expects 'list', got 'A'
-InvalidArgument@15:6-15:13: Argument $b of g() expects 'non-empty-list', got 'A'
-InvalidArgument@16:6-16:13: Argument $c of h() expects 'non-empty-array', got 'A'

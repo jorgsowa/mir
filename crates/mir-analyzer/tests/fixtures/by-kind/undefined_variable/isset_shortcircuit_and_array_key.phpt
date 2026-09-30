@@ -4,7 +4,7 @@ isset($data) && $data->method() applies narrowing from LHS to method call in RHS
 ===file===
 <?php
 if (isset($data) && $data->method()) {
+//                  ^^^^^^^^^^^^^^^ MixedMethodCall: Method method() called on mixed type
     /** @mir-check $data is mixed */
 }
 ===expect===
-MixedMethodCall@2:20-2:35: Method method() called on mixed type

@@ -13,5 +13,5 @@ function process(callable $c): void {
 }
 
 process(function (int $a): void {});
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $c of process() expects 'callable whose parameter #1 accepts string', got 'callable whose parameter #1 only accepts int'
 ===expect===
-InvalidArgument@7:8-7:34: Argument $c of process() expects 'callable whose parameter #1 accepts string', got 'callable whose parameter #1 only accepts int'

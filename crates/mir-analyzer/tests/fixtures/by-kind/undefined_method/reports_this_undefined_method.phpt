@@ -5,7 +5,7 @@ reports this undefined method
 class Svc {
     public function run(): void {
         $this->nonExistent();
+//      ^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Svc::nonExistent() does not exist
     }
 }
 ===expect===
-UndefinedMethod@4:8-4:28: Method Svc::nonExistent() does not exist

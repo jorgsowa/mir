@@ -15,19 +15,19 @@ class Foo {
 
 function narrowsReceiver(?Foo $obj): void {
     if (class_exists($obj->className)) {
+//                   ^^^^^^^^^^^^^^^ PossiblyNullArgument: Argument $class of class_exists() might be null
+//                   ^^^^^^^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $className on possibly null value
         $obj->ping();
     }
 }
 
 function doesNotNarrowOutsideBranch(?Foo $obj): void {
     if (class_exists($obj->className)) {
+//                   ^^^^^^^^^^^^^^^ PossiblyNullArgument: Argument $class of class_exists() might be null
+//                   ^^^^^^^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $className on possibly null value
         $_ = 1;
     }
     $obj->ping();
+//  ^^^^^^^^^^^^ PossiblyNullMethodCall: Cannot call method ping() on possibly null value
 }
 ===expect===
-PossiblyNullArgument@9:21-9:36: Argument $class of class_exists() might be null
-PossiblyNullPropertyFetch@9:21-9:36: Cannot access property $className on possibly null value
-PossiblyNullArgument@15:21-15:36: Argument $class of class_exists() might be null
-PossiblyNullPropertyFetch@15:21-15:36: Cannot access property $className on possibly null value
-PossiblyNullMethodCall@18:4-18:16: Cannot call method ping() on possibly null value

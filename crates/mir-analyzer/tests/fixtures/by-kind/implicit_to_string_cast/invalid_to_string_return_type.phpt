@@ -4,6 +4,6 @@ Invalid to string return type
 <?php
 class A {
     function __toString(): void { }
+//                              ^^^ InvalidToString: Method A::__toString() must return a string
 }
 ===expect===
-InvalidToString@3:32-3:35: Method A::__toString() must return a string

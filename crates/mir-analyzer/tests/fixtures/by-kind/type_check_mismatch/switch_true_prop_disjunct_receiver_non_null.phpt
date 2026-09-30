@@ -29,6 +29,7 @@ function pureInstanceofDisjunctUnion(?Box $x): void {
 function mixedDisjunctCaseOrderA(?Box $x): void {
     switch (true) {
         case is_null($x->value):
+//                   ^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $value on possibly null value
         case $x->value instanceof Foo:
             /** @mir-check $x is Box|null */
             $_ = $x;
@@ -39,10 +40,9 @@ function mixedDisjunctCaseOrderB(?Box $x): void {
     switch (true) {
         case $x->value instanceof Foo:
         case is_null($x->value):
+//                   ^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $value on possibly null value
             /** @mir-check $x is Box|null */
             $_ = $x;
     }
 }
 ===expect===
-PossiblyNullPropertyFetch@20:21-20:30: Cannot access property $value on possibly null value
-PossiblyNullPropertyFetch@30:21-30:30: Cannot access property $value on possibly null value

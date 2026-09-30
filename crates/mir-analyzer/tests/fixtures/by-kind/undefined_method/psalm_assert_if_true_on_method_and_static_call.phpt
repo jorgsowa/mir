@@ -34,6 +34,7 @@ function test_instance_call(Checker $c, mixed $value): void {
     if ($c->isUserInstance($value)) {
         $value->name();
         $value->missing();
+//      ^^^^^^^^^^^^^^^^^ UndefinedMethod: Method User::missing() does not exist
     }
 }
 
@@ -41,6 +42,7 @@ function test_static_call(mixed $value): void {
     if (Checker::isUserStatic($value)) {
         $value->name();
         $value->missing();
+//      ^^^^^^^^^^^^^^^^^ UndefinedMethod: Method User::missing() does not exist
     }
 }
 
@@ -55,8 +57,6 @@ function test_unguarded_stays_mixed(Checker $c, mixed $value): void {
     // No `if` guard — assertion never applies, $value stays mixed.
     $c->isUserInstance($value);
     $value->missing();
+//  ^^^^^^^^^^^^^^^^^ MixedMethodCall: Method missing() called on mixed type
 }
 ===expect===
-UndefinedMethod@26:8-26:25: Method User::missing() does not exist
-UndefinedMethod@33:8-33:25: Method User::missing() does not exist
-MixedMethodCall@47:4-47:21: Method missing() called on mixed type

@@ -24,6 +24,7 @@ function intComparisonNarrowsReceiverEvenWhenMixed(?Box $x): void {
 
 function countComparisonNarrowsReceiverEvenWhenMixed(?Box $x): void {
     if (count($x->items) > 0) {
+//            ^^^^^^^^^ MixedArgument: Argument $value of count() is mixed
         /** @mir-check $x is Box */
         $_ = 1;
     }
@@ -31,10 +32,9 @@ function countComparisonNarrowsReceiverEvenWhenMixed(?Box $x): void {
 
 function strlenNonEmptyNarrowsReceiverEvenWhenMixed(?Box $x): void {
     if (strlen($x->name) > 0) {
+//             ^^^^^^^^ MixedArgument: Argument $string of strlen() is mixed
         /** @mir-check $x is Box */
         $_ = 1;
     }
 }
 ===expect===
-MixedArgument@18:14-18:23: Argument $value of count() is mixed
-MixedArgument@25:15-25:23: Argument $string of strlen() is mixed

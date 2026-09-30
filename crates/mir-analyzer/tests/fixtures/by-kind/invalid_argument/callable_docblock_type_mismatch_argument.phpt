@@ -8,6 +8,6 @@ now gets full argument-type checking, not just arity.
  */
 function apply(callable $fn): void {
     $fn('not an int');
+//      ^^^^^^^^^^^^ InvalidArgument: Argument $arg0 of callable() expects 'int', got '"not an int"'
 }
 ===expect===
-InvalidArgument@6:8-6:20: Argument $arg0 of callable() expects 'int', got '"not an int"'

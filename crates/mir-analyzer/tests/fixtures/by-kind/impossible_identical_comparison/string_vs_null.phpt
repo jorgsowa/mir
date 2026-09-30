@@ -6,7 +6,7 @@ suppress=UnusedVariable,UnusedParam
 <?php
 function test(string $s): void {
     if ($s === null) {}
+//      ^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between 'string' and 'null' is always false — these types can never be identical
+//      ^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
 }
 ===expect===
-ImpossibleIdenticalComparison@3:8-3:19: '===' between 'string' and 'null' is always false — these types can never be identical
-RedundantCondition@3:8-3:19: Condition is always true/false for type 'bool'

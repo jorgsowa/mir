@@ -6,5 +6,5 @@ suppress=UnusedVariable
 <?php
 use Vendor\Missing\Foo;
 $fn = function(Foo $x): void {};
+//             ^^^ UndefinedClass: Class Vendor\Missing\Foo does not exist
 ===expect===
-UndefinedClass@3:15-3:18: Class Vendor\Missing\Foo does not exist

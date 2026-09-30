@@ -14,6 +14,6 @@ class Tally {
 /** @pure */
 function bump(Tally $t): void {
     $t->counts['x']++;
+//  ^^^^^^^^^^^^^^^ ImpurePropertyAssignment: Assigning to property counts of a parameter in a pure or external-mutation-free context
 }
 ===expect===
-ImpurePropertyAssignment@8:4-8:19: Assigning to property counts of a parameter in a pure or external-mutation-free context

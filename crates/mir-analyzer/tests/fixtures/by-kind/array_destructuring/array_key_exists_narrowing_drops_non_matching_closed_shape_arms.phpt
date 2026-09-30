@@ -26,8 +26,8 @@ function narrows_union(array $arr): void {
 function single_shape_stays_lenient(array $arr): void {
     if (array_key_exists('favicon', $arr)) {
         $val = $arr['favicon'];
+//      ^^^^^^^^^^^^^^^^^^^^^^ MixedAssignment: Variable $val is assigned a mixed type
         echo 1;
     }
 }
 ===expect===
-MixedAssignment@18:8-18:30: Variable $val is assigned a mixed type

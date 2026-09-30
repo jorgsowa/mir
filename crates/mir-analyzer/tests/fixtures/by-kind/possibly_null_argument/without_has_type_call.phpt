@@ -6,6 +6,6 @@ $method = new ReflectionMethod(stdClass::class);
 $parameters = $method->getParameters();
 foreach ($parameters as $parameter) {
     $parameter->getType()->__toString();
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PossiblyNullMethodCall: Cannot call method __toString() on possibly null value
 }
 ===expect===
-PossiblyNullMethodCall@5:4-5:39: Cannot call method __toString() on possibly null value

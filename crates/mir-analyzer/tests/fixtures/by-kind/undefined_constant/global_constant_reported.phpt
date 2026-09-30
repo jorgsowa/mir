@@ -4,6 +4,6 @@ global constant reported
 <?php
 function test(): void {
     echo UNDEFINED_CONST;
+//       ^^^^^^^^^^^^^^^ UndefinedConstant: Constant UNDEFINED_CONST is not defined
 }
 ===expect===
-UndefinedConstant@3:9-3:24: Constant UNDEFINED_CONST is not defined

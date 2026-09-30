@@ -27,8 +27,8 @@ class Widened extends P {
 }
 class Narrowed extends P {
     public function byIds(int ...$ids): int { return count($ids); }
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method Narrowed::byids() signature mismatch: parameter $ids type 'int' is incompatible with parent type 'non-empty-string'
     public function byElement(string ...$ids): int { return count($ids); }
     public function narrowed(string ...$ids): int { return count($ids); }
 }
 ===expect===
-MethodSignatureMismatch@26:4-26:67: Method Narrowed::byids() signature mismatch: parameter $ids type 'int' is incompatible with parent type 'non-empty-string'

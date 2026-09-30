@@ -16,7 +16,7 @@ foreach ([new Item()] as $item) {
 // After loop, $result should be just string, not string|null
 // because the loop is guaranteed to execute
 if (is_string($result)) {
+//  ^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
     echo $result;
 }
 ===expect===
-RedundantCondition@15:4-15:22: Condition is always true/false for type 'bool'

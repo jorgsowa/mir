@@ -9,7 +9,7 @@ try {
 } catch (\Error $e) {
     echo $e->getMessage();
 } catch (\TypeError $e) {
+//       ^^^^^^^^^^ UnreachableCatch: Catch block for 'TypeError' is unreachable — already caught by 'Error'
     echo $e->getMessage();
 }
 ===expect===
-UnreachableCatch@6:9-6:19: Catch block for 'TypeError' is unreachable — already caught by 'Error'

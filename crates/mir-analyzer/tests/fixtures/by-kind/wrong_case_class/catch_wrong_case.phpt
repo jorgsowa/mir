@@ -8,6 +8,6 @@ class AppException extends \RuntimeException {}
 try {
     throw new AppException("err");
 } catch (appexception $e) {
+//       ^^^^^^^^^^^^ WrongCaseClass: Class name 'appexception' has incorrect casing; use 'AppException'
 }
 ===expect===
-WrongCaseClass@5:9-5:21: Class name 'appexception' has incorrect casing; use 'AppException'

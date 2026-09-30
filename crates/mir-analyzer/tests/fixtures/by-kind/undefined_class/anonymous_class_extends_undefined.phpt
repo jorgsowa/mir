@@ -6,5 +6,5 @@ suppress=UnusedVariable
 ===file===
 <?php
 $x = new class extends UndefinedBase {};
+//                     ^^^^^^^^^^^^^ UndefinedClass: Class UndefinedBase does not exist
 ===expect===
-UndefinedClass@2:23-2:36: Class UndefinedBase does not exist

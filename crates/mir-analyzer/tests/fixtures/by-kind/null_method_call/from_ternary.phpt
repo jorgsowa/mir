@@ -7,7 +7,7 @@ diagnostic is also raised because stdClass::foo() does not exist.
 function test(bool $flag): void {
     $x = $flag ? new stdClass() : null;
     $x->foo();
+//  ^^^^^^^^^ PossiblyNullMethodCall: Cannot call method foo() on possibly null value
+//  ^^^^^^^^^ UndefinedMethod: Method stdClass::foo() does not exist
 }
 ===expect===
-PossiblyNullMethodCall@4:4-4:13: Cannot call method foo() on possibly null value
-UndefinedMethod@4:4-4:13: Method stdClass::foo() does not exist

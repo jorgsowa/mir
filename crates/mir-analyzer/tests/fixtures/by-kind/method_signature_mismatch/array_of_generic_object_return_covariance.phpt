@@ -26,6 +26,6 @@ class ValidImpl extends Base {
 class InvalidImpl extends Base {
     /** @return array<int, Unrelated> */
     public function make(): array { return []; }
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method InvalidImpl::make() signature mismatch: return type 'array<int, Unrelated>' is not a subtype of parent 'array<int, Animal>'
 }
 ===expect===
-MethodSignatureMismatch@21:4-21:48: Method InvalidImpl::make() signature mismatch: return type 'array<int, Unrelated>' is not a subtype of parent 'array<int, Animal>'

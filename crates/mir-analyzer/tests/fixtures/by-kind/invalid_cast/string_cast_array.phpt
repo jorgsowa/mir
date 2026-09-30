@@ -6,6 +6,6 @@ suppress=UnusedVariable
 ===file===
 <?php
 $x = (string)[];
+//           ^^ InvalidCast: Cannot cast 'array{}' to 'string'
 
 ===expect===
-InvalidCast@2:13-2:15: Cannot cast 'array{}' to 'string'

@@ -28,9 +28,9 @@ class AChild extends A {
 function foo(A $a) : void {
     if ($a->hasA()) {
         echo strlen($a->getA());
+//                  ^^^^^^^^^^ PossiblyNullArgument: Argument $string of strlen() might be null
     }
 }
 
 foo(new AChild());
 ===expect===
-PossiblyNullArgument@25:20-25:30: Argument $string of strlen() might be null

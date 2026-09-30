@@ -10,18 +10,18 @@ suppress=MixedArrayAccess,MixedReturnStatement,MixedAssignment
 /** @pure */
 function readSession(): int {
     return $_SESSION['x'];
+//         ^^^^^^^^^^^^^^ ImpureGlobalVariable: Using global variable $x in a @pure function
 }
 
 /** @pure */
 function writeSession(int $n): void {
     $_SESSION['x'] = $n;
+//  ^^^^^^^^^^^^^^^^^^^ ImpureGlobalVariable: Using global variable $x in a @pure function
 }
 
 /** @pure */
 function readEnv(): string {
     return $_ENV['HOME'];
+//         ^^^^^^^^^^^^^ ImpureGlobalVariable: Using global variable $HOME in a @pure function
 }
 ===expect===
-ImpureGlobalVariable@4:11-4:25: Using global variable $x in a @pure function
-ImpureGlobalVariable@9:4-9:23: Using global variable $x in a @pure function
-ImpureGlobalVariable@14:11-14:24: Using global variable $HOME in a @pure function

@@ -26,6 +26,6 @@ class Http {
 function leak(): void {
     $http = new Http();
     echo $http->params()->get('id');
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 ===expect===
-TaintedHtml@17:4-17:36: Tainted HTML output — possible XSS

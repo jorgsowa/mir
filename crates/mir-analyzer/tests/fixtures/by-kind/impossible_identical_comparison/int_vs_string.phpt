@@ -6,8 +6,8 @@ suppress=UnusedVariable,UnusedParam
 <?php
 function test(int $x): void {
     if ($x === "hello") {}
+//      ^^^^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between 'int' and '"hello"' is always false — these types can never be identical
     if ($x !== "world") {}
+//      ^^^^^^^^^^^^^^ ImpossibleIdenticalComparison: '!==' between 'int' and '"world"' is always true — these types can never be identical
 }
 ===expect===
-ImpossibleIdenticalComparison@3:8-3:22: '===' between 'int' and '"hello"' is always false — these types can never be identical
-ImpossibleIdenticalComparison@4:8-4:22: '!==' between 'int' and '"world"' is always true — these types can never be identical

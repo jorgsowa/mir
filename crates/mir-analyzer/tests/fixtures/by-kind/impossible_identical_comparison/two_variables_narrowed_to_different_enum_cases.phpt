@@ -14,8 +14,8 @@ enum Suit {
 function f(Suit $a, Suit $b): bool {
     if ($a === Suit::Hearts && $b === Suit::Spades) {
         return $a === $b;
+//             ^^^^^^^^^ ImpossibleIdenticalComparison: '===' between 'Suit::Hearts' and 'Suit::Spades' is always false — these types can never be identical
     }
     return false;
 }
 ===expect===
-ImpossibleIdenticalComparison@9:15-9:24: '===' between 'Suit::Hearts' and 'Suit::Spades' is always false — these types can never be identical

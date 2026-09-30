@@ -9,7 +9,7 @@ suppress=UnusedVariable
 $obj = new class {
     public function build(): void {
         parent::build();
+//      ^^^^^^ ParentNotFound: Cannot use parent:: when current class has no parent
     }
 };
 ===expect===
-ParentNotFound@5:8-5:14: Cannot use parent:: when current class has no parent

@@ -8,6 +8,6 @@ declare(strict_types=1);
 
 function isMatch(string $subject, string $pattern): bool {
     return preg_match($pattern, $subject);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'int<0, 1>|false' is not compatible with declared 'bool'
 }
 ===expect===
-InvalidReturnType@5:4-5:42: Return type 'int<0, 1>|false' is not compatible with declared 'bool'

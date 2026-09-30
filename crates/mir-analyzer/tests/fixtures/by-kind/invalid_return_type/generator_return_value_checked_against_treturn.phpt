@@ -7,6 +7,6 @@ A generator's `return <expr>;` is still checked, but against the declared
 function gen(): \Generator {
     yield 'a';
     return "not a bool";
+//  ^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type '"not a bool"' is not compatible with declared 'bool'
 }
 ===expect===
-InvalidReturnType@5:4-5:24: Return type '"not a bool"' is not compatible with declared 'bool'

@@ -9,8 +9,8 @@ final class C {
     public const MAP = ['a' => 1, 'b' => 2];
     public static function g(): int {
         return self::MAP['nope'];
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'int'
+//                       ^^^^^^ NonExistentArrayOffset: Array offset 'nope' does not exist
     }
 }
 ===expect===
-MixedReturnStatement@5:8-5:33: Cannot return a mixed type from function with declared return type 'int'
-NonExistentArrayOffset@5:25-5:31: Array offset 'nope' does not exist

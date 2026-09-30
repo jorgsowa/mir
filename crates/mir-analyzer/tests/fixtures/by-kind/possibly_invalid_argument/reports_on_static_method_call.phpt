@@ -11,6 +11,6 @@ class Converter {
 function readInput(): string|false { return 'data'; }
 function test(): void {
     Converter::process(readInput());
+//                     ^^^^^^^^^^^ PossiblyInvalidArgument: Argument $s of process() expects 'string', possibly different type 'string|false' provided
 }
 ===expect===
-PossiblyInvalidArgument@8:23-8:34: Argument $s of process() expects 'string', possibly different type 'string|false' provided

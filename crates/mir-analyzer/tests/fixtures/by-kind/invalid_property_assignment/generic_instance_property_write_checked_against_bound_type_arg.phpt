@@ -24,6 +24,6 @@ class Box {
 function bad(): void {
     $b = new Box(42);
     $b->value = 'not an int';
+//  ^^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $value expects 'int', cannot assign '"not an int"'
 }
 ===expect===
-InvalidPropertyAssignment@18:4-18:28: Property $value expects 'int', cannot assign '"not an int"'

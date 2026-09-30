@@ -8,6 +8,6 @@ function foo(int $n): void {
 }
 
 foo(3.7);
+//  ^^^ ImplicitFloatToIntCast: Implicit cast from 3.7 to int truncates the fractional part
 
 ===expect===
-ImplicitFloatToIntCast@6:4-6:7: Implicit cast from 3.7 to int truncates the fractional part

@@ -11,5 +11,5 @@ declare(strict_types=1);
 function takes_string(string $s): void { echo $s; }
 
 takes_string(1);
+//           ^ InvalidArgument: Argument $s of takes_string() expects 'string', got '1'
 ===expect===
-InvalidArgument@7:13-7:14: Argument $s of takes_string() expects 'string', got '1'

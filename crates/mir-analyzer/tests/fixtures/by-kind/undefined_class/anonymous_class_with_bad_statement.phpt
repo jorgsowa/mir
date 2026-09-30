@@ -7,7 +7,7 @@ suppress=UnusedVariable
 $foo = new class {
     public function a() {
         new B();
+//          ^ UndefinedClass: Class B does not exist
     }
 };
 ===expect===
-UndefinedClass@4:12-4:13: Class B does not exist

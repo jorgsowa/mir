@@ -6,6 +6,6 @@ interface B {}
 
 class A {
     use B;
+//      ^ InvalidTraitUse: Trait B used incorrectly: B is an interface, not a trait
 }
 ===expect===
-InvalidTraitUse@5:8-5:9: Trait B used incorrectly: B is an interface, not a trait

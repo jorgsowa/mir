@@ -21,10 +21,10 @@ abstract class Option {
             /** @return NotARealClass */
             static function (self $o) {
                 return $o->get();
+//              ^^^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'PhpOption\NotARealClass'
             },
             $args
         );
     }
 }
 ===expect===
-MixedReturnStatement@13:16-13:33: Cannot return a mixed type from function with declared return type 'PhpOption\NotARealClass'

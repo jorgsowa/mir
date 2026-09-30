@@ -13,6 +13,7 @@ class B extends A {
     public function foo(array|string $param): void {
         if (is_array($param)) $param = json_encode($param);
         parent::foo($param);
+//                  ^^^^^^ PossiblyInvalidArgument: Argument $param of foo() expects 'string', possibly different type 'string|false' provided
     }
 }
 
@@ -24,4 +25,3 @@ class C extends B {
     }
 }
 ===expect===
-PossiblyInvalidArgument@10:20-10:26: Argument $param of foo() expects 'string', possibly different type 'string|false' provided

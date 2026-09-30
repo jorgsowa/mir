@@ -5,7 +5,7 @@ ParentNotFound fires when parent:: is used in a class with no parent.
 class Orphan {
     public function build(): void {
         parent::build();
+//      ^^^^^^ ParentNotFound: Cannot use parent:: when current class has no parent
     }
 }
 ===expect===
-ParentNotFound@4:8-4:14: Cannot use parent:: when current class has no parent

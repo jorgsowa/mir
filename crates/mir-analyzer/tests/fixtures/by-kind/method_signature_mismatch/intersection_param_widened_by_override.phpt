@@ -30,6 +30,6 @@ final class Impl implements Logger {
     public function warn(iterable $context): void {}
     public function err(?array $context): void {}
     public function bad(string $context): void {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method Impl::bad() signature mismatch: parameter $context type 'string' is incompatible with parent type 'array<string, mixed>&array{'actor': array{'id': int|string}&array<string, mixed>}'
 }
 ===expect===
-MethodSignatureMismatch@25:4-25:49: Method Impl::bad() signature mismatch: parameter $context type 'string' is incompatible with parent type 'array<string, mixed>&array{'actor': array{'id': int|string}&array<string, mixed>}'

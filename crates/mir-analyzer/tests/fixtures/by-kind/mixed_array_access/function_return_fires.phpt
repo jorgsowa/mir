@@ -6,5 +6,5 @@ function getMixed(): mixed {
     return [];
 }
 echo getMixed()[0];
+//   ^^^^^^^^^^^^^ MixedArrayAccess: Array access on mixed type
 ===expect===
-MixedArrayAccess@5:5-5:18: Array access on mixed type

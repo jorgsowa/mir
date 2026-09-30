@@ -17,6 +17,6 @@ function test(?Bar $x): void {
     assert_not_null($x);
     $x->ping();
     $x->missing();
+//  ^^^^^^^^^^^^^ UndefinedMethod: Method Bar::missing() does not exist
 }
 ===expect===
-UndefinedMethod@16:4-16:17: Method Bar::missing() does not exist

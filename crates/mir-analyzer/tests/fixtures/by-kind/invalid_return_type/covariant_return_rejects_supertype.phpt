@@ -18,6 +18,6 @@ function make(): Box {
     /** @var Box<Dog> $b */
     $b = new Box();
     return $b;
+//  ^^^^^^^^^^ InvalidReturnType: Return type 'Box<Dog>' is not compatible with declared 'Box<Cat>'
 }
 ===expect===
-InvalidReturnType@15:4-15:14: Return type 'Box<Dog>' is not compatible with declared 'Box<Cat>'

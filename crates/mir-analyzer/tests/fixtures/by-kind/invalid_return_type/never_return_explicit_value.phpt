@@ -8,23 +8,23 @@ static-analysis check).
 
 function returns_string(): never {
     return "hello";
+//  ^^^^^^^^^^^^^^^ ParseError: Parse error: A never-returning function must not return
 }
 
 function returns_int(): never {
     return 42;
+//  ^^^^^^^^^^ ParseError: Parse error: A never-returning function must not return
 }
 
 function returns_null(): never {
     return null;
+//  ^^^^^^^^^^^^ ParseError: Parse error: A never-returning function must not return
 }
 
 class Foo {
     public function method_returns_value(): never {
         return true;
+//      ^^^^^^^^^^^^ ParseError: Parse error: A never-returning function must not return
     }
 }
 ===expect===
-ParseError@4:4-4:19: Parse error: A never-returning function must not return
-ParseError@8:4-8:14: Parse error: A never-returning function must not return
-ParseError@12:4-12:16: Parse error: A never-returning function must not return
-ParseError@17:8-17:20: Parse error: A never-returning function must not return

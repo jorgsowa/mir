@@ -14,7 +14,7 @@ class NewApi {
 function check(): void {
     if (class_exists('NewApi')) {
         NewApi::run(1);
+//      ^^^^^^^^^^^^^^ TooFewArguments: Too few arguments for run(): expected 2, got 1
     }
 }
 ===expect===
-TooFewArguments@8:8-8:22: Too few arguments for run(): expected 2, got 1

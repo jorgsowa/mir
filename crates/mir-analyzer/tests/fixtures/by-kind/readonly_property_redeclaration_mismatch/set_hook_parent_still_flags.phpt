@@ -12,9 +12,9 @@ class Base {
 
 class Child extends Base {
     public readonly int $x;
+//  ^^^^^^^^^^^^^^^^^^^^^^^ ReadonlyPropertyRedeclarationMismatch: Cannot redeclare non-readonly property Base::$x as readonly Child::$x
     public function __construct() {
         $this->x = 1;
     }
 }
 ===expect===
-ReadonlyPropertyRedeclarationMismatch@11:4-11:27: Cannot redeclare non-readonly property Base::$x as readonly Child::$x

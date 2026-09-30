@@ -12,6 +12,6 @@ function foo(int $x): string {
             // no break — falls through to end of switch
     }
     return $y;
+//         ^^ PossiblyUndefinedVariable: Variable $y might not be defined
 }
 ===expect===
-PossiblyUndefinedVariable@11:11-11:13: Variable $y might not be defined

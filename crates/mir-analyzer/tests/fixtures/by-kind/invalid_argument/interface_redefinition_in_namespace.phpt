@@ -5,6 +5,6 @@ Interface redefinition in namespace
 namespace Aye {
     interface Foo {}
     interface Foo {}
+//  ^^^^^^^^^^^^^^^^ DuplicateInterface: Interface Aye\Foo has already been defined
 }
 ===expect===
-DuplicateInterface@4:4-4:20: Interface Aye\Foo has already been defined

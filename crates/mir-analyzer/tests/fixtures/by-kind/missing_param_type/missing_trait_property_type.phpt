@@ -4,10 +4,10 @@ Missing trait property type
 <?php
 trait T {
     public $foo = 5;
+//  ^^^^^^^^^^^^^^^ MissingPropertyType: Property T::$foo has no type annotation
 }
 
 class A {
     use T;
 }
 ===expect===
-MissingPropertyType@3:4-3:19: Property T::$foo has no type annotation

@@ -7,6 +7,6 @@ function test(): int {
     /** @var bool $b */
     $b = true;
     return $b;
+//  ^^^^^^^^^^ InvalidReturnType: Return type 'bool' is not compatible with declared 'int'
 }
 ===expect===
-InvalidReturnType@5:4-5:14: Return type 'bool' is not compatible with declared 'int'

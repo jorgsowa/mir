@@ -27,6 +27,7 @@ function checksPropertyDirectlyMismatch(Holder $h): void {
     if ($h->flag === true) {
         /** @mir-check $h->flag is false */
         $_ = null;
+//      ^^^^^^^^^^ TypeCheckMismatch: Type of $h->flag is expected to be false, got true
     }
 }
 
@@ -47,6 +48,7 @@ function checksArrayShapeKeyDirectlyMismatch(array $arr): void {
     if (isset($arr['age'])) {
         /** @mir-check $arr['age'] is string */
         $_ = null;
+//      ^^^^^^^^^^ TypeCheckMismatch: Type of $arr['age'] is expected to be string, got int
     }
 }
 
@@ -64,6 +66,7 @@ function checksNestedShapeKeyDirectly(array $arr): void {
 function checksNestedShapeKeyDirectlyMismatch(array $arr): void {
     /** @mir-check $arr['a']['b'] is string */
     $_ = null;
+//  ^^^^^^^^^^ TypeCheckMismatch: Type of $arr['a']['b'] is expected to be string, got int
 }
 
 class Service {
@@ -80,6 +83,7 @@ class Service {
         if (self::$name !== null) {
             /** @mir-check self::$name is int */
             $_ = null;
+//          ^^^^^^^^^^ TypeCheckMismatch: Type of self::$name is expected to be int, got string
         }
     }
 
@@ -96,6 +100,7 @@ function checksMethodCallReturnTypeDirectly(Service $s): void {
 function checksMethodCallReturnTypeDirectlyMismatch(Service $s): void {
     /** @mir-check $s->getStatus() is int */
     $_ = null;
+//  ^^^^^^^^^^ TypeCheckMismatch: Type of $s->getStatus() is expected to be int, got string
 }
 
 class Inner {
@@ -119,6 +124,7 @@ function checksChainedPropertyDirectly(Outer $o): void {
 function checksChainedPropertyDirectlyMismatch(Outer $o): void {
     /** @mir-check $o->inner->value is true */
     $_ = null;
+//  ^^^^^^^^^^ TypeCheckMismatch: Type of $o->inner->value is expected to be true, got bool|string
 }
 
 function checksNullsafeChainDirectly(?Inner $i): void {
@@ -132,6 +138,7 @@ function checksNullsafeChainDirectlyMismatch(?Inner $i): void {
     if ($i?->value !== null) {
         /** @mir-check $i?->value is int */
         $_ = null;
+//      ^^^^^^^^^^ TypeCheckMismatch: Type of $i?->value is expected to be int, got bool|string
     }
 }
 
@@ -142,13 +149,6 @@ function checksNullsafeChainDirectlyMismatch(?Inner $i): void {
 function checksMalformedExprFallsBackToMixed(): void {
     /** @mir-check $ is int */
     $_ = null;
+//  ^^^^^^^^^^ TypeCheckMismatch: Type of $ is expected to be int, got mixed
 }
 ===expect===
-TypeCheckMismatch@17:8-17:18: Type of $h->flag is expected to be false, got true
-TypeCheckMismatch@37:8-37:18: Type of $arr['age'] is expected to be string, got int
-TypeCheckMismatch@54:4-54:14: Type of $arr['a']['b'] is expected to be string, got int
-TypeCheckMismatch@70:12-70:22: Type of self::$name is expected to be int, got string
-TypeCheckMismatch@86:4-86:14: Type of $s->getStatus() is expected to be int, got string
-TypeCheckMismatch@109:4-109:14: Type of $o->inner->value is expected to be true, got bool|string
-TypeCheckMismatch@122:8-122:18: Type of $i?->value is expected to be int, got bool|string
-TypeCheckMismatch@132:4-132:14: Type of $ is expected to be int, got mixed

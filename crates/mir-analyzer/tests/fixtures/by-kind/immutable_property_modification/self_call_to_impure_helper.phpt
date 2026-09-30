@@ -12,12 +12,12 @@ class C {
 
     public function f(): void {
         self::mutateHelper();
+//      ^^^^^^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method mutateHelper() in a pure or immutable context
     }
 
     public function mutateHelper(): void {
         $this->x = 1;
+//      ^^^^^^^^^^^^ ImmutablePropertyModification: Assigning to property x of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
     }
 }
 ===expect===
-ImpureMethodCall@7:8-7:28: Calling impure method mutateHelper() in a pure or immutable context
-ImmutablePropertyModification@11:8-11:20: Assigning to property x of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)

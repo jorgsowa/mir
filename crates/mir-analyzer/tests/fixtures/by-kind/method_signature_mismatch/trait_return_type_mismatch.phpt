@@ -9,10 +9,10 @@ class A {
 
 trait T {
     abstract public function foo() : string;
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method B::foo() signature mismatch: return type 'string' is not a subtype of A::foo() 'void'
 }
 
 class B extends A {
     use T;
 }
 ===expect===
-MethodSignatureMismatch@7:4-7:44: Method B::foo() signature mismatch: return type 'string' is not a subtype of A::foo() 'void'

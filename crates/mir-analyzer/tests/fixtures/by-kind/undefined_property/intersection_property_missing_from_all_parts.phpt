@@ -11,7 +11,7 @@ class Foo {
 function useIt(object $x): void {
     if ($x instanceof Foo && $x instanceof CountableIface) {
         echo $x->nonexistentProp;
+//               ^^^^^^^^^^^^^^^ UndefinedProperty: Property Foo&CountableIface::$nonexistentProp does not exist
     }
 }
 ===expect===
-UndefinedProperty@10:17-10:32: Property Foo&CountableIface::$nonexistentProp does not exist

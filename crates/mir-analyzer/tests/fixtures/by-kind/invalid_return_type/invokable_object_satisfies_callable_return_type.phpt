@@ -16,5 +16,5 @@ function makeHandler(): callable { return new Handler(); }
 class NotInvokable {}
 /** @return callable(string): int */
 function makeInvalid(): callable { return new NotInvokable(); }
+//                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'NotInvokable' is not compatible with declared 'callable(string): int'
 ===expect===
-InvalidReturnType@10:35-10:61: Return type 'NotInvokable' is not compatible with declared 'callable(string): int'

@@ -22,7 +22,7 @@ class Http {
     public function leak(): void {
         self::$param = new Param();
         echo self::$param->get('id');
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 ===expect===
-TaintedHtml@14:8-14:37: Tainted HTML output — possible XSS

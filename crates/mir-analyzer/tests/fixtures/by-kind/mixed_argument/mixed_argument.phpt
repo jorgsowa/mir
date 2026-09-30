@@ -8,5 +8,5 @@ function fooFoo(int $a): void {}
 /** @var mixed */
 $a = "hello";
 fooFoo($a);
+//     ^^ MixedArgument: Argument $a of fooFoo() is mixed
 ===expect===
-MixedArgument@5:7-5:9: Argument $a of fooFoo() is mixed

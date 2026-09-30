@@ -15,6 +15,7 @@ class Box {
 
 function rightOperand(?Box $x): void {
     if ($x->flag == true) {
+//      ^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $flag on possibly null value
         /** @mir-check $x->flag is true */
         $_ = 1;
     }
@@ -22,6 +23,7 @@ function rightOperand(?Box $x): void {
 
 function leftOperand(?Box $x): void {
     if (true == $x->flag) {
+//              ^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $flag on possibly null value
         /** @mir-check $x->flag is true */
         $_ = 1;
     }
@@ -29,6 +31,7 @@ function leftOperand(?Box $x): void {
 
 function falseMatchDoesNotNarrowNonNull(?Box $x): void {
     if ($x->flag == false) {
+//      ^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $flag on possibly null value
         // `null == false` is true, so a false-literal match does NOT
         // prove the receiver non-null — flag's own type still admits null.
         /** @mir-check $x->flag is false|null */
@@ -36,6 +39,3 @@ function falseMatchDoesNotNarrowNonNull(?Box $x): void {
     }
 }
 ===expect===
-PossiblyNullPropertyFetch@7:8-7:16: Cannot access property $flag on possibly null value
-PossiblyNullPropertyFetch@14:16-14:24: Cannot access property $flag on possibly null value
-PossiblyNullPropertyFetch@21:8-21:16: Cannot access property $flag on possibly null value

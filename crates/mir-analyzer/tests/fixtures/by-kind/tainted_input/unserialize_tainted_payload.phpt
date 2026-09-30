@@ -6,6 +6,6 @@ suppress=MixedArgument,MixedArrayAccess,MixedAssignment,UnusedVariable
 <?php
 function test(): void {
     $obj = unserialize($_COOKIE['session']);
+//         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'unserialize'
 }
 ===expect===
-TaintedInput@3:11-3:43: Tainted input reaching sink 'unserialize'

@@ -5,6 +5,6 @@ Calling a method on a variable assigned null reports NullMethodCall.
 function test(): void {
     $x = null;
     $x->foo();
+//  ^^^^^^^^^ NullMethodCall: Cannot call method foo() on null
 }
 ===expect===
-NullMethodCall@4:4-4:13: Cannot call method foo() on null

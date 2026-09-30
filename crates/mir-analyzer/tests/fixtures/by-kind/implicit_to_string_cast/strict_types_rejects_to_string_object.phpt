@@ -11,5 +11,5 @@ class Label {
 function render(string $s): void {}
 
 render(new Label());
+//     ^^^^^^^^^^^ InvalidArgument: Argument $s of render() expects 'string', got 'Label'
 ===expect===
-InvalidArgument@8:7-8:18: Argument $s of render() expects 'string', got 'Label'

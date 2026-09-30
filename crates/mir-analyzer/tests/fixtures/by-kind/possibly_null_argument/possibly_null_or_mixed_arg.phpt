@@ -10,6 +10,7 @@ class A {
 }
 
 function takesString(string $s) : void {}
+//                   ^^^^^^^^^ UnusedParam: Parameter $s is never used
 
 function takesA(?A $a) : void {
     /**
@@ -19,4 +20,3 @@ function takesA(?A $a) : void {
     takesString($a->foo);
 }
 ===expect===
-UnusedParam@9:21-9:30: Parameter $s is never used

@@ -11,6 +11,6 @@ class Foo {
 
 function test(Foo $f): void {
     $f->oldMethod();
+//  ^^^^^^^^^^^^^^^ DeprecatedMethod: Method Foo::oldMethod() is deprecated
 }
 ===expect===
-DeprecatedMethod@8:4-8:19: Method Foo::oldMethod() is deprecated

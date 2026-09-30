@@ -7,6 +7,6 @@ static-variable write, but had no purity check anywhere.
 /** @pure */
 function mutateByRef(int &$x): void {
     $x = 42;
+//  ^^^^^^^ ImpureByRefAssignment: Assigning to by-reference parameter $x in a @pure function
 }
 ===expect===
-ImpureByRefAssignment@4:4-4:11: Assigning to by-reference parameter $x in a @pure function

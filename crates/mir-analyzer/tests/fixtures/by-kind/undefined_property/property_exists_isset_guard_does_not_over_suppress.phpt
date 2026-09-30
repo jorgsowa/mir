@@ -12,11 +12,13 @@ class Plain {
             return $this->extra;
         }
         return $this->other;
+//                    ^^^^^ UndefinedProperty: Property Plain::$other does not exist
     }
 
     public function caseSensitive(): mixed {
         if (property_exists($this, 'Extra')) {
             return $this->extra;
+//                        ^^^^^ UndefinedProperty: Property Plain::$extra does not exist
         }
         return null;
     }
@@ -26,9 +28,7 @@ class Plain {
             return $this->extra;
         }
         return $this->extra;
+//                    ^^^^^ UndefinedProperty: Property Plain::$extra does not exist
     }
 }
 ===expect===
-UndefinedProperty@7:22-7:27: Property Plain::$other does not exist
-UndefinedProperty@12:26-12:31: Property Plain::$extra does not exist
-UndefinedProperty@21:22-21:27: Property Plain::$extra does not exist

@@ -14,6 +14,6 @@ function foo(int $i) : void {
     }
 
     if ($a) {}
+//      ^^ PossiblyUndefinedVariable: Variable $a might not be defined
 }
 ===expect===
-PossiblyUndefinedVariable@13:8-13:10: Variable $a might not be defined

@@ -8,9 +8,9 @@ suppress=UnusedParam,UnusedVariable,MixedAssignment,MixedArgument
 <?php
 
 function connect(string $host, string $user, string $password) {
+//       ^^^^^^^ MissingReturnType: Function connect() has no return type annotation
     $session = ssh2_connect($host);
     ssh2_auth_password($session, $user, $password);
     return $session;
 }
 ===expect===
-MissingReturnType@3:9-3:16: Function connect() has no return type annotation

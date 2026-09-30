@@ -23,6 +23,6 @@ function throughImplementingClass(Impl $i): int {
 
 function stillFlagsRealUndefinedProperty(Impl $i): int {
     return $i->nope;
+//             ^^^^ UndefinedProperty: Property Impl::$nope does not exist
 }
 ===expect===
-UndefinedProperty@17:15-17:19: Property Impl::$nope does not exist

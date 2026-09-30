@@ -17,7 +17,7 @@ class Container {
 function f(Container $c): void {
     if (is_a($c->item, Foo::class)) {
         $c->item->barMethod();
+//      ^^^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Foo::barMethod() does not exist
     }
 }
 ===expect===
-UndefinedMethod@12:8-12:29: Method Foo::barMethod() does not exist

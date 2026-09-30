@@ -8,8 +8,8 @@ class A {
      */
     public function getValue() {
         return 42;
+//      ^^^^^^^^^^ InvalidReturnType: Return type '42' is not compatible with declared 'string'
     }
 }
 
 ===expect===
-InvalidReturnType@7:8-7:18: Return type '42' is not compatible with declared 'string'

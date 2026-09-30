@@ -6,7 +6,7 @@ class Baz {
     public function handle(?object $obj): void {
         $ctx = ['key' => 'value'];
         $obj->doSomething($ctx);
+//      ^^^^^^^^^^^^^^^^^^^^^^^ PossiblyNullMethodCall: Cannot call method doSomething() on possibly null value
     }
 }
 ===expect===
-PossiblyNullMethodCall@5:8-5:31: Cannot call method doSomething() on possibly null value

@@ -15,6 +15,6 @@ function describe(string $ifaceName): void {}
 
 function test(bool $cond): void {
     describe($cond ? 'Shape' : 'ConcreteThing');
+//           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ NotAnInterface: ConcreteThing is not an interface
 }
 ===expect===
-NotAnInterface@9:13-9:46: ConcreteThing is not an interface

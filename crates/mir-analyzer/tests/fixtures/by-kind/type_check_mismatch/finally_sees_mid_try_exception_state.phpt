@@ -19,7 +19,7 @@ function f(): void {
     } finally {
         /** @mir-check $x is B|null */
         echo get_class($x);
+//                     ^^ PossiblyNullArgument: Argument $object of get_class() might be null
     }
 }
 ===expect===
-PossiblyNullArgument@13:23-13:25: Argument $object of get_class() might be null

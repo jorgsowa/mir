@@ -10,7 +10,7 @@ suppress=MixedAssignment
 function test(): void {
     foreach ($_POST as $v) {
         echo $v;
+//      ^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 ===expect===
-TaintedHtml@4:8-4:16: Tainted HTML output — possible XSS

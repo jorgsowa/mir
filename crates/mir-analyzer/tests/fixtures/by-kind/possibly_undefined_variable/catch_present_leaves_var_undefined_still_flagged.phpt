@@ -19,6 +19,6 @@ function encode(mixed $value): void {
         // cleanup, does not touch $str
     }
     assert($str !== false);
+//         ^^^^ PossiblyUndefinedVariable: Variable $str might not be defined
 }
 ===expect===
-PossiblyUndefinedVariable@10:11-10:15: Variable $str might not be defined

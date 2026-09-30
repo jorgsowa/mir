@@ -14,6 +14,6 @@ suppress=UnusedVariable,MismatchingDocblockParamType
  */
 function f(int $x): void {
     $y = (int) $x;
+//             ^^ RedundantCast: Casting 'int' to 'int' is redundant
 }
 ===expect===
-RedundantCast@6:15-6:17: Casting 'int' to 'int' is redundant

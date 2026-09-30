@@ -12,9 +12,9 @@ function test(array $arr): int {
     if ($arr === []) {
         $arr[5] = 1;
         return $arr[0];
+//      ^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'int'
+//                  ^ NonExistentArrayOffset: Array offset '0' does not exist
     }
     return 0;
 }
 ===expect===
-MixedReturnStatement@6:8-6:23: Cannot return a mixed type from function with declared return type 'int'
-NonExistentArrayOffset@6:20-6:21: Array offset '0' does not exist

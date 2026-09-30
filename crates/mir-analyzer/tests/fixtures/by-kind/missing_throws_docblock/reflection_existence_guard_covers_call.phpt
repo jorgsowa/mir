@@ -18,6 +18,7 @@ function guardedMethod(string $c, string $n): void {
 function unguardedMethod(string $c, string $n): void {
     $class = new \ReflectionClass($c);
     $class->getMethod($n);
+//  ^^^^^^^^^^^^^^^^^^^^^ MissingThrowsDocblock: Exception ReflectionException is thrown but not declared in @throws
 }
 
 function guardedDefault(\ReflectionParameter $p): void {
@@ -28,7 +29,6 @@ function guardedDefault(\ReflectionParameter $p): void {
 
 function unguardedDefault(\ReflectionParameter $p): void {
     $p->getDefaultValue();
+//  ^^^^^^^^^^^^^^^^^^^^^ MissingThrowsDocblock: Exception ReflectionException is thrown but not declared in @throws
 }
 ===expect===
-MissingThrowsDocblock@11:4-11:25: Exception ReflectionException is thrown but not declared in @throws
-MissingThrowsDocblock@21:4-21:25: Exception ReflectionException is thrown but not declared in @throws

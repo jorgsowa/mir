@@ -10,7 +10,7 @@ suppress=UnusedParam
 function create(string $name, int $count, bool $active): void {}
 
 create(name: "test", count: 5, active: true);
+//     ^^^^^^^^^^^^ InvalidNamedArguments: create() does not accept named arguments
+//                   ^^^^^^^^ InvalidNamedArguments: create() does not accept named arguments
+//                             ^^^^^^^^^^^^ InvalidNamedArguments: create() does not accept named arguments
 ===expect===
-InvalidNamedArguments@7:7-7:19: create() does not accept named arguments
-InvalidNamedArguments@7:21-7:29: create() does not accept named arguments
-InvalidNamedArguments@7:31-7:43: create() does not accept named arguments

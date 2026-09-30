@@ -4,5 +4,5 @@ Null array access
 <?php
 $a = null;
 echo $a[0];
+//   ^^^^^ NullArrayAccess: Cannot access array on null
 ===expect===
-NullArrayAccess@3:5-3:10: Cannot access array on null

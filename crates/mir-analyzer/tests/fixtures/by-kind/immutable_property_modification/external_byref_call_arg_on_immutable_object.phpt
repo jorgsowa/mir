@@ -15,6 +15,6 @@ class Box {
 
 function mutateImmutable(Box $b): void {
     sort($b->items);
+//       ^^^^^^^^^ ImmutablePropertyModification: Assigning to property items of $b in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
 }
 ===expect===
-ImmutablePropertyModification@10:9-10:18: Assigning to property items of $b in an immutable context (@psalm-immutable class or @psalm-mutation-free method)

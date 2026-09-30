@@ -12,6 +12,6 @@ class User {
 function test(?User $u): void {
     $u->name = $_GET['name'];
     echo $u?->name;
+//  ^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 ===expect===
-TaintedHtml@7:4-7:19: Tainted HTML output — possible XSS

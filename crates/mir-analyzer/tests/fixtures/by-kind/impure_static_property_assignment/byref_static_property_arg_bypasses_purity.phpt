@@ -14,7 +14,7 @@ class Bag {
 /** @pure */
 function enqueue(): void {
     array_push(Bag::$queue, 1);
+//             ^^^^^^^^^^^ ImpureStaticPropertyAssignment: Assigning to static property Bag::$queue in a @pure function
+//                  ^^^^^^ ImpureStaticPropertyAccess: Reading static property Bag::$queue in a @pure function
 }
 ===expect===
-ImpureStaticPropertyAssignment@8:15-8:26: Assigning to static property Bag::$queue in a @pure function
-ImpureStaticPropertyAccess@8:20-8:26: Reading static property Bag::$queue in a @pure function

@@ -11,6 +11,8 @@ class Data { }
  * @param User $user
  */
 function saveUserData(mixed $data, User $user): void {}
+//                    ^^^^^^^^^^^ UnusedParam: Parameter $data is never used
+//                                 ^^^^^^^^^^ UnusedParam: Parameter $user is never used
 
 function test(): void {
     // Mix of template and concrete types - should not report InvalidArgument
@@ -19,5 +21,3 @@ function test(): void {
     saveUserData(123, new User());
 }
 ===expect===
-UnusedParam@10:22-10:33: Parameter $data is never used
-UnusedParam@10:35-10:45: Parameter $user is never used

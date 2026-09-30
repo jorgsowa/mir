@@ -6,6 +6,6 @@ class Foo {}
 
 function test(Foo $obj): void {
     $obj::nonExistent();
+//  ^^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Foo::nonExistent() does not exist
 }
 ===expect===
-UndefinedMethod@5:4-5:23: Method Foo::nonExistent() does not exist

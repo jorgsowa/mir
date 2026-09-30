@@ -9,6 +9,6 @@ function takesInt(int $n): void { var_dump($n); }
 function getResult(): string|false { return 'x'; }
 function test(): void {
     takesInt(getResult());
+//           ^^^^^^^^^^^ InvalidArgument: Argument $n of takesInt() expects 'int', got 'string|false'
 }
 ===expect===
-InvalidArgument@6:13-6:24: Argument $n of takesInt() expects 'int', got 'string|false'

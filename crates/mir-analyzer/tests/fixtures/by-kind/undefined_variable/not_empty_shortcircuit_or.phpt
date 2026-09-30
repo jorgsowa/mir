@@ -4,8 +4,8 @@ empty($x) || $x->method() should error: empty() doesn't guarantee variable is de
 ===file===
 <?php
 if (empty($x) || $x->method()) {
+//               ^^^^^^^^^^^^ MixedMethodCall: Method method() called on mixed type
     // empty() doesn't provide same narrowing as !isset() because empty($undefined) is true
     // So this WILL error with UndefinedVariable - expected
 }
 ===expect===
-MixedMethodCall@2:17-2:29: Method method() called on mixed type

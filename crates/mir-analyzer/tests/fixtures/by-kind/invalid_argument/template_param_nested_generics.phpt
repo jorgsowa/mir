@@ -13,6 +13,7 @@ class Map { }
  * @param Container<Container<T>> $value
  */
 function processNested(Container $value): void {}
+//                     ^^^^^^^^^^^^^^^^ UnusedParam: Parameter $value is never used
 
 /**
  * @template K
@@ -20,6 +21,7 @@ function processNested(Container $value): void {}
  * @param Map<K, Container<V>> $map
  */
 function processMapWithContainer(Map $map): void {}
+//                               ^^^^^^^^ UnusedParam: Parameter $map is never used
 
 class Item { }
 
@@ -35,5 +37,3 @@ function test(): void {
     processMapWithContainer($mapData);
 }
 ===expect===
-UnusedParam@12:23-12:39: Parameter $value is never used
-UnusedParam@19:33-19:41: Parameter $map is never used

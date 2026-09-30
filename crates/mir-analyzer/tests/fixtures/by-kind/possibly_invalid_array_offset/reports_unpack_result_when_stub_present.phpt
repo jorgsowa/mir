@@ -6,7 +6,7 @@ suppress=ForbiddenCode,MixedAssignment
 <?php
 function test(): void {
     [$a] = unpack('N', pack('N', 1));
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PossiblyInvalidArrayOffset: Array offset might be invalid: expects 'array', got 'array<int, mixed>|false'
     var_dump($a);
 }
 ===expect===
-PossiblyInvalidArrayOffset@3:4-3:36: Array offset might be invalid: expects 'array', got 'array<int, mixed>|false'

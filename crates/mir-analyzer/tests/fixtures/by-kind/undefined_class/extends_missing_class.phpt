@@ -3,5 +3,5 @@ extends missing class
 ===file===
 <?php
 class Foo extends MissingBase {}
+//                ^^^^^^^^^^^ UndefinedClass: Class MissingBase does not exist
 ===expect===
-UndefinedClass@2:18-2:29: Class MissingBase does not exist

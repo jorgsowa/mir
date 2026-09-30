@@ -8,8 +8,8 @@ class C {
 
 class C2 extends C {
     #[Override]
+//  ^^^^^^^^^^^ InvalidOverride: Method C2::f() has #[Override] but parent method C::f() is private
     private function f(): void {}
 }
 
 ===expect===
-InvalidOverride@7:4-7:15: Method C2::f() has #[Override] but parent method C::f() is private

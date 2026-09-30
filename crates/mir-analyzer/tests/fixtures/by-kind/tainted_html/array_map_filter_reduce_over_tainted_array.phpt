@@ -11,20 +11,20 @@ suppress=MixedArrayAccess,MixedArgument,MixedReturnStatement,MixedArgumentTypeCo
 <?php
 function viaArrayMap(): void {
     echo array_map('strtoupper', $_GET['arr'])[0];
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function viaArrayFilter(): void {
     echo array_filter($_GET['arr'])[0];
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function viaArrayReduce(): void {
     echo array_reduce($_GET['arr'], fn($carry, $item) => $carry . $item, '');
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function staticOnly(): void {
     echo array_map('strtoupper', ['a', 'b'])[0];
 }
 ===expect===
-TaintedHtml@3:4-3:50: Tainted HTML output — possible XSS
-TaintedHtml@7:4-7:39: Tainted HTML output — possible XSS
-TaintedHtml@11:4-11:77: Tainted HTML output — possible XSS

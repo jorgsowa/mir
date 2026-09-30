@@ -10,7 +10,7 @@ class Config {
 
     public function legacy(): void {
         echo self::OLD_MAX;
+//                 ^^^^^^^ DeprecatedConstant: Constant Config::OLD_MAX is deprecated: use MAX_RETRIES instead
     }
 }
 ===expect===
-DeprecatedConstant@7:19-7:26: Constant Config::OLD_MAX is deprecated: use MAX_RETRIES instead

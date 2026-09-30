@@ -11,5 +11,5 @@ function run(callable $f) : void {
 }
 
 run("ff");
+//  ^^^^ UndefinedFunction: Function ff() is not defined
 ===expect===
-UndefinedFunction@10:4-10:8: Function ff() is not defined

@@ -6,6 +6,6 @@ suppress=UnusedVariable,UnusedParam
 <?php
 function test(array $arr): void {
     if ($arr === "foo") {}
+//      ^^^^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between 'array' and '"foo"' is always false — these types can never be identical
 }
 ===expect===
-ImpossibleIdenticalComparison@3:8-3:22: '===' between 'array' and '"foo"' is always false — these types can never be identical

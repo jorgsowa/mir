@@ -9,6 +9,6 @@ function makeBox(): mixed {
     /** @var Box<Box<int>> $b */
     $b = new Box();
     return $b;
+//  ^^^^^^^^^^ InvalidReturnType: Return type 'Box<Box<int>>' is not compatible with declared 'Box<Box<string>>'
 }
 ===expect===
-InvalidReturnType@8:4-8:14: Return type 'Box<Box<int>>' is not compatible with declared 'Box<Box<string>>'

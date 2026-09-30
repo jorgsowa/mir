@@ -21,6 +21,7 @@ trait Describable {
 
 enum Status {
     use HasCounter;
+//      ^^^^^^^^^^ InvalidTraitUse: Trait HasCounter used incorrectly: Enum Status cannot use trait HasCounter: it declares a non-static property $count, and enums cannot carry state beyond their cases
     case Active;
     case Inactive;
 }
@@ -35,4 +36,3 @@ function f(Kind $k): string {
     return $k->describe();
 }
 ===expect===
-InvalidTraitUse@13:8-13:18: Trait HasCounter used incorrectly: Enum Status cannot use trait HasCounter: it declares a non-static property $count, and enums cannot carry state beyond their cases

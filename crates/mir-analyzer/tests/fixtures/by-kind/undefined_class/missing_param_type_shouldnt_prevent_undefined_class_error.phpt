@@ -6,5 +6,5 @@ suppress=UnusedParam,UnusedFunction
 <?php
 /** @suppress MissingParamType */
 function foo($s = Foo::BAR) : void {}
+//                ^^^ UndefinedClass: Class Foo does not exist
 ===expect===
-UndefinedClass@3:18-3:21: Class Foo does not exist

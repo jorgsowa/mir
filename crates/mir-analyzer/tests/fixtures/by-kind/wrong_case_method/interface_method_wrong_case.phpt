@@ -12,5 +12,5 @@ class ConsoleLogger implements Logger {
 }
 $l = new ConsoleLogger();
 $l->LOGMESSAGE("hello");
+//  ^^^^^^^^^^ WrongCaseMethod: Method name 'ConsoleLogger::LOGMESSAGE' has incorrect casing; use 'logMessage'
 ===expect===
-WrongCaseMethod@9:4-9:14: Method name 'ConsoleLogger::LOGMESSAGE' has incorrect casing; use 'logMessage'

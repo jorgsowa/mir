@@ -25,9 +25,9 @@ function all_are_users(mixed ...$values): bool {
 function test(mixed $a, mixed $b): void {
     if (all_are_users($a, $b)) {
         $a->missing();
+//      ^^^^^^^^^^^^^ UndefinedMethod: Method User::missing() does not exist
         $b->missing();
+//      ^^^^^^^^^^^^^ UndefinedMethod: Method User::missing() does not exist
     }
 }
 ===expect===
-UndefinedMethod@20:8-20:21: Method User::missing() does not exist
-UndefinedMethod@21:8-21:21: Method User::missing() does not exist

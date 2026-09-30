@@ -11,6 +11,6 @@ function b(&$p): string {
 
 function main(bool $a, string $b, string $c): void {
     b($a ? $b : $c);
+//    ^^^^^^^^^^^^ InvalidPassByReference: Argument $p of b() must be passed by reference
 }
 ===expect===
-InvalidPassByReference@10:6-10:18: Argument $p of b() must be passed by reference

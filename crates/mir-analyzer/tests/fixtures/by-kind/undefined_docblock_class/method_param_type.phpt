@@ -8,6 +8,6 @@ suppress=UnusedParam
 class Foo {
     /** @param UndefinedParamClass $x */
     public function bar($x): void {}
+//                  ^^^ UndefinedDocblockClass: Docblock type 'UndefinedParamClass' does not exist
 }
 ===expect===
-UndefinedDocblockClass@4:20-4:23: Docblock type 'UndefinedParamClass' does not exist

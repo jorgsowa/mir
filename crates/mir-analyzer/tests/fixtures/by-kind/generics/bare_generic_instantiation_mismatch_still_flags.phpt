@@ -22,7 +22,9 @@ class Holder {
 
     public function __construct() {
         $this->a = new Gen('s');
+//      ^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $a expects 'Gen<int>', cannot assign 'Gen<string>'
         $this->b = new StrGen();
+//      ^^^^^^^^^^^^^^^^^^^^^^^ InvalidPropertyAssignment: Property $b expects 'Gen<int>', cannot assign 'StrGen<string>'
     }
 }
 
@@ -31,8 +33,6 @@ function take(Gen $g): void {}
 
 function caller(): void {
     take(new StrGen());
+//       ^^^^^^^^^^^^ InvalidArgument: Argument $g of take() expects 'Gen<int>', got 'StrGen<string>'
 }
 ===expect===
-InvalidPropertyAssignment@18:8-18:31: Property $a expects 'Gen<int>', cannot assign 'Gen<string>'
-InvalidPropertyAssignment@19:8-19:31: Property $b expects 'Gen<int>', cannot assign 'StrGen<string>'
-InvalidArgument@27:9-27:21: Argument $g of take() expects 'Gen<int>', got 'StrGen<string>'

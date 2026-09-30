@@ -16,6 +16,6 @@ function test(): void {
     /** @var Box<string> $box */
     $box = new Box();
     $box->transform('hello');
+//  ^^^^^^^^^^^^^^^^^^^^^^^^ ShadowedTemplateParam: Method template parameter 'T' shadows class-level template parameter with the same name
 }
 ===expect===
-ShadowedTemplateParam@15:4-15:28: Method template parameter 'T' shadows class-level template parameter with the same name

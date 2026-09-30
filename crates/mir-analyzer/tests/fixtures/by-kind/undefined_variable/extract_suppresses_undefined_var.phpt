@@ -11,7 +11,7 @@ function getDsn(array $config): string {
 
 function noDynamic(): void {
     echo $undefined;
+//       ^^^^^^^^^^ UndefinedVariable: Variable $undefined is not defined
 }
 
 ===expect===
-UndefinedVariable@9:9-9:19: Variable $undefined is not defined

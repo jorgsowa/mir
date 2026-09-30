@@ -5,5 +5,5 @@ InvalidArrayOffset fires when an array is used as an array key.
 $arr = [1, 2, 3];
 $key = [0, 1];
 echo $arr[$key];
+//        ^^^^ InvalidArrayOffset: Array offset expects 'array-key', got 'array{0: 0, 1: 1}'
 ===expect===
-InvalidArrayOffset@4:10-4:14: Array offset expects 'array-key', got 'array{0: 0, 1: 1}'

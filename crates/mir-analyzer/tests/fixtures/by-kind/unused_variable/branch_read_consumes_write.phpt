@@ -29,8 +29,8 @@ function last_like(iterable $items) {
 
 function still_dead(): int {
     $x = 1;
+//  ^^ UnusedVariable: Variable $x is never read
     $x = 2;
     return $x;
 }
 ===expect===
-UnusedVariable@24:4-24:6: Variable $x is never read

@@ -14,6 +14,7 @@ function wrong_order(): void {
         doSomething();
     } catch (\Exception $e) {
     } catch (\InvalidArgumentException $e) {
+//           ^^^^^^^^^^^^^^^^^^^^^^^^^ UnreachableCatch: Catch block for 'InvalidArgumentException' is unreachable — already caught by 'Exception'
     }
 }
 
@@ -30,8 +31,7 @@ function union_catch_shadows_later_subtype(): void {
         doSomething();
     } catch (\TypeError|\Exception $e) {
     } catch (\InvalidArgumentException $e) {
+//           ^^^^^^^^^^^^^^^^^^^^^^^^^ UnreachableCatch: Catch block for 'InvalidArgumentException' is unreachable — already caught by 'Exception'
     }
 }
 ===expect===
-UnreachableCatch@8:13-8:38: Catch block for 'InvalidArgumentException' is unreachable — already caught by 'Exception'
-UnreachableCatch@24:13-24:38: Catch block for 'InvalidArgumentException' is unreachable — already caught by 'Exception'

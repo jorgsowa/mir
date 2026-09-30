@@ -4,6 +4,6 @@ Interface property without hooks
 <?php
 interface A {
     public string $value;
+//  ^^^^^^^^^^^^^^^^^^^^ ParseError: Parse error: Interfaces may only include hooked properties
 }
 ===expect===
-ParseError@3:4-3:24: Parse error: Interfaces may only include hooked properties

@@ -8,5 +8,5 @@ suppress=UnusedParam
 ===file===
 <?php
 function f(NotARealMemcacheClass $x): void {}
+//         ^^^^^^^^^^^^^^^^^^^^^ UndefinedClass: Class NotARealMemcacheClass does not exist
 ===expect===
-UndefinedClass@2:11-2:32: Class NotARealMemcacheClass does not exist

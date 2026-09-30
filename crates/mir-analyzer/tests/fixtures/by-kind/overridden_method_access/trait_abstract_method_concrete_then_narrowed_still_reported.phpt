@@ -17,6 +17,6 @@ class Base {
 }
 class Child extends Base {
     protected function foo(): void {}
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ OverriddenMethodAccess: Method Child::foo() overrides with less visibility
 }
 ===expect===
-OverriddenMethodAccess@10:4-10:37: Method Child::foo() overrides with less visibility

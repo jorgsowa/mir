@@ -17,5 +17,5 @@ function bar(string $a, string $b, string $c, string $d): bool {
 }
 
 foo("bar");
+//  ^^^^^ InvalidArgument: Argument $arg of foo() expects 'callable with 3 required parameter(s)', got 'callable with 4 required parameter(s)'
 ===expect===
-InvalidArgument@14:4-14:9: Argument $arg of foo() expects 'callable with 3 required parameter(s)', got 'callable with 4 required parameter(s)'

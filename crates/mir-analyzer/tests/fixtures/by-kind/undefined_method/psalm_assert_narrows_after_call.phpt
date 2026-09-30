@@ -17,6 +17,6 @@ function test(mixed $value): void {
     assert_user($value);
     $value->name();
     $value->missing();
+//  ^^^^^^^^^^^^^^^^^ UndefinedMethod: Method User::missing() does not exist
 }
 ===expect===
-UndefinedMethod@16:4-16:21: Method User::missing() does not exist

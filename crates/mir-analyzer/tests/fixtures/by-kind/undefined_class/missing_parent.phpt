@@ -3,5 +3,5 @@ Missing parent
 ===file===
 <?php
 class A extends B { }
+//              ^ UndefinedClass: Class B does not exist
 ===expect===
-UndefinedClass@2:16-2:17: Class B does not exist

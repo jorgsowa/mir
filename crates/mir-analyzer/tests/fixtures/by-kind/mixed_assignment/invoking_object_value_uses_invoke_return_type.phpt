@@ -12,6 +12,7 @@ class Adder {
 function useAdder(Adder $adder): void {
     $result = $adder(1, 2);
     strlen($result);
+//         ^^^^^^^ ArgumentTypeCoercion: Argument $string of strlen() expects 'string', got 'int' — coercion may fail at runtime
 }
 
 class Recursive {
@@ -37,4 +38,3 @@ function invokeClosureOrCallableUnion(int $n, $gen): void {
     strlen($result);
 }
 ===expect===
-ArgumentTypeCoercion@7:11-7:18: Argument $string of strlen() expects 'string', got 'int' — coercion may fail at runtime

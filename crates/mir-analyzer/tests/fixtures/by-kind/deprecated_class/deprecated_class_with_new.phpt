@@ -10,5 +10,5 @@ suppress=UnusedVariable
 class Foo { }
 
 $a = new Foo();
+//       ^^^ DeprecatedClass: Class Foo is deprecated
 ===expect===
-DeprecatedClass@7:9-7:12: Class Foo is deprecated

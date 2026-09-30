@@ -13,6 +13,7 @@ class PublicHolder
     {
         foreach (array_keys(self::$items) as $key) {
             takesInt($key);
+//                   ^^^^ PossiblyInvalidArgument: Argument $n of takesInt() expects 'int', possibly different type 'int|string' provided
         }
     }
 }
@@ -22,4 +23,3 @@ function takesInt(int $n): void
     var_dump($n);
 }
 ===expect===
-PossiblyInvalidArgument@10:21-10:25: Argument $n of takesInt() expects 'int', possibly different type 'int|string' provided

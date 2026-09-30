@@ -11,6 +11,6 @@ function guarded(array $meta): string {
 /** @param array{title: string} $meta */
 function unguarded(array $meta): string {
     return (string) $meta['favicon'];
+//                        ^^^^^^^^^ NonExistentArrayOffset: Array offset 'favicon' does not exist
 }
 ===expect===
-NonExistentArrayOffset@8:26-8:35: Array offset 'favicon' does not exist

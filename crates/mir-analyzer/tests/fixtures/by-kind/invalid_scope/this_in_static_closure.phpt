@@ -7,10 +7,10 @@ class C {
     public function f(): void {
         $f = static function (): void {
             echo $this->a;
+//               ^^^^^ InvalidScope: $this cannot be used in a static method
         };
         $f();
     }
 }
 
 ===expect===
-InvalidScope@6:17-6:22: $this cannot be used in a static method

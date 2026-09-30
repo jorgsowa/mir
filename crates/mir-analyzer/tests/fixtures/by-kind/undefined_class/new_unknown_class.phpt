@@ -4,6 +4,6 @@ new unknown class
 <?php
 function test(): void {
     new UnknownClass();
+//      ^^^^^^^^^^^^ UndefinedClass: Class UnknownClass does not exist
 }
 ===expect===
-UndefinedClass@3:8-3:20: Class UnknownClass does not exist

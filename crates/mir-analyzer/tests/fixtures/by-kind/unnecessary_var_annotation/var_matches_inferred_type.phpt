@@ -11,6 +11,7 @@ function maybe() { return null; }
 function f(): void {
     /** @var string $a */
     $a = get();
+//  ^^^^^^^^^^^ UnnecessaryVarAnnotation: @var annotation for $a is unnecessary
 
     /** @var string $b */
     $b = maybe();
@@ -21,4 +22,3 @@ function f(): void {
     echo $a, $b, $c;
 }
 ===expect===
-UnnecessaryVarAnnotation@8:4-8:15: @var annotation for $a is unnecessary

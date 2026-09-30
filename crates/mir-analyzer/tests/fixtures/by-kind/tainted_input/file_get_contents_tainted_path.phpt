@@ -7,6 +7,6 @@ suppress=MixedArgument,MixedArrayAccess,MixedAssignment,UnusedVariable
 function test(): void {
     $path = $_GET['path'];
     $data = file_get_contents($path);
+//          ^^^^^^^^^^^^^^^^^^^^^^^^ TaintedInput: Tainted input reaching sink 'file'
 }
 ===expect===
-TaintedInput@4:12-4:36: Tainted input reaching sink 'file'

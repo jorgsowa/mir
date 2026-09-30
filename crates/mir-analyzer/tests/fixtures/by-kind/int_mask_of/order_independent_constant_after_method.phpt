@@ -19,5 +19,5 @@ class Flags {
 $f = new Flags();
 $f->set(3);
 $f->set(4);
+//      ^ InvalidArgument: Argument $flags of set() expects '0|1|2|3', got '4'
 ===expect===
-InvalidArgument@14:8-14:9: Argument $flags of set() expects '0|1|2|3', got '4'

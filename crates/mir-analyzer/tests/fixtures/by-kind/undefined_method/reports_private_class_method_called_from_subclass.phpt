@@ -8,7 +8,7 @@ class Base {
 class Child extends Base {
     public function run(): void {
         $this->secret();
+//      ^^^^^^^^^^^^^^^ UndefinedMethod: Method Base::secret() does not exist
     }
 }
 ===expect===
-UndefinedMethod@7:8-7:23: Method Base::secret() does not exist

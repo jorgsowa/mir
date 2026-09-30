@@ -11,5 +11,5 @@ class A {
 
 $a = new A("hello");
 $b = $a->bar;
+//       ^^^ InaccessibleProperty: Cannot access property A::$bar
 ===expect===
-InaccessibleProperty@8:9-8:12: Cannot access property A::$bar

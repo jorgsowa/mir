@@ -15,9 +15,9 @@ enum Suit {
 function foo(Suit $s): void {
     if ($s === Suit::Clubs)  {
         if ($s === Suit::Clubs) {
+//          ^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
             echo "bad";
         }
     }
 }
 ===expect===
-RedundantCondition@11:12-11:30: Condition is always true/false for type 'bool'

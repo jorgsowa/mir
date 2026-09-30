@@ -5,6 +5,6 @@ from nullable variable
 function test(bool $flag): void {
     $x = $flag ? [1, 2, 3] : null;
     echo $x[0];
+//       ^^^^^ PossiblyNullArrayAccess: Cannot access array on possibly null value
 }
 ===expect===
-PossiblyNullArrayAccess@4:9-4:14: Cannot access array on possibly null value

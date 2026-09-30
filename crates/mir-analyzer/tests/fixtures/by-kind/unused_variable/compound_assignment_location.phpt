@@ -7,18 +7,18 @@ suppress=MissingReturnType
 function test() {
     $x = 1;
     $x += 2;
+//  ^^ UnusedVariable: Variable $x is never read
 
     $y = "hello";
     $y .= "world";
+//  ^^ UnusedVariable: Variable $y is never read
 
     $z = 10;
     ++$z;
+//    ^^ UnusedVariable: Variable $z is never read
 
     $a = 1;
     $a++;
+//  ^^ UnusedVariable: Variable $a is never read
 }
 ===expect===
-UnusedVariable@4:4-4:6: Variable $x is never read
-UnusedVariable@7:4-7:6: Variable $y is never read
-UnusedVariable@10:6-10:8: Variable $z is never read
-UnusedVariable@13:4-13:6: Variable $a is never read

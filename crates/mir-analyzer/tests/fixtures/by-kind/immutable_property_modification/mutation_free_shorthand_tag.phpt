@@ -9,7 +9,7 @@ class Token {
     /** @mutation-free */
     public function setValue(string $v): void {
         $this->value = $v;
+//      ^^^^^^^^^^^^^^^^^ ImmutablePropertyModification: Assigning to property value of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
     }
 }
 ===expect===
-ImmutablePropertyModification@8:8-8:25: Assigning to property value of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)

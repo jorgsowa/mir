@@ -14,6 +14,6 @@ class App {
 
 function test(App $app): void {
     $app->write();
+//  ^^^^^^^^^^^^^ DeprecatedMethod: Method App::write() is deprecated: use log() instead
 }
 ===expect===
-DeprecatedMethod@11:4-11:17: Method App::write() is deprecated: use log() instead

@@ -17,7 +17,7 @@ function test(mixed $value): void {
     if (is_user($value)) {
         $value->name();
         $value->missing();
+//      ^^^^^^^^^^^^^^^^^ UndefinedMethod: Method User::missing() does not exist
     }
 }
 ===expect===
-UndefinedMethod@16:8-16:25: Method User::missing() does not exist

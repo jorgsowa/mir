@@ -9,15 +9,15 @@ suppress=MixedArrayAccess,MixedArgument
 <?php
 function viaSprintf(): void {
     echo sprintf('<b>%s</b>', $_GET['name']);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function viaVsprintf(): void {
     echo vsprintf('<b>%s</b>', [$_GET['name']]);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function safeFormatOnly(): void {
     echo sprintf('<b>%s</b>', 'static');
 }
 ===expect===
-TaintedHtml@3:4-3:45: Tainted HTML output — possible XSS
-TaintedHtml@7:4-7:48: Tainted HTML output — possible XSS

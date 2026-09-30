@@ -33,12 +33,12 @@ class Widget {
         // Narrowed to Derived|null, not the declared Base — a possibly-null
         // call, not an undefined method on Base.
         $this->item->extra();
+//      ^^^^^^^^^^^^^^^^^^^^ PossiblyNullMethodCall: Cannot call method extra() on possibly null value
     }
     public static function loadStatic(): void {
         self::$staticItem = Finder::findStatic();
         self::$staticItem->extra();
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^ PossiblyNullMethodCall: Cannot call method extra() on possibly null value
     }
 }
 ===expect===
-PossiblyNullMethodCall@29:8-29:28: Cannot call method extra() on possibly null value
-PossiblyNullMethodCall@33:8-33:34: Cannot call method extra() on possibly null value

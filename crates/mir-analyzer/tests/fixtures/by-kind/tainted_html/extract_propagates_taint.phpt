@@ -10,6 +10,7 @@ suppress=MixedArgument
 function viaExtract(): void {
     extract($_GET);
     echo $name;
+//  ^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function safeExtractOnly(): void {
@@ -18,4 +19,3 @@ function safeExtractOnly(): void {
     echo $name;
 }
 ===expect===
-TaintedHtml@4:4-4:15: Tainted HTML output — possible XSS

@@ -10,8 +10,8 @@ class A {
 
 class B extends A {
     public function foo(): void {
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method B::foo() signature mismatch: return type 'void' is not a subtype of parent 'string|null'
         return;
     }
 }
 ===expect===
-MethodSignatureMismatch@9:4-9:33: Method B::foo() signature mismatch: return type 'void' is not a subtype of parent 'string|null'

@@ -19,7 +19,7 @@ class Handler {
 
     public function handle(): void {
         echo $this->req->getParam('x');
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
     }
 }
 ===expect===
-TaintedHtml@13:8-13:39: Tainted HTML output — possible XSS

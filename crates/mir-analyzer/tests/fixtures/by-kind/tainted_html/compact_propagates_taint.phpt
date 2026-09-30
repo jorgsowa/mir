@@ -11,6 +11,7 @@ function viaCompact(): void {
     $id = $_GET['id'];
     $data = compact('id');
     echo $data['id'];
+//  ^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function safeCompactOnly(): void {
@@ -19,4 +20,3 @@ function safeCompactOnly(): void {
     echo $data['id'];
 }
 ===expect===
-TaintedHtml@5:4-5:21: Tainted HTML output — possible XSS

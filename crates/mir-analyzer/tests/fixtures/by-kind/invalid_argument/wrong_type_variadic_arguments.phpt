@@ -7,5 +7,5 @@ suppress=UnusedParam
 function takesArguments(int ...$args) : void {}
 
 takesArguments(age: "abc");
+//             ^^^^^^^^^^ InvalidArgument: Argument $args of takesArguments() expects 'int', got '"abc"'
 ===expect===
-InvalidArgument@4:15-4:25: Argument $args of takesArguments() expects 'int', got '"abc"'

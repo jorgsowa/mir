@@ -20,7 +20,7 @@ class Service {
     /** @psalm-external-mutation-free */
     public function run(Box $other): void {
         $other->cache->bump();
+//      ^^^^^^^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method bump() in a pure or immutable context
     }
 }
 ===expect===
-ImpureMethodCall@14:8-14:29: Calling impure method bump() in a pure or immutable context

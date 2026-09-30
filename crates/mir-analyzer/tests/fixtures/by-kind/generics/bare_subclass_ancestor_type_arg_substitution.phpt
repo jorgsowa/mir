@@ -28,6 +28,6 @@ function accept_dog_collection($c): void {}
 /** @param DogList<Cat> $list */
 function relay($list): void {
     accept_dog_collection($list);
+//                        ^^^^^ InvalidArgument: Argument $c of accept_dog_collection() expects 'Collection<Dog>', got 'DogList<Cat>'
 }
 ===expect===
-InvalidArgument@21:26-21:31: Argument $c of accept_dog_collection() expects 'Collection<Dog>', got 'DogList<Cat>'

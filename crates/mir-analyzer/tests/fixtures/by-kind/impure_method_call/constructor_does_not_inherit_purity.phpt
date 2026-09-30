@@ -24,7 +24,7 @@ class ExplicitPureChild extends Base {
     /** @pure */
     public function __construct(Reader $reader) {
         $reader->read();
+//      ^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method read() in a pure or immutable context
     }
 }
 ===expect===
-ImpureMethodCall@22:8-22:23: Calling impure method read() in a pure or immutable context

@@ -35,5 +35,5 @@ class TypedList implements Collection {
 function needsAnimals(GrandCollection $c): void {}
 
 needsAnimals(new TypedList(new Unrelated()));
+//           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $c of needsAnimals() expects 'GrandCollection<Animal>', got 'TypedList<Unrelated>'
 ===expect===
-InvalidArgument@26:13-26:43: Argument $c of needsAnimals() expects 'GrandCollection<Animal>', got 'TypedList<Unrelated>'

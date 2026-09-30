@@ -9,5 +9,5 @@ trait HasFoo {
 }
 
 echo HasFoo::FOO;
+//   ^^^^^^^^^^^ TraitConstantAccessedDirectly: Cannot access trait constant HasFoo::FOO directly
 ===expect===
-TraitConstantAccessedDirectly@6:5-6:16: Cannot access trait constant HasFoo::FOO directly

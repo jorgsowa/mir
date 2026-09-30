@@ -4,6 +4,6 @@ No visibility interface property with hooks
 <?php
 interface SomeInterface {
     string $value { get; }
+//  ^^^^^^ ParseError: Parse error: expected modifier, found identifier
 }
 ===expect===
-ParseError@3:4-3:10: Parse error: expected modifier, found identifier

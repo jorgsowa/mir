@@ -8,7 +8,7 @@ Array keys of string array doesnt conforms to int list
  */
 function getKeys(array $array) {
     return array_keys($array);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'list<string>' is not compatible with declared 'list<int>'
 }
 
 ===expect===
-InvalidReturnType@7:4-7:30: Return type 'list<string>' is not compatible with declared 'list<int>'

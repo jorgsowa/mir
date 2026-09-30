@@ -4,6 +4,6 @@ Verify UnusedVariable location for global variable declaration.
 <?php
 function test(): void {
     global $config;
+//         ^^^^^^^ UnusedVariable: Variable $config is never read
 }
 ===expect===
-UnusedVariable@3:11-3:18: Variable $config is never read

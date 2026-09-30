@@ -12,11 +12,11 @@ final class Integer
  * @param Integer $value
  */
 function acceptsIntegerClass($value): void
+//                           ^^^^^^ UnusedParam: Parameter $value is never used
 {
 }
 
 acceptsIntegerClass(new Integer());
 acceptsIntegerClass(5);
+//                  ^ InvalidArgument: Argument $value of acceptsIntegerClass() expects 'Regression\DocblockTypePrecedence\Integer', got '5'
 ===expect===
-UnusedParam@11:29-11:35: Parameter $value is never used
-InvalidArgument@16:20-16:21: Argument $value of acceptsIntegerClass() expects 'Regression\DocblockTypePrecedence\Integer', got '5'

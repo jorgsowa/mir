@@ -7,7 +7,7 @@ Array keys of string keyed array doesnt conform to int list
  */
 function getKeys() {
     return array_keys(["foo" => 42, "bar" => 42]);
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidReturnType: Return type 'non-empty-list<"foo"|"bar">' is not compatible with declared 'list<int>'
 }
 
 ===expect===
-InvalidReturnType@6:4-6:50: Return type 'non-empty-list<"foo"|"bar">' is not compatible with declared 'list<int>'

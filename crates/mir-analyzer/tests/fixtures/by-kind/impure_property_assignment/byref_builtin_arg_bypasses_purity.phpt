@@ -15,6 +15,6 @@ class Box {
 /** @pure */
 function normalize(Box $b): void {
     sort($b->items);
+//       ^^^^^^^^^ ImpurePropertyAssignment: Assigning to property items of a parameter in a pure or external-mutation-free context
 }
 ===expect===
-ImpurePropertyAssignment@8:9-8:18: Assigning to property items of a parameter in a pure or external-mutation-free context

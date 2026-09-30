@@ -10,6 +10,7 @@ class Logger {
     /** @psalm-mutation-free */
     public function flush(): void {
         $this->doClear();
+//      ^^^^^^^^^^^^^^^^ ImpureMethodCall: Calling impure method doClear() in a pure or immutable context
     }
 
     private function doClear(): void {
@@ -17,4 +18,3 @@ class Logger {
     }
 }
 ===expect===
-ImpureMethodCall@8:8-8:24: Calling impure method doClear() in a pure or immutable context

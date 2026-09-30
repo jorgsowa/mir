@@ -6,6 +6,6 @@ suppress=UnusedVariable,UnusedParam
 <?php
 function test(bool $a): void {
     $a[0] = 5;
+//  ^^^^^^^^^ InvalidArrayAssignment: Cannot use [] assignment on non-array type 'bool'
 }
 ===expect===
-InvalidArrayAssignment@3:4-3:13: Cannot use [] assignment on non-array type 'bool'

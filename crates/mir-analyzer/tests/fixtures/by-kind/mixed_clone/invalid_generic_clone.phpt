@@ -8,6 +8,6 @@ Invalid generic clone
  */
 function foo($a): void {
     clone $a;
+//  ^^^^^^^^ InvalidClone: cannot clone non-object int|string
 }
 ===expect===
-InvalidClone@7:4-7:12: cannot clone non-object int|string

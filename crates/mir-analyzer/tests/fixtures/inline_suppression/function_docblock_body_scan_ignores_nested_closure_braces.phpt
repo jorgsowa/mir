@@ -13,5 +13,5 @@ function f(): void {
     $cb();
 }
 new NoSuchClassOutside();
+//  ^^^^^^^^^^^^^^^^^^ UndefinedClass: Class NoSuchClassOutside does not exist
 ===expect===
-UndefinedClass@9:4-9:22: Class NoSuchClassOutside does not exist

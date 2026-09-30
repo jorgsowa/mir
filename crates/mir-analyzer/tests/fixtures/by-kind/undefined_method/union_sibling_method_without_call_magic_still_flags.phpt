@@ -13,6 +13,6 @@ class ServiceB {
 }
 function test(ServiceA|ServiceB $service): void {
     $service->reveal();
+//  ^^^^^^^^^^^^^^^^^^ UndefinedMethod: Method ServiceB::reveal() does not exist
 }
 ===expect===
-UndefinedMethod@9:4-9:22: Method ServiceB::reveal() does not exist

@@ -11,10 +11,10 @@ suppress=UnusedParam
 function rejectsEmptyBranch(array $counts): int {
     if ($counts === []) {
         return $counts['total'];
+//      ^^^^^^^^^^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'int'
+//                     ^^^^^^^ NonExistentArrayOffset: Array offset 'total' does not exist
     }
 
     return $counts['total'];
 }
 ===expect===
-MixedReturnStatement@5:8-5:32: Cannot return a mixed type from function with declared return type 'int'
-NonExistentArrayOffset@5:23-5:30: Array offset 'total' does not exist

@@ -9,7 +9,7 @@ final class C {
     public const array D = [];
     public static function f(): string {
         return array_key_first(self::D);
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ NullableReturnStatement: Return type 'string|int|null' is not compatible with declared 'string'
     }
 }
 ===expect===
-NullableReturnStatement@5:8-5:40: Return type 'string|int|null' is not compatible with declared 'string'

@@ -10,7 +10,7 @@ function test(bool $cond): void {
     // $x is only possibly-assigned here
     if (!isset($x) || strlen($x) > 3) {
         echo $x;
+//           ^^ PossiblyUndefinedVariable: Variable $x might not be defined
     }
 }
 ===expect===
-PossiblyUndefinedVariable@9:13-9:15: Variable $x might not be defined

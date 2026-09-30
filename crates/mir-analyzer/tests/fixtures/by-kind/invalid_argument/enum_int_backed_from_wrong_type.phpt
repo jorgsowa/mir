@@ -10,5 +10,5 @@ enum Priority: int {
 }
 
 Priority::from('high');
+//             ^^^^^^ InvalidArgument: Argument $value of from() expects 'int', got '"high"'
 ===expect===
-InvalidArgument@7:15-7:21: Argument $value of from() expects 'int', got '"high"'

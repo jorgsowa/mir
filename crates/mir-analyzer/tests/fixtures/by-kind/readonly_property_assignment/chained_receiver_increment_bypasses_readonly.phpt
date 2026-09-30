@@ -16,7 +16,7 @@ class Container {
 class Counter {
     public function bump(Container $c): void {
         $c->box->n++;
+//      ^^^^^^^^^^ ReadonlyPropertyAssignment: Cannot assign to readonly property Box::$n outside of constructor
     }
 }
 ===expect===
-ReadonlyPropertyAssignment@10:8-10:18: Cannot assign to readonly property Box::$n outside of constructor

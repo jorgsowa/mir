@@ -8,6 +8,6 @@ class Foo {
 
 function test(Foo $obj): void {
     $obj::bar("wrong");
+//            ^^^^^^^ InvalidArgument: Argument $x of bar() expects 'int', got '"wrong"'
 }
 ===expect===
-InvalidArgument@7:14-7:21: Argument $x of bar() expects 'int', got '"wrong"'

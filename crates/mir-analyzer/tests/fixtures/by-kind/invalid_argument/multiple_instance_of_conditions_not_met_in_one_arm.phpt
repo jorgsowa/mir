@@ -16,9 +16,9 @@ function baz(C $_): int {
 function bar(Foo $foo): int {
     return match (true) {
         $foo instanceof A, $foo instanceof B => baz($foo),
+//                                                  ^^^^ InvalidArgument: Argument $_ of baz() expects 'C', got 'A|B'
         $foo instanceof C => 3,
         default => 0,
     };
 }
 ===expect===
-InvalidArgument@13:52-13:56: Argument $_ of baz() expects 'C', got 'A|B'

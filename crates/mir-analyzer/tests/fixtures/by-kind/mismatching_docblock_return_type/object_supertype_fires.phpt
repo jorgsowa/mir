@@ -8,5 +8,5 @@ class Dog extends Animal {}
 
 /** @return Animal */
 function getDog(): Dog { return new Dog(); }
+//       ^^^^^^ MismatchingDocblockReturnType: Docblock return type 'Animal' does not match inferred 'Dog'
 ===expect===
-MismatchingDocblockReturnType@6:9-6:15: Docblock return type 'Animal' does not match inferred 'Dog'

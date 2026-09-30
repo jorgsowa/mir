@@ -6,5 +6,5 @@ suppress=MixedAssignment,UnusedVariable
 <?php
 $x = ["a"];
 $y = $x["b"];
+//      ^^^ NonExistentArrayOffset: Array offset 'b' does not exist
 ===expect===
-NonExistentArrayOffset@3:8-3:11: Array offset 'b' does not exist

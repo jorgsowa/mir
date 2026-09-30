@@ -4,8 +4,8 @@ UndefinedDocblockClass fires for the element class of an `array<int, Foo>` @retu
 <?php
 /** @return array<int, NonExistentElement> */
 function missing(): array {
+//       ^^^^^^^ UndefinedDocblockClass: Docblock type 'NonExistentElement' does not exist
     return [];
 }
 
 ===expect===
-UndefinedDocblockClass@3:9-3:16: Docblock type 'NonExistentElement' does not exist

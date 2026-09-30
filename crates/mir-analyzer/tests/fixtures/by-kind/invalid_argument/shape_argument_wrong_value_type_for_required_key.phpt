@@ -10,5 +10,5 @@ suppress=MissingParamType,UnusedParam
 function takesConfig(array $config): void {}
 
 takesConfig(['host' => 'localhost', 'port' => 'not-a-port']);
+//          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ InvalidArgument: Argument $config of takesConfig() expects 'array{'host': string, 'port': int}', got 'array{'host': "localhost", 'port': "not-a-port"}'
 ===expect===
-InvalidArgument@5:12-5:59: Argument $config of takesConfig() expects 'array{'host': string, 'port': int}', got 'array{'host': "localhost", 'port': "not-a-port"}'

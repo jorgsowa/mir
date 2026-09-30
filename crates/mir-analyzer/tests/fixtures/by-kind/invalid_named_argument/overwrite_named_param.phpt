@@ -7,5 +7,5 @@ function test(int $param, int $param2): void {
 }
 
 test(param: 1, param: 2);
+//             ^^^^^^^^ InvalidNamedArgument: test() has no parameter named $param
 ===expect===
-InvalidNamedArgument@6:15-6:23: test() has no parameter named $param

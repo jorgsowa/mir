@@ -8,5 +8,5 @@ class A {
     public function __invoke(string $p): void {}
 }
 (new A)->__invoke(1);
+//                ^ ArgumentTypeCoercion: Argument $p of __invoke() expects 'string', got '1' — coercion may fail at runtime
 ===expect===
-ArgumentTypeCoercion@5:18-5:19: Argument $p of __invoke() expects 'string', got '1' — coercion may fail at runtime

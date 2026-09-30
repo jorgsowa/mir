@@ -21,13 +21,16 @@ class StatusHolder {
 
 function classStringExclusionReachableOnNullableReceiver(?ClsHolder $h): void {
     if ($h->cls !== Foo::class) {
+//      ^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $cls on possibly null value
         /** @mir-check $_ is never */
         $_ = 1;
+//      ^^^^^^^ TypeCheckMismatch: Type of $_ is expected to be never, got mixed
     }
 }
 
 function classStringExclusionDivergesOnNonNullableReceiver(ClsHolder $h): void {
     if ($h->cls !== Foo::class) {
+//      ^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         /** @mir-check $_ is never */
         $_ = 1;
     }
@@ -35,21 +38,18 @@ function classStringExclusionDivergesOnNonNullableReceiver(ClsHolder $h): void {
 
 function enumCaseExclusionReachableOnNullableReceiver(?StatusHolder $h): void {
     if ($h->status !== Status::Active) {
+//      ^^^^^^^^^^ PossiblyNullPropertyFetch: Cannot access property $status on possibly null value
         /** @mir-check $_ is never */
         $_ = 1;
+//      ^^^^^^^ TypeCheckMismatch: Type of $_ is expected to be never, got mixed
     }
 }
 
 function enumCaseExclusionDivergesOnNonNullableReceiver(StatusHolder $h): void {
     if ($h->status !== Status::Active) {
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         /** @mir-check $_ is never */
         $_ = 1;
     }
 }
 ===expect===
-PossiblyNullPropertyFetch@14:8-14:15: Cannot access property $cls on possibly null value
-TypeCheckMismatch@16:8-16:15: Type of $_ is expected to be never, got mixed
-RedundantCondition@21:8-21:30: Condition is always true/false for type 'bool'
-PossiblyNullPropertyFetch@28:8-28:18: Cannot access property $status on possibly null value
-TypeCheckMismatch@30:8-30:15: Type of $_ is expected to be never, got mixed
-RedundantCondition@35:8-35:37: Condition is always true/false for type 'bool'

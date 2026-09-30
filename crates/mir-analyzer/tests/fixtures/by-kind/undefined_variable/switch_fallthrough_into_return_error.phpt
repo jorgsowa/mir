@@ -16,6 +16,6 @@ function foo(int $x): void {
             return;
     }
     echo $y;
+//       ^^ UndefinedVariable: Variable $y is not defined
 }
 ===expect===
-UndefinedVariable@13:9-13:11: Variable $y is not defined

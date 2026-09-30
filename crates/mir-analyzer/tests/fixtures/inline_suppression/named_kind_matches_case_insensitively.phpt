@@ -5,6 +5,6 @@ still suppresses UndefinedClass
 <?php
 function test(): void {
     noSuchFunc(new NoSuchClass()); // @mir-ignore undefinedclass
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function noSuchFunc() is not defined
 }
 ===expect===
-UndefinedFunction@3:4-3:33: Function noSuchFunc() is not defined

@@ -5,5 +5,5 @@ suppress=MissingClosureReturnType,UnusedVariable
 ===file===
 <?php
 $a = array_map(function ($i) { return $i->foo(); }, [1, 2, 3, 4]);
+//                                    ^^^^^^^^^ MixedMethodCall: Method foo() called on mixed type
 ===expect===
-MixedMethodCall@2:38-2:47: Method foo() called on mixed type

@@ -7,5 +7,5 @@ suppress=MixedAssignment
 $key = json_decode('"hello"');
 $arr = ['hello' => 1, 'world' => 2];
 echo $arr[$key];
+//        ^^^^ MixedArrayOffset: Mixed type used as array offset
 ===expect===
-MixedArrayOffset@4:10-4:14: Mixed type used as array offset

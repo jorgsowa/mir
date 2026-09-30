@@ -8,6 +8,6 @@ interface Repository {
 
 function getRepo(): void {
     new Repository();
+//      ^^^^^^^^^^ InterfaceInstantiation: Cannot instantiate interface Repository
 }
 ===expect===
-InterfaceInstantiation@7:8-7:18: Cannot instantiate interface Repository

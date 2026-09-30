@@ -9,12 +9,12 @@ suppress=MixedArgument,MixedArrayAccess,PossiblyInvalidArrayAccess
 function fromGetAllHeaders(): void {
     $headers = getallheaders();
     echo $headers['User-Agent'];
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 
 function fromApacheRequestHeaders(): void {
     $headers = apache_request_headers();
     echo $headers['User-Agent'];
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 ===expect===
-TaintedHtml@4:4-4:32: Tainted HTML output — possible XSS
-TaintedHtml@9:4-9:32: Tainted HTML output — possible XSS

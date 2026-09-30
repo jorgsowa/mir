@@ -4,6 +4,6 @@ json_decode() returns mixed; MixedReturnStatement fires when declared return is 
 <?php
 function decode(): string {
     return json_decode('{"key":"value"}');
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MixedReturnStatement: Cannot return a mixed type from function with declared return type 'string'
 }
 ===expect===
-MixedReturnStatement@3:4-3:42: Cannot return a mixed type from function with declared return type 'string'

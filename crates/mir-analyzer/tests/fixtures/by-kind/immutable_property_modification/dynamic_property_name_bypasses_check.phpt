@@ -15,14 +15,14 @@ class Box {
 
     public function mutate(string $prop): void {
         $this->$prop = 5;
+//      ^^^^^^^^^^^^^^^^ ImmutablePropertyModification: Assigning to property $prop of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
     }
 }
 
 class Caller {
     public function mutateExternal(Box $b, string $prop): void {
         $b->$prop = 5;
+//      ^^^^^^^^^^^^^ ImmutablePropertyModification: Assigning to property $prop of $b in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
     }
 }
 ===expect===
-ImmutablePropertyModification@7:8-7:24: Assigning to property $prop of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
-ImmutablePropertyModification@13:8-13:21: Assigning to property $prop of $b in an immutable context (@psalm-immutable class or @psalm-mutation-free method)

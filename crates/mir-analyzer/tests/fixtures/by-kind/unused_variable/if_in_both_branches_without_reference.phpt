@@ -5,9 +5,9 @@ If in both branches without reference
 $a = 5;
 if (rand(0, 1)) {
     $b = "hello";
+//  ^^ UnusedVariable: Variable $b is never read
 } else {
     $b = "goodbye";
 }
 echo $a;
 ===expect===
-UnusedVariable@4:4-4:6: Variable $b is never read

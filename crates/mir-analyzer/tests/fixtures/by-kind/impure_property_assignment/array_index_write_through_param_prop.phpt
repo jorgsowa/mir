@@ -15,14 +15,14 @@ class Bag {
 /** @pure */
 function pushInPure(Bag $b, int $n): void {
     $b->items[] = $n;
+//  ^^^^^^^^^^^^^^^^ ImpurePropertyAssignment: Assigning to property items of a parameter in a pure or external-mutation-free context
 }
 
 class Pusher {
     /** @psalm-external-mutation-free */
     public function pushInMutationFree(Bag $b, int $n): void {
         $b->items[] = $n;
+//      ^^^^^^^^^^^^^^^^ ImpurePropertyAssignment: Assigning to property items of a parameter in a pure or external-mutation-free context
     }
 }
 ===expect===
-ImpurePropertyAssignment@11:4-11:20: Assigning to property items of a parameter in a pure or external-mutation-free context
-ImpurePropertyAssignment@17:8-17:24: Assigning to property items of a parameter in a pure or external-mutation-free context

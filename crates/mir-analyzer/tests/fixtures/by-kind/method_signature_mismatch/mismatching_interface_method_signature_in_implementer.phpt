@@ -17,7 +17,7 @@ class B implements A {
     use T;
 
     public function fooFoo(int $a): void {
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method B::foofoo() signature mismatch: method has fewer parameters (1) than parent A::foofoo() (2)
     }
 }
 ===expect===
-MethodSignatureMismatch@14:4-14:42: Method B::foofoo() signature mismatch: method has fewer parameters (1) than parent A::foofoo() (2)

@@ -11,8 +11,8 @@ function impure_fn(): void { echo "side effect"; }
 /** @pure */
 function test(): int {
     $f = fn() => impure_fn();
+//               ^^^^^^^^^^^ ImpureFunctionCall: Calling impure function impure_fn() in a @pure function
     $f();
     return 1;
 }
 ===expect===
-ImpureFunctionCall@6:17-6:28: Calling impure function impure_fn() in a @pure function

@@ -10,7 +10,7 @@ class Foo {
     public function unserialize(string $data): void {
         $other = new Foo();
         $other->__construct();
+//      ^^^^^^^^^^^^^^^^^^^^^ DirectConstructorCall: Cannot call constructor of Foo directly
     }
 }
 ===expect===
-DirectConstructorCall@7:8-7:29: Cannot call constructor of Foo directly

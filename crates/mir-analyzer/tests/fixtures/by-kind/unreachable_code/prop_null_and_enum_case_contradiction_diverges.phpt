@@ -16,6 +16,8 @@ class Holder {
 
 function propNullOnNonNullable(Holder $h): void {
     if ($h->name === null) {
+//      ^^^^^^^^^^^^^^^^^ ImpossibleIdenticalComparison: '===' between 'string' and 'null' is always false — these types can never be identical
+//      ^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         echo "unreachable";
     }
 }
@@ -36,10 +38,8 @@ class StatusHolder {
 
 function propEnumCaseContradiction(StatusHolder $h): void {
     if ($h->status !== Status::Active) {
+//      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RedundantCondition: Condition is always true/false for type 'bool'
         echo "unreachable";
     }
 }
 ===expect===
-ImpossibleIdenticalComparison@9:8-9:25: '===' between 'string' and 'null' is always false — these types can never be identical
-RedundantCondition@9:8-9:25: Condition is always true/false for type 'bool'
-RedundantCondition@29:8-29:37: Condition is always true/false for type 'bool'

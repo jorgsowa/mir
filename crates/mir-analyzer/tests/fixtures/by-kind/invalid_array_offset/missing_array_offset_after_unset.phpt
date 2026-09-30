@@ -5,5 +5,5 @@ Missing array offset after unset
 $x = ["a" => "value", "b" => "value"];
 unset($x["a"]);
 echo $x["a"];
+//      ^^^ NonExistentArrayOffset: Array offset 'a' does not exist
 ===expect===
-NonExistentArrayOffset@4:8-4:11: Array offset 'a' does not exist

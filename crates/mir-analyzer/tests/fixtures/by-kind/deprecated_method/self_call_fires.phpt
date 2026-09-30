@@ -8,7 +8,7 @@ class Service {
 
     public function run(): void {
         $this->process();
+//      ^^^^^^^^^^^^^^^^ DeprecatedMethod: Method Service::process() is deprecated: use newProcess() instead
     }
 }
 ===expect===
-DeprecatedMethod@7:8-7:24: Method Service::process() is deprecated: use newProcess() instead

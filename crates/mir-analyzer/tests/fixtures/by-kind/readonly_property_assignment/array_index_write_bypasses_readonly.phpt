@@ -11,7 +11,7 @@ class Box {
 
     public function push(int $n): void {
         $this->items[] = $n;
+//      ^^^^^^^^^^^^^^^^^^^ ReadonlyPropertyAssignment: Cannot assign to readonly property Box::$items outside of constructor
     }
 }
 ===expect===
-ReadonlyPropertyAssignment@6:8-6:27: Cannot assign to readonly property Box::$items outside of constructor

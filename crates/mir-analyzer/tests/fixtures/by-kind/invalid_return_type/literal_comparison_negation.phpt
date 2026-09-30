@@ -23,8 +23,8 @@ function removeString(string $x): string {
 function strictlyNotOne(int $x): int {
     if ($x === 1) {
         return 1;
+//      ^^^^^^^^^ InvalidReturnType: Return type '1' is not compatible with declared '2|3'
     }
     return $x;
 }
 ===expect===
-InvalidReturnType@22:8-22:17: Return type '1' is not compatible with declared '2|3'

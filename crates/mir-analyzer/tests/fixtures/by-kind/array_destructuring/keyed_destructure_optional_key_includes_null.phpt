@@ -12,7 +12,7 @@ function test(array $arr): void {
     ['a' => $a] = $arr;
     /** @trace $a */
     strlen($a);
+//  ^^^^^^^^^^^ Trace: Type of $a is string|null
+//         ^^ PossiblyNullArgument: Argument $string of strlen() might be null
 }
 ===expect===
-Trace@8:4-8:15: Type of $a is string|null
-PossiblyNullArgument@8:11-8:13: Argument $string of strlen() might be null

@@ -3,6 +3,6 @@ Invalid backing type
 ===file===
 <?php
 enum Status: array {}
+//           ^^^^^ ParseError: Parse error: Enum backing type must be int or string
 
 ===expect===
-ParseError@2:13-2:18: Parse error: Enum backing type must be int or string

@@ -20,8 +20,8 @@ function still_flags_undefined_method($x): void {
     if (!isset($x) || $x instanceof Foo) {
         if ($x !== null) {
             $x->notAMethod();
+//          ^^^^^^^^^^^^^^^^ UndefinedMethod: Method Foo::notAMethod() does not exist
         }
     }
 }
 ===expect===
-UndefinedMethod@19:12-19:28: Method Foo::notAMethod() does not exist

@@ -5,11 +5,11 @@ reports deprecated self method
 class Greeter {
     /** @deprecated use newGreet() instead */
     public static function oldGreet(string $name): void {}
+//                                  ^^^^^^^^^^^^ UnusedParam: Parameter $name is never used
 
     public static function test(): void {
         self::oldGreet('Alice');
+//      ^^^^^^^^^^^^^^^^^^^^^^^ DeprecatedMethodCall: Call to deprecated method Greeter::oldGreet: use newGreet() instead
     }
 }
 ===expect===
-UnusedParam@4:36-4:48: Parameter $name is never used
-DeprecatedMethodCall@7:8-7:31: Call to deprecated method Greeter::oldGreet: use newGreet() instead

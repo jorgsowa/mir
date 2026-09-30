@@ -19,5 +19,5 @@ class A {
 
 $a = new A();
 echo strlen($a->foo);
+//          ^^^^^^^ InvalidArgument: Argument $string of strlen() expects 'string', got 'array{'x': int}'
 ===expect===
-InvalidArgument@17:12-17:19: Argument $string of strlen() expects 'string', got 'array{'x': int}'

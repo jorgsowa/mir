@@ -13,6 +13,6 @@ function test(): void {
     $b = new Logger();
     $b->log .= $_GET['msg'];
     echo $b->log;
+//  ^^^^^^^^^^^^^ TaintedHtml: Tainted HTML output — possible XSS
 }
 ===expect===
-TaintedHtml@8:4-8:17: Tainted HTML output — possible XSS

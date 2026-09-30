@@ -21,7 +21,7 @@ class C {
 class D extends C {
     public function bar() : void {
         $this->foo();
+//      ^^^^^^^^^^^^ UndefinedMethod: Method C::foo() does not exist
     }
 }
 ===expect===
-UndefinedMethod@20:8-20:20: Method C::foo() does not exist

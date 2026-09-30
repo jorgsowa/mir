@@ -8,7 +8,7 @@ class Notification {}
 function dispatch(Notification $n): void {
     if (property_exists($n, 'broadcastOn')) {
         $n->broadcastOn();
+//      ^^^^^^^^^^^^^^^^^ UndefinedMethod: Method Notification::broadcastOn() does not exist
     }
 }
 ===expect===
-UndefinedMethod@6:8-6:25: Method Notification::broadcastOn() does not exist

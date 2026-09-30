@@ -12,9 +12,9 @@ class Rect {
 
     public function reset(): void {
         $this->width = 0.0;
+//      ^^^^^^^^^^^^^^^^^^ ImmutablePropertyModification: Assigning to property width of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
         $this->height = 0.0;
+//      ^^^^^^^^^^^^^^^^^^^ ImmutablePropertyModification: Assigning to property height of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
     }
 }
 ===expect===
-ImmutablePropertyModification@11:8-11:26: Assigning to property width of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
-ImmutablePropertyModification@12:8-12:27: Assigning to property height of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)

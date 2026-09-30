@@ -35,6 +35,6 @@ function testMismatchStillFlagged(): void {
     /** @var DogBox<Widget> $box */
     $box = new DogBox();
     $box->requiresAnimalCollection();
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ IfThisIsMismatch: Cannot call DogBox::requiresAnimalCollection() — @if-this-is requires $this to be 'Collection<Animal>', but it is 'DogBox<Widget>'
 }
 ===expect===
-IfThisIsMismatch@29:4-29:36: Cannot call DogBox::requiresAnimalCollection() — @if-this-is requires $this to be 'Collection<Animal>', but it is 'DogBox<Widget>'

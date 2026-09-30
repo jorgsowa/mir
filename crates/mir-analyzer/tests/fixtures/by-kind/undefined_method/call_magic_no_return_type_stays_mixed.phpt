@@ -13,6 +13,6 @@ class TestDouble {
 
 function test(): void {
     (new TestDouble())->anyMethod()->anotherMethod();
+//  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ MixedMethodCall: Method anotherMethod() called on mixed type
 }
 ===expect===
-MixedMethodCall@9:4-9:52: Method anotherMethod() called on mixed type

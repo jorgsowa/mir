@@ -7,7 +7,7 @@ class Validator {
 
     public static function check(): bool {
         return self::validate();
+//             ^^^^^^^^^^^^^^^^ NonStaticSelfCall: Non-static method Validator::validate() cannot be called statically
     }
 }
 ===expect===
-NonStaticSelfCall@6:15-6:31: Non-static method Validator::validate() cannot be called statically

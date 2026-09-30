@@ -7,6 +7,6 @@ class Config {
 }
 function run(Config $c): void {
     echo $c::SECRET;
+//           ^^^^^^ InaccessibleClassConstant: Cannot access constant Config::SECRET
 }
 ===expect===
-InaccessibleClassConstant@6:13-6:19: Cannot access constant Config::SECRET

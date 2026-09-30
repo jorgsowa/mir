@@ -4,5 +4,5 @@ Int var new call
 <?php
 $a = 5;
 new $a();
+//  ^^ InvalidStringClass: Dynamic class instantiation requires string or class-string type, got '5'
 ===expect===
-InvalidStringClass@3:4-3:6: Dynamic class instantiation requires string or class-string type, got '5'

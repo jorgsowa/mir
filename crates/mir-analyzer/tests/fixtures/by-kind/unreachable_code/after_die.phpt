@@ -5,6 +5,6 @@ after die
 function foo(): void {
     die('fatal');
     $x = 2;
+//  ^^^^^^^ UnreachableCode: Unreachable code detected
 }
 ===expect===
-UnreachableCode@4:4-4:11: Unreachable code detected

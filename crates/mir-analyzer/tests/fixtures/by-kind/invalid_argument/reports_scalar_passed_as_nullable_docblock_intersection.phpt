@@ -10,6 +10,6 @@ function f($x): void { $_ = $x; }
 
 function test(): void {
     f("hello");
+//    ^^^^^^^ InvalidArgument: Argument $x of f() expects 'Iterator&Countable|null', got '"hello"'
 }
 ===expect===
-InvalidArgument@9:6-9:13: Argument $x of f() expects 'Iterator&Countable|null', got '"hello"'

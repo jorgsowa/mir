@@ -4,6 +4,6 @@ constructor reported
 <?php
 class Foo {
     public function __construct(int $x) {}
+//                              ^^^^^^ UnusedParam: Parameter $x is never used
 }
 ===expect===
-UnusedParam@3:32-3:38: Parameter $x is never used

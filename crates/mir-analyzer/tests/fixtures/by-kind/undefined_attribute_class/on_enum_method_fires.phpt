@@ -6,9 +6,9 @@ enum Status {
     case Active;
 
     #[Cache]
+//    ^^^^^ UndefinedAttributeClass: Attribute class Cache does not exist
     public function label(): string {
         return "active";
     }
 }
 ===expect===
-UndefinedAttributeClass@5:6-5:11: Attribute class Cache does not exist

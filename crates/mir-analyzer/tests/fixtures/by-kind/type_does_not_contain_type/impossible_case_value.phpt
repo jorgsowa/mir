@@ -12,7 +12,7 @@ switch ($a) {
         break;
 
     case "c":
+//       ^^^ TypeDoesNotContainType: Type '"a"|"b"' can never contain type '"c"'
         echo "impossible";
 }
 ===expect===
-TypeDoesNotContainType@11:9-11:12: Type '"a"|"b"' can never contain type '"c"'

@@ -8,8 +8,8 @@ suppress=UnusedVariable
 function f(array $x): void {
     match ($x['type']) {
         'a' => $x['bar'],
+//                ^^^^^ NonExistentArrayOffset: Array offset 'bar' does not exist
         'b' => $x['bar'],
     };
 }
 ===expect===
-NonExistentArrayOffset@5:18-5:23: Array offset 'bar' does not exist

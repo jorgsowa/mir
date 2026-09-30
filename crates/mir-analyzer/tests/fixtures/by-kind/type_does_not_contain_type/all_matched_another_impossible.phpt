@@ -8,7 +8,7 @@ function foo() : string {
         "a" => "hello",
         "b" => "goodbye",
         "c" => "impossible",
+//      ^^^ TypeDoesNotContainType: Type '"a"|"b"' can never contain type '"c"'
     };
 }
 ===expect===
-TypeDoesNotContainType@7:8-7:11: Type '"a"|"b"' can never contain type '"c"'

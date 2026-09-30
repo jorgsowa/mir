@@ -6,5 +6,5 @@ suppress=ForbiddenCode
 <?php
 function f(int $x): void { var_dump($x); }
 function test(): void { f(null); }
+//                        ^^^^ NullArgument: Argument $x of f() cannot be null
 ===expect===
-NullArgument@3:26-3:30: Argument $x of f() cannot be null

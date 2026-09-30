@@ -6,5 +6,5 @@ suppress=UnusedParam
 <?php
 class User {}
 function find(int $id): ?user { return null; }
+//                       ^^^^ WrongCaseClass: Class name 'user' has incorrect casing; use 'User'
 ===expect===
-WrongCaseClass@3:25-3:29: Class name 'user' has incorrect casing; use 'User'

@@ -4,7 +4,7 @@ isset($x) && use($x) applies narrowing from LHS to RHS in short-circuit evaluati
 ===file===
 <?php
 if (isset($x) && $x->method()) {
+//               ^^^^^^^^^^^^ MixedMethodCall: Method method() called on mixed type
     // After fix: no UndefinedVariable on RHS of isset($x) &&
 }
 ===expect===
-MixedMethodCall@2:17-2:29: Method method() called on mixed type

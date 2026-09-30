@@ -4,5 +4,5 @@ Array map with non callable string array
 <?php
 $foo = ["one", "two"];
 array_map($foo, ["hello"]);
+//        ^^^^ InvalidArgument: Argument $callback of array_map() expects 'callable', got 'array{0: "one", 1: "two"}'
 ===expect===
-InvalidArgument@3:10-3:14: Argument $callback of array_map() expects 'callable', got 'array{0: "one", 1: "two"}'

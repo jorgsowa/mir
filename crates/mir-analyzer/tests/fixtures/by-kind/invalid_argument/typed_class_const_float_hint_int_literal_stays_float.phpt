@@ -10,6 +10,7 @@ final class Foo {
     private const float PI = 3;
     public function bar(): void {
         baz([self::PI]);
+//          ^^^^^^^^^^ InvalidArgument: Argument $ids of baz() expects 'list<positive-int>', got 'array{0: float}'
     }
 }
 
@@ -17,4 +18,3 @@ final class Foo {
 function baz(array $ids): void {}
 
 ===expect===
-InvalidArgument@5:12-5:22: Argument $ids of baz() expects 'list<positive-int>', got 'array{0: float}'

@@ -14,5 +14,5 @@ function sumAll(...$nums): int {
 
 sumAll(1, 2, 3);
 sumAll(1, "bad");
+//        ^^^^^ InvalidArgument: Argument $nums of sumAll() expects 'int', got '"bad"'
 ===expect===
-InvalidArgument@8:10-8:15: Argument $nums of sumAll() expects 'int', got '"bad"'

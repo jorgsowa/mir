@@ -8,6 +8,6 @@ function maybeNull(): ?Foo { return null; }
 function test(): void {
     $x = maybeNull();
     $x->bar();
+//  ^^^^^^^^^ PossiblyNullMethodCall: Cannot call method bar() on possibly null value
 }
 ===expect===
-PossiblyNullMethodCall@6:4-6:13: Cannot call method bar() on possibly null value

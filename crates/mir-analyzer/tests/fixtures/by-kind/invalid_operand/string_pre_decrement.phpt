@@ -6,5 +6,5 @@ suppress=UnusedVariable
 <?php
 $a = "hello";
 --$a;
+//^^ InvalidOperand: Operator '--' not supported for operand of type '"hello"'
 ===expect===
-InvalidOperand@3:2-3:4: Operator '--' not supported for operand of type '"hello"'

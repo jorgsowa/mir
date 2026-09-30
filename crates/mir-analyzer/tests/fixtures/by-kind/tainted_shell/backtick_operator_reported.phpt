@@ -10,6 +10,6 @@ suppress=MixedArgument,MixedAssignment,ForbiddenCode,MixedArrayAccess,UnusedVari
 function test(): void {
     $dir = $_GET['dir'];
     $out = `ls $dir`;
+//         ^^^^^^^^^ TaintedShell: Tainted shell command — possible command injection
 }
 ===expect===
-TaintedShell@4:11-4:20: Tainted shell command — possible command injection

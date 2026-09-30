@@ -5,7 +5,7 @@ trait method body
 trait MyTrait {
     public function go(): void {
         missing_function();
+//      ^^^^^^^^^^^^^^^^^^ UndefinedFunction: Function missing_function() is not defined
     }
 }
 ===expect===
-UndefinedFunction@4:8-4:26: Function missing_function() is not defined

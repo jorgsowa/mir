@@ -9,9 +9,9 @@ suppress=MixedArgument,MixedArrayAccess,UnusedVariable
 <?php
 function run_query(mysqli $db): void {
     $tainted = $_GET['sql'];
+//  ^^^^^^^^^^^^^^^^^^^^^^^ MixedAssignment: Variable $tainted is assigned a mixed type
     $f = fn() => mysqli_query($db, $tainted);
+//               ^^^^^^^^^^^^^^^^^^^^^^^^^^^ TaintedSql: Tainted SQL query — possible SQL injection
     $f();
 }
 ===expect===
-MixedAssignment@3:4-3:27: Variable $tainted is assigned a mixed type
-TaintedSql@4:17-4:44: Tainted SQL query — possible SQL injection

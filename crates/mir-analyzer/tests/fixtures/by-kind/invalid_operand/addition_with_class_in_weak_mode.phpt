@@ -5,5 +5,5 @@ suppress=UnusedVariable
 ===file===
 <?php
 $a = "hi" + (new stdClass);
+//   ^^^^^^^^^^^^^^^^^^^^^ InvalidOperand: Operator '+' not supported between '"hi"' and 'stdClass'
 ===expect===
-InvalidOperand@2:5-2:26: Operator '+' not supported between '"hi"' and 'stdClass'

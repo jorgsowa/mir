@@ -36,6 +36,7 @@ function literalBoolKey(): void {
 
 function literalFloatKey(): void {
     $arr = [1.9 => 1];
+//          ^^^ ImplicitFloatToIntCast: Implicit cast from 1.9 to int truncates the fractional part
     /** @mir-check $arr is array{1: 1} */
     $_ = $arr;
 }
@@ -52,4 +53,3 @@ function dynamicBoolKeyFallsBackToInt(bool $b): void {
     $_ = $arr;
 }
 ===expect===
-ImplicitFloatToIntCast@30:12-30:15: Implicit cast from 1.9 to int truncates the fractional part

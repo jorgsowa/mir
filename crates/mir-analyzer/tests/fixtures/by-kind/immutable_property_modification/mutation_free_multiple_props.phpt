@@ -18,11 +18,11 @@ class Vector {
     /** @psalm-mutation-free */
     public function zero(): void {
         $this->x = 0.0;
+//      ^^^^^^^^^^^^^^ ImmutablePropertyModification: Assigning to property x of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
         $this->y = 0.0;
+//      ^^^^^^^^^^^^^^ ImmutablePropertyModification: Assigning to property y of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
         $this->z = 0.0;
+//      ^^^^^^^^^^^^^^ ImmutablePropertyModification: Assigning to property z of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
     }
 }
 ===expect===
-ImmutablePropertyModification@16:8-16:22: Assigning to property x of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
-ImmutablePropertyModification@17:8-17:22: Assigning to property y of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
-ImmutablePropertyModification@18:8-18:22: Assigning to property z of $this in an immutable context (@psalm-immutable class or @psalm-mutation-free method)
