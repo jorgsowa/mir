@@ -33,6 +33,8 @@ pub enum SinkKind {
     Shell,       // system / exec / shell_exec → command injection
     File,        // filesystem path args → path traversal / LFI / SSRF
     Unserialize, // unserialize → PHP object injection
+    Header,      // header → response splitting / open redirect
+    Cookie,      // setcookie / setrawcookie → cookie injection
 }
 
 impl SinkKind {
@@ -45,7 +47,11 @@ impl SinkKind {
     /// constant path is not flagged — only a tainted *path* is.
     pub fn tainted_arg_indices(self) -> Option<&'static [usize]> {
         match self {
-            SinkKind::Html | SinkKind::Sql | SinkKind::Shell => None,
+            SinkKind::Html
+            | SinkKind::Sql
+            | SinkKind::Shell
+            | SinkKind::Header
+            | SinkKind::Cookie => None,
             // Path is the first argument for every File sink listed below.
             SinkKind::File => Some(&[0]),
             // unserialize($data) — the payload is the first argument.
@@ -89,6 +95,10 @@ pub fn classify_sink(fn_name: &str) -> Option<SinkKind> {
     match crate::util::php_ident_lowercase(fn_name).as_str() {
         // HTML output
         "echo" | "print" | "printf" | "vprintf" | "fprintf" => Some(SinkKind::Html),
+
+        // HTTP response header / cookie
+        "header" => Some(SinkKind::Header),
+        "setcookie" | "setrawcookie" => Some(SinkKind::Cookie),
 
         // SQL
         "mysql_query" | "mysqli_query" | "mysqli_real_query" | "mysqli_multi_query"
@@ -155,6 +165,8 @@ pub fn taint_sink_issue(kind: &str) -> mir_issues::IssueKind {
     match kind {
         "llm_prompt" => mir_issues::IssueKind::TaintedLlmPrompt,
         "html" => mir_issues::IssueKind::TaintedHtml,
+        "header" => mir_issues::IssueKind::TaintedHeader,
+        "cookie" => mir_issues::IssueKind::TaintedCookie,
         "sql" => mir_issues::IssueKind::TaintedSql,
         "shell" => mir_issues::IssueKind::TaintedShell,
         other => mir_issues::IssueKind::TaintedInput {

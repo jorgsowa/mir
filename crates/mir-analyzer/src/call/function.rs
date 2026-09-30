@@ -407,6 +407,8 @@ impl CallAnalyzer {
                         SinkKind::Html => IssueKind::TaintedHtml,
                         SinkKind::Sql => IssueKind::TaintedSql,
                         SinkKind::Shell => IssueKind::TaintedShell,
+                        SinkKind::Header => IssueKind::TaintedHeader,
+                        SinkKind::Cookie => IssueKind::TaintedCookie,
                         SinkKind::File => IssueKind::TaintedInput {
                             sink: "file".to_string(),
                         },

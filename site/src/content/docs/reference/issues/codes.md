@@ -144,6 +144,8 @@ issues keep their code.
 | MIR0802  | TaintedSql                    | [security/tainted-sql](../security/tainted-sql/) |
 | MIR0803  | TaintedShell                  | [security/tainted-shell](../security/tainted-shell/) |
 | MIR0804  | TaintedLlmPrompt              | [security/tainted-llm-prompt](../security/tainted-llm-prompt/) |
+| MIR0805  | TaintedHeader                 | [security/tainted-header](../security/tainted-header/) |
+| MIR0806  | TaintedCookie                 | [security/tainted-cookie](../security/tainted-cookie/) |
 | MIR0900  | InvalidTemplateParam          | [generics/invalid-template-param](../generics/invalid-template-param/) |
 | MIR0901  | ShadowedTemplateParam         | [generics/shadowed-template-param](../generics/shadowed-template-param/) |
 | MIR0902  | IfThisIsMismatch              | [generics/if-this-is-mismatch](../generics/if-this-is-mismatch/) |

@@ -137,6 +137,8 @@ All issue types mir can emit, grouped by category.
 | `TaintedSql` | User-controlled input reaches a SQL sink without parameterization. |
 | `TaintedShell` | User-controlled input reaches a shell execution sink without escaping. |
 | `TaintedLlmPrompt` | Tainted input reaches a `@taint-sink llm_prompt` parameter without sanitization. |
+| `TaintedHeader` | User-controlled input reaches `header()` without validation. |
+| `TaintedCookie` | User-controlled input reaches `setcookie()` / `setrawcookie()` without validation. |
 
 ## Generics
 

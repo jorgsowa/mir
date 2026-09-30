@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `TaintedHeader` (MIR0805) for tainted input reaching `header()`, and `TaintedCookie` (MIR0806) for `setcookie()`/`setrawcookie()`. Also accepted as `@taint-sink header` / `@taint-sink cookie`.
+- `exit`/`die` with a tainted string operand reports `TaintedHtml`; `mysqli_real_query`, `mysqli_multi_query` and `pg_send_query` are SQL sinks.
 - Optional Psalm-compatible `errorLevel` (1–8, root attribute or `--error-level`):
   issues below the configured Psalm level are downgraded to info. Unset keeps
   mir's own severities.
