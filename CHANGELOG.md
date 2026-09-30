@@ -7,7 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.80.0] - 2026-09-30
+
+### Added
+
+- `array_filter()` narrows its result when the callback excludes `null`,
+  including predicates beyond `is_null`.
+- Niladic `$this->prop !== null` predicate methods infer
+  `assert-if-true` / `assert-if-false`.
+- `===edit===` sections in phpt fixtures, with edit fixtures grouped under
+  `by-edit/`.
+- Symbol resolution in unreachable code, for a cursor just past an identifier,
+  for class-constant fetches (class token), and for method declaration names in
+  find-references.
+- Definition locations for global constants, and property definitions resolved
+  by kind when a method shares the name.
+
 ### Fixed
+
 
 - Re-analysis after an edit no longer panics with "Data for reusable `Fqcn`
   was not interned in the latest revision" when a cached inference reused a
@@ -17,8 +34,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   calls between unannotated functions in the same file now use the callee's
   inferred type instead of `mixed`. A return type that keeps growing through
   recursion widens to `mixed`.
+- `@return` docblocks no longer lose the `null` member in spaced unions, and a
+  bare `non-empty-list` keeps its non-empty guarantee.
+- `list<T>` return types are checked against keyed-array shapes, and any
+  return type is accepted for `void`-typed callable params.
+- An override may widen a parent's intersection param to one of its parts.
+  Unrelated override param types report "incompatible with"; "narrower than" is
+  kept for real narrowing.
+- A native-only override inherits the parent's docblock-refined return type.
+- Readonly redeclaration of a get-only hook property is allowed.
+- A bare generic instantiation is accepted against a parameterized target.
+- `use const` imports resolve for unqualified constant references.
+- Writes in the RHS of a short-circuit expression join the parent flow state.
+- `const` declarations infer a literal type, class tokens are typed as
+  `class-string<Fqcn>`, and first-class callables of functions are typed as
+  their `Closure`.
+- In-process parse cache entries are reused only for the same path.
+- Interned `Fqcn` values are never collected.
 
 ### Changed
+
+- php-rs-parser, php-ast, php-lexer and phpdoc-parser upgraded to 0.21.
 
 - Inferred return types are computed only for calls whose declared return type
   doesn't already decide the result, cutting cold analysis of Laravel from
