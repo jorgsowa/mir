@@ -617,8 +617,7 @@ fn callback_predicate_narrowed(
     callback_expr: Option<&Expr>,
     db: &dyn crate::db::MirDatabase,
 ) -> Option<Type> {
-    let (param_name, body) =
-        super::callable::single_param_predicate_body(callback_expr?)?;
+    let (param_name, body) = super::callable::single_param_predicate_body(callback_expr?)?;
     let (fn_name, is_true) = crate::narrowing::classify_var_predicate(body, param_name)?;
     crate::narrowing::type_fn_narrowed(value, fn_name.as_ref(), db, is_true)
 }

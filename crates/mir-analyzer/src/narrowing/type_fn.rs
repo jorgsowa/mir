@@ -405,9 +405,7 @@ pub(crate) fn classify_var_predicate<'a>(
             _ => e,
         }
     }
-    let is_var = |e: &Expr| {
-        matches!(&unwrap(e).kind, ExprKind::Variable(name) if name.trim_start_matches('$') == var_name)
-    };
+    let is_var = |e: &Expr| matches!(&unwrap(e).kind, ExprKind::Variable(name) if name.trim_start_matches('$') == var_name);
     let call_fn_name = |e: &'a Expr| -> Option<&'a str> {
         let ExprKind::FunctionCall(call) = &unwrap(e).kind else {
             return None;
@@ -435,7 +433,7 @@ pub(crate) fn classify_var_predicate<'a>(
             };
             let matches_null = (is_var(&b.left) && matches!(unwrap(&b.right).kind, ExprKind::Null))
                 || (is_var(&b.right) && matches!(unwrap(&b.left).kind, ExprKind::Null));
-            matches_null.then(|| (Cow::Borrowed("is_null"), is_true))
+            matches_null.then_some((Cow::Borrowed("is_null"), is_true))
         }
         _ => call_fn_name(e).map(|name| (Cow::Borrowed(name), true)),
     }
