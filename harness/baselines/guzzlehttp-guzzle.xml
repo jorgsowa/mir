@@ -8,7 +8,6 @@
   <file src="src/Cookie/CookieJar.php">
     <ImpossibleIdenticalComparison>
       <code><![CDATA[$cookie->getName() !== null]]></code>
-      <code><![CDATA[++$accepted === self::MAX_SET_COOKIE_FIELDS]]></code>
     </ImpossibleIdenticalComparison>
   </file>
   <file src="src/Handler/CurlMultiHandler.php">

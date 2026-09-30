@@ -67,18 +67,11 @@ impl<'a> ExpressionAnalyzer<'a> {
             if !right_ctx.diverges {
                 let _right_ty = self.analyze(&b.right, &mut right_ctx);
             }
-            // Propagate reads and consumed write locations from the short-circuit
-            // RHS back to the parent. Without this, a variable consumed only in
-            // the RHS (e.g. `A && $x['key']`) would not be marked as consumed in
-            // the parent, causing its pending write to survive into a catch block
-            // that resets last_write_locs to the pre-try state.
+            // Reads consumed only in the RHS (`A && $x['key']`) must reach the
+            // parent, or the pending write survives into a catch block.
             ctx.absorb_branch_reads(&right_ctx);
-            for (name, ty) in right_ctx.vars.iter() {
-                if !ctx.vars.contains_key(name) {
-                    std::sync::Arc::make_mut(&mut ctx.vars).insert(*name, ty.clone());
-                    std::sync::Arc::make_mut(&mut ctx.possibly_assigned_vars).insert(*name);
-                }
-            }
+            // The RHS runs on some paths only: join its writes with the skipped state.
+            *ctx = FlowState::merge_branches(ctx, ctx.clone(), Some(right_ctx));
             return Type::single(Atomic::TBool);
         }
 

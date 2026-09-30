@@ -41,6 +41,11 @@ function runMir(array $args, string $cwd): array
     return [$stdout, $stderr, $exitCode];
 }
 
+function countBaselineEntries(string $baselineFile): int
+{
+    return substr_count((string) file_get_contents($baselineFile), '<code>');
+}
+
 $overallStatus = 0;
 
 foreach (require $here . '/packages.php' as $package) {

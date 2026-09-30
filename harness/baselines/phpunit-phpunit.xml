@@ -135,12 +135,6 @@
       <code><![CDATA[]]></code>
     </UnusedVariable>
   </file>
-  <file src="src/TextUI/Configuration/SourceMapper.php">
-    <InvalidPropertyAssignment>
-      <code><![CDATA[self::$files = new SplObjectStorage]]></code>
-      <code><![CDATA[self::$files = new SplObjectStorage]]></code>
-    </InvalidPropertyAssignment>
-  </file>
   <file src="src/Util/PHP/JobRunner.php">
     <UnusedForeachValue>
       <code><![CDATA[]]></code>
