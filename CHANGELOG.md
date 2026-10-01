@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.83.0] - 2026-10-02
+
 ### Added
 
 - `memoizeMethodCallResults="true"` on the config root (and `AnalysisSession::with_memoize_method_call_results`) assumes repeated zero-arg method calls on the same receiver return the same value, as in Psalm. Guards on `$a->b()`, `$a->b()->prop` and `$a->b()->c()` (null, truthiness, `instanceof`) then hold for the next identical call until an impure call on the receiver or a reassignment. Off by default.
