@@ -99,16 +99,8 @@ pub(super) fn check_counts(
         }
 
         if seen_named && !has_spread {
+            // The parser already reports a positional argument after a named one.
             has_shape_error = true;
-            ea.emit(
-                IssueKind::InvalidNamedArgument {
-                    fn_name: fn_name.to_string(),
-                    name: format!("#{}", i + 1),
-                    overwrites: false,
-                },
-                Severity::Error,
-                *span,
-            );
             continue;
         }
 
