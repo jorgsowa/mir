@@ -1353,15 +1353,20 @@ impl MirDbStorage {
         }
     }
 
-    /// Transitive subtypes of `fqcn` from the maintained edge index.
+    /// Subtypes of `fqcn` from the maintained edge index: transitive, or only
+    /// those naming it as a direct parent when `direct_only`.
     pub fn subtype_sites_of(
         &self,
         fqcn: &str,
         include_trait_users: bool,
+        direct_only: bool,
     ) -> Vec<crate::db::subtype_index::SubtypeSite> {
-        self.subtype_index
-            .lock()
-            .subtypes_of(fqcn, include_trait_users)
+        let index = self.subtype_index.lock();
+        if direct_only {
+            index.direct_subtypes_of(fqcn, include_trait_users)
+        } else {
+            index.subtypes_of(fqcn, include_trait_users)
+        }
     }
 
     /// Mark a file path as a user-provided stub so `workspace_symbol_index`

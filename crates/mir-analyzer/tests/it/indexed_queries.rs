@@ -385,6 +385,56 @@ fn subtype_files_include_trait_users_on_request() {
 }
 
 #[test]
+fn direct_subtype_classes_exclude_grandchildren() {
+    let files = [
+        ("animal.php", "<?php\nnamespace Zoo;\ninterface Animal {}\n"),
+        (
+            "cat.php",
+            "<?php\nnamespace Pets;\nuse Zoo\\Animal as Beast;\nclass Cat implements Beast {}\n",
+        ),
+        (
+            "lion.php",
+            "<?php\nnamespace Wild;\nclass Lion extends \\Pets\\Cat {}\n",
+        ),
+        (
+            "dog.php",
+            "<?php\nnamespace Pets;\nclass Dog implements \\Zoo\\Animal {}\n",
+        ),
+    ];
+    let mut session = session_with(&files);
+    let names = |subs: Vec<mir_analyzer::SubtypeClassSite>| {
+        let mut n: Vec<String> = subs.iter().map(|s| s.fqcn.to_string()).collect();
+        n.sort();
+        n
+    };
+    let direct = session.indexed_direct_subtype_classes("Zoo\\Animal", &paths(&files), false);
+    assert_eq!(names(direct), vec!["Pets\\Cat", "Pets\\Dog"]);
+    let transitive = session.indexed_subtype_classes("Zoo\\Animal", &paths(&files), false);
+    assert_eq!(
+        names(transitive),
+        vec!["Pets\\Cat", "Pets\\Dog", "Wild\\Lion"]
+    );
+    let of_cat = session.indexed_direct_subtype_classes("Pets\\Cat", &paths(&files), false);
+    assert_eq!(names(of_cat), vec!["Wild\\Lion"]);
+}
+
+#[test]
+fn direct_subtype_classes_trait_users_on_request() {
+    let files = [
+        ("helper.php", "<?php\ntrait Helper {}\n"),
+        ("post.php", "<?php\nclass Post { use Helper; }\n"),
+        ("page.php", "<?php\nclass Page extends Post {}\n"),
+    ];
+    let mut session = session_with(&files);
+    assert!(session
+        .indexed_direct_subtype_classes("Helper", &paths(&files), false)
+        .is_empty());
+    let users = session.indexed_direct_subtype_classes("Helper", &paths(&files), true);
+    assert_eq!(users.len(), 1, "{users:?}");
+    assert_eq!(users[0].fqcn.as_ref(), "Post");
+}
+
+#[test]
 fn subtype_classes_do_not_fall_back_to_another_namespace() {
     let files = [
         (

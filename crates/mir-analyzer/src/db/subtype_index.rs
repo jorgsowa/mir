@@ -413,10 +413,23 @@ impl SubtypeIndex {
         let Some(root) = self.lookup_edge_key(fqcn) else {
             return Vec::new();
         };
-        self.subtypes_of_key(root, include_trait_users)
+        self.subtypes_of_key(root, include_trait_users, false)
     }
 
-    fn subtypes_of_key(&self, root: KeyId, include_trait_users: bool) -> Vec<SubtypeSite> {
+    /// Subtypes that name `fqcn` as a direct parent, without descending.
+    pub fn direct_subtypes_of(&self, fqcn: &str, include_trait_users: bool) -> Vec<SubtypeSite> {
+        let Some(root) = self.lookup_edge_key(fqcn) else {
+            return Vec::new();
+        };
+        self.subtypes_of_key(root, include_trait_users, true)
+    }
+
+    fn subtypes_of_key(
+        &self,
+        root: KeyId,
+        include_trait_users: bool,
+        direct_only: bool,
+    ) -> Vec<SubtypeSite> {
         let mut visited: FxHashSet<KeyId> = FxHashSet::default();
         visited.insert(root);
         let mut queue: Vec<KeyId> = vec![root];
@@ -458,7 +471,7 @@ impl SubtypeIndex {
                         location: stored.location.clone(),
                     });
                 }
-                if qualifies {
+                if qualifies && !direct_only {
                     visited.insert(*child);
                     queue.push(*child);
                 }

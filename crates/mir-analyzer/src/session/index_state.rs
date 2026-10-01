@@ -727,6 +727,7 @@ const REF_QUERY_CACHE_LOCATION_CAP: usize = 200_000;
 pub(crate) struct SubtypeQueryCacheKey {
     pub(crate) class_fqn: String,
     pub(crate) include_trait_users: bool,
+    pub(crate) direct_only: bool,
     pub(crate) generation: QueryGeneration,
     pub(crate) files_hash: u64,
 }

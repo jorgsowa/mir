@@ -296,6 +296,19 @@ impl AnalysisSession {
         })
     }
 
+    /// See [`AnalysisSnapshot::indexed_direct_subtype_classes`].
+    pub fn indexed_direct_subtype_classes(
+        &mut self,
+        class_fqn: &str,
+        files: &[Arc<str>],
+        include_trait_users: bool,
+    ) -> Vec<SubtypeClassSite> {
+        self.prepare_for_query(None);
+        self.query_snapshot(|snap| {
+            snap.indexed_direct_subtype_classes(class_fqn, files, include_trait_users)
+        })
+    }
+
     /// See [`AnalysisSnapshot::indexed_method_implementations`].
     pub fn indexed_method_implementations(
         &mut self,

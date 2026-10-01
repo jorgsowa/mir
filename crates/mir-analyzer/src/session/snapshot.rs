@@ -804,7 +804,7 @@ impl AnalysisSnapshot {
             .collect::<Vec<_>>();
         out.extend(ancestors);
         out.extend(
-            db.subtype_sites_of(target, true)
+            db.subtype_sites_of(target, true, false)
                 .into_iter()
                 .map(|s| s.fqcn.trim_start_matches('\\').to_string()),
         );
@@ -1020,17 +1020,41 @@ impl AnalysisSnapshot {
         files: &[Arc<str>],
         include_trait_users: bool,
     ) -> Result<Vec<SubtypeClassSite>, Cancelled> {
+        self.subtype_classes_memoized(class_fqn, files, include_trait_users, false)
+    }
+
+    /// Like [`Self::indexed_subtype_classes`], restricted to subtypes that
+    /// name `class_fqn` directly in `extends`/`implements` (or `use` when
+    /// `include_trait_users`), resolved by canonical FQCN.
+    pub fn indexed_direct_subtype_classes(
+        &self,
+        class_fqn: &str,
+        files: &[Arc<str>],
+        include_trait_users: bool,
+    ) -> Result<Vec<SubtypeClassSite>, Cancelled> {
+        self.subtype_classes_memoized(class_fqn, files, include_trait_users, true)
+    }
+
+    fn subtype_classes_memoized(
+        &self,
+        class_fqn: &str,
+        files: &[Arc<str>],
+        include_trait_users: bool,
+        direct_only: bool,
+    ) -> Result<Vec<SubtypeClassSite>, Cancelled> {
         catch(|| {
             let key = SubtypeQueryCacheKey {
                 class_fqn: class_fqn.trim_start_matches('\\').to_ascii_lowercase(),
                 include_trait_users,
+                direct_only,
                 generation: self.query_cache_generation(),
                 files_hash: hash_files(files),
             };
             if let Some(hit) = self.index.subtype_queries.get(&key) {
                 return hit;
             }
-            let out = self.subtype_classes_uncached(class_fqn, files, include_trait_users);
+            let out =
+                self.subtype_classes_uncached(class_fqn, files, include_trait_users, direct_only);
             if let Err(cancelled) = self.ensure_no_retire_since(key.generation) {
                 unwind(cancelled);
             }
@@ -1048,6 +1072,7 @@ impl AnalysisSnapshot {
         class_fqn: &str,
         files: &[Arc<str>],
         include_trait_users: bool,
+        direct_only: bool,
     ) -> Vec<SubtypeClassSite> {
         let db = &self.db;
         let mut scanned: HashSet<String> = HashSet::default();
@@ -1064,7 +1089,10 @@ impl AnalysisSnapshot {
             if !needles.is_empty() {
                 self.commit_defs_for_matching(files, &needles);
             }
-            sites = db.subtype_sites_of(class_fqn, include_trait_users);
+            sites = db.subtype_sites_of(class_fqn, include_trait_users, direct_only);
+            if direct_only {
+                break;
+            }
             pending = sites
                 .iter()
                 .map(|s| s.fqcn.trim_start_matches('\\').to_string())
