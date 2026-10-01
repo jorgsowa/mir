@@ -136,15 +136,10 @@ fn symfony_query_analyze_file_false_positives() {
         .expect("ParameterBag file");
     let parameter_bag_out = analyze_file(&db, parameter_bag);
     assert!(
-        parameter_bag_out.issues.contains(
-            &Issue::new(
-                IssueKind::UndefinedClass {
-                    name: "T".to_string(),
-                },
-                Location::new(fx.parameter_bag.clone(), 200, 200, 19, 25),
-            )
-            .with_snippet("$class")
-        ),
-        "ParameterBag currently reports a template-docblock false positive for T"
+        !parameter_bag_out
+            .issues
+            .iter()
+            .any(|issue| matches!(&issue.kind, IssueKind::UndefinedClass { name } if name == "T")),
+        "ParameterBag must not report the template parameter T as an undefined class"
     );
 }
