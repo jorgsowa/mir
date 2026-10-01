@@ -1230,6 +1230,12 @@ impl<'a> DefinitionCollector<'a> {
         })
     }
 
+    /// Source location of a docblock tag; `None` when the docblock's position is unknown.
+    fn tag_location(&self, doc_start: Option<u32>, tag_span: (u32, u32)) -> Option<Location> {
+        let base = doc_start?;
+        Some(self.location(base + tag_span.0, base + tag_span.1))
+    }
+
     fn location(&self, start: u32, end: u32) -> Location {
         let src = self.source;
         let start_off = start as usize;
@@ -1400,6 +1406,7 @@ impl<'a> DefinitionCollector<'a> {
         own_methods: &mut mir_codebase::definitions::MemberMap<Arc<MethodDef>>,
         own_properties: &mut mir_codebase::definitions::MemberMap<PropertyDef>,
         location: Option<Location>,
+        doc_start: Option<u32>,
         template_names: &rustc_hash::FxHashSet<String>,
         template_params: &[TemplateParam],
     ) {
@@ -1431,7 +1438,9 @@ impl<'a> DefinitionCollector<'a> {
                     is_static: false,
                     is_readonly: prop.read_only,
                     default: None,
-                    location: location.clone(),
+                    location: self
+                        .tag_location(doc_start, prop.tag_span)
+                        .or_else(|| location.clone()),
                     deprecated: None,
                     has_native_readonly: false,
                     // Magic `@property` declarations carry no PHP native type.
@@ -1518,7 +1527,9 @@ impl<'a> DefinitionCollector<'a> {
                     is_impure: false,
                     no_named_arguments: false,
                     is_override: false,
-                    location: location.clone(),
+                    location: self
+                        .tag_location(doc_start, method.tag_span)
+                        .or_else(|| location.clone()),
                     docstring: None,
                     is_virtual: true,
                     taint_sink_params: vec![],

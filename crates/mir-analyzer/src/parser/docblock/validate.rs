@@ -324,6 +324,7 @@ pub(super) fn parse_method_line(s: &str) -> Option<DocMethod> {
         name,
         is_static,
         params: parse_method_params(rest),
+        tag_span: (0, 0),
     })
 }
 

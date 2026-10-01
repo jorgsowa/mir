@@ -15,5 +15,5 @@ class A {
 
 /** @method D foo(string $s) */
 class B extends A {}
-//<^^^^^^^^^^^^^^^^^^^^ MethodSignatureMismatch: Method B::foo() signature mismatch: return type 'D' is not a subtype of parent 'C'
 ===expect===
+MethodSignatureMismatch@11:4-11:31: Method B::foo() signature mismatch: return type 'D' is not a subtype of parent 'C'

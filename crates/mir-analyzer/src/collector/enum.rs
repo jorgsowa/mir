@@ -334,6 +334,7 @@ impl DefinitionCollector<'_> {
             &mut own_methods,
             &mut own_properties,
             Some(self.location(stmt_span.start, stmt_span.end)),
+            decl.doc_comment.as_ref().map(|c| c.span.start),
             &rustc_hash::FxHashSet::default(),
             &[],
         );

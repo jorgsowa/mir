@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Method calls on an intersection-typed receiver (`Mock&Svc`) now record a navigation symbol, so go-to-definition and references resolve.
 - A `@return $this` method now keeps the receiver's class in chains (`$sub->chain()->subOnly()`), like `@return static`.
 - Go-to-definition and find-references now resolve on the declaration name of global constants, class/interface/trait/enum constants and properties.
+- `@method` and `@property` members now carry their own tag location, so go-to-definition lands on the tag instead of the class; signature-mismatch diagnostics on `@method` members point at the tag too.
 
 ## [0.82.0] - 2026-10-01
 

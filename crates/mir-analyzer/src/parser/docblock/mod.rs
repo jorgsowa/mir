@@ -355,6 +355,7 @@ impl DocblockParser {
                                 text,
                             );
                             result.properties.push(DocProperty {
+                                tag_span: tag_head_span(text, tag.span.start, tag.span.end),
                                 type_hint: ty_str,
                                 name: name.trim_start_matches('$').to_string(),
                                 read_only: false,
@@ -374,6 +375,7 @@ impl DocblockParser {
                                 text,
                             );
                             result.properties.push(DocProperty {
+                                tag_span: tag_head_span(text, tag.span.start, tag.span.end),
                                 type_hint: ty_str,
                                 name: name.trim_start_matches('$').to_string(),
                                 read_only: true,
@@ -393,6 +395,7 @@ impl DocblockParser {
                                 text,
                             );
                             result.properties.push(DocProperty {
+                                tag_span: tag_head_span(text, tag.span.start, tag.span.end),
                                 type_hint: ty_str,
                                 name: name.trim_start_matches('$').to_string(),
                                 read_only: false,
@@ -405,7 +408,8 @@ impl DocblockParser {
                     let body_str = body_text(&tag.body).unwrap_or_default().trim().to_string();
                     if let Some(err) = validate_method_body(&body_str) {
                         result.invalid_annotations.push(err);
-                    } else if let Some(m) = parse_method_line(&body_str) {
+                    } else if let Some(mut m) = parse_method_line(&body_str) {
+                        m.tag_span = tag_head_span(text, tag.span.start, tag.span.end);
                         for p in &m.params {
                             record_backslash_keyword_types(
                                 &mut result,
@@ -520,6 +524,7 @@ impl DocblockParser {
                     if let Some(body_str) = body_text(&tag.body) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             result.properties.push(DocProperty {
+                                tag_span: tag_head_span(text, tag.span.start, tag.span.end),
                                 type_hint: ty_str,
                                 name,
                                 read_only: false,
@@ -532,6 +537,7 @@ impl DocblockParser {
                     if let Some(body_str) = body_text(&tag.body) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             result.properties.push(DocProperty {
+                                tag_span: tag_head_span(text, tag.span.start, tag.span.end),
                                 type_hint: ty_str,
                                 name,
                                 read_only: true,
@@ -544,6 +550,7 @@ impl DocblockParser {
                     if let Some(body_str) = body_text(&tag.body) {
                         if let Some((ty_str, name)) = parse_param_line(&body_str) {
                             result.properties.push(DocProperty {
+                                tag_span: tag_head_span(text, tag.span.start, tag.span.end),
                                 type_hint: ty_str,
                                 name,
                                 read_only: false,
@@ -731,12 +738,29 @@ fn parse_self_out_type(trimmed: &str) -> Type {
 // ParsedDocblock support types
 // ---------------------------------------------------------------------------
 
+/// Byte range of a tag's first line, without trailing whitespace or the
+/// docblock's closing `*/`.
+fn tag_head_span(text: &str, start: impl TryInto<usize>, end: impl TryInto<usize>) -> (u32, u32) {
+    let (Ok(start), Ok(end)) = (start.try_into(), end.try_into()) else {
+        return (0, 0);
+    };
+    let end = end.min(text.len());
+    let Some(raw) = text.get(start..end) else {
+        return (start as u32, end as u32);
+    };
+    let head = raw.lines().next().unwrap_or(raw);
+    let head = head.trim_end().trim_end_matches("*/").trim_end();
+    (start as u32, (start + head.len()) as u32)
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct DocProperty {
     pub type_hint: String,
     pub name: String,     // without leading $
     pub read_only: bool,  // true for @property-read
     pub write_only: bool, // true for @property-write
+    /// Byte range of the tag within the docblock text.
+    pub tag_span: (u32, u32),
 }
 
 #[derive(Debug, Default, Clone)]
@@ -745,6 +769,8 @@ pub struct DocMethod {
     pub name: String,
     pub is_static: bool,
     pub params: Vec<DocMethodParam>,
+    /// Byte range of the tag within the docblock text.
+    pub tag_span: (u32, u32),
 }
 
 #[derive(Debug, Default, Clone)]

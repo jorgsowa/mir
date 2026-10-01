@@ -291,6 +291,7 @@ impl<'a> DefinitionCollector<'a> {
             &mut own_methods,
             &mut own_properties,
             Some(self.location(stmt_span.start, stmt_span.end)),
+            decl.doc_comment.as_ref().map(|c| c.span.start),
             &trait_template_names,
             &trait_template_params,
         );
