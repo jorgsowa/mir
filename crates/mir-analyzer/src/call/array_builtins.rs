@@ -588,13 +588,16 @@ pub(crate) fn infer_array_filter_return(
     if source.is_mixed() {
         return None;
     }
+    let default_mode = arg_types
+        .get(2)
+        .is_none_or(|m| m.types.iter().all(|a| matches!(a, Atomic::TLiteralInt(0))));
+    if let Some(shape) = filtered_keyed_shape(source, default_mode, callback_expr, db) {
+        return Some(shape);
+    }
     let (key, value) = crate::stmt::infer_foreach_types(source);
     if key.is_mixed() && value.is_mixed() {
         return None;
     }
-    let default_mode = arg_types
-        .get(2)
-        .is_none_or(|m| m.types.iter().all(|a| matches!(a, Atomic::TLiteralInt(0))));
     let value = if default_mode {
         callback_predicate_narrowed(&value, callback_expr, db).unwrap_or(value)
     } else {
@@ -603,6 +606,38 @@ pub(crate) fn infer_array_filter_return(
     Some(Type::single(Atomic::TArray {
         key: Box::new(key),
         value: Box::new(value),
+    }))
+}
+
+/// A filtered non-list shape keeps its keys, each now optional (any entry may
+/// be dropped). Value narrowing follows the same rule as the generic path.
+fn filtered_keyed_shape(
+    source: &Type,
+    default_mode: bool,
+    callback_expr: Option<&Expr>,
+    db: &dyn crate::db::MirDatabase,
+) -> Option<Type> {
+    let [Atomic::TKeyedArray {
+        properties,
+        is_open,
+        is_list: false,
+    }] = source.types.as_slice()
+    else {
+        return None;
+    };
+    let mut properties = properties.clone();
+    for prop in properties.values_mut() {
+        prop.optional = true;
+        if default_mode {
+            if let Some(narrowed) = callback_predicate_narrowed(&prop.ty, callback_expr, db) {
+                prop.ty = narrowed;
+            }
+        }
+    }
+    Some(Type::single(Atomic::TKeyedArray {
+        properties,
+        is_open: *is_open,
+        is_list: false,
     }))
 }
 
