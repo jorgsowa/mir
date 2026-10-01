@@ -223,7 +223,7 @@ impl AnalysisSession {
                     }
                 }
                 let entries = crate::db::subtype_index::entries_from_slice(&defs.slice);
-                let file_no = db.locked_ref_index().intern_path(&parsed.file);
+                let file_no = db.intern_path(&parsed.file);
                 db.set_file_class_edges(file_no, entries);
                 all_issues.extend(Arc::unwrap_or_clone(defs.issues));
             }
@@ -448,7 +448,7 @@ impl AnalysisSession {
             for (file, issues, symbols, ref_locs) in body_results {
                 all_issues.extend(issues);
                 all_symbols.extend(symbols);
-                let file_no = db.locked_ref_index().intern_path(&file);
+                let file_no = db.intern_path(&file);
                 db.set_file_reference_locations(file_no, ref_locs);
             }
         }
@@ -583,7 +583,7 @@ impl AnalysisSession {
                 // text are refused, as on the analysis path below.
                 self.index.retire_references(&self.db.salsa, file_path);
                 let db = &self.db.salsa;
-                let file_no = db.locked_ref_index().intern_path(&file);
+                let file_no = db.intern_path(&file);
                 db.set_file_reference_locations(file_no, locs);
                 self.index.clear_dependency_graph_cache();
                 opts.apply(&mut issues);
@@ -634,7 +634,7 @@ impl AnalysisSession {
                 );
                 all_issues.extend(body_issues);
                 let pending = db.take_pending_ref_locs();
-                let file_no = db.locked_ref_index().intern_path(&file);
+                let file_no = db.intern_path(&file);
                 db.set_file_reference_locations(file_no, pending);
                 if opts.skip_symbols {
                     Vec::new()
@@ -786,7 +786,7 @@ impl AnalysisSession {
             let db = &self.db.salsa;
             for (file, slice) in &prepared {
                 let entries = crate::db::subtype_index::entries_from_slice(slice);
-                let file_no = db.locked_ref_index().intern_path(file);
+                let file_no = db.intern_path(file);
                 db.set_file_class_edges(file_no, entries);
             }
         }

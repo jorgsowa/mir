@@ -196,20 +196,12 @@ impl AnalysisSession {
         if should_cancel() {
             return None;
         }
-        let stale = self.db_view().stale_reference_candidates(symbol, files);
+        let stale = self
+            .db_view()
+            .stale_reference_candidates_unguarded(symbol, files);
 
         if !stale.is_empty() {
-            // The bump scope closes before the commit view captures its
-            // generation.
-            {
-                let mut session = self.defer_revision_bumps();
-                for path in &stale {
-                    if !session.prepare_file_for_analysis_cancellable(path, should_cancel) {
-                        return None;
-                    }
-                }
-            }
-            if should_cancel() {
+            if !self.prepare_stale_candidates(&stale, should_cancel) {
                 return None;
             }
             self.query_snapshot(|snap| snap.commit_reference_candidates(&stale));
@@ -222,6 +214,61 @@ impl AnalysisSession {
         let out = snap.read_references(symbol, files, include_declaration, includes);
         snap.memoize_references(key, &out);
         Some(out)
+    }
+
+    /// Owner-side prelude for [`AnalysisSnapshot::indexed_references_to`]:
+    /// the warm-up [`Self::indexed_references_to`] runs before reading, so a
+    /// snapshot taken afterwards analyzes every stale candidate with its
+    /// dependencies loaded.
+    ///
+    /// `stale` is [`AnalysisSnapshot::stale_reference_candidates`], computed
+    /// on a snapshot *before* the host takes its lock to call this: that scan
+    /// is O(candidates) and, on a cold workspace, scans file text, so it must
+    /// not run under the lock. Only the stale files are prepared (not every
+    /// candidate), the workspace index is settled when it has pending work,
+    /// and with `include_declaration` the file declaring `symbol` is loaded.
+    /// With nothing stale and nothing pending this is a no-op. A file that
+    /// went stale after `stale` was computed is analyzed without the warm-up,
+    /// as it would be without this call. `false` when `should_cancel` stopped
+    /// it first.
+    pub fn prepare_references_query(
+        &mut self,
+        symbol: &crate::Name,
+        stale: &[Arc<str>],
+        include_declaration: bool,
+        should_cancel: &(dyn Fn() -> bool + Sync),
+    ) -> bool {
+        if self.db.salsa.needs_index_settle()
+            && !self.settle_workspace_index_cancellable(should_cancel)
+        {
+            return false;
+        }
+        if !self.prepare_stale_candidates(stale, should_cancel) {
+            return false;
+        }
+        if include_declaration {
+            self.load_symbol_owner(symbol);
+        }
+        true
+    }
+
+    /// Class-load warm-up for `stale`, with revision bumps coalesced. The
+    /// bump scope closes before the caller's commit view captures its
+    /// generation.
+    fn prepare_stale_candidates(
+        &mut self,
+        stale: &[Arc<str>],
+        should_cancel: &(dyn Fn() -> bool + Sync),
+    ) -> bool {
+        {
+            let mut session = self.defer_revision_bumps();
+            for path in stale {
+                if !session.prepare_file_for_analysis_cancellable(path, should_cancel) {
+                    return false;
+                }
+            }
+        }
+        !should_cancel()
     }
 
     /// The symbol's declaration site, narrowed from the collector's

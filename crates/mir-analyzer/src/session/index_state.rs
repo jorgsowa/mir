@@ -16,11 +16,15 @@ use parking_lot::{Mutex, MutexGuard, RwLock};
 use salsa::Cancelled;
 
 use crate::cache::AnalysisCache;
-use crate::db::{MirDatabase, MirDbStorage};
+use crate::db::{FileSlab, MirDatabase, MirDbStorage, SourceFile};
 
 use super::BatchReplayState;
 
 pub(crate) struct IndexState {
+    /// A slab indexed by the file's input handle, not a locked map: freshness
+    /// scans read one entry per candidate from many threads at once, and a
+    /// single `RwLock` here made them collapse onto its cache line.
+    ///
     /// file → [`RefCommit`] its reference locations were last committed
     /// from. Exact while the text is pointer-equal and the commit either
     /// fully resolved every name it referenced or was stamped at the current
@@ -28,11 +32,11 @@ pub(crate) struct IndexState {
     /// reference this file's analysis left unresolved, even though this
     /// file's own text never changed. Files absent here have never been
     /// committed.
-    ref_committed: RwLock<HashMap<Arc<str>, RefCommit>>,
+    ref_committed: FileSlab<RefCommit>,
     /// file → source text its subtype-index class edges were last committed
     /// from. Definitions depend only on the file's own text, so a
     /// pointer-equal entry is always exact (no cross-file drift).
-    defs_committed: RwLock<HashMap<Arc<str>, Arc<str>>>,
+    defs_committed: FileSlab<Arc<str>>,
     /// Memoized `indexed_references_to` results. Without this, a repeat
     /// query against an unchanged candidate set re-pays the O(candidates)
     /// freshness scan on every call — measured at tens of MB / seconds of
@@ -118,8 +122,8 @@ impl CommitGuard<'_> {
 impl Default for IndexState {
     fn default() -> Self {
         Self {
-            ref_committed: RwLock::default(),
-            defs_committed: RwLock::default(),
+            ref_committed: FileSlab::default(),
+            defs_committed: FileSlab::default(),
             ref_queries: QueryMemo::new(REF_QUERY_CACHE_LOCATION_CAP),
             subtype_queries: QueryMemo::new(SUBTYPE_QUERY_CACHE_SITE_CAP),
             dependency_graph: RwLock::default(),
@@ -156,6 +160,31 @@ struct RefCommit {
     live_analyzed: bool,
 }
 
+/// How a reference-freshness scan treats one candidate.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum RefFreshness {
+    /// Postings are exact for the current text.
+    Fresh,
+    /// Committed against other text, or seeded by an unverified disk-cache
+    /// replay: re-analyze unconditionally.
+    Stale,
+    /// A live analysis of exactly this text, stale only by generation: the
+    /// mention gate may skip it, as for a never-committed file.
+    StaleByGenerationOnly,
+    /// Never committed, so it holds no postings.
+    Uncommitted,
+}
+
+/// How a defs-freshness scan treats one candidate.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum DefsFreshness {
+    Fresh,
+    /// Committed against other text: recommit unconditionally.
+    Stale,
+    /// Never committed: recommit only if it mentions a frontier name.
+    Uncommitted,
+}
+
 impl IndexState {
     /// The current [`RetireEpoch`]. Captured by the owner when it hands out a
     /// snapshot, while no retire can race it.
@@ -176,7 +205,10 @@ impl IndexState {
     pub(crate) fn retire_references(&self, db: &MirDbStorage, file: &str) {
         let mut retirements = self.retirements.lock();
         self.record_retirement(&mut retirements, file);
-        self.forget_ref_committed(file);
+        let sf = db.lookup_source_file(file);
+        if let Some(sf) = sf {
+            self.forget_ref_committed(sf);
+        }
         db.clear_file_references(file);
     }
 
@@ -184,9 +216,11 @@ impl IndexState {
     pub(crate) fn retire_file(&self, db: &MirDbStorage, file: &str) {
         let mut retirements = self.retirements.lock();
         self.record_retirement(&mut retirements, file);
-        self.forget_ref_committed(file);
+        if let Some(sf) = db.lookup_source_file(file) {
+            self.forget_ref_committed(sf);
+            self.forget_defs_committed(sf);
+        }
         db.clear_file_references(file);
-        self.forget_defs_committed(file);
         db.clear_file_class_edges(file);
     }
 
@@ -203,38 +237,34 @@ impl IndexState {
         self.retire_seq.load(Ordering::SeqCst)
     }
 
-    /// Whether `file`'s reference postings are exact for `current_text` at
-    /// `current_gen`: text pointer-equal, and the commit either resolved
-    /// every name (immune to workspace growth) or was stamped at that
-    /// generation — catches a file analyzed before a class it references
-    /// was registered elsewhere, which would otherwise look fresh forever.
-    pub(crate) fn is_ref_committed(
+    /// What a freshness scan must do with `file`, in one lookup.
+    ///
+    /// Postings are exact for `current_text` at `current_gen` when the text
+    /// is pointer-equal and the commit either resolved every name (immune to
+    /// workspace growth) or was stamped at that generation — which catches a
+    /// file analyzed before a class it references was registered elsewhere,
+    /// and would otherwise look fresh forever. A live-analyzed commit of
+    /// exactly this text that is stale only by generation stays eligible for
+    /// the mention gate: a needle miss is as conclusive as for a
+    /// never-committed file. A replayed (unverified) commit never is.
+    pub(crate) fn ref_freshness(
         &self,
-        file: &str,
+        file: SourceFile,
         current_text: &Arc<str>,
         current_gen: u64,
-    ) -> bool {
-        self.ref_committed.read().get(file).is_some_and(|c| {
-            Arc::ptr_eq(&c.text, current_text) && (c.resolved || c.generation == current_gen)
-        })
-    }
-
-    /// Whether `file` has a *live-analyzed* reference commit recorded against
-    /// exactly `current_text` — i.e. it's only stale by generation, not
-    /// because its text changed or because it was seeded by an unverified
-    /// disk-cache replay. Such a commit is still eligible for the
-    /// mention/needle gate: the current text is exactly what a live analysis
-    /// already scanned, so a needle miss is as conclusive as for a
-    /// never-committed file.
-    pub(crate) fn ref_commit_stale_by_generation_only(
-        &self,
-        file: &str,
-        current_text: &Arc<str>,
-    ) -> bool {
+    ) -> RefFreshness {
         self.ref_committed
-            .read()
-            .get(file)
-            .is_some_and(|c| c.live_analyzed && Arc::ptr_eq(&c.text, current_text))
+            .read(file, |c| {
+                let same_text = Arc::ptr_eq(&c.text, current_text);
+                if same_text && (c.resolved || c.generation == current_gen) {
+                    RefFreshness::Fresh
+                } else if same_text && c.live_analyzed {
+                    RefFreshness::StaleByGenerationOnly
+                } else {
+                    RefFreshness::Stale
+                }
+            })
+            .unwrap_or(RefFreshness::Uncommitted)
     }
 
     /// Whether `file`'s stored postings came from exactly this
@@ -243,14 +273,16 @@ impl IndexState {
     /// Arc), so callers skip the index rewrite and only re-stamp the mark.
     pub(crate) fn ref_commit_is_current(
         &self,
-        file: &str,
+        file: SourceFile,
         current_text: &Arc<str>,
         out: &Arc<crate::db::AnalyzeOutput>,
     ) -> bool {
-        self.ref_committed.read().get(file).is_some_and(|c| {
-            Arc::ptr_eq(&c.text, current_text)
-                && c.out.upgrade().is_some_and(|prev| Arc::ptr_eq(&prev, out))
-        })
+        self.ref_committed
+            .read(file, |c| {
+                Arc::ptr_eq(&c.text, current_text)
+                    && c.out.upgrade().is_some_and(|prev| Arc::ptr_eq(&prev, out))
+            })
+            .unwrap_or(false)
     }
 
     /// Record a commit computed against the workspace state at `generation`
@@ -262,7 +294,7 @@ impl IndexState {
     /// unknown — the gen-guarded safe direction.
     pub(crate) fn mark_ref_committed(
         &self,
-        file: &Arc<str>,
+        file: SourceFile,
         text: &Arc<str>,
         out: Option<&Arc<crate::db::AnalyzeOutput>>,
         generation: u64,
@@ -275,41 +307,44 @@ impl IndexState {
             resolved,
             live_analyzed: out.is_some(),
         };
-        self.ref_committed.write().insert(file.clone(), commit);
+        self.ref_committed.set(file, commit);
     }
 
-    pub(crate) fn forget_ref_committed(&self, file: &str) {
-        self.ref_committed.write().remove(file);
-    }
-
-    /// Every file with a reference commit on record, regardless of
-    /// staleness. Files absent here have no reference postings at all.
-    pub(crate) fn ref_committed_keys(&self) -> Vec<Arc<str>> {
-        self.ref_committed.read().keys().cloned().collect()
+    pub(crate) fn forget_ref_committed(&self, file: SourceFile) {
+        self.ref_committed.remove(file);
     }
 
     /// Whether `file`'s subtype-index class edges were committed from exactly
     /// `current_text`.
-    pub(crate) fn is_defs_committed(&self, file: &str, current_text: &Arc<str>) -> bool {
+    pub(crate) fn is_defs_committed(&self, file: SourceFile, current_text: &Arc<str>) -> bool {
         self.defs_committed
-            .read()
-            .get(file)
-            .is_some_and(|t| Arc::ptr_eq(t, current_text))
+            .read(file, |t| Arc::ptr_eq(t, current_text))
+            .unwrap_or(false)
     }
 
-    pub(crate) fn mark_defs_committed(&self, file: &Arc<str>, text: &Arc<str>) {
+    /// What a defs freshness scan must do with `file`, in one lookup.
+    pub(crate) fn defs_freshness(
+        &self,
+        file: SourceFile,
+        current_text: &Arc<str>,
+    ) -> DefsFreshness {
         self.defs_committed
-            .write()
-            .insert(file.clone(), text.clone());
+            .read(file, |t| {
+                if Arc::ptr_eq(t, current_text) {
+                    DefsFreshness::Fresh
+                } else {
+                    DefsFreshness::Stale
+                }
+            })
+            .unwrap_or(DefsFreshness::Uncommitted)
     }
 
-    pub(crate) fn forget_defs_committed(&self, file: &str) {
-        self.defs_committed.write().remove(file);
+    pub(crate) fn mark_defs_committed(&self, file: SourceFile, text: &Arc<str>) {
+        self.defs_committed.set(file, text.clone());
     }
 
-    /// Every file with a defs commit on record, regardless of staleness.
-    pub(crate) fn defs_committed_keys(&self) -> Vec<Arc<str>> {
-        self.defs_committed.read().keys().cloned().collect()
+    pub(crate) fn forget_defs_committed(&self, file: SourceFile) {
+        self.defs_committed.remove(file);
     }
 
     /// Capture before reading anything a dependency graph is built from.
@@ -378,11 +413,11 @@ impl IndexState {
         let commit = self.begin_commit();
         commit.admit(file, stamp.retire_epoch)?;
         self.clear_transient_batch_replay();
-        let file_no = db.locked_ref_index().intern_path(file);
+        let file_no = db.intern_path(file);
         db.set_file_reference_locations(file_no, locs);
         self.clear_dependency_graph_cache();
-        if let Some(text) = text {
-            self.mark_ref_committed(file, &text, None, stamp.generation, resolved);
+        if let (Some(text), Some(sf)) = (text, db.lookup_source_file(file)) {
+            self.mark_ref_committed(sf, &text, None, stamp.generation, resolved);
         }
         Ok(())
     }
@@ -404,7 +439,7 @@ impl IndexState {
         let entries = crate::db::subtype_index::entries_from_slice(&defs.slice);
         // Stage the disk-cache write only when the commit will rewrite
         // postings — a no-op re-sweep adds no hashing or parse-walk cost.
-        let cache_put = if self.ref_commit_is_current(path.as_ref(), &text, &out) {
+        let cache_put = if self.ref_commit_is_current(sf, &text, &out) {
             None
         } else {
             cache.and_then(|cache| stage_ref_cache_put(cache, db, sf, path.as_ref(), &text, &out))
@@ -416,6 +451,7 @@ impl IndexState {
         });
         Some(AnalyzedFile {
             file: path.clone(),
+            sf,
             text,
             out,
             entries,
@@ -447,8 +483,8 @@ impl IndexState {
                 refused = Err(cancelled);
                 continue;
             }
-            if !self.ref_commit_is_current(a.file.as_ref(), &a.text, &a.out) {
-                let file_no = db.locked_ref_index().intern_path(&a.file);
+            if !self.ref_commit_is_current(a.sf, &a.text, &a.out) {
+                let file_no = db.intern_path(&a.file);
                 db.set_file_reference_locations(file_no, a.out.ref_locs.to_vec());
                 dependency_graph_changed = true;
             }
@@ -465,16 +501,16 @@ impl IndexState {
                 );
             }
             self.mark_ref_committed(
-                &a.file,
+                a.sf,
                 &a.text,
                 Some(&a.out),
                 stamp.generation,
                 !a.out.has_unresolved_names(),
             );
-            if !self.is_defs_committed(a.file.as_ref(), &a.text) {
-                let file_no = db.locked_ref_index().intern_path(&a.file);
+            if !self.is_defs_committed(a.sf, &a.text) {
+                let file_no = db.intern_path(&a.file);
                 db.set_file_class_edges(file_no, a.entries.clone());
-                self.mark_defs_committed(&a.file, &a.text);
+                self.mark_defs_committed(a.sf, &a.text);
                 dependency_graph_changed = true;
             }
             drop(commit);
@@ -497,9 +533,11 @@ impl IndexState {
     ) -> Result<(), Cancelled> {
         let commit = self.begin_commit();
         commit.admit(file, epoch)?;
-        let file_no = db.locked_ref_index().intern_path(file);
+        let file_no = db.intern_path(file);
         db.set_file_class_edges(file_no, entries);
-        self.mark_defs_committed(file, text);
+        if let Some(sf) = db.lookup_source_file(file) {
+            self.mark_defs_committed(sf, text);
+        }
         Ok(())
     }
 }
@@ -510,6 +548,7 @@ impl IndexState {
 /// file dirty rather than wrongly fresh.
 pub(crate) struct AnalyzedFile {
     pub(crate) file: Arc<str>,
+    sf: SourceFile,
     text: Arc<str>,
     pub(crate) out: Arc<crate::db::AnalyzeOutput>,
     entries: Vec<crate::db::SubtypeEntry>,

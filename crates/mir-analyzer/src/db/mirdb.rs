@@ -75,12 +75,16 @@ impl Drop for IndexPendingClaim {
 #[derive(Clone)]
 pub struct MirDbStorage {
     storage: salsa::Storage<Self>,
+    /// Path ↔ [`crate::db::FileNo`], shared by every file-keyed index and
+    /// read without taking any index lock.
+    path_interner: Arc<crate::db::PathInterner>,
     /// Unified reference index: symbol→locations, file→symbols and
     /// symbol→files views behind one lock with a single writer path, so the
     /// views cannot drift apart. See [`crate::db::ref_index::RefIndex`].
     ref_index: Arc<Mutex<crate::db::ref_index::RefIndex>>,
     /// Times `ref_index` was locked, shared across clones. Perf gates assert
-    /// read paths stay lookup-shaped (bounded locks per request).
+    /// posting access stays lookup-shaped (bounded locks per request, none
+    /// per candidate file).
     ref_index_locks: Arc<std::sync::atomic::AtomicU64>,
     /// Delta-maintained inverted inheritance index: resolved parent FQCN →
     /// direct children, replacing per-query workspace scans. See
@@ -331,9 +335,13 @@ struct ResolverState {
 
 impl Default for MirDbStorage {
     fn default() -> Self {
+        let path_interner = Arc::<crate::db::PathInterner>::default();
         let mut db = Self {
             storage: salsa::Storage::default(),
-            ref_index: Arc::default(),
+            ref_index: Arc::new(Mutex::new(crate::db::ref_index::RefIndex::with_paths(
+                Arc::clone(&path_interner),
+            ))),
+            path_interner,
             ref_index_locks: Arc::default(),
             subtype_index: Arc::default(),
             class_mentions: Arc::default(),
@@ -498,7 +506,7 @@ impl MirDatabase for MirDbStorage {
     }
 
     fn extract_file_reference_locations(&self, file: &str) -> Vec<(Arc<str>, u32, u16, u16)> {
-        let Some(file_no) = self.locked_ref_index().lookup_path(file) else {
+        let Some(file_no) = self.lookup_path(file) else {
             return Vec::new();
         };
         self.locked_ref_index().file_locations(file_no)
@@ -513,7 +521,7 @@ impl MirDatabase for MirDbStorage {
     }
 
     fn clear_file_references(&self, file: &str) {
-        let Some(file_no) = self.locked_ref_index().lookup_path(file) else {
+        let Some(file_no) = self.lookup_path(file) else {
             return;
         };
         self.locked_ref_index().clear_file(file_no);
@@ -524,7 +532,7 @@ impl MirDatabase for MirDbStorage {
     }
 
     fn file_referenced_symbols(&self, file: &str) -> Vec<Arc<str>> {
-        let Some(file_no) = self.locked_ref_index().lookup_path(file) else {
+        let Some(file_no) = self.lookup_path(file) else {
             return Vec::new();
         };
         self.locked_ref_index().symbols_referenced_by(file_no)
@@ -651,12 +659,30 @@ impl MirDatabase for MirDbStorage {
 }
 
 impl MirDbStorage {
-    /// The single gateway to the reference index: every lock is counted so
-    /// hosts can assert the index stays untouched on their hot paths.
+    /// The single gateway to the reference index's postings: every lock is
+    /// counted so hosts can assert the index stays untouched on their hot
+    /// paths. Resolving a path to its id ([`Self::lookup_path`]) is not a
+    /// posting access and takes no lock here.
     pub fn locked_ref_index(&self) -> parking_lot::MutexGuard<'_, crate::db::ref_index::RefIndex> {
         self.ref_index_locks
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         self.ref_index.lock()
+    }
+
+    /// The id for `path`, assigned on first sight and stable for the life of
+    /// this database and its clones.
+    pub fn intern_path(&self, path: &Arc<str>) -> crate::db::FileNo {
+        self.path_interner.intern(path)
+    }
+
+    /// The id for `path`, if it has been interned.
+    pub fn lookup_path(&self, path: &str) -> Option<crate::db::FileNo> {
+        self.path_interner.lookup(path)
+    }
+
+    /// The path an id was assigned to. Panics if the id is invalid.
+    pub fn path_of(&self, file: crate::db::FileNo) -> Arc<str> {
+        self.path_interner.path_of(file)
     }
 
     /// Times the reference index has been locked (all clones combined).
@@ -1187,8 +1213,7 @@ impl MirDbStorage {
         file: crate::db::FileNo,
         entries: Vec<crate::db::subtype_index::SubtypeEntry>,
     ) {
-        let ref_index = self.locked_ref_index();
-        let file_path = ref_index.path_of(file);
+        let file_path = self.path_of(file);
         self.add_class_mention_names(entries.iter().map(|e| e.fqcn.as_ref()));
         if self
             .subtype_index
@@ -1281,14 +1306,14 @@ impl MirDbStorage {
         q: &crate::db::class_mention_index::MentionQuery,
         current_text: &Arc<str>,
     ) -> Option<bool> {
-        let file_no = self.locked_ref_index().lookup_path(file)?;
+        let file_no = self.lookup_path(file)?;
         self.class_mentions.answer(file_no, q, current_text)
     }
 
     /// Whether `file` already holds a mention scan of exactly `text` at
     /// `epoch` or newer.
     pub fn class_mentions_current(&self, file: &str, text: &Arc<str>, epoch: u64) -> bool {
-        let Some(file_no) = self.locked_ref_index().lookup_path(file) else {
+        let Some(file_no) = self.lookup_path(file) else {
             return false;
         };
         self.class_mentions.is_current(file_no, text, epoch)
@@ -1302,7 +1327,7 @@ impl MirDbStorage {
         epoch: u64,
         names: Box<[Name]>,
     ) {
-        let file_no = self.locked_ref_index().intern_path(file);
+        let file_no = self.intern_path(file);
         self.class_mentions
             .set_file(file_no, text.clone(), epoch, names);
     }
@@ -1320,7 +1345,7 @@ impl MirDbStorage {
 
     /// Drop `file`'s class-like declarations from the subtype edge index.
     pub fn clear_file_class_edges(&self, file: &str) {
-        let Some(file_no) = self.locked_ref_index().lookup_path(file) else {
+        let Some(file_no) = self.lookup_path(file) else {
             return;
         };
         if self.subtype_index.lock().clear_file(file_no) {
@@ -1408,7 +1433,7 @@ impl MirDbStorage {
             if *sf.text(self) != text {
                 // Entry pins the old text Arc; the ptr guard would already
                 // sideline it, dropping it now frees the memory too.
-                if let Some(file_no) = self.locked_ref_index().lookup_path(&path) {
+                if let Some(file_no) = self.lookup_path(&path) {
                     self.clear_file_class_mentions(file_no);
                 }
                 sf.set_text(self).with_durability(durability).to(text);
@@ -1594,7 +1619,7 @@ impl MirDbStorage {
                 {
                     *self.workspace_symbol_index_input.write() = None;
                 }
-                if let Some(file_no) = self.locked_ref_index().lookup_path(path) {
+                if let Some(file_no) = self.lookup_path(path) {
                     self.clear_file_class_mentions(file_no);
                 }
                 self.file_decl_snapshots.write().remove(&sf);

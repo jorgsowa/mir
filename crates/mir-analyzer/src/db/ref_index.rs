@@ -9,17 +9,19 @@
 //! entry points ([`RefIndex::append_batch`] and [`RefIndex::clear_file`]),
 //! so the views cannot disagree.
 //!
-//! File paths are interned to `u32` ids internally: per-location tuples
-//! store 4 bytes instead of an `Arc<str>` (8 bytes + refcount traffic), and
-//! file-keyed lookups hash an integer instead of a path string. The public
-//! API still speaks `Arc<str>` paths; resolving an id back to its path is an
-//! O(1) `Arc` clone.
+//! File paths are interned to `u32` ids by the shared [`PathInterner`]:
+//! per-location tuples store 4 bytes instead of an `Arc<str>` (8 bytes +
+//! refcount traffic), and file-keyed lookups hash an integer instead of a
+//! path string. The interner lives outside this index's lock, so resolving a
+//! path never contends with posting access. The public API still speaks
+//! `Arc<str>` paths; resolving an id back to its path is an O(1) `Arc` clone.
 
 use std::sync::Arc;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
+use super::path_interner::PathInterner;
 use super::reference_locations::RefLoc;
 
 /// Interned file id, valid within one `RefIndex` instance.
@@ -34,10 +36,8 @@ type LocTuple = (FileNo, u32, u16, u16);
 
 #[derive(Default, Debug)]
 pub struct RefIndex {
-    /// Path → interned id.
-    path_ids: FxHashMap<Arc<str>, FileNo>,
-    /// Id → path (`Arc` shared with `path_ids` keys).
-    paths: Vec<Arc<str>>,
+    /// File identity, shared with the database and the other file-keyed indexes.
+    paths: Arc<PathInterner>,
     /// Symbol key → interned id.
     symbol_ids: FxHashMap<Arc<str>, SymbolNo>,
     /// Id → symbol key (`Arc` shared with `symbol_ids` keys).
@@ -55,19 +55,33 @@ pub struct RefIndex {
     referencers: FxHashMap<SymbolNo, SmallVec<[FileNo; 4]>>,
 }
 
-impl RefIndex {
-    fn intern(&mut self, path: &Arc<str>) -> FileNo {
-        if let Some(&id) = self.path_ids.get(path.as_ref()) {
-            return id;
-        }
-        let id = self.paths.len() as FileNo;
-        self.paths.push(path.clone());
-        self.path_ids.insert(path.clone(), id);
-        id
-    }
+/// Resolves the file of consecutive locations with one interner access
+/// while the file stays the same, as a file's own locations do.
+struct FileIds<'a> {
+    paths: &'a PathInterner,
+    last: Option<(Arc<str>, FileNo)>,
+}
 
-    fn lookup(&self, path: &str) -> Option<FileNo> {
-        self.path_ids.get(path).copied()
+impl FileIds<'_> {
+    fn intern(&mut self, path: &Arc<str>) -> FileNo {
+        match &self.last {
+            Some((last, id)) if Arc::ptr_eq(last, path) || last == path => *id,
+            _ => {
+                let id = self.paths.intern(path);
+                self.last = Some((path.clone(), id));
+                id
+            }
+        }
+    }
+}
+
+impl RefIndex {
+    /// An empty index resolving files through `paths`.
+    pub fn with_paths(paths: Arc<PathInterner>) -> Self {
+        Self {
+            paths,
+            ..Self::default()
+        }
     }
 
     fn intern_symbol(&mut self, symbol: &Arc<str>) -> SymbolNo {
@@ -95,9 +109,14 @@ impl RefIndex {
     /// caller bumps the subtype-edge epoch for them.
     pub fn append_batch(&mut self, locs: Vec<RefLoc>) -> bool {
         let mut touched_impl = false;
+        let paths = Arc::clone(&self.paths);
+        let mut files = FileIds {
+            paths: &paths,
+            last: None,
+        };
         for loc in locs {
             touched_impl |= loc.symbol_key.starts_with("impl");
-            let file_id = self.intern(&loc.file);
+            let file_id = files.intern(&loc.file);
             let symbol_id = self.intern_symbol(&loc.symbol_key);
             let is_new_edge = self
                 .file_symbols
@@ -161,9 +180,14 @@ impl RefIndex {
         });
         self.clear_file(file);
         let mut seen: FxHashSet<(SymbolNo, LocTuple)> = FxHashSet::default();
+        let paths = Arc::clone(&self.paths);
+        let mut files = FileIds {
+            paths: &paths,
+            last: None,
+        };
         for loc in locs {
             touched_impl |= loc.symbol_key.starts_with("impl");
-            let file_id = self.intern(&loc.file);
+            let file_id = files.intern(&loc.file);
             let symbol_id = self.intern_symbol(&loc.symbol_key);
             let tuple = (file_id, loc.line, loc.col_start, loc.col_end);
             if !seen.insert((symbol_id, tuple)) {
@@ -188,7 +212,7 @@ impl RefIndex {
             .and_then(|symbol_id| self.by_symbol.get(&symbol_id))
             .map(|locs| {
                 locs.iter()
-                    .map(|&(f, line, cs, ce)| (self.path_of(f), line, cs, ce))
+                    .map(|&(f, line, cs, ce)| (self.paths.path_of(f), line, cs, ce))
                     .collect()
             })
             .unwrap_or_default()
@@ -205,7 +229,7 @@ impl RefIndex {
     pub fn referencers_of(&self, symbol: &str) -> Vec<Arc<str>> {
         self.lookup_symbol(symbol)
             .and_then(|symbol_id| self.referencers.get(&symbol_id))
-            .map(|files| files.iter().map(|&f| self.path_of(f)).collect())
+            .map(|files| files.iter().map(|&f| self.paths.path_of(f)).collect())
             .unwrap_or_default()
     }
 
@@ -241,28 +265,12 @@ impl RefIndex {
     pub fn all_pairs(&self) -> Vec<(Arc<str>, Arc<str>)> {
         let mut pairs = Vec::new();
         for (file_id, symbols) in &self.file_symbols {
-            let path = self.path_of(*file_id);
+            let path = self.paths.path_of(*file_id);
             for &symbol_id in symbols {
                 pairs.push((path.clone(), self.symbol_of(symbol_id)));
             }
         }
         pairs
-    }
-
-    /// Resolve a `FileNo` back to its path. Panics if the id is invalid.
-    pub fn path_of(&self, file_id: FileNo) -> Arc<str> {
-        self.paths[file_id as usize].clone()
-    }
-
-    /// Intern a path, returning its `FileNo`. Creates a new id if the path
-    /// is not yet interned.
-    pub fn intern_path(&mut self, path: &Arc<str>) -> FileNo {
-        self.intern(path)
-    }
-
-    /// Look up the `FileNo` for a path, if it has been interned.
-    pub fn lookup_path(&self, path: &str) -> Option<FileNo> {
-        self.lookup(path)
     }
 }
 
@@ -283,8 +291,8 @@ mod tests {
     #[test]
     fn append_dedup_and_views_stay_consistent() {
         let mut idx = RefIndex::default();
-        let file_a = idx.intern(&Arc::from("a.php"));
-        let _file_b = idx.intern(&Arc::from("b.php"));
+        let file_a = idx.paths.intern(&Arc::from("a.php"));
+        let _file_b = idx.paths.intern(&Arc::from("b.php"));
         idx.append_batch(vec![
             loc("fn:foo", "a.php", 1),
             loc("fn:foo", "a.php", 1), // duplicate
@@ -303,8 +311,8 @@ mod tests {
     #[test]
     fn clear_file_prunes_all_views() {
         let mut idx = RefIndex::default();
-        let file_a = idx.intern(&Arc::from("a.php"));
-        let _file_b = idx.intern(&Arc::from("b.php"));
+        let file_a = idx.paths.intern(&Arc::from("a.php"));
+        let _file_b = idx.paths.intern(&Arc::from("b.php"));
         idx.append_batch(vec![
             loc("fn:foo", "a.php", 1),
             loc("fn:foo", "b.php", 2),
@@ -323,8 +331,8 @@ mod tests {
     #[test]
     fn set_file_refs_replaces_only_that_file() {
         let mut idx = RefIndex::default();
-        let file_a = idx.intern(&Arc::from("a.php"));
-        let _file_b = idx.intern(&Arc::from("b.php"));
+        let file_a = idx.paths.intern(&Arc::from("a.php"));
+        let _file_b = idx.paths.intern(&Arc::from("b.php"));
         idx.append_batch(vec![loc("fn:foo", "a.php", 1), loc("fn:foo", "b.php", 2)]);
         idx.set_file_refs(file_a, vec![loc("cls:New", "a.php", 9)]);
         assert!(!idx
@@ -339,7 +347,7 @@ mod tests {
     #[test]
     fn set_file_refs_dedups_within_batch() {
         let mut idx = RefIndex::default();
-        let file_a = idx.intern(&Arc::from("a.php"));
+        let file_a = idx.paths.intern(&Arc::from("a.php"));
         idx.set_file_refs(
             file_a,
             vec![
@@ -354,7 +362,7 @@ mod tests {
     #[test]
     fn append_batch_across_multiple_calls_does_not_duplicate_referencers() {
         let mut idx = RefIndex::default();
-        let _file_a = idx.intern(&Arc::from("a.php"));
+        let _file_a = idx.paths.intern(&Arc::from("a.php"));
         idx.append_batch(vec![loc("fn:foo", "a.php", 1)]);
         idx.append_batch(vec![loc("fn:foo", "a.php", 2)]);
         idx.append_batch(vec![loc("fn:foo", "a.php", 3)]);
@@ -367,9 +375,9 @@ mod tests {
     #[test]
     fn clear_file_preserves_other_referencers_without_duplicates() {
         let mut idx = RefIndex::default();
-        let file_a = idx.intern(&Arc::from("a.php"));
-        let _file_b = idx.intern(&Arc::from("b.php"));
-        let _file_c = idx.intern(&Arc::from("c.php"));
+        let file_a = idx.paths.intern(&Arc::from("a.php"));
+        let _file_b = idx.paths.intern(&Arc::from("b.php"));
+        let _file_c = idx.paths.intern(&Arc::from("c.php"));
         idx.append_batch(vec![
             loc("fn:foo", "a.php", 1),
             loc("fn:foo", "a.php", 2),
@@ -384,8 +392,8 @@ mod tests {
     #[test]
     fn set_file_refs_recommit_churn_keeps_referencers_unique() {
         let mut idx = RefIndex::default();
-        let file_a = idx.intern(&Arc::from("a.php"));
-        let file_b = idx.intern(&Arc::from("b.php"));
+        let file_a = idx.paths.intern(&Arc::from("a.php"));
+        let file_b = idx.paths.intern(&Arc::from("b.php"));
         idx.append_batch(vec![loc("fn:foo", "a.php", 1), loc("fn:foo", "b.php", 2)]);
         idx.set_file_refs(file_a, vec![loc("fn:foo", "a.php", 5)]);
         idx.set_file_refs(file_b, vec![loc("fn:foo", "b.php", 6)]);
@@ -401,7 +409,7 @@ mod tests {
         let mut idx = RefIndex::default();
         for f in 0..50 {
             let file: Arc<str> = Arc::from(format!("f{f}.php"));
-            let file_no = idx.intern(&file);
+            let file_no = idx.paths.intern(&file);
             idx.set_file_refs(
                 file_no,
                 vec![loc("m:Base::foo", &file, 1), loc("m:Base::foo", &file, 2)],
@@ -411,7 +419,7 @@ mod tests {
         assert_eq!(idx.referencers_of("m:Base::foo").len(), 50);
         // Re-commit one file with fewer refs: only its entries change.
         let file_0: Arc<str> = Arc::from("f0.php");
-        let file_0_no = idx.intern(&file_0);
+        let file_0_no = idx.paths.intern(&file_0);
         idx.set_file_refs(file_0_no, vec![loc("m:Base::foo", "f0.php", 9)]);
         assert_eq!(idx.locations_of("m:Base::foo").len(), 99);
         assert_eq!(idx.referencers_of("m:Base::foo").len(), 50);
@@ -420,8 +428,8 @@ mod tests {
     #[test]
     fn file_locations_matches_cache_shape() {
         let mut idx = RefIndex::default();
-        let test_a = idx.intern(&Arc::from("test_a.php"));
-        let test_b = idx.intern(&Arc::from("test_b.php"));
+        let test_a = idx.paths.intern(&Arc::from("test_a.php"));
+        let test_b = idx.paths.intern(&Arc::from("test_b.php"));
         idx.set_file_refs(
             test_a,
             vec![loc("A", "test_a.php", 1), loc("B", "test_a.php", 5)],

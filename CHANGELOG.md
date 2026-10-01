@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `AnalysisSnapshot::stale_reference_candidates` finds, off the owner's lock, the candidates a references query would analyze, and `AnalysisSession::prepare_references_query` warms exactly those (plus the declaration owner and any pending index settle) for hosts that read through `AnalysisSnapshot`.
+- `AnalysisSnapshot::is_builtin_class`: whether a class name resolves to an embedded stub rather than a workspace class shadowing it.
+- `AnalysisSnapshot::reanalyze_files`: the snapshot-side half of `reanalyze_files_cancellable`.
+
+### Changed
+
+- Resolving a file path to its id no longer locks the reference index. Reference queries, stale-candidate scans and sweeps over unchanged files take no `ref_index_lock_count` locks (previously one per candidate file). The path table, the per-file reference/definition freshness marks and the candidate scans read sharded or lock-free state, so concurrent requests no longer queue on a shared lock (16 concurrent scans of 20K files: 114ms → 9ms).
+
 ## [0.81.0] - 2026-10-01
 
 ### Added

@@ -474,7 +474,9 @@ impl AnalysisSnapshot {
     /// [`AnalysisSession::prepare_for_query`] for `file` (or ingested it via
     /// [`AnalysisSession::ingest_file_prepared`]): classes load on demand
     /// regardless, but Composer `autoload.files` functions are indexed only
-    /// by that warm-up.
+    /// by that warm-up. `file` must already be ingested with `source` as its
+    /// text; the warm-up reads its input, so a file never ingested is not
+    /// warmed.
     pub fn analyze(
         &self,
         file: Arc<str>,

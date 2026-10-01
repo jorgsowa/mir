@@ -231,6 +231,7 @@ pub use self::class_mention_index::{
     ClassMentionIndex, ClassMentionStats, MentionQuery, MentionScanner,
 };
 pub use self::deps::{file_structural_deps, file_structural_symbols};
+pub(crate) use self::file_slab::FileSlab;
 pub use self::find_queries::{
     analyzed_class_defs, analyzed_enum_defs, analyzed_interface_defs, analyzed_trait_defs,
     class_ancestors_by_fqcn, class_array_property_defaults, class_in_file, class_like_decl_file,
@@ -249,6 +250,7 @@ pub use self::inferred_types::{
 #[allow(unused_imports)]
 pub use self::mirdb::MirDbStorage;
 pub use self::nodes::*;
+pub use self::path_interner::PathInterner;
 pub use self::per_function::{infer_function, FunctionInferenceResult};
 pub use self::queries::{
     class_constant_exists_in_chain, class_exists, class_is_immutable, class_kind,
@@ -277,10 +279,12 @@ pub use self::workspace::{
 // Sub-modules
 pub(crate) mod class_mention_index;
 mod deps;
+mod file_slab;
 mod find_queries;
 mod inferred_types;
 mod mirdb;
 mod nodes;
+mod path_interner;
 mod per_function;
 mod queries;
 pub mod ref_index;

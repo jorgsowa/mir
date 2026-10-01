@@ -846,6 +846,7 @@ dependencies = [
  "aho-corasick",
  "bincode",
  "blake3",
+ "boxcar",
  "criterion",
  "dashmap",
  "indexmap",

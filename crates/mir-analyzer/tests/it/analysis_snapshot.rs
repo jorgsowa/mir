@@ -301,3 +301,144 @@ fn snapshot_loads_a_builtin_stub_on_demand() {
     assert_eq!(found, (true, true));
     assert_eq!(session.loaded_stub_count(), stubs_before);
 }
+
+const POLYFILL_PATH: &str = "vendor/polyfill/Stringable.php";
+const POLYFILL: &str = "<?php\ninterface Stringable { public function __toString(): string; }\n";
+
+fn on_snapshot<R: Send + 'static>(
+    session: &AnalysisSession,
+    query: impl FnOnce(mir_analyzer::AnalysisSnapshot) -> R + Send + 'static,
+) -> R {
+    let snap = session.snapshot();
+    thread::spawn(move || query(snap)).join().unwrap()
+}
+
+#[test]
+fn is_builtin_class_is_true_only_for_classes_declared_by_a_stub() {
+    let (session, _files) = workspace();
+    let found = on_snapshot(&session, |snap| {
+        [
+            "ArrayObject",
+            "\\arrayobject",
+            "App\\Base",
+            "Missing\\Thing",
+        ]
+        .map(|fqcn| snap.is_builtin_class(fqcn).unwrap())
+    });
+    assert_eq!(found, [true, true, false, false]);
+}
+
+/// Vendor polyfills define stub-named classes; the workspace class wins, so
+/// the name-only `stub_path_for_class` gate misclassifies them as built-in.
+#[test]
+fn workspace_class_shadowing_a_stub_name_is_not_builtin() {
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    assert!(on_snapshot(&session, |snap| snap
+        .is_builtin_class("Stringable")
+        .unwrap()));
+
+    session.ingest_file(Arc::from(POLYFILL_PATH), Arc::from(POLYFILL));
+    session.prepare_for_query(None);
+    let (is_builtin, declared_in) = on_snapshot(&session, |snap| {
+        (
+            snap.is_builtin_class("Stringable").unwrap(),
+            snap.find_class_like("Stringable")
+                .unwrap()
+                .and_then(|class| class.location().map(|loc| loc.file.clone())),
+        )
+    });
+    assert!(mir_analyzer::stub_path_for_class("Stringable").is_some());
+    assert_eq!(declared_in.as_deref(), Some(POLYFILL_PATH));
+    assert!(!is_builtin);
+}
+
+/// Without the polyfill being indexed yet, a resolver-mapped workspace class
+/// still wins over the stub on demand.
+#[test]
+fn resolver_mapped_class_shadowing_a_stub_name_is_not_builtin() {
+    struct Polyfills;
+    impl mir_analyzer::ClassResolver for Polyfills {
+        fn resolve(&self, fqcn: &str) -> Option<std::path::PathBuf> {
+            (fqcn == "Stringable").then(|| std::path::PathBuf::from(POLYFILL_PATH))
+        }
+    }
+    impl mir_analyzer::SourceProvider for Polyfills {
+        fn read(&self, path: &str) -> Option<Arc<str>> {
+            (path == POLYFILL_PATH).then(|| Arc::from(POLYFILL))
+        }
+    }
+    let session = AnalysisSession::new(PhpVersion::LATEST)
+        .with_class_resolver(Arc::new(Polyfills))
+        .with_source_provider(Arc::new(Polyfills));
+    assert!(!on_snapshot(&session, |snap| snap
+        .is_builtin_class("Stringable")
+        .unwrap()));
+}
+
+fn issue_kinds(results: &[(Arc<str>, mir_analyzer::FileAnalysis)]) -> Vec<(Arc<str>, Vec<String>)> {
+    results
+        .iter()
+        .map(|(file, analysis)| {
+            (
+                file.clone(),
+                analysis
+                    .issues
+                    .iter()
+                    .map(|i| i.kind.name().to_string())
+                    .collect(),
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn snapshot_reanalyze_files_matches_the_session_and_commits_references() {
+    let (mut session, files) = workspace();
+    session.prepare_for_query(None);
+    for file in &files {
+        session.prepare_file_for_analysis(file);
+    }
+    let snap = session.snapshot();
+    let thread_files = files.clone();
+    let from_snapshot = thread::spawn(move || {
+        snap.reanalyze_files(&thread_files, &mir_analyzer::IndexCancel::new())
+            .unwrap()
+            .expect("not cancelled")
+    })
+    .join()
+    .unwrap();
+
+    let (mut other, other_files) = workspace();
+    let from_session =
+        other.reanalyze_files_cancellable(&other_files, &mir_analyzer::IndexCancel::new());
+
+    assert_eq!(issue_kinds(&from_snapshot), issue_kinds(&from_session));
+    assert!(
+        from_snapshot
+            .iter()
+            .any(|(file, analysis)| file.as_ref() == "caller.php"
+                && analysis
+                    .issues
+                    .iter()
+                    .any(|i| i.kind.name() == "UndefinedFunction")),
+        "{:?}",
+        issue_kinds(&from_snapshot)
+    );
+    assert!(session
+        .reference_locations("meth:App\\Base::run")
+        .iter()
+        .any(|(f, ..)| f.as_ref() == "caller.php"));
+}
+
+#[test]
+fn snapshot_reanalyze_files_stops_when_cancelled_without_committing() {
+    let (mut session, files) = workspace();
+    session.prepare_for_query(None);
+    let cancel = mir_analyzer::IndexCancel::new();
+    cancel.cancel();
+    let out = session.snapshot().reanalyze_files(&files, &cancel).unwrap();
+    assert!(out.is_none());
+    assert!(session
+        .reference_locations("meth:App\\Base::run")
+        .is_empty());
+}

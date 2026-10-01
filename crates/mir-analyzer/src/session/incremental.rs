@@ -127,22 +127,8 @@ impl AnalysisSession {
         // file resolves thousands; caching them balloons memory), and
         // diagnostics consumers don't read them. Cursor navigation resolves
         // the open file on demand via `symbol_at`/`name_at`.
-        let Some(results) = self.query_snapshot(|snap| snap.warm_pass(&dependents, cancel)) else {
-            return Vec::new();
-        };
-
-        results
-            .into_iter()
-            .map(|a| {
-                (
-                    a.file,
-                    crate::FileAnalysis {
-                        issues: a.out.issues.to_vec(),
-                        symbols: Vec::new(),
-                    },
-                )
-            })
-            .collect()
+        self.query_snapshot(|snap| snap.reanalyze_files(&dependents, cancel))
+            .unwrap_or_default()
     }
 
     /// Return the `use`-import alias map for a file: a list of `(alias, fqcn)`

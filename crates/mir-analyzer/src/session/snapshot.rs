@@ -5,8 +5,8 @@ use rustc_hash::FxHashSet as HashSet;
 use salsa::Cancelled;
 
 use super::index_state::{
-    hash_files, AnalyzedFile, IndexState, QueryGeneration, RefQueryCacheKey, RetireEpoch,
-    SubtypeQueryCacheKey, ViewStamp,
+    hash_files, AnalyzedFile, DefsFreshness, IndexState, QueryGeneration, RefFreshness,
+    RefQueryCacheKey, RetireEpoch, SubtypeQueryCacheKey, ViewStamp,
 };
 use super::queries::{identifier_char_col, span_range, ReferenceGate};
 use super::SubtypeClassSite;
@@ -171,6 +171,18 @@ impl AnalysisSnapshot {
         self.read(|db| crate::db::find_class_like(db, crate::db::Fqcn::from_str(db, fqcn)))
     }
 
+    /// Whether `fqcn` resolves to a class-like declared by an embedded
+    /// built-in stub. A workspace class sharing a stub's name (a polyfill's
+    /// `Stringable`) shadows it and answers `false`, where
+    /// [`crate::stub_path_for_class`] tests the name alone.
+    pub fn is_builtin_class(&self, fqcn: &str) -> Result<bool, Cancelled> {
+        self.read(|db| {
+            let fqcn = fqcn.trim_start_matches('\\');
+            crate::db::class_like_decl_file(db, crate::db::Fqcn::from_str(db, fqcn))
+                .is_some_and(|file| crate::stubs::is_stub_path(&file))
+        })
+    }
+
     pub fn find_function(&self, fqn: &str) -> Result<Option<Arc<crate::FunctionDef>>, Cancelled> {
         self.read(|db| crate::db::find_function(db, crate::db::Fqcn::from_str(db, fqn)))
     }
@@ -307,7 +319,7 @@ impl AnalysisSnapshot {
     /// Inverted-index find-references: posting-list lookup plus an on-demand
     /// freshness/completeness pass over `files` (the host's candidate scope
     /// — passing the whole workspace is fine; see the gate in
-    /// `stale_reference_candidates`).
+    /// `stale_reference_candidates_unguarded`).
     ///
     /// A candidate whose postings were committed from its current text (Arc
     /// identity) is answered from the index with no salsa work. Stale or
@@ -327,9 +339,11 @@ impl AnalysisSnapshot {
     /// `"utf-32"`).
     ///
     /// Stale candidates are analyzed against whatever the owner has loaded.
-    /// A candidate whose warm-up the owner never ran may reference a class
-    /// that isn't loaded yet; its commit then records unresolved names and
-    /// is re-verified after the owner's next load bumps the generation.
+    /// Classes load on demand, but Composer `autoload.files` functions only
+    /// load in the owner's warm-up: a candidate analyzed before it records
+    /// unresolved names and is re-verified after the owner's next load bumps
+    /// the generation. Run [`super::AnalysisSession::prepare_references_query`]
+    /// before taking the snapshot to warm the stale candidates first.
     ///
     /// Memoized per `(symbol, files, include_declaration, includes,
     /// query generation)` — see `RefQueryCacheKey` — so a repeat query
@@ -346,7 +360,7 @@ impl AnalysisSnapshot {
         if let Some(hit) = self.index.ref_queries.get(&key) {
             return Ok(hit);
         }
-        let stale = catch(|| self.stale_reference_candidates(symbol, files))?;
+        let stale = catch(|| self.stale_reference_candidates_unguarded(symbol, files))?;
         if !stale.is_empty() {
             self.commit_reference_candidates(&stale)?;
         }
@@ -411,6 +425,21 @@ impl AnalysisSnapshot {
         }
     }
 
+    /// The candidates in `files` that [`Self::indexed_references_to`] would
+    /// analyze and commit: those whose postings are not exact for their
+    /// current text. Empty means the owner-side prelude
+    /// ([`super::AnalysisSession::prepare_references_query`]) has nothing to
+    /// warm, so a host can check this off its lock and skip taking it; when
+    /// not empty it passes this list to the prelude, so the O(candidates)
+    /// scan never runs under the lock.
+    pub fn stale_reference_candidates(
+        &self,
+        symbol: &crate::Name,
+        files: &[Arc<str>],
+    ) -> Result<Vec<Arc<str>>, Cancelled> {
+        catch(|| self.stale_reference_candidates_unguarded(symbol, files))
+    }
+
     /// Freshness pass: candidates whose postings are not exact for their
     /// current text. Files not registered as `SourceFile` inputs are
     /// skipped. Never-committed files — no commit mark, hence no postings at
@@ -432,7 +461,7 @@ impl AnalysisSnapshot {
     /// Intentionally serial: each request already runs on its caller
     /// thread, and putting every concurrent request back onto the shared
     /// rayon pool lets an index batch monopolize the workers.
-    pub(super) fn stale_reference_candidates(
+    pub(super) fn stale_reference_candidates_unguarded(
         &self,
         symbol: &crate::Name,
         files: &[Arc<str>],
@@ -458,8 +487,6 @@ impl AnalysisSnapshot {
         // (analyze rather than skip, the conservative direction).
         let gate_complete = mention_queries.len() == gate.idents.len() + gate.raw.len()
             && mention_scanner.is_some();
-        let committed_any: HashSet<Arc<str>> =
-            self.index.ref_committed_keys().into_iter().collect();
         let current_gen = self.index_generation;
         let mut stale = Vec::new();
         let mut scanned: Vec<MentionScanRecord> = Vec::new();
@@ -468,16 +495,13 @@ impl AnalysisSnapshot {
                 continue;
             };
             let text = sf.text(db as &dyn MirDatabase);
-            if self.index.is_ref_committed(f.as_ref(), text, current_gen) {
-                continue;
-            }
-            if committed_any.contains(f.as_ref())
-                && !self
-                    .index
-                    .ref_commit_stale_by_generation_only(f.as_ref(), text)
-            {
-                stale.push(f.clone());
-                continue;
+            match self.index.ref_freshness(sf, text, current_gen) {
+                RefFreshness::Fresh => continue,
+                RefFreshness::Stale => {
+                    stale.push(f.clone());
+                    continue;
+                }
+                RefFreshness::StaleByGenerationOnly | RefFreshness::Uncommitted => {}
             }
             if has_needles && gate_complete {
                 // Any needle answering `true` admits the file; an
@@ -542,6 +566,37 @@ impl AnalysisSnapshot {
         cancel: &crate::IndexCancel,
     ) -> Result<bool, Cancelled> {
         Ok(self.warm_pass(files, cancel)?.is_some())
+    }
+
+    /// The read half of [`super::AnalysisSession::reanalyze_files_cancellable`]:
+    /// analyze `files`, commit their reference postings and class edges, and
+    /// return each file's diagnostics (`symbols` are empty). Files without
+    /// registered text are absent. `Ok(None)` when `cancel` stopped the pass
+    /// first, with nothing committed.
+    ///
+    /// Run the owner-side prelude first: `prepare_for_query(None)`, then
+    /// `prepare_file_for_analysis` per file, a map lookup for files ingested
+    /// with `ingest_file_prepared`.
+    #[allow(clippy::type_complexity)]
+    pub fn reanalyze_files(
+        &self,
+        files: &[Arc<str>],
+        cancel: &crate::IndexCancel,
+    ) -> Result<Option<Vec<(Arc<str>, crate::FileAnalysis)>>, Cancelled> {
+        Ok(self.warm_pass(files, cancel)?.map(|analyzed| {
+            analyzed
+                .into_iter()
+                .map(|a| {
+                    (
+                        a.file,
+                        crate::FileAnalysis {
+                            issues: a.out.issues.to_vec(),
+                            symbols: Vec::new(),
+                        },
+                    )
+                })
+                .collect()
+        }))
     }
 
     pub(super) fn warm_pass(
@@ -1101,8 +1156,6 @@ impl AnalysisSnapshot {
     fn commit_defs_for_matching(&self, files: &[Arc<str>], shorts: &[String]) {
         use rayon::prelude::*;
 
-        let committed_any: HashSet<Arc<str>> =
-            self.index.defs_committed_keys().into_iter().collect();
         // Admit the frontier names before preparing, so every needle gets a
         // real query (a declared class's short name is already in the
         // universe from indexing — admission then changes nothing).
@@ -1126,14 +1179,15 @@ impl AnalysisSnapshot {
                     return (None, None);
                 };
                 let text = sf.text(&*db as &dyn MirDatabase).clone();
-                if index.is_defs_committed(path.as_ref(), &text) {
+                let freshness = index.defs_freshness(sf, &text);
+                if freshness == DefsFreshness::Fresh {
                     return (None, None);
                 }
                 // Never-committed files must mention a frontier name; stale
                 // (previously committed) files recommit unconditionally —
                 // their classes may have re-parented.
                 let mut scan_rec: Option<MentionScanRecord> = None;
-                if use_mentions && !committed_any.contains(path.as_ref()) {
+                if use_mentions && freshness == DefsFreshness::Uncommitted {
                     let mut answer = Some(false);
                     for q in &queries {
                         match db.class_mention_answer(path.as_ref(), q, &text) {
@@ -1237,7 +1291,7 @@ impl AnalysisSnapshot {
         })
     }
 
-    /// Admission predicate for [`Self::stale_reference_candidates`]; see
+    /// Admission predicate for [`Self::stale_reference_candidates_unguarded`]; see
     /// [`ReferenceGate`] and `reference_gate_needles`.
     ///
     /// Instance/static methods other than `__construct`/`__invoke` on a
@@ -1354,7 +1408,7 @@ mod tests {
     fn cancelled_reference_commit_reports_cancellation() {
         let (mut session, files) = prepared_workspace(CALLS_RUN);
         let snap = session.snapshot();
-        let stale = snap.stale_reference_candidates(&Name::method("Base", "run"), &files);
+        let stale = snap.stale_reference_candidates_unguarded(&Name::method("Base", "run"), &files);
         assert!(stale.contains(&files[1]));
 
         let caller = files[1].clone();
@@ -1400,7 +1454,9 @@ mod tests {
 
         let snap = session.snapshot();
         let key = snap.reference_query_key(&symbol, &files, false, ReferenceIncludes::Plain);
-        assert!(snap.stale_reference_candidates(&symbol, &files).is_empty());
+        assert!(snap
+            .stale_reference_candidates_unguarded(&symbol, &files)
+            .is_empty());
         session.ingest_file(files[1].clone(), Arc::from(ROUTES_CALLS_RUN));
         let out = snap.read_references(&symbol, &files, false, ReferenceIncludes::Plain);
         assert!(snap.ensure_no_retire_since(key.generation).is_ok());
@@ -1425,7 +1481,9 @@ mod tests {
 
         let snap = session.snapshot();
         let key = snap.reference_query_key(&symbol, &files, false, ReferenceIncludes::Plain);
-        assert!(snap.stale_reference_candidates(&symbol, &files).is_empty());
+        assert!(snap
+            .stale_reference_candidates_unguarded(&symbol, &files)
+            .is_empty());
         session
             .index
             .retire_references(&session.db.salsa, files[1].as_ref());
@@ -1499,5 +1557,162 @@ mod tests {
             .into_iter()
             .map(|(file, _)| file)
             .collect()
+    }
+
+    /// Everything a whole-file analysis leaves behind that a later one could
+    /// observe: loaded dependencies, the warm-up skip mark, and the result.
+    #[derive(Debug, PartialEq)]
+    struct AnalysisOutcome {
+        issues: Vec<String>,
+        symbols: usize,
+        vendor_class_loaded: bool,
+        vendor_function_loaded: bool,
+        eager_files_drained: bool,
+        stubs_loaded: usize,
+        prepared: bool,
+        prepare_generation: u64,
+        references: Vec<String>,
+    }
+
+    const DEPENDENT: &str = "<?php\nnamespace App;\nfunction go(\\Vendor\\Base $b): void { vendor_helper('x'); new \\ArrayObject(); }\n";
+
+    fn composer_project(root: &std::path::Path) -> AnalysisSession {
+        let vendor = root.join("vendor");
+        std::fs::create_dir_all(vendor.join("composer")).unwrap();
+        std::fs::create_dir_all(vendor.join("helpers")).unwrap();
+        std::fs::create_dir_all(root.join("lib")).unwrap();
+        std::fs::write(
+            vendor.join("composer/autoload_files.php"),
+            "<?php\n$vendorDir = dirname(__DIR__);\n$baseDir = dirname($vendorDir);\nreturn array(\n    'abc123' => $vendorDir . '/helpers/functions.php',\n);\n",
+        )
+        .unwrap();
+        for empty in ["psr4", "classmap", "namespaces"] {
+            std::fs::write(
+                vendor.join(format!("composer/autoload_{empty}.php")),
+                "<?php\nreturn [];\n",
+            )
+            .unwrap();
+        }
+        std::fs::write(
+            vendor.join("helpers/functions.php"),
+            "<?php\nfunction vendor_helper(string $s): string { return $s; }\n",
+        )
+        .unwrap();
+        std::fs::write(
+            root.join("lib/Base.php"),
+            "<?php\nnamespace Vendor;\nclass Base {}\n",
+        )
+        .unwrap();
+        std::fs::write(
+            root.join("composer.json"),
+            r#"{"autoload":{"psr-4":{"App\\":"src/","Vendor\\":"lib/"}}}"#,
+        )
+        .unwrap();
+        let psr4 = crate::composer::Psr4Map::from_composer(root).unwrap();
+        AnalysisSession::new(PhpVersion::LATEST).with_psr4(Arc::new(psr4))
+    }
+
+    fn outcome(
+        session: &AnalysisSession,
+        file: &Arc<str>,
+        analysis: crate::FileAnalysis,
+    ) -> AnalysisOutcome {
+        let text = session.source_of(file).unwrap();
+        AnalysisOutcome {
+            issues: analysis
+                .issues
+                .iter()
+                .map(|i| format!("{:?}", i.kind))
+                .collect(),
+            symbols: analysis.symbols.len(),
+            vendor_class_loaded: {
+                let view = session.db_view();
+                let db = view.db();
+                crate::db::class_like_indexed(db, crate::db::Fqcn::from_str(db, "Vendor\\Base"))
+            },
+            vendor_function_loaded: session.contains_function("vendor_helper"),
+            eager_files_drained: session.pending_eager_function_files.is_none(),
+            stubs_loaded: session.loaded_stub_count(),
+            prepared: session.is_prepared_for_analysis(
+                file,
+                &text,
+                session.prepare_generation_snapshot(),
+            ),
+            prepare_generation: session.prepare_generation_snapshot(),
+            references: ["cls:Vendor\\Base", "fn:vendor_helper", "cls:ArrayObject"]
+                .into_iter()
+                .map(|key| format!("{key}={:?}", session.reference_locations(key)))
+                .collect(),
+        }
+    }
+
+    /// A host that ingests + `prepare_for_query(Some(file))` under its lock and
+    /// then runs `AnalysisSnapshot::analyze` leaves the session as
+    /// `FileAnalyzer::analyze` does, including the warm-up skip mark.
+    #[test]
+    fn prepare_for_query_then_snapshot_analyze_matches_file_analyzer() {
+        let file: Arc<str> = Arc::from("consumer.php");
+        let parsed = php_rs_parser::parse(DEPENDENT);
+
+        let root = tempfile::tempdir().unwrap();
+        let mut via_analyzer = composer_project(root.path());
+        via_analyzer.ingest_file(file.clone(), Arc::from(DEPENDENT));
+        let analysis = crate::FileAnalyzer::new(&mut via_analyzer).analyze(
+            file.clone(),
+            DEPENDENT,
+            &parsed.program,
+            &parsed.source_map,
+        );
+        let expected = outcome(&via_analyzer, &file, analysis);
+
+        let root = tempfile::tempdir().unwrap();
+        let mut via_snapshot = composer_project(root.path());
+        via_snapshot.ingest_file(file.clone(), Arc::from(DEPENDENT));
+        via_snapshot.prepare_for_query(Some(&file));
+        let analysis = via_snapshot
+            .snapshot()
+            .analyze(file.clone(), DEPENDENT, &parsed.program, &parsed.source_map)
+            .unwrap();
+        let actual = outcome(&via_snapshot, &file, analysis);
+
+        assert!(
+            expected.prepared && expected.vendor_function_loaded,
+            "{expected:#?}"
+        );
+        assert_eq!(actual, expected);
+    }
+
+    /// `FileAnalyzer::analyze` warms up from the AST it is handed, so it works
+    /// on a file never ingested; `prepare_for_query` finds no input to warm
+    /// from, so the host must ingest before the snapshot analysis.
+    #[test]
+    fn prepare_for_query_warms_nothing_for_a_file_that_was_never_ingested() {
+        let file: Arc<str> = Arc::from("consumer.php");
+        let parsed = php_rs_parser::parse(DEPENDENT);
+        let unresolved = |analysis: &crate::FileAnalysis| {
+            analysis
+                .issues
+                .iter()
+                .any(|i| matches!(i.kind, crate::IssueKind::UndefinedFunction { .. }))
+        };
+
+        let root = tempfile::tempdir().unwrap();
+        let mut via_analyzer = composer_project(root.path());
+        let analysis = crate::FileAnalyzer::new(&mut via_analyzer).analyze(
+            file.clone(),
+            DEPENDENT,
+            &parsed.program,
+            &parsed.source_map,
+        );
+        assert!(!unresolved(&analysis), "{:?}", analysis.issues);
+
+        let root = tempfile::tempdir().unwrap();
+        let mut via_snapshot = composer_project(root.path());
+        via_snapshot.prepare_for_query(Some(&file));
+        let analysis = via_snapshot
+            .snapshot()
+            .analyze(file, DEPENDENT, &parsed.program, &parsed.source_map)
+            .unwrap();
+        assert!(unresolved(&analysis), "{:?}", analysis.issues);
     }
 }

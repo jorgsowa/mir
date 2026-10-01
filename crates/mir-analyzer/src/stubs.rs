@@ -44,6 +44,13 @@ pub(crate) fn stub_content_for_path(path: &str) -> Option<&'static str> {
         .find_map(|&(p, c)| if p == path { Some(c) } else { None })
 }
 
+/// Whether `path` is one of the embedded stub files.
+pub(crate) fn is_stub_path(path: &str) -> bool {
+    static STUB_PATHS: LazyLock<HashSet<&'static str>> =
+        LazyLock::new(|| STUB_FILES.iter().map(|&(p, _)| p).collect());
+    STUB_PATHS.contains(path)
+}
+
 /// Look up the stub virtual path that defines a built-in PHP function.
 /// Lookup is case-insensitive (PHP function names are case-insensitive).
 /// Returns `None` if the function isn't a known built-in.

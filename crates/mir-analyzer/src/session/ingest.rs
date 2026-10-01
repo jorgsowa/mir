@@ -302,12 +302,14 @@ impl AnalysisSession {
         {
             let entries = crate::db::subtype_index::entries_from_slice(&file_defs.slice);
             let db = &self.db.salsa;
-            let file_no = db.locked_ref_index().intern_path(&file);
+            let file_no = db.intern_path(&file);
             db.set_file_class_edges(file_no, entries);
         }
         // Freshness is keyed on the Arc actually stored on the input (the
         // upsert keeps the prior Arc when content is equal), so read it back.
-        self.index.mark_defs_committed(&file, &stored_text);
+        if let Some(sf) = self.db.salsa.lookup_source_file(file.as_ref()) {
+            self.index.mark_defs_committed(sf, &stored_text);
+        }
     }
 
     /// [`Self::ingest_file`] followed by the file's Phase-1 warm-up
@@ -831,19 +833,19 @@ impl AnalysisSession {
                     stub,
                 } = hit;
                 if let Some((locs, resolved)) = refs {
-                    let file_no = db.locked_ref_index().intern_path(&file);
+                    let file_no = db.intern_path(&file);
                     db.set_file_reference_locations(file_no, locs);
                     self.index
-                        .mark_ref_committed(&file, &stored_text, None, commit_gen, resolved);
+                        .mark_ref_committed(sf, &stored_text, None, commit_gen, resolved);
                     dependency_graph_changed = true;
                     if !resolved {
                         unresolved.push(file.clone());
                     }
                 }
                 if let Some((entries, decls)) = stub {
-                    let file_no = db.locked_ref_index().intern_path(&file);
+                    let file_no = db.intern_path(&file);
                     db.set_file_class_edges(file_no, entries);
-                    self.index.mark_defs_committed(&file, &stored_text);
+                    self.index.mark_defs_committed(sf, &stored_text);
                     structural_target_files.push(file.clone());
                     dependency_graph_changed = true;
                     seed_decls.push((sf, decls));
