@@ -708,12 +708,14 @@ impl<'a> ClassAnalyzer<'a> {
                     // before giving up on a still-templated param type, so a concretely
                     // bound generic contract (`@extends Box<int>`) is still checked.
                     let parent_had_template = self.return_type_has_template(parent_ty_raw);
+                    // A native `array ...$p` on the other side means `@param X[] $p`
+                    // describes each argument, not the collected array.
                     let parent_ty = Self::variadic_element_type(
-                        parent_param.is_variadic,
+                        parent_param.is_variadic && !Self::is_native_array(child_ty_raw),
                         parent_ty_raw.substitute_templates(&inherited_bindings),
                     );
                     let child_ty = Self::variadic_element_type(
-                        child_param.is_variadic,
+                        child_param.is_variadic && !Self::is_native_array(parent_ty_raw),
                         child_ty_raw.substitute_templates(&inherited_bindings),
                     );
                     let parent_ty = &parent_ty;
@@ -1048,17 +1050,18 @@ impl<'a> ClassAnalyzer<'a> {
         Arc::new(m_clone)
     }
 
-    /// Docblock `@param list<X> ...$p` describes the collected array; compare its element type.
+    fn is_native_array(ty: &mir_types::Type) -> bool {
+        !ty.from_docblock && ty.types.iter().any(|a| a.is_array())
+    }
+
+    /// Docblock `@param X[] ...$p` / `list<X> ...$p` describes the collected array; compare its element type.
     fn variadic_element_type(is_variadic: bool, ty: mir_types::Type) -> mir_types::Type {
-        if !(is_variadic && ty.from_docblock && ty.is_single()) {
+        if !(is_variadic && ty.from_docblock) {
             return ty;
         }
-        match &ty.types[0] {
-            mir_types::Atomic::TList { value } | mir_types::Atomic::TNonEmptyList { value } => {
-                (**value).clone().from_docblock()
-            }
-            _ => ty,
-        }
+        crate::generic::variadic_element_type(&ty)
+            .clone()
+            .from_docblock()
     }
 
     fn type_has_self_or_static_atomic(ty: &mir_types::Type) -> bool {
