@@ -12,7 +12,7 @@ const commit = (() => {
 })();
 
 const PHP_VERSIONS = ['8.1', '8.2', '8.3', '8.4', '8.5', '8.6'];
-const DEFAULT_PHP = '8.6';
+const DEFAULT_PHP = '8.5';
 
 const EXAMPLES = {
   'type-mismatch': {
@@ -187,7 +187,7 @@ const DEFAULT_CODE = EXAMPLES['type-mismatch'].code;
   const exBtn    = exWrap.querySelector('.pg-drop-btn');
   const exList   = exWrap.querySelector('.pg-drop-list');
 
-  let pgVersion = verList.querySelector('.pg-drop-opt--selected')?.dataset.value ?? '8.6';
+  let pgVersion = verList.querySelector('.pg-drop-opt--selected')?.dataset.value ?? '8.5';
 
   let playground = null;
   let debounce   = null;
