@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Passing an undefined variable to a by-reference parameter of a function called through a literal-string variable (`$fn = 'preg_match'; $fn($re, $s, $m);`) no longer reports `UndefinedVariable`.
 - Method calls on an intersection-typed receiver (`Mock&Svc`) now record a navigation symbol, so go-to-definition and references resolve.
 - A `@return $this` method now keeps the receiver's class in chains (`$sub->chain()->subOnly()`), like `@return static`.
+- Go-to-definition and find-references now resolve on the declaration name of global constants, class/interface/trait/enum constants and properties.
 
 ## [0.82.0] - 2026-10-01
 

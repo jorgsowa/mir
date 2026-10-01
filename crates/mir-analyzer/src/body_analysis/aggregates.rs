@@ -107,7 +107,7 @@ impl<'a> BodyAnalyzer<'a> {
             }
             let php_ast::owned::ClassMemberKind::Method(method) = &member.kind else {
                 if let php_ast::owned::ClassMemberKind::ClassConst(c) = &member.kind {
-                    self.record_class_const_decl(c, &member.span, file, source, source_map);
+                    self.record_class_const_decl(c, &member.span, fqcn, file, source, source_map);
                 }
                 continue;
             };
@@ -195,7 +195,7 @@ impl<'a> BodyAnalyzer<'a> {
             }
             let php_ast::owned::ClassMemberKind::Method(method) = &member.kind else {
                 if let php_ast::owned::ClassMemberKind::ClassConst(c) = &member.kind {
-                    self.record_class_const_decl(c, &member.span, file, source, source_map);
+                    self.record_class_const_decl(c, &member.span, fqcn, file, source, source_map);
                 }
                 continue;
             };
@@ -349,7 +349,7 @@ impl<'a> BodyAnalyzer<'a> {
         for member in decl.body.members.iter() {
             let EnumMemberKind::Method(method) = &member.kind else {
                 if let EnumMemberKind::ClassConst(c) = &member.kind {
-                    self.record_class_const_decl(c, &member.span, file, source, source_map);
+                    self.record_class_const_decl(c, &member.span, fqcn, file, source, source_map);
                 }
                 continue;
             };
@@ -451,7 +451,7 @@ impl<'a> BodyAnalyzer<'a> {
         for member in decl.body.members.iter() {
             let EnumMemberKind::Method(method) = &member.kind else {
                 if let EnumMemberKind::ClassConst(c) = &member.kind {
-                    self.record_class_const_decl(c, &member.span, file, source, source_map);
+                    self.record_class_const_decl(c, &member.span, fqcn, file, source, source_map);
                 }
                 continue;
             };
@@ -557,7 +557,14 @@ impl<'a> BodyAnalyzer<'a> {
         for member in decl.body.members.iter() {
             let ClassMemberKind::Method(method) = &member.kind else {
                 if let ClassMemberKind::ClassConst(c) = &member.kind {
-                    self.record_class_const_decl(c, &member.span, file, source, source_map);
+                    self.record_class_const_decl(
+                        c,
+                        &member.span,
+                        &iface_fqcn,
+                        file,
+                        source,
+                        source_map,
+                    );
                 }
                 continue;
             };

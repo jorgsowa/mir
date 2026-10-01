@@ -1281,7 +1281,7 @@ pub(super) fn method_decl_name_span(
 /// method's name within its member span (interface methods have no body and
 /// often no params, so `method_header_name_span`'s param/body anchor doesn't
 /// apply).
-pub(super) fn bare_name_span_in(
+pub(crate) fn bare_name_span_in(
     source: &str,
     member_span: &php_ast::Span,
     name: &str,

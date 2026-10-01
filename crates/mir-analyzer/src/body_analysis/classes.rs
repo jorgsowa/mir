@@ -303,6 +303,19 @@ impl<'a> BodyAnalyzer<'a> {
         source_map: &php_rs_parser::source_map::SourceMap,
         all_issues: &mut Vec<Issue>,
     ) {
+        if self.collect_navigation_facts {
+            if let Some(name) = prop.name.as_deref().filter(|n| !n.is_empty()) {
+                let span = super::property_name_span(source, member_span, name);
+                if span.end > span.start {
+                    self.navigation_facts.borrow_mut().push(NavigationFact {
+                        span,
+                        expr_span: None,
+                        name: crate::Name::property(fqcn, name),
+                    });
+                }
+            }
+        }
+
         // Record the declaration name under a name-only key so find-references
         // with an unresolvable receiver ($x->prop on an untyped $x) can still
         // surface matching declarations, mirroring `methdecl:` for methods.
@@ -389,13 +402,11 @@ impl<'a> BodyAnalyzer<'a> {
         &self,
         constant: &php_ast::owned::ClassConstDecl,
         member_span: &php_ast::Span,
+        fqcn: &str,
         file: &Arc<str>,
         source: &str,
         source_map: &php_rs_parser::source_map::SourceMap,
     ) {
-        if self.mode != AnalysisMode::Full {
-            return;
-        }
         let Some(name) = constant.name.as_deref() else {
             return;
         };
@@ -404,6 +415,16 @@ impl<'a> BodyAnalyzer<'a> {
         }
         let span = super::bare_name_span_in(source, member_span, name);
         if span.end <= span.start {
+            return;
+        }
+        if self.collect_navigation_facts {
+            self.navigation_facts.borrow_mut().push(NavigationFact {
+                span,
+                expr_span: None,
+                name: crate::Name::class_constant(fqcn, name),
+            });
+        }
+        if self.mode != AnalysisMode::Full {
             return;
         }
         let (line, col_start) =
@@ -1555,7 +1576,7 @@ impl<'a> BodyAnalyzer<'a> {
             }
             let php_ast::owned::ClassMemberKind::Method(method) = &member.kind else {
                 if let php_ast::owned::ClassMemberKind::ClassConst(c) = &member.kind {
-                    self.record_class_const_decl(c, &member.span, file, source, source_map);
+                    self.record_class_const_decl(c, &member.span, fqcn, file, source, source_map);
                 }
                 continue;
             };
@@ -1785,7 +1806,7 @@ impl<'a> BodyAnalyzer<'a> {
             }
             let php_ast::owned::ClassMemberKind::Method(method) = &member.kind else {
                 if let php_ast::owned::ClassMemberKind::ClassConst(c) = &member.kind {
-                    self.record_class_const_decl(c, &member.span, file, source, source_map);
+                    self.record_class_const_decl(c, &member.span, fqcn, file, source, source_map);
                 }
                 continue;
             };

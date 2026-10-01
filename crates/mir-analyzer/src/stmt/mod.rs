@@ -692,7 +692,13 @@ impl<'a> StatementsAnalyzer<'a> {
             // ---- Namespace / use (at file level, already handled in definition
             // collection; braced namespace bodies are walked by
             // `BodyAnalyzer::analyze_global_exec` / `analyze_top_level_stmts`) --
-            StmtKind::Namespace(_) | StmtKind::Use(_) | StmtKind::Const(_) => {}
+            StmtKind::Namespace(_) | StmtKind::Use(_) => {}
+
+            StmtKind::Const(items) => {
+                for item in items.iter() {
+                    self.record_global_const_decl_name(item);
+                }
+            }
 
             // ---- Inert --------------------------------------------------------
             StmtKind::InlineHtml(_)
@@ -860,6 +866,22 @@ impl<'a> StatementsAnalyzer<'a> {
                 resolved_type,
             });
         }
+    }
+
+    fn record_global_const_decl_name(&mut self, item: &php_ast::owned::ConstItem) {
+        let Some(name) = item.name.as_deref().filter(|n| !n.is_empty()) else {
+            return;
+        };
+        let span = crate::body_analysis::bare_name_span_in(self.source, &item.span, name);
+        let fqn: Arc<str> = match self.db.file_namespace(self.file.as_ref()) {
+            Some(ns) => format!("{ns}\\{name}").into(),
+            None => Arc::from(name),
+        };
+        self.record_symbol(
+            span,
+            crate::symbol::ReferenceKind::GlobalConstant(fqn),
+            Type::mixed(),
+        );
     }
 
     pub(crate) fn record_symbol(
