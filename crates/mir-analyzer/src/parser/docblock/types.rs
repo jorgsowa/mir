@@ -452,10 +452,10 @@ pub(crate) fn parse_type_string(s: &str) -> Type {
         }
         "resource" => Type::mixed(), // treat as mixed
         // self/static/parent: emit sentinel with empty FQCN; collector fills it in.
-        "static" => Type::single(Atomic::TStaticObject {
+        "static" | "$this" => Type::single(Atomic::TStaticObject {
             fqcn: mir_types::Name::from(""),
         }),
-        "self" | "$this" => Type::single(Atomic::TSelf {
+        "self" => Type::single(Atomic::TSelf {
             fqcn: mir_types::Name::from(""),
         }),
         "parent" => Type::single(Atomic::TParent {
@@ -700,10 +700,10 @@ pub(super) fn parse_generic(name: &str, inner: &str) -> Type {
         // the written `<...>` args are dropped rather than parsed as a bogus
         // named class called "self"/"static"/"parent" — substitution re-attaches
         // the real receiver's own type params regardless.
-        "static" => Type::single(Atomic::TStaticObject {
+        "static" | "$this" => Type::single(Atomic::TStaticObject {
             fqcn: mir_types::Name::from(""),
         }),
-        "self" | "$this" => Type::single(Atomic::TSelf {
+        "self" => Type::single(Atomic::TSelf {
             fqcn: mir_types::Name::from(""),
         }),
         "parent" => Type::single(Atomic::TParent {

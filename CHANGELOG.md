@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed stale phpunit entries from the real-world harness baseline.
 - A positional argument after a named argument no longer yields a second `InvalidNamedArgument` with an internal `$#N` placeholder name; only the parse error is reported.
 - Passing an undefined variable to a by-reference parameter of a function called through a literal-string variable (`$fn = 'preg_match'; $fn($re, $s, $m);`) no longer reports `UndefinedVariable`.
+- Method calls on an intersection-typed receiver (`Mock&Svc`) now record a navigation symbol, so go-to-definition and references resolve.
+- A `@return $this` method now keeps the receiver's class in chains (`$sub->chain()->subOnly()`), like `@return static`.
 
 ## [0.82.0] - 2026-10-01
 

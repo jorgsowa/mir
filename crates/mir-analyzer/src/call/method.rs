@@ -492,8 +492,8 @@ impl CallAnalyzer {
         // Declaring class of the resolved method, threaded out of
         // `resolve_method_return` so the symbol-recording loop below does not
         // have to walk the ancestor chain a second time. Only the
-        // `TNamedObject` branch feeds it — the recording loop matches
-        // top-level `TNamedObject` atomics only.
+        // `TNamedObject` and `TIntersection` branches feed it — the recording
+        // loop matches those atomics only.
         let mut declaring = None;
         // `@psalm-self-out` per-atomic accumulator: a union receiver (e.g.
         // `A|B`) must keep every branch that doesn't declare self-out
@@ -589,6 +589,7 @@ impl CallAnalyzer {
                                 if crate::db::has_method_in_chain(ea.db, &resolved_arc, method_name)
                                 {
                                     found_method = true;
+                                    let mut part_declaring = None;
                                     intersection_result.merge_with(&resolve_method_return(
                                         ea,
                                         ctx,
@@ -600,11 +601,14 @@ impl CallAnalyzer {
                                         &arg_types,
                                         &arg_spans,
                                         sole_spread_ty.clone(),
-                                        &mut None,
+                                        &mut part_declaring,
                                         &mut this_self_out,
                                         Some(&full_receiver_ty),
                                         union_has_call_magic,
                                     ));
+                                    if declaring.is_none() {
+                                        declaring = part_declaring;
+                                    }
                                 }
                             }
                         }
@@ -749,7 +753,9 @@ impl CallAnalyzer {
         };
 
         for atomic in &obj_ty.types {
-            if let mir_types::Atomic::TNamedObject { .. } = atomic {
+            if let mir_types::Atomic::TNamedObject { .. }
+            | mir_types::Atomic::TIntersection { .. } = atomic
+            {
                 // The declaring class (via the inheritance chain) was threaded
                 // out of `resolve_method_return` above so that symbol_at →
                 // to_symbol() → references_to uses the same key as record_ref,
