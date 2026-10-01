@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A child class may redeclare a property with a covariant type over a parent's get-only hooked property; writable parents and unrelated types are still reported.
 - Removed stale phpunit entries from the real-world harness baseline.
 - A positional argument after a named argument no longer yields a second `InvalidNamedArgument` with an internal `$#N` placeholder name; only the parse error is reported.
+- Passing an undefined variable to a by-reference parameter of a function called through a literal-string variable (`$fn = 'preg_match'; $fn($re, $s, $m);`) no longer reports `UndefinedVariable`.
 
 ## [0.82.0] - 2026-10-01
 

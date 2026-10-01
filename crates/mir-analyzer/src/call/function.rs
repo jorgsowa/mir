@@ -133,6 +133,8 @@ impl CallAnalyzer {
                 // UndefinedVariable when the argument expression is analyzed.
                 if let Some((_, ref params)) = callee_params {
                     super::premark_byref_arg_vars(params, &call.args, ctx);
+                } else if let Some(f) = literal_named_function(&callee_ty, ea) {
+                    super::premark_byref_arg_vars(&f.params, &call.args, ctx);
                 }
 
                 // Collect arg types, spans, names and byref flags for type checking.
@@ -1655,6 +1657,18 @@ fn type_param_to_storage_param(p: &TypeFnParam) -> DeclaredParam {
 ///
 /// Returns `None` if the union contains a bare `TCallable { params: None }` (unknown arity),
 /// same guard as `extract_callable_params`.
+/// Function named by a single literal-string callee (`$fn = 'preg_match'; $fn(...)`).
+fn literal_named_function(
+    callee_ty: &Type,
+    ea: &ExpressionAnalyzer<'_>,
+) -> Option<Arc<mir_codebase::definitions::FunctionDef>> {
+    let [Atomic::TLiteralString(name)] = callee_ty.types.as_slice() else {
+        return None;
+    };
+    let fqn = name.trim_start_matches('\\');
+    crate::db::find_function(ea.db, crate::db::Fqcn::from_str(ea.db, fqn))
+}
+
 fn typed_params_from_callee(
     union: &Type,
     ea: &ExpressionAnalyzer<'_>,
