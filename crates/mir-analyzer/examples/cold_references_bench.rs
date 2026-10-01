@@ -145,7 +145,7 @@ fn main() {
     // that matters — every protected-member references query on the same
     // hierarchy pays it again.
     let t3 = Instant::now();
-    let subtypes = session.subtype_files("Illuminate\\Support\\ServiceProvider");
+    let subtypes = session.subtype_files("Illuminate\\Support\\ServiceProvider", false);
     eprintln!(
         "subtype_files(ServiceProvider) cold: {:.3}s, {} files",
         t3.elapsed().as_secs_f64(),
@@ -154,7 +154,7 @@ fn main() {
     let t4 = Instant::now();
     let n = 5;
     for _ in 0..n {
-        let repeat = session.subtype_files("Illuminate\\Support\\ServiceProvider");
+        let repeat = session.subtype_files("Illuminate\\Support\\ServiceProvider", false);
         assert_eq!(repeat.len(), subtypes.len());
     }
     eprintln!(

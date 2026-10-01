@@ -978,11 +978,16 @@ impl AnalysisSnapshot {
     /// Files declaring transitive subclasses of `class_fqn` anywhere in the
     /// workspace, excluding `class_fqn`'s own declaring file — the caller
     /// adds it. Subclasses are matched by resolved FQCN, so `extends \Ns\Base`
-    /// and aliased `use` forms are all found.
-    pub fn subtype_files(&self, class_fqn: &str) -> Result<Vec<Arc<str>>, Cancelled> {
+    /// and aliased `use` forms are all found. `include_trait_users` also
+    /// counts files whose classes `use` the trait `class_fqn`.
+    pub fn subtype_files(
+        &self,
+        class_fqn: &str,
+        include_trait_users: bool,
+    ) -> Result<Vec<Arc<str>>, Cancelled> {
         let files = self.db.source_file_paths();
         let mut out: Vec<Arc<str>> = self
-            .indexed_subtype_classes(class_fqn, &files, false)?
+            .indexed_subtype_classes(class_fqn, &files, include_trait_users)?
             .into_iter()
             .map(|s| s.file)
             .collect();

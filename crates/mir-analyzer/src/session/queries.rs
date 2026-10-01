@@ -135,9 +135,10 @@ impl AnalysisSession {
     /// aliased `use` forms are all found. Read-only from the caller's
     /// perspective; may trigger an on-demand commit of stale/uncommitted
     /// candidates' class edges (same self-heal `indexed_subtype_classes` uses).
-    pub fn subtype_files(&mut self, class_fqn: &str) -> Vec<Arc<str>> {
+    /// `include_trait_users` also counts classes that `use` the trait.
+    pub fn subtype_files(&mut self, class_fqn: &str, include_trait_users: bool) -> Vec<Arc<str>> {
         self.prepare_for_query(None);
-        self.query_snapshot(|snap| snap.subtype_files(class_fqn))
+        self.query_snapshot(|snap| snap.subtype_files(class_fqn, include_trait_users))
     }
 
     /// Compatibility wrapper for callers that only want `use` import items.

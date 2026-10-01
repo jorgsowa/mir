@@ -371,6 +371,20 @@ fn subtype_classes_transitive_with_alias_and_fqn_forms() {
 }
 
 #[test]
+fn subtype_files_include_trait_users_on_request() {
+    let files = [
+        ("helper.php", "<?php\ntrait Helper {}\n"),
+        ("post.php", "<?php\nclass Post { use Helper; }\n"),
+        ("rock.php", "<?php\nclass Rock {}\n"),
+    ];
+    let mut session = session_with(&files);
+    assert!(session.subtype_files("Helper", false).is_empty());
+    let users = session.subtype_files("Helper", true);
+    assert_eq!(users.len(), 1, "{users:?}");
+    assert!(users[0].ends_with("post.php"), "{users:?}");
+}
+
+#[test]
 fn subtype_classes_do_not_fall_back_to_another_namespace() {
     let files = [
         (

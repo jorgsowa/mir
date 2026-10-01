@@ -275,7 +275,7 @@ fn subtype_files_resolves_plain_fqn_and_aliased_extends() {
         Arc::from("<?php\nnamespace App;\nclass Stranger {}\n"),
     );
 
-    let mut files = session.subtype_files("App\\Base");
+    let mut files = session.subtype_files("App\\Base", false);
     files.sort();
     assert_eq!(
         files,

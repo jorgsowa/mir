@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - PHP 8.6 support: a configured 8.6+ target makes the parser accept partial-application placeholders (`?`/`...`) instead of raising a version-gate `ParseError`. Targets below 8.6 are unchanged.
+- `AnalysisSession::subtype_files` and `AnalysisSnapshot::subtype_files` take an `include_trait_users` flag; `true` also returns files whose classes `use` the trait.
 
 ### Fixed
 
