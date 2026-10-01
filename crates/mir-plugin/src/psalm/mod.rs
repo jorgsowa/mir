@@ -4,7 +4,8 @@
 //! `Psalm\Plugin\PluginEntryPointInterface`, installed via composer alongside
 //! `vimeo/psalm`. This bridge spawns a long-lived `php` subprocess (the host
 //! script embedded in this crate) that boots the analyzed project's
-//! `vendor/autoload.php`, invokes each configured entry point against a shim
+//! `vendor/autoload.php` (plus a separately installed Psalm, when the project
+//! autoloader lacks it), invokes each configured entry point against a shim
 //! `RegistrationInterface`, and answers JSON-lines RPC from mir.
 //!
 //! ## Supported Psalm plugin capabilities (v1)
@@ -21,7 +22,7 @@
 use std::io::{BufRead, BufReader, Write as _};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use parking_lot::Mutex;
 use rustc_hash::FxHashMap;
@@ -69,6 +70,10 @@ pub struct BridgeOptions {
     /// temp dir when `None`.
     pub host_script_dir: Option<PathBuf>,
     pub plugins: Vec<PsalmPluginSpec>,
+    /// `autoload.php` of a Psalm install outside the project's own vendor dir.
+    /// When `None`, the host discovers one under the project root if the
+    /// project's autoloader does not provide Psalm.
+    pub psalm_autoload: Option<PathBuf>,
 }
 
 impl BridgeOptions {
@@ -78,6 +83,7 @@ impl BridgeOptions {
             project_root: project_root.into(),
             host_script_dir: None,
             plugins,
+            psalm_autoload: None,
         }
     }
 }
@@ -195,6 +201,7 @@ impl PsalmBridgePlugin {
             serde_json::json!({
                 "projectRoot": options.project_root.to_string_lossy(),
                 "plugins": plugins,
+                "psalmAutoload": options.psalm_autoload,
             }),
         )?;
 
@@ -333,9 +340,11 @@ fn materialize_host_script(dir: Option<&Path>) -> Result<PathBuf, BridgeError> {
     let digest = content_hash_hex(HOST_PHP);
     let path = dir.join(format!("mir-psalm-host-{digest}.php"));
     if !path.exists() {
+        static NEXT_TMP: AtomicU64 = AtomicU64::new(0);
         let tmp = dir.join(format!(
-            "mir-psalm-host-{digest}.php.tmp.{}",
-            std::process::id()
+            "mir-psalm-host-{digest}.php.tmp.{}.{}",
+            std::process::id(),
+            NEXT_TMP.fetch_add(1, Ordering::Relaxed)
         ));
         std::fs::write(&tmp, HOST_PHP).map_err(BridgeError::WriteHost)?;
         std::fs::rename(&tmp, &path).map_err(BridgeError::WriteHost)?;

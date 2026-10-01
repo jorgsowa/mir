@@ -26,6 +26,17 @@ fn fixture_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/fake-psalm-project")
 }
 
+fn isolated_fixture_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/isolated-psalm-project")
+}
+
+fn test_plugin_spec() -> PsalmPluginSpec {
+    PsalmPluginSpec {
+        class: "TestPlugin\\Plugin".to_string(),
+        config_xml: None,
+    }
+}
+
 fn provider_event<'a>(
     function_id: &'a str,
     arg_types: &'a [Type],
@@ -91,4 +102,60 @@ fn bridge_hosts_a_psalm_plugin_end_to_end() {
     assert!(bridge
         .function_return_type(&provider_event("unrelated_fn", &int_arg))
         .is_none());
+}
+
+fn assert_provider_round_trip(bridge: &PsalmBridgePlugin) {
+    assert_eq!(bridge.function_return_type_ids(), vec!["test_helper"]);
+    let int_arg = [Type::single(mir_types::Atomic::TInt)];
+    match bridge.function_return_type(&provider_event("test_helper", &int_arg)) {
+        Some(ProvidedType::Parse(s)) => assert_eq!(s, "list<int>"),
+        other => panic!("expected Parse type from provider, got {other:?}"),
+    }
+}
+
+#[test]
+fn bridge_discovers_psalm_installed_outside_project_vendor() {
+    if !php_available() {
+        eprintln!("skipping psalm bridge test: no `php` binary on PATH");
+        return;
+    }
+
+    let bridge = spawn_isolated(None);
+    assert_provider_round_trip(&bridge);
+}
+
+#[test]
+fn bridge_honors_explicit_psalm_autoload() {
+    if !php_available() {
+        eprintln!("skipping psalm bridge test: no `php` binary on PATH");
+        return;
+    }
+
+    let explicit = isolated_fixture_root().join("tools/psalm/vendor/autoload.php");
+    let bridge = spawn_isolated(Some(explicit));
+    assert_provider_round_trip(&bridge);
+}
+
+#[test]
+fn bridge_reports_missing_psalm() {
+    if !php_available() {
+        eprintln!("skipping psalm bridge test: no `php` binary on PATH");
+        return;
+    }
+
+    let empty = tempfile::tempdir().unwrap();
+    let err = PsalmBridgePlugin::spawn(&BridgeOptions::new(empty.path(), vec![test_plugin_spec()]))
+        .err()
+        .expect("spawn should fail without Psalm");
+    assert!(
+        err.to_string()
+            .contains("Psalm (vimeo/psalm) was not found"),
+        "{err}"
+    );
+}
+
+fn spawn_isolated(psalm_autoload: Option<PathBuf>) -> PsalmBridgePlugin {
+    let mut options = BridgeOptions::new(isolated_fixture_root(), vec![test_plugin_spec()]);
+    options.psalm_autoload = psalm_autoload;
+    PsalmBridgePlugin::spawn(&options).expect("bridge should spawn and initialize")
 }

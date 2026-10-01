@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Psalm plugin bridge finds a Psalm install outside the project's own `vendor/` (e.g. an isolated tools install under the project root), so plugins run when only a separate install provides `vimeo/psalm`. `MIR_PSALM_AUTOLOAD` points at a specific install's `autoload.php`.
 - PHP 8.6 support: a configured 8.6+ target makes the parser accept partial-application placeholders (`?`/`...`) instead of raising a version-gate `ParseError`. Targets below 8.6 are unchanged.
 - `AnalysisSession::subtype_files` and `AnalysisSnapshot::subtype_files` take an `include_trait_users` flag; `true` also returns files whose classes `use` the trait.
 - `indexed_direct_subtype_classes` on `AnalysisSession` and `AnalysisSnapshot`: subtypes that name a class directly in `extends`/`implements` (or `use`, with `include_trait_users`), without grandchildren.
@@ -16,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Concurrent Psalm bridge spawns in one process no longer race on the host script's temporary file.
 - Partial-application placeholder arguments are no longer reported as `MixedArgument`.
 - A child class may redeclare a property with a covariant type over a parent's get-only hooked property; writable parents and unrelated types are still reported.
 - Removed stale phpunit entries from the real-world harness baseline.

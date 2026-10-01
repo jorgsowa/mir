@@ -60,6 +60,9 @@ pub fn setup_plugins(
         if let Ok(php) = std::env::var("MIR_PHP") {
             options.php_binary = php;
         }
+        if let Ok(autoload) = std::env::var("MIR_PSALM_AUTOLOAD") {
+            options.psalm_autoload = Some(resolve(&autoload, project_root));
+        }
         match PsalmBridgePlugin::spawn(&options) {
             Ok(bridge) => {
                 if !cli.quiet {

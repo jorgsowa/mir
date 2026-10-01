@@ -13,7 +13,9 @@ declare(strict_types=1);
  *   <- {"id":2,"result":{"type":"list<int>"}}
  *
  * Psalm plugin classes and Psalm itself are loaded from the analyzed
- * project's own vendor/autoload.php. Shim implementations of Psalm's
+ * project's own vendor/autoload.php, plus a separately installed Psalm
+ * (explicit "psalmAutoload" param, or discovered under the project root) when
+ * the project's autoloader does not provide it. Shim implementations of Psalm's
  * interfaces are GENERATED at runtime from the installed Psalm's actual
  * interface signatures (see MirShimGenerator), so this host does not break
  * when Psalm adds or changes interface methods.
@@ -192,15 +194,23 @@ final class MirPsalmHost
     {
         $root = (string)($params['projectRoot'] ?? getcwd());
         $autoload = $params['autoload'] ?? ($root . '/vendor/autoload.php');
-        if (!is_file($autoload)) {
-            throw new RuntimeException("no composer autoloader at $autoload — run `composer install` first");
+        if (is_file($autoload)) {
+            require $autoload;
         }
-        require $autoload;
+
+        if (!interface_exists('Psalm\\Plugin\\PluginEntryPointInterface')) {
+            $explicit = $params['psalmAutoload'] ?? null;
+            $psalmAutoload = $explicit !== null ? (string)$explicit : self::findPsalmAutoload($root);
+            if ($psalmAutoload !== null && is_file($psalmAutoload)) {
+                require $psalmAutoload;
+            }
+        }
 
         if (!interface_exists('Psalm\\Plugin\\PluginEntryPointInterface')) {
             throw new RuntimeException(
-                'Psalm is not installed in this project — psalm plugins need vimeo/psalm '
-                . '(it ships the plugin API the plugins are compiled against)'
+                "Psalm (vimeo/psalm) was not found: it is not in $autoload and no separate install was "
+                . 'found under the project root. Install it, or point MIR_PSALM_AUTOLOAD at the '
+                . "autoload.php of the install that provides it."
             );
         }
 
@@ -246,6 +256,37 @@ final class MirPsalmHost
             'methodClasses' => array_keys($this->methodProviders),
             'warnings' => $this->warnings,
         ];
+    }
+
+    /**
+     * Locate a Psalm install living outside the project's own vendor dir
+     * (e.g. an isolated tools install). Breadth-first so the shallowest wins.
+     */
+    private static function findPsalmAutoload(string $root): ?string
+    {
+        $queue = [[$root, 0]];
+        $visited = 0;
+        while ($queue && $visited++ < 2000) {
+            [$dir, $depth] = array_shift($queue);
+            foreach ([$dir, $dir . '/vendor'] as $vendorDir) {
+                if (is_file($vendorDir . '/autoload.php') && is_dir($vendorDir . '/vimeo/psalm')) {
+                    return $vendorDir . '/autoload.php';
+                }
+            }
+            if ($depth >= 3) {
+                continue;
+            }
+            $children = @scandir($dir) ?: [];
+            foreach ($children as $child) {
+                if ($child[0] === '.' || $child === 'vendor' || $child === 'node_modules') {
+                    continue;
+                }
+                if (is_dir($dir . '/' . $child)) {
+                    $queue[] = [$dir . '/' . $child, $depth + 1];
+                }
+            }
+        }
+        return null;
     }
 
     public function registerHooks(string $class): void
