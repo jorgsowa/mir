@@ -665,7 +665,8 @@ impl Type {
         )
     }
 
-    /// Narrow array/list types to their non-empty variants (for `count() > 0` etc.).
+    /// Narrow array/list types to their non-empty variants (for `count() > 0` etc.),
+    /// dropping the closed empty shape `array{}`.
     pub fn narrow_to_non_empty_collection(&self) -> Type {
         let mut out = Type::empty();
         out.from_docblock = self.from_docblock;
@@ -678,6 +679,11 @@ impl Type {
                 Atomic::TList { value } => out.add_type(Atomic::TNonEmptyList {
                     value: value.clone(),
                 }),
+                Atomic::TKeyedArray {
+                    properties,
+                    is_open: false,
+                    ..
+                } if properties.is_empty() => {}
                 _ => out.add_type(t.clone()),
             }
         }

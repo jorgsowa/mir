@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `$row !== []` and `count($row) > 0` drop the closed `array{}` arm from a union of shapes, so a key read after `if ($row === []) { return; }` is no longer reported as `NonExistentArrayOffset`.
 - A user stub that declares a class also present in the project or vendor no longer hides the real class's other members; stub members win and the rest are inherited from the real class, as in Psalm.
 - Psalm plugin bridge no longer degrades literal argument types to `mixed` for plugins calling `Type::parseString`, and no longer reuses a cached provider result across different calling classes.
 - Concurrent Psalm bridge spawns in one process no longer race on the host script's temporary file.
