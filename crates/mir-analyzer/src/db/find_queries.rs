@@ -660,7 +660,7 @@ fn real_class_shadowed_by_stub(db: &dyn MirDatabase, stub: &ClassDef) -> Option<
         .classes
         .iter()
         .find(|c| c.fqcn.to_ascii_lowercase() == key)?;
-    Some(resolve_cross_file_imports(db, real))
+    Some(resolve_cross_file_imports(db, real.clone()))
 }
 
 /// Stub members win; members only the real class declares are added.
@@ -693,7 +693,11 @@ fn merge_stub_over_real(stub: &ClassDef, real: &ClassDef) -> ClassDef {
         (&mut merged.mixins, &real.mixins),
     ] {
         for item in list.1 {
-            if !list.0.iter().any(|existing| existing.eq_ignore_ascii_case(item)) {
+            if !list
+                .0
+                .iter()
+                .any(|existing| existing.eq_ignore_ascii_case(item))
+            {
                 list.0.push(item.clone());
             }
         }

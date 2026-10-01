@@ -12,9 +12,9 @@ use std::process::Command;
 
 use mir_plugin::psalm::{BridgeOptions, PsalmBridgePlugin, PsalmPluginSpec};
 use mir_plugin::{
-    mir_types, php_ast, AfterFunctionLikeAnalysisEvent, AttributeArgInfo, AttributeInfo,
-    FunctionLikeParamInfo, FunctionReturnTypeProviderEvent, MethodReturnTypeProviderEvent,
-    MirPlugin, ProvidedType, Severity, Type,
+    mir_types, php_ast, AfterClassLikeAnalysisEvent, AfterFunctionLikeAnalysisEvent,
+    AttributeArgInfo, AttributeInfo, FunctionLikeParamInfo, FunctionReturnTypeProviderEvent,
+    MethodReturnTypeProviderEvent, MirPlugin, ProvidedType, Severity, Type,
 };
 
 fn php_available() -> bool {
@@ -250,4 +250,43 @@ fn bridge_reports_issues_from_after_function_like_hook() {
         "__construct: $key string App\\Attr 'a.b'"
     );
     assert_eq!(event.issues[0].span, Some(php_ast::Span::new(40, 55)));
+}
+
+#[test]
+fn bridge_runs_class_like_handlers_over_a_scanned_codebase() {
+    if !php_available() {
+        eprintln!("skipping psalm bridge test: no `php` binary on PATH");
+        return;
+    }
+
+    let root = fixture_root();
+    let mut options = BridgeOptions::new(&root, Vec::new());
+    options.plugin_files = vec![root.join("plugin/ClassHooks.php")];
+    let bridge = PsalmBridgePlugin::spawn(&options).expect("bridge should spawn and initialize");
+    assert!(bridge.hooks().after_class_like_analysis);
+
+    let file = root.join("src/Widget.php");
+    let mut event = AfterClassLikeAnalysisEvent {
+        fqcn: "App\\Widget",
+        file: file.to_str().unwrap(),
+        span: php_ast::Span::new(0, 40),
+        issues: Vec::new(),
+        suppressed_issues: Vec::new(),
+        used_classes: Vec::new(),
+        used_methods: Vec::new(),
+    };
+    bridge.after_class_like_analysis(&mut event);
+
+    assert_eq!(event.suppressed_issues, vec!["MissingConstructor"]);
+    assert_eq!(event.used_classes, vec!["App\\Widget"]);
+    assert_eq!(
+        event.used_methods,
+        vec![("App\\Widget".to_string(), "helper".to_string())]
+    );
+    assert_eq!(event.issues.len(), 1, "issues: {:?}", event.issues);
+    assert_eq!(
+        event.issues[0].message,
+        "class App\\Widget populated=1 scanned=Widget.php"
+    );
+    assert_eq!(event.issues[0].span, Some(php_ast::Span::new(5, 10)));
 }

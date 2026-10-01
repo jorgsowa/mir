@@ -833,6 +833,7 @@ impl<'a> BodyAnalyzer<'a> {
 }
 
 mod aggregates;
+pub(crate) mod class_like_plugins;
 mod classes;
 mod functions;
 mod orchestration;

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Psalm plugin bridge runs `AfterClassLikeVisit`, `AfterClassLikeAnalysis` and `AfterCodebasePopulated` handlers over a codebase scanned by Psalm itself, so plugins like the PHPUnit one see real class storage. mir plugins get a matching `after_class_like_analysis` hook that can raise issues, suppress issue names inside a class and mark classes/methods as used; plugin API version is now 4.
+- Return-type providers also fire for static method calls.
 - Psalm plugin bridge loads file-based plugins (`<plugin filename="..."/>`), registering the first class the file declares as a hook class.
 - Psalm plugin bridge runs `AfterFunctionLikeAnalysisInterface` handlers. mir plugins get a matching `after_function_like_analysis` hook with params, declared types and parameter attributes; plugin API version is now 3.
 - Return-type providers receive the enclosing class (`calling_class`) and can raise issues at the call site (`issues`); the Psalm bridge forwards issues plugins raise through `IssueBuffer::maybeAdd`.
@@ -20,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A user stub that declares a class also present in the project or vendor no longer hides the real class's other members; stub members win and the rest are inherited from the real class, as in Psalm.
 - Psalm plugin bridge no longer degrades literal argument types to `mixed` for plugins calling `Type::parseString`, and no longer reuses a cached provider result across different calling classes.
 - Concurrent Psalm bridge spawns in one process no longer race on the host script's temporary file.
 - Partial-application placeholder arguments are no longer reported as `MixedArgument`.

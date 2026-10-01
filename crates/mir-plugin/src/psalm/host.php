@@ -22,6 +22,8 @@ declare(strict_types=1);
  */
 
 ini_set('display_errors', 'stderr');
+// Psalm's scanner holds every scanned class in memory.
+ini_set('memory_limit', '-1');
 
 final class MirShimGenerator
 {
@@ -164,6 +166,18 @@ final class MirPsalmHost
 
     public string $currentFile = '';
     public ?string $callingClass = null;
+    public ?object $currentAliases = null;
+    /** @var array<class-string, true> */
+    private array $classLikeHandlers = [];
+    /** @var list<class-string> */
+    private array $nativeHandlers = [];
+    /** @var array<string, true> */
+    private array $scannedFiles = [];
+    /** @var array<string, array> */
+    private array $parsedFiles = [];
+    private ?object $composerLoader = null;
+    private bool $codebaseChanged = false;
+    private int $currentSpanEnd = 0;
     private string $projectRoot = '';
     private ?\Psalm\Internal\Analyzer\ProjectAnalyzer $projectAnalyzer = null;
     /** @var array<string, string> */
@@ -195,6 +209,8 @@ final class MirPsalmHost
                 return $this->methodReturnType($params);
             case 'afterFunctionLike':
                 return $this->afterFunctionLike($params);
+            case 'afterClassLike':
+                return $this->afterClassLike($params);
             case 'shutdown':
                 return [];
             default:
@@ -208,7 +224,8 @@ final class MirPsalmHost
         $this->projectRoot = $root;
         $autoload = $params['autoload'] ?? ($root . '/vendor/autoload.php');
         if (is_file($autoload)) {
-            require $autoload;
+            $loader = require $autoload;
+            $this->composerLoader = is_object($loader) && method_exists($loader, 'findFile') ? $loader : null;
         }
 
         if (!interface_exists('Psalm\\Plugin\\PluginEntryPointInterface')) {
@@ -272,6 +289,7 @@ final class MirPsalmHost
             'functionIds' => array_keys($this->functionProviders),
             'methodClasses' => array_keys($this->methodProviders),
             'afterFunctionLike' => $this->afterFunctionLikeHandlers !== [],
+            'afterClassLike' => $this->classLikeHandlers !== [],
             'warnings' => $this->warnings,
         ];
     }
@@ -375,6 +393,16 @@ final class MirPsalmHost
                     $this->methodProviders[strtolower(ltrim((string)$fqcn, '\\'))] = $class;
                 }
                 $used = true;
+            } elseif (
+                str_ends_with($iface, 'EventHandler\\AfterClassLikeAnalysisInterface')
+                || str_ends_with($iface, 'EventHandler\\AfterClassLikeVisitInterface')
+                || str_ends_with($iface, 'EventHandler\\AfterCodebasePopulatedInterface')
+            ) {
+                if (!isset($this->classLikeHandlers[$class])) {
+                    $this->classLikeHandlers[$class] = true;
+                    $this->nativeHandlers[] = $class;
+                }
+                $used = true;
             } elseif (str_ends_with($iface, 'EventHandler\\AfterFunctionLikeAnalysisInterface')) {
                 $this->afterFunctionLikeHandlers[] = $class;
                 $used = true;
@@ -451,6 +479,7 @@ final class MirPsalmHost
             throw new RuntimeException("$eventClass does not exist in this Psalm version");
         }
         $this->currentFile = $this->absolutePath((string)($params['file'] ?? 'unknown.php'));
+        $this->currentSpanEnd = (int)($params['spanEnd'] ?? 0);
         $class = $params['callingClass'] ?? $params['class'] ?? null;
         $this->callingClass = $class !== null ? (string)$class : null;
         $snippet = isset($params['snippet']) ? (string)$params['snippet'] : null;
@@ -585,7 +614,7 @@ final class MirPsalmHost
                     'getrootfilepath' => 'return \\MirPsalmHost::$instance->currentFile;',
                     'getfilename' => 'return basename(\\MirPsalmHost::$instance->currentFile);',
                     'getrootfilename' => 'return basename(\\MirPsalmHost::$instance->currentFile);',
-                    'getaliases' => 'return new \\Psalm\\Aliases();',
+                    'getaliases' => 'return \\MirPsalmHost::$instance->currentAliases ?? new \\Psalm\\Aliases();',
                     'getsuppressedissues' => 'return [];',
                     'getsource' => 'return $this;',
                     'getfqcln' => 'return \\MirPsalmHost::$instance->callingClass;',
@@ -624,10 +653,45 @@ final class MirPsalmHost
                 . '<projectFiles><directory name="."/></projectFiles></psalm>'
             );
             $providers = new \Psalm\Internal\Provider\Providers(new \Psalm\Internal\Provider\FileProvider());
+            if ($this->composerLoader !== null && method_exists($config, 'setComposerClassLoader')) {
+                $config->setComposerClassLoader($this->composerLoader);
+            }
             $this->projectAnalyzer = new \Psalm\Internal\Analyzer\ProjectAnalyzer($config, $providers);
+            $this->bootCodebase($config, $this->projectAnalyzer->getCodebase());
         }
         $this->registerProjectFile($this->currentFile);
-        return $this->projectAnalyzer->getCodebase();
+        $codebase = $this->projectAnalyzer->getCodebase();
+        // Psalm reads the file to compute issue locations; give it something for paths with no file on disk.
+        if (!is_file($this->currentFile) && isset($codebase->file_provider)
+            && method_exists($codebase->file_provider, 'addTemporaryFileChanges')) {
+            $codebase->file_provider->addTemporaryFileChanges(
+                $this->currentFile,
+                str_repeat("\n", $this->currentSpanEnd + 1)
+            );
+        }
+        return $codebase;
+    }
+
+    /**
+     * Load Psalm's internal stubs so class-typed comparisons see PHP's own
+     * classes, track references plugins create, and route class-level events
+     * Psalm's scanner and populator dispatch to the registered handlers.
+     */
+    private function bootCodebase(object $config, \Psalm\Codebase $codebase): void
+    {
+        try {
+            $config->visitStubFiles($codebase);
+            $codebase->scanFiles();
+        } catch (Throwable $e) {
+            $this->warnings[] = "psalm stubs unavailable: {$e->getMessage()}";
+        }
+        $codebase->collect_references = true;
+        $codebase->classlikes->collect_references = true;
+        if (property_exists($config, 'eventDispatcher')) {
+            foreach ($this->nativeHandlers as $handler) {
+                $config->eventDispatcher->registerClass($handler);
+            }
+        }
     }
 
     /** Psalm only reports issues in files it knows as project files; the set is private. */
@@ -727,6 +791,7 @@ final class MirPsalmHost
             return ['issues' => []];
         }
         $this->currentFile = $this->absolutePath((string)($params['file'] ?? 'unknown.php'));
+        $this->currentSpanEnd = (int)($params['spanEnd'] ?? 0);
         $this->callingClass = isset($params['class']) ? (string)$params['class'] : null;
         $name = (string)($params['name'] ?? '');
         $spanStart = (int)($params['spanStart'] ?? 0);
@@ -767,6 +832,199 @@ final class MirPsalmHost
         return ['issues' => $this->takeIssues()];
     }
 
+    // -- AfterClassLikeAnalysis ----------------------------------------------------
+
+    private function afterClassLike(array $params): array
+    {
+        $empty = ['issues' => [], 'suppressedIssues' => [], 'usedClasses' => [], 'usedMethods' => []];
+        if ($this->classLikeHandlers === []) {
+            return $empty;
+        }
+        $fqcn = (string)($params['fqcn'] ?? '');
+        $this->currentFile = $this->absolutePath((string)($params['file'] ?? ''));
+        $this->currentSpanEnd = (int)($params['spanEnd'] ?? 0);
+        $codebase = $this->psalmCodebase();
+        if ($codebase === null || $fqcn === '') {
+            return $empty;
+        }
+        $file = $this->absolutePath((string)($params['file'] ?? ''));
+
+        try {
+            $this->scanFile($codebase, $file);
+            $storage = $codebase->classlike_storage_provider->get($fqcn);
+        } catch (Throwable $e) {
+            $this->warnOnce("cannot load $fqcn into the psalm codebase: {$e->getMessage()}");
+            \Psalm\IssueBuffer::clear();
+            return $empty;
+        }
+        $node = $this->classLikeNode($file, $fqcn);
+        if ($node === null) {
+            return $empty;
+        }
+        try {
+            $this->dispatchCodebasePopulated($codebase);
+        } catch (Throwable $e) {
+            $this->warnOnce("after-codebase-populated handler failed: {$e->getMessage()}");
+        }
+
+        $this->currentAliases = $storage->aliases;
+        $before = $this->referenceSnapshot($codebase);
+        \Psalm\IssueBuffer::clear();
+
+        $event = $this->buildEvent(
+            'Psalm\\Plugin\\EventHandler\\Event\\AfterClassLikeAnalysisEvent',
+            ['file' => $file, 'class' => $fqcn],
+            [
+                'stmt' => $node,
+                'classlike_storage' => $storage,
+                'codebase' => $codebase,
+                'file_replacements' => [],
+            ]
+        );
+        try {
+            $codebase->config->eventDispatcher->dispatchAfterClassLikeAnalysis($event);
+        } catch (Throwable $e) {
+            $this->warnOnce("class-like handler failed for $fqcn: {$e->getMessage()}");
+        }
+
+        $used = $this->referenceDiff($codebase, $before, $file);
+        return [
+            'issues' => $this->takeIssues(),
+            'suppressedIssues' => array_values(array_unique(array_map('strval', $storage->suppressed_issues))),
+            'usedClasses' => $used['classes'],
+            'usedMethods' => $used['methods'],
+        ];
+    }
+
+    private function scanFile(\Psalm\Codebase $codebase, string $file): void
+    {
+        if (isset($this->scannedFiles[$file])) {
+            return;
+        }
+        $this->scannedFiles[$file] = true;
+        $this->codebaseChanged = true;
+        $codebase->scanner->addFileToDeepScan($file);
+        $codebase->scanFiles();
+    }
+
+    /** Psalm's ProjectAnalyzer, not the populator, announces a populated codebase. */
+    private function dispatchCodebasePopulated(\Psalm\Codebase $codebase): void
+    {
+        if (!$this->codebaseChanged) {
+            return;
+        }
+        $this->codebaseChanged = false;
+        $eventClass = \Psalm\Plugin\EventHandler\Event\AfterCodebasePopulatedEvent::class;
+        if (class_exists($eventClass)) {
+            $codebase->config->eventDispatcher->dispatchAfterCodebasePopulated(new $eventClass($codebase));
+        }
+    }
+
+    /** @return array<int, \PhpParser\Node\Stmt> */
+    private function parsedFile(string $file): array
+    {
+        if (!isset($this->parsedFiles[$file])) {
+            $stmts = $this->parser()->parse($this->fileContents($file)) ?? [];
+            $traverser = new \PhpParser\NodeTraverser();
+            $traverser->addVisitor(new \PhpParser\NodeVisitor\NameResolver());
+            $this->parsedFiles[$file] = $traverser->traverse($stmts);
+        }
+        return $this->parsedFiles[$file];
+    }
+
+    private function classLikeNode(string $file, string $fqcn): ?\PhpParser\Node\Stmt\ClassLike
+    {
+        $wanted = strtolower($fqcn);
+        $found = (new \PhpParser\NodeFinder())->findFirst(
+            $this->parsedFile($file),
+            static fn($n) => $n instanceof \PhpParser\Node\Stmt\ClassLike
+                && isset($n->namespacedName)
+                && strtolower($n->namespacedName->toString()) === $wanted
+        );
+        return $found instanceof \PhpParser\Node\Stmt\ClassLike ? $found : null;
+    }
+
+    /** @return array{classes: array<string, array<string, bool>>, members: array<string, array<string, bool>>} */
+    private function referenceSnapshot(\Psalm\Codebase $codebase): array
+    {
+        $provider = $codebase->file_reference_provider;
+        return [
+            'classes' => $provider->getAllNonMethodReferencesToClasses(),
+            'members' => $provider->getAllMethodReferencesToClassMembers(),
+        ];
+    }
+
+    /** References a handler created since $before, with canonical class casing. */
+    private function referenceDiff(\Psalm\Codebase $codebase, array $before, string $file): array
+    {
+        $after = $this->referenceSnapshot($codebase);
+        $classes = [];
+        foreach ($after['classes'] as $lc => $files) {
+            if (isset($files[$file]) && !isset($before['classes'][$lc][$file])) {
+                $classes[] = $this->casedClass($codebase, (string)$lc);
+            }
+        }
+        $methods = [];
+        foreach ($after['members'] as $member => $callers) {
+            if (count($callers) > count($before['members'][$member] ?? [])) {
+                [$class, $method] = array_pad(explode('::', (string)$member, 2), 2, '');
+                if ($method !== '' && $this->declaresMethod($codebase, $class, $method)) {
+                    $methods[] = $this->casedClass($codebase, $class) . '::' . $method;
+                }
+            }
+        }
+        return ['classes' => array_values(array_unique($classes)), 'methods' => array_values(array_unique($methods))];
+    }
+
+    /** Psalm also records references against every ancestor; keep only the declaring class. */
+    private function declaresMethod(\Psalm\Codebase $codebase, string $class, string $method): bool
+    {
+        try {
+            return isset($codebase->classlike_storage_provider->get($class)->methods[$method]);
+        } catch (Throwable $e) {
+            return false;
+        }
+    }
+
+    private function casedClass(\Psalm\Codebase $codebase, string $lowercase): string
+    {
+        try {
+            return $codebase->classlike_storage_provider->get($lowercase)->name;
+        } catch (Throwable $e) {
+            return $lowercase;
+        }
+    }
+
+    /** Scan classes a type mentions so Psalm's comparator can look them up. */
+    private function ensureTypeClasses(?\Psalm\Type\Union $type): void
+    {
+        $codebase = $type === null ? null : $this->psalmCodebase();
+        if ($codebase === null || !method_exists($codebase, 'queueClassLikeForScanning')) {
+            return;
+        }
+        $queued = false;
+        $walk = static function ($node) use (&$walk, $codebase, &$queued): void {
+            if ($node instanceof \Psalm\Type\Atomic\TNamedObject) {
+                $codebase->queueClassLikeForScanning($node->value);
+                $queued = true;
+            }
+            if (method_exists($node, 'getChildNodes')) {
+                foreach ($node->getChildNodes() as $child) {
+                    $walk($child);
+                }
+            }
+        };
+        $walk($type);
+        if ($queued) {
+            $this->codebaseChanged = true;
+            try {
+                $codebase->scanFiles();
+            } catch (Throwable $e) {
+                $this->warnOnce("cannot scan classes of a type: {$e->getMessage()}");
+            }
+        }
+    }
+
     private function buildParamStorage(array $p): \Psalm\Storage\FunctionLikeParameter
     {
         $type = null;
@@ -777,6 +1035,7 @@ final class MirPsalmHost
                 $type = null;
             }
         }
+        $this->ensureTypeClasses($type);
         $param = new \Psalm\Storage\FunctionLikeParameter((string)$p['name'], false, $type, $type);
         foreach ((array)($p['attributes'] ?? []) as $a) {
             $attrLocation = $this->rawLocation((int)$a['spanStart'], (int)$a['spanEnd']);
@@ -787,6 +1046,7 @@ final class MirPsalmHost
                 } catch (Throwable $e) {
                     $argType = \Psalm\Type::getMixed();
                 }
+                $this->ensureTypeClasses($argType);
                 $args[] = new \Psalm\Storage\AttributeArg($arg['name'] ?? null, $argType, $attrLocation);
             }
             $param->attributes[] = new \Psalm\Storage\AttributeStorage(

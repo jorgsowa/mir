@@ -76,3 +76,47 @@ fn stub_directory_function_resolves_without_undefined_function_error() {
         "framework_fn should be defined via stub directory; got: {undefined:?}"
     );
 }
+
+#[test]
+fn partial_stub_class_keeps_members_of_the_real_class() {
+    let root = create_temp_dir("merge");
+    fs::create_dir_all(root.path().join("src")).unwrap();
+    fs::write(
+        root.path().join("composer.json"),
+        r#"{"autoload":{"psr-4":{"App\\":"src/"}}}"#,
+    )
+    .unwrap();
+    fs::write(
+        root.path().join("src/Base.php"),
+        "<?php\nnamespace App;\nclass Base {\n    public function real(): int { return 1; }\n    public function stubbed(): string { return ''; }\n}\n",
+    )
+    .unwrap();
+    let stub = write(
+        &root,
+        "stubs/Base.php",
+        "<?php\nnamespace App;\nclass Base {\n    /** @return non-empty-string */\n    public function stubbed(): string {}\n}\n",
+    );
+    let consumer = write(
+        &root,
+        "main.php",
+        "<?php\nfunction go(\\App\\Base $b): void {\n    $b->real();\n    $b->stubbed();\n}\n",
+    );
+
+    let psr4 = std::sync::Arc::new(
+        mir_analyzer::composer::Psr4Map::from_composer(root.path()).expect("psr4 map"),
+    );
+    let mut analyzer = AnalysisSession::new(PhpVersion::LATEST)
+        .with_psr4(psr4)
+        .with_user_stubs(vec![stub], Vec::new());
+    let result = analyzer.analyze_paths(&[consumer], &BatchOptions::new().without_symbols());
+
+    let undefined: Vec<_> = result
+        .issues
+        .iter()
+        .filter(|i| i.kind.name() == "UndefinedMethod")
+        .collect();
+    assert!(
+        undefined.is_empty(),
+        "real() lives only on the real class; got: {undefined:?}"
+    );
+}

@@ -3,15 +3,17 @@
 //! so all tests in this binary share it; keep plugin behavior keyed to
 //! distinctive names so tests can't interfere).
 
+use std::fs;
 use std::sync::Once;
 
 use mir_analyzer::{analyze_source_with_options, BatchOptions};
 use mir_issues::{Issue, IssueKind, Severity};
 use mir_plugin::php_ast::owned::{ExprKind, StmtKind};
 use mir_plugin::{
-    AfterExpressionAnalysisEvent, AfterFunctionCallAnalysisEvent, AfterFunctionLikeAnalysisEvent,
-    AfterStatementAnalysisEvent, ClassPropertyProviderEvent, FunctionReturnTypeProviderEvent,
-    HookFlags, MethodReturnTypeProviderEvent, MirPlugin, PluginIssue, PluginRegistry, ProvidedType,
+    AfterClassLikeAnalysisEvent, AfterExpressionAnalysisEvent, AfterFunctionCallAnalysisEvent,
+    AfterFunctionLikeAnalysisEvent, AfterStatementAnalysisEvent, ClassPropertyProviderEvent,
+    FunctionReturnTypeProviderEvent, HookFlags, MethodReturnTypeProviderEvent, MirPlugin,
+    PluginIssue, PluginRegistry, ProvidedType,
 };
 
 struct TestPlugin;
@@ -27,6 +29,7 @@ impl MirPlugin for TestPlugin {
             after_statement_analysis: true,
             after_function_call_analysis: true,
             after_function_like_analysis: true,
+            after_class_like_analysis: true,
             before_add_issue: true,
             ..Default::default()
         }
@@ -58,7 +61,7 @@ impl MirPlugin for TestPlugin {
                 "get() called from PluginCaller",
             ));
         }
-        (event.method_name == "get").then(|| ProvidedType::Parse("int".to_string()))
+        matches!(event.method_name, "get" | "make").then(|| ProvidedType::Parse("int".to_string()))
     }
 
     fn class_property_classes(&self) -> Vec<String> {
@@ -105,6 +108,18 @@ impl MirPlugin for TestPlugin {
                 .issues
                 .push(PluginIssue::new("DangerousCall", "dangerous() is banned"));
         }
+    }
+
+    fn after_class_like_analysis(&self, event: &mut AfterClassLikeAnalysisEvent<'_>) {
+        if !event.fqcn.starts_with("PluginFlagged") {
+            return;
+        }
+        event.issues.push(PluginIssue::new(
+            "ClassLikeSeen",
+            format!("seen {}", event.fqcn),
+        ));
+        event.suppressed_issues.push("MissingConstructor".into());
+        event.used_classes.push("PluginFlaggedHelper".into());
     }
 
     fn after_function_like_analysis(&self, event: &mut AfterFunctionLikeAnalysisEvent<'_>) {
@@ -391,4 +406,73 @@ function plugin_outside(PluginContainer $c): void { $c->get(); }
         .collect();
     assert_eq!(hits.len(), 1, "{:?}", plugin_issue_names(&issues));
     assert_eq!(hits[0].location.line, 6);
+}
+
+#[test]
+fn static_method_provider_overrides_return_type() {
+    setup();
+    let issues = unsuppressed(
+        r#"<?php
+class PluginContainer {
+    public static function make(): object { return new stdClass(); }
+}
+function s(): void {
+    $x = PluginContainer::make();
+    /** @mir-check $x is int */
+    print $x;
+}
+"#,
+    );
+    let mismatches: Vec<_> = issues
+        .iter()
+        .filter(|i| matches!(i.kind, IssueKind::TypeCheckMismatch { .. }))
+        .collect();
+    assert!(
+        mismatches.is_empty(),
+        "static provider should have replaced object -> int: {mismatches:?}"
+    );
+}
+
+#[test]
+fn after_class_like_hook_reports_suppresses_and_marks_used() {
+    use mir_analyzer::{AnalysisSession, BatchOptions, PhpVersion};
+    setup();
+
+    let dir = crate::common::create_temp_dir("class-like-hook");
+    let path = dir.path().join("flagged.php");
+    fs::write(
+        &path,
+        r#"<?php
+class PluginFlaggedA { public int $count; }
+class PluginOther { public int $count; }
+"#,
+    )
+    .unwrap();
+
+    let mut session = AnalysisSession::new(PhpVersion::LATEST);
+    let result = session.analyze_paths(&[path], &BatchOptions::new().without_symbols());
+
+    let seen: Vec<_> = result
+        .issues
+        .iter()
+        .filter(|i| i.kind.display_name() == "ClassLikeSeen")
+        .collect();
+    assert_eq!(seen.len(), 1, "{:?}", result.issues);
+    assert_eq!(seen[0].location.line, 2);
+
+    let missing_ctor = |class: &str| {
+        result
+            .issues
+            .iter()
+            .filter(|i| matches!(&i.kind, IssueKind::MissingConstructor { class: c } if c == class))
+            .collect::<Vec<_>>()
+    };
+    assert!(
+        missing_ctor("PluginFlaggedA").iter().all(|i| i.suppressed),
+        "plugin-suppressed MissingConstructor must be marked suppressed"
+    );
+    assert!(
+        missing_ctor("PluginOther").iter().all(|i| !i.suppressed),
+        "classes the plugin ignored keep their issues"
+    );
 }

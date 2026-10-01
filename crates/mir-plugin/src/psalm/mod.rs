@@ -20,12 +20,18 @@
 //! - `AfterFunctionLikeAnalysisInterface` — fired per named function and
 //!   method with real Psalm storage objects built from mir's declarations
 //!   (params, declared types, parameter attributes).
+//! - `AfterClassLikeVisitInterface`, `AfterClassLikeAnalysisInterface` and
+//!   `AfterCodebasePopulatedInterface` — fired during batch runs, once per
+//!   class-like in an analyzed file. The host scans that file (and the
+//!   classes it depends on, resolved through the project's composer
+//!   autoloader) with Psalm's own scanner, so handlers see real
+//!   `ClassLikeStorage`. Issues, `suppressed_issues` additions and recorded
+//!   class/method references flow back to mir.
 //!
-//! The host boots a real Psalm `Codebase` over an empty project, so plugins
-//! can use `UnionTypeComparator`, `CodeLocation` and `IssueBuffer`; issues
-//! raised through `IssueBuffer` surface as mir plugin issues. Class-typed
-//! comparisons only succeed on identical names because that codebase has no
-//! class storage.
+//! The host boots a real Psalm `Codebase` with Psalm's internal stubs, so
+//! plugins can use `UnionTypeComparator`, `CodeLocation` and `IssueBuffer`;
+//! issues raised through `IssueBuffer` surface as mir plugin issues. Classes
+//! named in types the host builds are scanned on demand.
 //!
 //! Other hook registrations (`AfterExpressionAnalysis`, taint hooks, …) are
 //! reported in [`PsalmBridgePlugin::warnings`] and skipped — they would need
@@ -34,14 +40,14 @@
 use std::io::{BufRead, BufReader, Write as _};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 
 use parking_lot::Mutex;
 use rustc_hash::FxHashMap;
 
 use crate::{
-    AfterFunctionLikeAnalysisEvent, FunctionReturnTypeProviderEvent, HookFlags,
-    MethodReturnTypeProviderEvent, MirPlugin, PluginIssue, ProvidedType, Severity,
+    AfterClassLikeAnalysisEvent, AfterFunctionLikeAnalysisEvent, FunctionReturnTypeProviderEvent,
+    HookFlags, MethodReturnTypeProviderEvent, MirPlugin, PluginIssue, ProvidedType, Severity,
 };
 
 /// The PHP host program, embedded so the mir binary is self-contained. It is
@@ -105,6 +111,66 @@ impl BridgeOptions {
     }
 }
 
+/// Spawn one PHP host and run its `init`, loading every configured plugin.
+fn start_host(
+    options: &BridgeOptions,
+    script: &Path,
+) -> Result<(Rpc, serde_json::Value), BridgeError> {
+    let mut child = Command::new(&options.php_binary)
+        .arg("-d")
+        .arg("display_errors=stderr")
+        .arg(script)
+        .current_dir(&options.project_root)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .map_err(|source| BridgeError::Spawn {
+            php: options.php_binary.clone(),
+            source,
+        })?;
+
+    let stdin = child.stdin.take().expect("piped stdin");
+    let stdout = BufReader::new(child.stdout.take().expect("piped stdout"));
+    let mut rpc = Rpc {
+        child,
+        stdin,
+        stdout,
+        next_id: 0,
+    };
+
+    let plugins: Vec<serde_json::Value> = options
+        .plugins
+        .iter()
+        .map(|p| serde_json::json!({ "class": p.class, "configXml": p.config_xml }))
+        .collect();
+    let init = rpc.call(
+        "init",
+        serde_json::json!({
+            "projectRoot": options.project_root.to_string_lossy(),
+            "plugins": plugins,
+            "pluginFiles": options.plugin_files,
+            "psalmAutoload": options.psalm_autoload,
+        }),
+    )?;
+    Ok((rpc, init))
+}
+
+/// How many hosts share class-like scanning: `MIR_PSALM_HOSTS`, else up to 4
+/// bounded by the CPU count. Each holds its own Psalm codebase in memory.
+fn class_host_count() -> usize {
+    std::env::var("MIR_PSALM_HOSTS")
+        .ok()
+        .and_then(|v| v.parse::<usize>().ok())
+        .filter(|n| *n >= 1)
+        .unwrap_or_else(|| {
+            std::thread::available_parallelism()
+                .map(|n| n.get())
+                .unwrap_or(1)
+                .min(4)
+        })
+}
+
 struct Rpc {
     child: Child,
     stdin: ChildStdin,
@@ -166,6 +232,12 @@ impl Drop for Rpc {
 /// plugin.
 pub struct PsalmBridgePlugin {
     rpc: Mutex<Rpc>,
+    /// Additional hosts, spawned on first use, that share the class-like
+    /// scanning load: each scans files with its own Psalm codebase.
+    extra_hosts: Vec<Mutex<Option<Rpc>>>,
+    next_host: AtomicUsize,
+    options: BridgeOptions,
+    script: PathBuf,
     /// Set after an unrecoverable RPC failure; all further queries return
     /// `None` so analysis degrades to normal inference instead of erroring
     /// on every call site.
@@ -174,6 +246,7 @@ pub struct PsalmBridgePlugin {
     function_ids: Vec<String>,
     method_classes: Vec<String>,
     after_function_like: bool,
+    after_class_like: bool,
     /// Unsupported-hook and host-side setup warnings, for the CLI to print.
     pub warnings: Vec<String>,
     /// provider-result cache: call-signature key → docblock type string.
@@ -185,44 +258,7 @@ impl PsalmBridgePlugin {
     /// they registered.
     pub fn spawn(options: &BridgeOptions) -> Result<Self, BridgeError> {
         let script = materialize_host_script(options.host_script_dir.as_deref())?;
-
-        let mut child = Command::new(&options.php_binary)
-            .arg("-d")
-            .arg("display_errors=stderr")
-            .arg(&script)
-            .current_dir(&options.project_root)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
-            .spawn()
-            .map_err(|source| BridgeError::Spawn {
-                php: options.php_binary.clone(),
-                source,
-            })?;
-
-        let stdin = child.stdin.take().expect("piped stdin");
-        let stdout = BufReader::new(child.stdout.take().expect("piped stdout"));
-        let mut rpc = Rpc {
-            child,
-            stdin,
-            stdout,
-            next_id: 0,
-        };
-
-        let plugins: Vec<serde_json::Value> = options
-            .plugins
-            .iter()
-            .map(|p| serde_json::json!({ "class": p.class, "configXml": p.config_xml }))
-            .collect();
-        let init = rpc.call(
-            "init",
-            serde_json::json!({
-                "projectRoot": options.project_root.to_string_lossy(),
-                "plugins": plugins,
-                "pluginFiles": options.plugin_files,
-                "psalmAutoload": options.psalm_autoload,
-            }),
-        )?;
+        let (rpc, init) = start_host(options, &script)?;
 
         let str_list = |key: &str| -> Vec<String> {
             init.get(key)
@@ -235,14 +271,23 @@ impl PsalmBridgePlugin {
                 .unwrap_or_default()
         };
 
+        let extra_hosts = (1..class_host_count()).map(|_| Mutex::new(None)).collect();
         Ok(Self {
             rpc: Mutex::new(rpc),
+            extra_hosts,
+            next_host: AtomicUsize::new(0),
+            options: options.clone(),
+            script,
             dead: AtomicBool::new(false),
             stubs: str_list("stubs").into_iter().map(PathBuf::from).collect(),
             function_ids: str_list("functionIds"),
             method_classes: str_list("methodClasses"),
             after_function_like: init
                 .get("afterFunctionLike")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
+            after_class_like: init
+                .get("afterClassLike")
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false),
             warnings: str_list("warnings"),
@@ -256,6 +301,7 @@ impl PsalmBridgePlugin {
             && self.function_ids.is_empty()
             && self.method_classes.is_empty()
             && !self.after_function_like
+            && !self.after_class_like
     }
 
     /// Run `method` on the host. Returns the provided type string plus any
@@ -286,6 +332,66 @@ impl PsalmBridgePlugin {
             self.cache.lock().insert(cache_key, type_string.clone());
         }
         (type_string.map(ProvidedType::Parse), issues)
+    }
+
+    /// Run a class-like call on whichever host is idle, spawning extra hosts
+    /// on demand; waits on a rotating host when all are busy.
+    fn call_class_host(
+        &self,
+        method: &str,
+        params: serde_json::Value,
+    ) -> Option<serde_json::Value> {
+        if self.dead.load(Ordering::Relaxed) {
+            return None;
+        }
+        if let Some(mut primary) = self.rpc.try_lock() {
+            return self.finish_host_call(primary.call(method, params));
+        }
+        for slot in &self.extra_hosts {
+            if let Some(guard) = slot.try_lock() {
+                return self.call_extra_host(guard, method, params);
+            }
+        }
+        let n = self.extra_hosts.len() + 1;
+        let i = self.next_host.fetch_add(1, Ordering::Relaxed) % n;
+        if i == 0 {
+            let result = self.rpc.lock().call(method, params);
+            self.finish_host_call(result)
+        } else {
+            let guard = self.extra_hosts[i - 1].lock();
+            self.call_extra_host(guard, method, params)
+        }
+    }
+
+    fn call_extra_host(
+        &self,
+        mut guard: parking_lot::MutexGuard<'_, Option<Rpc>>,
+        method: &str,
+        params: serde_json::Value,
+    ) -> Option<serde_json::Value> {
+        if guard.is_none() {
+            match start_host(&self.options, &self.script) {
+                Ok((rpc, _)) => *guard = Some(rpc),
+                Err(e) => return self.finish_host_call(Err(e)),
+            }
+        }
+        let rpc = guard.as_mut().expect("host started above");
+        self.finish_host_call(rpc.call(method, params))
+    }
+
+    fn finish_host_call(
+        &self,
+        result: Result<serde_json::Value, BridgeError>,
+    ) -> Option<serde_json::Value> {
+        match result {
+            Ok(value) => Some(value),
+            Err(e) => {
+                if !self.dead.swap(true, Ordering::Relaxed) {
+                    eprintln!("mir: psalm plugin bridge disabled after error: {e}");
+                }
+                None
+            }
+        }
     }
 
     /// RPC call that disables the bridge on failure so analysis degrades to
@@ -352,6 +458,7 @@ impl MirPlugin for PsalmBridgePlugin {
     fn hooks(&self) -> HookFlags {
         HookFlags {
             after_function_like_analysis: self.after_function_like,
+            after_class_like_analysis: self.after_class_like,
             ..HookFlags::default()
         }
     }
@@ -413,6 +520,39 @@ impl MirPlugin for PsalmBridgePlugin {
         );
         event.issues.borrow_mut().extend(issues);
         provided
+    }
+
+    fn after_class_like_analysis(&self, event: &mut AfterClassLikeAnalysisEvent<'_>) {
+        let result = self.call_class_host(
+            "afterClassLike",
+            serde_json::json!({
+                "fqcn": event.fqcn,
+                "file": event.file,
+                "spanStart": event.span.start,
+                "spanEnd": event.span.end,
+            }),
+        );
+        let Some(result) = result else { return };
+        event.issues.extend(parse_issues(&result));
+        let strings = |key: &str| -> Vec<String> {
+            result
+                .get(key)
+                .and_then(|v| v.as_array())
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|v| v.as_str().map(str::to_string))
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+        event.suppressed_issues.extend(strings("suppressedIssues"));
+        event.used_classes.extend(strings("usedClasses"));
+        event
+            .used_methods
+            .extend(strings("usedMethods").into_iter().filter_map(|id| {
+                id.split_once("::")
+                    .map(|(c, m)| (c.to_string(), m.to_string()))
+            }));
     }
 
     fn after_function_like_analysis(&self, event: &mut AfterFunctionLikeAnalysisEvent<'_>) {

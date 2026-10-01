@@ -413,6 +413,47 @@ impl AnalysisSession {
 
         let _t_body_analysis = _t0.elapsed();
 
+        // Class-like plugin hooks (Psalm's AfterClassLikeAnalysis) run over
+        // every analyzed file each batch, so their issues, suppressions and
+        // reference marks never depend on body-analysis cache hits.
+        let mut body_results = body_results;
+        let mut class_like_suppressions: Vec<
+            crate::body_analysis::class_like_plugins::ClassSuppression,
+        > = Vec::new();
+        if mir_plugin::snapshot().is_some_and(|p| p.hooks().after_class_like_analysis) {
+            let outputs: Vec<(
+                Arc<str>,
+                crate::body_analysis::class_like_plugins::ClassLikePluginOutput,
+            )> = parsed_files
+                .par_iter()
+                .filter(|p| !files_with_parse_errors.contains(&p.file))
+                .map_with(self.db.snapshot_db(), |db, parsed| {
+                    let driver = BodyAnalyzer::new(&*db as &dyn MirDatabase, php_version);
+                    let output = driver.run_after_class_like_plugins(
+                        parsed.owned(),
+                        &parsed.file,
+                        parsed.source(),
+                        parsed.source_map(),
+                    );
+                    (parsed.file.clone(), output)
+                })
+                .collect();
+            let index_of: HashMap<Arc<str>, usize> = body_results
+                .iter()
+                .enumerate()
+                .map(|(i, r)| (r.0.clone(), i))
+                .collect();
+            for (file, output) in outputs {
+                class_like_suppressions.extend(output.suppressions);
+                if let Some(&i) = index_of.get(&file) {
+                    body_results[i].1.extend(output.issues);
+                    body_results[i].3.extend(output.ref_locs);
+                } else {
+                    all_issues.extend(output.issues);
+                }
+            }
+        }
+
         if self.cache.is_none() {
             let replay_files: HashMap<Arc<str>, crate::session::BatchReplayFile> = body_results
                 .iter()
@@ -529,6 +570,11 @@ impl AnalysisSession {
         }
 
         opts.apply(&mut all_issues);
+        for issue in all_issues.iter_mut() {
+            if !issue.suppressed && class_like_suppressions.iter().any(|s| s.applies_to(issue)) {
+                issue.suppressed = true;
+            }
+        }
         let analyzed_files_vec: Vec<Arc<str>> = analyzed_file_set.iter().cloned().collect();
         self.apply_suppressions_and_emit_unused(&mut all_issues, &analyzed_files_vec);
         if let Some(dump) = crate::metrics::dump() {

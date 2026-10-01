@@ -54,29 +54,9 @@ impl<'a> BodyAnalyzer<'a> {
             return;
         }
         for pi in issues {
-            let span = pi.span.unwrap_or(site.span);
-            let (line, col_start) =
-                crate::diagnostics::offset_to_line_col(source, span.start, source_map);
-            let (line_end, col_end) =
-                crate::diagnostics::offset_to_line_col(source, span.end, source_map);
-            let mut issue = Issue::new(
-                mir_issues::IssueKind::PluginIssue {
-                    name: pi.name,
-                    message: pi.message,
-                },
-                mir_issues::Location {
-                    file: file.clone(),
-                    line,
-                    line_end,
-                    col_start,
-                    col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
-                },
-            );
-            issue.severity = pi.severity;
-            if let Some(text) = crate::parser::span_text(source, span) {
-                issue.snippet = Some(text);
-            }
-            all_issues.push(issue);
+            all_issues.push(plugin_issue_to_issue(
+                pi, site.span, file, source, source_map,
+            ));
         }
     }
 
@@ -167,4 +147,36 @@ impl<'a> BodyAnalyzer<'a> {
             _ => None,
         }
     }
+}
+
+/// Convert a plugin-raised issue into a diagnostic at its span (or
+/// `default_span` when the plugin gave none).
+pub(super) fn plugin_issue_to_issue(
+    pi: mir_plugin::PluginIssue,
+    default_span: php_ast::Span,
+    file: &Arc<str>,
+    source: &str,
+    source_map: &php_rs_parser::source_map::SourceMap,
+) -> Issue {
+    let span = pi.span.unwrap_or(default_span);
+    let (line, col_start) = crate::diagnostics::offset_to_line_col(source, span.start, source_map);
+    let (line_end, col_end) = crate::diagnostics::offset_to_line_col(source, span.end, source_map);
+    let mut issue = Issue::new(
+        mir_issues::IssueKind::PluginIssue {
+            name: pi.name,
+            message: pi.message,
+        },
+        mir_issues::Location {
+            file: file.clone(),
+            line,
+            line_end,
+            col_start,
+            col_end: crate::diagnostics::clamp_col_end(line, line_end, col_start, col_end),
+        },
+    );
+    issue.severity = pi.severity;
+    if let Some(text) = crate::parser::span_text(source, span) {
+        issue.snippet = Some(text);
+    }
+    issue
 }

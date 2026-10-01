@@ -1241,6 +1241,17 @@ impl CallAnalyzer {
                     ctx.set_var("this", self_out_ty);
                 }
             }
+            let mut ret = ret;
+            ea.apply_method_call_plugins(
+                fqcn_arc.as_ref(),
+                owner_fqcn.as_ref(),
+                method_name,
+                &call.args,
+                &arg_types,
+                span,
+                ctx.self_fqcn.as_deref(),
+                &mut ret,
+            );
             ea.record_symbol(
                 call.method.span,
                 ReferenceKind::StaticCall {

@@ -34,7 +34,7 @@ pub mod psalm;
 
 /// Bumped whenever the [`MirPlugin`] trait or event types change incompatibly.
 /// Dylib plugins built against a different version are refused at load time.
-pub const MIR_PLUGIN_API_VERSION: u32 = 3;
+pub const MIR_PLUGIN_API_VERSION: u32 = 4;
 
 // ---------------------------------------------------------------------------
 // Issues emitted by plugins
@@ -210,6 +210,25 @@ pub struct AfterFunctionLikeAnalysisEvent<'a> {
     pub issues: Vec<PluginIssue>,
 }
 
+/// Counterpart of Psalm's `AfterClassLikeAnalysisEvent`, fired once per class,
+/// interface, trait and enum declared in an analyzed file during batch runs.
+pub struct AfterClassLikeAnalysisEvent<'a> {
+    /// Declared FQCN (no leading `\`).
+    pub fqcn: &'a str,
+    pub file: &'a str,
+    /// Span of the whole declaration.
+    pub span: php_ast::Span,
+    pub issues: Vec<PluginIssue>,
+    /// Issue names to suppress inside this declaration (Psalm's
+    /// `ClassLikeStorage::suppressed_issues`).
+    pub suppressed_issues: Vec<String>,
+    /// Classes the plugin marked as referenced, so dead-code detection
+    /// treats them as used.
+    pub used_classes: Vec<String>,
+    /// `(class, method)` pairs the plugin marked as referenced.
+    pub used_methods: Vec<(String, String)>,
+}
+
 /// Counterpart of Psalm's `AfterCodebasePopulatedEvent`. Fired once per batch
 /// run after definition collection, before body analysis.
 pub struct AfterCodebasePopulatedEvent<'a> {
@@ -260,6 +279,7 @@ pub struct HookFlags {
     pub after_function_call_analysis: bool,
     pub after_method_call_analysis: bool,
     pub after_function_like_analysis: bool,
+    pub after_class_like_analysis: bool,
     pub before_add_issue: bool,
     pub after_codebase_populated: bool,
 }
@@ -340,6 +360,8 @@ pub trait MirPlugin: Send + Sync {
 
     fn after_function_like_analysis(&self, _event: &mut AfterFunctionLikeAnalysisEvent<'_>) {}
 
+    fn after_class_like_analysis(&self, _event: &mut AfterClassLikeAnalysisEvent<'_>) {}
+
     /// Veto or pass an issue before it is reported (Psalm's
     /// `BeforeAddIssueInterface`). `Some(false)` drops the issue, `Some(true)`
     /// forces it through, `None` defers to other plugins.
@@ -378,6 +400,7 @@ pub struct PluginRegistry {
     after_fn_call: Vec<usize>,
     after_method_call: Vec<usize>,
     after_function_like: Vec<usize>,
+    after_class_like: Vec<usize>,
     before_issue: Vec<usize>,
     after_codebase: Vec<usize>,
 }
@@ -403,6 +426,7 @@ impl PluginRegistry {
         subscribe!(after_function_call_analysis, after_fn_call);
         subscribe!(after_method_call_analysis, after_method_call);
         subscribe!(after_function_like_analysis, after_function_like);
+        subscribe!(after_class_like_analysis, after_class_like);
         subscribe!(before_add_issue, before_issue);
         subscribe!(after_codebase_populated, after_codebase);
 
@@ -542,6 +566,12 @@ impl PluginRegistry {
     pub fn after_function_like_analysis(&self, event: &mut AfterFunctionLikeAnalysisEvent<'_>) {
         for &i in &self.after_function_like {
             self.plugins[i].after_function_like_analysis(event);
+        }
+    }
+
+    pub fn after_class_like_analysis(&self, event: &mut AfterClassLikeAnalysisEvent<'_>) {
+        for &i in &self.after_class_like {
+            self.plugins[i].after_class_like_analysis(event);
         }
     }
 
