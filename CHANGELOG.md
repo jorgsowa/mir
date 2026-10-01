@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Partial-application placeholder arguments are no longer reported as `MixedArgument`.
+- A child class may redeclare a property with a covariant type over a parent's get-only hooked property; writable parents and unrelated types are still reported.
+- Removed stale phpunit entries from the real-world harness baseline.
 
 ## [0.82.0] - 2026-10-01
 

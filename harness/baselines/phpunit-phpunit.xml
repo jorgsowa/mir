@@ -67,15 +67,6 @@
       <code><![CDATA[$this->constraint->asString()]]></code>
     </ImpureMethodCall>
   </file>
-  <file src="src/Runner/BackedUpEnvironmentVariable.php">
-    <ImpossibleIdenticalComparison>
-      <code><![CDATA[$this->from === self::FROM_GETENV]]></code>
-    </ImpossibleIdenticalComparison>
-    <InvalidArgument>
-      <code><![CDATA[self::FROM_SUPERGLOBAL]]></code>
-      <code><![CDATA[self::FROM_GETENV]]></code>
-    </InvalidArgument>
-  </file>
   <file src="src/Runner/CodeCoverage.php">
     <UnusedVariable>
       <code><![CDATA[]]></code>
